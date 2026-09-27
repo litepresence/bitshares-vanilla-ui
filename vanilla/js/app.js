@@ -79,6 +79,37 @@ var App = (function () {
       : state;
   }
 
+  /* paintFooter: persistent status bar (dexux-ref footer cue: version left,
+   *   latency/block right). Params: status ({state, node, latencyMs,
+   *   headBlock}). Returns nothing. Fails: never — missing footer is a
+   *   no-op. No sockets: reads the connection status only (head block is the
+   *   connect-time value Chain stashes; it refreshes on reconnect). */
+  function paintFooter(status) {
+    var foot = document.getElementById("appfoot-status");
+    if (!foot) return;
+    var s = status || {};
+    if (s.state === "open") {
+      var host = shortHost(s.node);
+      var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
+      var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
+      foot.textContent = (host ? host + " · " : "") + "LATENCY " + lat + blk;
+    } else {
+      foot.textContent = (s.state && s.state !== "unknown") ? String(s.state) : "connecting…";
+    }
+  }
+
+  /* shortHost: wss:// URL -> bare host (footer node label; the ref shows
+   *   geographic names we don't have, so the host is the honest label).
+   *   Params: url string. Returns host or "". Fails: never throws. */
+  function shortHost(url) {
+    try {
+      var m = /^wss?:\/\/([^/]+)/.exec(String(url || ""));
+      return m ? m[1] : "";
+    } catch (e) {
+      return "";
+    }
+  }
+
   /* connect: opens the chain socket (failures via connection events).
    *   Params: node (wss:// URL string). Returns nothing. Fails: never throws —
    *   Chain.connect rejections are swallowed; the badge carries the error. */
@@ -122,6 +153,8 @@ var App = (function () {
 
   function finishBoot(settings) {
     Store.subscribe("connection", paintBadge);
+    Store.subscribe("connection", paintFooter);
+    try { paintFooter(typeof Chain !== "undefined" && Chain ? Chain.status() : null); } catch (e) { /* badge carries errors */ }
     Store.subscribe("settings", onSettings);
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");

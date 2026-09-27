@@ -93,7 +93,18 @@ var PoolUI = (function () {
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
+    touchable(input);
+    var suffix = null;
+    if (opts.unit) {
+      var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
+      wrap.appendChild(input);
+      suffix = el(doc, "span", opts.unit, "unit-suffix");
+      wrap.appendChild(suffix);
+      label.appendChild(wrap);
+    } else {
+      label.appendChild(input);
+    }
+    row.appendChild(label); return { row: row, input: input, suffix: suffix };
   }
   function tableHead(doc, titles) {
     var hr = doc.createElement("tr");
@@ -167,39 +178,86 @@ var PoolUI = (function () {
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
     return btn;
   }
-  function pairLabel(r) { return r.sym_a + "/" + r.sym_b; }
-  function poolTable(doc, rows) { /* pool id / pair / balances human / share / taker % / open link */
+  /* assetLink: symbol -> #/asset/:symbol anchor (existing route; join misses
+   * link by bare id, which the asset view also resolves). textContent only. */
+  function assetLink(doc, sym) {
+    var a = el(doc, "a", sym);
+    a.setAttribute("href", "#/asset/" + sym);
+    return a;
+  }
+  function poolTable(doc, rows) { /* dexux-ref density: POOL ID / SHARE / A /
+    *   A QTY / B / B QTY / TAKER / WITHDRAWAL / EXCHANGE (swap) / STAKE.
+    *   EXCHANGE + STAKE both open the detail desk (#/pools/:id), which owns
+    *   the inline swap and stake panels — the list stays a list. */
     if (!rows.length) return el(doc, "p", "No pools found.", "muted");
-    var table = doc.createElement("table"); table.className = "node-table";
-    table.appendChild(tableHead(doc, ["Pool", "Pair", "Balance A", "Balance B", "Share", "Taker fee", ""]));
+    var table = doc.createElement("table"); table.className = "node-table pools-table";
+    table.appendChild(tableHead(doc, ["Pool ID", "Share asset", "Asset A", "Asset A qty",
+      "Asset B", "Asset B qty", "Taker fee", "Withdrawal fee", "Exchange", "Stake/Unstake"]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var tr = doc.createElement("tr");
-      var aA = amtText(r.balance_a_raw, r.asset_a_id, r.prec_a, r.sym_a);
-      var aB = amtText(r.balance_b_raw, r.asset_b_id, r.prec_b, r.sym_b);
-      var cA = el(doc, "td", aA.text); cA.title = "raw " + aA.raw;
-      var cB = el(doc, "td", aB.text); cB.title = "raw " + aB.raw;
-      var link = el(doc, "a", "Open"); link.setAttribute("href", "#/pools/" + r.id);
-      var td = doc.createElement("td"); td.appendChild(link);
-      tr.appendChild(el(doc, "td", r.id)); tr.appendChild(el(doc, "td", pairLabel(r)));
-      tr.appendChild(cA); tr.appendChild(cB); tr.appendChild(el(doc, "td", r.sym_share));
-      tr.appendChild(el(doc, "td", pctText(r.taker_units))); tr.appendChild(td);
+      /* Qty cells are bare numbers (the A/B columns already name the
+       * assets — dexux-ref density); raw integers stay in title. */
+      var aA = amtText(r.balance_a_raw, r.asset_a_id, r.prec_a, null);
+      var aB = amtText(r.balance_b_raw, r.asset_b_id, r.prec_b, null);
+      tr.appendChild(el(doc, "td", r.id));
+      var tdS = doc.createElement("td"); tdS.appendChild(assetLink(doc, r.sym_share)); tr.appendChild(tdS);
+      var tdA = doc.createElement("td"); tdA.appendChild(assetLink(doc, r.sym_a)); tr.appendChild(tdA);
+      var cA = el(doc, "td", aA.text, "num"); cA.title = "raw " + aA.raw; tr.appendChild(cA);
+      var tdB = doc.createElement("td"); tdB.appendChild(assetLink(doc, r.sym_b)); tr.appendChild(tdB);
+      var cB = el(doc, "td", aB.text, "num"); cB.title = "raw " + aB.raw; tr.appendChild(cB);
+      tr.appendChild(el(doc, "td", pctText(r.taker_units), "num"));
+      tr.appendChild(el(doc, "td", pctText(r.withdrawal_units), "num"));
+      var tdX = doc.createElement("td");
+      var xl = el(doc, "a", "⇄"); xl.setAttribute("href", "#/pools/" + r.id);
+      xl.setAttribute("aria-label", "Swap in pool " + r.id);
+      xl.title = "Swap in this pool";
+      tdX.appendChild(xl); tr.appendChild(tdX);
+      var tdSt = doc.createElement("td");
+      var sl = el(doc, "a", "Stake"); sl.setAttribute("href", "#/pools/" + r.id);
+      sl.setAttribute("aria-label", "Stake or unstake in pool " + r.id);
+      tdSt.appendChild(sl); tr.appendChild(tdSt);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); return table;
   }
-  /* Route entry: #/pools — filters + pool table + my-pools + create form. */
+  /* Route entry: #/pools — filters + pool table + my-pools + create form.
+   * Pager: page-size select (10/25/50, default 10 like the ref) + Prev/Next +
+   * "Page N". No numbered pages: the chain exposes no pool count, so totals
+   * are not invented — hasNext comes from fetching one row over the page.
+   * startId paging is inclusive on most nodes, so a leading duplicate of the
+   * previous page's last row is dropped (over-fetch of 2 covers it). */
   function renderPools(root) {
     if (!root) return;
     var ctx = routeReady(root, "Liquidity Pools", function () { renderPools(root); });
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
+    /* Wide wrap (mkt-wrap, detail-desk precedent): the 10-col dense table
+     * needs room; the plain 720px wrap would force scrolling at desktop. */
+    ctx.wrap.className = "wrap mkt-wrap";
     ctx.wrap.appendChild(el(doc, "p", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares.", "muted"));
+    var pager = { page: 0, size: 10, starts: ["1.19.0"] };
+    var filters = el(doc, "div", null, "pools-filters");
     var fA = field(doc, "Asset A", { placeholder: "symbol or 1.3.x" });
     var fB = field(doc, "Asset B", { placeholder: "symbol or 1.3.x" });
     var fS = field(doc, "Share asset", { placeholder: "symbol or 1.3.x" });
-    [fA, fB, fS].forEach(function (f) { ctx.wrap.appendChild(f.row); });
-    var go = touchable(el(doc, "button", "List pools")); go.type = "button"; ctx.wrap.appendChild(go);
+    [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
+    var sizeLab = el(doc, "label", "Per page ");
+    var sizeSel = doc.createElement("select");
+    ["10", "25", "50"].forEach(function (n) {
+      var o = doc.createElement("option");
+      o.value = n; o.textContent = n;
+      if (n === "10") o.selected = true;
+      sizeSel.appendChild(o);
+    });
+    touchable(sizeSel);
+    sizeLab.appendChild(sizeSel);
+    var sizeWrap = el(doc, "div", null, "xfer-field");
+    sizeWrap.appendChild(sizeLab);
+    filters.appendChild(sizeWrap);
+    var go = touchable(el(doc, "button", "List pools")); go.type = "button";
+    filters.appendChild(go);
+    ctx.wrap.appendChild(filters);
     var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
     var mineBox = el(doc, "div");
     ctx.wrap.appendChild(el(doc, "h2", "My pools"));
@@ -211,25 +269,68 @@ var PoolUI = (function () {
       v = String(v || "").trim(); if (!v) return null;
       return Asset.describe(v);
     }
-    go.addEventListener("click", function () {
+    /* pagerBar: Prev / "Page N" / Next. Next stores the page's last id as
+     * the following page's startId (list_* paging has no offsets). */
+    function pagerBar(pageRows, hasNext) {
+      var bar = el(doc, "div", null, "pools-pager");
+      var prev = touchable(el(doc, "button", "‹ Prev")); prev.type = "button";
+      prev.disabled = pager.page === 0;
+      var note = el(doc, "span", "Page " + (pager.page + 1), "pools-page");
+      var next = touchable(el(doc, "button", "Next ›")); next.type = "button";
+      next.disabled = !hasNext;
+      prev.addEventListener("click", function () {
+        if (myGen !== gen || pager.page === 0) return;
+        pager.page -= 1;
+        loadPage();
+      });
+      next.addEventListener("click", function () {
+        if (myGen !== gen || !hasNext || !pageRows.length) return;
+        pager.page += 1;
+        pager.starts[pager.page] = pageRows[pageRows.length - 1].id;
+        loadPage();
+      });
+      bar.appendChild(prev); bar.appendChild(note); bar.appendChild(next);
+      return bar;
+    }
+    function loadPage() {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
       showStatus(doc, listBox, "Loading pools…");
       Promise.resolve().then(async function () {
         var a = await resolveOpt(fA.input.value), b = await resolveOpt(fB.input.value), s = await resolveOpt(fS.input.value);
-        return Pool.list({ assetA: a ? a.id : null, assetB: b ? b.id : null, share: s ? s.id : null, limit: 10 });
+        var rows = await Pool.list({ assetA: a ? a.id : null, assetB: b ? b.id : null,
+          share: s ? s.id : null, limit: pager.size + 2, startId: pager.starts[pager.page] });
+        return rows || [];
       }).then(function (rows) {
         if (myGen !== gen) return; clearBox(listBox);
-        listBox.appendChild(poolTable(doc, rows));
+        /* Drop the inclusive-start duplicate of the previous page's tail. */
+        if (pager.page > 0 && rows.length && rows[0].id === pager.starts[pager.page]) rows.shift();
+        var hasNext = rows.length > pager.size;
+        var pageRows = hasNext ? rows.slice(0, pager.size) : rows;
+        var scroller = el(doc, "div", null, "pools-scroll");
+        scroller.appendChild(poolTable(doc, pageRows));
+        listBox.appendChild(scroller);
+        listBox.appendChild(pagerBar(pageRows, hasNext));
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, "Could not load pools.");
       }).then(function () { go.disabled = false; });
+    }
+    function resetAndLoad() {
+      if (myGen !== gen) return;
+      pager.page = 0; pager.starts = ["1.19.0"];
+      loadPage();
+    }
+    go.addEventListener("click", resetAndLoad);
+    sizeSel.addEventListener("change", function () {
+      var n = parseInt(sizeSel.value, 10);
+      pager.size = (n === 25 || n === 50) ? n : 10;
+      resetAndLoad();
     });
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return;
       Pool.mine(me.id).then(function (rows) {
         if (myGen !== gen) return; clearBox(mineBox); mineBox.appendChild(poolTable(doc, rows));
       }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", "No owned pools.", "muted")); } });
-      go.click();
+      loadPage();
     }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, "Could not load your account."); });
   }
   function createBox(doc, box, myGen) { /* op-59 create: a/b/share resolves, human percents, orientation preview */

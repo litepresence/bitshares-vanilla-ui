@@ -42,7 +42,8 @@ var InstantTradeUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite");
     wrap.appendChild(p); return p; }
-  /* Labeled input row with its own inline error slot. */
+  /* Labeled input row with its own inline error slot. opts.unit renders a
+   * unit suffix span after the input (dexux-ref cue, textContent only). */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
     var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
@@ -51,7 +52,16 @@ var InstantTradeUI = (function () {
     if (opts.id) input.id = opts.id;
     if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input); label.appendChild(input); row.appendChild(label);
+    touchable(input);
+    if (opts.unit) {
+      var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
+      wrap.appendChild(input);
+      wrap.appendChild(el(doc, "span", opts.unit, "unit-suffix"));
+      label.appendChild(wrap);
+    } else {
+      label.appendChild(input);
+    }
+    row.appendChild(label);
     var err = el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
@@ -148,6 +158,16 @@ var InstantTradeUI = (function () {
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", "Instant Trade"));
     wrap.appendChild(el(doc, "p", "Pick a market, choose a side, enter an amount. The price fills from the order book; review and sign one limit order.", "muted"));
+    /* Order-type strip (dexux-ref LIMIT/SCALED shape): this view is
+     * limit-only, so LIMIT is the active tab and SCALED links to the full
+     * desk (existing route, no behavior change to the form itself). */
+    var tabs = el(doc, "div", null, "order-tabs");
+    tabs.appendChild(el(doc, "span", "Limit", "order-tab-active"));
+    var scaledLink = doc.createElement("a");
+    scaledLink.textContent = "Scaled";
+    scaledLink.setAttribute("href", "#/market/" + (P.marketID || "BTS_CNY"));
+    tabs.appendChild(scaledLink);
+    wrap.appendChild(tabs);
     var mktF = fieldRow(doc, "Market (QUOTE_BASE) ", { id: "it-market", value: P.marketID, placeholder: "BTS_CNY", inputmode: "text" });
     wrap.appendChild(mktF.row);
     var sideRow = el(doc, "div", null, "xfer-field"), sideLabel = el(doc, "label", "Side ");
@@ -205,13 +225,17 @@ var InstantTradeUI = (function () {
     if (old) old.parentNode.removeChild(old);
     var box = el(doc, "div"); box.id = "it-loaded"; wrap.appendChild(box);
     var M = P.M, ctx = M.ctx;
+    try {
+      var sLink = wrap.querySelector(".order-tabs a");
+      if (sLink) sLink.setAttribute("href", "#/market/" + ctx.quoteSym + "_" + ctx.baseSym);
+    } catch (e) { /* strip keeps its default desk link */ }
     box.appendChild(el(doc, "p", "Trade " + ctx.quoteSym + " / " + ctx.baseSym + " — " + (P.side === "buy" ? "Buy " + ctx.quoteSym : "Sell " + ctx.quoteSym), "muted"));
     box.appendChild(el(doc, "p", "Latest: " + (M.stats && M.stats.latest ? M.stats.latest : "—") + " · Best bid: " + (M.bestBid || "—") + " · Best ask: " + (M.bestAsk || "—"), "muted"));
     if (!M.bestBid && !M.bestAsk) box.appendChild(el(doc, "p", "The order book is empty — type a price manually.", "muted"));
     if (!P.price) P.price = P.side === "buy" ? (M.bestAsk || "") : (M.bestBid || "");
-    var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal" });
+    var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal", unit: ctx.quoteSym });
     box.appendChild(amountF.row);
-    var priceF = fieldRow(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal" });
+    var priceF = fieldRow(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal", unit: ctx.baseSym + " / " + ctx.quoteSym });
     box.appendChild(priceF.row);
     var reviewBtn = touchable(el(doc, "button", "Review order"));
     reviewBtn.id = "it-review"; reviewBtn.type = "button"; box.appendChild(reviewBtn);

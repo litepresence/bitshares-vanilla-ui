@@ -1,5 +1,5 @@
 /* tx.js — graphene serializer registry + dispatch (ops 0-3, 6, 7,
- * 10-15, 19, 22-24, 25-28, 32, 33, 37, 49, 50, 52, 54-58, 59-73, 75, 76).
+ * 10-15, 19, 22-24, 25-28, 32-34, 37, 49, 50, 52, 54-58, 59-73, 75, 76).
  * Envelope/fee/sign/send live in tx-send.js (slice-18 cap split).
  *
   * What it owns: binary serialization of transfer (op 0), limit_order_create
@@ -12,7 +12,7 @@
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
  * withdraw_permission_delete (op 28), htlc_create (op 49), htlc_redeem
  * (op 50), htlc_extend (op 52), vesting_balance_create/withdraw (ops 32/33),
- * balance_claim (op 37, fee always 0), custom_authority_create/update/delete
+ * worker_create (op 34), balance_claim (op 37, fee always 0), custom_authority_create/update/delete
  * (ops 54/55/56), ticket_create/update (ops 57/58), liquidity_pool_create (op 59),
  * liquidity_pool_delete (op 60), liquidity_pool_deposit (op 61),
  * liquidity_pool_withdraw (op 62), liquidity_pool_exchange (op 63) and
@@ -233,10 +233,17 @@
   *                             + #4 .../protocol/vesting.hpp:74-90 / :101-117
   *                             + FC :124-125 + BJS vesting_balance_create /
   *                             vesting_balance_withdraw (order match)
-  * - serializeBalanceClaimOp <- #3 bitshares-api.js:2916-2924
-  *                             + #4 .../protocol/balance.hpp:40-57 (fee 0 at
-  *                             :42 + :51) + FC :62-63 + BJS balance_claim
-  *                             (order match, no extensions field)
+ * - serializeBalanceClaimOp <- #3 bitshares-api.js:2916-2924
+ *                             + #4 .../protocol/balance.hpp:40-57 (fee 0 at
+ *                             :42 + :51) + FC :62-63 + BJS balance_claim
+ *                             (order match, no extensions field)
+ * - serializeWorkerInitializer <- #3 bitshares-api.js:2240-2253 (variant
+ *                             varint + u16 vesting days for type 1 only)
+ *                             + #4 .../protocol/worker.hpp:69-72 (variant
+ *                             order refund/vesting/burn)
+ * - serializeWorkerCreateOp <- #3 bitshares-api.js:2850-2861
+ *                             + #4 .../protocol/worker.hpp:79-93 (struct)
+ *                             + FC :106-107 (wire order)
   * - serializeAuthority      <- #3 bitshares-api.js:2076-2110
   *                             + #4 .../protocol/authority.hpp:136
   *                             (weight_threshold, account/key/address maps)
@@ -359,7 +366,13 @@
  *   (authorized_account)(withdrawal_permission)
  *   <- .../protocol/withdraw_permission.hpp:185-187
  * - ops 25-28, 49-53 ids <- .../protocol/operations.hpp:81-84, :105-109
-  *   (51/53 VIRTUAL — never signed, never dispatched)
+ *   (51/53 VIRTUAL — never signed, never dispatched)
+ * - worker_create order (fee)(owner)(work_begin_date)(work_end_date)
+ *   (daily_pay)(name)(url)(initializer)
+ *   <- .../protocol/worker.hpp:106-107 (FC_REFLECT); initializer variant
+ *   order refund(0)/vesting(1)/burn(2) <- :69-72; validate() (end > begin,
+ *   0 < pay < MAX_SHARE_SUPPLY, name < 63, url < 127)
+ *   <- .../protocol/worker.cpp:30-38 + config.hpp:38-41
   * - liquidity_pool_create order (fee)(account)(asset_a)(asset_b)
   *   (share_asset)(taker_fee_percent)(withdrawal_fee_percent)(extensions)
   *   <- .../protocol/liquidity_pool.hpp:163-165
@@ -443,8 +456,17 @@
   * - op-23 key-approval sets sort by decoded pubkey bytes (flat_set order);
   *   #3 emits caller order. op-55 restrictions_to_remove sorts numerically
   *   (flat_set<u16>); restrictions_to_add keeps caller order (vector).
-  * - op-57/58 target_type is REQUIRED 0-4: #3's `|| 0` silently remaps a
-  *   forgotten lock type to liquid — vanilla throws (same rule as op-76).
+ * - op-57/58 target_type is REQUIRED 0-4: #3's `|| 0` silently remaps a
+ *   forgotten lock type to liquid — vanilla throws (same rule as op-76).
+ * - serializeWorkerInitializer accepts the ARRAY form [type,data] ONLY
+ *   (same rule as serializeVestingPolicy: the node JSON parser rejects
+ *   object form, so bytes built from one would never match a broadcastable
+ *   op). #3's legacy {type,...} object shape is NOT accepted, and its
+ *   `|| 0` fallbacks (daily_pay, pay_vesting_period_days) are NOT ported:
+ *   a forgotten pay would create a 0-pay worker the node always rejects,
+ *   a forgotten vesting period a 0-day vest — both fail loudly here.
+ *   Name/url byte-length guards (63/127 per worker.cpp) mirror the node's
+ *   validate() so always-rejected bytes are never built.
   * - op-54 operation_type is REQUIRED non-negative integer: #3's `|| 0`
   *   silently targets op 0 (transfer) for a caller that forgot the field.
   * - stale #3 field names (offer_to_update / new_* on op 71,
@@ -2134,6 +2156,79 @@ var Tx = (function () {
     ]);
   }
 
+  /* worker_initializer static_variant in ARRAY FORM ONLY [type, data]
+   * (same rule as serializeVestingPolicy: the node's JSON parser rejects
+   * object form, so bytes built from one would never match a broadcastable
+   * op). Wire ids per #4 worker.hpp:69-72: 0 refund_worker_initializer (no
+   * payload), 1 vesting_balance_worker_initializer (pay_vesting_period_days
+   * u16), 2 burn_worker_initializer (no payload). Type-1 days are REQUIRED
+   * explicit — #3's `|| 0` would silently write a 0-day vest for a caller
+   * that forgot the field (writeUint16LE throws loudly on missing input). */
+  function serializeWorkerInitializer(init) {
+    if (!Array.isArray(init) || init.length !== 2) {
+      throw new Error("worker initializer must be the array form [type, data] " +
+        "(0=refund, 1=vesting {pay_vesting_period_days}, 2=burn)");
+    }
+    var type = init[0], d = init[1] || {};
+    if (type === 0 || type === 2) return varintUint32(type);
+    if (type === 1) {
+      return concatBytes([varintUint32(1), writeUint16LE(d.pay_vesting_period_days)]);
+    }
+    throw new Error("worker initializer type must be 0 (refund), 1 (vesting) or 2 (burn), got: " +
+      JSON.stringify(type));
+  }
+
+  /* worker_create (op 34) in #4 FC order: fee, owner, work_begin_date,
+   * work_end_date, daily_pay int64, name, url, initializer (static_variant).
+   * Timestamps accept the shared ISO/unix-seconds shapes via the helpers
+   * above (timestamps, not money, so Date parsing is allowed). Ordering and
+   * pay bounds mirror the node's validate() (worker.cpp:30-38: end > begin,
+   * 0 < pay < GRAPHENE_MAX_SHARE_SUPPLY = 1e15): violations throw here
+   * loudly instead of producing always-rejected bytes. Name/url length
+   * guards (name < 63 bytes, url < 127 bytes — config.hpp:40-41) use
+   * TextEncoder byte lengths because size() counts bytes, not chars.
+   * daily_pay stays a digit string until writeInt64LE (integer-only, same
+   * rule as every asset path above). */
+  function serializeWorkerCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("worker_create op must be an object");
+    if (typeof op.name !== "string" || !op.name) {
+      throw new Error("worker_create name must be a non-empty string");
+    }
+    if (typeof op.url !== "string") {
+      throw new Error("worker_create url must be a string (empty allowed)");
+    }
+    var beginSecs = timestampToSecs(op.work_begin_date);
+    var endSecs = timestampToSecs(op.work_end_date);
+    if (endSecs <= beginSecs) {
+      throw new Error("worker_create work_end_date must be after work_begin_date");
+    }
+    var payStr = String(op.daily_pay);
+    if (!/^\d+$/.test(payStr)) {
+      throw new Error("worker_create daily_pay must be a digit string, got: " + JSON.stringify(op.daily_pay));
+    }
+    var payBig = BigInt(payStr);
+    if (payBig <= 0n) throw new Error("worker_create daily_pay must be greater than zero");
+    if (payBig >= 1000000000000000n) {
+      throw new Error("worker_create daily_pay exceeds GRAPHENE_MAX_SHARE_SUPPLY (1e15)");
+    }
+    if (new TextEncoder().encode(op.name).length >= 63) {
+      throw new Error("worker_create name must be under 63 bytes (GRAPHENE_MAX_WORKER_NAME_LENGTH)");
+    }
+    if (new TextEncoder().encode(op.url).length >= 127) {
+      throw new Error("worker_create url must be under 127 bytes (GRAPHENE_MAX_URL_LENGTH)");
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner),
+      serializeTimestamp(op.work_begin_date),
+      serializeTimestamp(op.work_end_date),
+      writeInt64LE(payStr),
+      serializeString(op.name),
+      serializeString(op.url),
+      serializeWorkerInitializer(op.initializer)
+    ]);
+  }
+
   /* Nested-op data dispatch for op-22 recursion: delegates to the SAME
    * per-op functions the outer serializeTransaction path uses, so enclosed
    * bytes can never drift from top-level bytes. Covers every op this file
@@ -2164,6 +2259,7 @@ var Tx = (function () {
     if (opType === 28) return serializeWithdrawPermissionDeleteOp(opData);
     if (opType === 32) return serializeVestingBalanceCreateOp(opData);
     if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
+    if (opType === 34) return serializeWorkerCreateOp(opData);
     if (opType === 37) return serializeBalanceClaimOp(opData);
     if (opType === 49) return serializeHtlcCreateOp(opData);
     if (opType === 50) return serializeHtlcRedeemOp(opData);
@@ -2190,7 +2286,7 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32, 33, 37, " +
+    throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32-34, 37, " +
       "49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
@@ -2231,6 +2327,7 @@ var Tx = (function () {
       else if (opType === 28) parts.push(serializeWithdrawPermissionDeleteOp(opData));
       else if (opType === 32) parts.push(serializeVestingBalanceCreateOp(opData));
       else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
+      else if (opType === 34) parts.push(serializeWorkerCreateOp(opData));
       else if (opType === 37) parts.push(serializeBalanceClaimOp(opData));
       // Op 38 (override_transfer) is ISSUER-ONLY (#4 balance/asset issuer
       // path; no vanilla wallet UI signs it) — deliberately NOT serialized.
@@ -2275,7 +2372,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32, 33, 37, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32-34, 37, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2296,6 +2393,7 @@ var Tx = (function () {
       withdraw_permission_create: 25, withdraw_permission_update: 26,
       withdraw_permission_claim: 27, withdraw_permission_delete: 28,
       vesting_balance_create: 32, vesting_balance_withdraw: 33,
+      worker_create: 34,
       balance_claim: 37,
       htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
       custom_authority_create: 54, custom_authority_update: 55,
@@ -2364,6 +2462,8 @@ var Tx = (function () {
       serializeProposalDeleteOp: serializeProposalDeleteOp,
       serializeVestingBalanceCreateOp: serializeVestingBalanceCreateOp,
       serializeVestingBalanceWithdrawOp: serializeVestingBalanceWithdrawOp,
+      serializeWorkerInitializer: serializeWorkerInitializer,
+      serializeWorkerCreateOp: serializeWorkerCreateOp,
       serializeBalanceClaimOp: serializeBalanceClaimOp,
       serializeCustomAuthorityCreateOp: serializeCustomAuthorityCreateOp,
       serializeCustomAuthorityUpdateOp: serializeCustomAuthorityUpdateOp,

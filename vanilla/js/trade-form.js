@@ -111,7 +111,9 @@ var TradeForm = (function () {
     return p;
   }
 
-  /* Labeled input row with its own inline error slot. Returns refs. */
+  /* Labeled input row with its own inline error slot. Returns refs.
+   * opts.unit (dexux-ref): unit suffix label rendered in a span after the
+   * input (e.g. "BTS", "BITUSD / BTS") — textContent only, never read back. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
     var row = el(doc, "div", null, "xfer-field");
@@ -125,13 +127,23 @@ var TradeForm = (function () {
     if (opts.min !== undefined) input.setAttribute("min", opts.min);
     if (opts.max !== undefined) input.setAttribute("max", opts.max);
     touchable(input);
-    label.appendChild(input);
+    var suffix = null;
+    if (opts.unit) {
+      var wrap = doc.createElement("span");
+      wrap.className = "unit-wrap";
+      wrap.appendChild(input);
+      suffix = el(doc, "span", opts.unit, "unit-suffix");
+      wrap.appendChild(suffix);
+      label.appendChild(wrap);
+    } else {
+      label.appendChild(input);
+    }
     row.appendChild(label);
     var err = el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite");
     err.style.display = "none";
     row.appendChild(err);
-    return { row: row, input: input, err: err };
+    return { row: row, input: input, err: err, suffix: suffix };
   }
 
   /* Show (or clear) the inline validation message under a field row. */
@@ -456,11 +468,13 @@ var TradeForm = (function () {
     var st = P[side];
     body.appendChild(el(doc, "h3", (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym));
     var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", {
-      id: "trade-amount", value: st.amount, placeholder: "0.00", inputmode: "decimal"
+      id: "trade-amount", value: st.amount, placeholder: "0.00", inputmode: "decimal",
+      unit: ctx.quoteSym
     });
     body.appendChild(amountF.row);
     var priceF = fieldRow(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: "trade-price", value: st.price, placeholder: "0.00", inputmode: "decimal"
+      id: "trade-price", value: st.price, placeholder: "0.00", inputmode: "decimal",
+      unit: ctx.baseSym + " / " + ctx.quoteSym
     });
     body.appendChild(priceF.row);
     var fokRow = el(doc, "div", null, "xfer-field");
@@ -713,17 +727,21 @@ var TradeForm = (function () {
       id: "trade-n", value: st.n, placeholder: "3", inputmode: "numeric"
     });
     body.appendChild(nF.row);
+    var priceUnit = ctx.baseSym + " / " + ctx.quoteSym;
     var lowF = fieldRow(doc, "Price low (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: "trade-low", value: st.low, placeholder: "0.00", inputmode: "decimal"
+      id: "trade-low", value: st.low, placeholder: "0.00", inputmode: "decimal",
+      unit: priceUnit
     });
     body.appendChild(lowF.row);
     var highF = fieldRow(doc, "Price high (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: "trade-high", value: st.high, placeholder: "0.00", inputmode: "decimal"
+      id: "trade-high", value: st.high, placeholder: "0.00", inputmode: "decimal",
+      unit: priceUnit
     });
     body.appendChild(highF.row);
     var sellS = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
     var totalF = fieldRow(doc, "Total to sell (" + sellS + ") ", {
-      id: "trade-total", value: st.total, placeholder: "0.00", inputmode: "decimal"
+      id: "trade-total", value: st.total, placeholder: "0.00", inputmode: "decimal",
+      unit: sellS
     });
     body.appendChild(totalF.row);
     sideSel.addEventListener("change", function () {

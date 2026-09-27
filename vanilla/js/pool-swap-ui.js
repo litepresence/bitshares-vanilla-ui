@@ -42,8 +42,9 @@ var PoolSwapUI = (function () {
     wrap.appendChild(u.el(doc, "p", "Single-pool swap (one op-63). No multi-hop routing.", "muted"));
     var fSell = u.field(doc, "Sell asset", { value: "BTS" });
     var fBuy = u.field(doc, "Buy asset", { placeholder: "CNY" });
-    var fAmt = u.field(doc, "Sell amount", { inputmode: "decimal", placeholder: "1.0" });
-    var fSlip = u.field(doc, "Slippage %", { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal" });
+    var fAmt = u.field(doc, "Sell amount", { inputmode: "decimal", placeholder: "1.0",
+      unit: String(fSell.input.value || "").trim() || "BTS" });
+    var fSlip = u.field(doc, "Slippage %", { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal", unit: "%" });
     [fSell, fBuy, fAmt, fSlip].forEach(function (f) { wrap.appendChild(f.row); });
     var find = u.touchable(u.el(doc, "button", "Find pools")); find.type = "button"; wrap.appendChild(find);
     var pickBox = u.el(doc, "div"); wrap.appendChild(pickBox);
@@ -62,6 +63,8 @@ var PoolSwapUI = (function () {
         return { sell: s, buy: b, rows: rows };
       }).then(function (found) {
         if (!live(myGen, uiGen)) return; u.clearBox(pickBox);
+        /* Suffix tracks the resolved sell asset (input keeps its id/value). */
+        if (fAmt.suffix) fAmt.suffix.textContent = found.sell.symbol;
         if (!found.rows.length) {
           pickBox.appendChild(u.el(doc, "p", "No pool exists for " + found.sell.symbol + "/" + found.buy.symbol + ".", "muted"));
           return;

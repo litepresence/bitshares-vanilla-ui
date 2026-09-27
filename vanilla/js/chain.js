@@ -10,7 +10,7 @@ var Chain = (function () {
   var ws = null, nextId = 1, pending = {}, lastStatus = {state: "unknown"};
 
   function setStatus(patch) {
-    lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null}, lastStatus, patch);
+    lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
     Store.emitConnection(lastStatus);
     var badge = document.getElementById("conn-badge");
     if (badge) {
@@ -94,7 +94,10 @@ var Chain = (function () {
         }).then(function (res) {
           if (done) return; done = true; clearTimeout(guard);
           var latencyMs = Date.now() - t0;
-          setStatus({state: "open", node: url, latencyMs: latencyMs, chainId: res[0]});
+          /* Head block stashed from the ALREADY-fetched dynamic props (footer
+           * paint reads it; no extra RPC — same Promise.all as before). */
+          var headBlock = (res[1] && res[1].head_block_number) || null;
+          setStatus({state: "open", node: url, latencyMs: latencyMs, chainId: res[0], headBlock: headBlock});
           resolve({chainId: res[0], headBlockTime: res[1].time, latencyMs: latencyMs});
         }).catch(function (e) {
           if (done) return; done = true; clearTimeout(guard);
