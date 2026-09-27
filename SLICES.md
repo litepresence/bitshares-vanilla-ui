@@ -130,7 +130,10 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 ### 18. Final readability pass ⬜
 - [ ] End-to-end re-read per §3.7 (headers, descriptions, splits incl. 1167-line trade-ui.js, dead code); app incomplete until green
 
-## Standing facts (update as they change)
+## Standing directives (user, 2026-09-28 — binding for all remaining slices)
+- Retro look: continually review the ref UI via BOTH `vanilla/notes/original-pages/` screenshots AND the `bitshares-ui` codebase; iterate every page until the retro look holds. No page is done until it reads true against the original.
+- Themes: dark mode follows bitshares-dex-ux styling cues; light mode at builder discretion per modern standards; original-blue stays default. Every slice renders acceptably in all three (screenshot trio in parity note).
+- Completeness: port EVERY ref-UI route (§6) PLUS every astro-ui operation page (§5.4). Maintain the op-coverage matrix (`#1 route/modal` × `#2 page` × `vanilla slice`) — no astro-only op discovered late. Testnet-prove everything.
 
 - Testnet fixtures: `tooling/testnet-lite-test-1.json` (git-ignored, 600-perms) — funded `lite-test-1` account for broadcasts. Faucet: `testnet-faucet.xbts.io` ALIVE (registered `t9-vanilla-6742`); `faucet.testnet.bitshares.eu` dead (404 + self-signed). Leftover chain state (no delete op exists, intentional): `AFKTEST10` (1.3.1849) 9.0000 held by issuer; `AFKTESTM11` (1.3.1850) supply 0 with live feed (MCR 1750/MSSR 1500).
 - bitsharesjs policy: REFERENCE ONLY, never a dependency. Consult upstream raw files on demand when porting op serializers (see `mapping-chain-calls`); #4 headers win conflicts; testnet broadcast is final proof.
