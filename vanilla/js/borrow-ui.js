@@ -1,21 +1,33 @@
-/* borrow-ui.js — #/borrow margin positions + op-3 adjust form (split OUT of credit-ui.js).
+/* borrow-ui.js — #/borrow margin positions + op-3 adjust form + op-45
+ * settlement bids (split OUT of credit-ui.js).
  * Owns: margin positions table for an account (collateral/debt human both legs,
  *   call price, TCR at the proven divisor 1000) + op-3 call_order_update adjust
  *   form (signed delta-collateral / delta-debt, optional TCR, live fee, named-row
- *   confirm) + short margin explainer (port the WORDS of #1 Showcases/Borrow.jsx
- *   steps, not its stepper chrome). No safe position -> adjust form client-gated
- *   with an honest note (ambiguity H): positions READ is always offered, the
- *   broadcast only against an existing position. No money math here (Credit
- *   builders + Format do it); no serializers (tx.js owns bytes).
+ *   confirm) + op-45 bid_collateral section (asset-driven: settlement-fund
+ *   gate, existing-bids table, bid form with live fee + named-row confirm +
+ *   bid-list re-read proof) + short margin explainer (port the WORDS of #1
+ *   Showcases/Borrow.jsx steps, not its stepper chrome). No safe position ->
+ *   adjust form client-gated with an honest note (ambiguity H): positions READ
+ *   is always offered, the broadcast only against an existing position.
+ *   No settlement fund -> bid form client-gated the same way (C27): the READ
+ *   (fund + bids) is always offered, the broadcast only against a live fund.
+ *   No money math here (Credit builders + Format do it); no serializers
+ *   (tx.js owns bytes).
  * Consumes: Credit (positions/positionsMethod reads, buildCallUpdate, tcr/fee
  *   helpers, fee/sendAndProve), Tx.buildTx, Format, Account, Asset.describe,
  *   Wallet, Chain/Store. Created by: building-vanilla-slices skill,
- *   slice-13-credit plan Task 3 (pre-authorized split — credit-ui.js cap).
+ *   slice-13-credit plan Task 3 (pre-authorized split — credit-ui.js cap);
+ *   op-45 section appended by the C27/C29 deferred-matrix closeout.
  * CHAIN TRUTH (#4 wins): op 3 = (fee)(funding_account)(delta_collateral)
  *   (delta_debt)(extensions{optional u16 target_collateral_ratio}) <-
  *   market.hpp:171-197 — NO expiration field (#1 MarketsActions' is stale, NOT
  *   ported); TCR divisor 1000 <- BorrowModal.jsx:57-60/:478-481 (ambiguity G
  *   proven); negative delta_debt = borrow-more (WARNED in the form + confirm).
+ *   op 45 = (fee)(bidder)(additional_collateral)(debt_covered)(extensions) <-
+ *   market.hpp:307-308 (NOT op 46: operations.hpp:101-102 numbers
+ *   bid_collateral 45, execute_bid 46 VIRTUAL); bids exist only after a
+ *   global settlement leaves settlement_fund > 0 on the 2.4.x bitasset
+ *   (BSIP-0018; fund gate mirrors #2 SettlementBids.jsx hasSettlementFund).
  */
 var BorrowUI = (function () {
   "use strict";
@@ -118,6 +130,7 @@ var BorrowUI = (function () {
      "3. Top up collateral or repay debt any time with the adjust form — small steps only.",
      "4. Negative debt delta means borrowing MORE — it raises your liquidation risk."
     ].forEach(function (s) { ctx.wrap.appendChild(el(doc, "p", s, "muted")); });
+    settleSection(doc, ctx.wrap, myGen);
     go.addEventListener("click", function () {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox); clearBox(formBox);
       showStatus(doc, listBox, "Loading positions…");
@@ -262,6 +275,217 @@ var BorrowUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(out);
         showError(doc, out, e, "Could not prepare the adjust."); btn.disabled = false;
+      });
+    });
+  }
+
+  /* C27 settlement-bid section (op 45 bid_collateral, BSIP-0018). ASSET-driven,
+   * not position-driven: borrow-ui positions carry no RSQ/call-ratio field, so
+   * there is no per-position bid gate to read — the chain gate is the 2.4.x
+   * bitasset's settlement_fund (> 0 means globally settled, fund exists).
+   * Layout: asset input + Check button, then fund line + existing-bids table
+   * (get_collateral_bids) always, bid form only while a fund exists. */
+  function settleSection(doc, wrap, myGen) {
+    wrap.appendChild(el(doc, "h2", "Settlement bids (op 45)"));
+    wrap.appendChild(el(doc, "p", "After a bitasset globally settles, anyone can bid collateral to take over part of the debt and the settlement fund (BSIP-0018). Enter the settled asset: the fund and existing bids always read; the bid form appears only while a settlement fund exists.", "muted"));
+    var fAsset = field(doc, "Settled asset (symbol or 1.3.x)", { placeholder: "e.g. bitUSD" });
+    wrap.appendChild(fAsset.row);
+    var chk = touchable(el(doc, "button", "Check settlement fund")); chk.type = "button";
+    wrap.appendChild(chk);
+    var box = el(doc, "div"); wrap.appendChild(box);
+    chk.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      settleCheck(doc, box, myGen, fAsset.input.value.trim());
+    });
+  }
+  /* Resolve the asset, read its bitasset fund, list bids, gate the form.
+   * Params: input (symbol or 1.3.x). Fund raw stays a digit string until
+   * Format renders it; precisions come from get_assets, never assumed. */
+  function settleCheck(doc, box, myGen, input) {
+    clearBox(box);
+    if (!input) { showError(doc, box, new Error("unknown-asset"), "Enter a bitasset symbol or id first."); return; }
+    showStatus(doc, box, "Resolving asset and settlement fund…");
+    Promise.resolve().then(async function () {
+      var dbId = await Chain.db();
+      var asset = null;
+      if (/^1\.3\.\d+$/.test(input)) {
+        var byId = await Chain.call(dbId, "get_assets", [[input]]);
+        asset = byId && byId[0];
+      } else {
+        var bySym = await Chain.call(dbId, "lookup_asset_symbols", [[input]]);
+        asset = bySym && bySym[0];
+      }
+      if (!asset) throw new Error("unknown-asset");
+      if (!asset.bitasset_data_id) {
+        return { asset: asset, fundRaw: null, note: String(asset.symbol || input) +
+          " is not a bitasset (no settlement fund). Bids apply only to globally settled bitassets." };
+      }
+      var objs = await Chain.call(dbId, "get_objects", [[asset.bitasset_data_id]]);
+      var bit = (objs && objs[0]) || null;
+      if (!bit) throw new Error("unknown-asset");
+      var fundRaw = String(bit.settlement_fund !== undefined && bit.settlement_fund !== null ? bit.settlement_fund : "0");
+      if (!/^\d+$/.test(fundRaw)) fundRaw = "0";
+      var backingId = (bit.options && bit.options.short_backing_asset) || "1.3.0";
+      var metas = await Chain.call(dbId, "get_assets", [[backingId, asset.id]]);
+      var backingPrec = (metas && metas[0] && typeof metas[0].precision === "number") ? metas[0].precision : null;
+      var debtPrec = (metas && metas[1] && typeof metas[1].precision === "number") ? metas[1].precision : asset.precision;
+      var bids = await Chain.call(dbId, "get_collateral_bids", [asset.id, 100, 0]);
+      return { asset: asset, bit: bit, fundRaw: fundRaw, backingId: backingId,
+        backingPrec: backingPrec, debtPrec: debtPrec, bids: bids || [] };
+    }).then(function (R) {
+      if (myGen !== gen) return;
+      clearBox(box);
+      if (R.fundRaw === null) {
+        box.appendChild(el(doc, "p", R.note, "muted"));
+        return;
+      }
+      var fundHuman = (typeof R.backingPrec === "number")
+        ? Format.formatAmount(R.fundRaw, R.backingPrec) : R.fundRaw;
+      var fundLine = el(doc, "p", "Settlement fund for " + R.asset.symbol + ": " + fundHuman +
+        ((typeof R.backingPrec === "number") ? " (backing " + R.backingId + ")" : " (raw " + R.fundRaw + ")"));
+      fundLine.title = "raw " + R.fundRaw;
+      box.appendChild(fundLine);
+      box.appendChild(bidsTable(doc, R.bids, R));
+      if (R.fundRaw === "0") {
+        box.appendChild(el(doc, "p", "No settlement fund for " + R.asset.symbol + " (not globally settled). The bid form stays disabled until a fund exists — no broadcast without a target.", "muted"));
+        return;
+      }
+      var flags = Number(R.asset.options && R.asset.options.flags);
+      if (Number.isFinite(flags) && (flags & 0x8000)) {
+        box.appendChild(el(doc, "p", R.asset.symbol + " has collateral bidding disabled by issuer flag (0x8000). Bids would be rejected — no form offered.", "muted"));
+        return;
+      }
+      if (typeof R.backingPrec !== "number" || typeof R.debtPrec !== "number") {
+        box.appendChild(el(doc, "p", "Unexpected asset data from the node; stopped instead of guessing.", "muted"));
+        return;
+      }
+      bidBox(doc, box, myGen, R);
+    }).catch(function (e) {
+      if (myGen !== gen) return;
+      clearBox(box);
+      showError(doc, box, e, "Could not load the settlement fund.");
+    });
+  }
+  /* Existing-bids table (desktop) + phone cards; legs human via the joined
+   * precisions, raw integers in title (never shown bare). Empty -> honest note. */
+  function bidsTable(doc, bids, R) {
+    var box = el(doc, "div");
+    if (!bids || !bids.length) {
+      box.appendChild(el(doc, "p", "No collateral bids on " + R.asset.symbol + " yet.", "muted"));
+      return box;
+    }
+    var table = doc.createElement("table"); table.className = "node-table";
+    var hr = doc.createElement("tr");
+    ["Bidder", "Collateral", "Debt covered"].forEach(function (t) {
+      var th = doc.createElement("th"); th.textContent = t; hr.appendChild(th); });
+    var thead = doc.createElement("thead"); thead.appendChild(hr); table.appendChild(thead);
+    var tbody = doc.createElement("tbody");
+    bids.forEach(function (b) {
+      var tr = doc.createElement("tr");
+      var bidder = doc.createElement("td"); bidder.textContent = b.bidder || "—"; tr.appendChild(bidder);
+      var inv = b.additional_collateral || {}, debt = b.debt_covered || {};
+      var c = doc.createElement("td");
+      c.textContent = Format.formatAmount(String(inv.amount), R.backingPrec);
+      c.title = "raw " + String(inv.amount);
+      tr.appendChild(c);
+      var d = doc.createElement("td");
+      d.textContent = Format.formatAmount(String(debt.amount), R.debtPrec);
+      d.title = "raw " + String(debt.amount);
+      tr.appendChild(d);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); box.appendChild(table);
+    var cards = el(doc, "div", null, "node-cards");
+    bids.forEach(function (b) {
+      var c = el(doc, "div", null, "node-card");
+      var inv = b.additional_collateral || {}, debt = b.debt_covered || {};
+      c.appendChild(el(doc, "div", "Bidder " + (b.bidder || "—")));
+      c.appendChild(el(doc, "div", "Collateral " + Format.formatAmount(String(inv.amount), R.backingPrec)));
+      c.appendChild(el(doc, "div", "Debt " + Format.formatAmount(String(debt.amount), R.debtPrec)));
+      cards.appendChild(c);
+    });
+    box.appendChild(cards);
+    return box;
+  }
+  /* Op-45 bid form: bidder (defaults to the wallet account) + collateral/debt
+   * legs in display units; both legs REQUIRED > 0 (#4 market.cpp validate:
+   * nonzero debt needs nonzero collateral). Live fee, named-row confirm,
+   * re-read proof = the bid list observed again at a new head block. */
+  function bidBox(doc, box, myGen, R) {
+    box.appendChild(el(doc, "h3", "Place a bid"));
+    var fBidder = field(doc, "Bidder (blank = wallet account)", { placeholder: "blank = wallet account" });
+    var fColl = field(doc, "Collateral (" + R.backingId + " units)", { placeholder: "e.g. 10.0", inputmode: "decimal" });
+    var fDebt = field(doc, "Debt to cover (" + R.asset.symbol + " units)", { placeholder: "e.g. 5.0", inputmode: "decimal" });
+    [fBidder, fColl, fDebt].forEach(function (f) { box.appendChild(f.row); });
+    box.appendChild(el(doc, "p", "A bid locks your collateral against the settlement fund; the chain matches it while reviving the asset. Both legs must be above zero.", "muted"));
+    var btn = touchable(el(doc, "button", "Review bid")); btn.type = "button"; box.appendChild(btn);
+    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    Account.myAccountId().then(function (id) {
+      if (myGen === gen && !fBidder.input.value) fBidder.input.value = id;
+    }).catch(function () { /* manual bidder entry remains */ });
+    btn.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      clearBox(out); btn.disabled = true;
+      showStatus(doc, out, "Resolving and estimating fee…");
+      Promise.resolve().then(async function () {
+        var bidderId = fBidder.input.value.trim() ? (await Account.resolve(fBidder.input.value.trim())).id
+          : await Account.myAccountId();
+        var collRaw = Format.parseAmount(fColl.input.value, R.backingPrec);
+        var debtRaw = Format.parseAmount(fDebt.input.value, R.debtPrec);
+        if (BigInt(collRaw) <= 0n || BigInt(debtRaw) <= 0n) {
+          throw new Error("Both legs must be above zero (nonzero debt needs nonzero collateral).");
+        }
+        var pair = [45, { fee: { amount: "0", asset_id: "1.3.0" }, bidder: bidderId,
+          additional_collateral: { amount: collRaw, asset_id: R.backingId },
+          debt_covered: { amount: debtRaw, asset_id: R.asset.id }, extensions: [] }];
+        var fee = await Credit.fee(pair, "1.3.0");
+        return { pair: pair, fee: fee, bidderId: bidderId, collRaw: collRaw, debtRaw: debtRaw };
+      }).then(function (S) {
+        if (myGen !== gen) return;
+        Asset.describe(S.fee.asset_id).then(function (a) { return a; }).catch(function () { return null; })
+        .then(function (fa) {
+          if (myGen !== gen) return;
+          var feeHuman = fa ? Format.formatAmount(String(S.fee.amount), fa.precision) + " " + fa.symbol : String(S.fee.amount);
+          clearBox(out);
+          out.appendChild(el(doc, "h3", "Confirm settlement bid"));
+          out.appendChild(confirmList(doc, [
+            ["Bidder", S.bidderId],
+            ["Collateral", Format.formatAmount(S.collRaw, R.backingPrec) + " (" + R.backingId + ")", "raw " + S.collRaw],
+            ["Debt covered", Format.formatAmount(S.debtRaw, R.debtPrec) + " " + R.asset.symbol, "raw " + S.debtRaw],
+            ["Fund", Format.formatAmount(R.fundRaw, R.backingPrec), "raw " + R.fundRaw],
+            ["Fee", feeHuman, "raw " + String(S.fee.amount)], ["Network", "testnet"]]));
+          var back = touchable(el(doc, "button", "Back")); back.type = "button";
+          var send = touchable(el(doc, "button", "Sign & Send")); send.type = "button";
+          out.appendChild(back); out.appendChild(send);
+          back.addEventListener("click", function () { clearBox(out); btn.disabled = false; });
+          send.addEventListener("click", function () {
+            if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+            var status = showStatus(doc, out, "Broadcasting…");
+            var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+            if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); send.disabled = false; back.disabled = false; return; }
+            Tx.buildTx([S.pair]).then(function (unsigned) {
+              return Credit.sendAndProve(unsigned, wif, async function () {
+                try {
+                  var dbId = await Chain.db();
+                  return await Chain.call(dbId, "get_collateral_bids", [R.asset.id, 100, 0]);
+                } catch (e) { return null; } return null;
+              });
+            }).then(async function (res) {
+              if (myGen !== gen) return; clearBox(out);
+              out.appendChild(el(doc, "p", "Bid broadcast.", "xfer-ok"));
+              out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              btn.disabled = false;
+            }).catch(function (e) {
+              if (myGen !== gen) return; out.removeChild(status);
+              showError(doc, out, e, "Failed. Check state before retrying (do NOT blindly rebroadcast).");
+              send.disabled = false; back.disabled = false;
+            });
+          });
+          btn.disabled = false;
+        });
+      }).catch(function (e) {
+        if (myGen !== gen) return; clearBox(out);
+        showError(doc, out, e, "Could not prepare the bid."); btn.disabled = false;
       });
     });
   }

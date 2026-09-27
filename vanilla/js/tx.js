@@ -2229,6 +2229,51 @@ var Tx = (function () {
     ]);
   }
 
+  /* C27/C29 append (deferred-matrix closeout): account_upgrade (op 8) and
+   * bid_collateral (op 45) serializers. Hand-ported, no import:
+   * - serializeAccountUpgradeOp <- #3 bitshares-api.js:2449-2456
+   *   + #4 .../protocol/account.hpp:300-301 (FC_REFLECT wire order)
+   * - serializeBidCollateralOp <- #3 bitshares-api.js:3039-3047
+   *   + #4 .../protocol/market.hpp:307-308 (FC_REFLECT wire order)
+   * VARIANT NOTE (task said "op-46 bid_collateral" — off by one): #4
+   * operations.hpp:101-102 numbers bid_collateral 45 and execute_bid 46
+   * (VIRTUAL, never signed); #3 agrees (op table :3783, dispatch :1587).
+   * Vanilla serializes 45 and never 46. */
+
+  /* account_upgrade op data (op 8) in #4 FC_REFLECT order: fee,
+   * account_to_upgrade (1.2.x), upgrade_to_lifetime_member as a single
+   * 0x00/0x01 byte (FC bool; any truthy value writes 0x01 — callers pass
+   * an explicit boolean), empty extensions. Fee tier is flag-driven
+   * (#4 account.cpp:263-268: true -> membership_lifetime_fee, false ->
+   * membership_annual_fee); vanilla always upgrades to LTM (true) and lets
+   * get_required_fees answer the fee. validate() (#4 account.cpp:270-273)
+   * only asserts fee >= 0 — LTM-reuse rejection happens node-side. */
+  function serializeAccountUpgradeOp(op) {
+    if (!op || typeof op !== "object") throw new Error("account_upgrade op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account_to_upgrade),
+      new Uint8Array([op.upgrade_to_lifetime_member ? 1 : 0]),
+      varintUint32(0)
+    ]);
+  }
+
+  /* bid_collateral op data (op 45) in #4 FC_REFLECT order: fee, bidder
+   * (1.2.x), additional_collateral (backing asset), debt_covered (settled
+   * bitasset), empty extensions. validate() (#4 market.cpp:99-103):
+   * debt_covered 0 is allowed, but nonzero debt REQUIRES nonzero
+   * collateral — views require both legs > 0 and fail loudly otherwise. */
+  function serializeBidCollateralOp(op) {
+    if (!op || typeof op !== "object") throw new Error("bid_collateral op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.bidder),
+      serializeAsset(op.additional_collateral),
+      serializeAsset(op.debt_covered),
+      varintUint32(0)
+    ]);
+  }
+
   /* Nested-op data dispatch for op-22 recursion: delegates to the SAME
    * per-op functions the outer serializeTransaction path uses, so enclosed
    * bytes can never drift from top-level bytes. Covers every op this file
@@ -2243,6 +2288,7 @@ var Tx = (function () {
     if (opType === 3) return serializeCallOrderUpdateOp(opData);
     if (opType === 6) return serializeAccountUpdateOp(opData);
     if (opType === 7) return serializeAccountWhitelistOp(opData);
+    if (opType === 8) return serializeAccountUpgradeOp(opData);
     if (opType === 10) return serializeAssetCreateOp(opData);
     if (opType === 11) return serializeAssetUpdateOp(opData);
     if (opType === 12) return serializeAssetUpdateBitassetOp(opData);
@@ -2261,6 +2307,7 @@ var Tx = (function () {
     if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
     if (opType === 34) return serializeWorkerCreateOp(opData);
     if (opType === 37) return serializeBalanceClaimOp(opData);
+    if (opType === 45) return serializeBidCollateralOp(opData);
     if (opType === 49) return serializeHtlcCreateOp(opData);
     if (opType === 50) return serializeHtlcRedeemOp(opData);
     if (opType === 52) return serializeHtlcExtendOp(opData);
@@ -2286,8 +2333,8 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32-34, 37, " +
-      "49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
+    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19, 22-24, 25-28, 32-34, 37, " +
+      "45, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
@@ -2311,6 +2358,7 @@ var Tx = (function () {
       else if (opType === 3) parts.push(serializeCallOrderUpdateOp(opData));
       else if (opType === 6) parts.push(serializeAccountUpdateOp(opData));
       else if (opType === 7) parts.push(serializeAccountWhitelistOp(opData));
+      else if (opType === 8) parts.push(serializeAccountUpgradeOp(opData));
       else if (opType === 10) parts.push(serializeAssetCreateOp(opData));
       else if (opType === 11) parts.push(serializeAssetUpdateOp(opData));
       else if (opType === 12) parts.push(serializeAssetUpdateBitassetOp(opData));
@@ -2329,6 +2377,7 @@ var Tx = (function () {
       else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
       else if (opType === 34) parts.push(serializeWorkerCreateOp(opData));
       else if (opType === 37) parts.push(serializeBalanceClaimOp(opData));
+      else if (opType === 45) parts.push(serializeBidCollateralOp(opData));
       // Op 38 (override_transfer) is ISSUER-ONLY (#4 balance/asset issuer
       // path; no vanilla wallet UI signs it) — deliberately NOT serialized.
       // Do not "complete" this list with it.
@@ -2372,7 +2421,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32-34, 37, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19, 22-24, 25-28, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2386,6 +2435,7 @@ var Tx = (function () {
     OP: {
       transfer: 0, limit_order_create: 1, limit_order_cancel: 2,
       call_order_update: 3, account_update: 6, account_whitelist: 7,
+      account_upgrade: 8,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
       asset_publish_feed: 19,
@@ -2395,6 +2445,7 @@ var Tx = (function () {
       vesting_balance_create: 32, vesting_balance_withdraw: 33,
       worker_create: 34,
       balance_claim: 37,
+      bid_collateral: 45,
       htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
       custom_authority_create: 54, custom_authority_update: 55,
       custom_authority_delete: 56, ticket_create: 57, ticket_update: 58,
@@ -2457,6 +2508,8 @@ var Tx = (function () {
       serializeRestriction: serializeRestriction,
       serializeRestrictionArray: serializeRestrictionArray,
       serializeAccountWhitelistOp: serializeAccountWhitelistOp,
+      serializeAccountUpgradeOp: serializeAccountUpgradeOp,
+      serializeBidCollateralOp: serializeBidCollateralOp,
       serializeProposalCreateOp: serializeProposalCreateOp,
       serializeProposalUpdateOp: serializeProposalUpdateOp,
       serializeProposalDeleteOp: serializeProposalDeleteOp,

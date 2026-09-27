@@ -105,15 +105,15 @@
 | C24 | timed_transfer.astro | delayed transfers | PORTED via `/proposals` generic propose flow (slice-14; note: no dedicated prefill — propose-a-transfer covers the chain path) |
 | C25 | withdraw_permissions.astro | direct debit | merged in A22 → PORTED (slice-11) |
 | C26 | settlement.astro | force-settlement (op-17) | PORTED via `/borrow` + asset ops (slice-10/13; asset_settle op-17 serializer slice-14) |
-| C27 | settlement_bids.astro | collateral bidding (op-46 bid_collateral) | DEFERRED (reason: bid_collateral op-46 serializer not yet written; tracked as borrow follow-up) |
+| C27 | settlement_bids.astro | collateral bidding (op-45 bid_collateral; 46 is VIRTUAL execute_bid) | PORTED (op-45 serializer + `#/borrow` settlement-bid section; broadcast tester-queued) |
 | C28 | borrow, lend.astro | borrow/lend | merged in A20/A5 → PORTED (slice-13) |
-| C29 | ltm.astro | lifetime membership (op-8 account_upgrade) | DEFERRED (reason: account_upgrade op-8 serializer not yet written; tracked) |
-| C30 | monthly_referrer.astro | referrer stats (read-only) | DEFERRED (reason: read-only referral display, no signing path; low priority; tracked) |
-| C31 | network_fees.astro | fee schedule display | DEFERRED (reason: live per-op fee-fill via get_required_fees shipped slice-04; full schedule table deferred; tracked) |
+| C29 | ltm.astro | lifetime membership (op-8 account_upgrade) | PORTED (op-8 serializer + Membership section on account view; broadcast tester-queued) |
+| C30 | monthly_referrer.astro | referrer stats (read-only) | PORTED (`#/referrals`: registrar/referrer/splits/vesting; counts honestly absent) |
+| C31 | network_fees.astro | fee schedule display | PORTED (`#/fees`: standalone feeSection reuse) |
 | C32 | nodes.astro | node connections | merged in A6 → PORTED (slice-01) |
 | C33 | theme, visuals, page_themes.astro | theme config | merged in A6 → PORTED (themes.css 3-theme switch, slice-01/17) |
-| C34 | change_password.astro | keystore password change | DEFERRED (reason: backup/restore/unlock shipped slice-02; password-change UI pending; tracked) |
-| C35 | favourites.astro | favourite assets/accounts/markets | DEFERRED (reason: picker-level favourites shipped slice-05; dedicated favourites dashboard deferred; tracked) |
+| C34 | change_password.astro | keystore password change | PORTED (`#/wallet/password`: verify + re-encrypt + proof) |
+| C35 | favourites.astro | favourite assets/accounts/markets | PORTED (`#/favourites` dashboard) |
 | C36 | forum, forum_thread.astro | docs/forum mirror | DEFERRED (reason: external community forum, not a wallet function; same class as ReportModal) |
 | C37 | trollbox.astro | deprecated chat | DEFERRED (reason: dead chat widget, not a wallet function) |
 | C38 | featured.astro | featured pools | merged in A23 → PORTED (slice-11) |

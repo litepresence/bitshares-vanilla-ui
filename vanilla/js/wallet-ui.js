@@ -101,6 +101,7 @@ var WalletUI = (function () {
     var p = doc.createElement("p");
     var links = [
       ["#/wallet", "Wallet manager", "manager"],
+      ["#/wallet/password", "Change password", "password"],
       ["#/create-wallet-brainkey", "Create new wallet", "create"],
       ["#/existing-account", "Import existing account", "import"]
     ];

@@ -1,12 +1,17 @@
-/* AccountUI: public account pages (balances in human terms + op history).
+/* AccountUI: public account pages (balances in human terms + op history +
+ *   membership + lifetime-member upgrade).
  * Owns: DOM for the /account/:account_name route only (loading, header,
- *   balances table/cards, history list, /account/me unlock prompt, errors).
+ *   membership section with the op-8 LTM upgrade flow, balances table/cards,
+ *   history list, /account/me unlock prompt, errors).
  * Consumes: Account.resolve/balances/history/myAccountId (js/account.js),
- *   Wallet.isUnlocked/unlock (js/wallet.js); Format via Account display
- *   strings (no money math here); Store owns settings/connection outside
- *   this view (not read here, keeping the slice read-only).
+ *   Wallet.isUnlocked/unlock/keys (js/wallet.js); Format via Account display
+ *   strings (no money math here); the upgrade path additionally consumes
+ *   Chain (get_accounts re-read), Tx.fee/buildTx/sign (via Credit.fee/
+ *   Credit.sendAndProve + Tx.buildTx), Asset.describe (fee display) —
+ *   all guarded at call time, never at load.
  * Globals/side effects: document DOM under the router's root element,
- *   global AccountUI only. No network, no storage, no signing.
+ *   global AccountUI only. The upgrade flow signs + broadcasts one op-8
+ *   tx (user-confirmed, never automatic); everything else is read-only.
  * Created by: building-vanilla-slices skill, slice-03 Task 4.
  */
 var AccountUI = (function () {
@@ -316,6 +321,187 @@ var AccountUI = (function () {
     });
   }
 
+  /* Member status from a full get_accounts object (bitsharesjs
+   * ChainStore.getAccountMemberStatus rule, consumed at #1
+   * AccountMembership.jsx:85 — member_status drives the upgrade buttons
+   * there): lifetime iff the account is its own lifetime_referrer; else
+   * annual iff membership_expiration_date parses to a future time; else
+   * basic. Unparseable/missing dates read basic — a display field never
+   * throws. Params: full (raw account object or null). */
+  function memberStatus(full) {
+    if (!full || typeof full !== "object") return "basic";
+    if (full.lifetime_referrer && full.id && full.lifetime_referrer === full.id) {
+      return "lifetime";
+    }
+    var t = Date.parse(full.membership_expiration_date);
+    if (Number.isFinite(t) && t > Date.now()) return "annual";
+    return "basic";
+  }
+
+  /* Named-row confirm list (dt/dd pairs; dd title carries the raw value). */
+  function confirmList(doc, rows) {
+    var list = doc.createElement("dl");
+    list.className = "xfer-confirm";
+    rows.forEach(function (r) {
+      var dt = doc.createElement("dt");
+      dt.textContent = r[0];
+      list.appendChild(dt);
+      var dd = doc.createElement("dd");
+      dd.textContent = r[1];
+      if (r[2]) dd.title = r[2];
+      list.appendChild(dd);
+    });
+    return list;
+  }
+
+  /* Membership section (C29): status line for every account plus the op-8
+   * lifetime-member upgrade flow for non-LTM accounts. Flow: Review (fee
+   * estimated live via get_required_fees) -> named-row confirm (account,
+   * fee) -> Sign & Send -> re-read proof (status flips to lifetime).
+   * Guards: wallet must be unlocked AND bound to the viewed account (an
+   * upgrade signs with the account's own active key — anything else fails
+   * loudly before any broadcast). Params: doc, box (section element),
+   * acct ({id, name}). */
+  function renderMembership(doc, box, acct) {
+    var loading = doc.createElement("p");
+    loading.className = "muted";
+    loading.textContent = "Loading membership…";
+    box.appendChild(loading);
+    var need = ["Chain", "Tx", "Credit", "Format", "Asset", "Wallet", "Account"];
+    var missing = null;
+    need.forEach(function (g) {
+      if (typeof globalThis[g] === "undefined") missing = g;
+    });
+    if (missing) {
+      box.removeChild(loading);
+      showError(doc, box, missing + " backend missing: " + missing + " failed to load.");
+      return;
+    }
+    Promise.resolve().then(async function () {
+      var dbId = await Chain.db();
+      var rows = await Chain.call(dbId, "get_accounts", [[acct.id]]);
+      if (!rows || !rows[0]) throw new Error("unknown-account");
+      return rows[0];
+    }).then(function (full) {
+      box.removeChild(loading);
+      var status = memberStatus(full);
+      var p = doc.createElement("p");
+      if (status === "lifetime") {
+        p.textContent = "Lifetime member.";
+        box.appendChild(p);
+        return;
+      }
+      p.textContent = status === "annual" && full.membership_expiration_date
+        ? "Annual member (expires " + String(full.membership_expiration_date) + ")."
+        : "Basic account.";
+      box.appendChild(p);
+      var btn = doc.createElement("button");
+      btn.type = "button";
+      btn.style.minHeight = "44px";
+      btn.textContent = "Upgrade to lifetime member";
+      box.appendChild(btn);
+      var out = doc.createElement("div");
+      box.appendChild(out);
+      btn.addEventListener("click", function () {
+        while (out.firstChild) out.removeChild(out.firstChild);
+        btn.disabled = true;
+        var st = doc.createElement("p");
+        st.className = "muted";
+        st.textContent = "Resolving and estimating fee…";
+        out.appendChild(st);
+        Promise.resolve().then(async function () {
+          if (!Wallet.isUnlocked()) throw new Error("wallet-locked");
+          var mine = await Account.myAccountId();
+          if (mine !== acct.id) {
+            throw new Error("This upgrade must be signed by " + acct.name +
+              "'s active key — unlock that wallet account first (no broadcast made).");
+          }
+          var pair = [8, { fee: { amount: "0", asset_id: "1.3.0" },
+            account_to_upgrade: acct.id, upgrade_to_lifetime_member: true,
+            extensions: [] }];
+          var fee = await Credit.fee(pair, "1.3.0");
+          return { pair: pair, fee: fee, fromStatus: status };
+        }).then(function (R) {
+          var fa = null;
+          Asset.describe(R.fee.asset_id).then(function (a) { fa = a; })
+            .catch(function () { fa = null; }).then(function () {
+              while (out.firstChild) out.removeChild(out.firstChild);
+              var feeHuman = fa
+                ? Format.formatAmount(String(R.fee.amount), fa.precision) + " " + fa.symbol
+                : String(R.fee.amount);
+              out.appendChild(confirmList(doc, [
+                ["Account", acct.name + " (" + acct.id + ")"],
+                ["Upgrade", R.fromStatus + " → Lifetime member"],
+                ["Fee", feeHuman, "raw " + String(R.fee.amount)],
+                ["Network", "testnet"]
+              ]));
+              var back = doc.createElement("button");
+              back.type = "button";
+              back.style.minHeight = "44px";
+              back.textContent = "Back";
+              var send = doc.createElement("button");
+              send.type = "button";
+              send.style.minHeight = "44px";
+              send.textContent = "Sign & Send";
+              out.appendChild(back);
+              out.appendChild(send);
+              back.addEventListener("click", function () {
+                while (out.firstChild) out.removeChild(out.firstChild);
+                btn.disabled = false;
+              });
+              send.addEventListener("click", function () {
+                send.disabled = true;
+                back.disabled = true;
+                var bs = doc.createElement("p");
+                bs.className = "muted";
+                bs.textContent = "Broadcasting…";
+                out.appendChild(bs);
+                var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+                if (!wif) {
+                  out.removeChild(bs);
+                  showError(doc, out, new Error("wallet-locked"), "Wallet is locked.");
+                  send.disabled = false;
+                  back.disabled = false;
+                  return;
+                }
+                Tx.buildTx([R.pair]).then(function (unsigned) {
+                  return Credit.sendAndProve(unsigned, wif, async function () {
+                    try {
+                      var dbId = await Chain.db();
+                      var rows = await Chain.call(dbId, "get_accounts", [[acct.id]]);
+                      if (rows && rows[0] && memberStatus(rows[0]) === "lifetime") return rows[0];
+                    } catch (e) { return null; }
+                    return null;
+                  });
+                }).then(function (res) {
+                  while (out.firstChild) out.removeChild(out.firstChild);
+                  var ok = doc.createElement("p");
+                  ok.textContent = "Lifetime upgrade broadcast (" + res.via + "). " +
+                    acct.name + " is now a lifetime member.";
+                  out.appendChild(ok);
+                  btn.disabled = false;
+                }).catch(function (e) {
+                  out.removeChild(bs);
+                  showError(doc, out, e,
+                    "Failed. Check state before retrying (do NOT blindly rebroadcast).");
+                  send.disabled = false;
+                  back.disabled = false;
+                });
+              });
+              btn.disabled = false;
+            });
+        }).catch(function (e) {
+          while (out.firstChild) out.removeChild(out.firstChild);
+          showError(doc, out, e, "Could not prepare the upgrade.");
+          btn.disabled = false;
+        });
+      });
+    }).catch(function (e) {
+      box.removeChild(loading);
+      showError(doc, box, e, "Could not load membership.");
+    });
+  }
+
   /* Fill an account page: header (name + id), then balances and history
    * sections that each fail inline (never blank, never wiping the other). */
   function showAccount(doc, wrap, root, acct) {
@@ -326,6 +512,13 @@ var AccountUI = (function () {
     sub.className = "muted";
     sub.textContent = acct.id;
     wrap.appendChild(sub);
+
+    var memSection = doc.createElement("section");
+    var memH = doc.createElement("h2");
+    memH.textContent = "Membership";
+    memSection.appendChild(memH);
+    wrap.appendChild(memSection);
+    renderMembership(doc, memSection, acct);
 
     var balSection = doc.createElement("section");
     var balH = doc.createElement("h2");

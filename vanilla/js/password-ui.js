@@ -1,0 +1,152 @@
+/* password-ui.js — keystore password-change view (matrix C34).
+ * Owns: #/wallet/password (verify current password -> re-encrypt the local
+ *   keystore with the new password -> lock + unlock-with-new proof).
+ *   KEYSTORE-LOCAL ONLY: this changes the AES-GCM envelope password in
+ *   localStorage. It is NOT astro-ui's on-chain cloud-password op
+ *   (ChangePassword.jsx builds an account_update broadcast) — no serializers,
+ *   no broadcasts here by design. Re-encryption reuses Wallet.unlock +
+ *   Wallet.create (which re-derives from the in-memory brainkey and writes a
+ *   fresh random-salt envelope); keys never leave Wallet's memory-only state.
+ * Consumes: Wallet.unlock/create/lock/isUnlocked/getBrainkey (js/wallet.js).
+ *   No Chain, no Account, no Format (no amounts on screen).
+ * Globals/side effects: DOM under root only; localStorage envelope rewrite
+ *   via Wallet.create; global PasswordUI. Gen counter tears down stale async.
+ * Refs: slice-02 keystore (PBKDF2-600k/AES-GCM, wallet.js:10-24);
+ *   wallet-extension keystore discipline (verify-before-rewrite, #3).
+ * Created by: deferred-matrix close-out (C30/C31/C34/C35 batch).
+ */
+var PasswordUI = (function () {
+  "use strict";
+  var gen = 0;
+  /* textContent-only element (all strings via textContent, never HTML). */
+  function el(doc, tag, text, cls) {
+    var n = doc.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n; }
+  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
+  function touchable(n) { n.style.minHeight = "44px"; return n; }
+  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  function makeWrap(doc, root) {
+    var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
+  /* Inline error line (aria-live so failures are announced). */
+  function makeError(doc) {
+    var err = doc.createElement("div");
+    err.className = "error"; err.setAttribute("aria-live", "polite"); return err;
+  }
+  /* Labeled password row. */
+  function pwRow(doc, labelText, id) {
+    var row = el(doc, "div", null, "xfer-field");
+    var label = el(doc, "label", labelText + " ");
+    var input = doc.createElement("input");
+    input.id = id; input.type = "password";
+    input.setAttribute("autocomplete", "new-password");
+    input.setAttribute("spellcheck", "false");
+    touchable(input); label.appendChild(input); row.appendChild(label);
+    return { row: row, input: input };
+  }
+
+  /* Backend guard: loud inline panel when js/wallet.js failed to load. */
+  function backendMissing() {
+    return (typeof Wallet === "undefined" || !Wallet);
+  }
+
+  /* Route entry. States: (1) no wallet stored -> honest pointer to
+   * create/import; (2) form -> verify + re-encrypt + proof; (3) success panel
+   * (wallet left LOCKED so no key material lingers past the proof). */
+  function renderPassword(root) {
+    if (!root) return;
+    var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
+    if (!doc) return;
+    var myGen = ++gen;
+    clearRoot(root);
+    var wrap = makeWrap(doc, root);
+    wrap.appendChild(el(doc, "h1", "Change wallet password"));
+    if (backendMissing()) {
+      var missing = makeError(doc);
+      missing.textContent = "Wallet backend missing: js/wallet.js failed to load.";
+      wrap.appendChild(missing);
+      return;
+    }
+    wrap.appendChild(el(doc, "p",
+      "Changes the password that encrypts this device's wallet copy. " +
+      "Your brainkey and keys do not change — only the local lock on them. " +
+      "Nothing is broadcast; this never touches the chain.",
+      "muted"));
+    /* No-wallet probe: localStorage envelope absent -> point at create/import
+     * instead of a password form that could only fail. */
+    var hasWallet = true;
+    try {
+      if (typeof localStorage !== "undefined" &&
+          !localStorage.getItem("bts-vanilla-wallet-v1")) hasWallet = false;
+    } catch (e) { /* unreadable storage: let unlock surface it */ }
+    if (!hasWallet) {
+      wrap.appendChild(el(doc, "p", "No wallet stored on this device yet — there is no password to change.", "muted"));
+      var p = el(doc, "p", null, "muted");
+      [["#/create-wallet-brainkey", "Create new wallet"],
+       ["#/existing-account", "Import existing account"]].forEach(function (pr, i) {
+        if (i > 0) p.appendChild(doc.createTextNode(" · "));
+        var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; p.appendChild(a);
+      });
+      wrap.appendChild(p);
+      return;
+    }
+    var cur = pwRow(doc, "Current password", "pwcur-password");
+    var nw = pwRow(doc, "New password", "pwcur-new");
+    var cf = pwRow(doc, "Confirm new password", "pwcur-confirm");
+    wrap.appendChild(cur.row); wrap.appendChild(nw.row); wrap.appendChild(cf.row);
+    var btn = touchable(el(doc, "button", "Change password"));
+    btn.id = "pwcur-do"; btn.type = "button"; wrap.appendChild(btn);
+    var err = makeError(doc); wrap.appendChild(err);
+    var ok = el(doc, "p", "", "xfer-ok");
+    ok.setAttribute("aria-live", "polite"); wrap.appendChild(ok);
+    btn.addEventListener("click", function () {
+      err.textContent = ""; ok.textContent = "";
+      var curPw = cur.input.value, newPw = nw.input.value, cfmPw = cf.input.value;
+      if (!curPw) { err.textContent = "Enter your current password."; return; }
+      if (!newPw) { err.textContent = "Enter a new password."; return; }
+      if (newPw !== cfmPw) { err.textContent = "New passwords do not match."; return; }
+      if (newPw === curPw) { err.textContent = "The new password is the same as the current one — nothing to change."; return; }
+      btn.disabled = true; btn.textContent = "Verifying…";
+      Promise.resolve()
+        .then(function () { return Wallet.unlock(curPw); })
+        .then(function () {
+          if (myGen !== gen) throw new Error("stale-view");
+          var bk = Wallet.getBrainkey();
+          btn.textContent = "Re-encrypting…";
+          return Wallet.create(newPw, bk);
+        })
+        .then(function () {
+          if (myGen !== gen) throw new Error("stale-view");
+          /* Proof: lock, then unlock with the NEW password. Failure here
+           * surfaces honestly — the envelope was rewritten, so a proof
+           * failure is reported, never swallowed. */
+          Wallet.lock();
+          btn.textContent = "Verifying new password…";
+          return Wallet.unlock(newPw);
+        })
+        .then(function () {
+          if (myGen !== gen) return;
+          Wallet.lock(); /* leave locked: no keys linger past the proof */
+          btn.disabled = false; btn.textContent = "Change password";
+          cur.input.value = ""; nw.input.value = ""; cf.input.value = "";
+          ok.textContent = "Password changed and verified — the wallet is locked. Unlock with the new password to continue.";
+        })
+        .catch(function (e) {
+          if (myGen !== gen) return;
+          btn.disabled = false; btn.textContent = "Change password";
+          var msg = (e && e.message) ? e.message : String(e || "Password change failed");
+          if (msg === "stale-view") return;
+          if (msg.indexOf("wrong password") === 0) msg = "Current password is incorrect — nothing was changed.";
+          err.textContent = msg;
+        });
+    });
+    var back = el(doc, "p", null, "muted");
+    var a = doc.createElement("a"); a.href = "#/wallet"; a.textContent = "Back to Wallet manager";
+    back.appendChild(a); wrap.appendChild(back);
+  }
+
+  return { renderPassword: renderPassword };
+})();
+
+if (typeof module !== "undefined") { module.exports = PasswordUI; }

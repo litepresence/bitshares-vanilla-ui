@@ -146,6 +146,7 @@ var Router = (function () {
     { path: "/spotlight", title: "Spotlight", render: function (root) { DebitUI.renderSpotlight(root); } },
     { path: "/transfer/:to", title: "Transfer", render: function (root, params) { TransferUI.renderTransfer(root, params && params.to); } },
     { path: "/transfer", title: "Transfer", render: function (root, params) { TransferUI.renderTransfer(root, params && params.to); } },
+    { path: "/wallet/password", title: "Change Wallet Password", render: function (root) { PasswordUI.renderPassword(root); } },
     { path: "/wallet", title: "Wallet", render: function (root, params) { WalletUI.renderWallet(root, params); } },
     { path: "/create-wallet-brainkey", title: "Create Wallet (Brainkey)", render: function (root, params) { WalletUI.renderCreate(root, params); } },
     { path: "/existing-account", title: "Existing Account", render: function (root, params) { WalletUI.renderImport(root, params); } },
@@ -166,6 +167,9 @@ var Router = (function () {
     { path: "/assets/update/:symbol", title: "Update Asset", render: function (root, params) { AssetManageUI.renderUpdate(root, params && params.symbol); } },
     { path: "/assets/issue", title: "Issue Asset", render: function (root) { AssetManageUI.renderIssue(root); } },
     { path: "/assets/feed", title: "Publish Feed", render: function (root) { AssetFeedUI.renderFeed(root); } },
+    { path: "/fees", title: "Network Fees", render: function (root) { FeesUI.renderFees(root); } },
+    { path: "/referrals", title: "Referrals", render: function (root) { ReferralsUI.renderReferrals(root); } },
+    { path: "/favourites", title: "Favourites", render: function (root) { FavouritesUI.renderFavourites(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 
