@@ -133,11 +133,13 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] `i18n.js` + 10 dicts (121 keys; en full, es 32, 8 stubs); switcher; batch-1 en-identical (16/16); Store-envelope pref; drift gate
 - [x] Batch ledger in parity note `vanilla/notes/slice-17-i18n.md`; audit DONE-WITH-BROWSER-ITEMS
 
-### 18. Final readability pass 🔨
-- [ ] Full read-only audit (headers, descriptions, oversize, dead code, TODOs) — findings below
-- [ ] Targeted fix workers per finding group; readability note; re-verify
-- Oversize inventory (lines): tx.js 2674 (serializer registry — exception candidate), market-ui 1329, trade-ui 1206, vote-ui 952, explorer-assets 786, crypto 750, market-charts 638, transfer-ui 579, proposal-ui 555 (toolkit exception), market 542, account-ui 502, settings 443, htlc 422, htlc-ui 419
-- Tester browser passes (slices 2–17) remain queued with the human tester
+### 18. Final readability pass ✅
+- [x] Full read-only audit (headers, descriptions, oversize, dead code, TODOs)
+- [x] 10 behavior-identical splits; dead code deleted (caller-proven); exceptions recorded
+- [x] Readability note `vanilla/notes/slice-18-readability.md`; smoke-verified post-split
+- [x] Op-coverage matrix `vanilla/notes/op-coverage-matrix.md`: 0 unjustified missing (22+17+20 ported, 11 honest stubs, deferred with reasons)
+- [ ] STUB BUILD QUEUE (from matrix §A, in value order): `/instant-trade`×2, `/create-account`, `/accounts`, `/create-worker`, `/registration`×3+`/login`, `/news`, `/help/**`, `/prediction`×2
+- [ ] Tester browser passes (slices 2–17) + ticket funding (≥105 TEST) — with human tester
 
 ## Standing directives (user, 2026-09-28 — binding for all remaining slices)
 - Retro look: continually review the ref UI via BOTH `vanilla/notes/original-pages/` screenshots AND the `bitshares-ui` codebase; iterate every page until the retro look holds. No page is done until it reads true against the original.
