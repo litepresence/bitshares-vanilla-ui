@@ -18,14 +18,14 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 | 8 | Voting/governance | ✅ built (op-6 proven blocks 100916767/68, 1.2.5 sentinel; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 9 | Explorer | ✅ built (fixtures 100916767/68 read back, 4 verify bugs fixed, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 10 | Asset ops | ✅ built (ops 10–15+19, CER+F1+B1 money fixes, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
-| 11 | HTLC + direct debit + spotlight | 🔨 (plan mapped; T1+T2 landed; T3 views pending) |
-| 12 | Pools + swap + stake | ⬜ |
-| 13 | Credit + Same-T + borrow | ⬜ |
-| 14 | Proposals + tickets + misc | ⬜ |
-| 15 | Gateways | ⬜ |
-| 16 | Notifications + alerts | ⬜ |
-| 17 | i18n foundations | ⬜ |
-| 18 | Final readability pass | ⬜ |
+| 11 | HTLC + direct debit + spotlight | ✅ built (full lifecycle 1.16.621-625, debit 1.12.139, F-fixes; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 12 | Pools + swap + stake | ✅ built (2 lifecycles 1.19.66/67, virgin max-rule, DEX-UX mirror, ES refused; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 13 | Credit + Same-T + borrow | ✅ built (offer 1.21.43→deals, fund 1.20.29/30, denom 1M, same-tx rule; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 14 | Proposals + tickets + misc | ✅ built (props 1.10.1488/89/91, vesting, authority 1.17.4, F1-F6; tickets PENDING funds; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 15 | Gateways | ✅ built (XBTSX/IOB live, GDEX/BIT20 honest-unavailable, memo fix; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 16 | Notifications + alerts | ✅ built (engine wired, CSS, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 17 | i18n foundations | ✅ built (en+es+8 stubs, switcher, batch-1 en-identical, Store envelope; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 18 | Final readability pass | 🔨 (oversize list inventoried — see below; audit then fixes) |
 | — | Extension-wrapper adapter | 🔒 post-v1 hardening, never a v1 dependency |
 
 ## Sub-objectives per slice
@@ -101,34 +101,43 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] Money-critical fixes: F1 CER legs, B1 `pctHumanToRatio` ×10 pad (chain reconcile: MCR 1750/MSSR 1500 TRUE on-chain); F2 subscribe, F3 feeGen; split (170/380/267/275/282)
 - [x] Parity note `vanilla/notes/slice-10-assets.md`, audit DONE-WITH-BROWSER-ITEMS (round-trips `"175"→1750→"175"`, `"2"→200→"2"`)
 
-### 11. HTLC + direct debit + spotlight 🔨
-- [x] Plan mapped (`docs/superpowers/plans/2026-09-28-slice-11-htlc.md`): ops 25/26/27/28 + 49/50/52 (51/53 VIRTUAL never signed); hash variant 0–3, sha256-only until RIPEMD proven; op-26 start-time trap; spotlight = tile grid + recurring via slice-6 path
-- [x] Task 1: serializers in `tx.js` (7 ops, op-26 trap vector proven in bytes); Task 2: `htlc.js` reads+builders (400 lines)
-- [ ] Task 3: views (htlc-ui + debit split, preimage never displayed, routes + tags)
-- [ ] Task 4: full lifecycle testnet proof (create→redeem, create→refund, debit create→claim→delete), parity note, audit
+### 11. HTLC + direct debit + spotlight ✅ (browser ⏳)
+- [x] Ops 25/26/27/28 + 49/50/52 (51/53 VIRTUAL never signed); op-26 trap proven
+- [x] Full lifecycle: HTLC `1.16.621` create→redeem, `1.16.622` extend→expiry (virtual op-53), cross-account 623/624; debit `1.12.139` create→claim→update→delete; F-FEEFILL/F-DEBITGEN/F-MEMO + subscribe fixed
+- [x] Parity note `vanilla/notes/slice-11-htlc.md`, audit DONE-WITH-BROWSER-ITEMS
 
-### 12. Pools + swap + stake ⬜
-- [ ] Pool create/deposit/withdraw/exchange, simple swap page, staking views
-- [ ] UX DIRECTION (user): prefer bitshares-dex-UX experience over reference bitshares-ui for pools — orderbook desk and pools desk must feel seamless (same design language). Review how DEX-UX gathered candle data from Kibana/Elasticsearch + how it mirrored the two desks.
+### 12. Pools + swap + stake ✅ (browser ⏳)
+- [x] Ops 59/60/61/62/63/75; lifecycles `1.19.66` + `1.19.67`; virgin mint = max(raw) proven; DEX-UX desk mirror; ES transport refused (chain-only)
+- [x] Parity note `vanilla/notes/slice-12-pools.md`, audit DONE (verdict DONE-WITH-BROWSER-ITEMS)
+- [x] UX DIRECTION (user): DEX-UX experience over Poolmart — desks seamless (kept)
 
-### 13. Credit + Same-T + borrow ⬜
-- [ ] Credit offers/deals lifecycle, Same-T funds, barter, margin/borrow views
+### 13. Credit + Same-T + borrow ✅ (browser ⏳)
+- [x] Ops 3/64–73/76; offer `1.21.43`→deals `1.22.70/71`; funds `1.20.29/30`; denom 1M; same-tx [67,68] rule; barter form (PROPOSE deferred → slice 14)
+- [x] Parity note `vanilla/notes/slice-13-credit.md`, audit DONE-WITH-BROWSER-ITEMS
 
-### 14. Proposals + tickets + misc ⬜
-- [ ] Proposal create/approve/reject, vote-lock tickets, airdrops, blind transfers, invoices, vesting claims, custom authorities, account lists
+### 14. Proposals + tickets + misc ✅ (browser ⏳)
+- [x] Ops 7/22/23/24/32/33/37/54/55/56/57/58; props `1.10.1488/89/91`; barter PROPOSE proven; vesting/authority/whitelist/airdrop; blind downscoped honestly; F1–F6 fixed
+- [x] Tickets PENDING (fees 100 TEST > fixture 38.8; faucet rate-limited)
+- [x] Parity note `vanilla/notes/slice-14-proposals.md`, audit DONE-WITH-BROWSER-ITEMS
 
-### 15. Gateways ⬜
-- [ ] Per-gateway adapters with explicit unavailable states, deposit-address flows, NEVER load-bearing
-- [ ] SCOPE (user, 2026-09-28): in-scope = XBTSX, BIT20, GDEX, IOB only. BIT20/GDEX may no longer be fully automated — verify live, ship "unavailable" states if dead. All other historic gateway partners (RuDEX/Citadel/BlockTrades/Bitspark/…) are out of business → OUT OF SCOPE, do not port.
+### 15. Gateways ✅ (browser ⏳)
+- [x] XBTSX + IOB live (45 + 2 coins); GDEX dead (DNS) → manual-only; BIT20 gateway-less → disabled; withdraw = transfer-prefill delegation; `backingCoin` memo fix proven live (`BTC:`)
+- [x] SCOPE (user, 2026-09-28): XBTSX/BIT20/GDEX/IOB only; all other historic partners OUT OF SCOPE (kept)
+- [x] Parity note `vanilla/notes/slice-15-gateways.md`, audit DONE-WITH-BROWSER-ITEMS
 
-### 16. Notifications + alerts ⬜
-- [ ] Native DOM notifications, price alerts (no notification library)
+### 16. Notifications + alerts ✅ (browser ⏳)
+- [x] Toast engine + rules + watcher + prefs (browser OFF default); `#/alerts` + host + desk bell; wired into ticker/history/broadcasts; CSS + split
+- [x] Parity note `vanilla/notes/slice-16-notify.md`, audit DONE-WITH-BROWSER-ITEMS
 
-### 17. i18n foundations ⬜
-- [ ] Plain JSON dicts + `Intl` (no react-intl); English-first until then; locale switcher wired to existing picker assets
+### 17. i18n foundations ✅ (browser ⏳)
+- [x] `i18n.js` + 10 dicts (121 keys; en full, es 32, 8 stubs); switcher; batch-1 en-identical (16/16); Store-envelope pref; drift gate
+- [x] Batch ledger in parity note `vanilla/notes/slice-17-i18n.md`; audit DONE-WITH-BROWSER-ITEMS
 
-### 18. Final readability pass ⬜
-- [ ] End-to-end re-read per §3.7 (headers, descriptions, splits incl. 1167-line trade-ui.js, dead code); app incomplete until green
+### 18. Final readability pass 🔨
+- [ ] Full read-only audit (headers, descriptions, oversize, dead code, TODOs) — findings below
+- [ ] Targeted fix workers per finding group; readability note; re-verify
+- Oversize inventory (lines): tx.js 2674 (serializer registry — exception candidate), market-ui 1329, trade-ui 1206, vote-ui 952, explorer-assets 786, crypto 750, market-charts 638, transfer-ui 579, proposal-ui 555 (toolkit exception), market 542, account-ui 502, settings 443, htlc 422, htlc-ui 419
+- Tester browser passes (slices 2–17) remain queued with the human tester
 
 ## Standing directives (user, 2026-09-28 — binding for all remaining slices)
 - Retro look: continually review the ref UI via BOTH `vanilla/notes/original-pages/` screenshots AND the `bitshares-ui` codebase; iterate every page until the retro look holds. No page is done until it reads true against the original.
