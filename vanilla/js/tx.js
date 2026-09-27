@@ -1,7 +1,8 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
- * (op 1) and limit_order_cancel (op 2) transactions, unsigned-tx
+ * (op 1), limit_order_cancel (op 2) and account_update (op 6, voting only)
+ * transactions, unsigned-tx
  * construction (single- and multi-op), fee lookup, local signing dispatch,
  * and broadcast with inclusion proof. Later slices extend this file with
  * further ops — new code appends here, never forks a second serializer.
@@ -41,6 +42,22 @@
  * - serializeLimitOrderAutoAction (on_fill path only, best-effort)
  *                          <- #3 bitshares-api.js:1898-1912
  * - serializeTransaction   <- #3 bitshares-api.js:1663-1696
+ * - voteIdToUint32         <- #3 bitshares-api.js:2126-2134 ("type:instance"
+ *                             string -> (type&0xff)|((instance&0xffffff)<<8))
+ *                             + #4 .../protocol/vote.hpp:42-49 (wire u32 =
+ *                             instance<<8|type), :68-70 (ctor content)
+ * - serializeAccountOptions
+ *                          <- #3 bitshares-api.js:2116-2140 (pubkey,
+ *                             voting_account default '1.2.5', u16 counts,
+ *                             varint-counted vote u32s, empty extensions)
+ *                             + #4 .../protocol/account.hpp:39-59 (FC field
+ *                             order) + sorted-before-publish #1
+ *                             AccountVoting.jsx:354-361
+ * - serializeAccountUpdateOp
+ *                          <- #3 bitshares-api.js:2420-2429 (fee, account,
+ *                             owner?, active?, new_options?, extensions)
+ *                             + #4 .../protocol/account.hpp:151-162
+ * - op 6 = account_update_operation <- #4 .../protocol/operations.hpp:62
  * - fee placeholder + get_required_fees shape [[[opId, opData]], assetId]
  *                          <- #3 bitshares-api.js:761-788 (getRequiredFee)
  *                             + :795-805 (broadcastTransaction fee fill)
@@ -331,6 +348,94 @@ var Tx = (function () {
     ]);
   }
 
+  /* vote_id "type:instance" string (or raw u32 number) -> u32 wire value
+   * (instance<<8 | type). #4 vote.hpp:42-49; #3 bitshares-api.js:2126-2134.
+   * Instance must fit 24 bits, type 8 bits — anything else throws. No float:
+   * the shift/mask path is integer-only (writeUint32LE re-applies >>> 0). */
+  function voteIdToUint32(vote) {
+    var type, instance;
+    if (typeof vote === "string") {
+      if (!/^\d+:\d+$/.test(vote)) throw new Error("bad vote id (want \"type:instance\"): " + JSON.stringify(vote));
+      var parts = vote.split(":");
+      type = parseInt(parts[0], 10);
+      instance = parseInt(parts[1], 10);
+    } else if (typeof vote === "number" && Number.isInteger(vote) && vote >= 0 && vote <= 0xFFFFFFFF) {
+      type = vote & 0xFF;
+      instance = vote >>> 8;
+    } else {
+      throw new Error("bad vote id (want \"type:instance\" or u32): " + JSON.stringify(vote));
+    }
+    if (type < 0 || type > 0xFF) throw new Error("vote type out of range: " + JSON.stringify(vote));
+    if (instance < 0 || instance > 0xFFFFFF) throw new Error("vote instance out of range: " + JSON.stringify(vote));
+    return (((instance << 8) | type) >>> 0);
+  }
+
+  /* account_options in #4 order: memo_key, voting_account (defaults to the
+   * proxy-to-self sentinel "1.2.5" per #4 account.hpp:48 + #3 default),
+   * num_witness u16, num_committee u16, votes (varint count + u32 LE each),
+   * extensions. Votes sort ascending by (type, instance) before serializing
+   * (#1 AccountVoting.jsx:354-361 sorts before publish; #4 account.hpp:58
+   * holds a flat_set<vote_id_type>). Counts are plain u16s, not percents. */
+  function serializeAccountOptions(opts) {
+    if (!opts || typeof opts !== "object") throw new Error("account_options must be an object");
+    if (typeof opts.memo_key !== "string" || !opts.memo_key) {
+      throw new Error("account_options.memo_key must be a public key string");
+    }
+    var votingAccount = opts.voting_account || "1.2.5";
+    var numWitness = opts.num_witness || 0;
+    var numCommittee = opts.num_committee || 0;
+    if (!Number.isInteger(numWitness) || numWitness < 0 || numWitness > 0xFFFF) {
+      throw new Error("num_witness out of range: " + numWitness);
+    }
+    if (!Number.isInteger(numCommittee) || numCommittee < 0 || numCommittee > 0xFFFF) {
+      throw new Error("num_committee out of range: " + numCommittee);
+    }
+    var votes = opts.votes || [];
+    if (!Array.isArray(votes)) throw new Error("account_options.votes must be an array");
+    var u32s = votes.map(voteIdToUint32);
+    u32s.sort(function (a, b) {
+      var ta = a & 0xFF, tb = b & 0xFF;
+      if (ta !== tb) return ta - tb;
+      return (a >>> 8) - (b >>> 8);
+    });
+    var parts = [
+      serializePublicKey(opts.memo_key),
+      serializeObjectId(votingAccount),
+      writeUint16LE(numWitness),
+      writeUint16LE(numCommittee),
+      varintUint32(u32s.length)
+    ];
+    for (var i = 0; i < u32s.length; i++) parts.push(writeUint32LE(u32s[i]));
+    parts.push(varintUint32(0));
+    return concatBytes(parts);
+  }
+
+  /* account_update op data (op 6) in #4 order: fee, account, owner?, active?,
+   * new_options?, extensions. #3 bitshares-api.js:2420-2429; #4
+   * account.hpp:151-162 (fee_payer = account). Voting sets ONLY new_options:
+   * a non-null owner/active throws loudly — authority bytes have no
+   * serializer in this file (a separate slice owns that, never a silent
+   * best-effort here). Undefined optionals encode absent, same convention
+   * as the transfer memo path. */
+  function serializeAccountUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("account_update op must be an object");
+    if (op.owner !== null && op.owner !== undefined) {
+      throw new Error("account_update owner authority serialization is not supported (voting sets new_options only)");
+    }
+    if (op.active !== null && op.active !== undefined) {
+      throw new Error("account_update active authority serialization is not supported (voting sets new_options only)");
+    }
+    var ABSENT = new Uint8Array([0]);
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      ABSENT,
+      ABSENT,
+      serializeOptional(op.new_options === undefined ? null : op.new_options, serializeAccountOptions),
+      varintUint32(0)
+    ]);
+  }
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -349,7 +454,8 @@ var Tx = (function () {
       if (opType === 0) parts.push(serializeTransferOp(opData));
       else if (opType === 1) parts.push(serializeLimitOrderCreateOp(opData));
       else if (opType === 2) parts.push(serializeLimitOrderCancelOp(opData));
-      else throw new Error("tx.js supports ops 0-2, got op " + opType);
+      else if (opType === 6) parts.push(serializeAccountUpdateOp(opData));
+      else throw new Error("tx.js supports ops 0-2 and 6, got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -607,7 +713,7 @@ var Tx = (function () {
   }
 
   return {
-    OP: { transfer: 0, limit_order_create: 1, limit_order_cancel: 2 },
+    OP: { transfer: 0, limit_order_create: 1, limit_order_cancel: 2, account_update: 6 },
     fee: fee,
     feeMulti: feeMulti,
     buildTx: buildTx,
@@ -634,6 +740,9 @@ var Tx = (function () {
       serializeLimitOrderCreateOp: serializeLimitOrderCreateOp,
       serializeLimitOrderCancelOp: serializeLimitOrderCancelOp,
       serializeLimitOrderAutoAction: serializeLimitOrderAutoAction,
+      voteIdToUint32: voteIdToUint32,
+      serializeAccountOptions: serializeAccountOptions,
+      serializeAccountUpdateOp: serializeAccountUpdateOp,
       serializeTransaction: serializeTransaction
     }
   };

@@ -90,7 +90,7 @@ var Router = (function () {
     { path: "/registration/local", title: "Registration", render: placeholder("Registration") },
     { path: "/registration/cloud", title: "Registration", render: placeholder("Registration") },
     { path: "/news", title: "News", render: placeholder("News") },
-    { path: "/voting", title: "Voting", render: placeholder("Voting") },
+    { path: "/voting", title: "Voting", render: function (root) { VoteUI.renderVoting(root); } },
     { path: "/explorer", title: "Explorer", render: placeholder("Explorer") },
     { path: "/explorer/:tab", title: "Explorer", render: placeholder("Explorer") },
     { path: "/asset/:symbol", title: "Asset", render: placeholder("Asset") },
