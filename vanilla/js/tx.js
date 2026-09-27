@@ -1,7 +1,8 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52, 59-63, 75).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-3, 6, 10-15, 19, 25-28, 49, 50, 52, 59-73, 75, 76).
  *
- * What it owns: binary serialization of transfer (op 0), limit_order_create
- * (op 1), limit_order_cancel (op 2), account_update (op 6, voting only),
+  * What it owns: binary serialization of transfer (op 0), limit_order_create
+  * (op 1), limit_order_cancel (op 2), call_order_update (op 3), account_update
+  * (op 6, voting only),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
  * (op 15), asset_publish_feed (op 19), withdraw_permission_create (op 25),
@@ -10,7 +11,7 @@
  * (op 50), htlc_extend (op 52), liquidity_pool_create (op 59),
  * liquidity_pool_delete (op 60), liquidity_pool_deposit (op 61),
  * liquidity_pool_withdraw (op 62), liquidity_pool_exchange (op 63) and
- * liquidity_pool_update (op 75) transactions, unsigned-tx
+  * liquidity_pool_update (op 75), samet_fund ops (64-68), credit ops (69-73, 76) transactions, unsigned-tx
  * construction (single- and multi-op), fee lookup, local signing dispatch,
  * and broadcast with inclusion proof. Later slices extend this file with
  * further ops — new code appends here, never forks a second serializer.
@@ -159,6 +160,45 @@
   *                             + #4 .../protocol/liquidity_pool.hpp:168-169
   * - ops 59-63, 75 ids       <- #4 .../protocol/operations.hpp:115-119
   *                              (59-63), :131 (75)
+  * - serializeCallOrderUpdateOp <- #3 bitshares-api.js:2355-2382
+  *                              (object-form ext + array static_variant
+  *                              fallback, empty -> 0x00)
+  *                              + #4 .../protocol/market.hpp:171-197 (struct;
+  *                              NO expiration field — #1 MarketsActions'
+  *                              expiration-inside-op-3 is stale, not ported)
+  *                              + FC :303-304
+  * - serializeSametFund{Create,Delete,Update,Borrow,Repay}Op
+  *                           <- #3 bitshares-api.js:3362-3428
+  *                              + #4 .../protocol/samet_fund.hpp FC lines
+  *                              (create/delete/update/borrow/repay orders);
+  *                              fee_rate denom GRAPHENE_FEE_RATE_DENOM =
+  *                              1000000 <- #4 .../protocol/config.hpp:121;
+  *                              update uses the CANONICAL new_fee_rate name
+  * - serializeCreditOffer{Create,Delete,Update,Accept}Op
+  *                           <- #3 bitshares-api.js:3436-3544
+  *                              + #4 .../protocol/credit_offer.hpp FC lines
+  *                              (create/delete/update/accept orders)
+  * - serializeCreditDealRepayOp
+  *                           <- #3 bitshares-api.js:3550-3559
+  *                              + #4 .../protocol/credit_offer.hpp FC lines
+  * - serializeCreditDealUpdateOp
+  *                           <- #3 bitshares-api.js:3565-3577 (account-first
+  *                              with borrower fallback — documents #3's
+  *                              committee-account trap comment)
+  *                              + #4 .../protocol/credit_offer.hpp FC lines
+  *                              (wire field is `account`, NOT `borrower`)
+  * - op 74 (credit_deal_expired) VIRTUAL — deliberately NOT serialized
+  *   (#4 operations.hpp:130 + credit_offer.hpp "virtual operation" assert;
+  *   #3's :3580-3594 serializer exists only for history display, never tx)
+  * - op-72 ext<ext{optional u8 auto_repay}> packing <- #4 ext.hpp (count of
+  *   set optionals + index + value) + credit_offer.hpp:118-129 (0/1/2 enum),
+  *   :137-141 (ext decl); #3 always writes EMPTY (:3542) — the SET form is
+  *   vanilla's ambiguity-C addition, same count+index+value shape as op 3
+  * - op-69/71 flat_map ordering: #4 stores flat_map (ordered); vanilla sorts
+  *   entries by id before writing (same numeric rule as serializeIdSet) —
+  *   #3 emits caller order, so bytes are identical for sorted input
+  * - ops 3, 64-73, 76 ids <- #4 .../protocol/operations.hpp:59 (3),
+  *   :120-130 (64-73, incl. 74 VIRTUAL), :132 (76)
   * - op dispatch 25-28, 49/50/52
  *                            <- #3 bitshares-api.js:1547-1554, :1595-1604
  *                              (51/53 VIRTUAL — never dispatched, see the
@@ -292,10 +332,21 @@
  * - serializeAssetCreateOp REQUIRES an explicit precision byte (0..12): #3's
  *   `precision || 5` silently remaps an explicit 0 to 5 — vanilla throws
  *   instead. Byte-identical whenever precision is supplied.
- * - serializePriceFeed has NO ||1750/||1500 fallback: #3 silently applies
- *   MCR/MSSR defaults, vanilla throws on missing/non-ratio values (a caller
- *   that forgot the ratio must fail loudly, not publish a default feed).
- */
+  * - serializePriceFeed has NO ||1750/||1500 fallback: #3 silently applies
+  *   MCR/MSSR defaults, vanilla throws on missing/non-ratio values (a caller
+  *   that forgot the ratio fails loudly instead of publishing a default feed).
+  * - u32 rate/duration fields (fee_rate, new_fee_rate, max_duration_seconds,
+  *   max_fee_rate, min_duration_seconds) go through assertUint32 instead of
+  *   #3's `|| 0`: a forgotten rate must fail loudly, not serialize as 0
+  *   (silent 0% fee rate or 0-second duration). Same for int64
+  *   balance/min_deal_amount (writeInt64LE throws on missing input).
+  * - op-76 auto_repay is REQUIRED explicit (0/1/2): #3's `?? 0` would
+  *   silently write no_auto_repayment for a caller that forgot the field.
+  * - stale #3 field names (offer_to_update / new_* on op 71,
+  *   repay_period_seconds, offer_expiry_time) are deliberately NOT accepted:
+  *   canonical #4 names only — anything else fails loudly on the missing
+  *   canonical field instead of serializing absent-absent bytes.
+  */
 
 var Tx = (function () {
   "use strict";
@@ -1118,6 +1169,349 @@ var Tx = (function () {
     ]);
   }
 
+  /* call_order_update (op 3) in #4 FC order: fee, funding_account,
+   * delta_collateral, delta_debt, extensions=extension<options_type>. The ext
+   * holds ONE optional u16 target_collateral_ratio: absent/empty extensions
+   * encode a single 0x00 (count 0); set encodes count 1 + variant index 0 +
+   * u16 LE (matches #3's pack path). Accepts the object form
+   * {target_collateral_ratio} and the static_variant array form
+   * [[0, {target_collateral_ratio}]] (same dual-shape convention as the
+   * limit_order_create on_fill collapse above). NO expiration field — #1's
+   * MarketsActions passes one inside op 3 but #4's FC_REFLECT has no such
+   * field, so vanilla never writes it. */
+  function serializeCallOrderUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("call_order_update op must be an object");
+    var tcr;
+    if (Array.isArray(op.extensions)) {
+      for (var i = 0; i < op.extensions.length; i++) {
+        var item = op.extensions[i];
+        var data = Array.isArray(item) ? item[1] : item;
+        if (data && data.target_collateral_ratio !== undefined && data.target_collateral_ratio !== null) {
+          tcr = data.target_collateral_ratio;
+          break;
+        }
+      }
+    } else if (op.extensions && typeof op.extensions === "object") {
+      tcr = op.extensions.target_collateral_ratio;
+    }
+    var ext = (tcr === undefined || tcr === null)
+      ? varintUint32(0)
+      : concatBytes([varintUint32(1), varintUint32(0), writeUint16LE(tcr)]);
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.funding_account),
+      serializeAsset(op.delta_collateral),
+      serializeAsset(op.delta_debt),
+      ext
+    ]);
+  }
+
+  /* samet_fund_create (op 64) in #4 FC order: fee, owner_account, asset_type
+   * (asset id), balance int64, fee_rate u32 (denom GRAPHENE_FEE_RATE_DENOM =
+   * 1000000, so 1000 units = 0.1% — integer units only, never a ratio),
+   * empty extensions. */
+  function serializeSametFundCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("samet_fund_create op must be an object");
+    assertUint32(op.fee_rate, "fee_rate");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.asset_type),
+      writeInt64LE(op.balance),
+      writeUint32LE(op.fee_rate),
+      varintUint32(0)
+    ]);
+  }
+
+  /* samet_fund_delete (op 65) in #4 FC order: fee, owner_account, fund_id
+   * (1.20.x), empty extensions. Fee is 0 (free owner cleanup, #4
+   * fee_params_t) — enforced read-side at confirm time, not here. */
+  function serializeSametFundDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("samet_fund_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.fund_id),
+      varintUint32(0)
+    ]);
+  }
+
+  /* samet_fund_update (op 66) in #4 FC order: fee, owner_account, fund_id,
+   * delta_amount?, new_fee_rate? (CANONICAL name), empty extensions.
+   * Absent optionals encode 0x00 via serializeOptional, same convention as
+   * the transfer-memo path. */
+  function serializeSametFundUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("samet_fund_update op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.fund_id),
+      serializeOptional(op.delta_amount, serializeAsset),
+      serializeOptional(op.new_fee_rate, function (v) {
+        assertUint32(v, "new_fee_rate");
+        return writeUint32LE(v);
+      }),
+      varintUint32(0)
+    ]);
+  }
+
+  /* samet_fund_borrow (op 67) in #4 FC order: fee, borrower, fund_id,
+   * borrow_amount, empty extensions. Fee payer is the borrower. */
+  function serializeSametFundBorrowOp(op) {
+    if (!op || typeof op !== "object") throw new Error("samet_fund_borrow op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.borrower),
+      serializeObjectId(op.fund_id),
+      serializeAsset(op.borrow_amount),
+      varintUint32(0)
+    ]);
+  }
+
+  /* samet_fund_repay (op 68) in #4 FC order: fee, account, fund_id,
+   * repay_amount, fund_fee, empty extensions. repay_amount AND fund_fee are
+   * both explicit assets (the fee for using the fund is not the op fee). */
+  function serializeSametFundRepayOp(op) {
+    if (!op || typeof op !== "object") throw new Error("samet_fund_repay op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.fund_id),
+      serializeAsset(op.repay_amount),
+      serializeAsset(op.fund_fee),
+      varintUint32(0)
+    ]);
+  }
+
+  /* Numeric id-string comparator for flat_map entry sorting: "S.T.I" keys
+   * compared part-wise as integers (string sort would misorder 1.3.10 before
+   * 1.3.9 — same rule as serializeIdSet). Accepts a {id: value} object or an
+   * [[id, value], ...] array; returns a sorted [[id, value], ...] copy. A
+   * malformed key sorts arbitrarily but still throws loudly in
+   * serializeObjectId below — never silently repaired. */
+  function sortedMapEntries(map) {
+    var entries;
+    if (Array.isArray(map)) {
+      entries = map.slice();
+    } else {
+      entries = Object.keys(map || {}).map(function (k) { return [k, map[k]]; });
+    }
+    entries.sort(function (a, b) {
+      var pa = String(a[0]).split("."), pb = String(b[0]).split(".");
+      for (var i = 0; i < 3; i++) {
+        var d = parseInt(pa[i], 10) - parseInt(pb[i], 10);
+        if (d !== 0) return d;
+      }
+      return 0;
+    });
+    return entries;
+  }
+
+  /* flat_map<asset_id, price>: varint count + entries SORTED by asset id
+   * (determinism — #4 flat_map is ordered; #3 emits caller order, so bytes
+   * are identical for already-sorted input). */
+  function serializeCollateralMap(map) {
+    var entries = sortedMapEntries(map === undefined || map === null ? {} : map);
+    var parts = [varintUint32(entries.length)];
+    for (var i = 0; i < entries.length; i++) {
+      parts.push(serializeObjectId(entries[i][0]));
+      parts.push(serializePrice(entries[i][1]));
+    }
+    return concatBytes(parts);
+  }
+
+  /* flat_map<account_id, share_type>: varint count + entries SORTED by
+   * account id. Share values stay digit strings until writeInt64LE
+   * (integer-only, same rule as every asset path above). */
+  function serializeBorrowerMap(map) {
+    var entries = sortedMapEntries(map === undefined || map === null ? {} : map);
+    var parts = [varintUint32(entries.length)];
+    for (var i = 0; i < entries.length; i++) {
+      parts.push(serializeObjectId(entries[i][0]));
+      parts.push(writeInt64LE(entries[i][1]));
+    }
+    return concatBytes(parts);
+  }
+
+  /* Optional flat_map: 0x00 when absent, 0x01 + map bytes when present.
+   * Present-but-empty encodes 0x01 + count 0 — distinct from absent, so an
+   * explicit "clear the map" survives the round trip (matches #3). */
+  function serializeOptionalCollateralMap(map) {
+    if (map === null || map === undefined) return new Uint8Array([0]);
+    return concatBytes([new Uint8Array([1]), serializeCollateralMap(map)]);
+  }
+
+  /* Optional flat_map<account_id, share_type>: same absent/present rule. */
+  function serializeOptionalBorrowerMap(map) {
+    if (map === null || map === undefined) return new Uint8Array([0]);
+    return concatBytes([new Uint8Array([1]), serializeBorrowerMap(map)]);
+  }
+
+  /* credit_offer_create (op 69) in #4 FC order: fee, owner_account,
+   * asset_type, balance int64, fee_rate u32 (1M denom), max_duration_seconds
+   * u32, min_deal_amount int64, enabled byte, auto_disable_time
+   * (time_point_sec), acceptable_collateral map(asset_id -> price),
+   * acceptable_borrowers map(account_id -> int64), empty extensions. */
+  function serializeCreditOfferCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_offer_create op must be an object");
+    assertUint32(op.fee_rate, "fee_rate");
+    assertUint32(op.max_duration_seconds, "max_duration_seconds");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.asset_type),
+      writeInt64LE(op.balance),
+      writeUint32LE(op.fee_rate),
+      writeUint32LE(op.max_duration_seconds),
+      writeInt64LE(op.min_deal_amount),
+      new Uint8Array([op.enabled ? 1 : 0]),
+      serializeTimestamp(op.auto_disable_time),
+      serializeCollateralMap(op.acceptable_collateral),
+      serializeBorrowerMap(op.acceptable_borrowers),
+      varintUint32(0)
+    ]);
+  }
+
+  /* credit_offer_delete (op 70) in #4 FC order: fee, owner_account, offer_id
+   * (1.21.x), empty extensions. Fee is 0 — enforced read-side at confirm
+   * time, not here. */
+  function serializeCreditOfferDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_offer_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.offer_id),
+      varintUint32(0)
+    ]);
+  }
+
+  /* credit_offer_update (op 71) in #4 FC order: fee, owner_account, offer_id,
+   * delta_amount?, fee_rate?, max_duration_seconds?, min_deal_amount?,
+   * enabled?, auto_disable_time?, acceptable_collateral?,
+   * acceptable_borrowers?, empty extensions. CANONICAL names only (see
+   * header): unchanged fields stay null/undefined and encode absent — never
+   * zero-filled, so an update touches only what it sets. */
+  function serializeCreditOfferUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_offer_update op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.owner_account),
+      serializeObjectId(op.offer_id),
+      serializeOptional(op.delta_amount, serializeAsset),
+      serializeOptional(op.fee_rate, function (v) {
+        assertUint32(v, "fee_rate");
+        return writeUint32LE(v);
+      }),
+      serializeOptional(op.max_duration_seconds, function (v) {
+        assertUint32(v, "max_duration_seconds");
+        return writeUint32LE(v);
+      }),
+      serializeOptional(op.min_deal_amount, writeInt64LE),
+      serializeOptional(op.enabled, function (v) { return new Uint8Array([v ? 1 : 0]); }),
+      serializeOptional(op.auto_disable_time, serializeTimestamp),
+      serializeOptionalCollateralMap(op.acceptable_collateral),
+      serializeOptionalBorrowerMap(op.acceptable_borrowers),
+      varintUint32(0)
+    ]);
+  }
+
+  /* credit_offer_accept (op 72) in #4 FC order: fee, borrower, offer_id,
+   * borrow_amount, collateral, max_fee_rate u32 (same 1M denom as fee_rate),
+   * min_duration_seconds u32, extensions=extension<ext{optional u8
+   * auto_repay}>. The ext packs per ext.hpp: varint count of SET optionals +
+   * (index + value) each — so omitted auto_repay is a single 0x00 (the #3
+   * always-empty form, proven path first), while a set auto_repay (0/1/2)
+   * encodes 0x01 0x00 <u8>. Accepts the object form {auto_repay} and the
+   * static_variant array form [[0, {auto_repay}]], mirroring op 3 above.
+   * Accepting SPAWNS the deal (1.22.x) — there is no credit_deal_create op. */
+  function serializeCreditOfferAcceptOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_offer_accept op must be an object");
+    assertUint32(op.max_fee_rate, "max_fee_rate");
+    assertUint32(op.min_duration_seconds, "min_duration_seconds");
+    var autoRepay;
+    if (Array.isArray(op.extensions)) {
+      for (var i = 0; i < op.extensions.length; i++) {
+        var item = op.extensions[i];
+        var data = Array.isArray(item) ? item[1] : item;
+        if (data && data.auto_repay !== undefined && data.auto_repay !== null) {
+          autoRepay = data.auto_repay;
+          break;
+        }
+      }
+    } else if (op.extensions && typeof op.extensions === "object") {
+      autoRepay = op.extensions.auto_repay;
+    }
+    var ext;
+    if (autoRepay === undefined || autoRepay === null) {
+      ext = varintUint32(0);
+    } else {
+      assertAutoRepay(autoRepay);
+      ext = concatBytes([varintUint32(1), varintUint32(0), new Uint8Array([autoRepay])]);
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.borrower),
+      serializeObjectId(op.offer_id),
+      serializeAsset(op.borrow_amount),
+      serializeAsset(op.collateral),
+      writeUint32LE(op.max_fee_rate),
+      writeUint32LE(op.min_duration_seconds),
+      ext
+    ]);
+  }
+
+  /* credit_deal_repay (op 73) in #4 FC order: fee, account, deal_id
+   * (1.22.x), repay_amount, credit_fee, empty extensions. repay_amount AND
+   * credit_fee are both explicit assets. */
+  function serializeCreditDealRepayOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_deal_repay op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.deal_id),
+      serializeAsset(op.repay_amount),
+      serializeAsset(op.credit_fee),
+      varintUint32(0)
+    ]);
+  }
+
+  /* auto_repay enum guard (credit_offer.hpp:118-129): 0 no_auto_repayment,
+   * 1 only_full_repayment, 2 allow_partial_repayment. Loud failure — a
+   * forgotten or out-of-range value must never become silent bytes. */
+  function assertAutoRepay(value) {
+    if (!Number.isInteger(value) || value < 0 || value > 2) {
+      throw new Error("auto_repay must be 0, 1 or 2 " +
+        "(0=no_auto_repayment, 1=only_full_repayment, 2=allow_partial_repayment), got: " +
+        JSON.stringify(value));
+    }
+  }
+
+  /* credit_deal_update (op 76) in #4 FC order: fee, account, deal_id,
+   * auto_repay u8, empty extensions. The wire field is `account` (as in deal
+   * repay); op.borrower is kept ONLY as a fallback per #3's documented trap
+   * (:3568-3572), where a canonical dApp op leaves `account` unset and the
+   * node defaults it to 1.2.0 (committee) — missing both still throws loudly
+   * in serializeObjectId instead of silently targeting the committee
+   * account. auto_repay is REQUIRED explicit (see header). */
+  function serializeCreditDealUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("credit_deal_update op must be an object");
+    var account = (op.account !== undefined && op.account !== null) ? op.account : op.borrower;
+    assertAutoRepay(op.auto_repay);
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(account),
+      serializeObjectId(op.deal_id),
+      writeUint8(op.auto_repay),
+      varintUint32(0)
+    ]);
+  }
+
+  /* Op 74 (credit_deal_expired) is VIRTUAL (#4 operations.hpp:130;
+   * validate() asserts !"virtual operation" in credit_offer.hpp) — it can
+   * never appear in a signed tx, so no serializer exists for it here (same
+   * rule as ops 51/53 below). #3's serializeCreditDealExpiredOp (:3580-3594)
+   * serves history display only. */
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -1136,6 +1530,7 @@ var Tx = (function () {
       if (opType === 0) parts.push(serializeTransferOp(opData));
       else if (opType === 1) parts.push(serializeLimitOrderCreateOp(opData));
       else if (opType === 2) parts.push(serializeLimitOrderCancelOp(opData));
+      else if (opType === 3) parts.push(serializeCallOrderUpdateOp(opData));
       else if (opType === 6) parts.push(serializeAccountUpdateOp(opData));
       else if (opType === 10) parts.push(serializeAssetCreateOp(opData));
       else if (opType === 11) parts.push(serializeAssetUpdateOp(opData));
@@ -1156,12 +1551,25 @@ var Tx = (function () {
       else if (opType === 61) parts.push(serializeLiquidityPoolDepositOp(opData));
       else if (opType === 62) parts.push(serializeLiquidityPoolWithdrawOp(opData));
       else if (opType === 63) parts.push(serializeLiquidityPoolExchangeOp(opData));
+      else if (opType === 64) parts.push(serializeSametFundCreateOp(opData));
+      else if (opType === 65) parts.push(serializeSametFundDeleteOp(opData));
+      else if (opType === 66) parts.push(serializeSametFundUpdateOp(opData));
+      else if (opType === 67) parts.push(serializeSametFundBorrowOp(opData));
+      else if (opType === 68) parts.push(serializeSametFundRepayOp(opData));
+      else if (opType === 69) parts.push(serializeCreditOfferCreateOp(opData));
+      else if (opType === 70) parts.push(serializeCreditOfferDeleteOp(opData));
+      else if (opType === 71) parts.push(serializeCreditOfferUpdateOp(opData));
+      else if (opType === 72) parts.push(serializeCreditOfferAcceptOp(opData));
+      else if (opType === 73) parts.push(serializeCreditDealRepayOp(opData));
+      // Op 74 (credit_deal_expired) is VIRTUAL — never dispatched (see the
+      // no-serializer note above). Do not "complete" this list.
       else if (opType === 75) parts.push(serializeLiquidityPoolUpdateOp(opData));
+      else if (opType === 76) parts.push(serializeCreditDealUpdateOp(opData));
       // Ops 51 (htlc_redeemed) and 53 (htlc_refund) are VIRTUAL (#4
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52, 59-63 and 75, got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 10-15, 19, 25-28, 49, 50, 52, 59-73, 75 and 76 (74 is virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -1420,7 +1828,8 @@ var Tx = (function () {
 
   return {
     OP: {
-      transfer: 0, limit_order_create: 1, limit_order_cancel: 2, account_update: 6,
+      transfer: 0, limit_order_create: 1, limit_order_cancel: 2,
+      call_order_update: 3, account_update: 6,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
       asset_publish_feed: 19,
@@ -1429,7 +1838,12 @@ var Tx = (function () {
       htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
       liquidity_pool_create: 59, liquidity_pool_delete: 60,
       liquidity_pool_deposit: 61, liquidity_pool_withdraw: 62,
-      liquidity_pool_exchange: 63, liquidity_pool_update: 75
+      liquidity_pool_exchange: 63, liquidity_pool_update: 75,
+      samet_fund_create: 64, samet_fund_delete: 65, samet_fund_update: 66,
+      samet_fund_borrow: 67, samet_fund_repay: 68,
+      credit_offer_create: 69, credit_offer_delete: 70,
+      credit_offer_update: 71, credit_offer_accept: 72,
+      credit_deal_repay: 73, credit_deal_update: 76
     },
     fee: fee,
     feeMulti: feeMulti,
@@ -1490,6 +1904,24 @@ var Tx = (function () {
       serializeLiquidityPoolWithdrawOp: serializeLiquidityPoolWithdrawOp,
       serializeLiquidityPoolExchangeOp: serializeLiquidityPoolExchangeOp,
       serializeLiquidityPoolUpdateOp: serializeLiquidityPoolUpdateOp,
+      serializeCallOrderUpdateOp: serializeCallOrderUpdateOp,
+      serializeSametFundCreateOp: serializeSametFundCreateOp,
+      serializeSametFundDeleteOp: serializeSametFundDeleteOp,
+      serializeSametFundUpdateOp: serializeSametFundUpdateOp,
+      serializeSametFundBorrowOp: serializeSametFundBorrowOp,
+      serializeSametFundRepayOp: serializeSametFundRepayOp,
+      sortedMapEntries: sortedMapEntries,
+      serializeCollateralMap: serializeCollateralMap,
+      serializeBorrowerMap: serializeBorrowerMap,
+      serializeOptionalCollateralMap: serializeOptionalCollateralMap,
+      serializeOptionalBorrowerMap: serializeOptionalBorrowerMap,
+      serializeCreditOfferCreateOp: serializeCreditOfferCreateOp,
+      serializeCreditOfferDeleteOp: serializeCreditOfferDeleteOp,
+      serializeCreditOfferUpdateOp: serializeCreditOfferUpdateOp,
+      serializeCreditOfferAcceptOp: serializeCreditOfferAcceptOp,
+      serializeCreditDealRepayOp: serializeCreditDealRepayOp,
+      assertAutoRepay: assertAutoRepay,
+      serializeCreditDealUpdateOp: serializeCreditDealUpdateOp,
       serializeTransaction: serializeTransaction
     }
   };
