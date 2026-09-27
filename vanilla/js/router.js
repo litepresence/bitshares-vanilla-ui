@@ -127,6 +127,7 @@ var Router = (function () {
     { path: "/pools/:id", title: "Liquidity Pool", render: function (root, params) { PoolDetailUI.renderPoolDetail(root, params && params.id); } },
     { path: "/pools", title: "Liquidity Pools", render: function (root) { PoolUI.renderPools(root); } },
     { path: "/swap", title: "Swap", render: function (root) { PoolSwapUI.renderSwap(root); } },
+    { path: "/alerts", title: "Price Alerts", render: function (root) { NotifyUI.render(root); } },
     { path: "/assets", title: "Assets", render: function (root) { AssetUI.renderAssets(root); } },
     { path: "/assets/create", title: "Create Asset", render: function (root) { AssetUI.renderCreate(root); } },
     { path: "/assets/update/:symbol", title: "Update Asset", render: function (root, params) { AssetManageUI.renderUpdate(root, params && params.symbol); } },

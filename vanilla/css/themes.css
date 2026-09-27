@@ -20,4 +20,16 @@
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
+  --toast-shadow: rgba(0, 0, 0, 0.5);
+}
+/* Slice-16 toast shadow per theme (not a palette value — elevation only):
+ * retro default, modern light, DEX-UX dark cue. Level-stripe colors reuse
+ * the palette tokens directly in app.css (info→accent, success→buy,
+ * warning→warn, error→danger), so no new color tokens are introduced. */
+:root,
+:root[data-theme="original-blue"] {
+  --toast-shadow: rgba(0, 0, 0, 0.15);
+}
+:root[data-theme="light"] {
+  --toast-shadow: rgba(0, 0, 0, 0.12);
 }

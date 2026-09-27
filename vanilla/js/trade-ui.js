@@ -282,7 +282,23 @@ var TradeUI = (function () {
     while (Date.now() < deadline) {
       var found = null;
       try { found = await prove(); } catch (e) { found = null; }
-      if (found) return { found: found, head: await headBlock(), via: via };
+      if (found) {
+        var head = await headBlock();
+        /* Slice-16 (F1d): tx-confirmed toast supplement (inline result
+         * panels stay primary). Single shared point for all trade flows
+         * (place/scaled/cancel/cancel-all); guarded silent to the host. */
+        try {
+          if (typeof NotifyHost !== "undefined" && NotifyHost &&
+              typeof NotifyHost.mountToasts === "function") {
+            try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
+          }
+          if (typeof Notify !== "undefined" && Notify &&
+              typeof Notify.txConfirmed === "function") {
+            try { Notify.txConfirmed(head ? "head #" + String(head) : null); } catch (e) { /* silent */ }
+          }
+        } catch (e) { /* notify optional here */ }
+        return { found: found, head: head, via: via };
+      }
       await sleep(PROVE_INTERVAL_MS);
     }
     throw new Error("Sent (" + via + ") but the order was not observed within " +

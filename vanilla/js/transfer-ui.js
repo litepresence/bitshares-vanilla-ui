@@ -548,6 +548,18 @@ var TransferUI = (function () {
         " (position " + String(proof.trxInBlock) + ").", "xfer-ok");
       ok.setAttribute("aria-live", "polite");
       wrap.appendChild(ok);
+      /* Slice-16 (F1d): tx-confirmed toast supplement (inline panel stays
+       * primary). Guarded so a notify fault never breaks the result. */
+      try {
+        if (typeof NotifyHost !== "undefined" && NotifyHost &&
+            typeof NotifyHost.mountToasts === "function") {
+          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
+        }
+        if (typeof Notify !== "undefined" && Notify &&
+            typeof Notify.txConfirmed === "function") {
+          try { Notify.txConfirmed("block #" + String(proof.blockNum)); } catch (e) { /* silent */ }
+        }
+      } catch (e) { /* notify optional here */ }
       var sent = el(doc, "p",
         Format.formatAmount(ctx.amountInt, ctx.asset.precision) + " " +
         ctx.asset.symbol + " → " + ctx.to.name, "muted");

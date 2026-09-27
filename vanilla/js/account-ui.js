@@ -12,6 +12,11 @@
 var AccountUI = (function () {
   "use strict";
 
+  /* Slice-16 (F1b): per-account last-seen history first-id for the pulled
+   * fill/transfer watcher. No global polling state in Notify; the caller
+   * persists per-view. First paint is a baseline (never toasts). */
+  var _histFirst = {};
+
   /* Operation type -> human label (spec verbatim, 0..10). */
   var OP_LABELS = {
     0: "Transfer",
@@ -363,6 +368,25 @@ var AccountUI = (function () {
     Account.history(acct.id, 20).then(function (rows) {
       histSection.removeChild(histLoading);
       renderHistory(doc, histSection, rows);
+      /* Slice-16 (F1b): pulled history watcher on the existing fetch.
+       * First-entry diff per plan; a notify fault never breaks history. */
+      try {
+        if (typeof NotifyHost !== "undefined" && NotifyHost &&
+            typeof NotifyHost.mountToasts === "function") {
+          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
+        }
+        if (typeof NotifyRules !== "undefined" && NotifyRules &&
+            typeof NotifyRules.checkHistory === "function") {
+          try {
+            var prev = Object.prototype.hasOwnProperty.call(_histFirst, acct.id)
+              ? _histFirst[acct.id] : null;
+            var res = NotifyRules.checkHistory(prev, rows, { watchAccounts: [acct.id] });
+            if (res && res.firstId !== undefined && res.firstId !== null) {
+              _histFirst[acct.id] = String(res.firstId);
+            }
+          } catch (e) { /* watcher sleeps, never breaks the view */ }
+        }
+      } catch (e) { /* notify optional here */ }
     }).catch(function (e) {
       histSection.removeChild(histLoading);
       showError(doc, histSection, e, "History unavailable on this node.");

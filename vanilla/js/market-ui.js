@@ -601,6 +601,16 @@ var MarketUI = (function () {
     head.appendChild(el(doc, "h1", pair.quote + " / " + pair.base));
     var sub = el(doc, "p", "Loading market…", "muted");
     head.appendChild(sub);
+    /* Slice-16 bell: price-alert entry point (ExchangeHeader.jsx:210-232
+     * shape, link flavour — opens #/alerts, never a modal). Optional: the
+     * desk works fully when notify-ui.js is absent. */
+    try {
+      if (typeof NotifyHost !== "undefined" && NotifyHost &&
+          typeof NotifyHost.bellFor === "function") {
+        var bell = NotifyHost.bellFor(pair.quote, pair.base);
+        if (bell) head.appendChild(bell);
+      }
+    } catch (e) { /* alerts optional, desk unaffected */ }
     /* Header stats strip (toward #1): Latest / 24h change / 24h volume /
      * Best bid-ask — compact row above the charts, theme-aware via CSS. */
     var strip = doc.createElement("div");
@@ -938,6 +948,19 @@ var MarketUI = (function () {
     Market.stats(b.id, q.id).then(function (st) {
       state.ticker = st;
       renderStrip();
+      /* Slice-16 (F1a): pulled alert engine on the existing ticker refresh.
+       * Pair key QUOTE_BASE + human latest; a notify fault never breaks the
+       * desk (guarded; missing feed simply never fires downstream). */
+      try {
+        if (typeof NotifyHost !== "undefined" && NotifyHost &&
+            typeof NotifyHost.mountToasts === "function") {
+          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
+        }
+        if (typeof NotifyRules !== "undefined" && NotifyRules &&
+            typeof NotifyRules.checkAlerts === "function") {
+          try { NotifyRules.checkAlerts(state.id, st ? st.latest : null); } catch (e) { /* never break desk */ }
+        }
+      } catch (e) { /* notify optional here */ }
       while (state.statsBox.firstChild) state.statsBox.removeChild(state.statsBox.firstChild);
       state.statsBox.appendChild(el(doc, "h2", "24h stats"));
       var dl = el(doc, "dl", null, "mkt-stats");
