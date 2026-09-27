@@ -1,4 +1,4 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52, 59-63, 75).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
  * (op 1), limit_order_cancel (op 2), account_update (op 6, voting only),
@@ -7,7 +7,10 @@
  * (op 15), asset_publish_feed (op 19), withdraw_permission_create (op 25),
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
  * withdraw_permission_delete (op 28), htlc_create (op 49), htlc_redeem
- * (op 50) and htlc_extend (op 52) transactions, unsigned-tx
+ * (op 50), htlc_extend (op 52), liquidity_pool_create (op 59),
+ * liquidity_pool_delete (op 60), liquidity_pool_deposit (op 61),
+ * liquidity_pool_withdraw (op 62), liquidity_pool_exchange (op 63) and
+ * liquidity_pool_update (op 75) transactions, unsigned-tx
  * construction (single- and multi-op), fee lookup, local signing dispatch,
  * and broadcast with inclusion proof. Later slices extend this file with
  * further ops — new code appends here, never forks a second serializer.
@@ -132,7 +135,31 @@
  * - serializeWithdrawPermissionDeleteOp
  *                            <- #3 bitshares-api.js:2765-2772
  *                              + #4 .../protocol/withdraw_permission.hpp:185-187
- * - op dispatch 25-28, 49/50/52
+ * - serializeLiquidityPoolCreateOp
+  *                          <- #3 bitshares-api.js:3277-3288
+  *                             + #4 .../protocol/liquidity_pool.hpp:163-165 (FC)
+  * - serializeLiquidityPoolDeleteOp
+  *                          <- #3 bitshares-api.js:3294-3301
+  *                             + #4 .../protocol/liquidity_pool.hpp:166-167
+  * - serializeLiquidityPoolDepositOp
+  *                          <- #3 bitshares-api.js:3307-3316
+  *                             + #4 .../protocol/liquidity_pool.hpp:170-171
+  * - serializeLiquidityPoolWithdrawOp
+  *                          <- #3 bitshares-api.js:3322-3330
+  *                             + #4 .../protocol/liquidity_pool.hpp:172-173
+  * - serializeLiquidityPoolExchangeOp
+  *                          <- #3 bitshares-api.js:1733-1755
+  *                             + #4 .../protocol/liquidity_pool.hpp:174-175
+  * - serializeLiquidityPoolUpdateOp (CANONICAL names only — #3's new_*
+  *   fallback at :3346-3353 deliberately NOT ported: a dApp op using only
+  *   new_* names would serialize both fields absent and the node rejects
+  *   it ("at least one must be set"), so vanilla callers use
+  *   taker_fee_percent / withdrawal_fee_percent or fail loudly here)
+  *                          <- #3 bitshares-api.js:3337-3356
+  *                             + #4 .../protocol/liquidity_pool.hpp:168-169
+  * - ops 59-63, 75 ids       <- #4 .../protocol/operations.hpp:115-119
+  *                              (59-63), :131 (75)
+  * - op dispatch 25-28, 49/50/52
  *                            <- #3 bitshares-api.js:1547-1554, :1595-1604
  *                              (51/53 VIRTUAL — never dispatched, see the
  *                              dispatch-site comment)
@@ -215,7 +242,26 @@
  *   (authorized_account)(withdrawal_permission)
  *   <- .../protocol/withdraw_permission.hpp:185-187
  * - ops 25-28, 49-53 ids <- .../protocol/operations.hpp:81-84, :105-109
- *   (51/53 VIRTUAL — never signed, never dispatched)
+  *   (51/53 VIRTUAL — never signed, never dispatched)
+  * - liquidity_pool_create order (fee)(account)(asset_a)(asset_b)
+  *   (share_asset)(taker_fee_percent)(withdrawal_fee_percent)(extensions)
+  *   <- .../protocol/liquidity_pool.hpp:163-165
+  * - liquidity_pool_delete order (fee)(account)(pool)(extensions) <- :166-167
+  * - liquidity_pool_update order (fee)(account)(pool)(taker_fee_percent?)
+  *   (withdrawal_fee_percent?)(extensions) <- :168-169; at-least-one-set is
+  *   enforced by validate() in .../protocol/liquidity_pool.cpp (vanilla
+  *   throws in the serializer too — silent absent-absent bytes are always
+  *   rejected); withdrawal-to-zero-only is gated by the Task-2 builder, not
+  *   here (serializer writes what it is given)
+  * - liquidity_pool_deposit order (fee)(account)(pool)(amount_a)(amount_b)
+  *   (extensions) <- :170-171
+  * - liquidity_pool_withdraw order (fee)(account)(pool)(share_amount)
+  *   (extensions) <- :172-173
+  * - liquidity_pool_exchange order (fee)(account)(pool)(amount_to_sell)
+  *   (min_to_receive)(extensions) <- :174-175; result is
+  *   generic_exchange_operation_result holding 3 fees in order: maker market
+  *   fee, taker market fee, liquidity-pool taker fee (liquidity_pool.hpp:132-137)
+  * - ops 59-63, 75 ids <- .../protocol/operations.hpp:115-119 (59-63), :131 (75)
  * - get_required_fees <- .../app/database_api.hpp:1313
  * - broadcast_transaction_with_callback
  *   <- .../app/api.hpp:360
@@ -971,6 +1017,107 @@ var Tx = (function () {
     ]);
   }
 
+  /* liquidity_pool_create (op 59) in #4 FC order: fee, account, asset_a,
+   * asset_b, share_asset, taker_fee_percent u16, withdrawal_fee_percent u16,
+   * extensions. Percents are HUNDREDTHS (150 = 1.5%) — integer units only;
+   * writeUint16LE rejects floats/strings loudly. No hidden a/b sort here:
+   * the Task-2 builder sorts upstream and the serializer writes what it is
+   * given (byte determinism). Missing percents default to 0 (the #4 struct
+   * default), matching #3's `|| 0`. */
+  function serializeLiquidityPoolCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_create op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.asset_a),
+      serializeObjectId(op.asset_b),
+      serializeObjectId(op.share_asset),
+      writeUint16LE(op.taker_fee_percent || 0),
+      writeUint16LE(op.withdrawal_fee_percent || 0),
+      varintUint32(0)
+    ]);
+  }
+
+  /* liquidity_pool_delete (op 60) in #4 FC order: fee, account, pool
+   * (1.19.x), extensions. Fee is 0 (free owner cleanup, #4 fee_params_t) —
+   * enforced read-side at confirm time, not here. */
+  function serializeLiquidityPoolDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.pool),
+      varintUint32(0)
+    ]);
+  }
+
+  /* liquidity_pool_deposit (op 61) in #4 FC order: fee, account, pool,
+   * amount_a, amount_b, extensions. Amounts stay digit strings until
+   * writeInt64LE (integer-only, same rule as every asset path above). */
+  function serializeLiquidityPoolDepositOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_deposit op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.pool),
+      serializeAsset(op.amount_a),
+      serializeAsset(op.amount_b),
+      varintUint32(0)
+    ]);
+  }
+
+  /* liquidity_pool_withdraw (op 62) in #4 FC order: fee, account, pool,
+   * share_amount, extensions. */
+  function serializeLiquidityPoolWithdrawOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_withdraw op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.pool),
+      serializeAsset(op.share_amount),
+      varintUint32(0)
+    ]);
+  }
+
+  /* liquidity_pool_exchange (op 63) in #4 FC order: fee, account, pool,
+   * amount_to_sell, min_to_receive, extensions. Executes immediately against
+   * the pool (CPMM) — not an orderbook fill; slippage math lives in the
+   * Task-2 builder, this function writes the resulting RAW min verbatim. */
+  function serializeLiquidityPoolExchangeOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_exchange op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.pool),
+      serializeAsset(op.amount_to_sell),
+      serializeAsset(op.min_to_receive),
+      varintUint32(0)
+    ]);
+  }
+
+  /* liquidity_pool_update (op 75) in #4 FC order: fee, account, pool,
+   * taker_fee_percent?, withdrawal_fee_percent?, extensions. Both fee fields
+   * are OPTIONAL (absent <-> 0x00 via serializeOptional, same convention as
+   * the transfer-memo path); at least one must be set or the node's
+   * validate() rejects — so both-absent throws loudly here instead of
+   * producing always-rejected bytes. CANONICAL names only (see header). */
+  function serializeLiquidityPoolUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("liquidity_pool_update op must be an object");
+    var taker = (op.taker_fee_percent === undefined || op.taker_fee_percent === null) ? null : op.taker_fee_percent;
+    var withdrawal = (op.withdrawal_fee_percent === undefined || op.withdrawal_fee_percent === null) ? null : op.withdrawal_fee_percent;
+    if (taker === null && withdrawal === null) {
+      throw new Error("liquidity_pool_update needs at least one of taker_fee_percent / withdrawal_fee_percent");
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.pool),
+      serializeOptional(taker, writeUint16LE),
+      serializeOptional(withdrawal, writeUint16LE),
+      varintUint32(0)
+    ]);
+  }
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -1004,11 +1151,17 @@ var Tx = (function () {
       else if (opType === 49) parts.push(serializeHtlcCreateOp(opData));
       else if (opType === 50) parts.push(serializeHtlcRedeemOp(opData));
       else if (opType === 52) parts.push(serializeHtlcExtendOp(opData));
+      else if (opType === 59) parts.push(serializeLiquidityPoolCreateOp(opData));
+      else if (opType === 60) parts.push(serializeLiquidityPoolDeleteOp(opData));
+      else if (opType === 61) parts.push(serializeLiquidityPoolDepositOp(opData));
+      else if (opType === 62) parts.push(serializeLiquidityPoolWithdrawOp(opData));
+      else if (opType === 63) parts.push(serializeLiquidityPoolExchangeOp(opData));
+      else if (opType === 75) parts.push(serializeLiquidityPoolUpdateOp(opData));
       // Ops 51 (htlc_redeemed) and 53 (htlc_refund) are VIRTUAL (#4
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-2, 6, 10-15, 19, 25-28, 49, 50 and 52, got op " + opType);
+      else throw new Error("tx.js supports ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52, 59-63 and 75, got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -1273,7 +1426,10 @@ var Tx = (function () {
       asset_publish_feed: 19,
       withdraw_permission_create: 25, withdraw_permission_update: 26,
       withdraw_permission_claim: 27, withdraw_permission_delete: 28,
-      htlc_create: 49, htlc_redeem: 50, htlc_extend: 52
+      htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
+      liquidity_pool_create: 59, liquidity_pool_delete: 60,
+      liquidity_pool_deposit: 61, liquidity_pool_withdraw: 62,
+      liquidity_pool_exchange: 63, liquidity_pool_update: 75
     },
     fee: fee,
     feeMulti: feeMulti,
@@ -1328,6 +1484,12 @@ var Tx = (function () {
       serializeWithdrawPermissionUpdateOp: serializeWithdrawPermissionUpdateOp,
       serializeWithdrawPermissionClaimOp: serializeWithdrawPermissionClaimOp,
       serializeWithdrawPermissionDeleteOp: serializeWithdrawPermissionDeleteOp,
+      serializeLiquidityPoolCreateOp: serializeLiquidityPoolCreateOp,
+      serializeLiquidityPoolDeleteOp: serializeLiquidityPoolDeleteOp,
+      serializeLiquidityPoolDepositOp: serializeLiquidityPoolDepositOp,
+      serializeLiquidityPoolWithdrawOp: serializeLiquidityPoolWithdrawOp,
+      serializeLiquidityPoolExchangeOp: serializeLiquidityPoolExchangeOp,
+      serializeLiquidityPoolUpdateOp: serializeLiquidityPoolUpdateOp,
       serializeTransaction: serializeTransaction
     }
   };
