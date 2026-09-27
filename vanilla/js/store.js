@@ -1,0 +1,114 @@
+/* Store: tiny pub/sub + localStorage persistence. Sole settings owner. */
+var Store = (function () {
+  "use strict";
+
+  var SETTINGS_KEY = "bts-vanilla-settings-v1";
+
+  var DEFAULT_NODES = {
+    mainnet: ["wss://api.bitshares.dev/ws", "wss://dex.iobanker.com/ws", "wss://node.xbts.io/ws", "wss://public.xbts.io/ws", "wss://cloud.xbts.io/ws", "wss://btsws.roelandp.nl/ws"],
+    testnet: ["wss://testnet.xbts.io/ws", "wss://testnet.dex.trading/"]
+  };
+
+  var CHAIN_IDS = {
+    mainnet: "4018d7844c78f6a6c41c6a552b898022310fc5dec06da467ee7905a8dad512c8",
+    testnet: "39f5e2ede1f8bc1a3a54a7914414e3779e33193f1f5693510e73cb7a87617447"
+  };
+
+  var THEMES = ["original-blue", "light", "dark"];
+
+  var listeners = { settings: [], connection: [] };
+
+  function baseSettings() {
+    return {
+      network: "mainnet",
+      activeNode: DEFAULT_NODES.mainnet[0],
+      customNodes: [],
+      theme: "original-blue"
+    };
+  }
+
+  function readStored() {
+    try {
+      if (typeof localStorage === "undefined") return null;
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function loadSettings() {
+    var base = baseSettings();
+    var stored = readStored();
+    if (!stored) return base;
+    var network = (stored.network === "testnet" || stored.network === "mainnet") ? stored.network : base.network;
+    var theme = (THEMES.indexOf(stored.theme) !== -1) ? stored.theme : base.theme;
+    var customNodes = Array.isArray(stored.customNodes)
+      ? stored.customNodes.filter(function (u) { return typeof u === "string"; })
+      : [];
+    var fallbackNode = network === "testnet" ? DEFAULT_NODES.testnet[0] : DEFAULT_NODES.mainnet[0];
+    var activeNode = (typeof stored.activeNode === "string" && stored.activeNode) ? stored.activeNode : fallbackNode;
+    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme };
+  }
+
+  function saveSettings(patch) {
+    var current = loadSettings();
+    var next = {
+      network: current.network,
+      activeNode: current.activeNode,
+      customNodes: current.customNodes,
+      theme: current.theme
+    };
+    if (patch && typeof patch === "object") {
+      if (typeof patch.network === "string") next.network = patch.network;
+      if (typeof patch.activeNode === "string") next.activeNode = patch.activeNode;
+      if (Array.isArray(patch.customNodes)) next.customNodes = patch.customNodes;
+      if (typeof patch.theme === "string") next.theme = patch.theme;
+    }
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      }
+    } catch (e) { /* storage blocked/full: keep in-memory value, still emit */ }
+    emit("settings", next);
+    return next;
+  }
+
+  function subscribe(topic, fn) {
+    if (!listeners[topic]) listeners[topic] = [];
+    listeners[topic].push(fn);
+    return function () {
+      var arr = listeners[topic] || [];
+      var i = arr.indexOf(fn);
+      if (i !== -1) arr.splice(i, 1);
+    };
+  }
+
+  function emit(topic, data) {
+    var arr = (listeners[topic] || []).slice();
+    for (var i = 0; i < arr.length; i++) {
+      try { arr[i](data); } catch (e) { /* listener errors must not break the store */ }
+    }
+  }
+
+  /* status: {state, node, latencyMs, chainId}; state in unknown|connecting|open|closed|error */
+  function emitConnection(status) {
+    emit("connection", status || {});
+  }
+
+  return {
+    loadSettings: loadSettings,
+    saveSettings: saveSettings,
+    subscribe: subscribe,
+    emitConnection: emitConnection,
+    DEFAULT_NODES: DEFAULT_NODES,
+    CHAIN_IDS: CHAIN_IDS
+  };
+})();
+
+/* Expose the single Store global to Node for headless smoke tests (no-op in browsers). */
+if (typeof globalThis !== "undefined" && typeof globalThis.Store === "undefined") { globalThis.Store = Store; }
+if (typeof module !== "undefined") { module.exports = Store; }

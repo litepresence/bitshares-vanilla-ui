@@ -1,0 +1,23 @@
+/* Theme tokens. Original blue is default; light/dark refined per slice. */
+:root,
+:root[data-theme="original-blue"] {
+  --bg: #f5f7fa; --panel: #ffffff; --text: #333333; --muted: #777777;
+  --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
+  --buy: #22d173; --sell: #e3745b; --warn: #fcab53; --danger: #e3745b;
+  --border: #dddddd; --header-bg: #337ab7; --header-text: #ffffff;
+}
+:root[data-theme="light"] {
+  --bg: #ffffff; --panel: #f5f7fa; --text: #222222; --muted: #666666;
+  --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
+  --buy: #1da866; --sell: #d35a41; --warn: #e89b3d; --danger: #d35a41;
+  --border: #e2e2e2; --header-bg: #337ab7; --header-text: #ffffff;
+}
+/* Dark converges on DEX-UX (slice-07 Task 4 exact values: panels #131722,
+ * borders #2a2e39, text #e0e3eb, muted #758696, accent #007bff, buy #26de81,
+ * sell #ff231f). Original-blue/light keep PALETTE.md authority (untouched). */
+:root[data-theme="dark"] {
+  --bg: #131722; --panel: #131722; --text: #e0e3eb; --muted: #758696;
+  --accent: #007bff; --accent-text: #ffffff; --button-bg: #049cce;
+  --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
+  --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
+}

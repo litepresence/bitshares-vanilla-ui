@@ -1,0 +1,134 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
+  min-height: 56px; background: var(--header-bg); color: var(--header-text); }
+.brand { color: inherit; font-weight: 700; font-size: 1.1rem; text-decoration: none; }
+.badge { margin-left: auto; padding: 4px 12px; border-radius: 999px; font-size: 0.85rem;
+  background: var(--muted); color: #fff; min-height: 44px; display: inline-flex; align-items: center; }
+.badge[data-state="open"] { background: var(--buy); }
+.badge[data-state="closed"], .badge[data-state="error"] { background: var(--danger); }
+#nav-toggle { display: none; margin-left: 8px; min-width: 44px; min-height: 44px;
+  background: transparent; border: 1px solid currentColor; border-radius: 6px;
+  color: inherit; font-size: 1.2rem; }
+#nav { display: flex; gap: 4px; padding: 8px 16px; background: var(--panel);
+  border-bottom: 1px solid var(--border); }
+#nav a { padding: 10px 14px; min-height: 44px; display: inline-flex; align-items: center;
+  color: var(--text); text-decoration: none; border-radius: 6px; }
+#nav a:hover { background: var(--bg); }
+.wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
+.wrap.mkt-wrap { max-width: 1400px; }
+@media (min-width: 1200px) { .wrap.wide { max-width: none; display: grid;
+  grid-template-columns: repeat(12, 1fr); gap: 16px; } }
+@media (max-width: 719px) {
+  #nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  #nav { display: none; flex-direction: column; }
+  #nav.open { display: flex; }
+  .badge { font-size: 0.75rem; }
+}
+.node-table { width: 100%; border-collapse: collapse; background: var(--panel); }
+.node-table th, .node-table td { padding: 12px; border-bottom: 1px solid var(--border);
+  text-align: left; }
+.node-table th:first-child, .node-table td:first-child { position: sticky; left: 0;
+  background: var(--panel); }
+.node-cards { display: none; }
+@media (max-width: 559px) {
+  .node-table { display: none; }
+  .node-cards { display: grid; gap: 12px; }
+  .node-card { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; }
+  .node-card .latency { margin-right: 8px; }
+}
+button, select, input { min-height: 44px; font-size: 1rem; }
+button { background: var(--button-bg); color: #fff; border: 0; border-radius: 6px;
+  padding: 0 16px; }
+.error { color: var(--danger); } .muted { color: var(--muted); }
+/* Market desk (slice-05): single column stacked chart/book/trades/side on
+ * phones; three-column book|charts+trades|side desk at >=1200px. Tables and
+ * cards reuse .node-table/.node-cards above; canvases size via CSS (JS only
+ * reads layout width for devicePixelRatio scaling). */
+.mkt { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "head" "charts" "book" "trades" "side" "orders"; }
+.mkt-head { grid-area: head; } .mkt-charts { grid-area: charts; }
+.mkt-book { grid-area: book; } .mkt-trades { grid-area: trades; }
+.mkt-side { grid-area: side; } .mkt-orders { grid-area: orders; }
+.mkt section h2 { margin: 6px 0; font-size: 1rem; }
+.mkt-canvas { width: 100%; display: block; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
+/* Slice-07 Task 4 density pass (desk ONLY — no global body changes):
+ * compact book rows, smaller desk headings, tighter section spacing. */
+/* Header stats strip: Latest / 24h change / 24h volume / Best bid-ask. */
+.mkt-statstrip { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; }
+.mkt-stat { white-space: nowrap; }
+.mkt-stat strong { font-weight: 600; }
+/* Chart control rows: timeframe radios, indicator checkboxes, osc radios. */
+.mkt-tfrow, .mkt-indrow, .mkt-oscrow { display: flex; flex-wrap: wrap;
+  align-items: center; gap: 4px 12px; margin: 6px 0; }
+.mkt-tf, .mkt-ind, .mkt-kind { display: inline-flex; align-items: center;
+  gap: 6px; min-height: 44px; padding: 0 8px 0 0; }
+.mkt-indrow #mkt-invert { min-height: 44px; }
+.mkt-count-note { margin: 2px 0 8px; }
+/* Chart pane hosts (LightweightCharts sizes into these; heights fixed so the
+ * desk never jumps while candles load). Canvas fallback draws inside too. */
+.mkt-price-host { height: 320px; margin-bottom: 12px; }
+.mkt-osc-host { height: 170px; margin-bottom: 12px; }
+.mkt-price-host:empty, .mkt-osc-host:empty { display: none; }
+.mkt-chart-empty { display: flex; align-items: center; justify-content: center;
+  height: 100%; min-height: 120px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 8px; }
+/* Picker: asset-type radios + favorite stars (favorites sort first). */
+.mkt-kinds { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
+.mkt-picker-row { display: flex; align-items: center; gap: 4px; }
+.mkt-picker-row a { flex: 1; min-width: 0; }
+.mkt-star { background: transparent; color: var(--warn); border: 0;
+  min-width: 44px; min-height: 44px; font-size: 1.2rem; padding: 0 8px; }
+/* Desk tables stay dense on wide screens (scoped .mkt-book only). */
+.mkt-book .node-table th, .mkt-book .node-table td { padding: 6px 8px;
+  font-size: 0.9rem; }
+/* Orderbook numerics match the original (.order-table, _exchange.scss:118-140):
+ * right-aligned numbers, 14px headers / 12px cells, tight padding. */
+.mkt-book .node-table { table-layout: fixed; }
+.mkt-book .node-table th { font-size: 14px; padding: 5px 5px; text-align: right; }
+.mkt-book .node-table th:first-child { text-align: left; }
+.mkt-book .node-table td { font-size: 12px; padding: 5px 5px; text-align: right; }
+.mkt-book .node-table td:first-child { text-align: left; }
+/* Book scroll regions: capped height + sticky header (original behavior,
+ * native overflow). Phone cards (<560px) keep natural flow — tables hidden. */
+.mkt h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+@media (min-width: 560px) {
+  .book-scroll { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .book-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+}
+.mkt-trades .node-table th, .mkt-trades .node-table td { padding: 6px 8px;
+  font-size: 0.9rem; }
+.mkt-stats { display: flex; flex-wrap: wrap; gap: 4px 24px; }
+.mkt-stats dt { color: var(--muted); } .mkt-stats dd { margin: 0; font-weight: 600; }
+.mkt-picker-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.mkt-picker-list a { display: inline-flex; align-items: center; min-height: 44px;
+  padding: 6px 12px; color: var(--text); text-decoration: none; border-radius: 6px; }
+.mkt-picker-list a:hover, .mkt-picker-list a[aria-current="page"] { background: var(--panel); }
+.mkt-direct { display: flex; gap: 8px; margin-top: 8px; }
+.mkt-direct input { flex: 1; min-width: 0; }
+.mkt-foot { display: flex; align-items: center; gap: 12px; }
+.mkt table { margin-bottom: 12px; }
+@media (min-width: 1200px) {
+  .mkt { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr) minmax(0, 4fr);
+    grid-template-areas: "head head head" "book charts side" "book trades side" "orders orders orders"; }
+}
+
+/* Raw-chain-data disclosures (proof, not decoration): triangle-only summary,
+ * copyable pre. Usage: <details class="raw"><summary aria-label="...">
+ * </summary><pre>{...}</pre></details>. Never put secrets inside one. */
+details.raw { margin: 4px 0; }
+details.raw > summary { cursor: pointer; list-style: none; display: inline-block;
+  min-width: 44px; min-height: 44px; line-height: 44px; color: var(--muted); }
+details.raw > summary::-webkit-details-marker { display: none; }
+details.raw > summary::before { content: "▸"; font-size: 0.9rem; }
+details.raw[open] > summary::before { content: "▾"; }
+details.raw > summary:hover { color: var(--text); }
+details.raw > pre { user-select: text; -webkit-user-select: text;
+  white-space: pre-wrap; word-break: break-all; font-size: 12px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px; margin: 4px 0 8px; max-height: 300px; overflow: auto; }

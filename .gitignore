@@ -1,0 +1,21 @@
+# NEVER commit secrets. Testnet fixtures with private keys / brainkeys live
+# here during verification but must stay local-only (AGENTS.md rule 7).
+tooling/testnet-*.json
+tooling/*secret*
+tooling/*wif*
+**/*brainkey*.json
+/tmp/faucet-keys.json
+/tmp/lite-*.txt
+# Dev-only visual tooling (headless browser + deps). Never shipped, never required.
+tooling/visual/node_modules/
+tooling/visual/.browsers/
+tooling/visual/package-lock.json
+# Reference checkouts: read-only, each with its own history. Never commit them.
+bitshares-ui/
+astro-ui/
+wallet-extension/
+bitshares-core/
+# Editor + OS noise.
+.DS_Store
+*.swp
+*~
