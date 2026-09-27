@@ -113,6 +113,11 @@ var Router = (function () {
     { path: "/instant-trade", title: "Instant Trade", render: placeholder("Instant Trade") },
     { path: "/instant-trade/:marketID", title: "Instant Trade", render: placeholder("Instant Trade") },
     { path: "/pools", title: "Liquidity Pools", render: placeholder("Liquidity Pools") },
+    { path: "/assets", title: "Assets", render: function (root) { AssetUI.renderAssets(root); } },
+    { path: "/assets/create", title: "Create Asset", render: function (root) { AssetUI.renderCreate(root); } },
+    { path: "/assets/update/:symbol", title: "Update Asset", render: function (root, params) { AssetManageUI.renderUpdate(root, params && params.symbol); } },
+    { path: "/assets/issue", title: "Issue Asset", render: function (root) { AssetManageUI.renderIssue(root); } },
+    { path: "/assets/feed", title: "Publish Feed", render: function (root) { AssetFeedUI.renderFeed(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 

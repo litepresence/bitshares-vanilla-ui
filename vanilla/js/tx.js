@@ -1,8 +1,10 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
- * (op 1), limit_order_cancel (op 2) and account_update (op 6, voting only)
- * transactions, unsigned-tx
+ * (op 1), limit_order_cancel (op 2), account_update (op 6, voting only),
+ * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
+ * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
+ * (op 15) and asset_publish_feed (op 19) transactions, unsigned-tx
  * construction (single- and multi-op), fee lookup, local signing dispatch,
  * and broadcast with inclusion proof. Later slices extend this file with
  * further ops — new code appends here, never forks a second serializer.
@@ -58,6 +60,45 @@
  *                             owner?, active?, new_options?, extensions)
  *                             + #4 .../protocol/account.hpp:151-162
  * - op 6 = account_update_operation <- #4 .../protocol/operations.hpp:62
+ * - writeUint8              <- #3 bitshares-api.js:1931-1933
+ * - serializeIdSet (sorted) <- #3 bitshares-api.js:1998-2000 (varint count +
+ *                              items; vanilla sorts a COPY numerically because
+ *                              #4 stores these fields as flat_set — identical
+ *                              bytes for already-sorted input, canonical bytes
+ *                              otherwise; string sort would misorder 1.2.10
+ *                              before 1.2.9)
+ * - serializePrice          <- #3 bitshares-api.js:2145-2150
+ *                              + #4 .../protocol/asset.hpp:310 (base)(quote)
+ * - serializeAssetOptions   <- #3 bitshares-api.js:2155-2176
+ *                              + #4 .../protocol/asset_ops.hpp:47-102 (struct)
+ *                              + FC :626-639
+ * - serializeBitassetOptions<- #3 bitshares-api.js:2181-2192
+ *                              + #4 .../protocol/asset_ops.hpp:109-186 (struct)
+ *                              + FC :650-658
+ * - serializePriceFeed      <- #3 bitshares-api.js:2197-2204
+ *                              + #4 .../protocol/asset.hpp:160-189 (struct)
+ *                              + FC .../protocol/asset.hpp:312-313
+ * - serializeAssetCreateOp  <- #3 bitshares-api.js:2475-2486
+ *                              + #4 .../protocol/asset_ops.hpp:192-226 (struct)
+ *                              + FC :682-691
+ * - serializeAssetUpdateOp  <- #3 bitshares-api.js:2492-2501
+ *                              + #4 .../protocol/asset_ops.hpp:351-382 (struct)
+ *                              + FC :692-699
+ * - serializeAssetUpdateBitassetOp
+ *                           <- #3 bitshares-api.js:2507-2515
+ *                              + #4 .../protocol/asset_ops.hpp:398-411 (struct)
+ * - serializeAssetUpdateFeedProducersOp
+ *                           <- #3 bitshares-api.js:2521-2529
+ *                              + #4 .../protocol/asset_ops.hpp:430-439 (struct)
+ * - serializeAssetIssueOp   <- #3 bitshares-api.js:2535-2550
+ *                              + #4 .../protocol/asset_ops.hpp:485-505 (struct)
+ * - serializeAssetReserveOp <- #3 bitshares-api.js:2556-2563
+ *                              + #4 .../protocol/asset_ops.hpp:513-524 (struct)
+ * - serializeAssetPublishFeedOp
+ *                           <- #3 bitshares-api.js:2610-2618
+ *                              + #4 .../protocol/asset_ops.hpp:462-480 (struct)
+ * - ops 10-15, 19 ids       <- #4 .../protocol/operations.hpp:66-75
+ *                              (/* 10 *\/ … /* 19 *\/)
  * - fee placeholder + get_required_fees shape [[[opId, opData]], assetId]
  *                          <- #3 bitshares-api.js:761-788 (getRequiredFee)
  *                             + :795-805 (broadcastTransaction fee fill)
@@ -83,12 +124,47 @@
  *   but FC_REFLECT order governs the bytes — matches #3's serializer)
  * - memo fields (from)(to)(nonce)(message)
  *   <- bitshares-core .../protocol/memo.hpp:37-61
+ * - asset_create order (fee)(issuer)(symbol)(precision)(common_options)
+ *   (bitasset_opts)(is_prediction_market)(extensions)
+ *   <- bitshares-core .../protocol/asset_ops.hpp:682-691 (FC_REFLECT)
+ * - asset_update order (fee)(issuer)(asset_to_update)(new_issuer)
+ *   (new_options)(extensions) <- .../protocol/asset_ops.hpp:692-699
+ * - asset_update_bitasset order (fee)(issuer)(asset_to_update)(new_options)
+ *   (extensions) <- struct .../protocol/asset_ops.hpp:398-411
+ * - asset_update_feed_producers order (fee)(issuer)(asset_to_update)
+ *   (new_feed_producers)(extensions) <- struct .../protocol/asset_ops.hpp:430-439
+ * - asset_issue order (fee)(issuer)(asset_to_issue)(issue_to_account)(memo)
+ *   (extensions) <- struct .../protocol/asset_ops.hpp:485-505
+ * - asset_reserve order (fee)(payer)(amount_to_reserve)(extensions)
+ *   <- struct .../protocol/asset_ops.hpp:513-524
+ * - asset_publish_feed order (fee)(publisher)(asset_id)(feed)(extensions)
+ *   <- struct .../protocol/asset_ops.hpp:462-480
+ * - asset_options order (max_supply)(market_fee_percent)(max_market_fee)
+ *   (issuer_permissions)(flags)(core_exchange_rate)(whitelist_authorities)
+ *   (blacklist_authorities)(whitelist_markets)(blacklist_markets)
+ *   (description)(extensions) <- .../protocol/asset_ops.hpp:626-639
+ * - bitasset_options order (feed_lifetime_sec)(minimum_feeds)
+ *   (force_settlement_delay_sec)(force_settlement_offset_percent)
+ *   (maximum_force_settlement_volume)(short_backing_asset)(extensions)
+ *   <- .../protocol/asset_ops.hpp:650-658
+ * - price_feed order (settlement_price)(maintenance_collateral_ratio)
+ *   (maximum_short_squeeze_ratio)(core_exchange_rate)
+ *   <- .../protocol/asset.hpp:312-313 (note: struct declaration lists
+ *   core_exchange_rate second at asset.hpp:160-189, but FC_REFLECT order
+ *   governs the bytes — matches #3's serializer)
+ * - price order (base)(quote), asset order (amount)(asset_id)
+ *   <- .../protocol/asset.hpp:309-310
+ * - ops 10-19 ids <- .../protocol/operations.hpp:66-75
  * - get_required_fees <- .../app/database_api.hpp:1313
  * - broadcast_transaction_with_callback
  *   <- .../app/api.hpp:360
- * BJS cross-check: NOT consulted (no ambiguity found: #3 is explicit and
- * commented, #4 FC_REFLECT confirms field order; testnet acceptance is the
- * slice-06 Task 3 gate).
+ * BJS cross-check: slice-10 Task 1 fetched the single upstream serializer
+ * file (https://raw.githubusercontent.com/bitshares/bitsharesjs/master/lib/serializer/src/operations.js,
+ * fetched 2026-09-27) and confirmed ops 10/11/12/13/14/15/19, asset_options,
+ * bitasset_options, price_feed and price field orders match #3/#4 exactly —
+ * no conflict, so #4's order stands unchallenged. (Pre-slice-10 ops 0-2, 6:
+ * NOT re-checked — no ambiguity found: #3 is explicit and commented, #4
+ * FC_REFLECT confirms field order; testnet acceptance is the gate.)
  * KNOWN NUANCE (recorded, not guessed): #4 gives
  * create_take_profit_order_action an `extensions` field (market.hpp:46,
  * "Unused. Reserved for future use") which #3's auto-action serializer does
@@ -104,6 +180,14 @@
  *   broadcast() description: vanilla Chain has no notice dispatcher and
  *   chain.js is append-only in this task; #3 itself documents that some
  *   nodes never push the notice — :846-853).
+ * - serializeIdSet sorts a copy numerically (flat_set wire order). #3 emits
+ *   caller order; bytes are identical for already-sorted input.
+ * - serializeAssetCreateOp REQUIRES an explicit precision byte (0..12): #3's
+ *   `precision || 5` silently remaps an explicit 0 to 5 — vanilla throws
+ *   instead. Byte-identical whenever precision is supplied.
+ * - serializePriceFeed has NO ||1750/||1500 fallback: #3 silently applies
+ *   MCR/MSSR defaults, vanilla throws on missing/non-ratio values (a caller
+ *   that forgot the ratio must fail loudly, not publish a default feed).
  */
 
 var Tx = (function () {
@@ -436,6 +520,218 @@ var Tx = (function () {
     ]);
   }
 
+  /* uint8 single byte (precision, minimum_feeds). Throws on out-of-range. */
+  function writeUint8(value) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFF) throw new Error("uint8 out of range: " + value);
+    return new Uint8Array([value & 0xFF]);
+  }
+
+  /* Sorted object-id set: varint count + instance varints. #4 stores these
+   * fields as flat_set (sorted); #3 emits caller order, so vanilla sorts a
+   * copy numerically by (space, type, instance) — identical bytes for
+   * already-sorted input, canonical bytes otherwise. Throws on any
+   * non-N.N.N entry (no silent repair, same rule as serializeObjectId). */
+  function serializeIdSet(ids) {
+    var arr = (ids === null || ids === undefined) ? [] : ids;
+    if (!Array.isArray(arr)) throw new Error("id set must be an array");
+    var copy = arr.slice();
+    copy.sort(function (a, b) {
+      var pa = String(a).split("."), pb = String(b).split(".");
+      for (var i = 0; i < 3; i++) {
+        var d = parseInt(pa[i], 10) - parseInt(pb[i], 10);
+        if (d !== 0) return d;
+      }
+      return 0;
+    });
+    var parts = [varintUint32(copy.length)];
+    for (var i = 0; i < copy.length; i++) parts.push(serializeObjectId(copy[i]));
+    return concatBytes(parts);
+  }
+
+  /* price {base: asset, quote: asset} in #4 FC order (base)(quote).
+   * Integer-only: amounts stay digit strings until writeInt64LE. */
+  function serializePrice(price) {
+    if (!price || typeof price !== "object") throw new Error("price must be {base, quote}");
+    return concatBytes([serializeAsset(price.base), serializeAsset(price.quote)]);
+  }
+
+  /* asset_options in #4 FC order: max_supply i64, market_fee_percent u16
+   * (HUNDREDTHS: 200 = 2% — never a ratio), max_market_fee i64,
+   * issuer_permissions u16, flags u16, core_exchange_rate price, four id
+   * sets, description string, empty extensions. Scalar fallbacks mirror #3;
+   * the CER is structural and must be present. Extensions always encode
+   * empty (ambiguity C: populated only on proven testnet need, Task 4). */
+  function serializeAssetOptions(o) {
+    if (!o || typeof o !== "object") throw new Error("asset_options must be an object");
+    return concatBytes([
+      writeInt64LE(o.max_supply || 0),
+      writeUint16LE(o.market_fee_percent || 0),
+      writeInt64LE(o.max_market_fee || 0),
+      writeUint16LE(o.issuer_permissions || 0),
+      writeUint16LE(o.flags || 0),
+      serializePrice(o.core_exchange_rate),
+      serializeIdSet(o.whitelist_authorities),
+      serializeIdSet(o.blacklist_authorities),
+      serializeIdSet(o.whitelist_markets),
+      serializeIdSet(o.blacklist_markets),
+      serializeString(o.description || ""),
+      varintUint32(0)
+    ]);
+  }
+
+  /* bitasset_options in #4 FC order: feed_lifetime_sec u32, minimum_feeds u8,
+   * force_settlement_delay_sec u32, force_settlement_offset_percent u16
+   * (hundredths), maximum_force_settlement_volume u16 (hundredths),
+   * short_backing_asset id, EMPTY extensions (ambiguity B: BSIP74/75/77 ext
+   * populated only on proven testnet need, Task 4). */
+  function serializeBitassetOptions(o) {
+    if (!o || typeof o !== "object") throw new Error("bitasset_options must be an object");
+    return concatBytes([
+      writeUint32LE(o.feed_lifetime_sec || 0),
+      writeUint8(o.minimum_feeds || 0),
+      writeUint32LE(o.force_settlement_delay_sec || 0),
+      writeUint16LE(o.force_settlement_offset_percent || 0),
+      writeUint16LE(o.maximum_force_settlement_volume || 0),
+      serializeObjectId(o.short_backing_asset || "1.3.0"),
+      varintUint32(0)
+    ]);
+  }
+
+  /* Collateral-ratio field check: integer in [1, 10000] (fixed point over
+   * GRAPHENE_COLLATERAL_RATIO_DENOM = 1000, #4 asset.hpp:165-189 — e.g.
+   * 1750 = 175% MCR). NOT hundredths: this formatter must never be reused
+   * for percent fields and vice versa. */
+  function assertRatioU16(value, name) {
+    if (!Number.isInteger(value) || value < 1 || value > 10000) {
+      throw new Error(name + " must be an integer ratio 1..10000 (1750 = 175%), got: " + JSON.stringify(value));
+    }
+  }
+
+  /* price_feed in #4 FC order: settlement_price, MCR u16, MSSR u16,
+   * core_exchange_rate. MCR/MSSR are REQUIRED explicit ratio ints — #3's
+   * ||1750/||1500 silent fallback is deliberately NOT ported (see header):
+   * a caller that forgot the ratio fails loudly instead of publishing a
+   * default-looking feed. */
+  function serializePriceFeed(f) {
+    if (!f || typeof f !== "object") throw new Error("price_feed must be an object");
+    assertRatioU16(f.maintenance_collateral_ratio, "maintenance_collateral_ratio");
+    assertRatioU16(f.maximum_short_squeeze_ratio, "maximum_short_squeeze_ratio");
+    return concatBytes([
+      serializePrice(f.settlement_price),
+      writeUint16LE(f.maintenance_collateral_ratio),
+      writeUint16LE(f.maximum_short_squeeze_ratio),
+      serializePrice(f.core_exchange_rate)
+    ]);
+  }
+
+  /* asset_create (op 10) in #4 FC order: fee, issuer, symbol, precision u8,
+   * common_options, bitasset_opts?, is_prediction_market byte, extensions.
+   * Precision is REQUIRED (integer 0..12): #3's `precision || 5` silently
+   * remaps an explicit 0 to 5 — vanilla throws instead (see header). */
+  function serializeAssetCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_create op must be an object");
+    if (typeof op.symbol !== "string" || !op.symbol) throw new Error("asset_create symbol must be a non-empty string");
+    if (!Number.isInteger(op.precision) || op.precision < 0 || op.precision > 12) {
+      throw new Error("asset_create precision must be an integer 0..12, got: " + JSON.stringify(op.precision));
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeString(op.symbol),
+      writeUint8(op.precision),
+      serializeAssetOptions(op.common_options),
+      serializeOptional(op.bitasset_opts === undefined ? null : op.bitasset_opts, serializeBitassetOptions),
+      new Uint8Array([op.is_prediction_market ? 1 : 0]),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_update (op 11) in #4 FC order: fee, issuer, asset_to_update,
+   * new_issuer?, new_options, extensions (empty per ambiguity C). */
+  function serializeAssetUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_update op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeObjectId(op.asset_to_update),
+      serializeOptional(op.new_issuer === undefined ? null : op.new_issuer, serializeObjectId),
+      serializeAssetOptions(op.new_options),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_update_bitasset (op 12) in #4 FC order: fee, issuer,
+   * asset_to_update, new_options (bitasset_options), extensions (empty per
+   * ambiguity B). Target must be market-issued — enforced read-side by
+   * asset.js (Task 2), not here: bytes carry no such check. */
+  function serializeAssetUpdateBitassetOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_update_bitasset op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeObjectId(op.asset_to_update),
+      serializeBitassetOptions(op.new_options),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_update_feed_producers (op 13) in #4 FC order: fee, issuer,
+   * asset_to_update, new_feed_producers (sorted account-id set),
+   * extensions. */
+  function serializeAssetUpdateFeedProducersOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_update_feed_producers op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeObjectId(op.asset_to_update),
+      serializeIdSet(op.new_feed_producers),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_issue (op 14) in #4 FC order: fee, issuer, asset_to_issue,
+   * issue_to_account, memo?, extensions. Memo uses the shared full-structure
+   * memo serializer via serializeOptional (absent <-> 0x00, same convention
+   * as the transfer path; byte-identical to #3's if/else branch). */
+  function serializeAssetIssueOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_issue op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeAsset(op.asset_to_issue),
+      serializeObjectId(op.issue_to_account),
+      serializeOptional(op.memo === undefined ? null : op.memo, serializeMemo),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_reserve (op 15) in #4 FC order: fee, payer, amount_to_reserve,
+   * extensions. NOT usable on market-issued assets — enforced read-side by
+   * asset.js (Task 2) with a `not-market-issued` error, not here. */
+  function serializeAssetReserveOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_reserve op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.payer),
+      serializeAsset(op.amount_to_reserve),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_publish_feed (op 19) in #4 FC order: fee, publisher, asset_id,
+   * feed (price_feed), extensions (empty; BSIP77 initial_collateral_ratio
+   * ext populated only on proven testnet need, Task 4). */
+  function serializeAssetPublishFeedOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_publish_feed op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.publisher),
+      serializeObjectId(op.asset_id),
+      serializePriceFeed(op.feed),
+      varintUint32(0)
+    ]);
+  }
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -455,7 +751,14 @@ var Tx = (function () {
       else if (opType === 1) parts.push(serializeLimitOrderCreateOp(opData));
       else if (opType === 2) parts.push(serializeLimitOrderCancelOp(opData));
       else if (opType === 6) parts.push(serializeAccountUpdateOp(opData));
-      else throw new Error("tx.js supports ops 0-2 and 6, got op " + opType);
+      else if (opType === 10) parts.push(serializeAssetCreateOp(opData));
+      else if (opType === 11) parts.push(serializeAssetUpdateOp(opData));
+      else if (opType === 12) parts.push(serializeAssetUpdateBitassetOp(opData));
+      else if (opType === 13) parts.push(serializeAssetUpdateFeedProducersOp(opData));
+      else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
+      else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
+      else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
+      else throw new Error("tx.js supports ops 0-2, 6, 10-15 and 19, got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -713,7 +1016,12 @@ var Tx = (function () {
   }
 
   return {
-    OP: { transfer: 0, limit_order_create: 1, limit_order_cancel: 2, account_update: 6 },
+    OP: {
+      transfer: 0, limit_order_create: 1, limit_order_cancel: 2, account_update: 6,
+      asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
+      asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
+      asset_publish_feed: 19
+    },
     fee: fee,
     feeMulti: feeMulti,
     buildTx: buildTx,
@@ -743,6 +1051,20 @@ var Tx = (function () {
       voteIdToUint32: voteIdToUint32,
       serializeAccountOptions: serializeAccountOptions,
       serializeAccountUpdateOp: serializeAccountUpdateOp,
+      writeUint8: writeUint8,
+      serializeIdSet: serializeIdSet,
+      serializePrice: serializePrice,
+      serializeAssetOptions: serializeAssetOptions,
+      serializeBitassetOptions: serializeBitassetOptions,
+      assertRatioU16: assertRatioU16,
+      serializePriceFeed: serializePriceFeed,
+      serializeAssetCreateOp: serializeAssetCreateOp,
+      serializeAssetUpdateOp: serializeAssetUpdateOp,
+      serializeAssetUpdateBitassetOp: serializeAssetUpdateBitassetOp,
+      serializeAssetUpdateFeedProducersOp: serializeAssetUpdateFeedProducersOp,
+      serializeAssetIssueOp: serializeAssetIssueOp,
+      serializeAssetReserveOp: serializeAssetReserveOp,
+      serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
       serializeTransaction: serializeTransaction
     }
   };
