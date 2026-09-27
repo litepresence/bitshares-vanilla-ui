@@ -3,12 +3,15 @@
  *   Showcases/Barter.jsx add-asset pattern) + optional escrow leg + per-side
  *   balance warnings (integer math, port the SHAPE of Barter.jsx
  *   checkAmountsTotal) + human-readable atomic preview ("A gives X → B; B
- *   gives Y → A") + live leg-fee hints (each leg fee-estimated as a transfer;
- *   the op-22 fee itself lands with slice 14) + PROPOSE button
- *   DISABLED with an honest slice-14 note. ZERO new serializers for barter —
- *   ever: #1 builds a transfer_list handed to op-22 create, and
- *   op-22 wiring is slice 14's. This form places zero transactions. Offline
- *   shows Retry plus auto-resubscribe on reconnect (htlc-ui pattern).
+ *   gives Y → A") + live leg-fee hints (each leg fee-estimated as a transfer)
+ *   + PROPOSE button wired to Proposal.buildCreate (op 22, slice 14): the two
+ *   sides' legs become enclosed transfer ops, fee-payer = Peer A, live op-22
+ *   fee, standard confirm, prove by proposalsFor re-read. ZERO new serializers
+ *   for barter — ever: #1 builds a transfer_list handed to op-22 create, and
+ *   this form calls Proposal.buildCreate with the same shape. Escrow stays
+ *   preview-only (no chain shape for it is proven — ambiguity I). This form
+ *   broadcasts ONLY via the PROPOSE path after preview. Offline shows Retry
+ *   plus auto-resubscribe on reconnect (htlc-ui pattern).
  * Consumes: Format (parse/format, string math only), Account (resolve/balances),
  *   Asset.describe, Tx.fee (leg hints only — never broadcast), Chain/Store,
  *   Wallet (unlock gate only). Created by: building-vanilla-slices skill,
@@ -77,16 +80,18 @@ var BarterUI = (function () {
     r.appendChild(fa); r.appendChild(fq); box.appendChild(r);
     return { asset: fa, amount: fq };
   }
-  /* Route entry: #/barter — two-sided form + escrow + preview; PROPOSE disabled. */
+  /* Route entry: #/barter — two-sided form + escrow + preview; PROPOSE enabled
+   * (op-22 via Proposal.buildCreate, slice 14: fee-payer = Peer A, live fee,
+   * standard confirm, prove by proposalsFor re-read). */
   function renderBarter(root) {
     if (!root) return;
     var doc = root.ownerDocument || document, myGen = ++gen;
     dropOpenSubs();
     root.innerHTML = "";
-    ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function () { /* checked below */ });
+    ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].forEach(function () { /* checked below */ });
     var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", "Barter"));
-    var miss = ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].filter(function (g) {
+    var miss = ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].filter(function (g) {
       return typeof globalThis[g] === "undefined"; });
     if (miss.length) { showError(doc, wrap, "Barter backend missing: " + miss.join(", ") + " failed to load."); return; }
     if (Chain.status().state !== "open") {
@@ -107,7 +112,7 @@ var BarterUI = (function () {
       });
       return;
     }
-    wrap.appendChild(el(doc, "p", "Two-sided atomic swap preview. Nothing here broadcasts: proposing lands with op-22 support in slice 14.", "muted"));
+    wrap.appendChild(el(doc, "p", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A).", "muted"));
     var fA = field(doc, "Peer A account", { placeholder: "name or 1.2.N" });
     wrap.appendChild(fA.row);
     wrap.appendChild(el(doc, "h2", "A gives"));
@@ -126,21 +131,136 @@ var BarterUI = (function () {
     wrap.appendChild(fEsc.row);
     var check = touchable(el(doc, "button", "Preview barter")); check.type = "button"; wrap.appendChild(check);
     var out = el(doc, "div", null, "xfer-out"); wrap.appendChild(out);
-    var propose = touchable(el(doc, "button", "Propose (lands in slice 14)"));
+    var fExp = field(doc, "Proposal expiration", { type: "datetime-local", value: defaultExpiration() });
+    var fRev = field(doc, "Review period seconds (optional)", { placeholder: "blank = none", inputmode: "numeric" });
+    wrap.appendChild(fExp.row); wrap.appendChild(fRev.row);
+    var propose = touchable(el(doc, "button", "Propose barter (op 22)"));
     propose.type = "button"; propose.disabled = true;
-    propose.title = "Disabled: proposal broadcast (op 22) lands in slice 14.";
+    propose.title = "Preview the barter first — proposing needs resolved legs.";
     wrap.appendChild(propose);
-    wrap.appendChild(el(doc, "p", "Proposing is disabled until proposal broadcast lands in slice 14 (op-22 serializer owner). This form never sends a transaction.", "muted"));
+    var proposeOut = el(doc, "div", null, "xfer-out"); wrap.appendChild(proposeOut);
+    var lastPreview = null;
     check.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(out); check.disabled = true;
+      clearBox(out); check.disabled = true; propose.disabled = true; lastPreview = null;
       showStatus(doc, out, "Resolving and checking balances…");
       preview(doc, out, myGen, fA.input.value.trim(), legsA, fB.input.value.trim(), legsB, fEsc.input.value.trim())
-        .then(function () { check.disabled = false; })
+        .then(function (res) {
+          check.disabled = false;
+          if (res && myGen === gen) {
+            lastPreview = res; propose.disabled = false;
+            propose.title = "Enclose both sides as transfer ops in one proposal (fee-payer = " + res.A.acct.name + ").";
+          }
+        })
         .catch(function (e) {
           if (myGen !== gen) return; clearBox(out);
           showError(doc, out, e, "Could not preview the barter."); check.disabled = false;
         });
+    });
+    propose.addEventListener("click", function () {
+      if (myGen !== gen || !lastPreview) return;
+      proposeBarter(doc, proposeOut, myGen, lastPreview, fExp.input.value.trim(), fRev.input.value.trim(), propose);
+    });
+  }
+  /* Default expiration: now + 24h as a datetime-local value. Date only, never money. */
+  function defaultExpiration() {
+    var t = new Date(Date.now() + 86400000);
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + "T" + p(t.getHours()) + ":" + p(t.getMinutes());
+  }
+  /* PROPOSE (slice-13 deferred proof): two sides' legs -> op-0 pairs ->
+   * Proposal.buildCreate (fee-payer = Peer A) -> live op-22 fee -> confirm ->
+   * broadcast -> prove by proposalsFor re-read. Escrow stays preview-only. */
+  function proposeBarter(doc, out, myGen, prev, expV, revV, btn) {
+    clearBox(out); btn.disabled = true;
+    showStatus(doc, out, "Building the proposal…");
+    function done() { btn.disabled = false; }
+    Promise.resolve().then(async function () {
+      if (!expV) throw new Error("Proposal expiration must be set.");
+      var expIso = expV.length === 16 ? expV + ":00" : expV;
+      var rev = (revV === "") ? null : parseInt(revV, 10);
+      if (rev !== null && (!Number.isInteger(rev) || rev < 0)) throw new Error("Review period must be a non-negative integer.");
+      function leg(fromId, toId, it) {
+        // No memo key: the null-memo object shape is rejected by the node at
+        // fee time (types.cpp:49 base58 assert), so legs omit memo entirely
+        // (the slice-4 proven shape — key absent, never present-but-null).
+        return [0, { fee: { amount: "0", asset_id: "1.3.0" }, from: fromId, to: toId,
+          amount: { amount: it.raw, asset_id: it.id },
+          extensions: [] }];
+      }
+      var pairs = [];
+      prev.A.items.forEach(function (it) { pairs.push(leg(prev.A.acct.id, prev.B.acct.id, it)); });
+      prev.B.items.forEach(function (it) { pairs.push(leg(prev.B.acct.id, prev.A.acct.id, it)); });
+      var pair = Proposal.buildCreate({ feePayerId: prev.A.acct.id, expirationIso: expIso,
+        reviewPeriodSecOrNull: rev, innerOps: pairs.map(function (p) { return { op: p }; }) });
+      var before = (await Proposal.proposalsFor(prev.A.acct.name || prev.A.acct.id)).length;
+      await Proposal.fee(pair, "1.3.0");
+      return { pair: pair, before: before };
+    }).then(function (built) {
+      if (myGen !== gen) return done();
+      feeText(built.pair[1].fee).then(function (f) {
+        if (myGen !== gen) return done();
+        confirmPropose(doc, out, myGen, prev, built, f, btn);
+        done();
+      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, "Fee lookup failed."); } done(); });
+    }).catch(function (e) {
+      if (myGen !== gen) return done();
+      clearBox(out); showError(doc, out, e, "Could not build the proposal."); done();
+    });
+  }
+  async function feeText(fee) {
+    try {
+      var a = await Asset.describe(fee.asset_id);
+      return Format.formatAmount(String(fee.amount), a.precision) + " " + a.symbol;
+    } catch (e) { return String(fee.amount) + " (" + fee.asset_id + ")"; }
+  }
+  /* Nested confirm rows for the barter legs (self-contained: no ProposalUI coupling). */
+  function confirmPropose(doc, out, myGen, prev, built, feeHuman, btn) {
+    clearBox(out);
+    out.appendChild(el(doc, "h3", "Confirm barter proposal (op 22)"));
+    var list = el(doc, "dl", null, "confirm");
+    [["Fee payer", prev.A.acct.name + " (" + prev.A.acct.id + ")"],
+     ["Expiration", built.pair[1].expiration_time],
+     ["Review period", (built.pair[1].review_period_seconds === null ? "none" : Proposal.durToHuman(built.pair[1].review_period_seconds))],
+     ["Enclosed transfers", String(built.pair[1].proposed_ops.length)],
+     ["Fee (live)", feeHuman]].forEach(function (r) {
+      list.appendChild(el(doc, "dt", r[0])); list.appendChild(el(doc, "dd", r[1]));
+    });
+    out.appendChild(list);
+    prev.A.items.forEach(function (it) {
+      out.appendChild(el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+        " " + it.symbol + " → " + prev.B.acct.name, ""));
+    });
+    prev.B.items.forEach(function (it) {
+      out.appendChild(el(doc, "p", prev.B.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+        " " + it.symbol + " → " + prev.A.acct.name, ""));
+    });
+    if (prev.esc) out.appendChild(el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
+    var back = touchable(el(doc, "button", "Back")); back.type = "button";
+    var send = touchable(el(doc, "button", "Sign & Send")); send.type = "button";
+    out.appendChild(back); out.appendChild(send);
+    back.addEventListener("click", function () { clearBox(out); });
+    send.addEventListener("click", function () {
+      if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+      var status = showStatus(doc, out, "Signing…");
+      var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+      if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); send.disabled = false; back.disabled = false; return; }
+      Tx.buildTx([built.pair]).then(function (unsigned) {
+        status.textContent = "Broadcasting…";
+        return Proposal.sendAndProve(unsigned, wif, async function () {
+          var now = await Proposal.proposalsFor(prev.A.acct.name || prev.A.acct.id);
+          return now.length > built.before ? now[now.length - 1] : null;
+        });
+      }).then(async function (res) {
+        if (myGen !== gen) return; clearBox(out);
+        out.appendChild(el(doc, "p", "Barter proposed and re-read on chain.", "xfer-ok"));
+        var head = (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
+        out.appendChild(el(doc, "p", "Observed at head block #" + String(head) + " (" + res.via + ").", "muted"));
+      }).catch(function (e) {
+        if (myGen !== gen) return; out.removeChild(status);
+        showError(doc, out, e, "Failed. Check state before retrying (do NOT blindly rebroadcast).");
+        send.disabled = false; back.disabled = false;
+      });
     });
   }
   /* Resolve one side: account + per-leg asset/precision + raw amounts + balance warnings. */
@@ -194,7 +314,7 @@ var BarterUI = (function () {
     var hints = [];
     async function legFee(fromId, toId, it) {
       var op = { fee: { amount: "0", asset_id: "1.3.0" }, from: fromId, to: toId,
-        amount: { amount: it.raw, asset_id: it.id }, memo: { from: null, to: null, nonce: "0", message: null }, extensions: [] };
+        amount: { amount: it.raw, asset_id: it.id }, extensions: [] };
       try {
         var f = await Tx.fee(0, op, "1.3.0");
         hints.push(it.symbol + ": " + String(f.amount) + " (" + String(f.asset_id) + ")");
@@ -203,7 +323,8 @@ var BarterUI = (function () {
     for (var i = 0; i < A.items.length; i++) { await legFee(A.acct.id, B.acct.id, A.items[i]); if (myGen !== gen) return; }
     for (var k = 0; k < B.items.length; k++) { await legFee(B.acct.id, A.acct.id, B.items[k]); if (myGen !== gen) return; }
     out.removeChild(status);
-    out.appendChild(el(doc, "p", "Leg fee hints (transfer-rate estimate; op-22 fee lands slice 14): " + hints.join("; "), "muted"));
+    out.appendChild(el(doc, "p", "Leg fee hints (live transfer-rate estimates; the proposal fee is estimated at PROPOSE time): " + hints.join("; "), "muted"));
+    return { A: A, B: B, esc: esc };
   }
 
   return { renderBarter: renderBarter };

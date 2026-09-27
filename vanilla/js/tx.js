@@ -1,14 +1,18 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-3, 6, 10-15, 19, 25-28, 49, 50, 52, 59-73, 75, 76).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-3, 6, 7,
+ * 10-15, 19, 22-24, 25-28, 32, 33, 37, 49, 50, 52, 54-58, 59-73, 75, 76).
  *
   * What it owns: binary serialization of transfer (op 0), limit_order_create
   * (op 1), limit_order_cancel (op 2), call_order_update (op 3), account_update
-  * (op 6, voting only),
+  * (op 7), account_whitelist (op 7),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
- * (op 15), asset_publish_feed (op 19), withdraw_permission_create (op 25),
+ * (op 15), asset_publish_feed (op 19), proposal_create/update/delete (ops
+ * 22/23/24), withdraw_permission_create (op 25),
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
  * withdraw_permission_delete (op 28), htlc_create (op 49), htlc_redeem
- * (op 50), htlc_extend (op 52), liquidity_pool_create (op 59),
+ * (op 50), htlc_extend (op 52), vesting_balance_create/withdraw (ops 32/33),
+ * balance_claim (op 37, fee always 0), custom_authority_create/update/delete
+ * (ops 54/55/56), ticket_create/update (ops 57/58), liquidity_pool_create (op 59),
  * liquidity_pool_delete (op 60), liquidity_pool_deposit (op 61),
  * liquidity_pool_withdraw (op 62), liquidity_pool_exchange (op 63) and
   * liquidity_pool_update (op 75), samet_fund ops (64-68), credit ops (69-73, 76) transactions, unsigned-tx
@@ -199,13 +203,86 @@
   *   #3 emits caller order, so bytes are identical for sorted input
   * - ops 3, 64-73, 76 ids <- #4 .../protocol/operations.hpp:59 (3),
   *   :120-130 (64-73, incl. 74 VIRTUAL), :132 (76)
+  * - serializeAccountWhitelistOp
+  *                          <- #3 bitshares-api.js:2435-2443
+  *                             + #4 .../protocol/account.hpp:197-220 (struct;
+  *                             new_listing bitfield 0-3) + FC :303 (wire order)
+  * - serializeProposalCreateOp (op_wrapper dual-shape + recursion)
+  *                          <- #3 bitshares-api.js:2651-2669 (op_wrapper
+  *                             normalise {op:[type,data]} vs bare + id-shape
+  *                             note) + #4 .../protocol/proposal.hpp:70-82
+  *                             (struct) + FC :177-178 (wire order) + #4
+  *                             .../protocol/operations.hpp:153-157 (op_wrapper
+  *                             holds one `operation` static_variant — wire is
+  *                             varint type + data, no extra framing)
+  *                             + BJS operations.js proposal_create/op_wrapper
+  *                             (field order match, fetched 2026-09-28)
+  * - serializeProposalUpdateOp <- #3 bitshares-api.js:2677-2690
+  *                             + #4 .../protocol/proposal.hpp:119-135 + FC
+  *                             :179-181 + BJS proposal_update (order match)
+  * - serializeProposalDeleteOp <- #3 bitshares-api.js:2696-2704
+  *                             + #4 .../protocol/proposal.hpp:156-165 + FC
+  *                             :182 + BJS proposal_delete (order match)
+  * - serializeVestingPolicy (static_variant ARRAY FORM ONLY)
+  *                          <- #3 bitshares-api.js:2211-2232 (array-vs-object
+  *                             comment: node's JSON parser rejects object form)
+  *                             + #4 .../protocol/vesting.hpp:50-54 (variant
+  *                             order linear/cdd/instant) + FC :124-130
+  * - serializeVestingBalanceCreateOp / WithdrawOp
+  *                          <- #3 bitshares-api.js:2823-2831 / :2837-2844
+  *                             + #4 .../protocol/vesting.hpp:74-90 / :101-117
+  *                             + FC :124-125 + BJS vesting_balance_create /
+  *                             vesting_balance_withdraw (order match)
+  * - serializeBalanceClaimOp <- #3 bitshares-api.js:2916-2924
+  *                             + #4 .../protocol/balance.hpp:40-57 (fee 0 at
+  *                             :42 + :51) + FC :62-63 + BJS balance_claim
+  *                             (order match, no extensions field)
+  * - serializeAuthority      <- #3 bitshares-api.js:2076-2110
+  *                             + #4 .../protocol/authority.hpp:136
+  *                             (weight_threshold, account/key/address maps)
+  *                             + BJS operations.js authority (map order match)
+  * - serializeRestriction (+Argument, types 0-41)
+  *                          <- #3 bitshares-api.js:2304-2336 (simple types;
+  *                             complex punted) + #4 .../protocol/
+  *                             restriction.hpp:99-137 (variant list + FC order)
+  *                             + BJS operations.js restriction (42-member
+  *                             variant incl. set/vector forms; the pair tag
+  *                             member is an upstream gap there — vanilla implements
+  *                             it per #4 as int64 + vector<restriction>)
+  * - serializeCustomAuthority{Create,Update,Delete}Op
+  *                          <- #3 bitshares-api.js:3197-3242
+  *                             + #4 .../protocol/custom_authority.hpp:36-122
+  *                             + FC :130-136 + BJS custom_authority_create /
+  *                             update / delete (order match)
+  * - serializeTicket{Create,Update}Op
+  *                          <- #3 bitshares-api.js:3248-3271
+  *                             + #4 .../protocol/ticket.hpp:33-41 (lock enum
+  *                             0-4) + :47-80 + FC :90-93 + BJS ticket_create /
+  *                             ticket_update (order match)
+  * - serializeOperationData (nested-op recursion for op 22)
+  *                          <- #3 bitshares-api.js:1495-... (operation switch;
+  *                             vanilla's copy delegates to the same per-op
+  *                             functions the outer tx path uses — never a fork)
+  * - ops 7, 22-24, 32/33, 37, 54-58 ids
+  *                          <- #4 .../protocol/operations.hpp:63 (7), :78-80
+  *                             (22-24), :88-90 (32/33), :93 (37), :110-114
+  *                             (54-58)
+  * - NOT serialized (WHY comments at the dispatch site, slice-14 scope
+  *   decision): 38 override_transfer (issuer-only — no vanilla UI path),
+  *   39/40/41 blind trio (needs Pedersen commitments + bulletproof
+  *   range_proofs + blinding-factor ECDH mint: #3 serializes the bytes but
+  *   can not CREATE them, #2 mints them only behind Electron-host IPC —
+  *   vendoring that crypto is its own audited slice, never smuggled in),
+  *   46 execute_bid (VIRTUAL per #4 operations.hpp:102, never signed)
   * - op dispatch 25-28, 49/50/52
  *                            <- #3 bitshares-api.js:1547-1554, :1595-1604
  *                              (51/53 VIRTUAL — never dispatched, see the
  *                              dispatch-site comment)
- * - fee placeholder + get_required_fees shape [[[opId, opData]], assetId]
- *                          <- #3 bitshares-api.js:761-788 (getRequiredFee)
- *                             + :795-805 (broadcastTransaction fee fill)
+  * - fee placeholder + get_required_fees shape [[[opId, opData]], assetId]
+  *                          <- #3 bitshares-api.js:761-788 (getRequiredFee)
+  *                             + :795-805 (broadcastTransaction fee fill)
+  *                             + :1339-1341 (op-22 nested [flat, [inners]] —
+  *                             flat first, inners informational)
  * - buildTransfer ref-block/expiration logic
  *                          <- #3 bitshares-api.js:885-920 (buildTransaction,
  *                             incl. :895-906 prefix parse, :908-911 expiry)
@@ -342,6 +419,34 @@
   *   balance/min_deal_amount (writeInt64LE throws on missing input).
   * - op-76 auto_repay is REQUIRED explicit (0/1/2): #3's `?? 0` would
   *   silently write no_auto_repayment for a caller that forgot the field.
+  * - serializeAccountWhitelistOp REQUIRES new_listing 0-3: #3's `|| 0`
+  *   silently remaps a forgotten listing to no_listing — vanilla throws.
+  * - serializeVestingPolicy accepts the ARRAY form [type,data] ONLY: #3 also
+  *   accepts a {type,...} object, but #4's node JSON parser rejects object
+  *   form, so bytes built from one would never match a broadcastable op.
+  *   Type 2 (instant) emits NO payload: #3's else-branch would write cdd
+  *   bytes for type 2, and BJS has no third variant member at all — #4's
+  *   FC_REFLECT_EMPTY (vesting.hpp:129) wins over both.
+  * - serializeAuthority SORTS both maps (account ids numerically, key
+  *   strings by decoded bytes): #3 emits caller order, but #4 stores
+  *   flat_maps (ordered) — identical bytes for sorted input, canonical
+  *   otherwise (same rule as serializeIdSet). address_auths entries are
+  *   40-char ripemd160 hex -> 20 raw bytes per #4 address.hpp (addr field)
+  *   and BJS Types.address — #3's 33-byte pubkey-style write is NOT ported.
+  *   In practice address_auths is always empty (#4: backward-compat only).
+  * - serializeRestriction implements the FULL BJS 0-41 argument table
+  *   (incl. set/vector forms #3 punts on by writing an empty varint, and
+  *   the pair<int64,vector<restriction>> member BJS leaves as an upstream gap):
+  *   silent empty bytes for a caller-supplied restriction are always
+  *   rejected or fully encoded — never half-written. Sets sort (fc set
+  *   order); vectors keep caller order.
+  * - op-23 key-approval sets sort by decoded pubkey bytes (flat_set order);
+  *   #3 emits caller order. op-55 restrictions_to_remove sorts numerically
+  *   (flat_set<u16>); restrictions_to_add keeps caller order (vector).
+  * - op-57/58 target_type is REQUIRED 0-4: #3's `|| 0` silently remaps a
+  *   forgotten lock type to liquid — vanilla throws (same rule as op-76).
+  * - op-54 operation_type is REQUIRED non-negative integer: #3's `|| 0`
+  *   silently targets op 0 (transfer) for a caller that forgot the field.
   * - stale #3 field names (offer_to_update / new_* on op 71,
   *   repay_period_seconds, offer_expiry_time) are deliberately NOT accepted:
   *   canonical #4 names only — anything else fails loudly on the missing
@@ -1512,6 +1617,583 @@ var Tx = (function () {
    * rule as ops 51/53 below). #3's serializeCreditDealExpiredOp (:3580-3594)
    * serves history display only. */
 
+  /* authority {weight_threshold u32, account_auths [[id, u16]...],
+   * key_auths [[pubkey, u16]...], address_auths [[ripemd160hex, u16]...]} in
+   * #4 FC order (weight_threshold)(account_auths)(key_auths)(address_auths).
+   * Null/undefined encodes the empty authority (threshold 0, three empty
+   * counts — matches #3's empty branch). Maps sort (see header deviations);
+   * weights go through writeUint16LE so an out-of-range weight throws. */
+  function serializeAuthority(auth) {
+    if (auth === null || auth === undefined) {
+      return concatBytes([writeUint32LE(0), varintUint32(0), varintUint32(0), varintUint32(0)]);
+    }
+    if (typeof auth !== "object") throw new Error("authority must be an object");
+    var threshold = auth.weight_threshold;
+    if (!Number.isInteger(threshold) || threshold < 0 || threshold > 0xFFFFFFFF) {
+      throw new Error("authority.weight_threshold must be a u32, got: " + JSON.stringify(threshold));
+    }
+    var parts = [writeUint32LE(threshold)];
+    var acc = Array.isArray(auth.account_auths) ? auth.account_auths.slice() : [];
+    acc.sort(function (a, b) {
+      var pa = String(a[0]).split("."), pb = String(b[0]).split(".");
+      for (var i = 0; i < 3; i++) {
+        var d = parseInt(pa[i], 10) - parseInt(pb[i], 10);
+        if (d !== 0) return d;
+      }
+      return 0;
+    });
+    parts.push(varintUint32(acc.length));
+    for (var i = 0; i < acc.length; i++) {
+      parts.push(serializeObjectId(acc[i][0]));
+      parts.push(writeUint16LE(acc[i][1]));
+    }
+    var keys = Array.isArray(auth.key_auths) ? auth.key_auths.slice() : [];
+    keys.sort(function (a, b) {
+      var ha = bytesToHex(serializePublicKey(a[0])), hb = bytesToHex(serializePublicKey(b[0]));
+      return ha < hb ? -1 : ha > hb ? 1 : 0;
+    });
+    parts.push(varintUint32(keys.length));
+    for (var k = 0; k < keys.length; k++) {
+      parts.push(serializePublicKey(keys[k][0]));
+      parts.push(writeUint16LE(keys[k][1]));
+    }
+    var addrs = Array.isArray(auth.address_auths) ? auth.address_auths : [];
+    parts.push(varintUint32(addrs.length));
+    for (var m = 0; m < addrs.length; m++) {
+      parts.push(serializeAddressHex(addrs[m][0]));
+      parts.push(writeUint16LE(addrs[m][1]));
+    }
+    return concatBytes(parts);
+  }
+
+  /* ripemd160 address hex (40 chars) -> 20 raw bytes. #4 address.hpp wraps a
+   * single fc::ripemd160; BJS Types.address appends the same 20 bytes — the
+   * 33-byte pubkey-style write #3 uses for address_auths is not ported. */
+  function serializeAddressHex(hex) {
+    var bytes = hexToBytes(hex);
+    if (bytes.length !== 20) {
+      throw new Error("address must be 20 bytes (40 hex chars), got " + bytes.length + " bytes");
+    }
+    return bytes;
+  }
+
+  /* Timestamp to unix seconds without writing: accepts ISO strings (UTC, Z
+   * appended when missing — same convention as serializeTimestamp) or
+   * unix-seconds numbers. Throws on anything else (never defaults 0). */
+  function timestampToSecs(ts) {
+    var secs;
+    if (typeof ts === "number") {
+      secs = Math.floor(ts);
+    } else if (typeof ts === "string") {
+      var iso = /[Zz]$/.test(ts) ? ts : ts + "Z";
+      secs = Math.floor(new Date(iso).getTime() / 1000);
+    } else {
+      throw new Error("timestamp must be an ISO string or unix seconds, got: " + JSON.stringify(ts));
+    }
+    assertUint32(secs, "timestamp");
+    return secs;
+  }
+
+  /* vesting_policy_initializer static_variant in ARRAY FORM ONLY [type, data]
+   * (see header: object form is rejected because the node rejects it too).
+   * Type 0 linear = (begin_timestamp, u32 cliff, u32 duration); type 1 cdd =
+   * (start_claim, u32 vesting_seconds); type 2 instant = no payload (#4
+   * FC_REFLECT_EMPTY — #3/BJS have no correct instant encoding). */
+  function serializeVestingPolicy(policy) {
+    if (!Array.isArray(policy) || policy.length !== 2) {
+      throw new Error("vesting policy must be the array form [type, data] " +
+        "(e.g. [0, {begin_timestamp, vesting_cliff_seconds, vesting_duration_seconds}])");
+    }
+    var type = policy[0], d = policy[1] || {};
+    if (type === 0) {
+      assertUint32(d.vesting_cliff_seconds, "vesting_cliff_seconds");
+      assertUint32(d.vesting_duration_seconds, "vesting_duration_seconds");
+      return concatBytes([
+        varintUint32(0),
+        serializeTimestamp(d.begin_timestamp),
+        writeUint32LE(d.vesting_cliff_seconds),
+        writeUint32LE(d.vesting_duration_seconds)
+      ]);
+    } else if (type === 1) {
+      assertUint32(d.vesting_seconds, "vesting_seconds");
+      return concatBytes([
+        varintUint32(1),
+        serializeTimestamp(d.start_claim),
+        writeUint32LE(d.vesting_seconds)
+      ]);
+    } else if (type === 2) {
+      return varintUint32(2);
+    }
+    throw new Error("vesting policy type must be 0 (linear), 1 (cdd) or 2 (instant), got: " +
+      JSON.stringify(type));
+  }
+
+  /* Sorted public-key set: varint count + raw 33-byte keys ordered by decoded
+   * bytes (fc flat_set<public_key_type> order). Used by op-23 key approvals
+   * and restriction argument type 24. #3 emits caller order (see header). */
+  function serializePubkeySet(keys) {
+    var arr = (keys === null || keys === undefined) ? [] : keys;
+    if (!Array.isArray(arr)) throw new Error("pubkey set must be an array");
+    var decoded = arr.map(function (k) { return serializePublicKey(k); });
+    decoded.sort(function (a, b) {
+      var ha = bytesToHex(a), hb = bytesToHex(b);
+      return ha < hb ? -1 : ha > hb ? 1 : 0;
+    });
+    var parts = [varintUint32(decoded.length)];
+    for (var i = 0; i < decoded.length; i++) parts.push(decoded[i]);
+    return concatBytes(parts);
+  }
+
+  /* Sorted u16 set: varint count + u16 LE each, ascending. Used by op-55
+   * restrictions_to_remove (flat_set<uint16>). writeUint16LE rejects
+   * out-of-range entries loudly. */
+  function serializeU16Set(values) {
+    var arr = (values === null || values === undefined) ? [] : values;
+    if (!Array.isArray(arr)) throw new Error("u16 set must be an array");
+    var copy = arr.slice().sort(function (a, b) { return a - b; });
+    var parts = [varintUint32(copy.length)];
+    for (var i = 0; i < copy.length; i++) parts.push(writeUint16LE(copy[i]));
+    return concatBytes(parts);
+  }
+
+  /* Sorted object-id set with a caller-supplied item writer. Same numeric
+   * (space, type, instance) order as serializeIdSet; covers restriction set
+   * argument types 26-38 (account/asset/force_settlement/.../balance ids). */
+  function serializeSortedIdSet(ids, writer) {
+    var arr = (ids === null || ids === undefined) ? [] : ids;
+    if (!Array.isArray(arr)) throw new Error("id set must be an array");
+    var copy = arr.slice();
+    copy.sort(function (a, b) {
+      var pa = String(a).split("."), pb = String(b).split(".");
+      for (var i = 0; i < 3; i++) {
+        var d = parseInt(pa[i], 10) - parseInt(pb[i], 10);
+        if (d !== 0) return d;
+      }
+      return 0;
+    });
+    var parts = [varintUint32(copy.length)];
+    for (var i = 0; i < copy.length; i++) parts.push(writer(copy[i]));
+    return concatBytes(parts);
+  }
+
+  /* restriction argument static_variant payload for types 0-41 (member order
+   * per #4 restriction.hpp:55-97, BJS operations.js restriction table).
+   * argType selects the writer; vectors keep caller order, sets sort.
+   * Shape: {argument_type: N, argument: value}; type 0 (void) carries no
+   * payload, type 41 (variant_assert_argument) takes [tagInt64, [restrs...]]
+   * per #4's pair<int64_t, vector<restriction>> (a BJS upstream gap — implemented
+   * here, not punted). */
+  function serializeRestrictionArgument(argType, arg) {
+    if (!Number.isInteger(argType) || argType < 0 || argType > 41) {
+      throw new Error("restriction argument_type must be 0..41, got: " + JSON.stringify(argType));
+    }
+    if (argType === 0) return new Uint8Array(0);
+    if (argType === 1) return new Uint8Array([(arg ? 1 : 0)]);
+    if (argType === 2) return writeInt64LE(arg === undefined || arg === null ? "0" : arg);
+    if (argType === 3) return serializeString(arg || "");
+    if (argType === 4) return writeUint32LE(timestampToSecs(arg === undefined || arg === null ? 0 : arg));
+    if (argType === 5) return serializePublicKey(arg);
+    if (argType === 6) {
+      var h32 = hexToBytes(arg);
+      if (h32.length !== 32) throw new Error("restriction sha256 argument must be 32 bytes, got " + h32.length);
+      return h32;
+    }
+    if (argType >= 7 && argType <= 19) return serializeObjectId(arg);
+    if (argType === 20) {
+      var bools = ((arg === null || arg === undefined) ? [] : arg).slice().sort();
+      var bp = [varintUint32(bools.length)];
+      for (var i0 = 0; i0 < bools.length; i0++) bp.push(new Uint8Array([bools[i0] ? 1 : 0]));
+      return concatBytes(bp);
+    }
+    if (argType === 21) {
+      var ints = ((arg === null || arg === undefined) ? [] : arg).slice();
+      ints.sort(function (a, b) {
+        var ba = BigInt(a), bb = BigInt(b);
+        return ba < bb ? -1 : ba > bb ? 1 : 0;
+      });
+      var ip = [varintUint32(ints.length)];
+      for (var i1 = 0; i1 < ints.length; i1++) ip.push(writeInt64LE(ints[i1]));
+      return concatBytes(ip);
+    }
+    if (argType === 22) {
+      var strs = ((arg === null || arg === undefined) ? [] : arg).slice().sort();
+      var sp = [varintUint32(strs.length)];
+      for (var i2 = 0; i2 < strs.length; i2++) sp.push(serializeString(strs[i2]));
+      return concatBytes(sp);
+    }
+    if (argType === 23) {
+      var times = ((arg === null || arg === undefined) ? [] : arg).map(timestampToSecs).sort(function (a, b) { return a - b; });
+      var tp = [varintUint32(times.length)];
+      for (var i3 = 0; i3 < times.length; i3++) tp.push(writeUint32LE(times[i3]));
+      return concatBytes(tp);
+    }
+    if (argType === 24) return serializePubkeySet(arg);
+    if (argType === 25) {
+      var raws = ((arg === null || arg === undefined) ? [] : arg).slice();
+      var hexes = raws.map(function (h) {
+        var b = hexToBytes(h);
+        if (b.length !== 32) throw new Error("restriction sha256-set entry must be 32 bytes");
+        return bytesToHex(b);
+      }).sort();
+      var rp = [varintUint32(hexes.length)];
+      for (var i4 = 0; i4 < hexes.length; i4++) rp.push(hexToBytes(hexes[i4]));
+      return concatBytes(rp);
+    }
+    if (argType >= 26 && argType <= 38) return serializeSortedIdSet(arg, serializeObjectId);
+    if (argType === 39) {
+      var vec = (arg === null || arg === undefined) ? [] : arg;
+      if (!Array.isArray(vec)) throw new Error("restriction vector argument must be an array");
+      var vp = [varintUint32(vec.length)];
+      for (var i5 = 0; i5 < vec.length; i5++) vp.push(serializeRestriction(vec[i5]));
+      return concatBytes(vp);
+    }
+    /* argType === 40: vector<vector<restriction>> — outer + inner counts,
+     * caller order at both levels (vectors, never sorted). */
+    var outer = (arg === null || arg === undefined) ? [] : arg;
+    if (!Array.isArray(outer)) throw new Error("restriction nested-vector argument must be an array");
+    if (argType === 40) {
+      var op = [varintUint32(outer.length)];
+      for (var i6 = 0; i6 < outer.length; i6++) {
+        var inner = outer[i6] || [];
+        if (!Array.isArray(inner)) throw new Error("restriction nested-vector row must be an array");
+        op.push(varintUint32(inner.length));
+        for (var j6 = 0; j6 < inner.length; j6++) op.push(serializeRestriction(inner[j6]));
+      }
+      return concatBytes(op);
+    }
+    /* argType === 41: variant_assert_argument pair<int64_t,
+     * vector<restriction>> — [tag, [restrictions]]. writeInt64LE takes digit
+     * strings / safe ints / BigInts (negative tags need BigInt form). */
+    if (!Array.isArray(arg) || arg.length !== 2 || !Array.isArray(arg[1])) {
+      throw new Error("restriction variant_assert argument must be [tagInt64, [restrictions]]");
+    }
+    var ap = [writeInt64LE(arg[0]), varintUint32(arg[1].length)];
+    for (var i7 = 0; i7 < arg[1].length; i7++) ap.push(serializeRestriction(arg[1][i7]));
+    return concatBytes(ap);
+  }
+
+  /* restriction {member_index varint, restriction_type varint, argument
+   * static_variant (type varint + payload), empty extensions} in #4 FC
+   * order. member_index/restriction_type/argument_type are REQUIRED integers
+   * (#3's `|| 0` would silently file a forgotten restriction under member 0
+   * / func_eq — vanilla throws). */
+  function serializeRestriction(r) {
+    if (!r || typeof r !== "object") throw new Error("restriction must be an object");
+    if (!Number.isInteger(r.member_index) || r.member_index < 0) {
+      throw new Error("restriction.member_index must be a non-negative integer, got: " +
+        JSON.stringify(r.member_index));
+    }
+    if (!Number.isInteger(r.restriction_type) || r.restriction_type < 0 || r.restriction_type > 13) {
+      throw new Error("restriction.restriction_type must be 0..13, got: " +
+        JSON.stringify(r.restriction_type));
+    }
+    return concatBytes([
+      varintUint32(r.member_index),
+      varintUint32(r.restriction_type),
+      varintUint32(r.argument_type === undefined || r.argument_type === null ? 0 : r.argument_type),
+      serializeRestrictionArgument(
+        r.argument_type === undefined || r.argument_type === null ? 0 : r.argument_type, r.argument),
+      varintUint32(0)
+    ]);
+  }
+
+  /* restriction vector: varint count + items in caller order (fc vector —
+   * order is semantic, never sorted). Shared by op-54 restrictions and
+   * op-55 restrictions_to_add. */
+  function serializeRestrictionArray(list) {
+    var arr = (list === null || list === undefined) ? [] : list;
+    if (!Array.isArray(arr)) throw new Error("restrictions must be an array");
+    var parts = [varintUint32(arr.length)];
+    for (var i = 0; i < arr.length; i++) parts.push(serializeRestriction(arr[i]));
+    return concatBytes(parts);
+  }
+
+  /* account_whitelist (op 7) in #4 FC order: fee, authorizing_account,
+   * account_to_list, new_listing u8 (bitfield 0-3: none/white/black/both),
+   * extensions. */
+  function serializeAccountWhitelistOp(op) {
+    if (!op || typeof op !== "object") throw new Error("account_whitelist op must be an object");
+    if (!Number.isInteger(op.new_listing) || op.new_listing < 0 || op.new_listing > 3) {
+      throw new Error("new_listing must be 0..3 " +
+        "(0=none, 1=whitelisted, 2=blacklisted, 3=both), got: " + JSON.stringify(op.new_listing));
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.authorizing_account),
+      serializeObjectId(op.account_to_list),
+      writeUint8(op.new_listing),
+      varintUint32(0)
+    ]);
+  }
+
+  /* proposal_create (op 22) in #4 FC order: fee, fee_paying_account,
+   * expiration_time, proposed_ops (varint count + op_wrapper entries),
+   * review_period_seconds?, extensions. Each entry accepts the #3 dual
+   * shape — {op: [type, data]} or bare [type, data] — and emits the
+   * canonical wrapper (varint type + data bytes, #4 operations.hpp:153-157).
+   * RECURSION runs through serializeOperationData below: nested ops use the
+   * same bytes as top-level ops, never a fork. */
+  function serializeProposalCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("proposal_create op must be an object");
+    var list = op.proposed_ops;
+    if (!Array.isArray(list)) throw new Error("proposal_create proposed_ops must be an array");
+    var parts = [
+      serializeAsset(op.fee),
+      serializeObjectId(op.fee_paying_account),
+      serializeTimestamp(op.expiration_time),
+      varintUint32(list.length)
+    ];
+    for (var i = 0; i < list.length; i++) {
+      var entry = list[i];
+      var inner = Array.isArray(entry) ? entry : entry.op;
+      if (!Array.isArray(inner) || inner.length !== 2) {
+        throw new Error("proposal_create proposed_ops[" + i + "] must be [opType, opData] or {op: [opType, opData]}");
+      }
+      if (!Number.isInteger(inner[0]) || inner[0] < 0) {
+        throw new Error("proposal_create proposed_ops[" + i + "] type must be a non-negative integer");
+      }
+      parts.push(varintUint32(inner[0]));
+      parts.push(serializeOperationData(inner[0], inner[1]));
+    }
+    parts.push(serializeOptional(
+      op.review_period_seconds === undefined ? null : op.review_period_seconds,
+      function (v) {
+        assertUint32(v, "review_period_seconds");
+        return writeUint32LE(v);
+      }));
+    parts.push(varintUint32(0));
+    return concatBytes(parts);
+  }
+
+  /* proposal_update (op 23) in #4 FC order: fee, fee_paying_account, proposal
+   * (1.10.x), four sorted account-id sets, two sorted pubkey sets,
+   * extensions. */
+  function serializeProposalUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("proposal_update op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.fee_paying_account),
+      serializeObjectId(op.proposal),
+      serializeIdSet(op.active_approvals_to_add),
+      serializeIdSet(op.active_approvals_to_remove),
+      serializeIdSet(op.owner_approvals_to_add),
+      serializeIdSet(op.owner_approvals_to_remove),
+      serializePubkeySet(op.key_approvals_to_add),
+      serializePubkeySet(op.key_approvals_to_remove),
+      varintUint32(0)
+    ]);
+  }
+
+  /* proposal_delete (op 24) in #4 FC order: fee, fee_paying_account,
+   * using_owner_authority byte, proposal (1.10.x), extensions. */
+  function serializeProposalDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("proposal_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.fee_paying_account),
+      new Uint8Array([op.using_owner_authority ? 1 : 0]),
+      serializeObjectId(op.proposal),
+      varintUint32(0)
+    ]);
+  }
+
+  /* vesting_balance_create (op 32) in #4 FC order: fee, creator, owner,
+   * amount, policy (static_variant, array form only). NO extensions field. */
+  function serializeVestingBalanceCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("vesting_balance_create op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.creator),
+      serializeObjectId(op.owner),
+      serializeAsset(op.amount),
+      serializeVestingPolicy(op.policy)
+    ]);
+  }
+
+  /* vesting_balance_withdraw (op 33) in #4 FC order: fee, vesting_balance
+   * (1.13.x), owner, amount. NO extensions field exists. */
+  function serializeVestingBalanceWithdrawOp(op) {
+    if (!op || typeof op !== "object") throw new Error("vesting_balance_withdraw op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.vesting_balance),
+      serializeObjectId(op.owner),
+      serializeAsset(op.amount)
+    ]);
+  }
+
+  /* balance_claim (op 37) in #4 FC order: fee (ALWAYS 0 — calculate_fee
+   * returns 0, balance.hpp:51; the fee asset field still serializes, so a
+   * zero placeholder is the honest value), deposit_to_account,
+   * balance_to_claim, balance_owner_key, total_claimed. NO extensions field
+   * exists. Authority comes from the owner KEY signature, not account auth. */
+  function serializeBalanceClaimOp(op) {
+    if (!op || typeof op !== "object") throw new Error("balance_claim op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.deposit_to_account),
+      serializeObjectId(op.balance_to_claim),
+      serializePublicKey(op.balance_owner_key),
+      serializeAsset(op.total_claimed)
+    ]);
+  }
+
+  /* custom_authority_create (op 54) in #4 FC order: fee, account, enabled
+   * byte, valid_from, valid_to, operation_type varint, auth, restrictions
+   * vector, extensions. */
+  function serializeCustomAuthorityCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("custom_authority_create op must be an object");
+    if (!Number.isInteger(op.operation_type) || op.operation_type < 0) {
+      throw new Error("operation_type must be a non-negative integer (op id this authority can sign), got: " +
+        JSON.stringify(op.operation_type));
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      new Uint8Array([op.enabled ? 1 : 0]),
+      serializeTimestamp(op.valid_from),
+      serializeTimestamp(op.valid_to),
+      varintUint32(op.operation_type),
+      serializeAuthority(op.auth),
+      serializeRestrictionArray(op.restrictions),
+      varintUint32(0)
+    ]);
+  }
+
+  /* custom_authority_update (op 55) in #4 FC order: fee, account,
+   * authority_to_update (1.17.x), new_enabled?, new_valid_from?,
+   * new_valid_to?, new_auth?, restrictions_to_remove (sorted u16 set),
+   * restrictions_to_add (vector, caller order), extensions. Unchanged fields
+   * stay null/undefined and encode absent — never zero-filled, so an update
+   * touches only what it sets (same convention as op-71). */
+  function serializeCustomAuthorityUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("custom_authority_update op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.authority_to_update),
+      serializeOptional(op.new_enabled === undefined ? null : op.new_enabled,
+        function (v) { return new Uint8Array([v ? 1 : 0]); }),
+      serializeOptional(op.new_valid_from === undefined ? null : op.new_valid_from, serializeTimestamp),
+      serializeOptional(op.new_valid_to === undefined ? null : op.new_valid_to, serializeTimestamp),
+      serializeOptional(op.new_auth === undefined ? null : op.new_auth, serializeAuthority),
+      serializeU16Set(op.restrictions_to_remove),
+      serializeRestrictionArray(op.restrictions_to_add),
+      varintUint32(0)
+    ]);
+  }
+
+  /* custom_authority_delete (op 56) in #4 FC order: fee, account,
+   * authority_to_delete (1.17.x), extensions. */
+  function serializeCustomAuthorityDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("custom_authority_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeObjectId(op.authority_to_delete),
+      varintUint32(0)
+    ]);
+  }
+
+  /* ticket_create (op 57) in #4 FC order: fee, account, target_type varint
+   * (0 liquid / 1 180-day / 2 360-day / 3 720-day / 4 forever — 5 COUNT is
+   * not a valid target), amount, extensions. */
+  function serializeTicketCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("ticket_create op must be an object");
+    if (!Number.isInteger(op.target_type) || op.target_type < 0 || op.target_type > 4) {
+      throw new Error("target_type must be 0..4 " +
+        "(0=liquid, 1=lock_180_days, 2=lock_360_days, 3=lock_720_days, 4=lock_forever), got: " +
+        JSON.stringify(op.target_type));
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      varintUint32(op.target_type),
+      serializeAsset(op.amount),
+      varintUint32(0)
+    ]);
+  }
+
+  /* ticket_update (op 58) in #4 FC order: fee, ticket (1.18.x), account,
+   * target_type varint (same 0-4 gate as create), amount_for_new_target?,
+   * extensions. */
+  function serializeTicketUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("ticket_update op must be an object");
+    if (!Number.isInteger(op.target_type) || op.target_type < 0 || op.target_type > 4) {
+      throw new Error("target_type must be 0..4 " +
+        "(0=liquid, 1=lock_180_days, 2=lock_360_days, 3=lock_720_days, 4=lock_forever), got: " +
+        JSON.stringify(op.target_type));
+    }
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.ticket),
+      serializeObjectId(op.account),
+      varintUint32(op.target_type),
+      serializeOptional(op.amount_for_new_target === undefined ? null : op.amount_for_new_target, serializeAsset),
+      varintUint32(0)
+    ]);
+  }
+
+  /* Nested-op data dispatch for op-22 recursion: delegates to the SAME
+   * per-op functions the outer serializeTransaction path uses, so enclosed
+   * bytes can never drift from top-level bytes. Covers every op this file
+   * serializes (a nested op 22 inside an op 22 writes what it is given —
+   * chain validity of deep nesting is the node's call, not the serializer's).
+   * Kept as a separate function (rather than refactoring the proven
+   * serializeTransaction chain) so no existing dispatch line changes. */
+  function serializeOperationData(opType, opData) {
+    if (opType === 0) return serializeTransferOp(opData);
+    if (opType === 1) return serializeLimitOrderCreateOp(opData);
+    if (opType === 2) return serializeLimitOrderCancelOp(opData);
+    if (opType === 3) return serializeCallOrderUpdateOp(opData);
+    if (opType === 6) return serializeAccountUpdateOp(opData);
+    if (opType === 7) return serializeAccountWhitelistOp(opData);
+    if (opType === 10) return serializeAssetCreateOp(opData);
+    if (opType === 11) return serializeAssetUpdateOp(opData);
+    if (opType === 12) return serializeAssetUpdateBitassetOp(opData);
+    if (opType === 13) return serializeAssetUpdateFeedProducersOp(opData);
+    if (opType === 14) return serializeAssetIssueOp(opData);
+    if (opType === 15) return serializeAssetReserveOp(opData);
+    if (opType === 19) return serializeAssetPublishFeedOp(opData);
+    if (opType === 22) return serializeProposalCreateOp(opData);
+    if (opType === 23) return serializeProposalUpdateOp(opData);
+    if (opType === 24) return serializeProposalDeleteOp(opData);
+    if (opType === 25) return serializeWithdrawPermissionCreateOp(opData);
+    if (opType === 26) return serializeWithdrawPermissionUpdateOp(opData);
+    if (opType === 27) return serializeWithdrawPermissionClaimOp(opData);
+    if (opType === 28) return serializeWithdrawPermissionDeleteOp(opData);
+    if (opType === 32) return serializeVestingBalanceCreateOp(opData);
+    if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
+    if (opType === 37) return serializeBalanceClaimOp(opData);
+    if (opType === 49) return serializeHtlcCreateOp(opData);
+    if (opType === 50) return serializeHtlcRedeemOp(opData);
+    if (opType === 52) return serializeHtlcExtendOp(opData);
+    if (opType === 54) return serializeCustomAuthorityCreateOp(opData);
+    if (opType === 55) return serializeCustomAuthorityUpdateOp(opData);
+    if (opType === 56) return serializeCustomAuthorityDeleteOp(opData);
+    if (opType === 57) return serializeTicketCreateOp(opData);
+    if (opType === 58) return serializeTicketUpdateOp(opData);
+    if (opType === 59) return serializeLiquidityPoolCreateOp(opData);
+    if (opType === 60) return serializeLiquidityPoolDeleteOp(opData);
+    if (opType === 61) return serializeLiquidityPoolDepositOp(opData);
+    if (opType === 62) return serializeLiquidityPoolWithdrawOp(opData);
+    if (opType === 63) return serializeLiquidityPoolExchangeOp(opData);
+    if (opType === 64) return serializeSametFundCreateOp(opData);
+    if (opType === 65) return serializeSametFundDeleteOp(opData);
+    if (opType === 66) return serializeSametFundUpdateOp(opData);
+    if (opType === 67) return serializeSametFundBorrowOp(opData);
+    if (opType === 68) return serializeSametFundRepayOp(opData);
+    if (opType === 69) return serializeCreditOfferCreateOp(opData);
+    if (opType === 70) return serializeCreditOfferDeleteOp(opData);
+    if (opType === 71) return serializeCreditOfferUpdateOp(opData);
+    if (opType === 72) return serializeCreditOfferAcceptOp(opData);
+    if (opType === 73) return serializeCreditDealRepayOp(opData);
+    if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
+    if (opType === 76) return serializeCreditDealUpdateOp(opData);
+    throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32, 33, 37, " +
+      "49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
+  }
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -1532,6 +2214,7 @@ var Tx = (function () {
       else if (opType === 2) parts.push(serializeLimitOrderCancelOp(opData));
       else if (opType === 3) parts.push(serializeCallOrderUpdateOp(opData));
       else if (opType === 6) parts.push(serializeAccountUpdateOp(opData));
+      else if (opType === 7) parts.push(serializeAccountWhitelistOp(opData));
       else if (opType === 10) parts.push(serializeAssetCreateOp(opData));
       else if (opType === 11) parts.push(serializeAssetUpdateOp(opData));
       else if (opType === 12) parts.push(serializeAssetUpdateBitassetOp(opData));
@@ -1539,13 +2222,36 @@ var Tx = (function () {
       else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
       else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
       else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
+      else if (opType === 22) parts.push(serializeProposalCreateOp(opData));
+      else if (opType === 23) parts.push(serializeProposalUpdateOp(opData));
+      else if (opType === 24) parts.push(serializeProposalDeleteOp(opData));
       else if (opType === 25) parts.push(serializeWithdrawPermissionCreateOp(opData));
       else if (opType === 26) parts.push(serializeWithdrawPermissionUpdateOp(opData));
       else if (opType === 27) parts.push(serializeWithdrawPermissionClaimOp(opData));
       else if (opType === 28) parts.push(serializeWithdrawPermissionDeleteOp(opData));
+      else if (opType === 32) parts.push(serializeVestingBalanceCreateOp(opData));
+      else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
+      else if (opType === 37) parts.push(serializeBalanceClaimOp(opData));
+      // Op 38 (override_transfer) is ISSUER-ONLY (#4 balance/asset issuer
+      // path; no vanilla wallet UI signs it) — deliberately NOT serialized.
+      // Do not "complete" this list with it.
+      // Ops 39/40/41 (transfer_to_blind / blind_transfer /
+      // transfer_from_blind) are DOWNSCOPED by the slice-14 blind-transfer
+      // scoping decision: blind outputs need Pedersen commitments (33B) +
+      // bulletproof range_proofs + blinding-factor ECDH mint that no static
+      // page can create (#3 serializes but never mints; #2 mints only behind
+      // Electron-host IPC). No serializer lands until that crypto ships as
+      // its own audited slice. Do not "complete" this list with them.
+      // Op 46 (execute_bid) is VIRTUAL (#4 operations.hpp:102, same rule as
+      // ops 51/53/74) — never signed, never dispatched.
       else if (opType === 49) parts.push(serializeHtlcCreateOp(opData));
       else if (opType === 50) parts.push(serializeHtlcRedeemOp(opData));
       else if (opType === 52) parts.push(serializeHtlcExtendOp(opData));
+      else if (opType === 54) parts.push(serializeCustomAuthorityCreateOp(opData));
+      else if (opType === 55) parts.push(serializeCustomAuthorityUpdateOp(opData));
+      else if (opType === 56) parts.push(serializeCustomAuthorityDeleteOp(opData));
+      else if (opType === 57) parts.push(serializeTicketCreateOp(opData));
+      else if (opType === 58) parts.push(serializeTicketUpdateOp(opData));
       else if (opType === 59) parts.push(serializeLiquidityPoolCreateOp(opData));
       else if (opType === 60) parts.push(serializeLiquidityPoolDeleteOp(opData));
       else if (opType === 61) parts.push(serializeLiquidityPoolDepositOp(opData));
@@ -1569,7 +2275,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 10-15, 19, 25-28, 49, 50, 52, 59-73, 75 and 76 (74 is virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 10-15, 19, 22-24, 25-28, 32, 33, 37, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -1594,7 +2300,12 @@ var Tx = (function () {
 
   /* Fee lookup: pre-fills opData.fee with a zero placeholder (the node
    * requires the fee field present), then returns the chain's answered
-   * {amount, asset_id}. Amount stays raw (caller formats via Format). */
+   * {amount, asset_id}. Amount stays raw (caller formats via Format).
+   * NESTED-SHAPE TRAP (op 22 proposal_create): get_required_fees answers
+   * [flat_fee, [inner_fees]] for a proposal — #3 bitshares-api.js:1339-1341
+   * ("Only the first element is the proposal's own fee; inner fees are
+   * informational"). Reading fees[0].amount directly yields undefined, so
+   * the flat (first element) is unwrapped here; inners are informational. */
   async function fee(opId, opData, feeAssetId) {
     feeAssetId = feeAssetId || "1.3.0";
     if (!Number.isInteger(opId) || opId < 0) throw new Error("opId must be a non-negative integer");
@@ -1603,12 +2314,15 @@ var Tx = (function () {
     var dbId = await Chain.db();
     var fees = await Chain.call(dbId, "get_required_fees", [[[opId, opData]], feeAssetId]);
     if (!fees || !fees[0]) throw new Error("get_required_fees returned no fee");
-    return { amount: fees[0].amount, asset_id: fees[0].asset_id };
+    var flat = Array.isArray(fees[0]) ? fees[0][0] : fees[0];
+    if (!flat || typeof flat !== "object") throw new Error("get_required_fees returned no fee");
+    return { amount: flat.amount, asset_id: flat.asset_id };
   }
 
   /* Multi-op fee lookup: ONE get_required_fees call with the FULL op list
    * (never one call per op). Fills each opsArray[i][1].fee in place with
-   * its {amount, asset_id} answer. Returns {fees, totalRaw, totalDisplay}:
+   * its {amount, asset_id} answer (op-22 entries unwrap the nested
+   * [flat, [inners]] shape first — same rule as fee()). Returns {fees, totalRaw, totalDisplay}:
    * fees is the per-op [{amount, asset_id}] list, totalRaw is the BigInt
    * sum as a digit string (no float), totalDisplay is totalRaw formatted
    * via Format.formatAmount in the charged fee asset's precision (resolved
@@ -1638,13 +2352,15 @@ var Tx = (function () {
     }
     var total = 0n;
     for (var k = 0; k < fees.length; k++) {
-      if (!fees[k] || typeof fees[k] !== "object") throw new Error("get_required_fees fee " + k + " is not an object");
-      var raw = String(fees[k].amount);
+      var feeK = Array.isArray(fees[k]) ? fees[k][0] : fees[k];
+      if (!feeK || typeof feeK !== "object") throw new Error("get_required_fees fee " + k + " is not an object");
+      var raw = String(feeK.amount);
       if (!/^\d+$/.test(raw)) throw new Error("get_required_fees fee " + k + " is not a digit string: " + raw);
       total += BigInt(raw);
-      opsArray[k][1].fee = { amount: fees[k].amount, asset_id: fees[k].asset_id };
+      opsArray[k][1].fee = { amount: feeK.amount, asset_id: feeK.asset_id };
     }
-    var displayFeeId = (fees[0] && fees[0].asset_id) || feeAssetId;
+    var firstFee = (opsArray[0] && opsArray[0][1] && opsArray[0][1].fee) || null;
+    var displayFeeId = (firstFee && firstFee.asset_id) || feeAssetId;
     var rows = await Chain.call(dbId, "get_assets", [[displayFeeId]]);
     if (!rows || !rows[0] || typeof rows[0].precision !== "number") {
       throw new Error("bad-asset-shape for fee asset " + displayFeeId);
@@ -1829,13 +2545,18 @@ var Tx = (function () {
   return {
     OP: {
       transfer: 0, limit_order_create: 1, limit_order_cancel: 2,
-      call_order_update: 3, account_update: 6,
+      call_order_update: 3, account_update: 6, account_whitelist: 7,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
       asset_publish_feed: 19,
+      proposal_create: 22, proposal_update: 23, proposal_delete: 24,
       withdraw_permission_create: 25, withdraw_permission_update: 26,
       withdraw_permission_claim: 27, withdraw_permission_delete: 28,
+      vesting_balance_create: 32, vesting_balance_withdraw: 33,
+      balance_claim: 37,
       htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
+      custom_authority_create: 54, custom_authority_update: 55,
+      custom_authority_delete: 56, ticket_create: 57, ticket_update: 58,
       liquidity_pool_create: 59, liquidity_pool_delete: 60,
       liquidity_pool_deposit: 61, liquidity_pool_withdraw: 62,
       liquidity_pool_exchange: 63, liquidity_pool_update: 75,
@@ -1890,6 +2611,29 @@ var Tx = (function () {
       serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
       serializeTimestamp: serializeTimestamp,
       assertUint32: assertUint32,
+      serializeAuthority: serializeAuthority,
+      serializeAddressHex: serializeAddressHex,
+      timestampToSecs: timestampToSecs,
+      serializeVestingPolicy: serializeVestingPolicy,
+      serializePubkeySet: serializePubkeySet,
+      serializeU16Set: serializeU16Set,
+      serializeSortedIdSet: serializeSortedIdSet,
+      serializeRestrictionArgument: serializeRestrictionArgument,
+      serializeRestriction: serializeRestriction,
+      serializeRestrictionArray: serializeRestrictionArray,
+      serializeAccountWhitelistOp: serializeAccountWhitelistOp,
+      serializeProposalCreateOp: serializeProposalCreateOp,
+      serializeProposalUpdateOp: serializeProposalUpdateOp,
+      serializeProposalDeleteOp: serializeProposalDeleteOp,
+      serializeVestingBalanceCreateOp: serializeVestingBalanceCreateOp,
+      serializeVestingBalanceWithdrawOp: serializeVestingBalanceWithdrawOp,
+      serializeBalanceClaimOp: serializeBalanceClaimOp,
+      serializeCustomAuthorityCreateOp: serializeCustomAuthorityCreateOp,
+      serializeCustomAuthorityUpdateOp: serializeCustomAuthorityUpdateOp,
+      serializeCustomAuthorityDeleteOp: serializeCustomAuthorityDeleteOp,
+      serializeTicketCreateOp: serializeTicketCreateOp,
+      serializeTicketUpdateOp: serializeTicketUpdateOp,
+      serializeOperationData: serializeOperationData,
       serializeHtlcHash: serializeHtlcHash,
       serializeHtlcCreateOp: serializeHtlcCreateOp,
       serializeHtlcRedeemOp: serializeHtlcRedeemOp,
