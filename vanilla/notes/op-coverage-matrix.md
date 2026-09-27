@@ -19,18 +19,18 @@
 |---|---|---|---|
 | A1 | `/` → DashboardPage (:503) | index.astro + Home.jsx | `/` (:111) → PORTED (slice-05/07; documented deviation: redirects to last/default market desk with link, no blank page) |
 | A2 | `/account/:account_name` → AccountPage (:510) | balances, recent-activity, open-orders, call-orders.astro | `/account/:account_name` (:112) → PORTED (slice-03: balances, open orders, history, 22 live vectors) |
-| A3 | `/accounts` → DashboardAccountsOnly (:512) | — (no equiv) | `/accounts` (:113) → STUB (`placeholder("Accounts")`) |
+| A3 | `/accounts` → DashboardAccountsOnly (:512) | — (no equiv) | `/accounts` (:113) → PORTED (`accounts-ui.js`: wallet card + lookup + manage links) |
 | A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading) |
 | A5 | `/credit-offer` → CreditOfferPage (:520) | offers, offer, lend.astro | `/credit-offer` (:116) + `/credit-offer/:id` (:115) → PORTED (slice-13: offer 1.21.43 → deals 1.22.70/71) |
 | A6 | `/settings`, `/settings/:tab` (:524–528) | nodes, theme, visuals, page_themes.astro | `/settings`, `/settings/:tab` (:118–119) → PORTED (slice-01 nodes/latency/testnet; slice-17 switcher; 3 themes) |
 | A7 | `/invoice/:data` → Invoice (:529) | create_invoice, pay_invoice, stored_invoices, invoice_inventory.astro | `/invoice/:data` (:120) + `/invoice` (:121) → PORTED (slice-14 MiscUI) |
 | A8 | `/deposit-withdraw` (:533) | — (no astro equiv; gateway bridge) | `/deposit-withdraw` (:130) + `/:gateway` (:129) → PORTED (slice-15: XBTSX/IOB live, GDEX manual-only, BIT20 disabled) |
-| A9 | `/create-account` → LoginSelector (:538) | create_account.astro | `/create-account` (:131) → STUB (faucet round-trip proven slice-02 `t9-vanilla-6742`; dedicated view stub) |
-| A10 | `/login` → Login (:542) | change_password.astro (partial) | `/login` (:132) → STUB (unlock inline in wallet/account views slice-02/03) |
-| A11 | `/registration` → RegistrationSelector (:543) | create_account.astro | `/registration` (:133) → STUB (see A9) |
-| A12 | `/registration/local` → WalletRegistration (:548) | — | `/registration/local` (:134) → STUB (local wallet create shipped at `/create-wallet-brainkey`, slice-02) |
-| A13 | `/registration/cloud` → AccountRegistration (:553) | create_account.astro | `/registration/cloud` (:135) → STUB (see A9) |
-| A14 | `/news` → News (:558) | — | `/news` (:136) → STUB |
+| A9 | `/create-account` → LoginSelector (:538) | create_account.astro | `/create-account` (:131) → PORTED (`create-account-ui.js`: availability + brainkey + faucet register + verify) |
+| A10 | `/login` → Login (:542) | change_password.astro (partial) | `/login` (:132) → PORTED (`auth-ui.js`: unlock form + links) |
+| A11 | `/registration` → RegistrationSelector (:543) | create_account.astro | `/registration` (:133) → PORTED (`auth-ui.js` hub) |
+| A12 | `/registration/local` → WalletRegistration (:548) | — | `/registration/local` (:134) → PORTED (`auth-ui.js` → `#/create-wallet-brainkey`) |
+| A13 | `/registration/cloud` → AccountRegistration (:553) | create_account.astro | `/registration/cloud` (:135) → PORTED (`auth-ui.js` → `#/create-account`) |
+| A14 | `/news` → News (:558) | — | `/news` (:136) → PORTED (`news-ui.js`: honest static, no fake feed) |
 | A15 | `/voting` → redirect to `/account/:name/voting` (:559) | vote, governance, witnesses, committee, committee_parameters.astro | `/voting` (:137) → PORTED (slice-08: lists, proxy, slates, op-6 proven blocks 100916767/68; caveat: witness/committee create/update signing not yet — vote slate is) |
 | A16 | `/explorer`, `/explorer/:tab` (:566–570) | explorer.astro | `/explorer`, `/explorer/:tab` (:138–139) → PORTED (slice-09) |
 | A17 | `/asset/:symbol` → Asset (:571) | smartcoin, smartcoins, issued_assets.astro | `/asset/:symbol` (:140) → PORTED (slice-09/10) |
@@ -43,11 +43,11 @@
 | A24 | `/wallet` → WalletManager (:599) | — (astro outsources to Beet; local keystore is #1-only) | `/wallet` (:149) → PORTED (slice-02: PBKDF2-600k/AES-GCM, auto-lock, backup) |
 | A25 | `/create-wallet-brainkey` (:603) | — | `/create-wallet-brainkey` (:150) → PORTED (slice-02: classic brainkey, 49,744-word dict) |
 | A26 | `/existing-account` (:607) | — | `/existing-account` (:151) → PORTED (slice-02: import/look-ahead discovery) |
-| A27 | `/create-worker` → CreateWorker (:612) | create_worker.astro | `/create-worker` (:152) → STUB (proposal-path serializers proven slice-14; dedicated worker-create view stub) |
-| A28 | `/help` + 3 nested `:path` routes (:618–633) | forum.astro (docs-adjacent) | `/help/**` (:153) → STUB |
+| A27 | `/create-worker` → CreateWorker (:612) | create_worker.astro | `/create-worker` (:152) → PORTED (`create-worker-ui.js` + op-34 serializer, broadcast wired) |
+| A28 | `/help` + 3 nested `:path` routes (:618–633) | forum.astro (docs-adjacent) | `/help/**` (:153) → PORTED (`help-ui.js`: 20-topic index) |
 | A29 | `/htlc` → Htlc showcase (:634) | htlc.astro | `/htlc` (:155) + `/htlc/:id` (:154) → PORTED (slice-11: HTLC 1.16.621–625 lifecycle) |
-| A30 | `/prediction` (+`/:market` per §6) (:635) | — (no astro page; README-level only) | `/prediction` (:156) + `/prediction/:market` (:157) → STUB (PMA create math covered slice-10; dedicated market view stub) |
-| A31 | `/instant-trade` + `/:marketID` (:639–648) | instant_trade.astro | `/instant-trade` (:158) + `/instant-trade/:marketID` (:159) → STUB |
+| A30 | `/prediction` (+`/:market` per §6) (:635) | — (no astro page; README-level only) | `/prediction` (:156) + `/prediction/:market` (:157) → PORTED (`prediction-ui.js`: PMA scan + detail + desk links) |
+| A31 | `/instant-trade` + `/:marketID` (:639–648) | instant_trade.astro | `/instant-trade` (:158) + `/instant-trade/:marketID` (:159) → PORTED (`instant-trade-ui.js`: simple buy/sell via op-1) |
 | A32 | `/pools` → PoolmartPage (:649) | pools, stake, top-pools, custom_pool_overview, custom_pool_tracker.astro | `/pools` (:161) + `/pools/:id` (:160) + `/swap` (:162) → PORTED (slice-12: ops 59–63/75, lifecycles 1.19.66/67) |
 | A33 | `*` → Page404 (:650) | — | `*` (:169) → PORTED (render404 + dashboard link, router.js:54–60) |
 
@@ -135,8 +135,8 @@
 
 ## Counts
 
-- Section A (#1 routes): 33 rows — PORTED 22, STUB 11, DEFERRED 0, MISSING 0.
+- Section A (#1 routes): 33 rows — PORTED 33, STUB 0, DEFERRED 0, MISSING 0.
 - Section B (#1 modals/widgets): 19 rows — PORTED 17, DEFERRED 2 (B18 browser warning, B19 issue reporter), MISSING 0.
 - Section C (astro-only pages): 41 rows = 20 PORTED substantive + 11 merge-pointers to §A rows (C1, C19, C20, C22, C25, C28, C32, C33, C38, C39, C41) + 10 DEFERRED (C3 top-ops stats, C23 blind, C27 bid_collateral, C29 LTM op-8, C30 referrer display, C31 fee-schedule table, C34 password change, C35 favourites dashboard, C36 forum, C37 trollbox — all reasoned), MISSING 0.
 - Section D (out-of-scope, decided): 7 items, all with standing-directive reasons.
-- **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. STUB routes (A3, A9–A14, A27, A28, A30, A31) all render an honest placeholder, never a blank page, and each cites its router.js line. DEFERRED items each carry a reason + tracking note (C18 tickets-pending-funds is PORTED-view/pending-broadcast, not deferred-dropped).
+- **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. Former STUB routes (A3, A9–A14, A27, A28, A30, A31) all built out in stub batches 1–3 + op-34; no placeholders remain in §A. DEFERRED items each carry a reason + tracking note (C18 tickets-pending-funds is PORTED-view/pending-broadcast, not deferred-dropped).
