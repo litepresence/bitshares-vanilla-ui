@@ -104,10 +104,11 @@ var MarketUI = (function () {
     };
   }
 
-  /* Indicator lookup with availability guard. indicators-osc.js (RSI/Stoch/
-   * ATR/Fisher/...) is NOT wired in index.html in this slice (ONE-tag limit:
-   * only the vendor file was added), so osc functions may be absent in the
-   * browser — callers treat null as "unavailable", never throw. */
+  /* Indicator lookup with availability guard. indicators.js (SMA/EMA/BB/PSAR)
+   * and indicators-osc.js (RSI/MACD/Stoch/ATR/Fisher/...) are both wired in
+   * index.html, so every picker key resolves in the browser — the null path
+   * below is a robustness guard only (callers treat null as "unavailable",
+   * never throw). */
   function ind(name) {
     try {
       if (typeof Indicators !== "undefined" && Indicators &&
@@ -706,7 +707,7 @@ var MarketUI = (function () {
       /* Only indicator keys need the osc module; Volume is raw bucket data. */
       if (key !== "volume" && !ind(key)) {
         box.disabled = true;
-        lab.title = label + " unavailable in this build (osc module not wired)";
+        lab.title = label + " unavailable in this build";
       }
       touchable(box);
       box.addEventListener("change", function () {
@@ -1285,7 +1286,7 @@ var MarketUI = (function () {
       });
       if (state.oscNote) {
         state.oscNote.textContent = missing.length > 0
-          ? missing.join(", ") + " unavailable in this build (osc module not wired)."
+          ? missing.join(", ") + " unavailable in this build."
           : "";
       }
     } catch (e) { /* pane failure must not break the desk */ }
