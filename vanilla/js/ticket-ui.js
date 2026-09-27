@@ -24,6 +24,7 @@ var TicketUI = (function () {
   "use strict";
   var gen = 0;
   var AIRDROP_CHUNK = 10;
+  /* Shared-_ui accessor: ProposalUI._ui (proposal-ui.js loads first); throws proposal-ui-missing otherwise. */
   function U() {
     if (typeof ProposalUI === "undefined" || !ProposalUI._ui) throw new Error("proposal-ui-missing (proposal-ui.js first)");
     return ProposalUI._ui;
@@ -38,10 +39,12 @@ var TicketUI = (function () {
       return null;
     }
   }
+  /* Two-counter liveness: own gen (this route) + ProposalUI uiGen (shared gate) — stale async work bails. */
   function live(myGen, uiGen) {
     if (myGen !== gen) return false;
     try { return U().live(uiGen); } catch (e) { return false; }
   }
+  /* Ticket row -> deskTable shape (human amount + raw, lock WORD never a bare int). Params: ui, r (joined row). */
   function ticketRow(ui, r) {
     var a = (typeof r.prec === "number" && /^\d+$/.test(String(r.amount_raw)))
       ? Format.formatAmount(String(r.amount_raw), r.prec) + " " + r.sym
@@ -49,6 +52,7 @@ var TicketUI = (function () {
     return { t: r, cells: [{ text: r.id }, { text: r.owner }, { text: a, raw: r.amount_raw }, { text: r.lock_word }],
       cardLines: [r.id + " · " + r.owner, a, "Lock: " + r.lock_word] };
   }
+  /* Lock-type select (5 lock words, defaults to 1) wrapped in a labeled row. Returns: the select. */
   function lockSel(ui, doc, box, label) {
     var sel = doc.createElement("select"); ui.touchable(sel);
     [0, 1, 2, 3, 4].forEach(function (t) {
@@ -60,6 +64,7 @@ var TicketUI = (function () {
     lab.appendChild(sel); row.appendChild(lab); box.appendChild(row);
     return sel;
   }
+  /* Per-row Update button + review box (downgrades blocked client-side until testnet proves them). Params: ui, doc, box, myGen, uiGen, t (ticket row). */
   function updateBox(ui, doc, box, myGen, uiGen, t) {
     var b = ui.touchable(ui.el(doc, "button", "Update " + t.id)); b.type = "button"; box.appendChild(b);
     var out = ui.el(doc, "div", null, "xfer-out"); box.appendChild(out);
@@ -121,6 +126,7 @@ var TicketUI = (function () {
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fS.row); ctx.wrap.appendChild(fQ.row);
     var lock = lockSel(ui, doc, ctx.wrap, "Lock");
     var cbox = ui.el(doc, "div"); ctx.wrap.appendChild(cbox);
+    /* Paint ticket rows as a desk table (+ per-row update boxes when withUpdate). Params: box, rows, withUpdate. */
     function drawRows(box, rows, withUpdate) {
       ui.clearBox(box);
       box.appendChild(ui.deskTable(doc, ["ID", "Owner", "Amount", "Lock"], rows.map(function (r) { return ticketRow(ui, r); })));

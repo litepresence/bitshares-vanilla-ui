@@ -18,6 +18,7 @@
 var DebitUI = (function () {
   "use strict";
   var gen = 0;
+  /* Shared-_ui accessor: HtlcUI._ui (htlc-ui.js loads first); throws when the backend is missing. */
   function U() { /* shared helpers live in htlc-ui.js; missing file -> named error */
     if (typeof HtlcUI === "undefined" || !HtlcUI._ui) throw new Error("HTLC backend missing: htlc-ui.js failed to load.");
     return HtlcUI._ui;

@@ -1,7 +1,10 @@
-/* transfer-ui.js — transfer form → confirm → result (op 0 only).
+/* transfer-ui.js — transfer form + unlock gate (op 0 route entry).
  *
  * What it owns: DOM for the /transfer and /transfer/:to routes (locked gate,
- * form, confirm, result). No balances, no history, no other ops.
+ * form). Review + confirm + result live in transfer-confirm.js
+ * (slice-18 split — showForm calls TransferConfirm.review/showConfirm with
+ * an onBack closure that rebuilds this form with preserved input).
+ * No balances, no history, no other ops.
  * Consumes: Wallet.isUnlocked/unlock/keys (in-memory keys only),
  * Account.resolve/myAccountId, Tx.fee/buildTransfer/sign/broadcast,
  * Crypto.encryptMemo, Format.parseAmount/formatAmount, Chain.db/call/status,
@@ -100,37 +103,8 @@ var TransferUI = (function () {
     return p;
   }
 
-  /* UTF-8 string to lowercase hex (plain-memo message path). Byte loop,
-   * not money — no precision involved. */
-  function utf8Hex(str) {
-    var bytes = new TextEncoder().encode(str);
-    var out = "";
-    for (var i = 0; i < bytes.length; i++) {
-      out += bytes[i].toString(16).padStart(2, "0");
-    }
-    return out;
-  }
-
-  /* Full account row (needed for the recipient memo key, which
-   * Account.resolve intentionally does not return). */
-  async function fullAccount(id) {
-    var dbId = await Chain.db();
-    var rows = await Chain.call(dbId, "get_accounts", [[id]]);
-    if (!rows || !rows[0]) throw new Error("unknown-account");
-    return rows[0];
-  }
-
-  /* Symbol (trimmed, uppercased — symbols are canonical uppercase) to
-   * {id, symbol, precision}. Throws "Unknown asset: X." when absent. */
-  async function lookupAsset(symbol) {
-    var sym = String(symbol || "").trim().toUpperCase();
-    if (!sym) throw new Error("Asset symbol is required.");
-    var dbId = await Chain.db();
-    var rows = await Chain.call(dbId, "lookup_asset_symbols", [[sym]]);
-    if (!rows || !rows[0]) throw new Error("Unknown asset: " + sym + ".");
-    if (typeof rows[0].precision !== "number") throw new Error("bad-asset-shape");
-    return { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision };
-  }
+  /* UTF-8 memo hex + account/asset lookups moved verbatim to
+   * transfer-confirm.js (review side) — private copies there. */
 
   /* Labeled text input row. Returns {row, input}. */
   function fieldRow(doc, labelText, opts) {
@@ -226,8 +200,9 @@ var TransferUI = (function () {
     if (typeof Tx === "undefined" || !Tx ||
         typeof Account === "undefined" || !Account ||
         typeof Wallet === "undefined" || !Wallet ||
-        typeof Format === "undefined" || !Format) {
-      showError(doc, wrap, "Transfer backend missing: js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load.");
+        typeof Format === "undefined" || !Format ||
+        typeof TransferConfirm === "undefined" || !TransferConfirm) {
+      showError(doc, wrap, "Transfer backend missing: js/tx.js, js/account.js, js/wallet.js, js/format.js or js/transfer-confirm.js failed to load.");
       return;
     }
 
@@ -344,7 +319,7 @@ var TransferUI = (function () {
       setFieldError(amountF, "");
       reviewBtn.disabled = true;
       var status = showStatus(doc, wrap, "Checking recipient, asset, and fee…");
-      review({
+      TransferConfirm.review({
         to: toF.input.value.trim(),
         asset: assetF.input.value,
         amount: amountF.input.value,
@@ -352,7 +327,17 @@ var TransferUI = (function () {
         encrypted: encBox.checked
       }).then(function (ctx) {
         clearRoot(root);
-        showConfirm(doc, makeWrap(doc, root), root, from, ctx);
+        TransferConfirm.showConfirm(doc, makeWrap(doc, root), root, from, ctx, function () {
+          clearRoot(root);
+          showForm(doc, makeWrap(doc, root), root, from, {
+            to: ctx.to.name,
+            asset: ctx.asset.symbol,
+            amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
+            memo: ctx.memoText,
+            encrypted: ctx.memoKind !== "plain",
+            error: null
+          });
+        });
       }).catch(function (e) {
         var msg = (e && e.message) ? e.message : String(e || "Could not prepare the transfer.");
         if (msg.indexOf("unknown-account") !== -1) {
@@ -377,199 +362,8 @@ var TransferUI = (function () {
     });
   }
 
-  /* Validate everything and build the unsigned tx + live fee. Resolves a
-   * confirm context; rejects with a human-readable Error. Amounts stay
-   * integer strings throughout — Format.parseAmount is the only parser. */
-  async function review(vals) {
-    if (!vals.to) throw new Error("Recipient is required.");
-    var to = await Account.resolve(vals.to);
-    var asset = await lookupAsset(vals.asset);
-    var amountInt;
-    try {
-      amountInt = Format.parseAmount(vals.amount, asset.precision);
-    } catch (e) {
-      throw new Error(e && e.message ? e.message : "bad amount");
-    }
-    if (!/[1-9]/.test(amountInt)) throw new Error("Amount must be greater than zero.");
-
-    var memoText = String(vals.memo || "");
-    var memoObj = null;
-    var memoKind = "none";
-    if (memoText) {
-      var toFull = await fullAccount(to.id);
-      var toMemoKey = toFull && toFull.options ? toFull.options.memo_key : null;
-      if (!toMemoKey) {
-        throw new Error("Recipient " + to.name + " has no memo key; clear the memo to continue.");
-      }
-      if (vals.encrypted) {
-        if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) {
-          throw new Error("wallet-locked");
-        }
-        memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, toMemoKey);
-        memoKind = "encrypted";
-      } else {
-        var fromPub = (Wallet.keys && Wallet.keys.memo && Wallet.keys.memo.pub) || "";
-        memoObj = { from: fromPub, to: toMemoKey, nonce: "0", message: utf8Hex(memoText) };
-        memoKind = "plain";
-      }
-    }
-
-    var from = await Account.resolve(await Account.myAccountId());
-    var unsigned = await Tx.buildTransfer({
-      fromId: from.id,
-      toId: to.id,
-      amountInt: amountInt,
-      assetId: asset.id,
-      memoObj: memoObj
-    });
-    var opData = unsigned.operations[0][1];
-    var fee = await Tx.fee(0, opData, asset.id);
-    opData.fee = { amount: fee.amount, asset_id: fee.asset_id };
-
-    var network = "mainnet";
-    try {
-      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
-        network = Store.loadSettings().network;
-      }
-    } catch (e) { /* default stands */ }
-
-    return {
-      to: to,
-      asset: asset,
-      amountInt: amountInt,
-      memoText: memoText,
-      memoKind: memoKind,
-      unsigned: unsigned,
-      fee: fee,
-      network: network
-    };
-  }
-
-  /* Confirm screen. Row order follows #3's op-0 table (popup.js:5717-5722):
-   * From / To / Amount / Memo, plus Fee and Network. Fee shows the human
-   * amount with the raw integer in title (same convention as balances). */
-  function showConfirm(doc, wrap, root, from, ctx) {
-    wrap.appendChild(el(doc, "h1", "Confirm transfer"));
-    var list = el(doc, "dl", null, "xfer-confirm");
-
-    function row(term, text, title) {
-      var dt = el(doc, "dt", term);
-      var dd = el(doc, "dd", text);
-      if (title) dd.title = title;
-      list.appendChild(dt);
-      list.appendChild(dd);
-    }
-
-    row("From", from.name + " (" + from.id + ")");
-    row("To", ctx.to.name + " (" + ctx.to.id + ")");
-    var amountHuman = Format.formatAmount(ctx.amountInt, ctx.asset.precision) + " " + ctx.asset.symbol;
-    row("Amount", amountHuman, ctx.amountInt);
-    if (ctx.memoKind === "encrypted") row("Memo", "Encrypted");
-    else if (ctx.memoKind === "plain") row("Memo", "Plain: " + ctx.memoText);
-    else row("Memo", "(none)");
-    var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
-    row("Fee", feeHuman, String(ctx.fee.amount));
-    row("Network", ctx.network);
-
-    wrap.appendChild(list);
-
-    /* The exact operation about to be signed (no secrets: unsigned, fee
-     * filled). Review bytes before Sign & Send. */
-    var detOp = doc.createElement("details");
-    detOp.className = "raw";
-    var sumOp = doc.createElement("summary");
-    sumOp.setAttribute("aria-label", "Show unsigned operation JSON");
-    detOp.appendChild(sumOp);
-    var preOp = doc.createElement("pre");
-    try { preOp.textContent = JSON.stringify(ctx.unsigned.operations, null, 2); }
-    catch (e) { preOp.textContent = String(ctx.unsigned && ctx.unsigned.operations); }
-    detOp.appendChild(preOp);
-    wrap.appendChild(detOp);
-
-    var backBtn = touchable(el(doc, "button", "Back"));
-    backBtn.id = "xfer-back";
-    backBtn.type = "button";
-    wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Send"));
-    sendBtn.id = "xfer-send";
-    sendBtn.type = "button";
-    wrap.appendChild(sendBtn);
-
-    backBtn.addEventListener("click", function () {
-      clearRoot(root);
-      showForm(doc, makeWrap(doc, root), root, from, {
-        to: ctx.to.name,
-        asset: ctx.asset.symbol,
-        amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
-        memo: ctx.memoText,
-        encrypted: ctx.memoKind !== "plain",
-        error: null
-      });
-    });
-
-    sendBtn.addEventListener("click", function () {
-      backBtn.disabled = true;
-      sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, "Signing…");
-      var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!activeWIF) {
-        wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), "Wallet is locked.");
-        backBtn.disabled = false;
-        return;
-      }
-      Promise.resolve()
-        .then(function () { return Tx.sign(ctx.unsigned, activeWIF); })
-        .then(function (signed) {
-          status.textContent = "Broadcasting…";
-          return Tx.broadcast(signed);
-        })
-        .then(function (proof) {
-          clearRoot(root);
-          showResult(doc, makeWrap(doc, root), from, ctx, null, proof);
-        })
-        .catch(function (e) {
-          var msg = (e && e.message) ? e.message : String(e || "Broadcast failed");
-          wrap.removeChild(status);
-          showError(doc, wrap, msg, "Transfer failed.");
-          backBtn.disabled = false;
-        });
-    });
-  }
-
-  /* Result screen: inclusion proof (block # + position) or the node error
-   * text inline — never blank. Links back to the sender account page. */
-  function showResult(doc, wrap, from, ctx, errText, proof) {
-    wrap.appendChild(el(doc, "h1", errText ? "Transfer failed" : "Transfer sent"));
-    if (errText) {
-      showError(doc, wrap, errText, "Transfer failed.");
-    } else {
-      var ok = el(doc, "p", "Included in block #" + String(proof.blockNum) +
-        " (position " + String(proof.trxInBlock) + ").", "xfer-ok");
-      ok.setAttribute("aria-live", "polite");
-      wrap.appendChild(ok);
-      /* Slice-16 (F1d): tx-confirmed toast supplement (inline panel stays
-       * primary). Guarded so a notify fault never breaks the result. */
-      try {
-        if (typeof NotifyHost !== "undefined" && NotifyHost &&
-            typeof NotifyHost.mountToasts === "function") {
-          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
-        }
-        if (typeof Notify !== "undefined" && Notify &&
-            typeof Notify.txConfirmed === "function") {
-          try { Notify.txConfirmed("block #" + String(proof.blockNum)); } catch (e) { /* silent */ }
-        }
-      } catch (e) { /* notify optional here */ }
-      var sent = el(doc, "p",
-        Format.formatAmount(ctx.amountInt, ctx.asset.precision) + " " +
-        ctx.asset.symbol + " → " + ctx.to.name, "muted");
-      wrap.appendChild(sent);
-    }
-    var link = el(doc, "a", "View account " + from.name);
-    link.setAttribute("href", "#/account/" + from.name);
-    touchable(link);
-    wrap.appendChild(link);
-  }
+  /* review/showConfirm/showResult moved verbatim to transfer-confirm.js
+   * (confirm side) — called above as TransferConfirm.*. */
 
   return {
     renderTransfer: renderTransfer

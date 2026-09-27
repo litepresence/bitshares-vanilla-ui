@@ -23,6 +23,7 @@
 var VestingUI = (function () {
   "use strict";
   var gen = 0;
+  /* Shared-_ui accessor: ProposalUI._ui (proposal-ui.js loads first); throws proposal-ui-missing otherwise. */
   function U() {
     if (typeof ProposalUI === "undefined" || !ProposalUI._ui) throw new Error("proposal-ui-missing (proposal-ui.js first)");
     return ProposalUI._ui;
@@ -55,6 +56,7 @@ var VestingUI = (function () {
     if (p.kind === "cdd") return "locked until claimed · start " + p.beginHuman + " · vests over " + Proposal.durToHuman(p.duration_sec);
     return "instant (fully vested)";
   }
+  /* Vesting row -> deskTable shape (human balance + raw, policy words). Params: ui, doc, r (joined row). */
   function vestRow(ui, doc, r) {
     var a = (typeof r.prec === "number" && /^\d+$/.test(String(r.balance_raw)))
       ? Format.formatAmount(String(r.balance_raw), r.prec) + " " + r.sym
@@ -94,6 +96,7 @@ var VestingUI = (function () {
     var fD3 = ui.field(doc, "Duration seconds (linear only)", { placeholder: "seconds", inputmode: "numeric" });
     ctx.wrap.appendChild(fD1.row); ctx.wrap.appendChild(fD2.row); ctx.wrap.appendChild(fD3.row);
     var cbox = ui.el(doc, "div"); ctx.wrap.appendChild(cbox);
+    /* Current create-form inputs -> policy-words preview (reads the live policy select + date/seconds inputs). */
     function polWords() {
       var s2 = parseInt(fD2.input.value.trim() || "0", 10), s3 = parseInt((pol.value === "linear" ? fD3.input.value : fD2.input.value).trim() || "0", 10);
       return policyWords({ kind: pol.value, beginHuman: dateHuman(iso16(fD1.input.value) || null) || "none", cliff_sec: s2, duration_sec: s3 });
@@ -130,6 +133,7 @@ var VestingUI = (function () {
       },
       ok: function () { return "Vesting created and re-read on chain."; },
       fail: "Could not build vesting (check accounts, asset, amount and dates)." });
+    /* Per-row Claim button + amount/review box (over-claims blocked client-side; chain re-enforces). Params: t (vestRow shape). */
     function claimBox(t) {
       var b = ui.touchable(ui.el(doc, "button", "Claim " + t.r.id)); b.type = "button"; listBox.appendChild(b);
       var o2 = ui.el(doc, "div", null, "xfer-out"); listBox.appendChild(o2);

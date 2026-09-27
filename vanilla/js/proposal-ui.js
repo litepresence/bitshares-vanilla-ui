@@ -29,6 +29,7 @@ var ProposalUI = (function () {
     22: "proposal create", 23: "proposal update", 24: "proposal delete", 32: "vesting create",
     33: "vesting withdraw", 37: "balance claim", 54: "authority create", 55: "authority update",
     56: "authority delete", 57: "ticket create", 58: "ticket update" };
+  /* Op index -> short name (unknown indexes stay "operation type N", never blank). */
   function opName(t) { return OP_NAMES[t] || ("operation type " + t); }
   var ERRMAP = [["not-connected", "Network unavailable. Check Settings → Nodes and retry."], ["wallet-locked", "Wallet is locked."],
     ["unknown-proposal", "Unknown proposal."], ["unknown-ticket", "Unknown ticket."], ["unknown-vesting", "Unknown vesting balance."],
@@ -143,18 +144,21 @@ var ProposalUI = (function () {
     uniq.forEach(function (id) { if (!out[id]) out[id] = { sym: String(id), prec: null }; });
     return out;
   }
+  /* Raw amount -> human + sym via the symbol join (missing precision stays "raw (id)", never blank). Params: raw, aid, join. */
   function amtText(raw, aid, join) {
     var j = (join && join[aid]) || null;
     if (j && typeof j.prec === "number" && /^\d+$/.test(String(raw)))
       return Format.formatAmount(String(raw), j.prec) + " " + j.sym;
     return String(raw) + " (" + aid + ")";
   }
+  /* Fee object -> human + symbol (Asset.describe; raw + id fallback). Returns: Promise of string. */
   async function feeText(fee) {
     try {
       var a = await Asset.describe(fee.asset_id);
       return Format.formatAmount(String(fee.amount), a.precision) + " " + a.symbol;
     } catch (e) { return String(fee.amount) + " (" + fee.asset_id + ")"; }
   }
+  /* Chain head block number (observation marker for result panels, never a txid). Returns: Promise of int. */
   async function headBlock() {
     return (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
   }
@@ -225,15 +229,18 @@ var ProposalUI = (function () {
       clearBox(out); showError(doc, out, e, cfg.fail || "Could not prepare the transaction."); done();
     });
   }
+  /* Review button + output box wiring reviewPaid (gen-checked; cfg.btn disabled while building). Params: doc, box, myGen, label, cfg. */
   function reviewSection(doc, box, myGen, label, cfg) {
     var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
     var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
   }
+  /* Ticket lock type -> WORD (unknown types stay "lock type N", never a bare int). */
   function lockWord(t) {
     try { return ProposalTicket.lockLabel(t); } catch (e) { return "lock type " + t; }
   }
+  /* Listing u8 -> word via ProposalMisc (falls back to "listing N" when the backend is missing). */
   function listingWord(n) {
     try { return ProposalMisc.listingLabel(n); } catch (e) { return "listing " + n; }
   }
@@ -281,6 +288,7 @@ var ProposalUI = (function () {
     });
     return ids;
   }
+  /* First enclosed op -> op name for the proposals table (empty list -> "empty"). */
   function firstWords(entries) {
     if (!entries || !entries.length) return "empty";
     var pair = (entries[0] && entries[0].op !== undefined) ? entries[0].op : entries[0];
@@ -339,6 +347,7 @@ var ProposalUI = (function () {
     return ProposalTicket.buildTicketCreate({ accountId: acct.id,
       targetType: ProposalTicket.lockFromHuman(v[1] || "180"), amountRaw: traw, assetId: ainfo.id });
   }
+  /* One-line enclosed-op summary for the create-form list ("transfer 1 BTS (a → b)"). Params: kind, vals (descriptor inputs). */
   function innerSummary(kind, vals) {
     if (kind === "transfer") return "transfer " + vals[3] + " " + vals[2] + " (" + vals[0] + " → " + vals[1] + ")";
     if (kind === "whitelist") return "whitelist " + vals[1] + " → " + vals[2];
@@ -367,6 +376,7 @@ var ProposalUI = (function () {
     ctx.wrap.appendChild(kindSel);
     var innerBox = el(doc, "div"), addedBox = el(doc, "div"), inners = [];
     ctx.wrap.appendChild(innerBox); ctx.wrap.appendChild(addedBox);
+    /* Repaint the enclosed-ops list with per-row Remove buttons. */
     function drawInners() {
       clearBox(addedBox);
       addedBox.appendChild(el(doc, "h3", "Enclosed ops (" + inners.length + ")"));
@@ -377,6 +387,7 @@ var ProposalUI = (function () {
         p.appendChild(rm); addedBox.appendChild(p);
       });
     }
+    /* Inner-op descriptor form for one kind (fields from INNER_DEFS + Add button). Params: kind. */
     function innerForm(kind) {
       clearBox(innerBox);
       var inputs = INNER_DEFS[kind].map(function (d) {

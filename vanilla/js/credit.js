@@ -78,6 +78,7 @@ var Credit = (function () {
     var head = s.slice(0, -places).replace(/^0+(?=\d)/, ""), tail = s.slice(-places).replace(/0+$/, "");
     return tail ? head + "." + tail : head;
   }
+  /* Human percent -> integer units at places decimals ("1.5" -> 150 at 2 places) via string math, never float. Fails on malformed input or range overflow. */
   function _pctToU(human, places, max, name) {
     var m = new RegExp("^(\\d+)(?:\\.(\\d{1," + places + "}))?$").exec(String(human).trim());
     if (!m) throw new Error("bad " + name + " (0-100, <=" + places + " decimals): " + JSON.stringify(human));
@@ -138,6 +139,7 @@ var Credit = (function () {
     if (ids.length) { var objs = await _dbCall("lookup_asset_symbols", [ids]); (objs || []).forEach(function (a) { if (a && a.id) byId[a.id] = a; }); }
     return byId;
   }
+  /* lookup_asset_symbols join -> {sym, prec} display pair (misses degrade to the bare id, never a crash). */
   function _legJoin(byId, id) {
     var a = byId[id] || {};
     return { sym: a.symbol || String(id), prec: (typeof a.precision === "number" ? a.precision : null) };
@@ -166,7 +168,9 @@ var Credit = (function () {
     if (!rows || !rows[0]) throw new Error(kind + " (" + id + ")");
     return norm(rows[0]);
   }
+  /* Single credit offer by 1.21.x id. Returns: the normalized row. Fails "unknown-offer". */
   async function offer(id) { return _getOne(id, OFFER_RE, "unknown-offer", _normOffer); }
+  /* Single credit deal by 1.22.x id. Returns: the normalized row. Fails "unknown-deal". */
   async function deal(id) { return _getOne(id, DEAL_RE, "unknown-deal", _normDeal); }
   /* Offer lists (all three share one join path): list / by-owner / by-asset. Chain resolves names itself. */
   async function _offerRows(rows) {
@@ -197,9 +201,8 @@ var Credit = (function () {
     return normed.map(function (r) { var d = _legJoin(byId, r.debt_id), c = _legJoin(byId, r.coll_id);
       r.debt_sym = d.sym; r.debt_prec = d.prec; r.coll_sym = c.sym; r.coll_prec = c.prec; return r; });
   }
+  /* Deals under one offer id (debt+collateral symbols joined). Params: offerId 1.21.x, opts {limit, startId}. */
   async function dealsByOffer(offerId, opts) { _assertId(offerId, OFFER_RE, "offerId"); return _deals("get_credit_deals_by_offer_id", offerId, opts); }
-  async function dealsByBorrower(nameOrId, opts) { return _deals("get_credit_deals_by_borrower", nameOrId, opts); }
-  async function dealsByOwner(nameOrId, opts) { return _deals("get_credit_deals_by_offer_owner", nameOrId, opts); }
   /* Raw call-order -> plain row (collateral/debt accept {amount,asset_id} or raw+id shapes). */
   function _normPos(c) {
     if (!c || typeof c !== "object" || !c.id) throw new Error("unknown-position");
@@ -384,7 +387,7 @@ var Credit = (function () {
   }
 
   return { offer: offer, deal: deal, offers: offers, offersByOwner: offersByOwner, offersByAsset: offersByAsset,
-    dealsByOffer: dealsByOffer, dealsByBorrower: dealsByBorrower, dealsByOwner: dealsByOwner,
+    dealsByOffer: dealsByOffer,
     positions: positions, positionsMethod: positionsMethod,
     rateUnitsToHuman: rateUnitsToHuman, rateHumanToUnits: rateHumanToUnits,
     tcrUnitsToHuman: tcrUnitsToHuman, tcrHumanToUnits: tcrHumanToUnits,

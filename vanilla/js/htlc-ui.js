@@ -29,6 +29,7 @@ var HtlcUI = (function () {
     for (i = 0; i < map.length; i++) if (m.indexOf(map[i][0]) !== -1) { m = map[i][1]; break; }
     var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
+  /* Status line (aria-live, muted): progress text so panels never sit blank. Params: doc, wrap (appended to), text. Returns: the p. */
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
@@ -259,6 +260,7 @@ var HtlcUI = (function () {
     box.appendChild(fSecret.row); box.appendChild(fHash.row); box.appendChild(fSize.row);
     var period = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), p[0]]; }), "Lock time");
     box.appendChild(period.row);
+    /* Toggle preimage-vs-paste rows for the Secret mode select (type = preimage row; paste = hash + size rows). */
     function syncMode() {
       var paste = modeSel.value === "paste";
       fSecret.row.style.display = paste ? "none" : "";

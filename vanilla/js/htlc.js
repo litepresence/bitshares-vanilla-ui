@@ -1,5 +1,5 @@
 /* Htlc: HTLC (1.16.x) + withdraw-permission (1.12.x) reads + op-data builders.
- * Owns: read joins (htlc/mine/permissions/chainLimits), the seven slice-11
+ * Owns: read joins (htlc/mine/permissions), the seven slice-11
  *   builders returning [opId, opData] with zero-placeholder fee for live
  *   fee-fill (ops 49/50/52 + 25/26/27/28), preimage hashing (UTF-8 bytes,
  *   sha256 via WebCrypto), claim/hash gates, live fee via Tx.fee,
@@ -43,6 +43,7 @@ var Htlc = (function () {
   var DIGITS_RE = /^\d+$/, HEX_RE = /^[0-9a-fA-F]+$/;
   var ALGO_IDS = { ripemd160: 0, sha256: 2 };
   var ALGO_NAMES = { 0: "ripemd160", 2: "sha256" };
+  /* Millisecond sleep (sendAndProve prove-poll interval). Params: ms int. Returns: Promise. */
   function _sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
   /* One database-API round trip; socket failures -> "not-connected". */
   async function _dbCall(method, params) {
@@ -58,6 +59,7 @@ var Htlc = (function () {
   function _assertU16(n, name) { if (!Number.isInteger(n) || n < 0 || n > 0xFFFF) throw new Error(name + " must be u16, got: " + JSON.stringify(n)); }
   function _assertU32(n, name) { if (!Number.isInteger(n) || n < 0 || n > 0xFFFFFFFF) throw new Error(name + " must be u32, got: " + JSON.stringify(n)); }
   function _assertPrecision(p) { if (!Number.isInteger(p) || p < 0 || p > 12) throw new Error("precision must be 0-12, got: " + JSON.stringify(p)); }
+  /* Guard: Format.parseAmount must be loaded (builders take human amounts). Fails "format-unavailable". */
   function _needFormat() { if (typeof Format === "undefined" || !Format.parseAmount) throw new Error("format-unavailable (format.js first)"); }
   /* Name-or-id -> 1.2.N id via Account.resolve (id-only when unloaded). Fails "unknown-account". */
   async function _resolveAccountId(input) {
@@ -81,7 +83,9 @@ var Htlc = (function () {
     if (_toSecs(out) === null) throw new Error(name + " is not a real date-time: " + JSON.stringify(s));
     return out;
   }
+  /* String -> UTF-8 bytes (preimage hashing + memo hex payloads). */
   function _utf8(s) { return new TextEncoder().encode(String(s)); }
+  /* Bytes -> lowercase hex (hashes, memo payloads). Params: u8 Uint8Array. Returns: hex string. */
   function _hexOfBytes(u8) {
     var s = "", i;
     for (i = 0; i < u8.length; i++) s += (u8[i] < 16 ? "0" : "") + u8[i].toString(16);
@@ -156,7 +160,8 @@ var Htlc = (function () {
     var all = (res[0] || []).concat(res[1] || []), aids = [], i;
     for (i = 0; i < all.length; i++) aids.push((all[i].transfer || {}).asset_id);
     var precMap = await _precisions(aids), nowSecs = Math.floor(Date.now() / 1000);
-    function map(rows) { return rows.map(function (o) { return _htlcRow(o, precMap, nowSecs); }); }
+    /* Raw 1.16.x rows -> display rows (closed over precMap + nowSecs). */
+    function mapHtlcRows(rows) { return rows.map(function (o) { return _htlcRow(o, precMap, nowSecs); }); }
     return { sent: map(res[0] || []), received: map(res[1] || []) };
   }
   /* Permissions as giver + recipient (start "1.12.0", limit 100). Returns {asGiver[], asRecipient[]}.
@@ -167,22 +172,9 @@ var Htlc = (function () {
     var all = (res[0] || []).concat(res[1] || []), aids = [], i;
     for (i = 0; i < all.length; i++) aids.push((all[i].withdrawal_limit || {}).asset_id);
     var precMap = await _precisions(aids), nowSecs = Math.floor(Date.now() / 1000);
-    function map(rows) { return rows.map(function (o) { return _permRow(o, precMap, nowSecs); }); }
+    /* Raw 1.12.x rows -> display rows (closed over precMap + nowSecs). */
+    function mapPermRows(rows) { return rows.map(function (o) { return _permRow(o, precMap, nowSecs); }); }
     return { asGiver: map(res[0] || []), asRecipient: map(res[1] || []) };
-  }
-  /* Live caps from get_global_properties (ambiguity F: observed, never hardcoded). Scans
-   * parameters.extensions as [[name, obj]] pairs OR a plain object. Fails "limits-unavailable". */
-  async function chainLimits() {
-    var g = await _dbCall("get_global_properties", []);
-    var ext = g && g.parameters && g.parameters.extensions, found = null, i;
-    function pick(o) {
-      if (o && typeof o === "object" && o.max_timeout_secs !== undefined && o.max_preimage_size !== undefined) found = o;
-    }
-    if (Array.isArray(ext)) {
-      for (i = 0; i < ext.length; i++) pick(Array.isArray(ext[i]) ? ext[i][1] : (ext[i].updatable_htlc_options || ext[i]));
-    } else if (ext && typeof ext === "object") pick(ext.updatable_htlc_options || ext);
-    if (!found) throw new Error("limits-unavailable");
-    return { max_preimage_size: parseInt(found.max_preimage_size, 10), max_timeout_secs: parseInt(found.max_timeout_secs, 10) };
   }
   /* Typed preimage -> {typeId, hex, size} over UTF-8 BYTES (ambiguity B: size = byte length).
    * sha256 via WebCrypto (Tx.sha256Bytes precedent); ripemd160 unvendored -> explicit-hash-only.
@@ -412,7 +404,7 @@ var Htlc = (function () {
     var d = new Date(stamped);
     return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(d);
   }
-  return { htlc: htlc, mine: mine, permissions: permissions, chainLimits: chainLimits, hashPreimage: hashPreimage,
+  return { htlc: htlc, mine: mine, permissions: permissions, hashPreimage: hashPreimage,
     checkPreimage: checkPreimage, buildCreate: buildCreate, buildRedeem: buildRedeem, buildExtend: buildExtend,
     buildDebitCreate: buildDebitCreate, buildDebitUpdate: buildDebitUpdate, checkClaim: checkClaim,
     buildDebitClaim: buildDebitClaim, buildDebitDelete: buildDebitDelete,

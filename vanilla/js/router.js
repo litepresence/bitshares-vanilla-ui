@@ -1,4 +1,11 @@
-/* Router: hash router rendering §6 routes into #view. No dependencies. */
+/* Router: hash router rendering §6 routes into #view. No dependencies.
+ * Owns: the §6 route table, pattern matching (matchPattern/match), render
+ *   dispatch + 404/home/market shells. Consumes: view globals by feature
+ *   (MarketUI/AccountUI/etc, guarded — placeholder when absent), I18n.t for
+ *   shell strings (guarded fallback), window.location.hash. Side effects: DOM
+ *   under the given #view element + document.title, hashchange listener on
+ *   start. Created by: building-vanilla-slices skill, slice-01-shell-settings
+ *   plan. */
 var Router = (function () {
   "use strict";
 
@@ -30,6 +37,9 @@ var Router = (function () {
     });
   }
 
+  /* placeholder: stub renderer for not-yet-ported routes. Params: title
+   *   (string). Returns a render function (root) -> void. Fails: never — a
+   *   missing root is a no-op, strings are HTML-escaped. */
   function placeholder(title) {
     return function (root) {
       if (!root) return;
@@ -39,6 +49,8 @@ var Router = (function () {
     };
   }
 
+  /* render404: unknown-route page with a dashboard link. Params: root
+   *   (element). Returns nothing. Fails: never — a missing root is a no-op. */
   function render404(root) {
     if (!root) return;
     root.innerHTML =
@@ -47,6 +59,9 @@ var Router = (function () {
       '<a href="#/">' + escapeHtml(t("shell.go_dashboard", "Go to Dashboard")) + "</a></p></div>";
   }
 
+  /* renderSettings: settings route with placeholder fallback. Params: root
+   *   (element), params (object, e.g. {tab}). Returns nothing. Fails: never —
+   *   falls back to the Settings placeholder when SettingsPage is absent. */
   function renderSettings(root, params) {
     if (typeof SettingsPage !== "undefined" && SettingsPage && typeof SettingsPage.render === "function") {
       SettingsPage.render(root, params);
@@ -79,6 +94,9 @@ var Router = (function () {
       escapeHtml(target) + '">' + escapeHtml(t("shell.go_to", "Go to ")) + escapeHtml(target) + "</a></p></div>";
   }
 
+  /* renderMarketPage: market route with placeholder fallback. Params: root
+   *   (element), params ({marketID}). Returns nothing. Fails: never — falls
+   *   back to the Exchange placeholder when MarketUI is absent. */
   function renderMarketPage(root, params) {
     if (typeof MarketUI !== "undefined" && MarketUI &&
         typeof MarketUI.renderMarket === "function") {
@@ -156,6 +174,9 @@ var Router = (function () {
     return path.split("/").filter(function (s) { return s.length > 0; });
   }
 
+  /* matchPattern: one pattern against one path. Params: pattern (string with
+   *   :params or trailing /**), path (string). Returns {params} or null.
+   *   Fails: never throws — bad-decode segments fall back to the raw text. */
   function matchPattern(pattern, path) {
     if (pattern === "*") return null;
     if (pattern === "/") return path === "/" || path === "" ? { params: {} } : null;
@@ -188,6 +209,9 @@ var Router = (function () {
     return { params: params };
   }
 
+  /* match: first route whose pattern fits. Params: path (string). Returns
+   *   {route, params} or null. Fails: never throws ("*" is skipped here —
+   *   render() handles the miss as 404). */
   function match(path) {
     for (var i = 0; i < routes.length; i++) {
       var r = routes[i];
@@ -198,6 +222,9 @@ var Router = (function () {
     return null;
   }
 
+  /* currentPath: normalized path from location.hash. Params: none. Returns a
+   *   leading-slash path with query stripped and trailing slash removed.
+   *   Fails: never throws — a missing hash yields "/". */
   function currentPath() {
     var hash = "";
     if (typeof window !== "undefined" && window.location && typeof window.location.hash === "string") {
@@ -212,6 +239,9 @@ var Router = (function () {
     return path;
   }
 
+  /* render: draws currentPath into #view. Params: none. Returns nothing.
+   *   Fails: never throws on routing — unknown paths render the 404 view
+   *   (view errors themselves propagate). No-op before start(). */
   function render() {
     if (!view) return;
     var path = currentPath();
@@ -230,6 +260,8 @@ var Router = (function () {
     fn(view, params);
   }
 
+  /* start: binds hashchange and renders once. Params: viewEl (element).
+   *   Returns nothing. Fails: never throws — render is safe on any hash. */
   function start(viewEl) {
     view = viewEl;
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {

@@ -1,7 +1,9 @@
 /* Pool: liquidity-pool (1.19.x) reads + op-data builders + CPMM math.
  * Owns: get/list/mine + history (honest degrade), six builders for ops
  *   59/60/61/62/63/75 ([opId, opData], zero-placeholder fee for live
- *   fee-fill), CPMM quote/slippage, share-mint/burn estimates, depth points,
+ *   fee-fill), CPMM quote/slippage, share-mint estimates (shareOut; the
+ *   withdraw leg proves via Pool.get re-read, so shareBack was deleted in
+ *   the slice-18 audit — zero callers), depth points,
  *   the ONLY percent converters (u16 <-> human), fee via Tx.fee (filled IN
  *   PLACE — slice-11 F-FEEFILL lesson), sendAndProve (vote-pattern). No DOM,
  *   no key handling (WIF passes opaquely to Tx.sign) — views live in
@@ -113,6 +115,7 @@ var Pool = (function () {
     pools.forEach(function (p) {
       if (!p) return;
       var r = _normPool(p);
+      /* Joined-asset leg -> {sym, prec} display pair (misses degrade to the bare id, never a crash). */
       function leg(id) { var a = byId[id] || {}; return { sym: a.symbol || String(id), prec: (typeof a.precision === "number" ? a.precision : null) }; }
       var A = leg(p.asset_a), B = leg(p.asset_b), S = leg(p.share_asset);
       r.sym_a = A.sym; r.prec_a = A.prec; r.sym_b = B.sym; r.prec_b = B.prec; r.sym_share = S.sym; r.prec_share = S.prec;
@@ -216,17 +219,6 @@ var Pool = (function () {
     if (s <= 0n) throw new Error("deposit-too-small (rounds to zero shares)");
     return { share_raw: s.toString() };
   }
-  /* Withdraw-out estimates: floor(share * Bal / supply) per leg. */
-  function shareBack(args) {
-    args = args || {};
-    _assertDigits(args.supply_raw, "supply_raw"); _assertDigits(args.share_raw, "share_raw"); _assertDigits(args.balanceA_raw, "balanceA_raw"); _assertDigits(args.balanceB_raw, "balanceB_raw");
-    var supply = BigInt(args.supply_raw), share = BigInt(args.share_raw);
-    var balA = BigInt(args.balanceA_raw), balB = BigInt(args.balanceB_raw);
-    if (supply <= 0n) throw new Error("empty-pool");
-    if (share <= 0n) throw new Error("share_raw must be > 0");
-    if (share > supply) throw new Error("insufficient-share");
-    return { outA_raw: ((share * balA) / supply).toString(), outB_raw: ((share * balB) / supply).toString() };
-  }
   /* CPMM depth points 0->99% both sides (#2 SimpleSwap depth SHAPE, integer-first; pct is a display pixel). */
   function depthPoints(args, n) {
     args = args || {};
@@ -235,6 +227,7 @@ var Pool = (function () {
     if (!Number.isInteger(steps) || steps < 1 || steps > 100) throw new Error("n must be 1-100");
     var balA = BigInt(args.balanceA_raw), balB = BigInt(args.balanceB_raw);
     if (balA <= 0n || balB <= 0n) throw new Error("empty-pool");
+    /* One CPMM depth side: steps points from 1%..99% of balIn (pct is a display label only; sell/out stay raw strings). */
     function side(balIn, balOut) {
       var pts = [], i;
       for (i = 1; i <= steps; i++) {
@@ -365,7 +358,7 @@ var Pool = (function () {
   }
 
   return { get: get, list: list, mine: mine, history: history, listForm: listForm,
-    quote: quote, minReceive: minReceive, shareOut: shareOut, shareBack: shareBack, depthPoints: depthPoints,
+    quote: quote, minReceive: minReceive, shareOut: shareOut, depthPoints: depthPoints,
     buildCreate: buildCreate, buildDeposit: buildDeposit, buildWithdraw: buildWithdraw,
     buildExchange: buildExchange, buildUpdate: buildUpdate, buildDelete: buildDelete, fee: fee, sendAndProve: sendAndProve,
     pctUnitsToHuman: pctUnitsToHuman, pctHumanToUnits: pctHumanToUnits, DEFAULT_SLIPPAGE_PCT: DEFAULT_SLIPPAGE_PCT };

@@ -1,5 +1,5 @@
 /* Credit-samet: Same-T fund (1.20.x) reads + op-data builders.
- * Owns: fund/funds/fundsByOwner/fundsByAsset reads (symbols joined via
+ * Owns: fund/funds/fundsByOwner reads (symbols joined via
  *   lookup_asset_symbols) + five builders for ops 64/66/65/67/68 ([opId,
  *   opData], zero-placeholder fee for live fee-fill). Split OUT of credit.js
  *   on the ~380-line cap (slice-13 plan, pre-authorized — no new plan needed).
@@ -42,6 +42,7 @@ var CreditSamet = (function () {
       throw e;
     }
   }
+  /* Human percent -> fee-rate units via Credit.rateHumanToUnits (the ONLY fee-rate converter). Fails "credit-unavailable" when credit.js is missing. */
   function _rateHumanToUnits(human) {
     if (typeof Credit === "undefined" || !Credit.rateHumanToUnits) throw new Error("credit-unavailable (credit.js first)");
     return Credit.rateHumanToUnits(human);
@@ -84,10 +85,6 @@ var CreditSamet = (function () {
     opts = opts || {};
     return _withSyms((await _dbCall("get_samet_funds_by_owner", [String(nameOrId), opts.limit || null, opts.startId || null]) || []).map(_normFund));
   }
-  async function fundsByAsset(symOrId, opts) {
-    opts = opts || {};
-    return _withSyms((await _dbCall("get_samet_funds_by_asset", [String(symOrId), opts.limit || null, opts.startId || null]) || []).map(_normFund));
-  }
 
   /* Op-64 Same-T create (rate human -> units at denom 1M). */
   function buildSametCreate(args) {
@@ -129,6 +126,7 @@ var CreditSamet = (function () {
     return [67, { fee: { amount: "0", asset_id: CORE_ASSET }, borrower: args.borrowerId, fund_id: args.fundId,
       borrow_amount: { amount: args.borrowRaw, asset_id: args.borrowAssetId }, extensions: [] }];
   }
+  /* Op-68 Same-T repay (repay + fund_fee legs as RAW strings, both > 0). Returns [68, opData]. */
   function buildSametRepay(args) {
     args = args || {};
     _assertId(args.accountId, ACCOUNT_RE, "accountId"); _assertId(args.fundId, FUND_RE, "fundId");
@@ -139,7 +137,7 @@ var CreditSamet = (function () {
       fund_fee: { amount: args.feeRaw, asset_id: args.assetId }, extensions: [] }];
   }
 
-  return { fund: fund, funds: funds, fundsByOwner: fundsByOwner, fundsByAsset: fundsByAsset,
+  return { fund: fund, funds: funds, fundsByOwner: fundsByOwner,
     buildSametCreate: buildSametCreate, buildSametUpdate: buildSametUpdate, buildSametDelete: buildSametDelete,
     buildSametBorrow: buildSametBorrow, buildSametRepay: buildSametRepay };
 })();

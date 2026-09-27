@@ -1,4 +1,10 @@
-/* Chain: sole WebSocket owner. Raw JSON-RPC: login -> database -> queries. */
+/* Chain: sole WebSocket owner for all node traffic (principle: one chain module).
+ * Owns: the shared socket (ws/pending/nextId), status (lastStatus), api-id
+ *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net.
+ * Consumes: Store.emitConnection (status fan-out, read-only), document badge
+ *   #conn-badge (painted in setStatus, never read). Side effects: opens/closes
+ *   WebSockets, mutates lastStatus + api-id caches, paints the badge DOM.
+ * Created by: building-vanilla-slices skill, slice-01-shell-settings plan. */
 var Chain = (function () {
   "use strict";
   var ws = null, nextId = 1, pending = {}, lastStatus = {state: "unknown"};
@@ -15,6 +21,11 @@ var Chain = (function () {
     }
   }
 
+  /* call: one JSON-RPC "call" on the shared socket. Params: apiId (number),
+   *   method (string), params (array), timeoutMs (number, default 8000).
+   *   Returns a Promise for msg.result. Fails: rejects "not connected" when
+   *   the socket is down, "call timeout: <method>" on timeout, or the node's
+   *   error payload. */
   function call(apiId, method, params, timeoutMs) {
     return new Promise(function (resolve, reject) {
       if (!ws || ws.readyState !== 1) { reject(new Error("not connected")); return; }
@@ -33,6 +44,10 @@ var Chain = (function () {
     return new Promise(function (resolve, reject) {
       var sock, ids = 1, waiting = {}, done = false, guard;
       function fail(e) { if (done) return; done = true; clearTimeout(guard); try { sock.close(); } catch (err) {} reject(e); }
+      /* send: one JSON-RPC "call" on the probe's throwaway socket (mirrors
+       *   call() but uses the probe-local id map). Params: apiId, method,
+       *   params. Returns a Promise for msg.result. Fails: rejects via fail()
+       *   on probe timeout or node error, closing the throwaway socket. */
       function send(apiId, method, params) {
         return new Promise(function (res, rej) {
           var id = ids++;
@@ -106,6 +121,9 @@ var Chain = (function () {
     return call(1, "database", []).then(function (id) { _dbId = id; return id; });
   }
   var _historyId = null;
+  /* history: cached "history" api id (mirrors db()). Params: none. Returns a
+   *   Promise for the numeric api id. Fails: rejects when not connected or on
+   *   call timeout (via call()). */
   function history() {
     if (_historyId !== null) return Promise.resolve(_historyId);
     return call(1, "history", []).then(function (id) { _historyId = id; return id; });

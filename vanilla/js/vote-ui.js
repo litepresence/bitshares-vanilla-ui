@@ -13,6 +13,9 @@
  * Globals/side effects: DOM under the router root, global VoteUI only.
  *   WIFs pass as JS values into Tx.sign — never into the DOM. Generation
  *   counter invalidates stale async work after teardown (see teardown note).
+ *   Slate state + list rows live in js/vote-slate.js (VoteSlate global,
+ *   slice-18 split — bodies moved verbatim; this file keeps routing, proxy
+ *   fetch, publish, and result screens).
  * Created by: building-vanilla-slices skill, slice-08-voting plan Task 3.
  *
  * CHAIN TRUTH (from the slice-08 plan References; #4 wins):
@@ -113,30 +116,6 @@ var VoteUI = (function () {
     p.setAttribute("aria-live", "polite");
     wrap.appendChild(p);
     return p;
-  }
-
-  /* Raw core-precision int string -> "12.34%" via integer hundredths math.
-   * Params: totalRaw digit string, supplyRaw digit string (chain supply).
-   * Returns "" when the supply is missing/zero (column renders "—"). */
-  function sharePct(totalRaw, supplyRaw) {
-    if (!/^\d+$/.test(String(totalRaw || "")) || !/^\d+$/.test(String(supplyRaw || ""))) return "";
-    var supply = BigInt(supplyRaw);
-    if (supply === 0n) return "";
-    var bp = (BigInt(totalRaw) * 10000n) / supply;
-    var whole = (bp / 100n).toString();
-    var frac = (bp % 100n).toString().padStart(2, "0");
-    return whole + "." + frac + "%";
-  }
-
-  /* Human weight cell: "1,234.56789" style via Format (no grouping — plain
-   * decimal, same convention as balances) plus integer share-%. */
-  function humanWeight(totalRaw, supplyRaw) {
-    var human;
-    try {
-      human = Format.formatAmount(String(totalRaw), CORE_PRECISION_FALLBACK);
-    } catch (e) { human = String(totalRaw); }
-    var pct = sharePct(String(totalRaw), supplyRaw);
-    return pct ? human + " (" + pct + ")" : human;
   }
 
   /* Route entry: renderVoting(root). Waits for the shared connection, gates
@@ -313,90 +292,9 @@ var VoteUI = (function () {
     return "";
   }
 
-  /* Slate state: `published` is the last on-chain snapshot (dirty baseline);
-   * `draft` is the checkbox/proxy working copy. Sets hold vote_id strings
-   * ("t:i"). isChanged = proxy differs OR any set differs. Teardown: the
-   * state object is closed over by this render generation only; navigation
-   * bumps `gen`, so stale handlers/async work bail via the myGen check and
-   * the whole state is garbage-collected — no global stores, no listeners
-   * survive (the single Store.subscribe above unsubscribes on settle). */
-  function newState(me, lists, slate) {
-    function setOf(arr) {
-      var s = {};
-      for (var i = 0; i < (arr || []).length; i++) s[arr[i]] = true;
-      return s;
-    }
-    var proxyId = slate.voting_account || PROXY_SENTINEL;
-    return {
-      me: me,
-      lists: lists,
-      supply: "",
-      tab: "witness",
-      search: { witness: "", committee: "", worker: "" },
-      published: {
-        proxyId: proxyId,
-        witness: setOf(slate.byType.witness),
-        committee: setOf(slate.byType.committee),
-        worker: setOf(slate.byType.worker)
-      },
-      draft: {
-        proxyId: proxyId,
-        witness: setOf(slate.byType.witness),
-        committee: setOf(slate.byType.committee),
-        worker: setOf(slate.byType.worker)
-      },
-      byVoteId: indexByVoteId(lists),
-      proxySlate: null
-    };
-  }
-
-  function indexByVoteId(lists) {
-    var map = {};
-    var all = (lists.witnesses || []).concat(lists.committee || [], lists.workers || []);
-    for (var i = 0; i < all.length; i++) {
-      if (all[i] && all[i].vote_id) map[all[i].vote_id] = all[i];
-    }
-    return map;
-  }
-
-  function setSize(s) {
-    return Object.keys(s).length;
-  }
-
-  function sameSet(a, b) {
-    var ka = Object.keys(a), kb = Object.keys(b);
-    if (ka.length !== kb.length) return false;
-    for (var i = 0; i < ka.length; i++) if (!b[ka[i]]) return false;
-    return true;
-  }
-
-  function isChanged(st) {
-    return st.draft.proxyId !== st.published.proxyId ||
-      !sameSet(st.draft.witness, st.published.witness) ||
-      !sameSet(st.draft.committee, st.published.committee) ||
-      !sameSet(st.draft.worker, st.published.worker);
-  }
-
-  function voteName(st, voteId) {
-    var e = st.byVoteId[voteId];
-    if (e && e.name) return e.name + " (" + e.id + ")";
-    if (e) return e.id;
-    return voteId;
-  }
-
-  function diffNames(st, tab) {
-    var p = st.published[tab], d = st.draft[tab];
-    var added = [], removed = [];
-    Object.keys(d).forEach(function (v) { if (!p[v]) added.push(voteName(st, v)); });
-    Object.keys(p).forEach(function (v) { if (!d[v]) removed.push(voteName(st, v)); });
-    added.sort();
-    removed.sort();
-    return { added: added, removed: removed };
-  }
-
   /* Main view: account strip + proxy picker + tabs + publish/reset. */
   function showView(doc, wrap, root, me, lists, slate, supplyRaw, myGen) {
-    var st = newState(me, lists, slate);
+    var st = VoteSlate.newState(me, lists, slate);
     st.supply = supplyRaw || "";
 
     wrap.appendChild(el(doc, "h1", "Voting"));
@@ -414,11 +312,14 @@ var VoteUI = (function () {
     var actionBar = el(doc, "div", null, "vote-actions");
     wrap.appendChild(actionBar);
 
+    /* Repaint proxy line + tabs + list + actions for this generation (stale
+     * generations bail — the router reuses #view across routes, so a late
+     * proxy-slate fetch must not paint over the next page). */
     function refresh() {
       if (myGen !== gen) return;
       renderProxy(doc, proxyBox, root, st, myGen, refresh);
-      renderTabs(doc, tabsBar, st, refresh);
-      renderList(doc, listBox, st, refresh);
+      VoteSlate.renderTabs(doc, tabsBar, st, refresh);
+      VoteSlate.renderList(doc, listBox, st, refresh);
       renderActions(doc, actionBar, root, st, myGen);
     }
 
@@ -541,122 +442,14 @@ var VoteUI = (function () {
     });
   }
 
-  function renderTabs(doc, bar, st, refresh) {
-    while (bar.firstChild) bar.removeChild(bar.firstChild);
-    var tabs = [
-      ["witness", "Witnesses (" + setSize(st.draft.witness) + ")"],
-      ["committee", "Committee (" + setSize(st.draft.committee) + ")"],
-      ["worker", "Workers (" + setSize(st.draft.worker) + ")"]
-    ];
-    tabs.forEach(function (t) {
-      var b = touchable(el(doc, "button", t[1], st.tab === t[0] ? "vote-tab active" : "vote-tab"));
-      b.type = "button";
-      b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", st.tab === t[0] ? "true" : "false");
-      b.addEventListener("click", function () { st.tab = t[0]; refresh(); });
-      bar.appendChild(b);
-    });
-  }
-
-  /* One tab's searchable list. Rows are wrapping flex cards (phone stacks,
-   * desktop spreads) — no fixed pixel widths, no hover-only UI. Weights are
-   * human via Format p5 + integer share-%. */
-  function renderList(doc, box, st, refresh) {
-    while (box.firstChild) box.removeChild(box.firstChild);
-    var hasProxy = st.draft.proxyId !== PROXY_SENTINEL;
-    var entries = st.tab === "witness" ? st.lists.witnesses
-      : st.tab === "committee" ? st.lists.committee : st.lists.workers;
-    entries = entries || [];
-
-    var search = doc.createElement("input");
-    search.type = "search";
-    search.setAttribute("placeholder", "Search " + st.tab + "…");
-    search.setAttribute("aria-label", "Search " + st.tab);
-    search.value = st.search[st.tab] || "";
-    touchable(search);
-    search.style.width = "100%";
-    search.style.boxSizing = "border-box";
-    box.appendChild(search);
-    var rowsBox = el(doc, "div", null, "vote-rows");
-    box.appendChild(rowsBox);
-
-    function draw() {
-      while (rowsBox.firstChild) rowsBox.removeChild(rowsBox.firstChild);
-      var q = (search.value || "").trim().toLowerCase();
-      var shown = entries.filter(function (e) {
-        if (!q) return true;
-        return (e.name || "").toLowerCase().indexOf(q) !== -1 ||
-          (e.id || "").toLowerCase().indexOf(q) !== -1;
-      });
-      if (entries.length === 0) {
-        rowsBox.appendChild(el(doc, "p",
-          st.tab === "worker"
-            ? "No workers found. Testnets often have none — this is valid, not an error."
-            : "Nothing in this list.", "muted"));
-        return;
-      }
-      if (shown.length === 0) {
-        rowsBox.appendChild(el(doc, "p", "No matches for this search.", "muted"));
-        return;
-      }
-      shown.forEach(function (e) {
-        rowsBox.appendChild(rowCard(doc, st, e, hasProxy, refresh));
-      });
-    }
-
-    search.addEventListener("input", draw);
-    draw();
-  }
-
-  /* One slate row: vote checkbox + name/id + active marker + human weight.
-   * Workers add daily pay (human p5), dates, and for/against weights. */
-  function rowCard(doc, st, e, hasProxy, refresh) {
-    var card = el(doc, "div", null, "vote-row");
-    card.style.display = "flex";
-    card.style.flexWrap = "wrap";
-    card.style.gap = "8px";
-    card.style.alignItems = "center";
-    var box = doc.createElement("input");
-    box.type = "checkbox";
-    box.checked = !!st.draft[st.tab === "witness" ? "witness" : st.tab === "committee" ? "committee" : "worker"][e.vote_id];
-    box.disabled = hasProxy;
-    box.setAttribute("aria-label", "Vote for " + (e.name || e.id));
-    touchable(box);
-    box.addEventListener("change", function () {
-      var set = st.draft[st.tab === "witness" ? "witness" : st.tab === "committee" ? "committee" : "worker"];
-      if (box.checked) set[e.vote_id] = true;
-      else delete set[e.vote_id];
-      refresh();
-    });
-    card.appendChild(box);
-    var main = el(doc, "div", null, "vote-row-main");
-    main.style.flex = "1 1 200px";
-    var title = el(doc, "strong", (e.name || "(unnamed)") + " ");
-    main.appendChild(title);
-    main.appendChild(el(doc, "span", e.id + (e.active ? " ● active" : ""), "muted"));
-    card.appendChild(main);
-    var weight = el(doc, "div", humanWeight(e.total_raw, st.supply), "vote-weight");
-    weight.title = String(e.total_raw);
-    card.appendChild(weight);
-    if (st.tab === "worker") {
-      var pay;
-      try {
-        pay = Format.formatAmount(String(e.extra.daily_pay_raw || "0"), CORE_PRECISION_FALLBACK);
-      } catch (err) { pay = String(e.extra.daily_pay_raw || "0"); }
-      var sub = el(doc, "div",
-        "Pay/day " + pay + " · " + (e.extra.work_begin_date || "?") + " → " +
-        (e.extra.work_end_date || "?") + " · for " +
-        humanWeight(e.total_raw, st.supply) + " / against " +
-        humanWeight(e.extra.total_against_raw || "0", st.supply), "muted");
-      sub.style.flex = "1 1 100%";
-      card.appendChild(sub);
-    }
-    return card;
-  }
-
+  /* Publish + Reset bar: Publish disabled unless VoteSlate.isChanged (the
+   * slate matches the chain — no changes to publish); Reset re-renders the
+   * route, dropping the draft. Publish opens the named-row confirm.
+   * Params: doc, bar (emptied first), root (route root), st (slate state),
+   *   myGen (generation guard). Returns nothing. */
   function renderActions(doc, bar, root, st, myGen) {
     while (bar.firstChild) bar.removeChild(bar.firstChild);
-    var changed = isChanged(st);
+    var changed = VoteSlate.isChanged(st);
     var pub = touchable(el(doc, "button", "Publish votes"));
     pub.type = "button";
     pub.disabled = !changed;
@@ -764,7 +557,7 @@ var VoteUI = (function () {
       ? (st.proxyName || st.draft.proxyId) + " (" + newOptions.voting_account + ")"
       : "none — voting directly");
     ["witness", "committee", "worker"].forEach(function (tab) {
-      var d = diffNames(st, tab);
+      var d = VoteSlate.diffNames(st, tab);
       var label = tab.charAt(0).toUpperCase() + tab.slice(1);
       var finalCount = Object.keys(st.draft[tab]).length;
       var text = "final: " + finalCount;
@@ -939,11 +732,14 @@ var VoteUI = (function () {
 
   return {
     renderVoting: renderVoting,
+    /* Headless-test seam: slate math now lives in VoteSlate (slice-18
+     * split) — these aliases keep the old VoteUI._test import path working;
+     * slateMatches stays local (publish proof, never moved). */
     _test: {
-      sharePct: sharePct,
-      humanWeight: humanWeight,
-      sameSet: sameSet,
-      isChanged: isChanged,
+      sharePct: VoteSlate.sharePct,
+      humanWeight: VoteSlate.humanWeight,
+      sameSet: VoteSlate.sameSet,
+      isChanged: VoteSlate.isChanged,
       slateMatches: slateMatches
     }
   };

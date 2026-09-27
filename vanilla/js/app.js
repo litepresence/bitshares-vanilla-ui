@@ -1,4 +1,11 @@
-/* Boot: settings -> theme -> router -> chain connect; badge + theme follow the store. */
+/* App: boot wiring (settings -> theme -> router -> chain connect).
+ * Owns: boot/finishBoot sequencing, theme application, shell localization,
+ *   badge painting, settings-change reconnect. Consumes: Store.loadSettings/
+ *   subscribe (sole settings owner, read-only), Router.start, Chain.connect,
+ *   I18n.loadCached/t (guarded fallbacks). Side effects: sets
+ *   data-theme + shell strings + #view content, opens the chain socket,
+ *   subscribes to settings/connection topics. Created by:
+ *   building-vanilla-slices skill, slice-01-shell-settings plan. */
 var App = (function () {
   "use strict";
 
@@ -35,6 +42,9 @@ var App = (function () {
     if (a) a.textContent = t("nav.settings", "Settings");
   }
 
+  /* localizeShell: paints static index.html chrome in the current locale.
+   *   Params: none. Returns nothing. Fails: never throws — missing DOM nodes
+   *   are skipped, I18n failures keep previous strings. */
   function localizeShell() {
     if (typeof document === "undefined") return;
     try {
@@ -55,6 +65,9 @@ var App = (function () {
     if (theme) document.documentElement.setAttribute("data-theme", theme);
   }
 
+  /* paintBadge: connection status -> #conn-badge. Params: status ({state,
+   *   chainId, latencyMs}). Returns nothing. Fails: never — a missing badge
+   *   is a no-op, unknown states render as their state name. */
   function paintBadge(status) {
     var badge = document.getElementById("conn-badge");
     if (!badge) return;
@@ -66,6 +79,9 @@ var App = (function () {
       : state;
   }
 
+  /* connect: opens the chain socket (failures via connection events).
+   *   Params: node (wss:// URL string). Returns nothing. Fails: never throws —
+   *   Chain.connect rejections are swallowed; the badge carries the error. */
   function connect(node) {
     if (node) Chain.connect(node).catch(function () { /* failures surface via connection events */ });
   }
@@ -78,6 +94,9 @@ var App = (function () {
     }
   }
 
+  /* boot: settings -> theme -> locale -> router -> chain connect. Params:
+   *   none. Returns the loaded settings. Fails: never throws — a missing
+   *   I18n falls back to sync English boot via t() defaults. */
   function boot() {
     var settings = Store.loadSettings();
     lastTheme = settings.theme; lastNetwork = settings.network; lastNode = settings.activeNode;

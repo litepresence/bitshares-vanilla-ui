@@ -9,10 +9,6 @@
  *   (formatAmount/formatPrice — BigInt, 8 places like Market), ctx.assets
  *   (quote/base id/symbol/precision, never modified), TradeUI (cancel UI only,
  *   guarded — rows render without buttons when it failed to load).
- * Consumes: Market.myOrders (read-only fetch, via global — same as before
- *   the split), Wallet.isUnlocked (read-only gate, never modified), Format
- *   (formatAmount/formatPrice — BigInt, 8 places like Market), ctx.assets
- *   (quote/base id/symbol/precision, never modified).
  * Globals/side effects: DOM under the given parent element only; global
  *   MarketOrders only. showError/network/defaultMarket are private copies of
  *   the market-ui.js helpers (same per-file convention as transfer-ui.js) so

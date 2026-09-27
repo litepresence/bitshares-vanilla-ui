@@ -1,17 +1,15 @@
-/* MarketCharts: Canvas2D price + depth renderers for the read-only DEX desk,
- *   plus LightweightCharts candle/oscillator panes (slice-07 Task 4).
+/* MarketCharts: Canvas2D price + depth renderers for the read-only DEX desk
+ *   (canonical core) + stable LWC pane entry points (delegated, slice-18).
  * Owns: devicePixelRatio-aware line/area drawing, min/max labels, legends,
- *   empty-state text; LWC price pane (candles + volume + overlays) and
- *   STACKED oscillator sub-panes (Task 4b: one chart per active indicator,
- *   each with an independent scale — never shared), with canvas fallback
- *   when the vendored global is absent. No chain, no storage, no signing.
+ *   empty-state text (drawPrice/drawDepth, kept byte-identical). The LWC
+ *   price pane (candles + volume + overlays) and STACKED oscillator
+ *   sub-panes (Task 4b) live canonically in charts-lwc.js (ChartsLwc) —
+ *   drawPricePane/drawOscPane/removePane/hasLightweight below delegate with
+ *   identical signatures and handle contracts.
  * Consumes: nothing but CSS custom properties (theme colors read at draw
- *   time, so a theme switch only needs a redraw, never new code) plus the
- *   optional window.LightweightCharts UMD global (vendored, loaded BEFORE
- *   this file in index.html). Callers pass frame colors in; candle up/down
- *   are the task-spec'd constants, not theme tokens.
- * Globals/side effects: global MarketCharts only; draws into caller canvases
- *   and host divs (LWC charts removed via removePane before re-render).
+ *   time, so a theme switch only needs a redraw, never new code). No chain,
+ *   no storage, no signing (the LWC global is consumed by charts-lwc.js).
+ * Globals/side effects: global MarketCharts only; draws into caller canvases.
  * Created by: building-vanilla-slices skill, slice-05-exchange-read plan Task 3.
  * Extended by: slice-07 Task 4 (drawPricePane/drawOscPane/removePane/
  *   hasLightweight; drawPrice/drawDepth kept byte-identical as fallback).
@@ -264,366 +262,58 @@ var MarketCharts = (function () {
     legend(g, [["Bid", buy], ["Ask", sell]], labels.high || null, labels.low || null, muted);
   }
 
-  /* --- Slice-07 Task 4: LightweightCharts panes (canvas fallback retained) --- */
-
-  /* Spec'd candle colors (task interface — up #26de81 / down #ff231f).
-   * Deliberately NOT theme tokens: the task pins these hues in every theme. */
-  var CANDLE_UP = "#26de81";
-  var CANDLE_DOWN = "#ff231f";
-  var PANE_H = 320;
-  var OSC_H = 170;
+  /* --- Slice-07 Task 4: LightweightCharts panes (slice-18 split: canonical
+   * implementation in charts-lwc.js — ChartsLwc. Delegated so the
+   * MarketCharts.* API stays byte-identical; Canvas2D core above unchanged.
+   * Missing-backend contracts: hasLightweight false (callers take canvas
+   * paths), panes return {kind: "none", chart: null} (same as empty data),
+   * removePane stays a no-throw no-op. */
 
   /* True when the vendored UMD build is loaded and usable (v5 API:
    * createChart + addSeries). Test seam: hiding window/globalThis.
    * LightweightCharts forces the canvas fallback path below. */
   function hasLightweight() {
-    try {
-      if (typeof window !== "undefined" && window && window.LightweightCharts &&
-          typeof window.LightweightCharts.createChart === "function") return true;
-      if (typeof globalThis !== "undefined" && globalThis.LightweightCharts &&
-          typeof globalThis.LightweightCharts.createChart === "function") return true;
-    } catch (e) { /* absent: fall back */ }
+    if (typeof ChartsLwc !== "undefined" && ChartsLwc &&
+        typeof ChartsLwc.hasLightweight === "function") {
+      return ChartsLwc.hasLightweight();
+    }
     return false;
   }
 
-  /* The vendored global, or null when absent (same guards as above). */
-  function lw() {
-    try {
-      if (typeof window !== "undefined" && window && window.LightweightCharts) {
-        return window.LightweightCharts;
-      }
-      if (typeof globalThis !== "undefined" && globalThis.LightweightCharts) {
-        return globalThis.LightweightCharts;
-      }
-    } catch (e) { /* ignore */ }
-    return null;
-  }
-
-  /* Chart frame colors. The caller passes colors read from CSS vars (theme-
-   * aware); fallbacks are the DEX-UX dark triple, used only headless (no CSS).
-   * Params: passed {paneBg, grid, text} (any subset). Returns full triple. */
-  function paneColors(passed) {
-    passed = passed || {};
-    return {
-      paneBg: passed.paneBg || cssVar("--panel", "#131722"),
-      grid: passed.grid || cssVar("--border", "#2a2e39"),
-      text: passed.text || cssVar("--text", "#c5cbce")
-    };
-  }
-
-  /* Host layout width in CSS px (300px fallback when hidden/headless). */
-  function hostW(hostEl) {
-    try {
-      if (hostEl && hostEl.clientWidth) return hostEl.clientWidth;
-      if (hostEl && hostEl.parentNode && hostEl.parentNode.clientWidth) {
-        return hostEl.parentNode.clientWidth;
-      }
-    } catch (e) { /* fallback stands */ }
-    return 300;
-  }
-
-  /* "#rrggbb" + alpha -> "rgba(r,g,b,a)" for volume bars (pixel styling). */
-  function hexA(hex, alpha) {
-    var m = typeof hex === "string" ? /^#([0-9a-fA-F]{6})$/.exec(hex) : null;
-    if (!m) return hex;
-    var n = parseInt(m[1], 16);
-    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," +
-      (n & 255) + "," + alpha + ")";
-  }
-
-  /* Price-scale mode: Logarithmic when logScale, else Normal. Uses the v5
-   * enum when present, numeric fallback (Normal 0 / Logarithmic 1) otherwise.
-   * Params: LW global, logScale bool. Returns the mode value. */
-  function scaleMode(LW, logScale) {
-    try {
-      if (LW && LW.PriceScaleMode) {
-        return logScale ? LW.PriceScaleMode.Logarithmic : LW.PriceScaleMode.Normal;
-      }
-    } catch (e) { /* numeric fallback */ }
-    return logScale ? 1 : 0;
-  }
-
-  /* Muted centered empty-state div; panes never render blank. */
-  function emptyPane(doc, hostEl, text) {
-    var d = doc.createElement("div");
-    d.className = "mkt-chart-empty muted";
-    d.textContent = text || "No data.";
-    hostEl.appendChild(d);
-  }
-
-  /* Tear down a previous pane in a host: LWC chart.remove() first (frees its
-   * canvas + listeners), then empty the host. Params: hostEl, previous handle
-   * (may be null). Never throws (redraw must survive teardown races). */
-  function clearHost(hostEl, previous) {
-    try {
-      if (previous && previous.chart &&
-          typeof previous.chart.remove === "function") {
-        previous.chart.remove();
-      }
-    } catch (e) { /* already gone */ }
-    try {
-      while (hostEl.firstChild) hostEl.removeChild(hostEl.firstChild);
-    } catch (e) { /* headless host */ }
-  }
-
-  /* market.js buckets -> LWC candle rows. Number()/Math.floor here are
-   * CHART-PIXEL inputs only (Global Constraints): OHLC human strings become
-   * coordinates; epoch slot math is time, not money. Malformed bars are
-   * skipped (never plotted as zero-candles). Returns ascending-time rows. */
-  function toLwcCandles(buckets) {
-    var out = [];
-    var i;
-    for (i = 0; i < (buckets || []).length; i++) {
-      var b = buckets[i] || {};
-      var t = Math.floor((b.timeMs || 0) / 1000);
-      var o = Number(b.open), h = Number(b.high);
-      var l = Number(b.low), c = Number(b.close);
-      if (!(t > 0)) continue;
-      if (!isFinite(o) || !isFinite(h) || !isFinite(l) || !isFinite(c)) continue;
-      var v = Number(b.baseVolume);
-      out.push({
-        time: t, open: o, high: h, low: l, close: c,
-        red: !!b.red, vol: (isFinite(v) && v > 0) ? v : 0
-      });
-    }
-    return out;
-  }
-
-  /* Aligned values[] -> LWC line points, skipping warmup nulls/NaNs so the
-   * overlay breaks across gaps instead of diving to zero. Pixel math only. */
-  function lineData(times, values) {
-    var out = [];
-    var i;
-    for (i = 0; i < times.length && i < values.length; i++) {
-      var v = values[i];
-      if (typeof v !== "number" || !isFinite(v)) continue;
-      out.push({ time: times[i], value: v });
-    }
-    return out;
-  }
-
-  /* Price pane: candles + volume + overlay lines.
-   * Params: doc; hostEl (emptied first — pass the previous handle in
-   *   opts.previous for LWC teardown); opts {candles: market.js buckets,
-   *   overlays: [{name, color, values}] aligned to candles, logScale: bool,
-   *   colors: {paneBg, grid, text}, emptyText}.
-   * Returns a pane handle ({kind: "lwc"|"canvas"|"none", chart?}) for
-   * removePane. Without the vendored global, falls back to the legacy canvas
-   * line renderer (closes + first two overlays as SMA/EMA legs) — that path
-   * is what the hidden-global headless check exercises. */
+  /* Price pane: candles + volume + overlay lines (canonical implementation
+   * in charts-lwc.js). Same signature, same handle contract ({kind, chart});
+   * missing backend -> "none" handle (same as the empty-data path, never
+   * blank, never throws). */
   function drawPricePane(doc, hostEl, opts) {
-    opts = opts || {};
-    var handle = { kind: "none", chart: null };
-    if (!hostEl) return handle;
-    clearHost(hostEl, opts.previous);
-    var colors = paneColors(opts.colors);
-    var bars = toLwcCandles(opts.candles);
-    if (bars.length === 0) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || "No price history on this market.");
-      return handle;
+    if (typeof ChartsLwc !== "undefined" && ChartsLwc &&
+        typeof ChartsLwc.drawPricePane === "function") {
+      return ChartsLwc.drawPricePane(doc, hostEl, opts);
     }
-    var LW = hasLightweight() ? lw() : null;
-    if (!LW) {
-      var canvas = doc ? doc.createElement("canvas") : null;
-      if (!canvas) return handle;
-      canvas.className = "mkt-canvas";
-      hostEl.appendChild(canvas);
-      var closes = bars.map(function (b) { return b.close; });
-      var ovs = Array.isArray(opts.overlays) ? opts.overlays : [];
-      var sma = (ovs.length > 0 && Array.isArray(ovs[0].values)) ? ovs[0].values : null;
-      var ema = (ovs.length > 1 && Array.isArray(ovs[1].values)) ? ovs[1].values : null;
-      drawPrice(canvas, closes, sma, ema,
-        { max: null, min: null }, opts.emptyText);
-      handle.kind = "canvas";
-      return handle;
-    }
-    var times = bars.map(function (b) { return b.time; });
-    var crossMode = 0;
-    try {
-      if (LW.CrosshairMode) crossMode = LW.CrosshairMode.Normal;
-    } catch (e) { /* default stands */ }
-    var chart = LW.createChart(hostEl, {
-      width: hostW(hostEl),
-      height: PANE_H,
-      layout: { background: { color: colors.paneBg }, textColor: colors.text },
-      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
-      crosshair: { mode: crossMode },
-      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 2 },
-      rightPriceScale: { mode: scaleMode(LW, !!opts.logScale) }
-    });
-    var series = chart.addSeries(LW.CandlestickSeries, {
-      upColor: CANDLE_UP, downColor: CANDLE_DOWN,
-      wickUpColor: CANDLE_UP, wickDownColor: CANDLE_DOWN,
-      borderVisible: false
-    });
-    series.setData(bars.map(function (b) {
-      return { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close };
-    }));
-    var vols = chart.addSeries(LW.HistogramSeries, {
-      priceScaleId: "", priceFormat: { type: "volume" }
-    });
-    vols.setData(bars.map(function (b) {
-      return {
-        time: b.time, value: b.vol,
-        color: b.red ? hexA(CANDLE_DOWN, 0.5) : hexA(CANDLE_UP, 0.5)
-      };
-    }));
-    var ovs2 = Array.isArray(opts.overlays) ? opts.overlays : [];
-    var i;
-    for (i = 0; i < ovs2.length; i++) {
-      var ov = ovs2[i] || {};
-      if (!Array.isArray(ov.values)) continue;
-      var line = chart.addSeries(LW.LineSeries, {
-        color: (typeof ov.color === "string" && ov.color) ? ov.color : colors.text,
-        lineWidth: 1,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        crosshairMarkerVisible: false
-      });
-      line.setData(lineData(times, ov.values));
-    }
-    handle.kind = "lwc";
-    handle.chart = chart;
-    return handle;
+    return { kind: "none", chart: null };
   }
 
-  /* ONE oscillator sub-pane of a stack (Task 4b: the caller renders one pane
-   * per checked indicator, each with its OWN chart — never shared, because
-   * RSI (0-100) and ATR (price-scale) ranges are incompatible).
-   * Params: doc; hostEl; opts {times: unix seconds aligned to series values,
-   *   series: [{name, color, values}], colors, emptyText, histogram: bool}.
-   * LWC path renders one LineSeries per entry, or (histogram:true, the Volume
-   *   pane) one HistogramSeries per entry; the canvas fallback always strokes
-   *   line charts over the pane's own pixel range with a legend (same visual
-   *   language for every pane, volume included). */
+  /* ONE oscillator sub-pane of a stack (canonical implementation in
+   * charts-lwc.js). Same signature, same handle contract; missing backend
+   * -> "none" handle (same as the no-data path, never blank, never throws). */
   function drawOscPane(doc, hostEl, opts) {
-    opts = opts || {};
-    var handle = { kind: "none", chart: null };
-    if (!hostEl) return handle;
-    clearHost(hostEl, opts.previous);
-    var colors = paneColors(opts.colors);
-    var times = Array.isArray(opts.times) ? opts.times : [];
-    var entries = Array.isArray(opts.series) ? opts.series : [];
-    var i, k;
-    var anyPts = false;
-    for (i = 0; i < entries.length; i++) {
-      var vals = entries[i] ? entries[i].values : null;
-      if (!Array.isArray(vals)) continue;
-      for (k = 0; k < vals.length && k < times.length; k++) {
-        if (typeof vals[k] === "number" && isFinite(vals[k])) { anyPts = true; break; }
-      }
-      if (anyPts) break;
+    if (typeof ChartsLwc !== "undefined" && ChartsLwc &&
+        typeof ChartsLwc.drawOscPane === "function") {
+      return ChartsLwc.drawOscPane(doc, hostEl, opts);
     }
-    if (!anyPts) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || "No oscillator data.");
-      return handle;
-    }
-    var LW = hasLightweight() ? lw() : null;
-    if (!LW) {
-      var canvas = doc ? doc.createElement("canvas") : null;
-      if (!canvas) return handle;
-      canvas.className = "mkt-canvas";
-      hostEl.appendChild(canvas);
-      var g = fit(canvas, OSC_H);
-      if (!g) return handle;
-      var min = Infinity, max = -Infinity, n = 0;
-      for (i = 0; i < entries.length; i++) {
-        var arr = entries[i] ? entries[i].values : null;
-        if (!Array.isArray(arr)) continue;
-        if (arr.length > n) n = arr.length;
-        for (k = 0; k < arr.length; k++) {
-          if (typeof arr[k] === "number" && isFinite(arr[k])) {
-            if (arr[k] < min) min = arr[k];
-            if (arr[k] > max) max = arr[k];
-          }
-        }
-      }
-      if (!(max > min)) { max = min + 1; min = min - 1; }
-      var padL = 8, padR = 8, padT = 24, padB = 18;
-      var plotW = g.w - padL - padR, plotH = g.h - padT - padB;
-      function ox(j) { return padL + (n <= 1 ? plotW / 2 : (j * plotW) / (n - 1)); }
-      function oy(v) { return padT + (1 - (v - min) / (max - min)) * plotH; }
-      var names = [];
-      for (i = 0; i < entries.length; i++) {
-        var e = entries[i] || {};
-        var col = (typeof e.color === "string" && e.color) ? e.color : colors.text;
-        if (strokeSeries(g, e.values, n, ox, oy, col, 1.5)) {
-          names.push([e.name || ("Series " + (i + 1)), col]);
-        }
-      }
-      legend(g, names, null, null, colors.text);
-      handle.kind = "canvas";
-      return handle;
-    }
-    var crossMode = 0;
-    try {
-      if (LW.CrosshairMode) crossMode = LW.CrosshairMode.Normal;
-    } catch (e) { /* default stands */ }
-    var chart = LW.createChart(hostEl, {
-      width: hostW(hostEl),
-      height: OSC_H,
-      layout: { background: { color: colors.paneBg }, textColor: colors.text },
-      grid: { vertLines: { color: colors.grid }, horzLines: { color: colors.grid } },
-      crosshair: { mode: crossMode },
-      timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 2 }
-    });
-    /* Volume pane (histogram:true): one HistogramSeries per entry — base
-     * volume bars on the pane's OWN scale, never the price scale. Every
-     * other pane takes the line path below. Falls back to lines when the
-     * vendored build lacks HistogramSeries (never throws the desk away). */
-    if (opts.histogram) {
-      for (i = 0; i < entries.length; i++) {
-        var h = entries[i] || {};
-        if (!Array.isArray(h.values)) continue;
-        var hcol = (typeof h.color === "string" && h.color) ? h.color : colors.text;
-        var hist;
-        if (LW.HistogramSeries) {
-          hist = chart.addSeries(LW.HistogramSeries, {
-            color: hcol,
-            priceLineVisible: false,
-            lastValueVisible: false
-          });
-        } else {
-          hist = chart.addSeries(LW.LineSeries, {
-            color: hcol,
-            lineWidth: 1,
-            priceLineVisible: false,
-            lastValueVisible: false,
-            crosshairMarkerVisible: false
-          });
-        }
-        hist.setData(lineData(times, h.values));
-      }
-    } else {
-      for (i = 0; i < entries.length; i++) {
-        var s = entries[i] || {};
-        if (!Array.isArray(s.values)) continue;
-        var ls = chart.addSeries(LW.LineSeries, {
-          color: (typeof s.color === "string" && s.color) ? s.color : colors.text,
-          lineWidth: 1,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          crosshairMarkerVisible: false
-        });
-        ls.setData(lineData(times, s.values));
-      }
-    }
-    handle.kind = "lwc";
-    handle.chart = chart;
-    return handle;
+    return { kind: "none", chart: null };
   }
 
-  /* Release a pane handle from drawPricePane/drawOscPane (LWC remove + DOM
-   * clear is done by the next draw via opts.previous; this is for teardown
-   * paths like route change). Params: handle (may be null). Never throws. */
+  /* Release a pane handle (canonical implementation in charts-lwc.js).
+   * Missing backend -> no-op. Never throws (teardown paths rely on it). */
   function removePane(handle) {
-    try {
-      if (handle && handle.chart &&
-          typeof handle.chart.remove === "function") {
-        handle.chart.remove();
-      }
-    } catch (e) { /* already gone */ }
+    if (typeof ChartsLwc !== "undefined" && ChartsLwc &&
+        typeof ChartsLwc.removePane === "function") {
+      ChartsLwc.removePane(handle);
+    }
   }
+
+  /* (drawPricePane/drawOscPane/removePane bodies moved verbatim to
+   * charts-lwc.js — delegating shells above keep the MarketCharts API.) */
 
   return {
     drawPrice: drawPrice,

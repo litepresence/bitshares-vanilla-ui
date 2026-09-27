@@ -138,6 +138,7 @@ var Gateway = (function () {
       memoSupport: r.memoSupport !== undefined ? !!r.memoSupport : true
     };
   }
+  /* Heterogeneous coin-list body -> normalized rows (bare array or {coins,data,list} envelope). Returns: rows, or null (caller falls through to the next source). */
   function normalizeList(data) {
     var arr = Array.isArray(data) ? data : data && (data.coins || data.data || data.list);
     if (!Array.isArray(arr)) return null;
@@ -170,6 +171,7 @@ var Gateway = (function () {
       });
     });
   }
+  /* IOB coin list via GET /coins (2xx + rows, else gateway-rejected). Returns: Promise of rows. */
   function iobList() {
     return timedFetch(IOB_BASE + "/coins").then(function (r) {
       var rows = listOk("IOB", r, "GET");
@@ -177,6 +179,7 @@ var Gateway = (function () {
       return rows;
     });
   }
+  /* GDEX asset list via POST assetList (code 0 wins), GET-fallback on failure. Disabled adapters throw before any fetch. Returns: Promise of rows. */
   function gdexList() {
     assertEnabled("GDEX");
     return timedFetch(GDEX_BASE + "/gateway/asset/assetList", { method: "POST", body: gdexEnvelope() }).then(function (r) {
@@ -236,11 +239,13 @@ var Gateway = (function () {
     var memo = body.inputMemo || body.memo;
     return { address: String(address), memo: memo ? String(memo) : null };
   }
+  /* Cache a deposit address + last-coin marker. Params: gateway id, account, coin, res ({address, memo}). Returns: {address, memo, cached:false}. */
   function storeDeposit(id, account, coin, res) {
     cacheSet(addrKey(id, account, coin), res);
     cacheSet(lastKey(id, account), { coin: String(coin).toUpperCase(), at: Date.now() });
     return { address: res.address, memo: res.memo, cached: false };
   }
+  /* XBTSX deposit address for (account, coin): live row -> wallet-type endpoint, GET-fallback per ambiguity A. Returns: Promise of the storeDeposit shape. */
   function xbtsxDeposit(account, coin) {
     return rowFor(xbtsxList, coin).then(function (row) {
       if (!row.walletType) throw namedError("unproven", "no walletType in XBTSX row for " + coin);
@@ -263,6 +268,7 @@ var Gateway = (function () {
       });
     });
   }
+  /* GDEX deposit address for (account, coin) via getAddress (code 0 + VERBATIM host errors). Asserts enabled first. Returns: Promise of the storeDeposit shape. */
   function gdexDeposit(account, coin) {
     assertEnabled("GDEX");
     return rowFor(gdexList, coin).then(function (row) {

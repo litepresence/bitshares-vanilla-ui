@@ -120,7 +120,9 @@ var Proposal = (function () {
     out[dir === "add" ? "owner_approvals_to_add" : "owner_approvals_to_remove"] = args.ownerNotActive ? [args.accountId] : [];
     return [23, out];
   }
+  /* Op-23 approval: single-bit add set for accountId (owner-vs-active via ownerNotActive). Returns [23, opData]. */
   function buildApprove(args) { return _buildUpdate("add", args); }
+  /* Op-23 unapproval: mirror of buildApprove (single-bit remove set). Returns [23, opData]. */
   function buildUnapprove(args) { return _buildUpdate("remove", args); }
   /* Op-24 proposal delete/veto. */
   function buildDelete(args) {

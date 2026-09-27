@@ -25,6 +25,7 @@
 var SametUI = (function () {
   "use strict";
   var gen = 0;
+  /* Shared-_ui accessor: CreditUI._ui (credit-ui.js loads first); throws credit-ui-missing otherwise. */
   function U() {
     if (typeof CreditUI === "undefined" || !CreditUI._ui) throw new Error("credit-ui-missing (credit-ui.js first)");
     return CreditUI._ui;

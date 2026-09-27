@@ -25,6 +25,7 @@
 var MiscUI = (function () {
   "use strict";
   var gen = 0;
+  /* Shared-_ui accessor: ProposalUI._ui (proposal-ui.js loads first); throws proposal-ui-missing otherwise. */
   function U() {
     if (typeof ProposalUI === "undefined" || !ProposalUI._ui) throw new Error("proposal-ui-missing (proposal-ui.js first)");
     return ProposalUI._ui;
@@ -73,6 +74,7 @@ var MiscUI = (function () {
     ctx.wrap.appendChild(fA.row);
     var go = ui.touchable(ui.el(doc, "button", "Look up")); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
+    /* Authority detail table + Update/Delete boxes (blank update fields = unchanged). Params: a (authority row). */
     function drawAuth(a) {
       ui.clearBox(box);
       box.appendChild(ui.deskTable(doc, ["Field", "Value"], [
@@ -209,6 +211,7 @@ var MiscUI = (function () {
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fL.row);
     var go = ui.touchable(ui.el(doc, "button", "Check current")); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
+    /* Apply one listing bit change via an op-7 confirm (toAdd ? listingAdd : listingRemove). Params: authId, listeeId, cur, bit, toAdd. */
     function setListing(authId, listeeId, cur, bit, toAdd) {
       var next = toAdd ? ProposalMisc.listingAdd(cur, bit) : ProposalMisc.listingRemove(cur, bit);
       var o2 = ui.el(doc, "div", null, "xfer-out"); box.appendChild(o2);

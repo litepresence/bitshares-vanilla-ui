@@ -38,6 +38,12 @@ var Format = (function () {
     return out === "" ? "0" : out;
   }
 
+  /* formatPrice: raw base/quote integer pair -> human decimal string with
+   *   both precisions applied (base_per_quote = base_raw/10^basePrec divided by
+   *   quote_raw/10^quotePrec, rounded half-up to `places`). Params: baseRaw,
+   *   basePrec, quoteRaw, quotePrec, places (places >= 0). Returns the decimal
+   *   string. Throws on zero quote amount or negative places. Integer-only
+   *   BigInt math — never binary float for money. */
   function formatPrice(baseRaw, basePrec, quoteRaw, quotePrec, places) {    var b = BigInt(baseRaw), q = BigInt(quoteRaw);
     if (q === 0n) throw new Error("zero quote amount");
     if (places < 0) throw new Error("bad places");

@@ -144,24 +144,6 @@ var Crypto = (function () {
     return { wif: wif, pub: pub };
   }
 
-  /* Cloud-wallet style keys: per role, seed = account + role + password,
-   * hashed via fromSeedHex, then formatted as a keypair. */
-  async function passwordKeys(account, password, prefix) {
-    if (typeof account !== "string" || !account) {
-      throw new Error("account must be a non-empty string");
-    }
-    if (typeof password !== "string" || !password) {
-      throw new Error("password must be a non-empty string");
-    }
-    var roles = ["active", "owner", "memo"];
-    var out = {};
-    for (var i = 0; i < roles.length; i++) {
-      var seedHex = await fromSeedHex(account + roles[i] + password);
-      out[roles[i]] = await keypairFromPrivateHex(seedHex, prefix);
-    }
-    return out;
-  }
-
   /* Random 16-word brainkey from 32 crypto-random bytes; two bytes per
    * word, index uniform via floor (see header deviation note). */
   async function suggestBrainkey() {
@@ -267,6 +249,9 @@ var Crypto = (function () {
        8,  5, 12,  9, 12,  5, 14,  6,  8, 13,  6,  5, 15, 13, 11, 11
     ];
 
+    /* RIPEMD-160 round function (5 rounds selected by j); ported from #3
+    * crypto-utils.js:339. Params: j (round index 0-79), x/y/z (u32 words).
+    * Returns the u32 round output. Fails: never (pure integer ops). */
     function f(j, x, y, z) {
       if (j < 16) return (x ^ y ^ z) >>> 0;
       if (j < 32) return ((x & y) | (~x & z)) >>> 0;
@@ -275,6 +260,9 @@ var Crypto = (function () {
       return (x ^ (y | ~z)) >>> 0;
     }
 
+    /* RIPEMD-160 left-line constant per round; ported from #3
+    * crypto-utils.js:348. Params: j (round index 0-79). Returns the u32
+    * constant. Fails: never (pure). */
     function KL(j) {
       if (j < 16) return 0x00000000;
       if (j < 32) return 0x5A827999;
@@ -283,6 +271,9 @@ var Crypto = (function () {
       return 0xA953FD4E;
     }
 
+    /* RIPEMD-160 right-line constant per round; ported from #3
+    * crypto-utils.js:356. Params: j (round index 0-79). Returns the u32
+    * constant. Fails: never (pure). */
     function KR(j) {
       if (j < 16) return 0x50A28BE6;
       if (j < 32) return 0x5C4DD124;
@@ -291,6 +282,9 @@ var Crypto = (function () {
       return 0x00000000;
     }
 
+    /* RIPEMD-160 32-bit left rotation; ported from #3 crypto-utils.js:364.
+    * Params: x (u32 word), n (bit count). Returns the rotated u32. Fails:
+    * never (pure). */
     function rol(x, n) {
       return ((x << n) | (x >>> (32 - n))) >>> 0;
     }
@@ -735,7 +729,6 @@ var Crypto = (function () {
     normalizeBrainkey: normalizeBrainkey,
     brainPrivateKeyHex: brainPrivateKeyHex,
     fromSeedHex: fromSeedHex,
-    passwordKeys: passwordKeys,
     suggestBrainkey: suggestBrainkey,
     keypairFromPrivateHex: keypairFromPrivateHex,
     wifToPrivateKey: wifToPrivateKey,

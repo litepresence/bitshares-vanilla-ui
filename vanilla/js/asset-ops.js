@@ -67,6 +67,7 @@ var AssetOps = (function () {
   function _needFormat() {
     if (typeof Format === "undefined" || !Format.parseAmount) throw new Error("format-unavailable (format.js first)");
   }
+  /* Guard: Asset.describe must be loaded (builders resolving symbols need asset reads). Fails "asset-unavailable". */
   function _needReads() {
     if (typeof Asset === "undefined" || !Asset.describe) throw new Error("asset-unavailable (asset.js first)");
   }
@@ -148,6 +149,7 @@ var AssetOps = (function () {
     _assertDigits(String(cer.quote.amount), "cer.quote.amount");
     _assertId(cer.quote.asset_id, "cer.quote.asset_id");
     if (typeof o.description !== "string") throw new Error("description must be a string");
+    /* Optional id-array field -> [] when absent (whitelist/blacklist authorities + markets). Params: v, name (error label). Fails when present-but-not-an-array. */
     function arr(v, name) {
       if (v === undefined || v === null) return [];
       if (!Array.isArray(v)) throw new Error(name + " must be an array");

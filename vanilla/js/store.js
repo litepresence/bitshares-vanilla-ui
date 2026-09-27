@@ -1,4 +1,10 @@
-/* Store: tiny pub/sub + localStorage persistence. Sole settings owner. */
+/* Store: tiny pub/sub + localStorage persistence. Sole settings owner.
+ * Owns: settings envelope (network/activeNode/customNodes/theme/locale),
+ *   DEFAULT_NODES/CHAIN_IDS constants, settings+connection topics.
+ * Consumes: localStorage (readStored/saveSettings only, never the socket).
+ *   Side effects: localStorage reads/writes under SETTINGS_KEY, listener
+ *   fan-out on emit. Created by: building-vanilla-slices skill,
+ *   slice-01-shell-settings plan. */
 var Store = (function () {
   "use strict";
 
@@ -18,6 +24,8 @@ var Store = (function () {
 
   var listeners = { settings: [], connection: [] };
 
+  /* baseSettings: fresh defaults (mainnet + first node + original-blue + en).
+   *   Params: none. Returns a new settings object. Fails: never (pure). */
   function baseSettings() {
     return {
       network: "mainnet",
@@ -28,6 +36,9 @@ var Store = (function () {
     };
   }
 
+  /* readStored: raw persisted envelope or null. Params: none. Returns the
+   *   parsed object or null. Fails: never throws — missing storage, empty
+   *   slot, or bad JSON all return null. */
   function readStored() {
     try {
       if (typeof localStorage === "undefined") return null;
@@ -41,6 +52,9 @@ var Store = (function () {
     }
   }
 
+  /* loadSettings: base defaults overlaid with validated stored fields.
+   *   Params: none. Returns a fresh settings object. Fails: never throws —
+   *   unknown network/theme fall back to defaults, non-string nodes filtered. */
   function loadSettings() {
     var base = baseSettings();
     var stored = readStored();
@@ -56,6 +70,10 @@ var Store = (function () {
     return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale };
   }
 
+  /* saveSettings: merges a patch onto current settings, persists + emits.
+   *   Params: patch (object, optional — only known string/array fields apply).
+   *   Returns the merged settings object. Fails: never throws — blocked/full
+   *   storage still emits the in-memory value. */
   function saveSettings(patch) {
     var current = loadSettings();
     var next = {
@@ -91,6 +109,9 @@ var Store = (function () {
     };
   }
 
+  /* emit: fan-out to a topic's listeners (snapshot copy). Params: topic
+   *   (string), data (any). Returns nothing. Fails: never — a throwing
+   *   listener is swallowed so the store never breaks. */
   function emit(topic, data) {
     var arr = (listeners[topic] || []).slice();
     for (var i = 0; i < arr.length; i++) {

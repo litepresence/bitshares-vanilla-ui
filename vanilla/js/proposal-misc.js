@@ -3,7 +3,8 @@
  * slice-14 plan — one purpose: vesting/lists/authorities/claims, no proposal/
  * ticket code). Owns: get_vesting_balances reads (policy words joined, amounts
  *   raw), single-authority + account-validated authority reads (no chain list
- *   method exists — explicit 1.17.x ids only), claimables + requireClaimable,
+ *   method exists — explicit 1.17.x ids only), requireClaimable (empty-set
+ *   gate for claim views),
  *   THE ONLY whitelist converters (0 none / 1 whitelisted / 2 blacklisted /
  *   3 both + OR/subtract bit helpers), the op-7/32/33/37/54/55/56 builders
  *   ([opId, opData], zero fee for live fee-fill via Proposal.fee). No DOM, no
@@ -110,12 +111,6 @@ var ProposalMisc = (function () {
     _assertId(id, ACCOUNT_RE, "accountId");
     return [];
   }
-  /* Claimables: vesting rows + the op-37 note (balance objects need an explicit
-   * 1.15.x id + the OWNER-KEY signature, never account auth — ambiguity H). */
-  async function claimables(nameOrId) {
-    return { vestings: await vestings(nameOrId), owner_key_gated: true,
-      balance_note: "op-37 balance_claim needs an explicit balance id plus the balance-owner-key signature (not account auth)" };
-  }
   /* Empty claimable set -> no-claimables (views call before enabling claim). */
   function requireClaimable(rows) {
     if (!Array.isArray(rows) || !rows.length) throw new Error("no-claimables");
@@ -133,11 +128,13 @@ var ProposalMisc = (function () {
     if (!(k in map)) throw new Error("listing must be 0-3, got: " + JSON.stringify(h));
     return map[k];
   }
+  /* Listing bitfield add: ORs the white(1)/black(2) bit (0-3 range asserted on both args). */
   function listingAdd(cur, bit) {
     if (cur !== 0 && cur !== 1 && cur !== 2 && cur !== 3) throw new Error("listing must be 0-3");
     if (bit !== 1 && bit !== 2) throw new Error("bit must be 1 (white) or 2 (black)");
     return cur | bit;
   }
+  /* Listing bitfield remove: clears the white(1)/black(2) bit (range asserted; removing an absent bit is a no-op). */
   function listingRemove(cur, bit) {
     if (cur !== 0 && cur !== 1 && cur !== 2 && cur !== 3) throw new Error("listing must be 0-3");
     if (bit !== 1 && bit !== 2) throw new Error("bit must be 1 (white) or 2 (black)");
@@ -186,6 +183,7 @@ var ProposalMisc = (function () {
     return [32, { fee: _zeroFee(), creator: args.creatorId, owner: args.ownerId,
       amount: { amount: args.amountRaw, asset_id: args.assetId }, policy: _assertPolicy(args.policy) }];
   }
+  /* Op-33 vesting withdraw (NO extensions field on op 33). Returns [33, opData]. */
   function buildVestingWithdraw(args) {
     args = args || {};
     _assertId(args.ownerId, ACCOUNT_RE, "ownerId"); _assertId(args.vestingId, VESTING_RE, "vestingId");
@@ -234,7 +232,7 @@ var ProposalMisc = (function () {
     return [56, { fee: _zeroFee(), account: args.accountId, authority_to_delete: args.authorityId, extensions: [] }];
   }
 
-  return { vestings: vestings, authority: authority, authorities: authorities, claimables: claimables,
+  return { vestings: vestings, authority: authority, authorities: authorities,
     requireClaimable: requireClaimable, listingLabel: listingLabel, listingFromHuman: listingFromHuman,
     listingAdd: listingAdd, listingRemove: listingRemove,
     buildWhitelist: buildWhitelist, buildVestingCreate: buildVestingCreate, buildVestingWithdraw: buildVestingWithdraw,

@@ -180,6 +180,7 @@ var BarterUI = (function () {
       var expIso = expV.length === 16 ? expV + ":00" : expV;
       var rev = (revV === "") ? null : parseInt(revV, 10);
       if (rev !== null && (!Number.isInteger(rev) || rev < 0)) throw new Error("Review period must be a non-negative integer.");
+      /* One barter leg -> [0, opData] with NO memo key (null-memo objects die at fee time — key absent, never present-but-null). */
       function leg(fromId, toId, it) {
         // No memo key: the null-memo object shape is rejected by the node at
         // fee time (types.cpp:49 base58 assert), so legs omit memo entirely
@@ -208,6 +209,7 @@ var BarterUI = (function () {
       clearBox(out); showError(doc, out, e, "Could not build the proposal."); done();
     });
   }
+  /* Fee object -> human + symbol (Asset.describe; raw + id fallback). Returns: Promise of string. */
   async function feeText(fee) {
     try {
       var a = await Asset.describe(fee.asset_id);
@@ -299,6 +301,7 @@ var BarterUI = (function () {
     if (escV) { esc = await Account.resolve(escV); if (myGen !== gen) return; }
     clearBox(out);
     out.appendChild(el(doc, "h3", "Atomic preview"));
+    /* Append "X gives N SYM → Y" preview lines for one side. Params: side (readSide shape), givesTo (name). */
     function sideLines(side, givesTo) {
       side.items.forEach(function (it) {
         out.appendChild(el(doc, "p", side.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
@@ -312,6 +315,7 @@ var BarterUI = (function () {
     else out.appendChild(el(doc, "p", "Both sides hold every leg amount (integer check).", "muted"));
     var status = showStatus(doc, out, "Estimating leg fees…");
     var hints = [];
+    /* One leg's live op-0 fee hint appended to hints (failures degrade to "fee hint unavailable", never a throw). */
     async function legFee(fromId, toId, it) {
       var op = { fee: { amount: "0", asset_id: "1.3.0" }, from: fromId, to: toId,
         amount: { amount: it.raw, asset_id: it.id }, extensions: [] };

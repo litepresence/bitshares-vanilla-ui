@@ -17,10 +17,12 @@
  * - get_committee_members / get_committee_member_by_account /
  *   lookup_committee_member_accounts / get_committee_count
  *   <- database_api.hpp:1164-1188, registered :1576-1579
- * - get_all_workers(is_expired?) / get_workers_by_account /
- *   get_worker_count <- database_api.hpp:1201-1213, registered :1582-1584
- * - lookup_vote_ids(votes) <- database_api.hpp:1221-1233, registered
- *   :1587; lookup page limit 1000 <- application.hpp:73-75,206-208
+ * - get_all_workers(is_expired?) <- database_api.hpp:1201-1213, registered
+ *   :1582-1584 (the ONLY worker read wrapped here — get_workers_by_account
+ *   / get_worker_count / lookup_vote_ids exist on the node but no view
+ *   calls them, so they are not wrapped; see the slice-18 audit note).
+ *   Lookup page limit 1000 <- application.hpp:73-75,206-208 (_harvestIds
+ *   pages at LOOKUP_PAGE=100, LOOKUP_PAGES_MAX=10 — far under the cap).
  * - witness_object{witness_account, vote_id, total_votes u64}
  *   <- chain/witness_object.hpp:35-40; committee_member_object{
  *   committee_member_account, vote_id, total_votes u64}
@@ -117,20 +119,6 @@ var Vote = (function () {
    * only, undefined = node default (no filter). Lists use false. */
   function getAllWorkers(isExpired) {
     return _dbCall("get_all_workers", isExpired === undefined ? [] : [!!isExpired]);
-  }
-
-  /* Worker objects created by one account (name or 1.2.x id, verbatim). */
-  function getWorkersByAccount(nameOrId) {
-    return _dbCall("get_workers_by_account", [nameOrId]);
-  }
-
-  /* Worker count (uint64, verbatim). */
-  function getWorkerCount() { return _dbCall("get_worker_count", []); }
-
-  /* Resolve "type:instance" vote ids to their objects (witness / committee /
-   * worker variants, verbatim). Params: voteIds array of "t:i" strings. */
-  function lookupVoteIds(voteIds) {
-    return _dbCall("lookup_vote_ids", [voteIds || []]);
   }
 
   /* Batch-read object space 1.6.x / 1.5.x by count via get_objects.
@@ -377,9 +365,6 @@ var Vote = (function () {
     getCommitteeMemberByAccount: getCommitteeMemberByAccount,
     lookupCommitteeMemberAccounts: lookupCommitteeMemberAccounts,
     getAllWorkers: getAllWorkers,
-    getWorkersByAccount: getWorkersByAccount,
-    getWorkerCount: getWorkerCount,
-    lookupVoteIds: lookupVoteIds,
     lists: lists,
     currentVotes: currentVotes,
     fee: fee

@@ -19,7 +19,6 @@ var Explorer = (function () {
   var ASSETS_PAGE = 25; /* asset page size (#1 Assets.jsx 25/page) */
   var OBJECT_RE = /^1\.(\d+)\.(\d+)$/;
   var ASSET_ID_RE = /^1\.3\.\d+$/;
-  var TXID_RE = /^[0-9a-fA-F]{40}$/;
 
   /* Op index -> short name, FC_REFLECT order <- operations.hpp:56-133. */
   var OP_NAMES = ["transfer", "limit_order_create", "limit_order_cancel", "call_order_update",
@@ -183,15 +182,6 @@ var Explorer = (function () {
       signatures: Array.isArray(t.signatures) ? t.signatures.slice() : [] };
   }
 
-  /* Best-effort hash lookup (recent unexpired only, by consensus design).
-   * Fails "tx-expired-or-unknown" on null/bad input. */
-  async function recentTxById(txid) {
-    if (typeof txid !== "string" || !TXID_RE.test(txid)) throw new Error("tx-expired-or-unknown");
-    var t = await _dbCall("get_recent_transaction_by_id", [txid]);
-    if (!t) throw new Error("tx-expired-or-unknown");
-    return { txid: txid, tx: t };
-  }
-
   /* One asset-list page (raw extended_asset_objects). lower: bound symbol
    * ("" from top); limit 1..25. */
   function assetsPage(lower, limit) {
@@ -199,9 +189,6 @@ var Explorer = (function () {
     if (!(lim >= 1)) lim = ASSETS_PAGE;
     return _dbCall("list_assets", [typeof lower === "string" ? lower : "", Math.min(lim, ASSETS_PAGE)]);
   }
-
-  /* Total asset count (uint, verbatim). */
-  function assetCount() { return _dbCall("get_asset_count", []); }
 
   /* One asset + bitasset/dynamic joins. Absent bitasset_data_id yields
    * {is_smartcoin: false} (NOT error). Fails "unknown-asset" on null. */
@@ -327,7 +314,7 @@ var Explorer = (function () {
   }
 
   return { head: head, recentBlocks: recentBlocks, block: block, tx: tx,
-    recentTxById: recentTxById, assetsPage: assetsPage, assetCount: assetCount,
+    assetsPage: assetsPage,
     asset: asset, feeds: feeds, resolveObject: resolveObject, search: search };
 })();
 

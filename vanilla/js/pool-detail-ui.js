@@ -21,6 +21,7 @@ var PoolDetailUI = (function () {
   "use strict";
   var gen = 0;
   var OP_NAMES = { 59: "create", 60: "delete", 61: "deposit", 62: "withdraw", 63: "exchange" };
+  /* Shared-_ui accessor: PoolUI._ui (pool-ui.js loads first); throws when the backend is missing. */
   function U() {
     if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error("Pool backend missing: pool-ui.js failed to load.");
     return PoolUI._ui;

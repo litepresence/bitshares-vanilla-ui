@@ -89,11 +89,13 @@ var BorrowUI = (function () {
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
     touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
   }
+  /* Raw amount -> {text (human + sym, or raw + id fallback), raw}. Params: raw, prec (number|null), sym, id. */
   function amt(raw, prec, sym, id) {
     if (typeof prec === "number" && /^-?\d+$/.test(String(raw)))
       return { text: Format.formatAmount(String(raw), prec) + (sym ? " " + sym : ""), raw: String(raw) };
     return { text: String(raw) + " (" + id + ")", raw: String(raw) };
   }
+  /* Chain head block number (observation marker for result panels, never a txid). Returns: Promise of int. */
   async function headBlock() {
     return (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
   }
@@ -199,6 +201,7 @@ var BorrowUI = (function () {
         if (!pos) throw new Error("unknown-position");
         var cPrec = (pos.coll_prec === null || pos.coll_prec === undefined) ? (await Asset.describe(pos.coll_id)).precision : pos.coll_prec;
         var dPrec = (pos.debt_prec === null || pos.debt_prec === undefined) ? (await Asset.describe(pos.debt_id)).precision : pos.debt_prec;
+        /* Signed decimal input -> signed raw int string ("-1.5" -> "-" + parseAmount("1.5")). Params: v (input), prec. */
         function signed(v, prec) {
           v = String(v || "0").trim() || "0";
           var neg = v.charAt(0) === "-";
