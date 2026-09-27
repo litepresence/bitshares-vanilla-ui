@@ -1,10 +1,13 @@
-/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19).
+/* tx.js — graphene serializer subset + tx build/sign/broadcast (ops 0-2, 6, 10-15, 19, 25-28, 49, 50, 52).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
  * (op 1), limit_order_cancel (op 2), account_update (op 6, voting only),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
- * (op 15) and asset_publish_feed (op 19) transactions, unsigned-tx
+ * (op 15), asset_publish_feed (op 19), withdraw_permission_create (op 25),
+ * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
+ * withdraw_permission_delete (op 28), htlc_create (op 49), htlc_redeem
+ * (op 50) and htlc_extend (op 52) transactions, unsigned-tx
  * construction (single- and multi-op), fee lookup, local signing dispatch,
  * and broadcast with inclusion proof. Later slices extend this file with
  * further ops — new code appends here, never forks a second serializer.
@@ -99,6 +102,40 @@
  *                              + #4 .../protocol/asset_ops.hpp:462-480 (struct)
  * - ops 10-15, 19 ids       <- #4 .../protocol/operations.hpp:66-75
  *                              (/* 10 *\/ … /* 19 *\/)
+ * - serializeTimestamp       <- #3 bitshares-api.js:1959-1973 (ISO-with-Z /
+ *                              unix-seconds -> u32 LE; vanilla throws on
+ *                              missing/unparseable input instead of defaulting
+ *                              0 — loud failure, same rule as precision/MCR)
+ * - assertUint32             <- local guard (writeUint32LE folds via >>> 0,
+ *                              so it can not reject floats/strings; the seven
+ *                              ops below need loud integer checks)
+ * - serializeHtlcHash        <- #3 bitshares-api.js:3104-3132 (variant varint
+ *                              + STRICT length check, 32 iff type 2 else 20)
+ *                              + #4 .../protocol/htlc.hpp:33-43 (variant order
+ *                              ripemd160/sha1/sha256/hash160)
+ * - serializeHtlcCreateOp    <- #3 bitshares-api.js:3094-3137
+ *                              + #4 .../protocol/htlc.hpp:226-227 (FC order)
+ * - serializeHtlcRedeemOp    <- #3 bitshares-api.js:3143-3151
+ *                              + #4 .../protocol/htlc.hpp:228
+ * - serializeHtlcExtendOp    <- #3 bitshares-api.js:3171-3179
+ *                              + #4 .../protocol/htlc.hpp:231
+ * - serializeWithdrawPermissionCreateOp
+ *                            <- #3 bitshares-api.js:2711-2721
+ *                              + #4 .../protocol/withdraw_permission.hpp:176-178
+ * - serializeWithdrawPermissionUpdateOp (TRAP: period_start_time BEFORE
+ *   periods_until_expiration — unlike op 25)
+ *                            <- #3 bitshares-api.js:2728-2739
+ *                              + #4 .../protocol/withdraw_permission.hpp:179-182
+ * - serializeWithdrawPermissionClaimOp
+ *                            <- #3 bitshares-api.js:2745-2759
+ *                              + #4 .../protocol/withdraw_permission.hpp:183-184
+ * - serializeWithdrawPermissionDeleteOp
+ *                            <- #3 bitshares-api.js:2765-2772
+ *                              + #4 .../protocol/withdraw_permission.hpp:185-187
+ * - op dispatch 25-28, 49/50/52
+ *                            <- #3 bitshares-api.js:1547-1554, :1595-1604
+ *                              (51/53 VIRTUAL — never dispatched, see the
+ *                              dispatch-site comment)
  * - fee placeholder + get_required_fees shape [[[opId, opData]], assetId]
  *                          <- #3 bitshares-api.js:761-788 (getRequiredFee)
  *                             + :795-805 (broadcastTransaction fee fill)
@@ -155,6 +192,30 @@
  * - price order (base)(quote), asset order (amount)(asset_id)
  *   <- .../protocol/asset.hpp:309-310
  * - ops 10-19 ids <- .../protocol/operations.hpp:66-75
+ * - htlc_create order (fee)(from)(to)(amount)(preimage_hash)
+ *   (preimage_size)(claim_period_seconds)(extensions)
+ *   <- .../protocol/htlc.hpp:226-227
+ * - htlc_redeem order (fee)(htlc_id)(redeemer)(preimage)(extensions)
+ *   <- .../protocol/htlc.hpp:228
+ * - htlc_extend order (fee)(htlc_id)(update_issuer)(seconds_to_add)(extensions)
+ *   <- .../protocol/htlc.hpp:231
+ * - withdraw_permission_create order (fee)(withdraw_from_account)
+ *   (authorized_account)(withdrawal_limit)(withdrawal_period_sec)
+ *   (periods_until_expiration)(period_start_time)
+ *   <- .../protocol/withdraw_permission.hpp:176-178
+ * - withdraw_permission_update order (fee)(withdraw_from_account)
+ *   (authorized_account)(permission_to_update)(withdrawal_limit)
+ *   (withdrawal_period_sec)(period_start_time)(periods_until_expiration)
+ *   <- .../protocol/withdraw_permission.hpp:179-182 (NOTE the trap:
+ *   period_start_time comes BEFORE periods_until_expiration, unlike op 25)
+ * - withdraw_permission_claim order (fee)(withdraw_permission)
+ *   (withdraw_from_account)(withdraw_to_account)(amount_to_withdraw)(memo)
+ *   <- .../protocol/withdraw_permission.hpp:183-184
+ * - withdraw_permission_delete order (fee)(withdraw_from_account)
+ *   (authorized_account)(withdrawal_permission)
+ *   <- .../protocol/withdraw_permission.hpp:185-187
+ * - ops 25-28, 49-53 ids <- .../protocol/operations.hpp:81-84, :105-109
+ *   (51/53 VIRTUAL — never signed, never dispatched)
  * - get_required_fees <- .../app/database_api.hpp:1313
  * - broadcast_transaction_with_callback
  *   <- .../app/api.hpp:360
@@ -732,6 +793,184 @@ var Tx = (function () {
     ]);
   }
 
+  /* time_point_sec (uint32 unix seconds). Accepts an ISO "YYYY-MM-DDTHH:MM:SS"
+   * string (parsed as UTC, trailing Z added when missing — same convention as
+   * serializeTransaction) or a unix-seconds number. Integer-only; throws on
+   * missing/unparseable/out-of-range input (deliberate: #3 defaults those to
+   * 0, vanilla fails loudly — same rule as precision/MCR). */
+  function serializeTimestamp(ts) {
+    var secs;
+    if (typeof ts === "number") {
+      secs = Math.floor(ts);
+    } else if (typeof ts === "string") {
+      var iso = /[Zz]$/.test(ts) ? ts : ts + "Z";
+      secs = Math.floor(new Date(iso).getTime() / 1000);
+    } else {
+      throw new Error("timestamp must be an ISO string or unix seconds, got: " + JSON.stringify(ts));
+    }
+    assertUint32(secs, "timestamp");
+    return writeUint32LE(secs);
+  }
+
+  /* Loud u32 guard for the HTLC/withdraw fields below. writeUint32LE folds
+   * via >>> 0 and can not reject floats or digit strings (1.5 -> 1, "3600"
+   * -> 3600); these ops fail loudly instead so a caller bug never becomes
+   * silently-wrong lock/period bytes. */
+  function assertUint32(value, name) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) {
+      throw new Error(name + " must be an integer 0..4294967295, got: " + JSON.stringify(value));
+    }
+  }
+
+  /* HTLC hash static_variant [typeId, hexStr]: varint typeId + fixed raw
+   * bytes with NO length prefix (fc static_variant + fixed-size hash). Wire
+   * ids per #4 htlc.hpp:33-43: 0 = ripemd160, 1 = sha1, 2 = sha256,
+   * 3 = hash160; 32 bytes iff type 2, else 20. STRICT length check — a
+   * padded/truncated hash locks funds until timeout (#3 :3121-3130). Accepts
+   * ids 0-3; the Task-2 builder allow-lists sha256 + ripemd160 only
+   * (sha1/hash160 unsupported by design — no vendored RIPEMD-160, no
+   * trusted sha1; see slice-11 plan ambiguity A). */
+  function serializeHtlcHash(pair) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      throw new Error("htlc preimage_hash must be [typeId, hex] (e.g. [2, \"<64-char sha256 hex>\"])");
+    }
+    var typeId = pair[0];
+    if (!Number.isInteger(typeId) || typeId < 0 || typeId > 3) {
+      throw new Error("htlc preimage_hash type must be 0..3 " +
+        "(0=ripemd160, 1=sha1, 2=sha256, 3=hash160), got: " + JSON.stringify(typeId));
+    }
+    var want = (typeId === 2) ? 32 : 20;
+    var bytes = hexToBytes(pair[1]);
+    if (bytes.length !== want) {
+      throw new Error("htlc preimage_hash length " + bytes.length +
+        " bytes does not match hash type " + typeId + " (expected " + want + " bytes)");
+    }
+    return concatBytes([varintUint32(typeId), bytes]);
+  }
+
+  /* htlc_create (op 49) in #4 FC order: fee, from, to, amount,
+   * preimage_hash (static_variant), preimage_size u16 (UTF-8 BYTE length of
+   * the preimage, not char length — set by the Task-2 builder),
+   * claim_period_seconds u32, empty extensions (memo-in-HTLC deferred per
+   * slice-11 plan ambiguity C). */
+  function serializeHtlcCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("htlc_create op must be an object");
+    assertUint32(op.claim_period_seconds, "claim_period_seconds");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.from),
+      serializeObjectId(op.to),
+      serializeAsset(op.amount),
+      serializeHtlcHash(op.preimage_hash),
+      writeUint16LE(op.preimage_size),
+      writeUint32LE(op.claim_period_seconds),
+      varintUint32(0)
+    ]);
+  }
+
+  /* htlc_redeem (op 50) in #4 FC order: fee, htlc_id (1.16.x), redeemer,
+   * preimage bytes (caller passes hex — hex-decoded here with a varint
+   * length prefix, matching #1's Buffer->hex->bytes round trip), empty
+   * extensions. */
+  function serializeHtlcRedeemOp(op) {
+    if (!op || typeof op !== "object") throw new Error("htlc_redeem op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.htlc_id),
+      serializeObjectId(op.redeemer),
+      serializeBytesHex(op.preimage),
+      varintUint32(0)
+    ]);
+  }
+
+  /* htlc_extend (op 52) in #4 FC order: fee, htlc_id (1.16.x),
+   * update_issuer, seconds_to_add u32, empty extensions. */
+  function serializeHtlcExtendOp(op) {
+    if (!op || typeof op !== "object") throw new Error("htlc_extend op must be an object");
+    assertUint32(op.seconds_to_add, "seconds_to_add");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.htlc_id),
+      serializeObjectId(op.update_issuer),
+      writeUint32LE(op.seconds_to_add),
+      varintUint32(0)
+    ]);
+  }
+
+  /* withdraw_permission_create (op 25) in #4 FC order: fee,
+   * withdraw_from_account, authorized_account, withdrawal_limit,
+   * withdrawal_period_sec u32, periods_until_expiration u32,
+   * period_start_time (time_point_sec). No extensions field exists. */
+  function serializeWithdrawPermissionCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("withdraw_permission_create op must be an object");
+    assertUint32(op.withdrawal_period_sec, "withdrawal_period_sec");
+    assertUint32(op.periods_until_expiration, "periods_until_expiration");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.withdraw_from_account),
+      serializeObjectId(op.authorized_account),
+      serializeAsset(op.withdrawal_limit),
+      writeUint32LE(op.withdrawal_period_sec),
+      writeUint32LE(op.periods_until_expiration),
+      serializeTimestamp(op.period_start_time)
+    ]);
+  }
+
+  /* withdraw_permission_update (op 26) in #4 FC order: fee,
+   * withdraw_from_account, authorized_account, permission_to_update (1.12.x),
+   * withdrawal_limit, withdrawal_period_sec u32, period_start_time,
+   * periods_until_expiration u32. ORDER TRAP (Reference #7): period_start_time
+   * comes BEFORE periods_until_expiration here — the reverse of op 25.
+   * Swapping them builds validly-signed bytes the node rejects (or worse,
+   * misreads), so the order below mirrors the FC_REFLECT line exactly. */
+  function serializeWithdrawPermissionUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("withdraw_permission_update op must be an object");
+    assertUint32(op.withdrawal_period_sec, "withdrawal_period_sec");
+    assertUint32(op.periods_until_expiration, "periods_until_expiration");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.withdraw_from_account),
+      serializeObjectId(op.authorized_account),
+      serializeObjectId(op.permission_to_update),
+      serializeAsset(op.withdrawal_limit),
+      writeUint32LE(op.withdrawal_period_sec),
+      serializeTimestamp(op.period_start_time),
+      writeUint32LE(op.periods_until_expiration)
+    ]);
+  }
+
+  /* withdraw_permission_claim (op 27) in #4 FC order: fee,
+   * withdraw_permission (1.12.x), withdraw_from_account, withdraw_to_account,
+   * amount_to_withdraw, memo?. Fee payer is the CLAIMANT
+   * (withdraw_to_account). Memo is optional (0x00 when absent — byte-identical
+   * to #3's if/else branch); v1 sends it plaintext with a UI warning (see
+   * slice-11 plan scope decision). */
+  function serializeWithdrawPermissionClaimOp(op) {
+    if (!op || typeof op !== "object") throw new Error("withdraw_permission_claim op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.withdraw_permission),
+      serializeObjectId(op.withdraw_from_account),
+      serializeObjectId(op.withdraw_to_account),
+      serializeAsset(op.amount_to_withdraw),
+      serializeOptional(op.memo === undefined ? null : op.memo, serializeMemo)
+    ]);
+  }
+
+  /* withdraw_permission_delete (op 28) in #4 FC order: fee,
+   * withdraw_from_account, authorized_account, withdrawal_permission
+   * (1.12.x). Fee is 0 (free cancel) — enforced read-side at confirm time,
+   * not here. No extensions field exists. */
+  function serializeWithdrawPermissionDeleteOp(op) {
+    if (!op || typeof op !== "object") throw new Error("withdraw_permission_delete op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.withdraw_from_account),
+      serializeObjectId(op.authorized_account),
+      serializeObjectId(op.withdrawal_permission)
+    ]);
+  }
+
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
    * op count + (op id varint + op bytes)* + extension count. Signatures are
    * NOT part of the signed bytes. Expiration "YYYY-MM-DDTHH:MM:SS" parses as
@@ -758,7 +997,18 @@ var Tx = (function () {
       else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
       else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
       else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
-      else throw new Error("tx.js supports ops 0-2, 6, 10-15 and 19, got op " + opType);
+      else if (opType === 25) parts.push(serializeWithdrawPermissionCreateOp(opData));
+      else if (opType === 26) parts.push(serializeWithdrawPermissionUpdateOp(opData));
+      else if (opType === 27) parts.push(serializeWithdrawPermissionClaimOp(opData));
+      else if (opType === 28) parts.push(serializeWithdrawPermissionDeleteOp(opData));
+      else if (opType === 49) parts.push(serializeHtlcCreateOp(opData));
+      else if (opType === 50) parts.push(serializeHtlcRedeemOp(opData));
+      else if (opType === 52) parts.push(serializeHtlcExtendOp(opData));
+      // Ops 51 (htlc_redeemed) and 53 (htlc_refund) are VIRTUAL (#4
+      // operations.hpp:107,109; validate() asserts !"virtual operation" in
+      // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
+      // they are NEVER dispatched here. Do not "complete" this list.
+      else throw new Error("tx.js supports ops 0-2, 6, 10-15, 19, 25-28, 49, 50 and 52, got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -1020,7 +1270,10 @@ var Tx = (function () {
       transfer: 0, limit_order_create: 1, limit_order_cancel: 2, account_update: 6,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
-      asset_publish_feed: 19
+      asset_publish_feed: 19,
+      withdraw_permission_create: 25, withdraw_permission_update: 26,
+      withdraw_permission_claim: 27, withdraw_permission_delete: 28,
+      htlc_create: 49, htlc_redeem: 50, htlc_extend: 52
     },
     fee: fee,
     feeMulti: feeMulti,
@@ -1065,6 +1318,16 @@ var Tx = (function () {
       serializeAssetIssueOp: serializeAssetIssueOp,
       serializeAssetReserveOp: serializeAssetReserveOp,
       serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
+      serializeTimestamp: serializeTimestamp,
+      assertUint32: assertUint32,
+      serializeHtlcHash: serializeHtlcHash,
+      serializeHtlcCreateOp: serializeHtlcCreateOp,
+      serializeHtlcRedeemOp: serializeHtlcRedeemOp,
+      serializeHtlcExtendOp: serializeHtlcExtendOp,
+      serializeWithdrawPermissionCreateOp: serializeWithdrawPermissionCreateOp,
+      serializeWithdrawPermissionUpdateOp: serializeWithdrawPermissionUpdateOp,
+      serializeWithdrawPermissionClaimOp: serializeWithdrawPermissionClaimOp,
+      serializeWithdrawPermissionDeleteOp: serializeWithdrawPermissionDeleteOp,
       serializeTransaction: serializeTransaction
     }
   };
