@@ -23,7 +23,8 @@ var Store = (function () {
       network: "mainnet",
       activeNode: DEFAULT_NODES.mainnet[0],
       customNodes: [],
-      theme: "original-blue"
+      theme: "original-blue",
+      locale: "en"
     };
   }
 
@@ -51,7 +52,8 @@ var Store = (function () {
       : [];
     var fallbackNode = network === "testnet" ? DEFAULT_NODES.testnet[0] : DEFAULT_NODES.mainnet[0];
     var activeNode = (typeof stored.activeNode === "string" && stored.activeNode) ? stored.activeNode : fallbackNode;
-    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme };
+    var locale = (typeof stored.locale === "string" && stored.locale) ? stored.locale : base.locale;
+    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale };
   }
 
   function saveSettings(patch) {
@@ -60,13 +62,15 @@ var Store = (function () {
       network: current.network,
       activeNode: current.activeNode,
       customNodes: current.customNodes,
-      theme: current.theme
+      theme: current.theme,
+      locale: current.locale
     };
     if (patch && typeof patch === "object") {
       if (typeof patch.network === "string") next.network = patch.network;
       if (typeof patch.activeNode === "string") next.activeNode = patch.activeNode;
       if (Array.isArray(patch.customNodes)) next.customNodes = patch.customNodes;
       if (typeof patch.theme === "string") next.theme = patch.theme;
+      if (typeof patch.locale === "string") next.locale = patch.locale;
     }
     try {
       if (typeof localStorage !== "undefined") {
@@ -99,9 +103,19 @@ var Store = (function () {
     emit("connection", status || {});
   }
 
+  /* Raw explicitly-stored locale (or null): lets i18n.js prefer an
+   * envelope value the user actually chose over its legacy standalone key
+   * (loadSettings() merges base defaults, so it cannot make that
+   * distinction). Slice-17. */
+  function storedLocale() {
+    var stored = readStored();
+    return (stored && typeof stored.locale === "string" && stored.locale) ? stored.locale : null;
+  }
+
   return {
     loadSettings: loadSettings,
     saveSettings: saveSettings,
+    storedLocale: storedLocale,
     subscribe: subscribe,
     emitConnection: emitConnection,
     DEFAULT_NODES: DEFAULT_NODES,

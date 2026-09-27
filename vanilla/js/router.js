@@ -4,7 +4,21 @@ var Router = (function () {
 
   var view = null;
 
-  var NOT_PORTED_SUFFIX = " \u2014 not yet ported; tracked in slice N";
+  /* Batch-1 i18n (slice-17 Task 2): shell chrome strings only (404, home,
+   * not-ported suffix). Route titles + per-view placeholders stay hardcoded
+   * English for later per-view batches. Same t() fallback shape as
+   * settings.js: I18n when loaded, verbatim default otherwise. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
+  /* Function (not const): the suffix re-resolves on every render so a locale
+   * switch re-renders it without reload. Default holds a literal em-dash to
+   * match en.json verbatim (drift check compares source text, not \\uXXXX). */
+  function notPortedSuffix() { return t("shell.not_ported_suffix", " — not yet ported; tracked in slice N"); }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -21,15 +35,16 @@ var Router = (function () {
       if (!root) return;
       root.innerHTML =
         '<div class="wrap"><h1>' + escapeHtml(title) + "</h1>" +
-        '<p class="muted">' + escapeHtml(title + NOT_PORTED_SUFFIX) + "</p></div>";
+        '<p class="muted">' + escapeHtml(title + notPortedSuffix()) + "</p></div>";
     };
   }
 
   function render404(root) {
     if (!root) return;
     root.innerHTML =
-      '<div class="wrap"><h1>Page Not Found</h1>' +
-      '<p class="muted">Unknown route. <a href="#/">Go to Dashboard</a></p></div>';
+      '<div class="wrap"><h1>' + escapeHtml(t("shell.page_not_found", "Page Not Found")) + "</h1>" +
+      '<p class="muted">' + escapeHtml(t("shell.unknown_route", "Unknown route. ")) +
+      '<a href="#/">' + escapeHtml(t("shell.go_dashboard", "Go to Dashboard")) + "</a></p></div>";
   }
 
   function renderSettings(root, params) {
@@ -59,9 +74,9 @@ var Router = (function () {
     }
     if (!root) return;
     root.innerHTML =
-      '<div class="wrap"><h1>Dashboard</h1>' +
-      '<p class="muted">Opening the market… <a href="#/market/' +
-      escapeHtml(target) + '">Go to ' + escapeHtml(target) + "</a></p></div>";
+      '<div class="wrap"><h1>' + escapeHtml(t("shell.dashboard", "Dashboard")) + "</h1>" +
+      '<p class="muted">' + escapeHtml(t("shell.opening_market", "Opening the market… ")) + '<a href="#/market/' +
+      escapeHtml(target) + '">' + escapeHtml(t("shell.go_to", "Go to ")) + escapeHtml(target) + "</a></p></div>";
   }
 
   function renderMarketPage(root, params) {

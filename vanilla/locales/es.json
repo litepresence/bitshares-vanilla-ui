@@ -1,0 +1,269 @@
+{
+  "_meta": {
+    "version": 1,
+    "untranslated": false,
+    "translated": [
+      "nav.account",
+      "nav.dashboard",
+      "nav.exchange",
+      "nav.explorer",
+      "nav.settings",
+      "nav.transfer",
+      "nav.voting",
+      "settings.add",
+      "settings.connecting",
+      "settings.down",
+      "settings.err_dup",
+      "settings.err_wss",
+      "settings.offline",
+      "settings.probe_all",
+      "settings.remove",
+      "settings.retry",
+      "settings.select",
+      "settings.selected",
+      "settings.th_latency",
+      "settings.th_node",
+      "settings.th_status",
+      "settings.theme_label",
+      "settings.title",
+      "shell.badge_initial",
+      "shell.dashboard",
+      "shell.go_dashboard",
+      "shell.go_to",
+      "shell.menu",
+      "shell.not_ported_suffix",
+      "shell.opening_market",
+      "shell.page_not_found",
+      "shell.unknown_route"
+    ],
+    "provenance": {
+      "nav.account": "B1#1:header.account es",
+      "nav.dashboard": "B1#1:header.dashboard es; EN-delta: #1 EN is 'Portfolio'",
+      "nav.exchange": "B1#1:header.exchange es",
+      "nav.explorer": "B1#1:header.explorer es; EN-delta: #1 EN is 'Explore'",
+      "nav.settings": "B1#1:header.settings es verbatim (odd plural spelling kept as #1-verbatim)",
+      "nav.transfer": "B1#1-part:transfer.header es 'Detalles de transferencia' (noun); fresh-form",
+      "nav.voting": "fresh:standard Spanish; REJECT B1#1:voting.title es 'Voting' (untranslated-stale); 2nd opinion B2:GovernanceActions title es 'Votación'",
+      "settings.add": "B1#1-part:settings.add_api es 'Añadir nodo'",
+      "settings.connecting": "fresh; LOAD-BEARING: settings.js:236 compares the 'down' literal -- Task 2 must compare canonical ids, never translated text",
+      "settings.down": "fresh; LOAD-BEARING: same settings.js:236 note as connecting",
+      "settings.err_dup": "fresh:no #1 equivalent",
+      "settings.err_wss": "fresh:no #1 equivalent",
+      "settings.offline": "fresh:no #1 equivalent",
+      "settings.probe_all": "fresh:standard verb; B1#1:connection.manual_ping es 'Ir a ping nodos' is a different string",
+      "settings.remove": "B1#1:account.perm.remove_text es; 2nd opinion B2 'Eliminar'; REJECT B1#1:settings.remove es 'retirar' (case-mismatched, likely stale)",
+      "settings.retry": "B1#1:app_init.retry es",
+      "settings.select": "B2:selectAll/select pattern; REJECT B1#1:registration.select es 'Elige' (register mismatch for a button label)",
+      "settings.selected": "fresh:standard participle (masculine, implied 'nodo')",
+      "settings.th_latency": "fresh:standard tech term; REJECT B1#1:footer.latency es 'Estado latente' (mistranslation)",
+      "settings.th_node": "B1#1-part:settings.active_node es 'Nodo activo'",
+      "settings.th_status": "B1#1:gateway.status es",
+      "settings.theme_label": "B1#1:settings.themes es 'Tema'; trailing space preserved verbatim",
+      "settings.title": "B1#1:header.settings es verbatim, same as nav.settings",
+      "shell.badge_initial": "fresh; consistent with settings.connecting",
+      "shell.dashboard": "same source as nav.dashboard",
+      "shell.go_dashboard": "fresh; consistent with nav.dashboard 'Tablero'",
+      "shell.go_to": "fresh; trailing space preserved",
+      "shell.menu": "fresh:standard",
+      "shell.not_ported_suffix": "fresh; 'slice N' literal rendered as 'segmento N'; leading space preserved",
+      "shell.opening_market": "fresh; trailing space preserved",
+      "shell.page_not_found": "fresh; B1#1-adj:page404.page_not_found_title es '404 Pagina no encontrada' (EN differs: '404 page not found')",
+      "shell.unknown_route": "fresh; trailing space preserved"
+    }
+  },
+  "nav": {
+    "dashboard": "Tablero",
+    "exchange": "Intercambio",
+    "account": "Cuenta",
+    "transfer": "Transferencia",
+    "explorer": "Explorador",
+    "voting": "Votación",
+    "settings": "Configuraciónes"
+  },
+  "settings": {
+    "title": "Configuraciónes",
+    "network_mainnet": "mainnet",
+    "network_testnet": "testnet",
+    "th_node": "Nodo",
+    "th_latency": "Latencia",
+    "th_status": "Estado",
+    "remove": "Eliminar",
+    "select": "Seleccionar",
+    "selected": "Seleccionado",
+    "probe_all": "Probar todos",
+    "offline": "Todos los nodos están inaccesibles. Compruebe su conexión e inténtelo de nuevo.",
+    "retry": "Reintentar",
+    "custom_placeholder": "wss://…",
+    "add": "Añadir",
+    "err_wss": "Solo se permiten URLs wss://.",
+    "err_dup": "Nodo ya listado.",
+    "theme_label": "Tema ",
+    "theme_original_blue": "original-blue",
+    "theme_light": "light",
+    "theme_dark": "dark",
+    "pending": "…",
+    "dash": "—",
+    "connecting": "conectando",
+    "down": "caído"
+  },
+  "shell": {
+    "brand": "BitShares",
+    "menu": "Menú",
+    "badge_initial": "conectando…",
+    "not_ported_suffix": " — aún no portado; registrado en el segmento N",
+    "page_not_found": "Página no encontrada",
+    "unknown_route": "Ruta desconocida. ",
+    "go_dashboard": "Ir al Tablero",
+    "dashboard": "Tablero",
+    "opening_market": "Abriendo el mercado… ",
+    "go_to": "Ir a "
+  },
+  "account": {
+    "title": "Account",
+    "s1": "No balances.",
+    "s2": "No open orders.",
+    "s3": "No recent activity.",
+    "s4": "My Account",
+    "s5": "Wallet is locked. Enter your password to view your account.",
+    "s6": "Unlock",
+    "s7": "Balances"
+  },
+  "assets_feed": {
+    "title": "Publish Feed",
+    "s1": "—"
+  },
+  "assets_manage": {
+    "title": "Create Asset"
+  },
+  "asset_ops": {
+    "title": "Asset"
+  },
+  "assets": {
+    "title": "Assets"
+  },
+  "barter": {
+    "title": "Barter",
+    "s1": "Broadcasting…"
+  },
+  "borrow": {
+    "title": "Borrow"
+  },
+  "credit_detail": {
+    "title": "Credit Offer"
+  },
+  "credit": {
+    "title": "Credit Offer",
+    "s1": "Broadcasting…"
+  },
+  "debit": {
+    "title": "Direct Debit",
+    "s1": "signing…",
+    "s2": "Wallet is locked.",
+    "s3": "broadcasting…"
+  },
+  "explorer_assets": {
+    "title": "Asset",
+    "s1": "—",
+    "s2": "unavailable (quote precision unknown)",
+    "s3": "unavailable"
+  },
+  "explorer_blocks": {
+    "title": "Block"
+  },
+  "explorer": {
+    "title": "Explorer"
+  },
+  "gateway": {
+    "title": "Deposit / Withdraw",
+    "s1": "Gateway status thread"
+  },
+  "htlc": {
+    "title": "HTLC",
+    "s1": "Custom…",
+    "s2": "Broadcasting…",
+    "s3": "Checking…",
+    "s4": "Type the preimage to check it against the locked hash.",
+    "s5": "No match — the node would reject this preimage."
+  },
+  "market_book": {
+    "title": "Exchange",
+    "s1": "Spread — (empty book side)"
+  },
+  "market_charts": {
+    "title": "Exchange"
+  },
+  "market_orders": {
+    "title": "Exchange"
+  },
+  "market": {
+    "title": "Exchange"
+  },
+  "misc": {
+    "title": "Invoice"
+  },
+  "notify": {
+    "title": "Price Alerts",
+    "s1": "Enter two different symbols, e.g. BTS and USD.",
+    "s2": "Enter a price like 1.234.",
+    "s3": "Could not compare against the latest price.",
+    "s4": "Could not save this rule (check the price)."
+  },
+  "pool_detail": {
+    "title": "Liquidity Pool",
+    "s1": "No pool history yet.",
+    "s2": "Pool history unavailable (chain-only; no external index).",
+    "s3": "Withdrawal fee: keep",
+    "s4": "Withdrawal fee: set 0 (only allowed change)"
+  },
+  "swap": {
+    "title": "Swap"
+  },
+  "pools": {
+    "title": "Liquidity Pools",
+    "s1": "Broadcasting…"
+  },
+  "proposals_misc": {
+    "title": "Proposal"
+  },
+  "proposals_ticket": {
+    "title": "Tickets"
+  },
+  "proposals": {
+    "title": "Proposals",
+    "s1": "Open",
+    "s2": "Broadcasting…"
+  },
+  "samet": {
+    "title": "Same-T Funds"
+  },
+  "tickets": {
+    "title": "Tickets"
+  },
+  "trade": {
+    "title": "Exchange",
+    "s1": "Broadcasting…",
+    "s2": "Broadcasting cancel…"
+  },
+  "transfer": {
+    "title": "Transfer",
+    "s1": "Broadcasting…"
+  },
+  "vesting": {
+    "title": "Vesting"
+  },
+  "voting": {
+    "title": "Voting",
+    "s1": "Enter a proxy account name or id.",
+    "s2": "Unknown account."
+  },
+  "wallet": {
+    "title": "Wallet",
+    "s1": "Wallet backend missing: js/wallet.js failed to load.",
+    "s2": "Wallet is unlocked.",
+    "s3": "Wallet is locked. Enter your password to unlock.",
+    "s4": "Create Wallet (Brainkey)",
+    "s5": "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.",
+    "s6": "Confirm you wrote the brainkey down first.",
+    "s7": "Password required: enter a non-empty password."
+  }
+}

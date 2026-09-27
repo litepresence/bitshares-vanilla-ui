@@ -1,0 +1,202 @@
+{
+  "_meta": {
+    "version": 1,
+    "untranslated": true,
+    "translated": []
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "exchange": "Exchange",
+    "account": "Account",
+    "transfer": "Transfer",
+    "explorer": "Explorer",
+    "voting": "Voting",
+    "settings": "Settings"
+  },
+  "settings": {
+    "title": "Settings",
+    "network_mainnet": "mainnet",
+    "network_testnet": "testnet",
+    "th_node": "Node",
+    "th_latency": "Latency",
+    "th_status": "Status",
+    "remove": "Remove",
+    "select": "Select",
+    "selected": "Selected",
+    "probe_all": "Probe all",
+    "offline": "All nodes unreachable. Check your connection and retry.",
+    "retry": "Retry",
+    "custom_placeholder": "wss://…",
+    "add": "Add",
+    "err_wss": "Only wss:// URLs are allowed.",
+    "err_dup": "Node already listed.",
+    "theme_label": "Theme ",
+    "theme_original_blue": "original-blue",
+    "theme_light": "light",
+    "theme_dark": "dark",
+    "pending": "…",
+    "dash": "—",
+    "connecting": "connecting",
+    "down": "down"
+  },
+  "shell": {
+    "brand": "BitShares",
+    "menu": "Menu",
+    "badge_initial": "connecting…",
+    "not_ported_suffix": " — not yet ported; tracked in slice N",
+    "page_not_found": "Page Not Found",
+    "unknown_route": "Unknown route. ",
+    "go_dashboard": "Go to Dashboard",
+    "dashboard": "Dashboard",
+    "opening_market": "Opening the market… ",
+    "go_to": "Go to "
+  },
+  "account": {
+    "title": "Account",
+    "s1": "No balances.",
+    "s2": "No open orders.",
+    "s3": "No recent activity.",
+    "s4": "My Account",
+    "s5": "Wallet is locked. Enter your password to view your account.",
+    "s6": "Unlock",
+    "s7": "Balances"
+  },
+  "assets_feed": {
+    "title": "Publish Feed",
+    "s1": "—"
+  },
+  "assets_manage": {
+    "title": "Create Asset"
+  },
+  "asset_ops": {
+    "title": "Asset"
+  },
+  "assets": {
+    "title": "Assets"
+  },
+  "barter": {
+    "title": "Barter",
+    "s1": "Broadcasting…"
+  },
+  "borrow": {
+    "title": "Borrow"
+  },
+  "credit_detail": {
+    "title": "Credit Offer"
+  },
+  "credit": {
+    "title": "Credit Offer",
+    "s1": "Broadcasting…"
+  },
+  "debit": {
+    "title": "Direct Debit",
+    "s1": "signing…",
+    "s2": "Wallet is locked.",
+    "s3": "broadcasting…"
+  },
+  "explorer_assets": {
+    "title": "Asset",
+    "s1": "—",
+    "s2": "unavailable (quote precision unknown)",
+    "s3": "unavailable"
+  },
+  "explorer_blocks": {
+    "title": "Block"
+  },
+  "explorer": {
+    "title": "Explorer"
+  },
+  "gateway": {
+    "title": "Deposit / Withdraw",
+    "s1": "Gateway status thread"
+  },
+  "htlc": {
+    "title": "HTLC",
+    "s1": "Custom…",
+    "s2": "Broadcasting…",
+    "s3": "Checking…",
+    "s4": "Type the preimage to check it against the locked hash.",
+    "s5": "No match — the node would reject this preimage."
+  },
+  "market_book": {
+    "title": "Exchange",
+    "s1": "Spread — (empty book side)"
+  },
+  "market_charts": {
+    "title": "Exchange"
+  },
+  "market_orders": {
+    "title": "Exchange"
+  },
+  "market": {
+    "title": "Exchange"
+  },
+  "misc": {
+    "title": "Invoice"
+  },
+  "notify": {
+    "title": "Price Alerts",
+    "s1": "Enter two different symbols, e.g. BTS and USD.",
+    "s2": "Enter a price like 1.234.",
+    "s3": "Could not compare against the latest price.",
+    "s4": "Could not save this rule (check the price)."
+  },
+  "pool_detail": {
+    "title": "Liquidity Pool",
+    "s1": "No pool history yet.",
+    "s2": "Pool history unavailable (chain-only; no external index).",
+    "s3": "Withdrawal fee: keep",
+    "s4": "Withdrawal fee: set 0 (only allowed change)"
+  },
+  "swap": {
+    "title": "Swap"
+  },
+  "pools": {
+    "title": "Liquidity Pools",
+    "s1": "Broadcasting…"
+  },
+  "proposals_misc": {
+    "title": "Proposal"
+  },
+  "proposals_ticket": {
+    "title": "Tickets"
+  },
+  "proposals": {
+    "title": "Proposals",
+    "s1": "Open",
+    "s2": "Broadcasting…"
+  },
+  "samet": {
+    "title": "Same-T Funds"
+  },
+  "tickets": {
+    "title": "Tickets"
+  },
+  "trade": {
+    "title": "Exchange",
+    "s1": "Broadcasting…",
+    "s2": "Broadcasting cancel…"
+  },
+  "transfer": {
+    "title": "Transfer",
+    "s1": "Broadcasting…"
+  },
+  "vesting": {
+    "title": "Vesting"
+  },
+  "voting": {
+    "title": "Voting",
+    "s1": "Enter a proxy account name or id.",
+    "s2": "Unknown account."
+  },
+  "wallet": {
+    "title": "Wallet",
+    "s1": "Wallet backend missing: js/wallet.js failed to load.",
+    "s2": "Wallet is unlocked.",
+    "s3": "Wallet is locked. Enter your password to unlock.",
+    "s4": "Create Wallet (Brainkey)",
+    "s5": "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.",
+    "s6": "Confirm you wrote the brainkey down first.",
+    "s7": "Password required: enter a non-empty password."
+  }
+}

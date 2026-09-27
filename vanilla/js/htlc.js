@@ -398,10 +398,18 @@ var Htlc = (function () {
     }
     return parts.length ? parts.join(" ") : "0 seconds";
   }
-  /* Chain UTC "YYYY-MM-DDTHH:MM:SS" -> locale date-time via Intl (never raw epoch on screen). */
+  /* Chain UTC "YYYY-MM-DDTHH:MM:SS" -> locale date-time via I18n.date
+   * (slice-17 Task 2: the single Intl precedent migrates to the prefs-locale
+   * tag; same medium date+time options, same Z-normalized UTC instant — the
+   * only change vs the old undefined-locale call is which locale formats it.
+   * Falls back to the old inline Intl call when i18n.js failed to load.) */
   function formatDateTime(iso) {
     if (typeof iso !== "string" || _toSecs(iso) === null) throw new Error("bad-date: " + JSON.stringify(iso));
-    var d = new Date(iso.charAt(iso.length - 1) === "Z" ? iso : iso + "Z");
+    var stamped = iso.charAt(iso.length - 1) === "Z" ? iso : iso + "Z";
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") return I18n.date(stamped);
+    } catch (e) { /* inline fallback below */ }
+    var d = new Date(stamped);
     return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" }).format(d);
   }
   return { htlc: htlc, mine: mine, permissions: permissions, chainLimits: chainLimits, hashPreimage: hashPreimage,

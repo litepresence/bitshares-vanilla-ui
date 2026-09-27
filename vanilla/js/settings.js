@@ -1,6 +1,17 @@
-/* SettingsPage: nodes page. Network toggle, node table+cards, probe, custom nodes, theme. */
+/* SettingsPage: nodes page. Network toggle, node table+cards, probe, custom nodes, theme, locale. */
 var SettingsPage = (function () {
   "use strict";
+
+  /* Batch-1 i18n (slice-17 Task 2): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
 
   function allNodes(settings) {
     var defaults = (Store.DEFAULT_NODES && Store.DEFAULT_NODES[settings.network]) || [];
@@ -20,12 +31,17 @@ var SettingsPage = (function () {
     return Array.isArray(settings.customNodes) && settings.customNodes.indexOf(url) !== -1;
   }
 
-  function setRow(row, latencyText, statusText) {
+  /* Status is tracked as a canonical id on data-status (up|connecting|down);
+   * the visible text may be translated (settings.connecting/down are
+   * load-bearing Spanish in es mode) so paintOfflineIfAllDown compares the
+   * id below, never the translated text. */
+  function setRow(row, latencyText, statusText, statusId) {
     if (row) {
       var lat = row.querySelector(".latency");
       var st = row.querySelector(".node-status");
       if (lat) lat.textContent = latencyText;
       if (st) st.textContent = statusText;
+      if (statusId) row.setAttribute("data-status", statusId);
     }
     var url = row ? row.getAttribute("data-url") : null;
     if (url && row && row.ownerDocument) {
@@ -35,6 +51,7 @@ var SettingsPage = (function () {
         var cSt = card.querySelector(".node-status");
         if (cLat) cLat.textContent = latencyText;
         if (cSt) cSt.textContent = statusText;
+        if (statusId) card.setAttribute("data-status", statusId);
       }
     }
   }
@@ -50,7 +67,7 @@ var SettingsPage = (function () {
     rootEl.appendChild(wrap);
 
     var h1 = rootEl.ownerDocument.createElement("h1");
-    h1.textContent = "Settings";
+    h1.textContent = t("settings.title", "Settings");
     wrap.appendChild(h1);
 
     // Network toggle
@@ -65,7 +82,8 @@ var SettingsPage = (function () {
       radio.value = net;
       if (settings.network === net) radio.checked = true;
       label.appendChild(radio);
-      label.appendChild(rootEl.ownerDocument.createTextNode(" " + net));
+      var netLabel = (net === "testnet") ? t("settings.network_testnet", "testnet") : t("settings.network_mainnet", "mainnet");
+      label.appendChild(rootEl.ownerDocument.createTextNode(" " + netLabel));
       netToggle.appendChild(label);
     });
     wrap.appendChild(netToggle);
@@ -75,7 +93,7 @@ var SettingsPage = (function () {
     table.className = "node-table";
     var thead = rootEl.ownerDocument.createElement("thead");
     var headRow = rootEl.ownerDocument.createElement("tr");
-    ["", "Node", "Latency", "Status", ""].forEach(function (t) {
+    ["", t("settings.th_node", "Node"), t("settings.th_latency", "Latency"), t("settings.th_status", "Status"), ""].forEach(function (t) {
       var th = rootEl.ownerDocument.createElement("th");
       th.textContent = t;
       headRow.appendChild(th);
@@ -105,12 +123,12 @@ var SettingsPage = (function () {
 
       var tdLat = rootEl.ownerDocument.createElement("td");
       tdLat.className = "latency";
-      tdLat.textContent = "…";
+      tdLat.textContent = t("settings.pending", "…");
       tr.appendChild(tdLat);
 
       var tdSt = rootEl.ownerDocument.createElement("td");
       tdSt.className = "node-status";
-      tdSt.textContent = "…";
+      tdSt.textContent = t("settings.pending", "…");
       tr.appendChild(tdSt);
 
       var tdAct = rootEl.ownerDocument.createElement("td");
@@ -119,7 +137,7 @@ var SettingsPage = (function () {
         rm.type = "button";
         rm.className = "node-remove";
         rm.setAttribute("data-url", url);
-        rm.textContent = "Remove";
+        rm.textContent = t("settings.remove", "Remove");
         tdAct.appendChild(rm);
       }
       tr.appendChild(tdAct);
@@ -143,19 +161,19 @@ var SettingsPage = (function () {
 
       var latSpan = rootEl.ownerDocument.createElement("span");
       latSpan.className = "latency";
-      latSpan.textContent = "…";
+      latSpan.textContent = t("settings.pending", "…");
       card.appendChild(latSpan);
 
       var stSpan = rootEl.ownerDocument.createElement("span");
       stSpan.className = "node-status";
-      stSpan.textContent = "…";
+      stSpan.textContent = t("settings.pending", "…");
       card.appendChild(stSpan);
 
       var selBtn = rootEl.ownerDocument.createElement("button");
       selBtn.type = "button";
       selBtn.className = "node-select";
       selBtn.setAttribute("data-url", url);
-      selBtn.textContent = settings.activeNode === url ? "Selected" : "Select";
+      selBtn.textContent = settings.activeNode === url ? t("settings.selected", "Selected") : t("settings.select", "Select");
       card.appendChild(selBtn);
 
       if (isCustom(url, settings)) {
@@ -163,7 +181,7 @@ var SettingsPage = (function () {
         rm2.type = "button";
         rm2.className = "node-remove";
         rm2.setAttribute("data-url", url);
-        rm2.textContent = "Remove";
+        rm2.textContent = t("settings.remove", "Remove");
         card.appendChild(rm2);
       }
 
@@ -175,7 +193,7 @@ var SettingsPage = (function () {
     var probeBtn = rootEl.ownerDocument.createElement("button");
     probeBtn.id = "probe-all";
     probeBtn.type = "button";
-    probeBtn.textContent = "Probe all";
+    probeBtn.textContent = t("settings.probe_all", "Probe all");
     wrap.appendChild(probeBtn);
 
     // Offline panel (hidden unless all probes fail)
@@ -183,12 +201,12 @@ var SettingsPage = (function () {
     offline.id = "offline-panel";
     offline.hidden = true;
     var offMsg = rootEl.ownerDocument.createElement("p");
-    offMsg.textContent = "All nodes unreachable. Check your connection and retry.";
+    offMsg.textContent = t("settings.offline", "All nodes unreachable. Check your connection and retry.");
     offline.appendChild(offMsg);
     var retryBtn = rootEl.ownerDocument.createElement("button");
     retryBtn.id = "retry-btn";
     retryBtn.type = "button";
-    retryBtn.textContent = "Retry";
+    retryBtn.textContent = t("settings.retry", "Retry");
     offline.appendChild(retryBtn);
     wrap.appendChild(offline);
 
@@ -199,12 +217,12 @@ var SettingsPage = (function () {
     customInput.id = "custom-url";
     customInput.type = "text";
     customInput.setAttribute("inputmode", "url");
-    customInput.placeholder = "wss://…";
+    customInput.placeholder = t("settings.custom_placeholder", "wss://…");
     customWrap.appendChild(customInput);
     var customAdd = rootEl.ownerDocument.createElement("button");
     customAdd.id = "custom-add";
     customAdd.type = "button";
-    customAdd.textContent = "Add";
+    customAdd.textContent = t("settings.add", "Add");
     customWrap.appendChild(customAdd);
     var customError = rootEl.ownerDocument.createElement("div");
     customError.id = "custom-error";
@@ -215,7 +233,7 @@ var SettingsPage = (function () {
 
     // Theme selector
     var themeLabel = rootEl.ownerDocument.createElement("label");
-    themeLabel.textContent = "Theme ";
+    themeLabel.textContent = t("settings.theme_label", "Theme ");
     var themeSelect = rootEl.ownerDocument.createElement("select");
     themeSelect.id = "theme-select";
     ["original-blue", "light", "dark"].forEach(function (t) {
@@ -228,13 +246,51 @@ var SettingsPage = (function () {
     themeLabel.appendChild(themeSelect);
     wrap.appendChild(themeLabel);
 
+    /* Locale switcher (slice-17 Task 2): mirrors the theme selector shape
+     * (Reference #8). Option labels are the Reference-#7 display names;
+     * stub locales (8) are suffixed " — in English" (honest marking) and
+     * render English via the t() fallback chain. The visible "Language "
+     * label stays a hardcoded English literal in this batch (no dict key
+     * exists for it; converting it would churn all 10 dicts — queued for a
+     * later per-view batch with its Task-1-style key). The failure line
+     * below is likewise hardcoded: it is the ambiguity-E wording from the
+     * plan, shown only when the dict fetch fails. */
+    var localeLabel = rootEl.ownerDocument.createElement("label");
+    localeLabel.textContent = "Language ";
+    var localeSelect = rootEl.ownerDocument.createElement("select");
+    localeSelect.id = "locale-select";
+    var localeNames = {};
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.names === "function") localeNames = I18n.names();
+    } catch (e) { localeNames = {}; }
+    var localeCodes = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"];
+    var stubCodes = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh"];
+    var currentLocale = "en";
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.locale === "function") currentLocale = I18n.locale();
+    } catch (e) { currentLocale = "en"; }
+    localeCodes.forEach(function (code) {
+      var opt = rootEl.ownerDocument.createElement("option");
+      opt.value = code;
+      var name = localeNames[code] || code;
+      opt.textContent = (stubCodes.indexOf(code) !== -1) ? name + " — in English" : name;
+      if (currentLocale === code) opt.selected = true;
+      localeSelect.appendChild(opt);
+    });
+    localeLabel.appendChild(localeSelect);
+    wrap.appendChild(localeLabel);
+    var localeError = rootEl.ownerDocument.createElement("div");
+    localeError.id = "locale-error";
+    localeError.className = "error";
+    localeError.setAttribute("aria-live", "polite");
+    wrap.appendChild(localeError);
+
     function paintOfflineIfAllDown() {
       var rows = tbody.querySelectorAll("tr");
       if (!rows.length) { offline.hidden = true; return; }
       var allDown = true;
       for (var k = 0; k < rows.length; k++) {
-        var s = rows[k].querySelector(".node-status");
-        if (!s || s.textContent !== "down") { allDown = false; break; }
+        if (rows[k].getAttribute("data-status") !== "down") { allDown = false; break; }
       }
       offline.hidden = !allDown;
     }
@@ -244,11 +300,11 @@ var SettingsPage = (function () {
       function next() {
         if (i >= nodes.length) { paintOfflineIfAllDown(); return; }
         var url = nodes[i], row = tbody.querySelector('tr[data-url="' + url + '"]');
-        setRow(row, "…", "connecting");
+        setRow(row, t("settings.pending", "…"), t("settings.connecting", "connecting"), "connecting");
         Chain.probe(url, 6000).then(function (r) {
-          setRow(row, r.latencyMs + "ms", r.chainId.slice(0, 8));
+          setRow(row, r.latencyMs + "ms", r.chainId.slice(0, 8), "up");
         }).catch(function () {
-          setRow(row, "—", "down");
+          setRow(row, t("settings.dash", "—"), t("settings.down", "down"), "down");
         }).then(function () { i++; next(); });
       }
       next();
@@ -303,14 +359,14 @@ var SettingsPage = (function () {
     customAdd.addEventListener("click", function () {
       var v = customInput.value.trim();
       if (!/^wss:\/\//.test(v)) {
-        customError.textContent = "Only wss:// URLs are allowed.";
+        customError.textContent = t("settings.err_wss", "Only wss:// URLs are allowed.");
         return;
       }
       customError.textContent = "";
       var cur = Store.loadSettings();
       var customs = Array.isArray(cur.customNodes) ? cur.customNodes.slice() : [];
       if (allNodes(cur).indexOf(v) !== -1) {
-        customError.textContent = "Node already listed.";
+        customError.textContent = t("settings.err_dup", "Node already listed.");
         return;
       }
       customs.push(v);
@@ -341,6 +397,40 @@ var SettingsPage = (function () {
       if (typeof document !== "undefined" && document.documentElement) {
         document.documentElement.setAttribute("data-theme", t);
       }
+    });
+
+    /* Events: locale select. Full router re-render on switch (ambiguity D:
+     * cheap, plain, no subscriptions to rot — the whole shell + current
+     * view re-renders, so no view keeps stale strings after rapid
+     * switches). Failure (ambiguity E: file:// + uncached locale, offline
+     * fetch reject) shows the honest fallback line and snaps the select
+     * back — never a spinner, never blank. Pref write is owned by
+     * I18n.setLocale (Store envelope + standalone fallback). */
+    localeSelect.addEventListener("change", function () {
+      var code = localeSelect.value;
+      localeError.textContent = "";
+      if (typeof I18n === "undefined" || !I18n || typeof I18n.setLocale !== "function") {
+        localeError.textContent = "Locale unavailable offline — showing English.";
+        try { localeSelect.value = currentLocale; } catch (e) { /* select keeps user pick */ }
+        return;
+      }
+      I18n.setLocale(code).then(function (r) {
+        if (!r || !r.ok) {
+          localeError.textContent = "Locale unavailable offline — showing English.";
+          try { localeSelect.value = I18n.locale(); } catch (e) { /* select keeps user pick */ }
+          return;
+        }
+        currentLocale = I18n.locale();
+        try {
+          if (typeof App !== "undefined" && App && typeof App.localizeShell === "function") App.localizeShell();
+        } catch (e) { /* shell keeps previous strings */ }
+        try {
+          if (typeof Router !== "undefined" && Router && typeof Router.start === "function") Router.start(rootEl);
+          else render(rootEl);
+        } catch (e) {
+          try { render(rootEl); } catch (ignored) { /* view keeps previous strings */ }
+        }
+      });
     });
 
     // Initial latency pass

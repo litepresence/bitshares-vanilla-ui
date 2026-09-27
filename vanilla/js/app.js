@@ -4,6 +4,53 @@ var App = (function () {
 
   var lastNode = null, lastNetwork = null, lastTheme = null;
 
+  /* Batch-1 i18n (slice-17 Task 2): localize the static shell chrome that
+   * lives in index.html (brand, nav links, menu toggle, initial badge).
+   * Called at boot and after every locale switch; the dynamic connection
+   * badge (paintBadge states) stays English until its per-view batch. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
+  /* Explicit per-link calls (not a loop over dynamic keys) so the
+   * check_i18n.py drift gate scans every default against en.json. */
+  function localizeNav(nav) {
+    var a;
+    a = nav.querySelector('a[href="#/"]');
+    if (a) a.textContent = t("nav.dashboard", "Dashboard");
+    a = nav.querySelector('a[href="#/market/BTS_USD"]');
+    if (a) a.textContent = t("nav.exchange", "Exchange");
+    a = nav.querySelector('a[href="#/account/overview"]');
+    if (a) a.textContent = t("nav.account", "Account");
+    a = nav.querySelector('a[href="#/transfer"]');
+    if (a) a.textContent = t("nav.transfer", "Transfer");
+    a = nav.querySelector('a[href="#/explorer"]');
+    if (a) a.textContent = t("nav.explorer", "Explorer");
+    a = nav.querySelector('a[href="#/voting"]');
+    if (a) a.textContent = t("nav.voting", "Voting");
+    a = nav.querySelector('a[href="#/settings"]');
+    if (a) a.textContent = t("nav.settings", "Settings");
+  }
+
+  function localizeShell() {
+    if (typeof document === "undefined") return;
+    try {
+      var brand = document.querySelector(".brand");
+      if (brand) brand.textContent = t("shell.brand", "BitShares");
+      var toggle = document.getElementById("nav-toggle");
+      if (toggle) toggle.setAttribute("aria-label", t("shell.menu", "Menu"));
+      var nav = document.getElementById("nav");
+      if (nav) localizeNav(nav);
+      var badge = document.getElementById("conn-badge");
+      if (badge && badge.getAttribute("data-state") === "unknown") {
+        badge.textContent = t("shell.badge_initial", "connecting…");
+      }
+    } catch (e) { /* shell keeps previous strings */ }
+  }
+
   function applyTheme(theme) {
     if (theme) document.documentElement.setAttribute("data-theme", theme);
   }
@@ -35,7 +82,26 @@ var App = (function () {
     var settings = Store.loadSettings();
     lastTheme = settings.theme; lastNetwork = settings.network; lastNode = settings.activeNode;
     applyTheme(settings.theme);
-    Router.start(document.getElementById("view"));
+    /* Persisted locale first (I18n.loadCached reads the pref + {v:1} dict
+     * cache, never throws): shell strings render in the stored language on
+     * first paint, then the router draws the view. Load failure keeps
+     * English via the t() defaults — identical by construction. */
+    function ready() {
+      localizeShell();
+      Router.start(document.getElementById("view"));
+      finishBoot(settings);
+    }
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.loadCached === "function") {
+        I18n.loadCached().then(ready, ready);
+        return settings;
+      }
+    } catch (e) { /* sync boot below */ }
+    ready();
+    return settings;
+  }
+
+  function finishBoot(settings) {
     Store.subscribe("connection", paintBadge);
     Store.subscribe("settings", onSettings);
     var toggle = document.getElementById("nav-toggle");
@@ -47,13 +113,12 @@ var App = (function () {
       });
     }
     connect(settings.activeNode);
-    return settings;
   }
 
   /* Classic script: auto-boot in browsers only; require() under node stays side-effect free. */
   if (typeof document !== "undefined") boot();
 
-  return { boot: boot };
+  return { boot: boot, localizeShell: localizeShell };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }
