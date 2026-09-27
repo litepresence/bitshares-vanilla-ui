@@ -330,6 +330,7 @@ var AssetOps = (function () {
     if (!Array.isArray(opPair) || !Number.isInteger(opPair[0]) || !opPair[1]) throw new Error("opPair must be [opId, opData]");
     if (typeof Tx === "undefined" || !Tx.fee) throw new Error("tx-unavailable");
     var ans = await Tx.fee(opPair[0], opPair[1], feeAssetId || CORE_ASSET);
+    opPair[1].fee = { amount: String(ans.amount), asset_id: ans.asset_id };
     return { amount: String(ans.amount), asset_id: ans.asset_id };
   }
 
