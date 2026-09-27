@@ -199,10 +199,25 @@ var TransferUI = (function () {
     });
   }
 
-  /* Route entry: renderTransfer(root, prefillTo). Waits for the shared
-   * connection (deep links land before boot connects), then gates on
-   * unlock, resolves the sender, and shows the form. */
+  /* hashQuery(): ?asset= / ?memo= prefill for gateway withdraw delegation
+   * (slice-15) — parsed from location.hash, plain decode, no deps. A query
+   * memo forces plaintext (gateways cannot read encrypted memos). */
+  function hashQuery() {
+    var out = {};
+    try {
+      var h = (typeof location !== "undefined" && location.hash) || "";
+      var q = h.indexOf("?");
+      if (q === -1) return out;
+      h.slice(q + 1).split("&").forEach(function (kv) {
+        var i = kv.indexOf("="); if (i === -1) return;
+        out[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1));
+      });
+    } catch (e) { /* malformed query: prefill empty */ }
+    return out;
+  }
   function renderTransfer(root, prefillTo) {
+    /* Shared-socket wait (deep links land before boot connects), then gates on
+     * unlock, resolves the sender, and shows the form. */
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
@@ -249,12 +264,13 @@ var TransferUI = (function () {
       return Account.resolve(id);
     }).then(function (from) {
       clearRoot(root);
+      var q = hashQuery();
       showForm(doc, makeWrap(doc, root), root, from, {
         to: typeof prefillTo === "string" ? prefillTo : "",
-        asset: coreSymbol(),
+        asset: q.asset || coreSymbol(),
         amount: "",
-        memo: "",
-        encrypted: true,
+        memo: q.memo || "",
+        encrypted: !q.memo,
         error: null
       });
     }).catch(function (e) {
