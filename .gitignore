@@ -19,3 +19,5 @@ bitshares-core/
 .DS_Store
 *.swp
 *~
+# pnpm store (dev tooling installs).
+.pnpm-store/
