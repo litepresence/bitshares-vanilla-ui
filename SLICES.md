@@ -109,6 +109,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 
 ### 12. Pools + swap + stake ⬜
 - [ ] Pool create/deposit/withdraw/exchange, simple swap page, staking views
+- [ ] UX DIRECTION (user): prefer bitshares-dex-UX experience over reference bitshares-ui for pools — orderbook desk and pools desk must feel seamless (same design language). Review how DEX-UX gathered candle data from Kibana/Elasticsearch + how it mirrored the two desks.
 
 ### 13. Credit + Same-T + borrow ⬜
 - [ ] Credit offers/deals lifecycle, Same-T funds, barter, margin/borrow views
@@ -117,7 +118,8 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [ ] Proposal create/approve/reject, vote-lock tickets, airdrops, blind transfers, invoices, vesting claims, custom authorities, account lists
 
 ### 15. Gateways ⬜
-- [ ] Per-gateway adapters (GDEX/RuDEX/Citadel/…) with explicit unavailable states, deposit-address flows, NEVER load-bearing
+- [ ] Per-gateway adapters with explicit unavailable states, deposit-address flows, NEVER load-bearing
+- [ ] SCOPE (user, 2026-09-28): in-scope = XBTSX, BIT20, GDEX, IOB only. BIT20/GDEX may no longer be fully automated — verify live, ship "unavailable" states if dead. All other historic gateway partners (RuDEX/Citadel/BlockTrades/Bitspark/…) are out of business → OUT OF SCOPE, do not port.
 
 ### 16. Notifications + alerts ⬜
 - [ ] Native DOM notifications, price alerts (no notification library)
