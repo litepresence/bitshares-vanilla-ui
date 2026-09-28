@@ -182,6 +182,7 @@ var DashboardUI = (function () {
     try { unlocked = typeof Wallet !== "undefined" && Wallet && typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked(); }
     catch (e) { unlocked = false; }
     if (!unlocked) {
+      wrap.appendChild(gateCard(doc));
       wrap.appendChild(el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
       wrap.appendChild(linkPara(doc, [
         ["#/login", t("auth.login", "Login")],
@@ -214,6 +215,41 @@ var DashboardUI = (function () {
       clearRoot(acctSection);
       showError(doc, acctSection, e, t("transfer.load_account_failed", "Could not load your account."));
     });
+  }
+
+  /* Gate card (locked home, mirrors #1 root.png): centered welcome panel
+   *   with Create/Login actions + restore/registration links. Pure links —
+   *   no chain calls, no signing. Never throws — missing DOM is a no-op. */
+  function gateCard(doc) {
+    var card = doc.createElement("section");
+    card.className = "dashboard-gate";
+    card.appendChild(el(doc, "h2", t("dashboard.welcome", "Welcome to BitShares")));
+    card.appendChild(el(doc, "p", t("dashboard.tagline", "Your Decentralized Platform"), "muted"));
+    var row = doc.createElement("p");
+    row.className = "dashboard-gate-row";
+    var create = doc.createElement("a");
+    create.href = "#/create-account";
+    create.className = "btn";
+    create.textContent = t("dashboard.create", "Create Account");
+    touchable(create);
+    row.appendChild(create);
+    var login = doc.createElement("a");
+    login.href = "#/login";
+    login.className = "btn btn-ghost";
+    login.textContent = t("auth.login", "Login");
+    touchable(login);
+    row.appendChild(login);
+    card.appendChild(row);
+    var sub = doc.createElement("p");
+    sub.className = "muted";
+    sub.appendChild(doc.createTextNode(t("dashboard.restore_prefix", "Optionally, ")));
+    var restore = doc.createElement("a");
+    restore.href = "#/existing-account";
+    restore.textContent = t("password.import_existing_account", "Import existing account");
+    touchable(restore);
+    sub.appendChild(restore);
+    card.appendChild(sub);
+    return card;
   }
 
   /* Watched account: the wallet's own when unlocked, else the public

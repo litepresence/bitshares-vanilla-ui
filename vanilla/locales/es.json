@@ -120,6 +120,12 @@
     "opening_market": "Abriendo el mercado… ",
     "go_to": "Ir a "
   },
+  "dashboard": {
+    "welcome": "Welcome to BitShares",
+    "tagline": "Your Decentralized Platform",
+    "create": "Create Account",
+    "restore_prefix": "Optionally, "
+  },
   "account": {
     "title": "Account",
     "s1": "No balances.",

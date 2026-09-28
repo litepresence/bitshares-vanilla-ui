@@ -36,6 +36,22 @@ body { margin: 0; background: var(--bg); color: var(--text);
 .nav-dir-group .nav-group { font-weight: 700; display: block; margin: 0 0 4px; }
 .nav-dir-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .nav-dir-empty { margin: 12px 0 0; }
+/* Dashboard gate card (locked home, mirrors #1 root.png): centered panel,
+ * welcome heading, Create/Login action row, restore line. Tokens only. */
+.dashboard-gate { background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; padding: 24px 20px; margin: 12px auto 16px;
+  max-width: 520px; text-align: center; }
+.dashboard-gate h2 { margin: 0 0 4px; }
+.dashboard-gate-row { display: flex; gap: 12px; justify-content: center;
+  flex-wrap: wrap; margin: 16px 0; }
+a.btn { display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: 0 20px; background: var(--button-bg);
+  color: var(--accent-text); text-decoration: none; border-radius: 0;
+  font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
+  font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; }
+a.btn-ghost { background: transparent; color: var(--accent);
+  border: 1px solid var(--accent); }
 .wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
 .wrap.mkt-wrap { max-width: 1400px; }
 @media (min-width: 1200px) { .wrap.wide { max-width: none; display: grid;

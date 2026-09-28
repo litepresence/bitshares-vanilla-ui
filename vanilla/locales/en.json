@@ -46,6 +46,10 @@
       "shell.dashboard",
       "shell.opening_market",
       "shell.go_to",
+      "dashboard.welcome",
+      "dashboard.tagline",
+      "dashboard.create",
+      "dashboard.restore_prefix",
       "account.title",
       "account.s1",
       "account.s2",
@@ -2171,6 +2175,12 @@
     "dashboard": "Dashboard",
     "opening_market": "Opening the market… ",
     "go_to": "Go to "
+  },
+  "dashboard": {
+    "welcome": "Welcome to BitShares",
+    "tagline": "Your Decentralized Platform",
+    "create": "Create Account",
+    "restore_prefix": "Optionally, "
   },
   "account": {
     "title": "Account",
