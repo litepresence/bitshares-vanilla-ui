@@ -12,12 +12,13 @@ tooling/visual/.browsers/
 tooling/visual/package-lock.json
 # Reference checkouts: read-only, each with its own history. Never commit them.
 # Canonical home is /workspace/reference/; root symlinks preserve old paths.
-reference/
-bitshares-ui/
-astro-ui/
-wallet-extension/
-bitshares-core/
-bitshares-dex-ux/
+# (Bare names match both the reference/ dir contents and the root symlinks.)
+reference
+bitshares-ui
+astro-ui
+wallet-extension
+bitshares-core
+bitshares-dex-ux
 # Editor + OS noise.
 .DS_Store
 *.swp
