@@ -118,7 +118,11 @@
     "go_dashboard": "Ir al Tablero",
     "dashboard": "Tablero",
     "opening_market": "Abriendo el mercado… ",
-    "go_to": "Ir a "
+    "go_to": "Ir a ",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "follow": "Follow",
+    "unfollow": "Unfollow"
   },
   "dashboard": {
     "welcome": "Welcome to BitShares",
@@ -980,7 +984,10 @@
     "tab_recent": "Recent trades",
     "th_block": "Block",
     "trades_title": "Trades",
-    "trades_toggle_label": "Recent or my trades"
+    "trades_toggle_label": "Recent or my trades",
+    "starred_tab": "Starred",
+    "latest_label": "Latest",
+    "chg_label": "24h Δ"
   },
   "misc": {
     "title": "Invoice",
@@ -2296,7 +2303,8 @@
     "sell_col": "Sell",
     "tab_my": "My exchanges",
     "tab_pool": "Pool history",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "market_col": "Market"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

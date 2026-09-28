@@ -38,6 +38,10 @@
       "shell.menu",
       "shell.menu_filter",
       "shell.menu_no_match",
+      "shell.lock",
+      "shell.unlock",
+      "shell.follow",
+      "shell.unfollow",
       "shell.badge_initial",
       "shell.not_ported_suffix",
       "shell.page_not_found",
@@ -2126,7 +2130,11 @@
       "credit.retry_load",
       "gateway.retry_load",
       "htlc.retry_load",
-      "proposal.retry_load"
+      "proposal.retry_load",
+      "market.starred_tab",
+      "pool.market_col",
+      "market.latest_label",
+      "market.chg_label"
     ]
   },
   "nav": {
@@ -2169,6 +2177,10 @@
     "menu": "Menu",
     "menu_filter": "Filter menu",
     "menu_no_match": "No matching pages.",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
     "badge_initial": "connecting…",
     "not_ported_suffix": " — not yet ported; tracked in slice N",
     "page_not_found": "Page Not Found",
@@ -3038,7 +3050,10 @@
     "tab_recent": "Recent trades",
     "th_block": "Block",
     "trades_title": "Trades",
-    "trades_toggle_label": "Recent or my trades"
+    "trades_toggle_label": "Recent or my trades",
+    "starred_tab": "Starred",
+    "latest_label": "Latest",
+    "chg_label": "24h Δ"
   },
   "misc": {
     "title": "Invoice",
@@ -4354,7 +4369,8 @@
     "sell_col": "Sell",
     "tab_my": "My exchanges",
     "tab_pool": "Pool history",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "market_col": "Market"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

@@ -50,6 +50,27 @@ var MarketPicker = (function () {
     return n;
   }
 
+  /* Session ticker cache (id -> "latest · chg" or null-miss). Fail-open:
+   * misses render "—", never an error. Small curated lists only. */
+  var _tickCache = {};
+  function tickText(id, done) {
+    if (Object.prototype.hasOwnProperty.call(_tickCache, id)) { done(_tickCache[id]); return; }
+    var pair = null;
+    try {
+      if (typeof Market === "undefined" || !Market) { done(null); return; }
+      pair = Market.parseId(id);
+    } catch (e) { _tickCache[id] = null; done(null); return; }
+    Market.assets(pair.quote, pair.base).then(function (a) {
+      return Market.stats(a.base.id, a.quote.id);
+    }).then(function (s) {
+      var chg = (s.raw && s.raw.percent_change !== undefined && s.raw.percent_change !== null)
+        ? String(s.raw.percent_change) : null;
+      var text = (s.latest !== null && s.latest !== undefined ? s.latest : "—") +
+        (chg !== null ? " · " + chg : "");
+      _tickCache[id] = text;
+      done(text);
+    }).catch(function () { _tickCache[id] = null; done(null); });
+  }
   /* Network from Store (sole settings owner); mainnet when unreadable. */
   function network() {
     try {
@@ -322,6 +343,14 @@ var MarketPicker = (function () {
         touchable(a);
         if (id === currentID) a.setAttribute("aria-current", "page");
         li.appendChild(a);
+        /* Ticker stats (mirrors #1 FIND MARKETS PRICE/CHANGE columns):
+         * fail-open "—", fills in when the lookup lands. */
+        var stat = el(doc, "span", "—", "muted mkt-stat-inline");
+        li.appendChild(stat);
+        tickText(id, function (text) {
+          stat.textContent = text || "—";
+          try { stat.title = text || ""; } catch (e) { /* text stands */ }
+        });
         var star = touchable(doc.createElement("button"));
         star.className = "mkt-star";
         try {

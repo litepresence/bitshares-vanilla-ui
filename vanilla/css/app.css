@@ -36,6 +36,13 @@ body { margin: 0; background: var(--bg); color: var(--text);
 .nav-dir-group .nav-group { font-weight: 700; display: block; margin: 0 0 4px; }
 .nav-dir-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .nav-dir-empty { margin: 12px 0 0; }
+/* Palette account-actions row (#1 dropdown head): lock/follow/buttons. */
+.nav-dir-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; }
+.nav-dir-actions a { padding: 10px 14px; min-height: 44px; display: inline-flex;
+  align-items: center; color: var(--text); text-decoration: none; border-radius: 6px; }
+.nav-dir-actions a:hover { background: var(--bg); }
+.nav-dir-btn { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 /* Warning banner (mirrors #1 root.png scam banner): --warn band, dark text
  * for contrast on amber in every theme; dismiss persists in localStorage. */
 #warn-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px;
@@ -69,6 +76,11 @@ a.btn-ghost { background: transparent; color: var(--accent);
 .mkt-quotes button { min-height: 44px; padding: 6px 12px; border: 1px solid var(--border);
   border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 .mkt-quotes button[aria-pressed="true"] { border-color: var(--accent); font-weight: 700; }
+/* Picker row ticker stats (PRICE · CHANGE, fail-open "—"). */
+.mkt-picker-row { display: flex; align-items: center; gap: 8px; }
+.mkt-picker-row > a { flex: 1 1 auto; }
+.mkt-stat-inline { flex: 0 1 auto; min-width: 0; font-size: 0.85rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Sortable table headers (pools page-sort): text button in the th. */
 .th-sort { background: transparent; color: inherit; border: 0; padding: 0;
   font: inherit; text-transform: inherit; letter-spacing: inherit;

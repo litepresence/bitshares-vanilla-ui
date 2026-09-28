@@ -120,6 +120,38 @@ var DashboardUI = (function () {
     } catch (e) { return []; }
   }
 
+  /* Featured markets per quote base (mirrors #1 DashboardPage preferredBases
+   * tabs + FeaturedMarkets). Curated ids only — unknown pairs drop fail-open
+   * at fill time, never blank the tab. */
+  var FEATURED = {
+    BTS: ["BTS_USD", "BTS_CNY", "BTS_BTC", "BTS_ETH"],
+    USD: ["BTS_USD", "BTC_USD", "ETH_USD"],
+    CNY: ["BTS_CNY", "BTC_CNY"],
+    BTC: ["BTS_BTC", "ETH_BTC"]
+  };
+  /* Session ticker cache (id -> {latest, chg} or null-miss). Fail-open:
+   * misses render "—" and retry on next visit, never an error panel. */
+  var _tickCache = {};
+  function tickRow(id) {
+    if (Object.prototype.hasOwnProperty.call(_tickCache, id)) return Promise.resolve(_tickCache[id]);
+    var pair = null;
+    try {
+      if (typeof Market === "undefined" || !Market || typeof Market.parseId !== "function") return Promise.resolve(null);
+      pair = Market.parseId(id);
+    } catch (e) { _tickCache[id] = null; return Promise.resolve(null); }
+    return Market.assets(pair.quote, pair.base).then(function (a) {
+      return Market.stats(a.base.id, a.quote.id);
+    }).then(function (s) {
+      var row = {
+        latest: s.latest,
+        chg: (s.raw && s.raw.percent_change !== undefined && s.raw.percent_change !== null)
+          ? String(s.raw.percent_change) : null
+      };
+      _tickCache[id] = row;
+      return row;
+    }).catch(function () { _tickCache[id] = null; return null; });
+  }
+
   /* Network default market for the empty-favourites state
    * (MarketUI.defaultMarket: branding.js:98-108 source). Guarded fallback. */
   function defaultMarket() {
@@ -240,6 +272,41 @@ var DashboardUI = (function () {
     touchable(login);
     row.appendChild(login);
     card.appendChild(row);
+    /* Language select (mirrors #1 gate globe+English dropdown): reuses the
+     * settings locale builder so names/honesty rules stay single-sourced.
+     * Success re-renders shell + view (settings.js pattern); failure shows
+     * the honest line and snaps back. Never blank, never throws. */
+    try {
+      if (typeof SettingsPrefs !== "undefined" && SettingsPrefs &&
+          typeof SettingsPrefs.buildLocale === "function") {
+        var loc = SettingsPrefs.buildLocale(doc, t);
+        card.appendChild(loc.label);
+        card.appendChild(loc.error);
+        loc.select.addEventListener("change", function () {
+          var code = loc.select.value;
+          loc.error.textContent = "";
+          if (typeof I18n === "undefined" || !I18n || typeof I18n.setLocale !== "function") {
+            loc.error.textContent = "Locale unavailable offline — showing English.";
+            return;
+          }
+          I18n.setLocale(code).then(function (r) {
+            if (!r || !r.ok) {
+              loc.error.textContent = "Locale unavailable offline — showing English.";
+              try { loc.select.value = I18n.locale(); } catch (e) { /* keeps pick */ }
+              return;
+            }
+            try {
+              if (typeof App !== "undefined" && App && typeof App.localizeShell === "function") App.localizeShell();
+            } catch (e) { /* shell keeps previous strings */ }
+            try {
+              if (typeof Router !== "undefined" && Router && typeof Router.start === "function") {
+                Router.start(doc.getElementById("view") || undefined);
+              }
+            } catch (e) { /* view keeps previous strings */ }
+          });
+        });
+      }
+    } catch (e) { /* gate works without the language row */ }
     var sub = doc.createElement("p");
     sub.className = "muted";
     sub.appendChild(doc.createTextNode(t("dashboard.restore_prefix", "Optionally, ")));
@@ -310,7 +377,9 @@ var DashboardUI = (function () {
       thead.appendChild(headRow);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
-      list.forEach(function (b) {
+      /* Dashboard is a pulse, not the ledger: top 5 + link to the full
+       * account page (keeps locked scroll short; #1 shows tabs, not walls). */
+      list.slice(0, 5).forEach(function (b) {
         var tr = doc.createElement("tr");
         var assetCell = doc.createElement("td");
         assetCell.textContent = b.symbol;
@@ -325,7 +394,7 @@ var DashboardUI = (function () {
       section.appendChild(table);
       var cards = doc.createElement("div");
       cards.className = "node-cards";
-      list.forEach(function (b) {
+      list.slice(0, 5).forEach(function (b) {
         var card = doc.createElement("div");
         card.className = "node-card";
         var name = doc.createElement("div");
@@ -338,6 +407,13 @@ var DashboardUI = (function () {
         cards.appendChild(card);
       });
       section.appendChild(cards);
+      if (list.length > 5) {
+        section.appendChild(linkPara(doc, [
+          ["#/account/" + encodeURIComponent(found.name),
+            t("account.open_prefix", "Open ") + found.name +
+            " (" + list.length + ")"]
+        ]));
+      }
     }).catch(function (e) {
       if (myGen !== gen) return;
       clearRoot(section);
@@ -375,39 +451,92 @@ var DashboardUI = (function () {
     });
   }
 
-  /* Favourite markets (sync, from storage) + empty state pointing at the
-   * network default and the favourites page. */
+  /* Markets directory (mirrors #1 DashboardPage tabs: StarredMarkets +
+   * FeaturedMarkets per preferred base). Tabs: Starred + BTS/USD/CNY/BTC.
+   * Ticker stats load fail-open per row ("—" on miss); panes never blank. */
   function paintMarkets(doc, wrap) {
     var section = doc.createElement("section");
     section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
-    var favs = favMarkets();
-    if (favs.length === 0) {
-      section.appendChild(el(doc, "p",
-        t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below."),
-        "muted"));
-      section.appendChild(linkPara(doc, [
+    var tabs = doc.createElement("div");
+    tabs.className = "mkt-tabs";
+    tabs.setAttribute("role", "tablist");
+    var pane = doc.createElement("div");
+    var names = ["Starred", "BTS", "USD", "CNY", "BTC"];
+    names.forEach(function (name, i) {
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = name === "Starred" ? t("market.starred_tab", "Starred") : name;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      touchable(b);
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(tabs.querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-selected", x === b ? "true" : "false");
+        });
+        paintMarketPane(doc, pane, name);
+      });
+      tabs.appendChild(b);
+    });
+    section.appendChild(tabs);
+    section.appendChild(pane);
+    wrap.appendChild(section);
+    paintMarketPane(doc, pane, "Starred");
+  }
+
+  /* One markets pane: Starred reads the fav key; quote panes read FEATURED.
+   * Rows: market link + latest + 24h change (fail-open "—"). */
+  function paintMarketPane(doc, pane, name) {
+    while (pane.firstChild) pane.removeChild(pane.firstChild);
+    var ids = name === "Starred" ? favMarkets() : (FEATURED[name] || []).slice();
+    if (!ids.length) {
+      pane.appendChild(el(doc, "p",
+        name === "Starred"
+          ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
+          : t("account.s3", "No recent activity."), "muted"));
+      pane.appendChild(linkPara(doc, [
         ["#/market/" + encodeURIComponent(defaultMarket()), defaultMarket()],
         ["#/favourites", t("favourites.favourites", "Favourites")]
       ]));
-    } else {
-      var ul = doc.createElement("ul");
-      ul.className = "mkt-picker-list";
-      favs.slice().sort().forEach(function (id) {
-        var li = doc.createElement("li");
-        li.className = "mkt-picker-row";
-        var a = doc.createElement("a");
-        a.href = "#/market/" + encodeURIComponent(id);
-        a.textContent = id;
-        touchable(a);
-        li.appendChild(a);
-        ul.appendChild(li);
-      });
-      section.appendChild(ul);
-      section.appendChild(linkPara(doc, [
-        ["#/favourites", t("favourites.favourites", "Favourites")]
-      ]));
+      return;
     }
-    wrap.appendChild(section);
+    var table = doc.createElement("table");
+    table.className = "node-table";
+    var headRow = doc.createElement("tr");
+    [t("pool.market_col", "Market"), t("market.latest_label", "Latest"), t("market.chg_label", "24h Δ")].forEach(function (label) {
+      var th = doc.createElement("th");
+      th.textContent = label;
+      headRow.appendChild(th);
+    });
+    var thead = doc.createElement("thead");
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var tbody = doc.createElement("tbody");
+    ids.slice().sort().forEach(function (id) {
+      var tr = doc.createElement("tr");
+      var tdM = doc.createElement("td");
+      var a = doc.createElement("a");
+      a.href = "#/market/" + encodeURIComponent(id);
+      a.textContent = id;
+      touchable(a);
+      tdM.appendChild(a);
+      tr.appendChild(tdM);
+      var tdL = el(doc, "td", "…", "num");
+      var tdC = el(doc, "td", "…", "num");
+      tr.appendChild(tdL);
+      tr.appendChild(tdC);
+      tbody.appendChild(tr);
+      if (typeof Market !== "undefined" && Market) {
+        tickRow(id).then(function (r) {
+          tdL.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
+          tdC.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+        });
+      } else {
+        tdL.textContent = "—";
+        tdC.textContent = "—";
+      }
+    });
+    table.appendChild(tbody);
+    pane.appendChild(table);
   }
 
   /* Quick links into every area (labels reuse the news view's section

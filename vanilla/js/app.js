@@ -52,15 +52,19 @@ var App = (function () {
     { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/help"] }
   ];
 
-  /* ORIGINAL_NAV: the 7-link header bar — the pre-existing static index.html
-   *   set (Dashboard, Exchange, Account, Transfer, Explorer, Voting, Settings;
-   *   the NAV_ICONS keys below). "#/account/me" keeps the FIX noted above. */
-  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/account/me", "#/transfer",
-    "#/explorer", "#/voting", "#/settings"];
+  /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
+   *   (MenuDataStructure.js:66-75: dashboard/market/lending/explorer +
+   *   poolmart inHeader Always) — Dashboard, Exchange, Credit Offer,
+   *   Liquidity Pools, Explore. Account/Transfer/Voting/Settings live in the
+   *   burger palette (as in #1's dropdown), reachable everywhere. */
+  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/credit-offer", "#/pools",
+    "#/explorer"];
 
   /* Nav icons (icon-wiring pass): href -> vendored icon name. Mapping cites
-   *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242,
-   *   transfer:251, cogs:296); "user"/"voting" are the same icons-loader.js
+   *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242;
+   *   credit uses borrow: #1's deployment-unit asset renders as a blob at
+   *   18px while the IcoMoon borrow glyph stays crisp — documented deviation,
+   *   same link/target/label). "user"/"voting" are the same icons-loader.js
    *   names #1 uses for account/voting affordances. Icons are decorative
    *   (aria-hidden <img>); the label span keeps the accessible name, so
    *   routing, order, and i18n strings are untouched — skin only. Only the
@@ -69,11 +73,9 @@ var App = (function () {
   var NAV_ICONS = {
     "#/": "dashboard",
     "#/market/BTS_USD": "trade",
-    "#/account/me": "user",
-    "#/transfer": "transfer",
-    "#/explorer": "server",
-    "#/voting": "voting",
-    "#/settings": "cogs"
+    "#/credit-offer": "borrow",
+    "#/pools": "poolmart",
+    "#/explorer": "server"
   };
 
   /* Explicit per-href labels (not a data-driven t() loop) so the
@@ -183,6 +185,10 @@ var App = (function () {
     empty.className = "nav-dir-empty muted";
     empty.textContent = t("shell.menu_no_match", "No matching pages.");
     empty.style.display = "none";
+    /* Account actions (mirrors #1 dropdown head: lock toggle, create,
+     * follow, send/deposit/withdraw). Route-backed (no modal system in
+     * vanilla); lock acts directly on the Wallet keystore. */
+    try { panel.appendChild(buildAccountActions(document)); } catch (e) { /* groups stand alone */ }
     var sections = [];
     NAV_GROUPS.forEach(function (group) {
       var section = document.createElement("div");
@@ -226,10 +232,93 @@ var App = (function () {
     return panel;
   }
 
+  /* Contacts (mirrors #1 follow/unfollow): localStorage set of followed
+   * account names. No chain calls — pure watch-list. Never throws. */
+  var CONTACTS_KEY = "bts-vanilla-contacts-v1";
+  function loadContacts() {
+    try {
+      var raw = localStorage.getItem(CONTACTS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === "string"; }) : [];
+    } catch (e) { return []; }
+  }
+  function saveContacts(arr) {
+    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(arr)); } catch (e) { /* follow skips */ }
+  }
+  /* Current account name from the hash (#/account/<name>), "" otherwise. */
+  function hashAccount() {
+    try {
+      var h = (typeof location !== "undefined" && location.hash) || "";
+      var m = /^#\/account\/([^\/?#]+)/.exec(h);
+      if (!m || m[1] === "me") return "";
+      return decodeURIComponent(m[1]);
+    } catch (e) { return ""; }
+  }
+  /* buildAccountActions: lock toggle + follow + send/deposit/withdraw +
+   * create-account row at the palette head (#1 dropdown parity). Links close
+   * the palette; lock acts then rebuilds the nav. Never throws. */
+  function buildAccountActions(doc) {
+    var box = doc.createElement("div");
+    box.className = "nav-dir-actions";
+    function actLink(href, label) {
+      var a = doc.createElement("a");
+      a.setAttribute("href", href);
+      a.textContent = label;
+      a.addEventListener("click", function () { closeDirectory(false); });
+      box.appendChild(a);
+      return a;
+    }
+    function actButton(label, fn) {
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.className = "nav-dir-btn";
+      b.textContent = label;
+      try { b.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+      b.addEventListener("click", fn);
+      box.appendChild(b);
+      return b;
+    }
+    var unlocked = false;
+    try {
+      unlocked = (typeof Wallet !== "undefined" && Wallet &&
+        typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked());
+    } catch (e) { unlocked = false; }
+    if (unlocked) {
+      actButton(t("shell.lock", "Lock"), function () {
+        try { if (typeof Wallet !== "undefined" && Wallet && Wallet.lock) Wallet.lock(); } catch (e) { /* stays */ }
+        try {
+          var nav = doc.getElementById("nav");
+          if (nav) buildNav(nav);
+        } catch (e) { /* label keeps prior state */ }
+      });
+    } else {
+      actLink("#/login", t("shell.unlock", "Unlock"));
+    }
+    var acct = hashAccount();
+    if (acct) {
+      var contacts = loadContacts();
+      var follows = contacts.indexOf(acct) !== -1;
+      actButton((follows ? t("shell.unfollow", "Unfollow") : t("shell.follow", "Follow")) + " " + acct, function () {
+        var list = loadContacts();
+        var i = list.indexOf(acct);
+        if (i === -1) list.push(acct);
+        else list.splice(i, 1);
+        saveContacts(list);
+        try {
+          var nav = doc.getElementById("nav");
+          if (nav) { buildNav(nav); nav.classList.add("open"); }
+        } catch (e) { /* label keeps prior state */ }
+      });
+      actLink("#/transfer", t("nav.transfer", "Transfer"));
+      actLink("#/deposit-withdraw", t("gateway.title", "Deposit / Withdraw"));
+    }
+    actLink("#/create-account", t("account.register_short", "Register a new account"));
+    return box;
+  }
+
   /* closeDirectory: collapse #nav.open, refocus the toggle (focus-return).
    * Params: refocus bool. Never throws — missing DOM is a no-op. */
-  function closeDirectory(refocus) {
-    try {
+  function closeDirectory(refocus) {    try {
       var nav = document.getElementById("nav");
       var toggle = document.getElementById("nav-toggle");
       if (!nav || !nav.classList.contains("open")) return;
@@ -323,6 +412,13 @@ var App = (function () {
    *   data-theme instantly). Every copy re-syncs via syncThemeSwitchers on
    *   each settings emit. */
   var THEMES = ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"];
+  /* Human names for the header select (raw ids are identifiers, kept as
+   * option values + in settings; the header shows names a person picks). */
+  var THEME_NAMES = {
+    "ref-ui-theme": "Classic",
+    "vanilla-ui-theme": "Vanilla light",
+    "dex-ux-theme": "DEX dark"
+  };
 
   /* setTheme: persist via the sole settings owner. Params: id (theme id
    *   string). Returns nothing. Fails: never throws — unknown ids are
@@ -375,7 +471,7 @@ var App = (function () {
     THEMES.forEach(function (id) {
       var opt = doc.createElement("option");
       opt.value = id;
-      opt.textContent = id;
+      opt.textContent = THEME_NAMES[id] || id;
       try { opt.style.color = "#111111"; opt.style.background = "#ffffff"; } catch (e) { /* native popup stands */ }
       select.appendChild(opt);
     });
