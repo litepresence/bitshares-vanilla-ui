@@ -164,7 +164,7 @@ var AssetUI = (function () {
       if (g === gen && !f.input.value) f.input.value = me.name; }).catch(function () { /* manual stands */ });
     go.addEventListener("click", function () {
       var v = f.input.value.trim(); if (!v) { err(d, list,t("asset.enter_issuer", "Enter an issuer account.")); return; }
-      wipe(list); status(d, list, "Loading issued assets…");
+      wipe(list); status(d, list, t("asset.loading_issued", "Loading issued assets…"));
       Account.resolve(v).then(function (a) { return Asset.issuedBy(a.id, "1.3.0", 100); }).then(function (rows) {
         if (g !== gen) return; wipe(list);
         if (!rows.length) { list.appendChild(el(d, "p", t("asset.no_issued", "No assets issued by this account."), "muted")); return; }
@@ -264,11 +264,11 @@ var AssetUI = (function () {
           rows.push([t("asset.pma_row", "Prediction market"),  (tab === "pma") ? "yes" : "no"]);
           if (g !== gen) return; wipe(root);
           var w2 = wrap(d, root), fpp = await feePrec(f.asset_id);
-          confirm(d, w2, root, "Confirm asset create", rows, f.amount, fpp,
+          confirm(d, w2, root, t("asset.confirm_create", "Confirm asset create"), rows, f.amount, fpp,
             function () { renderCreate(root); }, function (onStep) {
               return publish(root, d, g, pair, async function () {
                 try { return await Asset.describe(symbol); } catch (e) { return null; }
-              }, "Asset created", symbol + " precision " + precision + " issued by " + me.name + ".",
+              }, t("asset.created", "Asset created"), symbol + " precision " + precision + " issued by " + me.name + ".",
                 "#/asset/" + symbol, "Open " + symbol, onStep); });
         })().catch(function (e) { rev.disabled = false; err(d, body,e,t("credit.could_not_prepare_the_create", "Could not prepare the create.")); });
       });

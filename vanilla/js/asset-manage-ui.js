@@ -151,7 +151,7 @@ var AssetManageUI = (function () {
         w.appendChild(el(d, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
     if (!symbol) { w.appendChild(el(d, "h1", t("asset.update_title", "Update asset"))); err(d, w,new Error("unknown-asset"),t("barter.unknown_asset", "Unknown asset.")); return; }
-    w.appendChild(el(d, "h1", "Update " + symbol)); status(d, w, "Loading asset…");
+    w.appendChild(el(d, "h1", "Update " + symbol)); status(d, w, t("explorer.loading_asset", "Loading asset…"));
     (async function () {
       var info = await Asset.describe(symbol);
       /* Null-tolerant at render: locked viewers get "" (never the issuer),
@@ -199,13 +199,13 @@ var AssetManageUI = (function () {
           var rows = [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
             [t("explorer.market_fee", "Market fee"),  AssetOps.hundredthsToPct(info.market_fee_hundredths) + "% → " + fp.input.value + "%", String(next.market_fee_percent)]];
           if ((info.description || "") !== (ds.input.value || "")) rows.push([t("asset.description_row", "Description"),  "changed (verified by re-read)"]);
-          confirm(d, w2, root, "Confirm asset update", rows, f.amount, pp,
+          confirm(d, w2, root, t("asset.confirm_update", "Confirm asset update"), rows, f.amount, pp,
             function () { renderUpdate(root, info.symbol); }, function (s) {
               return publish(root, d, g, pair, async function () {
                 try { var n = await Asset.describe(info.symbol);
                   return (n.description === (ds.input.value || "") && n.market_fee_hundredths === next.market_fee_percent) ? n : null;
                 } catch (e) { return null; } },
-                "Asset updated", info.symbol + " re-read matches the new options.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
+                t("asset.updated", "Asset updated"), info.symbol + " re-read matches the new options.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
         })().catch(function (e) { r1.disabled = false; err(d, v,e,t("credit.could_not_prepare_the_update", "Could not prepare the update.")); }); });
       /* op-12 bitasset (MPA only) */
       if (info.is_smartcoin) {
@@ -227,7 +227,7 @@ var AssetManageUI = (function () {
                 short_backing_asset: cur.short_backing_asset } });
             var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
             if (g !== gen) return; wipe(root); var w3 = wrap(d, root), pp = await feePrec(f.asset_id);
-            confirm(d, w3, root, "Confirm bitasset update",
+            confirm(d, w3, root, t("asset.confirm_bitasset", "Confirm bitasset update"),
               [[t("asset_ops.title", "Asset"),  info.symbol], [t("asset.offset_row", "Offset"),  of.input.value + "%"], [t("asset.max_vol_row", "Max vol"),  vf.input.value + "%"]],
               f.amount, pp, function () { renderUpdate(root, info.symbol); }, function (s) {
                 return publish(root, d, g, pair, async function () {
@@ -235,7 +235,7 @@ var AssetManageUI = (function () {
                     var n = o && o[0] && o[0].options;
                     return (n && n.force_settlement_offset_percent === pair[1].new_options.force_settlement_offset_percent) ? n : null;
                   } catch (e) { return null; } },
-                  "Bitasset updated", info.symbol + " bitasset re-read matches.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
+                  t("asset.bitasset_updated", "Bitasset updated"), info.symbol + " bitasset re-read matches.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
           })().catch(function (e) { r2.disabled = false; err(d, v,e,t("asset.bitasset_prepare_failed", "Could not prepare the bitasset update.")); }); });
       }
       /* op-13 producers */
@@ -251,11 +251,11 @@ var AssetManageUI = (function () {
           var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
           var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
           if (g !== gen) return; wipe(root); var w4 = wrap(d, root), pp = await feePrec(f.asset_id);
-          confirm(d, w4, root, "Confirm feed producers",
+          confirm(d, w4, root, t("asset.confirm_producers", "Confirm feed producers"),
             [[t("asset_ops.title", "Asset"),  info.symbol], [t("asset.producers_row", "Producers"),  ids.length ? ids.join(", ") : "(empty)"]],
             f.amount, pp, function () { renderUpdate(root, info.symbol); }, function (s) {
               return publish(root, d, g, pair, async function () { return true; },
-                "Producers updated", "Broadcast observed; verify on #/asset/" + info.symbol + ".",
+                t("asset.producers_updated", "Producers updated"), "Broadcast observed; verify on #/asset/" + info.symbol + ".",
                 "#/asset/" + info.symbol, "Open " + info.symbol, s); });
         })().catch(function (e) { r3.disabled = false; err(d, v,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); }); });
     })().catch(function (e) { if (g === gen) { wipe(root); var w2 = wrap(d, root);
@@ -271,7 +271,7 @@ var AssetManageUI = (function () {
     var s = field(d, t("explorer.th_symbol", "Symbol"), null, "", null, false, "AFKTEST01");
     var toF = isReserve ? null : field(d, t("asset.to_field", "To (name or 1.2.N)"), null, "");
     var a = field(d, t("asset.amount_field", "Amount (human)"), null, "1", "decimal");
-    var who = field(d, isReserve ? "Payer (name or 1.2.N)" : "Acting account (name or 1.2.N)", null, "1.2.0");
+    var who = field(d, isReserve ? t("asset.payer_field", "Payer (name or 1.2.N)") : t("asset.acting_field", "Acting account (name or 1.2.N)"), null, "1.2.0");
     v.appendChild(s.row); if (toF) v.appendChild(toF.row); v.appendChild(a.row); v.appendChild(who.row);
     var r = touch(el(d, "button", btnLabel)); r.type = "button"; v.appendChild(r);
     r.addEventListener("click", function () { r.disabled = true;
@@ -305,7 +305,7 @@ var AssetManageUI = (function () {
               isReserve ? "Assets reserved" : "Assets issued",
               Format.formatAmount(raw, info.precision) + " " + info.symbol + (isReserve ? " burned back." : " → " + to.name + "."),
               "#/asset/" + info.symbol, "Open " + info.symbol, st); });
-      })().catch(function (e) { r.disabled = false; err(d, v, e, isReserve ? "Could not prepare the reserve." : "Could not prepare the issue."); }); });
+      })().catch(function (e) { r.disabled = false; err(d, v, e, isReserve ? t("asset.reserve_prepare_failed", "Could not prepare the reserve.") : t("asset.issue_prepare_failed", "Could not prepare the issue.")); }); });
   }
   /* renderIssue: op-14 issue + op-15 reserve halves. PUBLIC preview renders
    * LOCKED (gate-repair); Sign & Send gates in publish() via fresh WIF. */
@@ -321,8 +321,8 @@ var AssetManageUI = (function () {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
         v.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
     } catch (e) { /* notice is display-only */ }
-    half(d, v, root, g, "Issue to account (op 14)", "Review issue", false);
-    half(d, v, root, g, "Reserve / burn back (op 15)", "Review reserve", true);
+    half(d, v, root, g, t("asset.issue_op14_title", "Issue to account (op 14)"), t("asset.review_issue", "Review issue"), false);
+    half(d, v, root, g, t("asset.reserve_op15_title", "Reserve / burn back (op 15)"), t("asset.review_reserve", "Review reserve"), true);
   }
   return { renderUpdate: renderUpdate, renderIssue: renderIssue };
 })();

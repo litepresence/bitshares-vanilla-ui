@@ -85,7 +85,7 @@ var DebitUI = (function () {
       if (myGen !== gen) return; u.routeFail(root, "Direct Debit", e, t("debit.load_failed", "Could not load permissions."), retry); });
   }
   function permTable(u, doc, rows, side) { /* limit/claimed/available human, period human, status */
-    if (!rows.length) return u.el(doc, "p", side === "giver" ? "You granted no permissions." : "No permissions granted to you.", "muted");
+    if (!rows.length) return u.el(doc, "p", side === "giver" ? t("debit.empty_giver", "You granted no permissions.") : t("debit.empty_recipient", "No permissions granted to you."), "muted");
     var table = doc.createElement("table"); table.className = "node-table";
     table.appendChild(u.tableHead(doc, [t("debit.perm_col", "Permission"),  side === "giver" ? t("debit.auth_row", "Authorized") : t("debit.giver_row", "Giver"),
       t("instant.limit", "Limit"), t("debit.used_col", "Used"), t("debit.avail_col", "Available"), t("debit.period_row", "Period"), t("prediction.hdr_status", "Status")]));
@@ -115,7 +115,7 @@ var DebitUI = (function () {
     var fStart = u.field(doc, t("debit.start_field", "Start (local time)"), {});
     fStart.input.type = "datetime-local";
     [fPerm, fAuth, fAsset, fLimit, fCount, fStart].forEach(function (f) { box.appendChild(f.row); });
-    var period = u.secsPicker(doc, u.presets.map(function (p) { return [String(p[1]), p[0]]; }), "Period");
+    var period = u.secsPicker(doc, u.presets.map(function (p) { return [String(p[1]), p[0]]; }), t("debit.period_row", "Period"));
     box.appendChild(period.row);
     u.reviewSection(doc, box, myGen, t("debit.review_perm", "Review permission"), {
       build: async function () {
@@ -159,7 +159,7 @@ var DebitUI = (function () {
         rows.push([t("borrow.network", "Network"),  "testnet"]);
         return rows;
       },
-      title: t("debit.confirm_perm", "Confirm permission"), ok: function (R) { return R.isUpdate ? "Permission updated." : "Permission created."; },
+      title: t("debit.confirm_perm", "Confirm permission"), ok: function (R) { return R.isUpdate ? t("debit.perm_updated", "Permission updated.") : t("debit.perm_created", "Permission created."); },
       fail: t("debit.perm_failed", "Could not prepare the permission.") });
   }
   function rowActionBox(u, doc, box, me, lists, myGen) { /* claim (≤ available + plaintext-memo warning) + delete (fee 0) */
@@ -236,9 +236,9 @@ var DebitUI = (function () {
     var miss = u.missingBackends();
     if (miss) { u.showError(doc, wrap, "Spotlight backend missing: " + miss + " failed to load."); return; }
     if (Chain.status().state !== "open") { var sretry = function () { renderSpotlight(root); }; u.offlineBox(doc, wrap, sretry); u.autoRetryOnOpen(myGen, sretry, function () { return myGen === gen; }); return; }
-    var tiles = [[t("htlc.title", "HTLC"),  "Lock funds with a hash + timelock.", "#/htlc", ""], [t("debit.title", "Direct Debit"),  "Recurring withdrawal permissions.", "#/direct-debit", ""],
-      [t("borrow.title", "Borrow"),  "Margin positions.", "", "Lands in a later slice"], [t("barter.barter", "Barter"),  "Two-sided swap offers.", "", "Lands in a later slice"],
-      [t("debit.tile_prediction", "Prediction"),  "Prediction markets.", "", "Lands in a later slice"], [t("instant.instant_trade", "Instant Trade"),  "Simple buy/sell view.", "", "Lands in a later slice"]];
+    var tiles = [[t("htlc.title", "HTLC"),  t("debit.tile_htlc_desc", "Lock funds with a hash + timelock."), "#/htlc", ""], [t("debit.title", "Direct Debit"),  t("debit.tile_debit_desc", "Recurring withdrawal permissions."), "#/direct-debit", ""],
+      [t("borrow.title", "Borrow"),  t("debit.tile_borrow_desc", "Margin positions."), "", "Lands in a later slice"], [t("barter.barter", "Barter"),  t("debit.tile_barter_desc", "Two-sided swap offers."), "", "Lands in a later slice"],
+      [t("debit.tile_prediction", "Prediction"),  t("debit.tile_prediction_desc", "Prediction markets."), "", "Lands in a later slice"], [t("instant.instant_trade", "Instant Trade"),  t("debit.tile_instant_desc", "Simple buy/sell view."), "", "Lands in a later slice"]];
     var grid = u.el(doc, "div", null, "spot-grid");
     tiles.forEach(function (t) {
       var card = u.el(doc, "div", null, "spot-card");

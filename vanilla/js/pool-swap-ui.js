@@ -90,7 +90,7 @@ var PoolSwapUI = (function () {
           sel.appendChild(o);
         });
         var row = u.el(doc, "div", null, "xfer-field");
-        row.appendChild(u.el(doc, "span", found.rows.length > 1 ? "Pool (several exist — pick one): " : "Pool: "));
+        row.appendChild(u.el(doc, "span", found.rows.length > 1 ? t("pool.pick_multi", "Pool (several exist — pick one): ") : t("pool.pick_single", "Pool: ")));
         row.appendChild(sel); pickBox.appendChild(row);
         var quoteBtn = u.touchable(u.el(doc, "button", t("notify.quote_label", "Quote"))); quoteBtn.type = "button"; pickBox.appendChild(quoteBtn);
         quoteBtn.addEventListener("click", function () {
@@ -170,7 +170,7 @@ var PoolSwapUI = (function () {
             [t("pool.slippage_row", "Slippage"),  slipHuman + "%"], [t("pool.impact_row", "Price impact"),  (Q.q.impact_bp / 100) + "%"],
             [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
         },
-        title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return "Swapped."; }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
+        title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return t("pool.swapped", "Swapped."); }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return; u.clearBox(quoteBox); u.showError(doc, quoteBox,e,t("pool.quote_failed", "Could not quote the swap."));
     });

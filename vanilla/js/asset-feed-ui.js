@@ -113,7 +113,7 @@ var AssetFeedUI = (function () {
   function feeSection(d, box) {
     var my = ++feeGen;
     box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
-    status(d, box, "Loading fee schedule…");
+    status(d, box, t("asset.loading_fees", "Loading fee schedule…"));
     Asset.feeSchedule().then(function (s) {
       if (my !== feeGen) return; wipe(box);
       box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
@@ -162,7 +162,7 @@ var AssetFeedUI = (function () {
     go.addEventListener("click", function () {
       var sym = s.input.value.trim().toUpperCase();
       if (!sym) { err(d, body,t("asset.enter_symbol", "Enter a symbol.")); return; }
-      wipe(body); status(d, body, "Loading feed…");
+      wipe(body); status(d, body, t("asset.loading_feed", "Loading feed…"));
       loadFeed(d, body, root, g, sym);
     });
   }
@@ -241,7 +241,7 @@ var AssetFeedUI = (function () {
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
         var stl = sb.input.value + " " + info.symbol + " / " + sq.input.value + " backing";
         var cer = cb.input.value + " " + info.symbol + " / " + cq.input.value + " backing";
-        confirm(d, w2, root, "Confirm feed",
+        confirm(d, w2, root, t("asset.confirm_feed", "Confirm feed"),
           [[t("asset.publisher_row", "Publisher"),  who.name + " (" + who.id + ")"], [t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
             [t("explorer.th_settlement", "Settlement"),  stl], [t("asset.mcr_row", "MCR"),  mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
             [t("explorer.th_mssr", "MSSR"),  mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "CER"),  cer]],
@@ -287,7 +287,7 @@ var AssetFeedUI = (function () {
         var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
         var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
-        confirm(d, w2, root, "Confirm feed producers",
+        confirm(d, w2, root, t("asset.confirm_producers", "Confirm feed producers"),
           [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"], [t("asset.producers_row", "Producers"),  ids.length ? ids.join(", ") : "(empty)"]],
           f.amount, pp, function () { renderFeed(root); }, function (onStep) {
             return (async function () {

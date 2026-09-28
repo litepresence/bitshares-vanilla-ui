@@ -577,7 +577,17 @@
     "tile_prediction": "Prediction",
     "total_field": "Total to sell",
     "unlocked_note": "Unlocked — press Preview again so the orders use your account, then sign.",
-    "used_col": "Used"
+    "used_col": "Used",
+    "empty_giver": "You granted no permissions.",
+    "empty_recipient": "No permissions granted to you.",
+    "perm_created": "Permission created.",
+    "perm_updated": "Permission updated.",
+    "tile_barter_desc": "Two-sided swap offers.",
+    "tile_borrow_desc": "Margin positions.",
+    "tile_debit_desc": "Recurring withdrawal permissions.",
+    "tile_htlc_desc": "Lock funds with a hash + timelock.",
+    "tile_instant_desc": "Simple buy/sell view.",
+    "tile_prediction_desc": "Prediction markets."
   },
   "explorer_assets": {
     "title": "Asset",
@@ -841,7 +851,16 @@
     "secret_type": "Type a new preimage",
     "size_row": "Preimage size",
     "unknown_account": "Account not found.",
-    "unknown_contract": "Unknown HTLC contract."
+    "unknown_contract": "Unknown HTLC contract.",
+    "created": "HTLC created.",
+    "empty_received": "No HTLCs addressed to you.",
+    "empty_sent": "No HTLCs sent from your accounts.",
+    "enter_secs": "Enter extra seconds.",
+    "hash_field": "Hash hex",
+    "hashlock_col": "Hash lock",
+    "locktime_label": "Lock time",
+    "size_field": "Preimage size (bytes)",
+    "to_account": "To account"
   },
   "market_book": {
     "title": "Exchange",
@@ -2121,7 +2140,25 @@
     "tab_uia": "UIA",
     "to_field": "To (name or 1.2.N)",
     "update_title": "Update asset",
-    "viewing_notice": "Viewing as committee-account (1.2.0) — unlock to sign."
+    "viewing_notice": "Viewing as committee-account (1.2.0) — unlock to sign.",
+    "bitasset_updated": "Bitasset updated",
+    "confirm_bitasset": "Confirm bitasset update",
+    "confirm_create": "Confirm asset create",
+    "confirm_feed": "Confirm feed",
+    "confirm_producers": "Confirm feed producers",
+    "confirm_update": "Confirm asset update",
+    "created": "Asset created",
+    "issue_op14_title": "Issue to account (op 14)",
+    "issue_prepare_failed": "Could not prepare the issue.",
+    "loading_feed": "Loading feed…",
+    "loading_fees": "Loading fee schedule…",
+    "loading_issued": "Loading issued assets…",
+    "payer_field": "Payer (name or 1.2.N)",
+    "reserve_op15_title": "Reserve / burn back (op 15)",
+    "reserve_prepare_failed": "Could not prepare the reserve.",
+    "review_issue": "Review issue",
+    "review_reserve": "Review reserve",
+    "updated": "Asset updated"
   },
   "pool": {
     "a_to_b_col": "A→B out (raw)",
@@ -2199,6 +2236,17 @@
     "unlock_notice": "Unlock to act — signing needs your wallet password.",
     "unstake_failed": "Could not prepare the unstake.",
     "warning_row": "Warning",
-    "withdrawal_row": "Withdrawal fee"
+    "withdrawal_row": "Withdrawal fee",
+    "delete_warning": "Delete is owner-only cleanup. Withdraw all liquidity first.",
+    "deleted": "Pool deleted.",
+    "pick_multi": "Pool (several exist — pick one): ",
+    "pick_single": "Pool: ",
+    "staked": "Staked (deposit broadcast).",
+    "swapped": "Swapped.",
+    "taker_pct_field": "Taker fee %",
+    "unstaked": "Unstaked (withdraw broadcast).",
+    "updated": "Pool updated.",
+    "withdrawal_pct_field": "Withdrawal fee %",
+    "withdrawal_zero_note": "Withdrawal fee can only be set to 0."
   }
 }

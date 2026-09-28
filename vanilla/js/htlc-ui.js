@@ -274,9 +274,9 @@ var HtlcUI = (function () {
       if (myGen !== gen) return; routeFail(root, "Hashed Timelock Contracts", e, t("htlc.load_failed", "Could not load contracts."), function () { renderHtlc(root); }); });
   }
   function htlcTable(doc, rows, kind) { /* ALGO NAME + short hex cells; rows link to detail */
-    if (!rows.length) return el(doc, "p", kind === "sent" ? "No HTLCs sent from your accounts." : "No HTLCs addressed to you.", "muted");
+    if (!rows.length) return el(doc, "p", kind === "sent" ? t("htlc.empty_sent", "No HTLCs sent from your accounts.") : t("htlc.empty_received", "No HTLCs addressed to you."), "muted");
     var table = doc.createElement("table"); table.className = "node-table";
-    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"),  "Amount", "Hash lock", "Expires", ""]));
+    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"),  t("confirm.amount", "Amount"), t("htlc.hashlock_col", "Hash lock"), t("proposal.expires", "Expires"), ""]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var tr = doc.createElement("tr"), a = amtText(r.amount_raw, r.asset_id, r.precision), exp, link, td, ac, hc;
@@ -293,9 +293,9 @@ var HtlcUI = (function () {
   }
   function createBox(doc, box, me, myGen) { /* create form; fee RE-READ at review; no preimage echo */
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
-    var fTo = field(doc, "To account", { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
-    var fAsset = field(doc, "Asset", { value: "BTS" });
-    var fAmount = field(doc, "Amount", { inputmode: "decimal", placeholder: "1.23456" });
+    var fTo = field(doc, t("htlc.to_account", "To account"), { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+    var fAsset = field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
+    var fAmount = field(doc, t("confirm.amount", "Amount"), { inputmode: "decimal", placeholder: "1.23456" });
     [fTo, fAsset, fAmount].forEach(function (f) { box.appendChild(f.row); });
     var algoSel = selectOpts(doc, touchable(doc.createElement("select")), [["sha256", "sha256"], ["ripemd160", "ripemd160"]]);
     var algoRow = el(doc, "div", null, "xfer-field");
@@ -305,11 +305,11 @@ var HtlcUI = (function () {
     var modeSel = selectOpts(doc, touchable(doc.createElement("select")), [["type", t("htlc.secret_type", "Type a new preimage")], ["paste", t("htlc.secret_paste", "Paste an existing hash")]]);
     var modeRow = el(doc, "div", null, "xfer-field");
     modeRow.appendChild(el(doc, "span", t("htlc.secret_label", "Secret: "))); modeRow.appendChild(modeSel); box.appendChild(modeRow);
-    var fSecret = field(doc, "Preimage", { placeholder: t("htlc.secret_ph", "secret words") });
-    var fHash = field(doc, "Hash hex", { placeholder: t("htlc.hash_ph", "hex of the preimage hash") });
-    var fSize = field(doc, "Preimage size (bytes)", { inputmode: "numeric" });
+    var fSecret = field(doc, t("htlc.preimage_label", "Preimage"), { placeholder: t("htlc.secret_ph", "secret words") });
+    var fHash = field(doc, t("htlc.hash_field", "Hash hex"), { placeholder: t("htlc.hash_ph", "hex of the preimage hash") });
+    var fSize = field(doc, t("htlc.size_field", "Preimage size (bytes)"), { inputmode: "numeric" });
     box.appendChild(fSecret.row); box.appendChild(fHash.row); box.appendChild(fSize.row);
-    var period = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), p[0]]; }), "Lock time");
+    var period = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), p[0]]; }), t("htlc.locktime_label", "Lock time"));
     box.appendChild(period.row);
     /* Toggle preimage-vs-paste rows for the Secret mode select (type = preimage row; paste = hash + size rows). */
     function syncMode() {
@@ -348,7 +348,7 @@ var HtlcUI = (function () {
           if (secs > 86400) rows.push([t("htlc.netnote_row", "Network note"),  "Fee scales per day (fee_per_day)"]);
           rows.push([t("borrow.network", "Network"),  "testnet"]); return rows;
         },
-        title: t("htlc.confirm_create", "Confirm HTLC"), ok: function () { return "HTLC created."; }, clear: [fSecret.input, fHash.input, fSize.input], fail: t("htlc.create_failed", "Could not prepare the HTLC.") });
+        title: t("htlc.confirm_create", "Confirm HTLC"), ok: function () { return t("htlc.created", "HTLC created."); }, clear: [fSecret.input, fHash.input, fSize.input], fail: t("htlc.create_failed", "Could not prepare the HTLC.") });
   }
   /* Route entry: #/htlc/:id — detail + redeem + extend; unknown id is an empty state. */
   function renderHtlcDetail(root, id) {
@@ -431,7 +431,7 @@ var HtlcUI = (function () {
   function extendBox(doc, box, me, row, myGen) { /* presets + custom, new-expiry preview, live fee */
     box.appendChild(el(doc, "h2", t("htlc.extend_title", "Extend timelock")));
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
-    var picker = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), "+" + p[0]]; }), "Add");
+    var picker = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), "+" + p[0]]; }), t("settings.add", "Add"));
     box.appendChild(picker.row);
     var preview = el(doc, "p", "", "muted"); preview.setAttribute("aria-live", "polite"); box.appendChild(preview);
     var oldSecs = Math.floor(new Date(row.expiration_iso + "Z").getTime() / 1000);
@@ -442,7 +442,7 @@ var HtlcUI = (function () {
     }
     function refreshPreview() {
       var n = picker.secs();
-      preview.textContent = (!Number.isInteger(n) || n < 1) ? "Enter extra seconds." : humanAdded(n).line; }
+      preview.textContent = (!Number.isInteger(n) || n < 1) ? t("htlc.enter_secs", "Enter extra seconds.") : humanAdded(n).line; }
     picker.sel.addEventListener("change", refreshPreview);
     picker.custom.addEventListener("input", refreshPreview); refreshPreview();
     reviewSection(doc, box, myGen, t("htlc.review_extend", "Review extend"), {

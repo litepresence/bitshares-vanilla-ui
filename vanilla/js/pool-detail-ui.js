@@ -102,7 +102,7 @@ var PoolDetailUI = (function () {
     var u = U(), note = u.el(doc, "p", t("pool.loading_history", "Loading price history…"), "muted"); charts.appendChild(note);
     Pool.history(r.id, 100).then(function (rows) {
       if (!live(myGen, uiGen)) return;
-      note.textContent = rows.length ? rows.length + " pool events." : "No pool history yet.";
+      note.textContent = rows.length ? rows.length + " pool events." : t("pool_detail.s1", "No pool history yet.");
       if (!rows.length) return;
       try {
         if (typeof LightweightCharts === "undefined") { note.textContent += " (chart library unavailable)"; return; }
@@ -181,7 +181,7 @@ var PoolDetailUI = (function () {
           [t("pool.amount_a_field", "Amount A"),  lA.text, "raw " + lA.raw], [t("pool.amount_b_field", "Amount B"),  lB.text, "raw " + lB.raw],
           [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: t("pool.confirm_stake", "Confirm stake"), ok: function () { return "Staked (deposit broadcast)."; }, fail: t("pool.stake_failed", "Could not prepare the stake.") });
+      title: t("pool.confirm_stake", "Confirm stake"), ok: function () { return t("pool.staked", "Staked (deposit broadcast)."); }, fail: t("pool.stake_failed", "Could not prepare the stake.") });
     var fS = u.field(doc, t("pool.shares_field", "LP shares"), { inputmode: "decimal", placeholder: "1.0" });
     box.appendChild(fS.row);
     u.reviewSection(doc, box, uiGen, t("pool.review_unstake", "Review unstake"), {
@@ -201,7 +201,7 @@ var PoolDetailUI = (function () {
           [t("pool.shares_field", "LP shares"),  sh.text, "raw " + sh.raw],
           [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: t("pool.confirm_unstake", "Confirm unstake"), ok: function () { return "Unstaked (withdraw broadcast)."; }, fail: t("pool.unstake_failed", "Could not prepare the unstake.") });
+      title: t("pool.confirm_unstake", "Confirm unstake"), ok: function () { return t("pool.unstaked", "Unstaked (withdraw broadcast)."); }, fail: t("pool.unstake_failed", "Could not prepare the unstake.") });
   }
   function swapInlineBox(doc, box, r, uiGen) { /* op-63 mini-form: quote + impact + slippage preview */
     var u = U();
@@ -243,7 +243,7 @@ var PoolDetailUI = (function () {
           [t("pool.impact_row", "Price impact"),  (R.q.impact_bp / 100) + "%"],
           [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return "Swapped."; }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
+      title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return t("pool.swapped", "Swapped."); }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
   }
   function manageBoxes(doc, box, r, uiGen) { /* op-75 fee edit (withdrawal 0-only) + op-60 owner delete (fee 0) */
     var u = U();
@@ -277,11 +277,11 @@ var PoolDetailUI = (function () {
           rows.push([t("pool.taker_row", "Taker fee"),  u.pctText(r.taker_units) + " → " + u.pctText(op.taker_fee_percent)]);
         if (op.withdrawal_fee_percent !== null && op.withdrawal_fee_percent !== undefined)
           rows.push([t("pool.withdrawal_row", "Withdrawal fee"),  u.pctText(r.withdrawal_units) + " → 0%"]);
-        rows.push([t("misc.note", "Note"),  "Withdrawal fee can only be set to 0."]);
+        rows.push([t("misc.note", "Note"),  t("pool.withdrawal_zero_note", "Withdrawal fee can only be set to 0.")]);
         rows.push([t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw]); rows.push([t("borrow.network", "Network"),  "testnet"]);
         return rows;
       },
-      title: t("pool.confirm_update", "Confirm pool update"), ok: function () { return "Pool updated."; }, fail: t("credit.could_not_prepare_the_update", "Could not prepare the update.") });
+      title: t("pool.confirm_update", "Confirm pool update"), ok: function () { return t("pool.updated", "Pool updated."); }, fail: t("credit.could_not_prepare_the_update", "Could not prepare the update.") });
     u.reviewSection(doc, box, uiGen, t("credit.review_delete", "Review delete"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
@@ -292,10 +292,10 @@ var PoolDetailUI = (function () {
       },
       rows: function (R, fee) {
         return [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)],
-          [t("pool.warning_row", "Warning"),  "Delete is owner-only cleanup. Withdraw all liquidity first."],
+          [t("pool.warning_row", "Warning"),  t("pool.delete_warning", "Delete is owner-only cleanup. Withdraw all liquidity first.")],
           [t("borrow.fee", "Fee"),  fee.text + " (expected 0)", "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: t("pool.confirm_delete", "Confirm pool delete"), ok: function () { return "Pool deleted."; }, fail: t("credit.could_not_prepare_the_delete", "Could not prepare the delete.") });
+      title: t("pool.confirm_delete", "Confirm pool delete"), ok: function () { return t("pool.deleted", "Pool deleted."); }, fail: t("credit.could_not_prepare_the_delete", "Could not prepare the delete.") });
   }
   return { renderPoolDetail: renderPoolDetail };
 })();

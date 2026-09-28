@@ -234,7 +234,7 @@ var PoolUI = (function () {
     *   the inline swap and stake panels — the list stays a list. */
     if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found."), "muted");
     var table = doc.createElement("table"); table.className = "node-table pools-table";
-    table.appendChild(tableHead(doc, [t("pool.id_col", "Pool ID"),  "Share asset", t("pool.asset_a_field", "Asset A"), t("pool.asset_a_qty_col", "Asset A qty"),
+    table.appendChild(tableHead(doc, [t("pool.id_col", "Pool ID"),  t("pool.share_asset_field", "Share asset"), t("pool.asset_a_field", "Asset A"), t("pool.asset_a_qty_col", "Asset A qty"),
       t("pool.asset_b_field", "Asset B"), t("pool.asset_b_qty_col", "Asset B qty"), t("pool.taker_row", "Taker fee"), t("pool.withdrawal_row", "Withdrawal fee"), t("market.title", "Exchange"), t("pool.stake_unstake_col", "Stake/Unstake")]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
@@ -295,9 +295,9 @@ var PoolUI = (function () {
     ctx.wrap.appendChild(el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
     var filters = el(doc, "div", null, "pools-filters");
-    var fA = field(doc, "Asset A", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fB = field(doc, "Asset B", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fS = field(doc, "Share asset", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fA = field(doc, t("pool.asset_a_field", "Asset A"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fB = field(doc, t("pool.asset_b_field", "Asset B"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fS = field(doc, t("pool.share_asset_field", "Share asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
     var sizeLab = el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");
@@ -399,11 +399,11 @@ var PoolUI = (function () {
     })();
   }
   function createBox(doc, box, myGen) { /* op-59 create: a/b/share resolves, human percents, orientation preview */
-    var fA = field(doc, "Asset A", { placeholder: "BTS" });
-    var fB = field(doc, "Asset B", { placeholder: "CNY" });
-    var fSh = field(doc, "Share asset", { placeholder: t("pool.share_ph", "fresh UIA symbol") });
-    var fT = field(doc, "Taker fee %", { value: "0.5", inputmode: "decimal" });
-    var fW = field(doc, "Withdrawal fee %", { value: "0", inputmode: "decimal" });
+    var fA = field(doc, t("pool.asset_a_field", "Asset A"), { placeholder: "BTS" });
+    var fB = field(doc, t("pool.asset_b_field", "Asset B"), { placeholder: "CNY" });
+    var fSh = field(doc, t("pool.share_asset_field", "Share asset"), { placeholder: t("pool.share_ph", "fresh UIA symbol") });
+    var fT = field(doc, t("pool.taker_pct_field", "Taker fee %"), { value: "0.5", inputmode: "decimal" });
+    var fW = field(doc, t("pool.withdrawal_pct_field", "Withdrawal fee %"), { value: "0", inputmode: "decimal" });
     [fA, fB, fSh, fT, fW].forEach(function (f) { box.appendChild(f.row); });
     reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
