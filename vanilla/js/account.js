@@ -1,10 +1,13 @@
-/* Account: read-only account data layer (resolve, balances, history, my-account).
+/* Account: read-only account data layer (resolve, balances, history, my-account,
+ *   equity replay).
  * Owns: BitShares account lookups and balance joining; no rendering, no signing.
  * Consumes: Chain.db/.history/.call, Format.formatAmount, Wallet.keys/
  *   .isUnlocked/.getBrainkey (in-memory unlocked keys), Crypto.
  *   brainPrivateKeyHex/.keypairFromPrivateHex (active seq1 pub derivation).
  * Globals/side effects: exposes global Account only; no DOM, no storage writes.
  * Created by: building-vanilla-slices skill, slice-03 Task 3.
+ * Extended by: dex-ux plots task (AFK round — proposal 4 equity replay:
+ *   historyPaged + replayEquity + equity; chain-history ONLY, ES refused).
  */
 "use strict";
 
@@ -101,6 +104,265 @@ var Account = (function () {
     return rows;
   }
 
+  /* Paged-walk bounds (dex-ux plot proposal 4 cost cap: <=5 pages x 100;
+   * stops early on an empty or short page). */
+  var HISTORY_PAGE = 100, HISTORY_MAX_PAGES = 5;
+  var HIST_ID_RE = /^1\.11\.\d+$/;
+  var INT_RE = /^\d+$/;
+
+  /* Unwrap one get_account_history row to its operation_history_object.
+   * Nodes return either the object or a [seq, object] pair (tx-send.js
+   * pollHistoryForTransfer handles both); the object carries .op/.block_num.
+   * Params: r raw row. Returns the object or null. */
+  function _unwrapHist(r) {
+    if (Array.isArray(r)) {
+      var i, c;
+      for (i = 0; i < r.length; i++) {
+        c = r[i];
+        if (c && typeof c === "object" && !Array.isArray(c) && c.op) return c;
+      }
+      if (r[1] && typeof r[1] === "object" && !Array.isArray(r[1])) return r[1];
+      return null;
+    }
+    return (r && typeof r === "object") ? r : null;
+  }
+
+  /* History-object id ("1.11.N") from either row shape, or null when the
+   * shape is unrecognized (caller stops paging — never guesses). */
+  function _histRowId(r, entry) {
+    if (entry && typeof entry.id === "string" && HIST_ID_RE.test(entry.id)) return entry.id;
+    if (Array.isArray(r) && typeof r[0] === "string" && HIST_ID_RE.test(r[0])) return r[0];
+    return null;
+  }
+
+  /* One get_account_history page — the SAME WS method Account.history uses
+   * (no new chain methods enter with paging); only `start` varies, `stop`
+   * stays the earliest id. Params: id account id; limit 1-100; start "1.11.x".
+   * Returns the raw row array (possibly empty). Fails "history-unavailable". */
+  async function _historyPage(id, limit, start) {
+    var histId;
+    try {
+      histId = await Chain.history();
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    var rows;
+    try {
+      rows = await Chain.call(histId, "get_account_history", [id, FIRST_HISTORY_OP, limit, start]);
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    return rows || [];
+  }
+
+  /* Paged history walk (dex-ux plot proposal 4 source — vanilla/notes/
+   * dexux-plots.md section 4; chain-history ONLY, ES refused). Start ids are
+   * inclusive on most nodes, so a leading duplicate of the previous page's
+   * tail is dropped. Params: id account id string; perPage/maxPages optional
+   * positive ints (defaults 100/5, hard caps 100/5 — the proposal's cost
+   * bound). Returns {pages, rows, truncated}: pages newest-first raw arrays,
+   * rows the deduped flat newest-first list, truncated true when the cap
+   * stopped a walk whose last raw page was full (older history exists but
+   * was not replayed — the view says so). */
+  async function historyPaged(id, perPage, maxPages) {
+    if (typeof id !== "string" || !id) throw new Error("unknown-account");
+    var per = (perPage === undefined || perPage === null) ? HISTORY_PAGE : perPage;
+    var max = (maxPages === undefined || maxPages === null) ? HISTORY_MAX_PAGES : maxPages;
+    if (!Number.isInteger(per) || per < 1 || per > 100) throw new Error("perPage must be 1-100");
+    if (!Number.isInteger(max) || max < 1 || max > 5) throw new Error("maxPages must be 1-5");
+    var pages = [], flat = [], start = FIRST_HISTORY_OP, lastTailId = null, p;
+    for (p = 0; p < max; p++) {
+      var raw = await _historyPage(id, per, start);
+      if (!raw || raw.length === 0) break;
+      var rawLen = raw.length, rows = raw;
+      if (lastTailId !== null) {
+        var firstId = _histRowId(rows[0], _unwrapHist(rows[0]));
+        if (firstId !== null && firstId === lastTailId) {
+          rows = rows.slice(1);
+          if (rows.length === 0) break;
+        }
+      }
+      pages.push(rows);
+      var i, tailId = lastTailId;
+      for (i = 0; i < rows.length; i++) {
+        flat.push(rows[i]);
+        var rid = _histRowId(rows[i], _unwrapHist(rows[i]));
+        if (rid) tailId = rid;
+      }
+      if (rawLen < per) break; /* short raw page: reached the oldest event */
+      if (!tailId) break; /* no ids to page with — return what we have */
+      lastTailId = tailId;
+      start = tailId;
+    }
+    var truncated = pages.length === max && pages[max - 1].length === per;
+    return { pages: pages, rows: flat, truncated: truncated };
+  }
+
+  /* One signed raw-integer leg into the per-asset accumulator.
+   * Params: acc {assetId: {total: bigint, per: {seriesIdx: bigint}}},
+   * assetId string, raw digit string, sign +1n|-1n, seriesIdx chronological
+   * page index. Returns true when applied, false on malformed input
+   * (caller counts the op skipped — never throws on chain data). */
+  function _legAdd(acc, assetId, raw, sign, seriesIdx) {
+    if (typeof assetId !== "string" || !assetId) return false;
+    if (typeof raw !== "string") raw = String(raw);
+    if (!INT_RE.test(raw)) return false;
+    var d;
+    try {
+      d = BigInt(raw) * sign;
+    } catch (e) {
+      return false;
+    }
+    if (d === 0n) return true; /* zero legs apply trivially; the op still counts */
+    var e = acc[assetId];
+    if (!e) e = acc[assetId] = { total: 0n, per: {} };
+    e.total += d;
+    e.per[seriesIdx] = (e.per[seriesIdx] || 0n) + d;
+    return true;
+  }
+
+  /* Signed raw legs for one history op tuple, filtered to the viewed account
+   * (legs for other accounts yield [] — seen but contributing nothing; null
+   * means out of scope entirely). Fee legs use the op's own fee asset (never
+   * assumed). Numeric codes are what nodes emit; the two string aliases
+   * mirror NotifyRules._opKind. Amount shapes mirror the #4 headers
+   * (transfer.hpp:45-67, market.hpp:206-233, liquidity_pool.hpp:94-152). */
+  function _equityLegs(code, body, accountId) {
+    function assetOf(a) {
+      if (!a || typeof a !== "object") return null;
+      if (typeof a.asset_id !== "string") return null;
+      if (a.amount === undefined || a.amount === null) return null;
+      return { asset_id: a.asset_id, raw: String(a.amount) };
+    }
+    if (code === 0 || code === "transfer" || code === 38 || code === "override_transfer") {
+      var out = [];
+      var amt = assetOf(body.amount), fee = assetOf(body.fee);
+      var from = body.from !== undefined ? String(body.from) : null;
+      var to = body.to !== undefined ? String(body.to) : null;
+      if (amt && to === accountId) out.push({ asset_id: amt.asset_id, raw: amt.raw, sign: 1n });
+      if (amt && from === accountId) {
+        out.push({ asset_id: amt.asset_id, raw: amt.raw, sign: -1n });
+        var payer = (code === 38 || code === "override_transfer")
+          ? (body.issuer !== undefined ? String(body.issuer) : null) : from;
+        if (fee && payer === accountId) out.push({ asset_id: fee.asset_id, raw: fee.raw, sign: -1n });
+      }
+      return out;
+    }
+    if (code === 4 || code === "fill_order") {
+      if (body.account_id !== undefined && String(body.account_id) !== accountId) return [];
+      var legs = [];
+      var recv = assetOf(body.receives), pays = assetOf(body.pays), f = assetOf(body.fee);
+      if (recv) legs.push({ asset_id: recv.asset_id, raw: recv.raw, sign: 1n });
+      if (pays) legs.push({ asset_id: pays.asset_id, raw: pays.raw, sign: -1n });
+      if (f) legs.push({ asset_id: f.asset_id, raw: f.raw, sign: -1n });
+      return legs;
+    }
+    if (code === 61 || code === 62 || code === 63) {
+      if (body.account !== undefined && String(body.account) !== accountId) return [];
+      var pl = [];
+      var pf = assetOf(body.fee);
+      if (code === 61) {
+        var aa = assetOf(body.amount_a), ab = assetOf(body.amount_b);
+        if (aa) pl.push({ asset_id: aa.asset_id, raw: aa.raw, sign: -1n });
+        if (ab) pl.push({ asset_id: ab.asset_id, raw: ab.raw, sign: -1n });
+      } else if (code === 62) {
+        var sh = assetOf(body.share_amount);
+        if (sh) pl.push({ asset_id: sh.asset_id, raw: sh.raw, sign: -1n });
+      } else {
+        var sell = assetOf(body.amount_to_sell), floor = assetOf(body.min_to_receive);
+        if (sell) pl.push({ asset_id: sell.asset_id, raw: sell.raw, sign: -1n });
+        if (floor) pl.push({ asset_id: floor.asset_id, raw: floor.raw, sign: 1n });
+      }
+      if (pf) pl.push({ asset_id: pf.asset_id, raw: pf.raw, sign: -1n });
+      return pl;
+    }
+    return null;
+  }
+
+  /* Replay balance-affecting ops as signed per-asset integer deltas
+   * (dex-ux plot proposal 4 math — Map(assetId → BigInt); integers until
+   * the view's Format.formatAmount at render; pool legs per _equityLegs).
+   * Unit-mixed pages stay per-asset — assets are NEVER summed across
+   * precisions (the view plots one series per asset). Params: pages
+   * newest-first raw page arrays (historyPaged shape); accountId "1.2.N".
+   * Returns {totals, counted, skipped}: totals maps assetId →
+   * {total_raw, perPage_raw} with perPage_raw in CHRONOLOGICAL order
+   * (index 0 = oldest page — the sparkline's x). */
+  function replayEquity(pages, accountId) {
+    var acc = {}, counted = 0, skipped = 0, pi, i, li;
+    pages = Array.isArray(pages) ? pages : [];
+    var n = pages.length;
+    for (pi = 0; pi < n; pi++) {
+      var rows = Array.isArray(pages[pi]) ? pages[pi] : [];
+      var seriesIdx = n - 1 - pi; /* chronological x: oldest page first */
+      for (i = 0; i < rows.length; i++) {
+        var entry = _unwrapHist(rows[i]);
+        if (!entry || !Array.isArray(entry.op) || entry.op.length < 2) {
+          skipped++;
+          continue;
+        }
+        var legs = _equityLegs(entry.op[0], entry.op[1] || {}, String(accountId));
+        if (!legs) {
+          skipped++;
+          continue;
+        }
+        var applied = 0;
+        for (li = 0; li < legs.length; li++) {
+          if (_legAdd(acc, legs[li].asset_id, legs[li].raw, legs[li].sign, seriesIdx)) applied++;
+        }
+        if (applied > 0) counted++;
+        else skipped++;
+      }
+    }
+    var totals = {}, ids = Object.keys(acc), k, s;
+    for (k = 0; k < ids.length; k++) {
+      var e = acc[ids[k]], perPage = [];
+      for (s = 0; s < n; s++) perPage.push((e.per[s] || 0n).toString());
+      totals[ids[k]] = { total_raw: e.total.toString(), perPage_raw: perPage };
+    }
+    return { totals: totals, counted: counted, skipped: skipped };
+  }
+
+  /* Fetch + replay + join symbols/precisions for the equity sparkline
+   * (proposal 4 host data). WS methods: get_account_history (historyPaged) +
+   * get_assets (same join as balances()) — no new chain methods. Params:
+   * accountId "1.2.N". Returns {assets, pagesFetched, eventsSeen, counted,
+   * skipped, truncated}: assets sorted by descending |total| as [{asset_id,
+   * symbol, precision, total_raw, perPage_raw}]; precision null + bare id on
+   * join miss (honest degrade, never throws).
+   * Fails "history-unavailable" / "unknown-account" (id shape). */
+  async function equity(accountId) {
+    if (typeof accountId !== "string" || !ID_RE.test(accountId)) throw new Error("unknown-account");
+    var walk = await historyPaged(accountId, HISTORY_PAGE, HISTORY_MAX_PAGES);
+    var rep = replayEquity(walk.pages, accountId);
+    var ids = Object.keys(rep.totals), byId = {};
+    if (ids.length) {
+      var dbId = await Chain.db();
+      var assets = await Chain.call(dbId, "get_assets", [ids]);
+      (assets || []).forEach(function (a) {
+        if (a && a.id) byId[a.id] = a;
+      });
+    }
+    var out = ids.map(function (id) {
+      var meta = byId[id] || {};
+      return { asset_id: id,
+        symbol: (meta.symbol || id),
+        precision: (typeof meta.precision === "number" ? meta.precision : null),
+        total_raw: rep.totals[id].total_raw,
+        perPage_raw: rep.totals[id].perPage_raw };
+    });
+    out.sort(function (x, y) { /* descending |total| (BigInt compare, never float) */
+      var ax = BigInt(x.total_raw), bx = BigInt(y.total_raw);
+      ax = ax < 0n ? -ax : ax;
+      bx = bx < 0n ? -bx : bx;
+      return ax === bx ? 0 : (ax > bx ? -1 : 1);
+    });
+    var eventsSeen = 0, p;
+    for (p = 0; p < walk.pages.length; p++) eventsSeen += walk.pages[p].length;
+    return { assets: out, pagesFetched: walk.pages.length, eventsSeen: eventsSeen,
+      counted: rep.counted, skipped: rep.skipped, truncated: walk.truncated };
+  }
+
   /* Return the account id bound to the unlocked wallet's active (seq1) key.
    * Params: none (reads Wallet in-memory keys + brainkey).
    * Returns: Promise of the account id string.
@@ -162,6 +424,9 @@ var Account = (function () {
     resolve: resolve,
     balances: balances,
     history: history,
+    historyPaged: historyPaged,
+    replayEquity: replayEquity,
+    equity: equity,
     openOrders: openOrders,
     myAccountId: myAccountId
   };

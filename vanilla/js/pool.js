@@ -2,8 +2,9 @@
  * Owns: get/list/mine + history (honest degrade), six builders for ops
  *   59/60/61/62/63/75 ([opId, opData], zero-placeholder fee for live
  *   fee-fill), CPMM quote/slippage, share-mint estimates (shareOut; the
- *   withdraw leg proves via Pool.get re-read, so shareBack was deleted in
- *   the slice-18 audit — zero callers), depth points,
+  *   withdraw leg proves via Pool.get re-read, so shareBack was deleted in
+  *   the slice-18 audit — zero callers), depth points, x·y=k curve points
+  *   (dex-ux plot proposal 5 — BigInt port of falcon_app.py:167-202),
  *   the ONLY percent converters (u16 <-> human), fee via Tx.fee (filled IN
  *   PLACE — slice-11 F-FEEFILL lesson), sendAndProve (vote-pattern). No DOM,
  *   no key handling (WIF passes opaquely to Tx.sign) — views live in
@@ -240,6 +241,30 @@ var Pool = (function () {
     return { aToB: side(balA, balB), bToA: side(balB, balA) };
   }
 
+  /* x·y=k reserve curve (dex-ux plot proposal 5 — formulas ported from
+   * reference/bitshares-dex-ux/falcon_app.py:167-202 `pool()` + asks loop:
+   * x_start*y_start = k, x1 = x_start+delta_x, y1 = k/x1 — floating point
+   * there becomes BigInt here; never imported, math only).
+   * k = A*B; step s = A/100n (1n floor for dust pools where A < 100);
+   * points (A+i*s, k/(A+i*s)) for i in 1..99 (integer-division floors);
+   * the current point (A,B) returns separately for marking. Human scaling
+   * happens only at render via Format. Throws "empty-pool" on zero balances. */
+  function curvePoints(args) {
+    args = args || {};
+    _assertDigits(args.balanceA_raw, "balanceA_raw"); _assertDigits(args.balanceB_raw, "balanceB_raw");
+    var balA = BigInt(args.balanceA_raw), balB = BigInt(args.balanceB_raw);
+    if (balA <= 0n || balB <= 0n) throw new Error("empty-pool");
+    var k = balA * balB, s = balA / 100n, i;
+    if (s <= 0n) s = 1n; /* dust pool: keep the walk moving one raw unit at a time */
+    var pts = [];
+    for (i = 1; i <= 99; i++) {
+      var x = balA + BigInt(i) * s;
+      pts.push({ x_raw: x.toString(), y_raw: (k / x).toString() });
+    }
+    return { k_raw: k.toString(), step_raw: s.toString(), points: pts,
+      current: { x_raw: balA.toString(), y_raw: balB.toString() } };
+  }
+
   /* Op-59 create. SORTS (a,b) by id (ambiguity E); pair.sorted exposes the orientation for the confirm. */
   function buildCreate(args) {
     args = args || {};
@@ -358,7 +383,7 @@ var Pool = (function () {
   }
 
   return { get: get, list: list, mine: mine, history: history, listForm: listForm,
-    quote: quote, minReceive: minReceive, shareOut: shareOut, depthPoints: depthPoints,
+    quote: quote, minReceive: minReceive, shareOut: shareOut, depthPoints: depthPoints, curvePoints: curvePoints,
     buildCreate: buildCreate, buildDeposit: buildDeposit, buildWithdraw: buildWithdraw,
     buildExchange: buildExchange, buildUpdate: buildUpdate, buildDelete: buildDelete, fee: fee, sendAndProve: sendAndProve,
     pctUnitsToHuman: pctUnitsToHuman, pctHumanToUnits: pctHumanToUnits, DEFAULT_SLIPPAGE_PCT: DEFAULT_SLIPPAGE_PCT };

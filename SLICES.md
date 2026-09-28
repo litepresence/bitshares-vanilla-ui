@@ -138,7 +138,8 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] 10 behavior-identical splits; dead code deleted (caller-proven); exceptions recorded
 - [x] Readability note `vanilla/notes/slice-18-readability.md`; smoke-verified post-split
 - [x] Op-coverage matrix `vanilla/notes/op-coverage-matrix.md`: 0 unjustified missing (22+17+20 ported, 11 honest stubs, deferred with reasons)
-- [ ] STUB BUILD QUEUE (from matrix §A, in value order): `/instant-trade`×2, `/create-account`, `/accounts`, `/create-worker`, `/registration`×3+`/login`, `/news`, `/help/**`, `/prediction`×2
+- [x] STUB BUILD QUEUE (all built): `/instant-trade`×2, `/create-account`, `/accounts`, `/create-worker` (+ op-34 serializer), `/registration`×3+`/login`, `/news`, `/help/**`, `/prediction`×2; deferred sweep: ops 8/45, `#/fees`, `#/referrals`, `#/wallet/password`, `#/favourites`, `#/ops`
+- [ ] Morning questions for owner: ref-ui-theme direction (currently #1's darkTheme column per branding.js default — lightTheme blue #337ab7 is the alternate reading); tester browser passes (slices 2–17 + new views)
 - [ ] Tester browser passes (slices 2–17) + ticket funding (≥105 TEST) — with human tester
 
 ## Standing directives (user, 2026-09-28 — binding for all remaining slices)

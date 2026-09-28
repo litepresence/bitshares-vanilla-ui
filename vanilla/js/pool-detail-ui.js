@@ -1,6 +1,7 @@
 /* pool-detail-ui.js — #/pools/:id detail desk (stats + chart + actions + depth + history).
  * Owns: detail desk mirroring the market-ui.js skeleton (stats strip, LWC chart
- *   pane from bucketed chain history, action panels below the chart, CPMM depth
+ *   pane from bucketed chain history, action panels below the chart, x·y=k
+ *   curve canvas + CPMM depth table (dex-ux plot proposal 5, chain data)
  *   + pool-history tabs), stake (op-61) / unstake (op-62) / inline swap (op-63)
  *   / update (op-75, withdrawal 0-only) / delete (op-60, fee 0) panels with
  *   NAMED-row confirms. DOM scaffolding comes from PoolUI._ui (pool-ui.js loads
@@ -121,8 +122,174 @@ var PoolDetailUI = (function () {
       if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
     });
   }
+  /* Theme token read (plain duplicate of the market-book.js helper —
+   * doctrine prefers duplication over a shared chart abstraction). */
+  function cssTok(name, fallback) {
+    try {
+      if (typeof getComputedStyle !== "undefined" && typeof document !== "undefined") {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+        if (v && v.trim()) return v.trim();
+      }
+    } catch (e) { /* fallback stands */ }
+    return fallback;
+  }
+
+  /* DPR-aware canvas fit (same contract as market-book.js: {ctx, w, h} CSS
+   * pixels, or null when unusable). */
+  function fitPlot(canvas, cssH) {
+    if (!canvas || typeof canvas.getContext !== "function") return null;
+    var w = canvas.clientWidth;
+    if (!w && canvas.parentNode && canvas.parentNode.clientWidth) {
+      w = canvas.parentNode.clientWidth;
+    }
+    if (!w || w <= 0) w = 300;
+    var dpr = 1;
+    try {
+      if (typeof window !== "undefined" && window.devicePixelRatio) {
+        dpr = window.devicePixelRatio;
+      }
+    } catch (e) { dpr = 1; }
+    canvas.style.width = "100%";
+    canvas.style.height = cssH + "px";
+    /* Pixel sizing below is Number() on layout pixels only — never money. */
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssH);
+    return { ctx: ctx, w: w, h: cssH };
+  }
+
+  /* Pool x·y=k curve + current point (dex-ux plot proposal 5 — math from
+   * Pool.curvePoints, itself a BigInt port of falcon_app.py:167-202; never
+   * imported). Source balances come from the already-fetched detail row —
+   * no new chain call. Collapsible <details open> with a canvas 2D line
+   * (ask side: selling A into the pool) + marked current reserves. The axis
+   * domains span the curve plus the current point; pixel mapping is
+   * parts-per-million in BigInt, then Number() on the 0..1e6 int — exact
+   * and pixel-only (never money). Tick labels go human via u.amtText at
+   * render (raw fallback when the join missed a precision). Empty pool →
+   * silent no-op (the depth table path below owns the honest empty sentence). */
+  function drawCurve(doc, book, r) {
+    var u = U(), c;
+    try {
+      c = Pool.curvePoints({ balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw });
+    } catch (e) {
+      return;
+    }
+    var det = doc.createElement("details");
+    det.className = "plot pool-curve";
+    det.setAttribute("open", "");
+    var sum = doc.createElement("summary");
+    sum.setAttribute("aria-label", "Pool x y k curve plot");
+    u.touchable(sum);
+    sum.textContent = "Pool curve (x·y=k)";
+    det.appendChild(sum);
+    var canvas = doc.createElement("canvas");
+    canvas.className = "mkt-canvas";
+    det.appendChild(canvas);
+    var precA = r.prec_a === undefined ? null : r.prec_a;
+    var precB = r.prec_b === undefined ? null : r.prec_b;
+    var aA = u.amtText(r.balance_a_raw, r.asset_a_id, precA, r.sym_a);
+    var aB = u.amtText(r.balance_b_raw, r.asset_b_id, precB, r.sym_b);
+    det.appendChild(u.el(doc, "p", "Current: " + aA.text + " / " + aB.text +
+      " — selling " + (r.sym_a || r.asset_a_id) + " into the pool (ask side, integer floors).", "muted"));
+    book.appendChild(det);
+    var g = fitPlot(canvas, 180);
+    if (!g) return;
+    var accent = cssTok("--accent", "#007bff");
+    var buy = cssTok("--buy", "#26de81");
+    var muted = cssTok("--muted", "#777777");
+    var border = cssTok("--border", "#2a2e39");
+    var i, xmin = null, xmax = null, ymin = null, ymax = null;
+    function span(v, mn, mx) {
+      if (mn === null || v < mn) mn = v;
+      if (mx === null || v > mx) mx = v;
+      return [mn, mx];
+    }
+    var xs = [], ys = [];
+    for (i = 0; i < c.points.length; i++) {
+      var px = BigInt(c.points[i].x_raw), py = BigInt(c.points[i].y_raw);
+      xs.push(px);
+      ys.push(py);
+      var sx = span(px, xmin, xmax);
+      xmin = sx[0];
+      xmax = sx[1];
+      var sy = span(py, ymin, ymax);
+      ymin = sy[0];
+      ymax = sy[1];
+    }
+    var curX = BigInt(c.current.x_raw), curY = BigInt(c.current.y_raw);
+    xs.push(curX);
+    ys.push(curY);
+    var s2 = span(curX, xmin, xmax);
+    xmin = s2[0];
+    xmax = s2[1];
+    var s3 = span(curY, ymin, ymax);
+    ymin = s3[0];
+    ymax = s3[1];
+    var xrange = xmax - xmin, yrange = ymax - ymin;
+    var padL = 8, padR = 8, padT = 24, padB = 30;
+    var plotW = g.w - padL - padR, plotH = g.h - padT - padB;
+    function fx(x) {
+      if (xrange === 0n) return padL + plotW / 2;
+      /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */
+      return padL + (Number((x - xmin) * 1000000n / xrange) / 1000000) * plotW;
+    }
+    function fy(v) {
+      if (yrange === 0n) return padT + plotH / 2;
+      /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */
+      return padT + (1 - Number((v - ymin) * 1000000n / yrange) / 1000000) * plotH;
+    }
+    var ctx = g.ctx;
+    ctx.strokeStyle = border;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(padL + 0.5, padT + 0.5, plotW - 1, plotH - 1);
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    /* Points arrive in ascending x (i = 1..99), so one pass draws the curve. */
+    for (i = 0; i < xs.length - 1; i++) {
+      var qx = fx(xs[i]), qy = fy(ys[i]);
+      if (i === 0) ctx.moveTo(qx, qy);
+      else ctx.lineTo(qx, qy);
+    }
+    ctx.stroke();
+    var cx = fx(curX), cy = fy(curY);
+    ctx.fillStyle = buy;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillStyle = accent;
+    ctx.fillRect(padL + 2, 6, 10, 3);
+    ctx.fillStyle = muted;
+    ctx.fillText("x·y=k", padL + 16, 15);
+    ctx.fillStyle = buy;
+    ctx.beginPath();
+    ctx.arc(padL + 62, 11, 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = muted;
+    ctx.fillText("current", padL + 69, 15);
+    /* Human tick labels at render (amtText degrades to raw on join miss). */
+    var xMinH = u.amtText(xmin.toString(), r.asset_a_id, precA, r.sym_a).text;
+    var xMaxH = u.amtText(xmax.toString(), r.asset_a_id, precA, r.sym_a).text;
+    var yMinH = u.amtText(ymin.toString(), r.asset_b_id, precB, r.sym_b).text;
+    var yMaxH = u.amtText(ymax.toString(), r.asset_b_id, precB, r.sym_b).text;
+    ctx.fillStyle = muted;
+    ctx.textAlign = "left";
+    ctx.fillText(xMinH, padL + 2, padT + plotH + 14);
+    ctx.fillText(yMaxH, padL + 2, padT + plotH + 26);
+    ctx.textAlign = "right";
+    ctx.fillText(xMaxH, padL + plotW - 2, padT + plotH + 14);
+    ctx.fillText(yMinH, padL + plotW - 2, padT + plotH + 26);
+    ctx.textAlign = "left";
+  }
+
   function depthPane(doc, book, r) { /* CPMM curve points -> compact table (first 8 steps per side) */
     var u = U();
+    drawCurve(doc, book, r); /* x·y=k canvas above the table; silent no-op on empty pools */
     try {
       var pts = Pool.depthPoints({ balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw });
       var table = doc.createElement("table"); table.className = "node-table";

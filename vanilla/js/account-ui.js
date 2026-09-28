@@ -1,7 +1,9 @@
 /* AccountUI: public account pages (balances in human terms + op history +
- *   membership + lifetime-member upgrade).
+ *   membership + lifetime-member upgrade + equity sparkline).
  * Owns: DOM for the /account/:account_name route only (loading, header,
  *   membership section with the op-8 LTM upgrade flow, balances table/cards,
+ *   equity sparkline (paged get_account_history integer replay as canvas
+ *   small multiples — dex-ux plot proposal 4, chain-history ONLY),
  *   history list, /account/me unlock prompt, errors).
  * Consumes: Account.resolve/balances/history/myAccountId (js/account.js),
  *   Wallet.isUnlocked/unlock/keys (js/wallet.js); Format via Account display
@@ -320,6 +322,215 @@ var AccountUI = (function () {
     section.appendChild(ul);
   }
 
+  /* Read a CSS custom property off <html> (theme-aware plot colors);
+   * falls back headlessly. Token-driven: all three themes supply
+   * --buy/--sell/--accent/--border/--muted/--text (themes.css). Plain
+   * duplicate of the market-book.js helper (doctrine: duplicated plain code
+   * over a shared abstraction with a future migration cost). */
+  function cssVar(name, fallback) {
+    try {
+      if (typeof getComputedStyle !== "undefined" && typeof document !== "undefined") {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+        if (v && v.trim()) return v.trim();
+      }
+    } catch (e) { /* fallback stands */ }
+    return fallback;
+  }
+
+  /* DPR-aware canvas fit (plain duplicate of the market-book.js helper —
+   * same contract: {ctx, w, h} CSS pixels, or null when unusable). */
+  function fitCanvas(canvas, cssH) {
+    if (!canvas || typeof canvas.getContext !== "function") return null;
+    var w = canvas.clientWidth;
+    if (!w && canvas.parentNode && canvas.parentNode.clientWidth) {
+      w = canvas.parentNode.clientWidth;
+    }
+    if (!w || w <= 0) w = 300;
+    var dpr = 1;
+    try {
+      if (typeof window !== "undefined" && window.devicePixelRatio) {
+        dpr = window.devicePixelRatio;
+      }
+    } catch (e) { dpr = 1; }
+    canvas.style.width = "100%";
+    canvas.style.height = cssH + "px";
+    /* Pixel sizing below is Number() on layout pixels only — never money. */
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssH);
+    return { ctx: ctx, w: w, h: cssH };
+  }
+
+  /* One small-multiple sparkline: per-page net deltas (raw strings,
+   * chronological) as a BigInt-normalized line with a dashed zero line when
+   * the series spans both signs. Pixel mapping is parts-per-million in
+   * BigInt, then Number() on the 0..1e6 int — exact and pixel-only (never
+   * money). Single-point series draw one dot. Returns nothing. */
+  function drawSpark(canvas, seriesRaw, color) {
+    var g = fitCanvas(canvas, 70);
+    if (!g) return;
+    var vals = (Array.isArray(seriesRaw) ? seriesRaw : []).map(function (s) {
+      try {
+        return BigInt(String(s));
+      } catch (e) {
+        return 0n;
+      }
+    });
+    if (!vals.length) return;
+    var muted = cssVar("--muted", "#777777");
+    var i, mn = vals[0], mx = vals[0];
+    for (i = 1; i < vals.length; i++) {
+      if (vals[i] < mn) mn = vals[i];
+      if (vals[i] > mx) mx = vals[i];
+    }
+    var range = mx - mn;
+    var padL = 8, padR = 8, padT = 8, padB = 12;
+    var plotW = g.w - padL - padR, plotH = g.h - padT - padB;
+    function frac(v) {
+      if (range === 0n) return 0.5;
+      /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */
+      return Number((v - mn) * 1000000n / range) / 1000000;
+    }
+    /* Pixel x: even page-index spacing (single page centers one dot). */
+    function x(i) {
+      return vals.length === 1 ? padL + plotW / 2 : padL + (i / (vals.length - 1)) * plotW;
+    }
+    function y(v) {
+      return padT + (1 - frac(v)) * plotH;
+    }
+    var ctx = g.ctx;
+    ctx.strokeStyle = cssVar("--border", "rgba(128,128,128,0.45)");
+    ctx.lineWidth = 1;
+    ctx.strokeRect(padL + 0.5, padT + 0.5, plotW - 1, plotH - 1);
+    if (mn < 0n && mx > 0n) {
+      ctx.strokeStyle = muted;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      ctx.moveTo(padL, y(0n));
+      ctx.lineTo(padL + plotW, y(0n));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (i = 0; i < vals.length; i++) {
+      if (i === 0) ctx.moveTo(x(i), y(vals[i]));
+      else ctx.lineTo(x(i), y(vals[i]));
+    }
+    ctx.stroke();
+    for (i = 0; i < vals.length; i++) {
+      ctx.beginPath();
+      ctx.arc(x(i), y(vals[i]), 2.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+    ctx.fillStyle = muted;
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText("oldest", padL + 2, g.h - 2);
+    ctx.textAlign = "right";
+    ctx.fillText("newest", padL + plotW - 2, g.h - 2);
+    ctx.textAlign = "left";
+  }
+
+  /* Human net for one replayed asset (Format at render; raw id fallback when
+   * the join missed the precision — never throws on chain data). */
+  function equityHuman(a) {
+    if (a.precision === null || a.precision === undefined) return a.total_raw + " (" + a.asset_id + ")";
+    try {
+      return Format.formatAmount(a.total_raw, a.precision) + " " + a.symbol;
+    } catch (e) {
+      return a.total_raw + " (" + a.asset_id + ")";
+    }
+  }
+
+  /* Equity sparkline section fill (dex-ux plot proposal 4 host — vanilla/
+   * notes/dexux-plots.md section 4). One <details open> with a small-multiples
+   * canvas per plotted asset (top 3 by |net|) + a net-change table for ALL
+   * replayed assets + an honest counts line. Assets are never summed across
+   * precisions (one series per asset, each scaled independently — the note
+   * says so). Honest empties: no history vs history-without-balance-legs. */
+  function renderEquity(doc, section, eq) {
+    var counts = "Replayed " + eq.pagesFetched + " page(s), " + eq.eventsSeen + " events: " +
+      eq.counted + " balance legs counted, " + eq.skipped + " skipped." +
+      (eq.truncated ? " Walk stopped at the 5-page cap — older history not included." : "");
+    if (!eq.assets || eq.assets.length === 0) {
+      var msg = doc.createElement("p");
+      msg.className = "muted";
+      msg.textContent = eq.eventsSeen === 0
+        ? "No history for this account yet — sparkline empty."
+        : "No balance-affecting ops in the last " + eq.eventsSeen +
+          " events (transfers, fills, pool legs) — sparkline empty.";
+      section.appendChild(msg);
+      var note0 = doc.createElement("p");
+      note0.className = "muted";
+      note0.textContent = counts;
+      section.appendChild(note0);
+      return;
+    }
+    var det = doc.createElement("details");
+    det.className = "plot acct-equity";
+    det.setAttribute("open", "");
+    var sum = doc.createElement("summary");
+    sum.setAttribute("aria-label", "Equity sparkline plot");
+    sum.style.minHeight = "44px";
+    sum.textContent = "Equity sparkline";
+    det.appendChild(sum);
+    section.appendChild(det);
+    var colors = [cssVar("--buy", "#6ba583"), cssVar("--sell", "#e3745b"), cssVar("--accent", "#1ec3fa")];
+    eq.assets.slice(0, 3).forEach(function (a, idx) {
+      var label = doc.createElement("div");
+      label.textContent = a.symbol + ": " + equityHuman(a);
+      label.title = "raw " + a.total_raw;
+      det.appendChild(label);
+      var canvas = doc.createElement("canvas");
+      canvas.className = "mkt-canvas";
+      det.appendChild(canvas);
+      drawSpark(canvas, a.perPage_raw, colors[idx % colors.length]);
+    });
+    if (eq.assets.length > 3) {
+      var more = doc.createElement("p");
+      more.className = "muted";
+      more.textContent = "+" + (eq.assets.length - 3) + " more asset(s) in the table below (top 3 plotted).";
+      det.appendChild(more);
+    }
+    var table = doc.createElement("table");
+    table.className = "node-table";
+    var thead = doc.createElement("thead");
+    var headRow = doc.createElement("tr");
+    ["Asset", "Net change"].forEach(function (h) {
+      var th = doc.createElement("th");
+      th.textContent = h;
+      headRow.appendChild(th);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var tbody = doc.createElement("tbody");
+    eq.assets.forEach(function (a) {
+      var tr = doc.createElement("tr");
+      var symCell = doc.createElement("td");
+      symCell.textContent = a.symbol;
+      tr.appendChild(symCell);
+      var netCell = doc.createElement("td");
+      netCell.textContent = equityHuman(a);
+      netCell.title = "raw " + a.total_raw;
+      tr.appendChild(netCell);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    det.appendChild(table);
+    var note = doc.createElement("p");
+    note.className = "muted";
+    note.textContent = counts + " Shape only, not a balance: each asset scaled independently —" +
+      " compare shape, not height. Pool receive legs replay at the min_to_receive floor" +
+      " (actual may exceed it); withdraw releases settle on chain.";
+    det.appendChild(note);
+  }
+
   /* Unlock prompt for /account/me while locked: password + button; on
    * success re-renders #/account/me so the user lands back where asked. */
   function renderUnlockPrompt(doc, wrap, root) {
@@ -565,6 +776,16 @@ var AccountUI = (function () {
     balSection.appendChild(balLoading);
     wrap.appendChild(balSection);
 
+    var eqSection = doc.createElement("section");
+    var eqH = doc.createElement("h2");
+    eqH.textContent = "Equity";
+    eqSection.appendChild(eqH);
+    var eqLoading = doc.createElement("p");
+    eqLoading.className = "muted";
+    eqLoading.textContent = "Replaying recent history…";
+    eqSection.appendChild(eqLoading);
+    wrap.appendChild(eqSection);
+
     var ordSection = doc.createElement("section");
     var ordH = doc.createElement("h2");
     ordH.textContent = t("account.orders_title", "Open orders");
@@ -591,6 +812,14 @@ var AccountUI = (function () {
     }).catch(function (e) {
       balSection.removeChild(balLoading);
       showError(doc, balSection, e, t("account.load_balances_failed", "Could not load balances."));
+    });
+
+    Account.equity(acct.id).then(function (eq) {
+      eqSection.removeChild(eqLoading);
+      renderEquity(doc, eqSection, eq);
+    }).catch(function (e) {
+      eqSection.removeChild(eqLoading);
+      showError(doc, eqSection, e, "Could not replay equity.");
     });
 
     Account.history(acct.id, 20).then(function (rows) {
