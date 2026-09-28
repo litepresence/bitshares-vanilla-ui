@@ -85,6 +85,20 @@ a.btn-ghost { background: transparent; color: var(--accent);
 .th-sort { background: transparent; color: inherit; border: 0; padding: 0;
   font: inherit; text-transform: inherit; letter-spacing: inherit;
   font-weight: inherit; cursor: pointer; min-height: 44px; }
+/* Indicator dropdown menu (shared market/pool control): button + grouped
+ * checkbox panel. Tokens only; panel scrolls in place; 44px rows. */
+.mkt-indmenu { position: relative; display: inline-block; margin: 6px 0; }
+.mkt-indmenu-btn { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer; }
+.mkt-indmenu-panel { position: absolute; top: 100%; left: 0; z-index: 40;
+  min-width: 260px; max-width: min(92vw, 560px); max-height: 60vh; overflow-y: auto;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px 12px; }
+.mkt-indmenu-group { margin: 8px 0 0; }
+.mkt-indmenu-head { font-weight: 700; font-size: 0.85rem; text-transform: uppercase;
+  letter-spacing: 0.05em; margin: 0 0 4px; color: var(--muted); }
+.mkt-indmenu-item { display: flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 0 4px; cursor: pointer; }
 .wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
 .wrap.mkt-wrap { max-width: 1400px; }
 /* Wide screens earn their pixels (principle #7): fluid caps at desk widths

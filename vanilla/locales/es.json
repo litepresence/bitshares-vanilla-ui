@@ -987,7 +987,10 @@
     "trades_toggle_label": "Recent or my trades",
     "starred_tab": "Starred",
     "latest_label": "Latest",
-    "chg_label": "24h Δ"
+    "chg_label": "24h Δ",
+    "indicators_menu": "Indicators",
+    "overlays_group": "Overlays",
+    "oscillators_group": "Oscillators"
   },
   "misc": {
     "title": "Invoice",

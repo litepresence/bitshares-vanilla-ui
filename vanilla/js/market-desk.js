@@ -314,26 +314,16 @@ var MarketDesk = (function () {
     chartsSec.appendChild(countNote);
     state.countNote = countNote;
 
-    /* Indicator picker: overlay checkboxes on the price pane + Log/Invert. */
+    /* Chart options row: shared indicator dropdown menu (overlays +
+     * oscillators in grouped checkboxes) + Log/Invert. The menu binds the
+     * same state.over/state.osc/state.oscBoxes contract the old sprawling
+     * rows used — only the control UI changed. */
     var indRow = doc.createElement("div");
     indRow.className = "mkt-indrow";
     chartsSec.appendChild(indRow);
-    [["sma", t("market.ov_sma", "SMA")], ["ema", t("market.ov_ema", "EMA")], ["bb", t("market.ov_bb", "BB")], ["psar", t("market.ov_psar", "PSAR")]].forEach(function (def) {
-      var lab = doc.createElement("label");
-      lab.className = "mkt-ind";
-      var box = doc.createElement("input");
-      box.type = "checkbox";
-      box.checked = !!state.over[def[0]];
-      box.setAttribute("aria-label", def[1] + " overlay");
-      touchable(box);
-      box.addEventListener("change", function () {
-        state.over[def[0]] = box.checked;
-        MarketInd.drawCharts(state);
-      });
-      lab.appendChild(box);
-      lab.appendChild(el(doc, "span", def[1]));
-      indRow.appendChild(lab);
-    });
+    if (typeof MarketInd !== "undefined" && MarketInd && typeof MarketInd.renderIndMenu === "function") {
+      MarketInd.renderIndMenu(doc, indRow, state);
+    }
     var logLab = doc.createElement("label");
     logLab.className = "mkt-ind";
     var logBox = doc.createElement("input");
@@ -370,44 +360,9 @@ var MarketDesk = (function () {
     priceHost.className = "mkt-price-host";
     chartsSec.appendChild(priceHost);
 
-    /* STACKED oscillator sub-panes + volume (Task 4b): multi-checkboxes —
-     * one INDEPENDENT pane per checked item (one LightweightCharts chart per
-     * pane — RSI 0-100 and ATR price-scale ranges are incompatible, so panes
-     * are never shared). Unchecking removes just that pane via removePane.
-     * Unavailable indicator fns (osc module not wired — see ind()) render
-     * disabled with a note, never throw; Volume needs no fn (always on). */
-    var oscRow = doc.createElement("div");
-    oscRow.className = "mkt-oscrow";
-    oscRow.setAttribute("role", "group");
-    oscRow.setAttribute("aria-label", t("market.osc_group_label", "Oscillators and volume"));
-    chartsSec.appendChild(oscRow);
-    MarketInd.OSC_ORDER.forEach(function (def) {
-      var key = def[0], label = def[1];
-      var lab = doc.createElement("label");
-      lab.className = "mkt-ind";
-      var box = doc.createElement("input");
-      box.type = "checkbox";
-      box.value = key;
-      box.checked = !!state.osc[key];
-      box.setAttribute("aria-label", label + " pane");
-      /* Only indicator keys need the osc module; Volume is raw bucket data. */
-      if (key !== "volume" && !MarketInd.ind(key)) {
-        box.disabled = true;
-        lab.title = label + " unavailable in this build";
-      }
-      touchable(box);
-      box.addEventListener("change", function () {
-        state.osc[key] = box.checked;
-        MarketInd.drawCharts(state);
-      });
-      lab.appendChild(box);
-      lab.appendChild(el(doc, "span", label));
-      oscRow.appendChild(lab);
-      state.oscBoxes[key] = box;
-    });
     /* Stacked pane container: drawCharts reconciles one child wrapper per
      * checked key (in OSC_ORDER); nothing checked -> no children at all,
-     * never a blank box. */
+     * never a blank box. (Picker menu above owns the checkboxes.) */
     var oscHost = doc.createElement("div");
     oscHost.id = "mkt-osc-host";
     oscHost.className = "mkt-osc-host";

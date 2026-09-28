@@ -33,13 +33,46 @@ var MarketInd = (function () {
   var PREF_BUCKETS = [300, 900, 1800, 3600, 14400, 86400];
   var CANDLE_COUNT = 200;
 
-  /* Stacked sub-pane order (Task 4b): checkbox order IS pane order — RSI,
-   * MACD, Stoch, ATR, Fisher, then Volume. Single source for the picker,
-   * the pane reconciliation in drawCharts, and teardown. */
+  /* Stacked sub-pane order (Task 4b + parity round): checkbox order IS pane
+   * order. Base six first (legacy default checks preserved), then Tulip
+   * momentum, Tulip volume/volatility, QX add-ons, all default-off. Single
+   * source for the picker menu, the pane reconciliation in drawCharts, and
+   * teardown. Labels are indicator SYMBOLS (identifiers, never localized —
+   * same class as theme ids; avoids ~40 dict entries per locale). */
   var OSC_ORDER = [
     ["rsi", "RSI"], ["macd", "MACD"], ["stoch", "Stoch"],
-    ["atr", "ATR"], ["fisher", "Fisher"], ["volume", "Volume"]
+    ["atr", "ATR"], ["fisher", "Fisher"], ["volume", "Volume"],
+    ["stochrsi", "StochRSI"], ["adxr", "ADXR"], ["cci", "CCI"],
+    ["cmo", "CMO"], ["dx", "DX"], ["mom", "MOM"], ["roc", "ROC"],
+    ["trix", "TRIX"], ["ultosc", "UltOsc"], ["willr", "WillR"],
+    ["apo", "APO"], ["ppo", "PPO"], ["bop", "BOP"], ["qstick", "QStick"],
+    ["obv", "OBV"], ["emv", "EMV"], ["vosc", "VOSC"], ["nvi", "NVI"],
+    ["pvi", "PVI"], ["wad", "WAD"], ["ad", "AD"], ["cvi", "CVI"],
+    ["natr", "NATR"], ["mass", "Mass"], ["kvo", "KVO"], ["adosc", "ADOSC"],
+    ["dpo", "DPO"], ["vhf", "VHF"], ["volatility", "Volatility"],
+    ["aroon", "Aroon"], ["di", "DMI+/-"], ["vortex", "Vortex"],
+    ["kst", "KST"], ["ravi", "RAVI"], ["tsi", "TSI"], ["smi", "SMI"],
+    ["eri", "ElderRay"], ["awesome", "Awesome"], ["arsi", "ARSI"],
+    ["ulcer", "Ulcer"], ["earsi", "EARSI"]
   ];
+
+  /* Price-pane overlay defs (key, label). First four keep their localized
+   * labels (slice-17 keys); the rest are symbols (see OSC_ORDER note). */
+  var OVERLAY_DEFS = [
+    ["sma", null], ["ema", null], ["bb", null], ["psar", null],
+    ["dema", "DEMA"], ["tema", "TEMA"], ["wma", "WMA"], ["kama", "KAMA"],
+    ["vidya", "VIDYA"], ["vwma", "VWMA"], ["linreg", "LINREG"],
+    ["tsf", "TSF"], ["aema", "AEMA"], ["holtwinters", "HOLT"],
+    ["supertrend", "SUPERTREND"], ["keltner", "KELTNER"],
+    ["donchian", "DONCHIAN"], ["zigzag", "ZIGZAG"], ["kagi", "KAGI"]
+  ];
+  function overlayLabel(key, fallback) {
+    if (key === "sma") return t("market.ov_sma", "SMA");
+    if (key === "ema") return t("market.ov_ema", "EMA");
+    if (key === "bb") return t("market.ov_bb", "BB");
+    if (key === "psar") return t("market.ov_psar", "PSAR");
+    return fallback;
+  }
 
   /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
    * the pre-conversion literal kept verbatim as enDefault (English-identical
@@ -309,7 +342,7 @@ var MarketInd = (function () {
    * {name, color, values} aligned to the candle slots (warmup nulls break
    * the line, never dive to zero). Colors are live theme tokens. Unavailable
    * indicator functions are skipped (see ind()), never throw. */
-  function priceOverlays(state, closes, highs, lows, C) {
+  function priceOverlays(state, closes, highs, lows, vols, C) {
     var out = [];
     var f;
     try {
@@ -328,6 +361,60 @@ var MarketInd = (function () {
       if (state.over.psar && (f = ind("psar"))) {
         out.push({ name: "PSAR", color: C.warn, values: f(highs, lows, { step: 0.02, max: 0.2 }) });
       }
+      /* Parity-round overlays (single line unless noted; defaults match each
+       * fn's own default period — the menu shows symbols, tooltips carry
+       * params where they matter). */
+      if (state.over.dema && (f = ind("dema"))) {
+        out.push({ name: "DEMA 21", color: C.buy, values: f(closes, 21) });
+      }
+      if (state.over.tema && (f = ind("tema"))) {
+        out.push({ name: "TEMA 21", color: C.sell, values: f(closes, 21) });
+      }
+      if (state.over.wma && (f = ind("wma"))) {
+        out.push({ name: "WMA 9", color: C.accent, values: f(closes, 9) });
+      }
+      if (state.over.kama && (f = ind("kama"))) {
+        out.push({ name: "KAMA 10", color: C.warn, values: f(closes, 10) });
+      }
+      if (state.over.vidya && (f = ind("vidya"))) {
+        out.push({ name: "VIDYA", color: C.muted, values: f(closes, {}) });
+      }
+      if (state.over.vwma && (f = ind("vwma"))) {
+        out.push({ name: "VWMA 20", color: C.accent, values: f(closes, vols, 20) });
+      }
+      if (state.over.linreg && (f = ind("linreg"))) {
+        out.push({ name: "LINREG 14", color: C.buy, values: f(closes, 14) });
+      }
+      if (state.over.tsf && (f = ind("tsf"))) {
+        out.push({ name: "TSF 14", color: C.sell, values: f(closes, 14) });
+      }
+      if (state.over.aema && (f = ind("aema"))) {
+        out.push({ name: "AEMA 14", color: C.muted, values: f(closes, {}) });
+      }
+      if (state.over.holtwinters && (f = ind("holtwinters"))) {
+        out.push({ name: "HOLT", color: C.accent, values: f(closes, {}).smooth });
+      }
+      if (state.over.supertrend && (f = ind("supertrend"))) {
+        out.push({ name: "SUPERTREND", color: C.warn, values: f(highs, lows, closes, {}).trend });
+      }
+      if (state.over.keltner && (f = ind("keltner"))) {
+        var kc = f(highs, lows, closes, {});
+        out.push({ name: "Kelt upper", color: C.muted, values: kc.upper });
+        out.push({ name: "Kelt mid", color: C.accent, values: kc.middle });
+        out.push({ name: "Kelt lower", color: C.muted, values: kc.lower });
+      }
+      if (state.over.donchian && (f = ind("donchian"))) {
+        var dc = f(highs, lows, 20);
+        out.push({ name: "Don upper", color: C.muted, values: dc.upper });
+        out.push({ name: "Don mid", color: C.accent, values: dc.middle });
+        out.push({ name: "Don lower", color: C.muted, values: dc.lower });
+      }
+      if (state.over.zigzag && (f = ind("zigzag"))) {
+        out.push({ name: "ZIGZAG", color: C.warn, values: f(closes, 5).line });
+      }
+      if (state.over.kagi && (f = ind("kagi"))) {
+        out.push({ name: "KAGI", color: C.accent, values: f(closes, 2) });
+      }
     } catch (e) { /* one bad overlay must not kill the pane */ }
     return out;
   }
@@ -339,7 +426,7 @@ var MarketInd = (function () {
    * the cached human baseVolume Numbers (pixels-only, prepared in maybeDraw
    * from market.js human strings) and histogram:true selects the
    * HistogramSeries LWC path (canvas fallback stays a line chart). */
-  function oscOne(key, state, closesNaN, highsNaN, lowsNaN, vols, C) {
+  function oscOne(key, state, closesNaN, highsNaN, lowsNaN, vols, C, opensNaN) {
     if (key === "volume") {
       return {
         series: [{ name: "Volume", color: C.accent, values: vols || [] }],
@@ -348,6 +435,10 @@ var MarketInd = (function () {
     }
     var f = ind(key);
     if (!f) return { series: [], missing: key, histogram: false };
+    /* Single-line helper: one named series, no options. */
+    function one(name, color, values) {
+      return { series: [{ name: name, color: color, values: values }], missing: null, histogram: false };
+    }
     try {
       if (key === "rsi") {
         return {
@@ -391,6 +482,109 @@ var MarketInd = (function () {
           missing: null, histogram: false
         };
       }
+      /* Parity-round panes (defaults = each fn's own defaults; multi-line
+       * where the indicator is natively multi-line). */
+      if (key === "stochrsi") return one("StochRSI 14", C.accent, f(closesNaN, 14));
+      if (key === "adxr") return one("ADXR 14", C.accent, f(highsNaN, lowsNaN, 14));
+      if (key === "cci") return one("CCI 20", C.accent, f(highsNaN, lowsNaN, closesNaN, 20));
+      if (key === "cmo") return one("CMO 14", C.accent, f(closesNaN, 14));
+      if (key === "dx") return one("DX 14", C.accent, f(highsNaN, lowsNaN, 14));
+      if (key === "mom") return one("MOM 12", C.accent, f(closesNaN, 12));
+      if (key === "roc") return one("ROC 12", C.accent, f(closesNaN, 12));
+      if (key === "trix") return one("TRIX 15", C.accent, f(closesNaN, 15));
+      if (key === "ultosc") {
+        return one("UltOsc", C.accent, f(highsNaN, lowsNaN, closesNaN, {}));
+      }
+      if (key === "willr") return one("WillR 14", C.accent, f(highsNaN, lowsNaN, closesNaN, 14));
+      if (key === "apo") return one("APO", C.accent, f(closesNaN, {}));
+      if (key === "ppo") return one("PPO", C.accent, f(closesNaN, {}));
+      if (key === "bop") {
+        return one("BOP", C.accent, f(opensNaN || closesNaN, highsNaN, lowsNaN, closesNaN));
+      }
+      if (key === "qstick") {
+        return one("QStick 8", C.accent, f(opensNaN || closesNaN, closesNaN, 8));
+      }
+      if (key === "obv") return one("OBV", C.accent, f(closesNaN, vols));
+      if (key === "emv") return one("EMV", C.accent, f(highsNaN, lowsNaN, vols));
+      if (key === "vosc") return one("VOSC", C.accent, f(vols, {}));
+      if (key === "nvi") return one("NVI", C.accent, f(closesNaN, vols));
+      if (key === "pvi") return one("PVI", C.accent, f(closesNaN, vols));
+      if (key === "wad") return one("WAD", C.accent, f(highsNaN, lowsNaN, closesNaN));
+      if (key === "ad") return one("AD", C.accent, f(highsNaN, lowsNaN, closesNaN, vols));
+      if (key === "cvi") return one("CVI 10", C.accent, f(highsNaN, lowsNaN, 10));
+      if (key === "natr") return one("NATR 14", C.accent, f(highsNaN, lowsNaN, closesNaN, 14));
+      if (key === "mass") return one("Mass", C.accent, f(highsNaN, lowsNaN));
+      if (key === "kvo") return one("KVO", C.accent, f(highsNaN, lowsNaN, closesNaN, vols, {}));
+      if (key === "adosc") return one("ADOSC", C.accent, f(highsNaN, lowsNaN, closesNaN, vols, {}));
+      if (key === "dpo") return one("DPO 21", C.accent, f(closesNaN, 21));
+      if (key === "vhf") return one("VHF 28", C.accent, f(closesNaN, 28));
+      if (key === "volatility") return one("Volatility 14", C.accent, f(closesNaN, 14));
+      if (key === "aroon") {
+        var ar = f(highsNaN, lowsNaN, 25);
+        return {
+          series: [
+            { name: "Aroon Up", color: C.accent, values: ar.up },
+            { name: "Aroon Down", color: C.muted, values: ar.down }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "di") {
+        var dd = f(highsNaN, lowsNaN, 14);
+        return {
+          series: [
+            { name: "+DI", color: C.accent, values: dd.plus },
+            { name: "-DI", color: C.muted, values: dd.minus }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "vortex") {
+        var vx = f(highsNaN, lowsNaN, closesNaN, 14);
+        return {
+          series: [
+            { name: "+VI", color: C.accent, values: vx.plus },
+            { name: "-VI", color: C.muted, values: vx.minus }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "kst") {
+        var ks = f(closesNaN, {});
+        return {
+          series: [
+            { name: "KST", color: C.accent, values: ks.kst },
+            { name: "Signal", color: C.muted, values: ks.signal }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "ravi") return one("RAVI", C.accent, f(highsNaN, lowsNaN, closesNaN, {}));
+      if (key === "tsi") return one("TSI", C.accent, f(closesNaN, {}));
+      if (key === "smi") {
+        var sm = f(highsNaN, lowsNaN, closesNaN, {});
+        return {
+          series: [
+            { name: "SMI", color: C.accent, values: sm.smi },
+            { name: "Signal", color: C.muted, values: sm.signal }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "eri") {
+        var er = f(highsNaN, lowsNaN, closesNaN, 13);
+        return {
+          series: [
+            { name: "Bull", color: C.accent, values: er.bull },
+            { name: "Bear", color: C.muted, values: er.bear }
+          ],
+          missing: null, histogram: false
+        };
+      }
+      if (key === "awesome") return one("Awesome", C.accent, f(highsNaN, lowsNaN, {}));
+      if (key === "arsi") return one("ARSI 14", C.accent, f(closesNaN, 14));
+      if (key === "ulcer") return one("Ulcer 14", C.accent, f(closesNaN, 14));
+      if (key === "earsi") return one("EARSI", C.accent, f(closesNaN, {}));
     } catch (e) {
       return { series: [], missing: key, histogram: false };
     }
@@ -470,12 +664,13 @@ var MarketInd = (function () {
   function maybeDraw(state) {
     var buckets = (state.candles && Array.isArray(state.candles.buckets))
       ? state.candles.buckets : [];
-    var closes = [], highs = [], lows = [], times = [], vols = [];
+    var closes = [], highs = [], lows = [], opens = [], times = [], vols = [];
     var i;
     for (i = 0; i < buckets.length; i++) {
       closes.push(numOrNull(Number(buckets[i] ? buckets[i].close : NaN)));
       highs.push(numOrNull(Number(buckets[i] ? buckets[i].high : NaN)));
       lows.push(numOrNull(Number(buckets[i] ? buckets[i].low : NaN)));
+      opens.push(numOrNull(Number(buckets[i] ? buckets[i].open : NaN)));
       times.push(Math.floor(((buckets[i] && buckets[i].timeMs) || 0) / 1000));
       /* Volume -> Number is PIXELS-ONLY (chart coordinate, not money): the
        * source is market.js buckets[].baseVolume, a human string already
@@ -488,14 +683,14 @@ var MarketInd = (function () {
     var overlays = [];
     if (any) {
       overlays = priceOverlays(state,
-        closes.map(numOrNaN), highs.map(numOrNaN), lows.map(numOrNaN), C);
+        closes.map(numOrNaN), highs.map(numOrNaN), lows.map(numOrNaN), vols, C);
     }
     var depth = state.bookDepth || { bids: [], asks: [] };
     /* Per-pane osc series are computed live in drawCharts (checkbox toggles
      * never refetch); only the pixel-ready raw arrays are cached here. */
     state.chartData = {
       buckets: buckets, overlays: overlays,
-      closes: closes, highs: highs, lows: lows, vols: vols, oscTimes: times,
+      closes: closes, highs: highs, lows: lows, opens: opens, vols: vols, oscTimes: times,
       depth: depth
     };
     drawCharts(state);
@@ -534,6 +729,7 @@ var MarketInd = (function () {
       var closesNaN = (d.closes || []).map(numOrNaN);
       var highsNaN = (d.highs || []).map(numOrNaN);
       var lowsNaN = (d.lows || []).map(numOrNaN);
+      var opensNaN = (d.opens || []).map(numOrNaN);
       var missing = [];
       OSC_ORDER.forEach(function (def) {
         var key = def[0], label = def[1];
@@ -552,7 +748,7 @@ var MarketInd = (function () {
         }
         var one;
         try {
-          one = oscOne(key, state, closesNaN, highsNaN, lowsNaN, d.vols, C);
+          one = oscOne(key, state, closesNaN, highsNaN, lowsNaN, d.vols, C, opensNaN);
         } catch (e) {
           one = { series: [], missing: key, histogram: false };
         }
@@ -621,18 +817,115 @@ var MarketInd = (function () {
     } catch (e) { /* canvas failure must not break the desk */ }
   }
 
+  /* Indicator dropdown menu (parity round, shared by market + pool desks):
+   * one "Indicators" button + grouped checkbox panel (Overlays on the price
+   * pane / Oscillator sub-panes), replacing the two sprawling checkbox rows.
+   * Same state contract as the old rows (state.over/state.osc +
+   * state.oscBoxes for pane-x sync), same redraw path (drawCharts) — only
+   * the control UI changes. Button toggles on click; Esc closes and
+   * refocuses the button; outside pointerdown closes; checkbox toggles never
+   * close the panel. All targets 44px; keyboard-native controls throughout. */
+  function renderIndMenu(doc, host, state) {
+    var wrap = doc.createElement("div");
+    wrap.className = "mkt-indmenu";
+    var btn = doc.createElement("button");
+    btn.type = "button";
+    btn.className = "mkt-indmenu-btn";
+    btn.textContent = t("market.indicators_menu", "Indicators");
+    try { btn.appendChild(doc.createTextNode(" ▾")); } catch (e) { /* label stands */ }
+    btn.setAttribute("aria-haspopup", "true");
+    btn.setAttribute("aria-expanded", "false");
+    touchable(btn);
+    var panel = doc.createElement("div");
+    panel.className = "mkt-indmenu-panel";
+    panel.style.display = "none";
+    function setOpen(open) {
+      panel.style.display = open ? "" : "none";
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) {
+        try {
+          var first = panel.querySelector("input");
+          if (first && typeof first.focus === "function") first.focus();
+        } catch (e) { /* button keeps focus */ }
+      }
+    }
+    function isOpen() { return panel.style.display !== "none"; }
+    btn.addEventListener("click", function () { setOpen(!isOpen()); });
+    function group(title, items, store, kind) {
+      var sec = doc.createElement("div");
+      sec.className = "mkt-indmenu-group";
+      var head = doc.createElement("div");
+      head.className = "mkt-indmenu-head";
+      head.textContent = title;
+      sec.appendChild(head);
+      items.forEach(function (def) {
+        var key = def[0], label = def[1];
+        var lab = doc.createElement("label");
+        lab.className = "mkt-indmenu-item";
+        var box = doc.createElement("input");
+        box.type = "checkbox";
+        box.checked = !!store[key];
+        box.setAttribute("aria-label", label + (kind === "over" ? " overlay" : " pane"));
+        if (kind === "osc" && key !== "volume" && !ind(key)) {
+          box.disabled = true;
+          lab.title = label + " unavailable in this build";
+        }
+        touchable(box);
+        box.addEventListener("change", function () {
+          store[key] = box.checked;
+          drawCharts(state);
+        });
+        lab.appendChild(box);
+        lab.appendChild(el(doc, "span", label));
+        sec.appendChild(lab);
+        if (kind === "osc") state.oscBoxes[key] = box;
+      });
+      panel.appendChild(sec);
+    }
+    var overItems = OVERLAY_DEFS.map(function (def) {
+      return [def[0], overlayLabel(def[0], def[1])];
+    });
+    group(t("market.overlays_group", "Overlays"), overItems, state.over, "over");
+    group(t("market.oscillators_group", "Oscillators"), OSC_ORDER, state.osc, "osc");
+    wrap.appendChild(btn);
+    wrap.appendChild(panel);
+    host.appendChild(wrap);
+    try {
+      doc.addEventListener("pointerdown", function (ev) {
+        if (!isOpen()) return;
+        var node = ev && ev.target;
+        while (node) {
+          if (node === wrap) return;
+          node = node.parentNode;
+        }
+        setOpen(false);
+      });
+      doc.addEventListener("keydown", function (ev) {
+        if (!isOpen()) return;
+        if ((ev && ev.key === "Escape") || (ev && ev.keyCode === 27)) {
+          setOpen(false);
+          try { btn.focus(); } catch (e) { /* focus stays */ }
+        }
+      });
+    } catch (e) { /* button toggle still works */ }
+    return { button: btn, panel: panel, close: function () { setOpen(false); } };
+  }
+
   return {
     drawCharts: drawCharts,
     maybeDraw: maybeDraw,
     renderStrip: renderStrip,
     paintCountNote: paintCountNote,
     paintTimeframes: paintTimeframes,
+    renderIndMenu: renderIndMenu,
     /* Shared read-only constants for the desk: bucket shortlist + candle
      * count (fill reconciliation) and pane order + indicator lookup (desk
      * checkbox wiring must match drawCharts pane order — single source). */
     PREF_BUCKETS: PREF_BUCKETS,
     CANDLE_COUNT: CANDLE_COUNT,
     OSC_ORDER: OSC_ORDER,
+    OVERLAY_DEFS: OVERLAY_DEFS,
+    overlayLabel: overlayLabel,
     ind: ind
   };
 })();
