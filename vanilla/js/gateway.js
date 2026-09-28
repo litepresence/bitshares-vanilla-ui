@@ -157,17 +157,17 @@ var Gateway = (function () {
     cacheSet("gw_list_" + id, { method: method, count: rows.length });
     return rows;
   }
-  /* xbtsxList: ambiguity-A procedure — POST-first (code shape per
-   * XbtsxMethods.js:5-15) with GET-fallback (live probe: POST 404s, GET
-   * 200s). Winner recorded in gw_list_XBTSX. */
+  /* xbtsxList: ambiguity A DECIDED (live probes 2026-09-28: POST 404s, GET 200s
+   * on every run) — GET-first with POST fallback (was POST-first; the doomed
+   * POST logged a console 404 on every list fetch). Winner: GET. */
   function xbtsxList() {
-    return timedFetch(XBTSX_BASE + "/coin", { method: "POST", body: {} }).then(function (r) {
-      var rows = listOk("XBTSX", r, "POST");
-      if (rows) return rows;
-      return timedFetch(XBTSX_BASE + "/coin").then(function (g) {
-        var grows = listOk("XBTSX", g, "GET");
-        if (!grows) throw namedError("gateway-rejected", "XBTSX coin list HTTP " + g.status);
-        return grows;
+    return timedFetch(XBTSX_BASE + "/coin").then(function (g) {
+      var grows = listOk("XBTSX", g, "GET");
+      if (grows) return grows;
+      return timedFetch(XBTSX_BASE + "/coin", { method: "POST", body: {} }).then(function (r) {
+        var rows = listOk("XBTSX", r, "POST");
+        if (!rows) throw namedError("gateway-rejected", "XBTSX coin list HTTP " + r.status);
+        return rows;
       });
     });
   }

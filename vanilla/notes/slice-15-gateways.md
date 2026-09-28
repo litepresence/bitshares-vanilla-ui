@@ -27,8 +27,11 @@ deposit never broadcasts; `tx.js` untouched.
   browser) = host death → manual-only unavailable panel + probe Retry.
 - BIT20: no assets on-chain (`BIT20.*` all not found), `bit20` account exists
   but gateway-less (`1.2.106303`) → tab disabled, no URL guessed.
-- Deposit-address fetch where free: XBTSX POST → 200 body `null`, IOB → 404 —
-  both recorded verbatim, no address forged, no funds moved.
+- XBTSX list flipped POST-first→GET-first (ambiguity A long decided; the doomed
+  POST logged a console 404 on every fetch). Remaining console signal:
+  GDEX `api.52bts.net` DNS failure — honest and expected (dead host; UI shows
+  gateway-down + Retry). Not suppressible (Chromium logs failed fetches) and
+  not a bug: it IS the health signal.
 
 ## Bug found by verification, fixed + re-proved (load-bearing)
 - `backingCoin` dropped: normalizer read only `deposit_coin_type`, live hosts
