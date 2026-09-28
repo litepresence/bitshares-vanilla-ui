@@ -33,6 +33,7 @@ class StubWS {
     };
     if (method === "login") respond(null);
     else if (method === "database") respond(2);
+    else if (method === "set_block_applied_callback") respond(null);
     else if (method === "get_chain_id") respond("роп12345");
     else if (method === "get_dynamic_global_properties") {
       respond({ head_block_number: blockNum, time: "2026-01-01T00:00:00" });
@@ -95,6 +96,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     sockets[sockets.length - 1].open();
     await sleep(50);
   }
+
+  // TEST 3: applied-block notice advances the tip with zero RPC.
+  sockets[sockets.length - 1].open();
+  await sleep(50);
+  const beforeNotice = Chain.status().headBlock;
+  const lastSock = sockets[sockets.length - 1];
+  lastSock.onmessage({ data: JSON.stringify({ method: "notice", params: [1, ["06d73c6c" + "00".repeat(16)]] }) });
+  await sleep(20);
+  const afterNotice = Chain.status().headBlock;
+  if (afterNotice !== 0x06d73c6c) fails.push("block notice did not advance tip (got " + afterNotice + " from " + beforeNotice + ")");
+  else console.log("PASS block notice advanced tip to " + afterNotice);
 
   // Cleanup: manual disconnect must NOT reconnect.
   const nCalm = sockets.length;

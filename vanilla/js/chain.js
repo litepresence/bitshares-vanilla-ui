@@ -1,9 +1,10 @@
 /* Chain: sole WebSocket owner for all node traffic (principle: one chain module).
  * Owns: the shared socket (ws/pending/nextId), status (lastStatus), api-id
  *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net,
- *   plus keepalive (20s heartbeat refreshing head block + RTT latency) and
- *   capped same-node auto-reconnect. Status fans out via Store.emitConnection
- *   (the footer is the connectivity signal — no topbar badge, #1 parity).
+ *   plus keepalive (block-push feed tracking the ~3s tip with zero extra RPC,
+ *   20s heartbeat refreshing RTT latency as backup) and capped same-node
+ *   auto-reconnect. Status fans out via Store.emitConnection (the footer is
+ *   the connectivity signal — no topbar badge, #1 parity).
  * Consumes: Store.emitConnection (status fan-out, read-only). Side effects:
  *   opens/closes WebSockets, mutates lastStatus + api-id caches.
  * Created by: building-vanilla-slices skill, slice-01-shell-settings plan. */
@@ -17,6 +18,11 @@ var Chain = (function () {
   var RECONNECT_DELAYS = [2000, 5000, 10000, 20000, 30000];
   var beatTimer = null, reconnectTimer = null, reconnectTries = 0;
   var manualClose = false, lastUrl = null, lastOpts = null;
+  /* Block-push subscription id (integer echoed back in notice params —
+   * routing is shape-disjoint from call/response ids, so no collision).
+   * Best-effort: nodes that disallow it (some testnets) just don't push;
+   * the heartbeat below covers them. */
+  var BLOCK_CB_ID = 1;
 
   function setStatus(patch) {
     lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
@@ -54,11 +60,34 @@ var Chain = (function () {
    *   fresh ones) — a stale cache would address the new connection wrongly. */
   function resetApiIds() { _dbId = null; _historyId = null; _netId = null; }
 
+  /* blockNumberFromId: graphene block ids lead with the 4-byte big-endian
+   * block number (astro-ui BlocksLive parity). Returns the number or null. */
+  function blockNumberFromId(blockId) {
+    try {
+      if (!blockId || typeof blockId !== "string" || blockId.length < 8) return null;
+      var num = parseInt(blockId.slice(0, 8), 16);
+      return (isFinite(num) && num > 0) ? num : null;
+    } catch (e) { return null; }
+  }
+
+  /* onBlockNotice: applied-block push -> advance the footer head block.
+   * Monotonic only (stale/reordered pushes never move it backwards). */
+  function onBlockNotice(payload) {
+    try {
+      var list = Array.isArray(payload) ? payload : [payload];
+      var num = blockNumberFromId(list[0]);
+      if (num === null) return;
+      var cur = lastStatus.headBlock;
+      if (typeof cur !== "number" || num > cur) setStatus({headBlock: num});
+    } catch (e) { /* heartbeat covers */ }
+  }
   /* Heartbeat: one get_dynamic_global_properties per interval on the open
    * socket (traffic both directions defeats idle timeouts) + the reply
    * refreshes the footer head block AND latency (round-trip time — the
-   * footer latency is live, not the connect-time sample). Failures are
-   * silent — the next beat retries; a dead socket surfaces via onclose. */
+   * footer latency is live, not the connect-time sample). Tip updates are
+   * MONOTONIC (a slow reply must never drag the tip backwards past a newer
+   * block-push notice). Failures are silent — the next beat retries; a dead
+   * socket surfaces via onclose. */
   function beat() {
     if (!ws || ws.readyState !== 1) return;
     var t0 = Date.now();
@@ -67,7 +96,12 @@ var Chain = (function () {
       return call(dbId, "get_dynamic_global_properties", [], 10000);
     }).then(function (props) {
       if (props && props.head_block_number && ws && ws.readyState === 1) {
-        setStatus({headBlock: props.head_block_number, latencyMs: Date.now() - t0});
+        var cur = lastStatus.headBlock;
+        if (typeof cur !== "number" || props.head_block_number > cur) {
+          setStatus({headBlock: props.head_block_number, latencyMs: Date.now() - t0});
+        } else {
+          setStatus({latencyMs: Date.now() - t0});
+        }
       }
     }).catch(function () { /* next beat retries */ });
   }
@@ -161,7 +195,9 @@ var Chain = (function () {
       try { ws = new WebSocket(url); } catch (e) { setStatus({state: "error", node: url}); reject(e); return; }
       var guard = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (e) {} setStatus({state: "error", node: url}); reject(new Error("connect timeout")); } }, timeoutMs);
       ws.onopen = function () {
+        var opDbId = null;
         call(1, "login", ["", ""]).then(function () { return call(1, "database", []); }).then(function (dbId) {
+          opDbId = dbId;
           return Promise.all([call(dbId, "get_chain_id", []), call(dbId, "get_dynamic_global_properties", [])]);
         }).then(function (res) {
           if (done) return; done = true; clearTimeout(guard);
@@ -172,6 +208,13 @@ var Chain = (function () {
           setStatus({state: "open", node: url, latencyMs: latencyMs, chainId: res[0], headBlock: headBlock});
           reconnectTries = 0;
           startHeartbeat(opts && opts.heartbeatMs);
+          /* Block-push feed (best-effort): the node pushes every applied
+           * block with ZERO extra RPC — the footer then tracks the ~3s
+           * chain tip instead of the 20s heartbeat. Nodes that disallow it
+           * (some testnets) just stay on heartbeat; never fatal. */
+          try {
+            if (opDbId !== null) call(opDbId, "set_block_applied_callback", [BLOCK_CB_ID]).catch(function () { /* heartbeat covers */ });
+          } catch (e) { /* heartbeat covers */ }
           resolve({chainId: res[0], headBlockTime: res[1].time, latencyMs: latencyMs});
         }).catch(function (e) {
           if (done) return; done = true; clearTimeout(guard);
@@ -181,6 +224,13 @@ var Chain = (function () {
       };
       ws.onmessage = function (ev) {
         var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
+        /* Push notices (no top-level id — shape-disjoint from call pairs):
+         * applied-block feed for the footer (see BLOCK_CB_ID). Unknown
+         * notices are ignored; the heartbeat covers unsubscribed nodes. */
+        if (msg.method === "notice" && Array.isArray(msg.params) && msg.params[0] === BLOCK_CB_ID) {
+          onBlockNotice(msg.params[1]);
+          return;
+        }
         if (msg.id !== undefined && pending[msg.id]) {
           var p = pending[msg.id]; delete pending[msg.id]; clearTimeout(p.timer);
           if (msg.error) p.reject(new Error(JSON.stringify(msg.error))); else p.resolve(msg.result);
