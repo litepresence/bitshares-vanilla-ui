@@ -81,10 +81,10 @@ var CreditUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", t("credit.viewing_as_committee_account_1_2_0_unlock_to", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted");
+    return el(doc, "p", t("credit.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted");
   }
   function signNotice(doc) {
-    return el(doc, "p", t("credit.wallet_locked_preview_only_password_is_asked", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return el(doc, "p", t("credit.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
@@ -203,11 +203,11 @@ var CreditUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         out.removeChild(status);
         if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-          var note = el(doc, "p", t("credit.wallet_is_locked_unlock_to_sign_the_preview", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          var note = el(doc, "p", t("credit.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
           note.className = "muted xfer-sign-note"; out.appendChild(note);
         }
         unlockInline(doc, out, function () {
-          out.appendChild(el(doc, "p", t("credit.unlocked_press_back_and_re_run_review_so_the", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          out.appendChild(el(doc, "p", t("credit.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
         });
         send.disabled = false; back.disabled = false; return; }
       Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {

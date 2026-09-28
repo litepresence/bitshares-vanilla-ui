@@ -274,7 +274,7 @@ var TransferUI = (function () {
       Account.resolve(v).then(function () {
         if (document.activeElement !== fromF.input) setFieldError(fromF, "");
       }).catch(function () {
-        setFieldError(fromF, t("transfer.unknown_account_name", "Unknown account."));
+        setFieldError(fromF, t("transfer.unknown_account_name", "Unknown account: %(name)s.", {name: v}));
       });
     });
 

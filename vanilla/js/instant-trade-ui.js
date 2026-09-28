@@ -179,7 +179,7 @@ var InstantTradeUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
-    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.viewing_as_committee_account_1_2_0_unlock_to", "Viewing as committee-account (1.2.0) — unlock to trade as your account."), "muted"));
+    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.viewing_as", "Viewing as committee-account (1.2.0) — unlock to trade as your account."), "muted"));
     wrap.appendChild(el(doc, "p", t("instant.pick_a_market_choose_a_side_enter_an_amount_t", "Pick a market, choose a side, enter an amount. The price fills from the order book; review and sign one limit order."), "muted"));
     /* Order-type strip (dexux-ref LIMIT/SCALED shape): this view is
      * limit-only, so LIMIT is the active tab and SCALED links to the full
@@ -309,7 +309,7 @@ var InstantTradeUI = (function () {
     });
     var previewWarn = null;
     if (locked) {
-      previewWarn = t("instant.previewing_as_committee_account_balances_not_ch", "Previewing as committee-account (1.2.0) — balances not checked. Unlock to validate yours before signing.");
+      previewWarn = t("instant.preview_balances_note", "Previewing as committee-account (1.2.0) — balances not checked. Unlock to validate yours before signing.");
     } else if (!sellBal || BigInt(sellBal.raw) < BigInt(sellRaw)) {
       throw new Error("Insufficient balance: have " + (sellBal ? Format.formatAmount(sellBal.raw, sellBal.precision) + " " + sellBal.symbol : "0") + ".");
     }
@@ -365,7 +365,7 @@ var InstantTradeUI = (function () {
     row(t("instant.network", "Network"), networkName());
     wrap.appendChild(list);
     if (R.previewWarn) wrap.appendChild(el(doc, "p", R.previewWarn, "error"));
-    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.wallet_locked_preview_only_password_is_asked", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
     var backBtn = touchable(el(doc, "button", t("instant.back", "Back")));
     backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", t("instant.sign_send", "Sign & Send")));
@@ -378,11 +378,11 @@ var InstantTradeUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
         if (!wrap.querySelector || !wrap.querySelector(".xfer-sign-note")) {
-          var note = el(doc, "p", t("instant.wallet_is_locked_unlock_to_sign_the_preview", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          var note = el(doc, "p", t("instant.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
           note.className = "muted xfer-sign-note"; wrap.appendChild(note);
         }
         unlockInline(doc, wrap, function () {
-          wrap.appendChild(el(doc, "p", t("instant.unlocked_press_back_and_review_again_so_the", "Unlocked — press Back and review again so the order uses your account."), "muted"));
+          wrap.appendChild(el(doc, "p", t("instant.unlocked_repreview_note", "Unlocked — press Back and review again so the order uses your account."), "muted"));
         });
         backBtn.disabled = false; sendBtn.disabled = false; return;
       }

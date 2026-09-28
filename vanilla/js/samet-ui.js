@@ -110,7 +110,7 @@ var SametUI = (function () {
     });
     Account.myAccountId().catch(function () { return ui.viewingAsId; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (!live(myGen, uiGen)) return;
-      if (lockedS) mineBox.appendChild(ui.el(doc, "p", t("samet.viewing_as_committee_account_1_2_0", "Viewing as committee-account (1.2.0)."), "muted"));
+      if (lockedS) mineBox.appendChild(ui.el(doc, "p", t("samet.viewing_as", "Viewing as committee-account (1.2.0)."), "muted"));
       CreditSamet.fundsByOwner(me.id, {}).then(function (rows) {
         if (!live(myGen, uiGen)) return; draw(mineBox, rows, true);
       }).catch(function () {
