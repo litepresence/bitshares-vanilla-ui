@@ -51,8 +51,13 @@ var HtlcUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
-  function offlineBox(doc, wrap, retryFn) { /* offline panel + Retry, never blank */
-    wrap.appendChild(el(doc, "p", t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+  function offlineBox(doc, wrap, retryFn) { /* Retry panel: copy depends on
+    * actual connection (unknown-id failures while connected must not claim
+    * the network is down). */
+    var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
+    wrap.appendChild(el(doc, "p", open
+      ? t("htlc.retry_load", "Retry loading.")
+      : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }

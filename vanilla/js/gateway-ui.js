@@ -54,8 +54,13 @@ var GatewayUI = (function () {
   function showStatus(doc, box, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); box.appendChild(p); return p;
   }
-  function offlineBox(doc, box, retryFn) {
-    box.appendChild(el(doc, "p", t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+  function offlineBox(doc, box, retryFn) { /* Retry panel: copy depends on
+    * actual connection (unknown-id failures while connected must not claim
+    * the network is down). */
+    var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
+    box.appendChild(el(doc, "p", open
+      ? t("gateway.retry_load", "Retry loading.")
+      : t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var b = touchable(el(doc, "button", t("gateway.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); box.appendChild(b);
   }

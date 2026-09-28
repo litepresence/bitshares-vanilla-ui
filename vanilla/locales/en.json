@@ -2114,7 +2114,11 @@
       "pool.sell_col",
       "pool.tab_my",
       "pool.tab_pool",
-      "pool.retry_load"
+      "pool.retry_load",
+      "credit.retry_load",
+      "gateway.retry_load",
+      "htlc.retry_load",
+      "proposal.retry_load"
     ]
   },
   "nav": {
@@ -2562,7 +2566,8 @@
     "locked_sign_note": "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing.",
     "password": "password",
     "unlocked_rereview_note": "Unlocked — press Back and re-run Review so the transaction uses your account.",
-    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as your account."
+    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as your account.",
+    "retry_load": "Retry loading."
   },
   "debit": {
     "title": "Direct Debit",
@@ -2843,7 +2848,8 @@
     "withdraw_note_b": "transfer form — this page never broadcasts a gateway withdraw.",
     "withdraw_prefix": "Withdraw ",
     "withdraw_tab": "WITHDRAW",
-    "your_account": "Your BitShares account "
+    "your_account": "Your BitShares account ",
+    "retry_load": "Retry loading."
   },
   "htlc": {
     "title": "HTLC",
@@ -2906,7 +2912,8 @@
     "hashlock_col": "Hash lock",
     "locktime_label": "Lock time",
     "size_field": "Preimage size (bytes)",
-    "to_account": "To account"
+    "to_account": "To account",
+    "retry_load": "Retry loading."
   },
   "market_book": {
     "title": "Exchange",
@@ -3956,7 +3963,8 @@
     "wallet_is_locked_enter_your_password_to_conti": "Wallet is locked. Enter your password to continue.",
     "yes_veto": "yes (veto)",
     "locked_sign_note": "Wallet is locked — browsing is public; unlock to sign.",
-    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself."
+    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
+    "retry_load": "Retry loading."
   },
   "referrals": {
     "account": "Account ",
