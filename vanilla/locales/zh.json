@@ -2240,7 +2240,15 @@
     "tab_my": "My exchanges",
     "tab_pool": "Pool history",
     "retry_load": "Retry loading.",
-    "market_col": "Market"
+    "market_col": "Market",
+    "paid_col": "Paid",
+    "recv_col": "Received",
+    "no_swaps": "No swaps yet.",
+    "spot_row": "Spot",
+    "synth_note": "Synthetic depth from the CPMM curve at current reserves — not resting orders.",
+    "hist_source_es": "Swap history via community index.",
+    "hist_source_chain": "Swap history via chain.",
+    "book_title": "Order book"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

@@ -35,7 +35,6 @@ var PoolDetailUI = (function () {
     return dflt;
   }
   var gen = 0;
-  var OP_NAMES = { 59: "create", 60: "delete", 61: "deposit", 62: "withdraw", 63: "exchange" };
   /* Shared-_ui accessor: PoolUI._ui (pool-ui.js loads first); throws when the backend is missing. */
   function U() {
     if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error(t("pool.backend_missing", "Pool backend missing: pool-ui.js failed to load."));
@@ -82,9 +81,38 @@ var PoolDetailUI = (function () {
     strip.appendChild(u.el(doc, "span", "Taker: " + u.pctText(r.taker_units)));
     strip.appendChild(u.el(doc, "span", "Withdrawal: " + u.pctText(r.withdrawal_units)));
     strip.appendChild(u.el(doc, "span", "Share: " + (r.sym_share || r.share_id)));
+    /* Spot price B-per-A (exact BigInt ratio, precOr5 fallbacks — same
+     * orientation as the book and candles below). */
+    try {
+      var spot = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      var spotEl = u.el(doc, "span", t("pool.spot_row", "Spot") + ": " + spot + " " + (r.sym_b || r.asset_b_id) + "/" + (r.sym_a || r.asset_a_id));
+      strip.appendChild(spotEl);
+    } catch (e) { /* strip stands without spot */ }
+    /* One tape fetch shared by chart + history (mainnet: ES adapter ->
+     * chain; other networks: chain — the community index is mainnet-only).
+     * Legs passed so cross-chain id collisions can never pollute the tape. */
+    var tape = { swaps: [], source: null };
+    if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.swapsForPool === "function") {
+      var net = "mainnet";
+      try {
+        if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+          var st = Store.loadSettings();
+          if (st && (st.network === "testnet" || st.network === "mainnet")) net = st.network;
+        }
+      } catch (e) { /* mainnet default stands */ }
+      try {
+        tape = await PoolHistory.swapsForPool(r.id, 200, { network: net, legA: r.asset_a_id, legB: r.asset_b_id });
+      } catch (e) { tape = { swaps: [], source: null }; }
+    }
+    if (!live(myGen, uiGen)) return;
+    if (tape.swaps && tape.swaps.length) {
+      try {
+        PoolHistory.enrich(tape.swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b));
+      } catch (e) { /* tape renders unpriced */ }
+    }
     var charts = doc.createElement("section"); charts.className = "mkt-charts"; desk.appendChild(charts);
     charts.appendChild(u.el(doc, "h2", t("pool.history_title", "Price history")));
-    chartPane(doc, charts, r, myGen, uiGen);
+    chartPane(doc, charts, r, tape, myGen, uiGen);
     var acts = doc.createElement("section"); acts.className = "mkt-side"; desk.appendChild(acts);
     acts.appendChild(u.el(doc, "h2", t("pool.stake_title", "Stake / unstake")));
     stakeBoxes(doc, acts, r, uiGen);
@@ -93,34 +121,78 @@ var PoolDetailUI = (function () {
     acts.appendChild(u.el(doc, "h2", t("pool.manage_title", "Update / delete")));
     manageBoxes(doc, acts, r, uiGen);
     var book = doc.createElement("section"); book.className = "mkt-book"; desk.appendChild(book);
-    book.appendChild(u.el(doc, "h2", t("pool.depth_title", "Depth (CPMM curve)")));
+    book.appendChild(u.el(doc, "h2", t("pool.book_title", "Order book")));
     depthPane(doc, book, r);
     var hist = doc.createElement("section"); hist.className = "mkt-trades"; desk.appendChild(hist);
     hist.appendChild(u.el(doc, "h2", t("pool.pool_history_title", "Pool history")));
-    historyPane(doc, hist, r, myGen, uiGen);
+    historyPane(doc, hist, r, tape, myGen, uiGen);
   }
-  function chartPane(doc, charts, r, myGen, uiGen) { /* LWC line from bucketed chain history; honest gap when unavailable */
-    var u = U(), note = u.el(doc, "p", t("pool.loading_history", "Loading price history…"), "muted"); charts.appendChild(note);
-    Pool.history(r.id, 100).then(function (rows) {
-      if (!live(myGen, uiGen)) return;
-      note.textContent = rows.length ? rows.length + " pool events." : t("pool_detail.s1", "No pool history yet.");
-      if (!rows.length) return;
+  /* Pool chart buckets (swap-tape timeframes; chain buckets API has no pool
+   * leg, so bucketing happens here over enriched swaps). */
+  var POOL_BUCKETS = [60, 300, 900, 1800, 3600];
+
+  function chartPane(doc, charts, r, tape, myGen, uiGen) {
+    /* Swap-price candles (ES adapter -> chain fallback) drawn through the
+     * SHARED MarketInd stack (timeframes + dropdown menu + LWC price pane +
+     * oscillator sub-panes) — the pool desk reads exactly like the exchange
+     * desk. State contract mirrors market-desk.js showDesk. Tape arrives
+     * pre-fetched from detailFill (shared with the history pane). */
+    var u = U();
+    if (typeof PoolHistory === "undefined" || typeof MarketInd === "undefined") {
+      charts.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
+      return;
+    }
+    var note = u.el(doc, "p", t("pool.loading_history", "Loading price history…"), "muted");
+    charts.appendChild(note);
+    var tfBox = doc.createElement("div");
+    tfBox.className = "mkt-tfrow";
+    tfBox.setAttribute("role", "radiogroup");
+    charts.appendChild(tfBox);
+    var countNote = u.el(doc, "p", "", "muted mkt-count-note");
+    countNote.setAttribute("aria-live", "polite");
+    charts.appendChild(countNote);
+    var menuHost = doc.createElement("div");
+    charts.appendChild(menuHost);
+    var priceHost = doc.createElement("div");
+    priceHost.className = "mkt-price-host";
+    charts.appendChild(priceHost);
+    var oscHost = doc.createElement("div");
+    oscHost.className = "mkt-osc-host";
+    charts.appendChild(oscHost);
+    var oscNote = u.el(doc, "p", "", "muted");
+    oscNote.setAttribute("aria-live", "polite");
+    charts.appendChild(oscNote);
+    var P = {
+      doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
+      over: { sma: true, ema: true }, osc: {}, oscBoxes: {}, panes: {}, paneEls: {},
+      candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,
+      priceHost: priceHost, oscHost: oscHost, oscNote: oscNote,
+      depthCanvas: null, basePrec: precOr5(r.prec_b), quotePrec: precOr5(r.prec_a),
+      assets: {
+        base: { precision: precOr5(r.prec_b), symbol: r.sym_b || r.asset_b_id },
+        quote: { precision: precOr5(r.prec_a), symbol: r.sym_a || r.asset_a_id }
+      },
+      swaps: [], precA: precOr5(r.prec_a), precB: precOr5(r.prec_b)
+    };
+    try { MarketInd.renderIndMenu(doc, menuHost, P); } catch (e) { /* chart works without the menu */ }
+    function rebucket() {
+      P.candles = { buckets: PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB) };
+      try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {
-        if (typeof LightweightCharts === "undefined") { note.textContent += " (chart library unavailable)"; return; }
-        var box = doc.createElement("div"); box.style.height = "220px"; charts.appendChild(box);
-        var chart = LightweightCharts.createChart(box, { height: 220 });
-        var series = chart.addLineSeries();
-        var buckets = {}, k;
-        rows.forEach(function (h) {
-          if (!h.block_time) return;
-          k = String(h.block_time).slice(0, 13);
-          buckets[k] = (buckets[k] || 0) + 1;
-        });
-        series.setData(Object.keys(buckets).sort().map(function (t) { return { time: t, value: buckets[t] }; }));
-      } catch (e) { note.textContent = t("pool_detail.s1", "No pool history yet."); }
-    }).catch(function () {
-      if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
-    });
+        P.countNote.textContent = P.swaps.length + " swaps · " + P.bucket + "s candles";
+      } catch (e) { /* count stands */ }
+    }
+    var swaps = (tape && tape.swaps) || [];
+    if (!tape || !tape.source) { note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."); return; }
+    if (!swaps.length) { note.textContent = t("pool.no_swaps", "No swaps yet."); return; }
+    P.swaps = swaps;
+    note.textContent = swaps.length + " swaps. " + (tape.source === "es"
+      ? t("pool.hist_source_es", "Swap history via community index.")
+      : t("pool.hist_source_chain", "Swap history via chain."));
+    try {
+      MarketInd.paintTimeframes(doc, P, function () { if (live(myGen, uiGen)) rebucket(); });
+    } catch (e) { /* default bucket stands */ }
+    rebucket();
   }
   /* Theme token read (plain duplicate of the market-book.js helper —
    * doctrine prefers duplication over a shared chart abstraction). */
@@ -287,25 +359,141 @@ var PoolDetailUI = (function () {
     ctx.textAlign = "left";
   }
 
-  function depthPane(doc, book, r) { /* CPMM curve points -> compact table (first 8 steps per side) */
+  function depthPane(doc, book, r) {
+    /* Synthetic resting-book view: the CPMM curve rendered as bids/asks
+     * through the SHARED MarketBook renderer (same tables, depth bars,
+     * spread line, staircase as the exchange desk) + the x·y=k canvas above.
+     * Rows are synthetic (no counterparty) — the note says so. Clicking a
+     * row prefills the inline swap form (amount + direction). */
     var u = U();
     drawCurve(doc, book, r); /* x·y=k canvas above the table; silent no-op on empty pools */
+    book.appendChild(u.el(doc, "p", t("pool.synth_note", "Synthetic depth from the CPMM curve at current reserves — not resting orders."), "muted"));
+    if (typeof MarketBook === "undefined" || typeof PoolHistory === "undefined" ||
+        typeof MarketBook.renderBook !== "function") {
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      return;
+    }
+    var precA = precOr5(r.prec_a), precB = precOr5(r.prec_b), levels = null;
     try {
-      var pts = Pool.depthPoints({ balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw });
-      var table = doc.createElement("table"); table.className = "node-table";
-      table.appendChild(u.tableHead(doc, [t("pool.sell_pct_col", "Sell %"),  t("pool.a_to_b_col", "A→B out (raw)"), t("pool.b_to_a_col", "B→A out (raw)")]));
-      var tbody = doc.createElement("tbody");
-      for (var i = 0; i < 8; i++) {
-        var tr = doc.createElement("tr");
-        tr.appendChild(u.el(doc, "td", String(pts.aToB[i].pct) + "%"));
-        tr.appendChild(u.el(doc, "td", pts.aToB[i].out_raw));
-        tr.appendChild(u.el(doc, "td", pts.bToA[i].out_raw));
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody); book.appendChild(table);
-    } catch (e) { book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted")); }
+      levels = PoolHistory.synthBook({
+        balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw,
+        precA: precA, precB: precB, taker_units: r.taker_units
+      });
+    } catch (e) { levels = null; }
+    if (!levels || (!levels.asks.length && !levels.bids.length)) {
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      return;
+    }
+    var spreadLine = u.el(doc, "p", "", "muted");
+    book.appendChild(spreadLine);
+    var host = doc.createElement("div");
+    book.appendChild(host);
+    try {
+      MarketBook.renderBook(doc, host, {
+        book: levels, basePrec: precB, quotePrec: precA,
+        baseSymbol: r.sym_b || r.asset_b_id, quoteSymbol: r.sym_a || r.asset_a_id,
+        spreadLine: spreadLine
+      });
+    } catch (e) {
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      return;
+    }
+    /* Click-fill: DOM rows follow their side array order (asks ship reversed
+     * for display — same array renderBookSide receives). Ask rows are
+     * taker-buys-A (pay leg B); bid rows are taker-sells-A (pay leg A);
+     * amounts are the exact human strings on the row. */
+    function fillSwap(human, dir) {
+      try {
+        var amt = doc.getElementById("pool-swap-amount");
+        var sel = doc.getElementById("pool-swap-dir");
+        if (!amt || !sel) return;
+        amt.value = human;
+        sel.value = dir;
+        var ev = null;
+        if (typeof Event === "function") {
+          try { ev = new Event("input", { bubbles: true }); } catch (x) { ev = null; }
+        }
+        if (ev && typeof amt.dispatchEvent === "function") {
+          try { amt.dispatchEvent(ev); } catch (x) { /* value stands */ }
+        }
+        if (typeof amt.focus === "function") amt.focus();
+      } catch (e) { /* read-only desk stands */ }
+    }
+    try {
+      var sides = host.querySelectorAll(".book-asks, .book-bids");
+      Array.prototype.forEach.call(sides, function (side) {
+        var isAsk = side.className.indexOf("book-asks") !== -1;
+        var arr = isAsk ? levels.asks.slice().reverse() : levels.bids;
+        var rows = side.querySelectorAll("table tbody tr, .book-row-card");
+        Array.prototype.forEach.call(rows, function (row, i) {
+          var lv = arr[i];
+          if (!lv) return;
+          var human = isAsk ? lv.base : lv.quote;
+          var dir = isAsk ? "B" : "A";
+          try {
+            row.setAttribute("tabindex", "0");
+            row.setAttribute("role", "button");
+            row.title = "Fill swap";
+          } catch (e) { /* rows render unclickable */ }
+          function go() { fillSwap(human, dir); }
+          try {
+            row.addEventListener("click", go);
+            row.addEventListener("keydown", function (ev) {
+              if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
+            });
+          } catch (e) { /* rows render unclickable */ }
+        });
+      });
+    } catch (e) { /* book renders unclickable */ }
   }
-  function historyPane(doc, hist, r, myGen, uiGen) { /* pool-history rows coded 59-63 + My-exchanges toggle; honest gap when unavailable */
+  /* tapeTable: swap rows with EXECUTED amounts (Time / Price B-per-A /
+   * Paid / Received / Account). Amounts human via leg precisions (raw in
+   * title); unknown assets render raw, never blank. */
+  function tapeTable(doc, swaps, r) {
+    var u = U();
+    function leg(asset) {
+      if (String(asset) === String(r.asset_a_id)) {
+        return { prec: (r.prec_a === undefined || r.prec_a === null) ? null : r.prec_a, sym: r.sym_a || String(asset) };
+      }
+      if (String(asset) === String(r.asset_b_id)) {
+        return { prec: (r.prec_b === undefined || r.prec_b === null) ? null : r.prec_b, sym: r.sym_b || String(asset) };
+      }
+      return { prec: null, sym: String(asset) };
+    }
+    var table = doc.createElement("table"); table.className = "node-table";
+    table.appendChild(u.tableHead(doc, [
+      t("pool.time_col", "Time (UTC)"), t("market.th_price", "Price"),
+      t("pool.paid_col", "Paid"), t("pool.recv_col", "Received"),
+      t("account.card_account", "Account")]));
+    var tbody = doc.createElement("tbody");
+    swaps.forEach(function (sw) {
+      var tr = doc.createElement("tr");
+      tr.appendChild(u.el(doc, "td", sw.time || "unknown"));
+      tr.appendChild(u.el(doc, "td", (sw.price === null || sw.price === undefined) ? "—" : String(sw.price)));
+      [sw.paid, sw.received].forEach(function (legAmt) {
+        var L = leg(legAmt.asset);
+        tr.appendChild(u.el(doc, "td", u.amtText(legAmt.amount, legAmt.asset, L.prec, L.sym).text));
+      });
+      var tdA = doc.createElement("td");
+      if (sw.account) {
+        var a = doc.createElement("a");
+        a.href = "#/account/" + encodeURIComponent(sw.account);
+        a.textContent = sw.account;
+        u.touchable(a);
+        tdA.appendChild(a);
+      } else tdA.textContent = "—";
+      tr.appendChild(tdA);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    return table;
+  }
+  function historyPane(doc, hist, r, tape, myGen, uiGen) {
+    /* Swap tape (Time / Price / Paid / Received / Account) + My-exchanges
+     * toggle — mirrors the market desk Recent/My tabs (same mkt-tabs
+     * contract, same locked-hint). Rows come from the shared tape fetch
+     * (executed paid/received, human strings, raw in title). */
+    var u = U();
     var u = U();
     /* Toggle mirrors #1 MarketHistory group-1 tabs (Exchange.jsx:2551-2616):
      * Pool history (all events) vs My exchanges (wallet op-63 for this pool).
@@ -337,22 +525,15 @@ var PoolDetailUI = (function () {
     tabMy.addEventListener("click", function () { cur = "my"; paint(); loadMy(poolBody, myBody, r, myGen, uiGen); });
     paint();
     var note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); poolBody.appendChild(note);
-    Pool.history(r.id, 50).then(function (rows) {
-      if (!live(myGen, uiGen)) return; poolBody.removeChild(note);
-      if (!rows.length) { poolBody.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet."), "muted")); return; }
-      var table = doc.createElement("table"); table.className = "node-table";
-      table.appendChild(u.tableHead(doc, [t("pool.time_col", "Time (UTC)"),  t("pool.event_col", "Event")]));
-      var tbody = doc.createElement("tbody");
-      rows.forEach(function (h) {
-        var tr = doc.createElement("tr");
-        tr.appendChild(u.el(doc, "td", h.block_time || "unknown"));
-        tr.appendChild(u.el(doc, "td", OP_NAMES[h.op_type] || ("op " + String(h.op_type))));
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody); poolBody.appendChild(table);
-    }).catch(function () {
-      if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
-    });
+    poolBody.removeChild(note);
+    var swaps = (tape && tape.swaps) || [];
+    if (!tape || !tape.source) {
+      poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
+    } else if (!swaps.length) {
+      poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet."), "muted"));
+    } else {
+      poolBody.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
+    }
     myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My exchanges to see your fills in this pool."), "muted"));
     function loadMy(poolBodyEl, myBodyEl, row, g1, g2) {
       void poolBodyEl;
@@ -373,27 +554,13 @@ var PoolDetailUI = (function () {
         return;
       }
       u.showStatus(doc, myBodyEl, t("account.loading_history", "Loading history…"));
-      Account.myAccountId().then(function (myId) { return Account.history(myId, 100); }).then(function (rows) {
+      Account.myAccountId().then(function (myId) {
         if (!live(g1, g2)) return;
         u.clearBox(myBodyEl);
-        var mine = (rows || []).filter(function (h) {
-          var tup = h ? h.op : null;
-          if (!Array.isArray(tup) || tup[0] !== 63) return false;
-          return ((tup[1] || {}).pool === row.id);
-        });
+        var tape2 = (typeof tape !== "undefined" && tape && tape.swaps) || [];
+        var mine = tape2.filter(function (sw) { return sw && String(sw.account) === String(myId); });
         if (!mine.length) { myBodyEl.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
-        var table = doc.createElement("table"); table.className = "node-table";
-        table.appendChild(u.tableHead(doc, [t("pool.block_col", "Block"), t("pool.sell_col", "Sell"), t("pool.min_recv_row", "Min to receive")]));
-        var tbody = doc.createElement("tbody");
-        mine.slice(0, 20).forEach(function (h) {
-          var d = (h.op && h.op[1]) || {};
-          var tr = doc.createElement("tr");
-          tr.appendChild(u.el(doc, "td", h.block_num !== undefined && h.block_num !== null ? String(h.block_num) : "—"));
-          tr.appendChild(u.el(doc, "td", d.amount_to_sell ? String(d.amount_to_sell.amount) + " " + String(d.amount_to_sell.asset_id) : "—"));
-          tr.appendChild(u.el(doc, "td", d.min_to_receive ? String(d.min_to_receive.amount) + " " + String(d.min_to_receive.asset_id) : "—"));
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody); myBodyEl.appendChild(table);
+        myBodyEl.appendChild(tapeTable(doc, mine.slice(0, 20), row));
       }).catch(function (e) {
         if (!live(g1, g2)) return;
         u.clearBox(myBodyEl); u.showError(doc, myBodyEl, e, t("pool.my_history_failed", "Could not load your exchanges."));
@@ -449,8 +616,10 @@ var PoolDetailUI = (function () {
   function swapInlineBox(doc, box, r, uiGen) { /* op-63 mini-form: quote + impact + slippage preview */
     var u = U();
     var fSell = u.field(doc, t("pool.sell_amount_field", "Sell amount"), { inputmode: "decimal", placeholder: "1.0" });
+    try { fSell.input.id = "pool-swap-amount"; } catch (e) { /* fill skips */ }
     box.appendChild(fSell.row);
     var dir = doc.createElement("select"); u.touchable(dir);
+    try { dir.id = "pool-swap-dir"; } catch (e) { /* fill skips */ }
     var oA = doc.createElement("option"); oA.value = "A"; oA.textContent = t("account.sell_prefix", "Sell ") + (r.sym_a || r.asset_a_id);
     var oB = doc.createElement("option"); oB.value = "B"; oB.textContent = t("account.sell_prefix", "Sell ") + (r.sym_b || r.asset_b_id);
     dir.appendChild(oA); dir.appendChild(oB); box.appendChild(dir);
