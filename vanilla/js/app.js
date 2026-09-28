@@ -520,9 +520,8 @@ var App = (function () {
     if (s.state === "open") {
       var host = shortHost(s.node);
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
-      /* Head block is the connect-time value Chain stashes (no live block
-       * feed exists) — labeled @connect so it never reads as live. */
-      var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) + " @connect" : "";
+      /* Head block is heartbeat-live (chain.js refreshes every 20s). */
+      var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
       foot.textContent = (host ? host + " · " : "") + "LATENCY " + lat + blk;
     } else {
       foot.textContent = (s.state && s.state !== "unknown") ? String(s.state) : "connecting…";

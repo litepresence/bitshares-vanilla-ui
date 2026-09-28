@@ -1,6 +1,8 @@
 /* Chain: sole WebSocket owner for all node traffic (principle: one chain module).
  * Owns: the shared socket (ws/pending/nextId), status (lastStatus), api-id
- *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net.
+ *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net,
+ *   plus keepalive (20s heartbeat refreshing the head block) and capped
+ *   same-node auto-reconnect ([2,5,10,20,30]s, then closed for manual failover).
  * Consumes: Store.emitConnection (status fan-out, read-only), document badge
  *   #conn-badge (painted in setStatus, never read). Side effects: opens/closes
  *   WebSockets, mutates lastStatus + api-id caches, paints the badge DOM.
@@ -8,6 +10,13 @@
 var Chain = (function () {
   "use strict";
   var ws = null, nextId = 1, pending = {}, lastStatus = {state: "unknown"};
+  /* Keepalive state: heartbeat timer, reconnect backoff, manual-close flag.
+   * Idle public-node sockets die silently (NAT/proxy ~30-60s); the heartbeat
+   * keeps traffic flowing and the reconnect recovers when it still drops. */
+  var HEARTBEAT_MS = 20000;
+  var RECONNECT_DELAYS = [2000, 5000, 10000, 20000, 30000];
+  var beatTimer = null, reconnectTimer = null, reconnectTries = 0;
+  var manualClose = false, lastUrl = null, lastOpts = null;
 
   function setStatus(patch) {
     lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
@@ -34,6 +43,73 @@ var Chain = (function () {
       pending[id] = {resolve: resolve, reject: reject, timer: timer};
       ws.send(JSON.stringify({id: id, method: "call", params: [apiId, method, params || []]}));
     });
+  }
+
+  /* failPending: reject every in-flight call (socket died — hanging until
+   *   each 8s timeout would lie about state). Params: reason string. */
+  function failPending(reason) {
+    var ids = Object.keys(pending);
+    ids.forEach(function (id) {
+      var p = pending[id];
+      delete pending[id];
+      try { clearTimeout(p.timer); } catch (e) { /* timer gone */ }
+      try { p.reject(new Error(reason)); } catch (e) { /* caller gone */ }
+    });
+  }
+
+  /* resetApiIds: per-connection api ids die with the socket (login returns
+   *   fresh ones) — a stale cache would address the new connection wrongly. */
+  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; }
+
+  /* Heartbeat: one get_dynamic_global_properties per interval on the open
+   * socket (traffic both directions defeats idle timeouts) + the reply
+   * refreshes the footer head block, so it goes live instead of @connect.
+   * Failures are silent — the next beat retries; a dead socket surfaces
+   * via onclose, never here. */
+  function beat() {
+    if (!ws || ws.readyState !== 1) return;
+    db().then(function (dbId) {
+      if (!ws || ws.readyState !== 1) return;
+      return call(dbId, "get_dynamic_global_properties", [], 10000);
+    }).then(function (props) {
+      if (props && props.head_block_number && ws && ws.readyState === 1) {
+        setStatus({headBlock: props.head_block_number});
+      }
+    }).catch(function () { /* next beat retries */ });
+  }
+  function startHeartbeat(ms) {
+    stopHeartbeat();
+    try {
+      beatTimer = setInterval(beat, ms || HEARTBEAT_MS);
+    } catch (e) { /* without timers the socket still works, just unguarded */ }
+  }
+  function stopHeartbeat() {
+    try { if (beatTimer !== null) clearInterval(beatTimer); } catch (e) { /* gone */ }
+    beatTimer = null;
+  }
+  function clearReconnect() {
+    try { if (reconnectTimer !== null) clearTimeout(reconnectTimer); } catch (e) { /* gone */ }
+    reconnectTimer = null;
+  }
+
+  /* scheduleReconnect: same-node redial with capped backoff after an
+   * UNEXPECTED close (manual disconnects never redial). Gives up after the
+   * delay list is spent — the badge stays "closed" and the user picks a
+   * node (failover), instead of hammering a dead endpoint forever. */
+  function scheduleReconnect() {
+    if (manualClose || !lastUrl) return;
+    var delays = (lastOpts && lastOpts.reconnectDelays) || RECONNECT_DELAYS;
+    if (reconnectTries >= delays.length) return;
+    var wait = delays[reconnectTries++];
+    clearReconnect();
+    try {
+      reconnectTimer = setTimeout(function () {
+        reconnectTimer = null;
+        if (manualClose || !lastUrl) return;
+        setStatus({state: "connecting", node: lastUrl});
+        connect(lastUrl, lastOpts).catch(function () { /* onclose reschedules */ });
+      }, wait);
+    } catch (e) { /* user Retry remains */ }
   }
 
   /* Probe: latency + chain ID on a throwaway socket. Never touches the shared
@@ -81,7 +157,9 @@ var Chain = (function () {
   }
 
   function connect(url, opts) {    var timeoutMs = (opts && opts.timeoutMs) || 12000;
-    disconnect();
+    stopHeartbeat(); clearReconnect(); resetApiIds();
+    manualClose = false; lastUrl = url; lastOpts = opts || null;
+    closeSocket();
     setStatus({state: "connecting", node: url});
     var t0 = Date.now();
     return new Promise(function (resolve, reject) {
@@ -98,6 +176,8 @@ var Chain = (function () {
            * paint reads it; no extra RPC — same Promise.all as before). */
           var headBlock = (res[1] && res[1].head_block_number) || null;
           setStatus({state: "open", node: url, latencyMs: latencyMs, chainId: res[0], headBlock: headBlock});
+          reconnectTries = 0;
+          startHeartbeat(opts && opts.heartbeatMs);
           resolve({chainId: res[0], headBlockTime: res[1].time, latencyMs: latencyMs});
         }).catch(function (e) {
           if (done) return; done = true; clearTimeout(guard);
@@ -112,12 +192,33 @@ var Chain = (function () {
           if (msg.error) p.reject(new Error(JSON.stringify(msg.error))); else p.resolve(msg.result);
         }
       };
-      ws.onclose = function () { if (!done) { done = true; clearTimeout(guard); setStatus({state: "closed", node: url}); reject(new Error("socket closed")); } else if (lastStatus.state === "open") { setStatus({state: "closed", node: url}); } };
+      ws.onclose = function () {
+        stopHeartbeat(); failPending("not connected"); resetApiIds();
+        if (!done) {
+          done = true; clearTimeout(guard);
+          setStatus({state: "closed", node: url}); reject(new Error("socket closed"));
+        } else if (lastStatus.state === "open") {
+          setStatus({state: "closed", node: url});
+          scheduleReconnect();
+        }
+      };
       ws.onerror = function () { /* onclose carries the failure */ };
     });
   }
 
-  function disconnect() { try { if (ws) ws.close(); } catch (e) {} ws = null; }
+  /* closeSocket: low-level close for handoffs (connect/probe paths) — never
+   *   redials, never touches flags. Manual user disconnects go through
+   *   disconnect() below, which suppresses the reconnect. */
+  function closeSocket() { try { if (ws) ws.close(); } catch (e) {} ws = null; }
+
+  function disconnect() {
+    manualClose = true;
+    stopHeartbeat(); clearReconnect(); failPending("not connected"); resetApiIds();
+    closeSocket();
+    if (lastStatus.state === "open" || lastStatus.state === "connecting") {
+      setStatus({state: "closed", node: (lastStatus && lastStatus.node) || null});
+    }
+  }
   var _dbId = null;
   function db() {
     if (_dbId !== null) return Promise.resolve(_dbId);
