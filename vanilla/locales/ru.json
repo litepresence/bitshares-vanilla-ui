@@ -797,13 +797,23 @@
   },
   "market_book": {
     "title": "Exchange",
-    "s1": "Spread — (empty book side)"
+    "s1": "Spread — (empty book side)",
+    "depth_plot": "Depth staircase",
+    "depth_plot_label": "Cumulative depth staircase plot",
+    "no_depth_plot": "No depth data — the book is empty on both sides."
   },
   "market_charts": {
     "title": "Exchange"
   },
   "market_orders": {
-    "title": "Exchange"
+    "title": "Exchange",
+    "tape": "Fill-size tape",
+    "tape_empty": "No fills to bin — tape empty.",
+    "tape_label": "Fill-size tape histogram",
+    "tape_largest": "largest bin",
+    "tape_max": "max",
+    "tape_note": "Fills binned by size",
+    "tape_skipped": "unmappable skipped"
   },
   "market": {
     "title": "Exchange",
@@ -881,7 +891,18 @@
     "th_price": "Price",
     "th_time": "Time",
     "th_total": "Total",
-    "timeframe_label": "Candle timeframe"
+    "timeframe_label": "Candle timeframe",
+    "depth_title": "Depth",
+    "fail_my_trades": "Could not load your fills.",
+    "loading_my_trades": "Loading your fills…",
+    "my_trades_locked": "Unlock your wallet to see your fills on this market. ",
+    "no_my_trades": "No fills for your account on this market.",
+    "raw_my_fills": "Raw my fills",
+    "tab_my": "My trades",
+    "tab_recent": "Recent trades",
+    "th_block": "Block",
+    "trades_title": "Trades",
+    "trades_toggle_label": "Recent or my trades"
   },
   "misc": {
     "title": "Invoice",
@@ -2180,6 +2201,28 @@
     "unstaked": "Unstaked (withdraw broadcast).",
     "updated": "Pool updated.",
     "withdrawal_pct_field": "Withdrawal fee %",
-    "withdrawal_zero_note": "Withdrawal fee can only be set to 0."
+    "withdrawal_zero_note": "Withdrawal fee can only be set to 0.",
+    "block_col": "Block",
+    "exchanges_title": "Pool exchanges",
+    "exchanges_toggle_label": "Pool or my exchanges",
+    "find_pool_hint": "Find a pool to see your exchanges.",
+    "hist_hint": "Find a pool to see its exchanges.",
+    "history_failed": "Could not load pool history.",
+    "my_hist_hint": "Open My exchanges to see your fills in this pool.",
+    "my_history_failed": "Could not load your exchanges.",
+    "my_locked": "Unlock your wallet to see your exchanges in this pool. ",
+    "no_my_exchanges": "No exchanges for your account in this pool.",
+    "sell_col": "Sell",
+    "tab_my": "My exchanges",
+    "tab_pool": "Pool history"
+  },
+  "market_ind": {
+    "vwap": "Session VWAP + spread",
+    "vwap_label": "Session VWAP and spread band plot",
+    "vwap_no_history": "No bucket history — VWAP unavailable on this market.",
+    "vwap_no_volume": "No bucket volume — VWAP needs fills in this session.",
+    "vwap_session": "Session VWAP",
+    "vwap_skipped": "empty slots skipped",
+    "vwap_unavailable": "VWAP unavailable (bucket math or asset precisions missing)."
   }
 }

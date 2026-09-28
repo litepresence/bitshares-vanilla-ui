@@ -103,7 +103,7 @@ var PoolSwapUI = (function () {
     histTabMy.addEventListener("click", function () { histTab = "my"; paintHistTab(); if (curPoolId) loadMyPoolHist(doc, u, myGen, uiGen, myPoolBody, curPoolId); });
     paintHistTab();
     poolBody.appendChild(u.el(doc, "p", t("pool.hist_hint", "Find a pool to see its exchanges."), "muted"));
-    myPoolBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Find a pool to see your exchanges."), "muted"));
+    myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your exchanges."), "muted"));
     function loadPoolHist(poolId) {
       curPoolId = poolId;
       u.clearBox(poolBody);
@@ -128,7 +128,7 @@ var PoolSwapUI = (function () {
         u.clearBox(poolBody); u.showError(doc, poolBody, e, t("pool.history_failed", "Could not load pool history."));
       });
       if (histTab === "my") loadMyPoolHist(doc, u, myGen, uiGen, myPoolBody, poolId);
-      else { u.clearBox(myPoolBody); myPoolBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Find a pool to see your exchanges."), "muted")); }
+      else { u.clearBox(myPoolBody); myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your exchanges."), "muted")); }
     }
     find.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; find.disabled = true;
