@@ -35,6 +35,9 @@ var PoolUI = (function () {
   }
   var gen = 0;
   var openSubs = [];
+  /* Page-sort (honest scope): the chain offers no sorted pool endpoint, so
+   * sortable headers reorder the LOADED page only, never the chain. */
+  var sortKey = "id", sortDir = 1;
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
     if (cls) n.className = cls;
@@ -236,13 +239,65 @@ var PoolUI = (function () {
   function poolTable(doc, rows) { /* dexux-ref density: POOL ID / SHARE / A /
     *   A QTY / B / B QTY / TAKER / WITHDRAWAL / EXCHANGE (swap) / STAKE.
     *   EXCHANGE + STAKE both open the detail desk (#/pools/:id), which owns
-    *   the inline swap and stake panels — the list stays a list. */
+    *   the inline swap and stake panels — the list stays a list.
+    *   Sort: Pool ID / Taker / Withdrawal headers toggle page-sort. */
     if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found."), "muted");
+    var view = rows.slice();
+    function sortVal(r) {
+      if (sortKey === "taker") return Number(r.taker_units) || 0;
+      if (sortKey === "withdrawal") return Number(r.withdrawal_units) || 0;
+      return String(r.id || "");
+    }
+    view.sort(function (a, b) {
+      var x = sortVal(a), y = sortVal(b);
+      if (x < y) return -1 * sortDir;
+      if (x > y) return 1 * sortDir;
+      return 0;
+    });
     var table = doc.createElement("table"); table.className = "node-table pools-table";
-    table.appendChild(tableHead(doc, [t("pool.id_col", "Pool ID"),  t("pool.share_asset_field", "Share asset"), t("pool.asset_a_field", "Asset A"), t("pool.asset_a_qty_col", "Asset A qty"),
-      t("pool.asset_b_field", "Asset B"), t("pool.asset_b_qty_col", "Asset B qty"), t("pool.taker_row", "Taker fee"), t("pool.withdrawal_row", "Withdrawal fee"), t("market.title", "Exchange"), t("pool.stake_unstake_col", "Stake/Unstake")]));
+    var hr = doc.createElement("tr");
+    var cols = [
+      { key: "id", label: t("pool.id_col", "Pool ID"), sortable: true },
+      { key: null, label: t("pool.share_asset_field", "Share asset") },
+      { key: null, label: t("pool.asset_a_field", "Asset A") },
+      { key: null, label: t("pool.asset_a_qty_col", "Asset A qty") },
+      { key: null, label: t("pool.asset_b_field", "Asset B") },
+      { key: null, label: t("pool.asset_b_qty_col", "Asset B qty") },
+      { key: "taker", label: t("pool.taker_row", "Taker fee"), sortable: true },
+      { key: "withdrawal", label: t("pool.withdrawal_row", "Withdrawal fee"), sortable: true },
+      { key: null, label: t("market.title", "Exchange") },
+      { key: null, label: t("pool.stake_unstake_col", "Stake/Unstake") }
+    ];
+    cols.forEach(function (c) {
+      var th = doc.createElement("th");
+      if (c.sortable) {
+        var b = doc.createElement("button");
+        b.type = "button";
+        b.className = "th-sort";
+        b.textContent = c.label + (sortKey === c.key ? (sortDir === 1 ? " ▲" : " ▼") : "");
+        b.setAttribute("aria-label", t("pool.sort_by", "Sort by ") + c.label);
+        if (sortKey === c.key) th.setAttribute("aria-sort", sortDir === 1 ? "ascending" : "descending");
+        touchable(b);
+        b.addEventListener("click", function () {
+          if (sortKey === c.key) sortDir = -1 * sortDir;
+          else { sortKey = c.key; sortDir = 1; }
+          var box = th;
+          while (box && box.tagName !== "TABLE") box = box.parentElement;
+          if (box && box.parentElement) {
+            var fresh = poolTable(doc, rows);
+            box.parentElement.replaceChild(fresh, box);
+          }
+        });
+        th.appendChild(b);
+      } else {
+        th.textContent = c.label;
+      }
+      hr.appendChild(th);
+    });
+    var thead = doc.createElement("thead"); thead.appendChild(hr);
+    table.appendChild(thead);
     var tbody = doc.createElement("tbody");
-    rows.forEach(function (r) {
+    view.forEach(function (r) {
       var tr = doc.createElement("tr");
       /* Qty cells are bare numbers (the A/B columns already name the
        * assets — dexux-ref density); raw integers stay in title. */
@@ -410,6 +465,9 @@ var PoolUI = (function () {
     var fT = field(doc, t("pool.taker_pct_field", "Taker fee %"), { value: "0.5", inputmode: "decimal" });
     var fW = field(doc, t("pool.withdrawal_pct_field", "Withdrawal fee %"), { value: "0", inputmode: "decimal" });
     [fA, fB, fSh, fT, fW].forEach(function (f) { box.appendChild(f.row); });
+    /* Virgin-mint rule (slice-12 proven: max(raw)): first deposit into an
+     * empty pool mints the larger leg — inline so nobody learns it by failing. */
+    box.appendChild(el(doc, "p", t("pool.virgin_note", "First deposit into an empty pool mints shares equal to the larger leg — fund both legs accordingly."), "muted"));
     reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());

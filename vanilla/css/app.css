@@ -60,6 +60,10 @@ a.btn-ghost { background: transparent; color: var(--accent);
 .mkt-quotes button { min-height: 44px; padding: 6px 12px; border: 1px solid var(--border);
   border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 .mkt-quotes button[aria-pressed="true"] { border-color: var(--accent); font-weight: 700; }
+/* Sortable table headers (pools page-sort): text button in the th. */
+.th-sort { background: transparent; color: inherit; border: 0; padding: 0;
+  font: inherit; text-transform: inherit; letter-spacing: inherit;
+  font-weight: inherit; cursor: pointer; min-height: 44px; }
 .wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
 .wrap.mkt-wrap { max-width: 1400px; }
 /* Wide screens earn their pixels (principle #7): fluid caps at desk widths
