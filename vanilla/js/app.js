@@ -424,7 +424,9 @@ var App = (function () {
     if (s.state === "open") {
       var host = shortHost(s.node);
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
-      var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
+      /* Head block is the connect-time value Chain stashes (no live block
+       * feed exists) — labeled @connect so it never reads as live. */
+      var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) + " @connect" : "";
       foot.textContent = (host ? host + " · " : "") + "LATENCY " + lat + blk;
     } else {
       foot.textContent = (s.state && s.state !== "unknown") ? String(s.state) : "connecting…";
@@ -489,6 +491,22 @@ var App = (function () {
     Store.subscribe("connection", paintFooter);
     try { paintFooter(typeof Chain !== "undefined" && Chain ? Chain.status() : null); } catch (e) { /* badge carries errors */ }
     Store.subscribe("settings", onSettings);
+    /* Warning banner (static #1-parity notice): visible until dismissed;
+     * dismissal persists in localStorage. Never throws — banner works
+     * without storage (shows every boot) and without JS it stays visible. */
+    try {
+      var banner = document.getElementById("warn-banner");
+      var dismiss = document.getElementById("warn-dismiss");
+      if (banner) {
+        var off = false;
+        try { off = localStorage.getItem("bts-vanilla-warn-off-v1") === "1"; } catch (e) { /* shows */ }
+        if (off) banner.setAttribute("hidden", "");
+        if (dismiss) dismiss.addEventListener("click", function () {
+          banner.setAttribute("hidden", "");
+          try { localStorage.setItem("bts-vanilla-warn-off-v1", "1"); } catch (e) { /* session-only */ }
+        });
+      }
+    } catch (e) { /* banner keeps static state */ }
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
     /* Header theme copy: sits on the bar before the hamburger toggle, so it
