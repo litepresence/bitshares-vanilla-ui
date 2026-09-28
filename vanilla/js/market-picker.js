@@ -204,6 +204,37 @@ var MarketPicker = (function () {
     });
     section.appendChild(kinds);
 
+    /* Quote-button row (mirrors #1 market sidebar quote filters): tapping a
+     * quote filters the list to pairs containing it; tapping again clears.
+     * Plain buttons, 44px targets, aria-pressed carries state. */
+    var QUOTES = ["BTS", "USD", "CNY", "BTC", "TEST", "USDT"];
+    var quotes = doc.createElement("div");
+    quotes.className = "mkt-quotes";
+    var activeQuote = "";
+    QUOTES.forEach(function (q) {
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = q;
+      b.setAttribute("aria-pressed", "false");
+      touchable(b);
+      b.addEventListener("click", function () {
+        if (activeQuote === q) {
+          activeQuote = "";
+          search.value = "";
+        } else {
+          activeQuote = q;
+          search.value = q;
+        }
+        Array.prototype.forEach.call(quotes.querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-pressed", x.textContent === activeQuote ? "true" : "false");
+        });
+        paint(search.value);
+        try { search.focus(); } catch (e) { /* focus stays */ }
+      });
+      quotes.appendChild(b);
+    });
+    section.appendChild(quotes);
+
     var search = doc.createElement("input");
     search.id = "mkt-search";
     search.type = "search";
@@ -318,6 +349,27 @@ var MarketPicker = (function () {
       if (t && t.value) { _kindFilter = t.value; paint(search.value); }
     });
     search.addEventListener("input", function () { paint(search.value); });
+    /* Keyboard nav (principle #4): arrows move through visible pairs,
+     * Enter follows the focused link natively. Never throws. */
+    ul.addEventListener("keydown", function (ev) {
+      if (!ev || (ev.key !== "ArrowDown" && ev.key !== "ArrowUp")) return;
+      try {
+        var links = ul.querySelectorAll("li a");
+        var vis = [];
+        Array.prototype.forEach.call(links, function (a) {
+          var li = a.parentElement;
+          if (li && li.style.display === "none") return;
+          if (a.style.display === "none") return;
+          vis.push(a);
+        });
+        if (!vis.length) return;
+        ev.preventDefault();
+        var i = vis.indexOf(doc.activeElement);
+        if (ev.key === "ArrowDown") i = (i + 1) % vis.length;
+        else i = (i - 1 + vis.length) % vis.length;
+        vis[i].focus();
+      } catch (e) { /* keyboard nav skips */ }
+    });
     paint("");
     ensureKinds(pickerSymbols()).then(function () { paint(search.value); });
 

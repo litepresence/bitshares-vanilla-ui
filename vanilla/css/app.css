@@ -52,8 +52,22 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   letter-spacing: 0.05em; }
 a.btn-ghost { background: transparent; color: var(--accent);
   border: 1px solid var(--accent); }
+/* Clickable book rows (click-to-fill): pointer + keyboard focus ring. */
+.book-row[tabindex], .book-row-card[tabindex] { cursor: pointer; }
+.book-row[tabindex]:focus, .book-row-card[tabindex]:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* Picker quote-button row (mirrors #1 market sidebar quote filters). */
+.mkt-quotes { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+.mkt-quotes button { min-height: 44px; padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+.mkt-quotes button[aria-pressed="true"] { border-color: var(--accent); font-weight: 700; }
 .wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
 .wrap.mkt-wrap { max-width: 1400px; }
+/* Wide screens earn their pixels (principle #7): fluid caps at desk widths
+ * so the market desk breathes instead of stranding in a narrow column. */
+@media (min-width: 1440px) {
+  .wrap { max-width: min(94vw, 1080px); }
+  .wrap.mkt-wrap { max-width: min(96vw, 2200px); }
+}
 @media (min-width: 1200px) { .wrap.wide { max-width: none; display: grid;
   grid-template-columns: repeat(12, 1fr); gap: 16px; } }
 @media (max-width: 719px) {

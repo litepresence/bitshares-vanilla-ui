@@ -47,6 +47,27 @@ var MarketBook = (function () {
     return n;
   }
 
+  /* Click-to-fill (desk parity with #1 order-book click): set the trade-form
+   * price input to the row price, fire input/change so form state syncs,
+   * then focus the amount input. No-op when the form is absent (read-only
+   * desk, locked view). Never throws — money strings pass through verbatim. */
+  function fillTradePrice(doc, priceText) {
+    try {
+      var price = doc.getElementById("trade-price");
+      if (!price) return;
+      price.value = String(priceText);
+      var ev = null;
+      if (typeof Event === "function") {
+        try { ev = new Event("input", { bubbles: true }); } catch (e) { ev = null; }
+      }
+      if (ev && typeof price.dispatchEvent === "function") {
+        try { price.dispatchEvent(ev); } catch (e) { /* value stands */ }
+      }
+      var amt = doc.getElementById("trade-amount");
+      if (amt && typeof amt.focus === "function") amt.focus();
+    } catch (e) { /* read-only desk stands */ }
+  }
+
   /* --- Exact decimal-string math (money-safe: BigInt + digit loops) --- */
 
   /* Split a non-negative decimal string into int/frac parts. */
@@ -376,6 +397,13 @@ var MarketBook = (function () {
       var tr = doc.createElement("tr");
       tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
       try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+      /* Click-to-fill: row price → trade-form price input (keyboard: Enter). */
+      try {
+        tr.setAttribute("tabindex", "0");
+        tr.setAttribute("role", "button");
+        tr.setAttribute("aria-label", "Fill price " + String(texts[0]));
+        tr.title = "Fill price";
+      } catch (e) { /* rows render unclickable */ }
       var texts = [
         lv.displayPrice !== undefined ? String(lv.displayPrice) : "",
         lv.quote !== undefined ? String(lv.quote) : "",
@@ -411,6 +439,26 @@ var MarketBook = (function () {
         card.appendChild(el(doc, "div", text, "cell-text"));
       });
       cards.appendChild(card);
+      /* Click-to-fill wiring (price text is texts[0]); row + card mirror. */
+      (function (row, cardEl, priceText) {
+        function go() { fillTradePrice(doc, priceText); }
+        try {
+          row.addEventListener("click", go);
+          row.addEventListener("keydown", function (ev) {
+            if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
+          });
+        } catch (e) { /* rows render unclickable */ }
+        try {
+          cardEl.setAttribute("tabindex", "0");
+          cardEl.setAttribute("role", "button");
+          cardEl.setAttribute("aria-label", "Fill price " + String(priceText));
+          cardEl.title = "Fill price";
+          cardEl.addEventListener("click", go);
+          cardEl.addEventListener("keydown", function (ev) {
+            if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
+          });
+        } catch (e) { /* cards render unclickable */ }
+      })(tr, card, texts[0]);
     }
     table.appendChild(tbody);
     /* Scroll region (matches the original's fixed-height book areas; native
