@@ -1,9 +1,15 @@
 /* Wallet: encrypted brainkey keystore (PBKDF2-600k + AES-GCM).
- * Owns: localStorage envelope under bts-vanilla-wallet-v1, in-memory unlock
- *   state (Wallet.keys), 5-minute inactivity auto-lock + hidden-tab lock.
+ * Owns: wallet envelope under bts-vanilla-wallet-v1, in-memory unlock
+ *   state (Wallet.keys), 5-minute inactivity auto-lock + hidden-tab lock,
+ *   unlock rate-limit (in-memory exponential + persisted lockout stamp).
+ * Storage backend seam (extension-wrapper): getItem/setItem go through
+ *   _store() — default is localStorage (sync values ride await unchanged,
+ *   so web behavior is byte-identical); the extension injects a
+ *   chrome.storage backend via setBackend() before boot. Nothing else in
+ *   this file knows which backend is active.
  * Consumes: Crypto.normalizeBrainkey/.brainPrivateKeyHex/.keypairFromPrivateHex
  *   (Task 3 interface only), Chain.db/.call for import verification.
- * Globals/side effects: localStorage read/write, setTimeout/clearTimeout lock
+ * Globals/side effects: backend reads/writes, setTimeout/clearTimeout lock
  *   timer, document visibilitychange listener, global Wallet.
  * Created by: building-vanilla-slices skill, slice-02 Task 4.
  */
@@ -21,6 +27,13 @@ var Wallet = (function () {
   var _data = null; // {brainkey:string, keys:{owner,active,memo:{wif,pub}}, created:string} | null
   var _lockTimer = null;
   var _onLock = null;
+  /* Rate-limit state: consecutive failures this session + persisted lockout
+   * stamp (survives restarts where the backend persists). Delays: 0,1,2,4,8
+   * … seconds, capped at 30s. Storage failures never weaken the in-memory
+   * count — they only lose cross-restart memory. */
+  var _failCount = 0;
+  var LOCKOUT_KEY = "bts-vanilla-lockout-v1";
+  var _backend = null;
 
   var api = {
     keys: null,
@@ -31,8 +44,35 @@ var Wallet = (function () {
     getBrainkey: getBrainkey,
     importBrainkey: importBrainkey,
     touch: touch,
-    onLock: onLock
+    onLock: onLock,
+    setBackend: setBackend
   };
+
+  /* Storage backend (extension seam — see header). Default wraps
+   * localStorage; values may be strings or Promises of strings. */
+  function _store() {
+    if (_backend) return _backend;
+    return {
+      getItem: function (k) {
+        if (typeof localStorage === "undefined") throw new Error("storage unavailable: localStorage missing");
+        return localStorage.getItem(k);
+      },
+      setItem: function (k, v) {
+        if (typeof localStorage === "undefined") throw new Error("storage unavailable: localStorage missing");
+        return localStorage.setItem(k, v);
+      }
+    };
+  }
+
+  /* setBackend: inject a {getItem(k), setItem(k,v)} backend (extension
+   * entry point — call before boot). Params: backend object. Fails: bad
+   * shape. Never touches stored data (migration is the wrapper's job). */
+  function setBackend(b) {
+    if (!b || typeof b.getItem !== "function" || typeof b.setItem !== "function") {
+      throw new Error("bad storage backend: need getItem/setItem functions");
+    }
+    _backend = b;
+  }
 
   /* Return the WebCrypto subtle handle, or throw a loud distinct Error. */
   function _subtle() {
@@ -91,9 +131,13 @@ var Wallet = (function () {
   }
 
   /* Read + shape-check the stored envelope. Throws no-wallet / corrupt. */
-  function _readEnvelope() {
-    if (typeof localStorage === "undefined") throw new Error("storage unavailable: localStorage missing");
-    var raw = localStorage.getItem(LS_KEY);
+  async function _readEnvelope() {
+    var raw;
+    try {
+      raw = await _store().getItem(LS_KEY);
+    } catch (e) {
+      throw new Error("storage unavailable: " + (e && e.message ? e.message : String(e)));
+    }
     if (!raw) throw new Error("no wallet found under " + LS_KEY);
     var env;
     try {
@@ -217,9 +261,8 @@ var Wallet = (function () {
     var keys = await _deriveFreshKeys(norm);
     var plain = { brainkey: norm, keys: keys, created: new Date().toISOString() };
     var env = await _encryptPlain(password, plain);
-    if (typeof localStorage === "undefined") throw new Error("storage unavailable: localStorage missing");
     try {
-      localStorage.setItem(LS_KEY, JSON.stringify(env));
+      await _store().setItem(LS_KEY, JSON.stringify(env));
     } catch (e) {
       throw new Error("wallet save failed: " + (e && e.message ? e.message : String(e)));
     }
@@ -228,15 +271,41 @@ var Wallet = (function () {
   }
 
   /* Decrypt the stored wallet into memory only. Resolves to Wallet.keys.
-   * Params: password string. Fails: no wallet, corrupt envelope, wrong password. */
+   * Params: password string. Rate-limited: each consecutive failure waits
+   *   0,1,2,4,8…s (cap 30s) before deriving, and persists a lockout stamp;
+   *   success resets both. Fails: locked-out, no wallet, corrupt envelope,
+   *   wrong password. */
   async function unlock(password) {
     if (typeof password !== "string" || password.length === 0) {
       throw new Error("password required: expected a non-empty string");
     }
-    var env = _readEnvelope();
-    var plain = await _decryptPlain(password, env);
-    _setUnlocked(plain);
-    return api.keys;
+    try {
+      var stamp = await _store().getItem(LOCKOUT_KEY);
+      var until = parseInt(stamp, 10);
+      if (isFinite(until) && until > Date.now()) {
+        throw new Error("locked out: try again in " + Math.ceil((until - Date.now()) / 1000) + "s");
+      }
+    } catch (e) {
+      if (e && e.message && e.message.indexOf("locked out") === 0) throw e;
+      /* unreadable stamp: in-memory count still enforced below */
+    }
+    if (_failCount > 0) {
+      var waitMs = Math.min(30000, 1000 * Math.pow(2, _failCount - 1));
+      await new Promise(function (res) { setTimeout(res, waitMs); });
+    }
+    var env = await _readEnvelope();
+    try {
+      var plain = await _decryptPlain(password, env);
+      _failCount = 0;
+      try { await _store().setItem(LOCKOUT_KEY, "0"); } catch (e) { /* stamp best-effort */ }
+      _setUnlocked(plain);
+      return api.keys;
+    } catch (e) {
+      _failCount++;
+      var waitMs2 = Math.min(30000, 1000 * Math.pow(2, _failCount - 1));
+      try { await _store().setItem(LOCKOUT_KEY, String(Date.now() + waitMs2)); } catch (x) { /* stamp best-effort */ }
+      throw e;
+    }
   }
 
   /* Best-effort zero of key material (strings immutable in JS: overwrite refs

@@ -25,3 +25,6 @@ bitshares-dex-ux
 *~
 # pnpm store (dev tooling installs).
 .pnpm-store/
+
+# Extension build output (reproducible via tooling/pack-extension.sh).
+extension-wrapper/dist/

@@ -26,7 +26,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 | 16 | Notifications + alerts | ✅ built (engine wired, CSS, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 17 | i18n foundations | ✅ built (en+es+8 stubs, switcher, batch-1 en-identical, Store envelope; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 18 | Final readability pass | 🔨 (oversize list inventoried — see below; audit then fixes) |
-| — | Extension-wrapper adapter | 🔒 post-v1 hardening, never a v1 dependency |
+| — | Extension-wrapper adapter Tier 1 (repackage+harden; Tier 2 gate follow-up) | 🔨 in v1 scope since 2026-09-28 (owner call) |
 
 ## Sub-objectives per slice
 

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 2,
+  "name": "BitShares Vanilla Wallet",
+  "version": "1.0.0",
+  "description": "BitShares reference-wallet replacement in dependency-free vanilla code. Keys stay local; transactions sign locally.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "bitshares-vanilla@bitshares.org",
+      "strict_min_version": "109.0"
+    }
+  },
+  "permissions": ["storage", "alarms", "tabs"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": "script-src 'self'; object-src 'self';",
+  "background": {
+    "page": "background/firefox.html",
+    "persistent": false
+  },
+  "browser_action": {
+    "default_title": "BitShares Vanilla Wallet",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "index.html#/settings",
+    "open_in_tab": true
+  }
+}
