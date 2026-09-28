@@ -138,11 +138,41 @@ var PoolDetailUI = (function () {
       table.appendChild(tbody); book.appendChild(table);
     } catch (e) { book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted")); }
   }
-  function historyPane(doc, hist, r, myGen, uiGen) { /* pool-history rows coded 59-63; honest gap when unavailable */
-    var u = U(), note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); hist.appendChild(note);
+  function historyPane(doc, hist, r, myGen, uiGen) { /* pool-history rows coded 59-63 + My-exchanges toggle; honest gap when unavailable */
+    var u = U();
+    /* Toggle mirrors #1 MarketHistory group-1 tabs (Exchange.jsx:2551-2616):
+     * Pool history (all events) vs My exchanges (wallet op-63 for this pool).
+     * My needs unlock: locked wallets get the Wallet-link hint (#9). */
+    var tabs = doc.createElement("div");
+    tabs.className = "mkt-tabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", t("pool.exchanges_toggle_label", "Pool or my exchanges"));
+    var tabPool = u.touchable(u.el(doc, "button", t("pool.tab_pool", "Pool history")));
+    tabPool.type = "button"; tabPool.id = "pool-hist-tab-pool"; tabPool.setAttribute("role", "tab");
+    var tabMy = u.touchable(u.el(doc, "button", t("pool.tab_my", "My exchanges")));
+    tabMy.type = "button"; tabMy.id = "pool-hist-tab-my"; tabMy.setAttribute("role", "tab");
+    tabs.appendChild(tabPool); tabs.appendChild(tabMy);
+    hist.appendChild(tabs);
+    var poolBody = u.el(doc, "div"); poolBody.id = "pool-hist-pool"; poolBody.setAttribute("role", "tabpanel");
+    var myBody = u.el(doc, "div"); myBody.id = "pool-hist-my"; myBody.setAttribute("role", "tabpanel");
+    hist.appendChild(poolBody); hist.appendChild(myBody);
+    var cur = "pool";
+    function paint() {
+      var isMy = cur === "my";
+      tabPool.setAttribute("aria-selected", isMy ? "false" : "true");
+      tabMy.setAttribute("aria-selected", isMy ? "true" : "false");
+      tabPool.setAttribute("aria-pressed", isMy ? "false" : "true");
+      tabMy.setAttribute("aria-pressed", isMy ? "true" : "false");
+      poolBody.style.display = isMy ? "none" : "";
+      myBody.style.display = isMy ? "" : "none";
+    }
+    tabPool.addEventListener("click", function () { cur = "pool"; paint(); });
+    tabMy.addEventListener("click", function () { cur = "my"; paint(); loadMy(poolBody, myBody, r, myGen, uiGen); });
+    paint();
+    var note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); poolBody.appendChild(note);
     Pool.history(r.id, 50).then(function (rows) {
-      if (!live(myGen, uiGen)) return; hist.removeChild(note);
-      if (!rows.length) { hist.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet."), "muted")); return; }
+      if (!live(myGen, uiGen)) return; poolBody.removeChild(note);
+      if (!rows.length) { poolBody.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet."), "muted")); return; }
       var table = doc.createElement("table"); table.className = "node-table";
       table.appendChild(u.tableHead(doc, [t("pool.time_col", "Time (UTC)"),  t("pool.event_col", "Event")]));
       var tbody = doc.createElement("tbody");
@@ -152,10 +182,56 @@ var PoolDetailUI = (function () {
         tr.appendChild(u.el(doc, "td", OP_NAMES[h.op_type] || ("op " + String(h.op_type))));
         tbody.appendChild(tr);
       });
-      table.appendChild(tbody); hist.appendChild(table);
+      table.appendChild(tbody); poolBody.appendChild(table);
     }).catch(function () {
       if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
     });
+    myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My exchanges to see your fills in this pool."), "muted"));
+    function loadMy(poolBodyEl, myBodyEl, row, g1, g2) {
+      void poolBodyEl;
+      u.clearBox(myBodyEl);
+      var unlocked = false;
+      try {
+        unlocked = typeof Wallet !== "undefined" && Wallet &&
+          (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
+      } catch (e) { unlocked = false; }
+      if (!unlocked) {
+        var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
+        var a = doc.createElement("a");
+        a.textContent = t("market.go_wallet", "Go to Wallet");
+        a.setAttribute("href", "#/wallet");
+        u.touchable(a);
+        hint.appendChild(a);
+        myBodyEl.appendChild(hint);
+        return;
+      }
+      u.showStatus(doc, myBodyEl, t("account.loading_history", "Loading history…"));
+      Account.myAccountId().then(function (myId) { return Account.history(myId, 100); }).then(function (rows) {
+        if (!live(g1, g2)) return;
+        u.clearBox(myBodyEl);
+        var mine = (rows || []).filter(function (h) {
+          var tup = h ? h.op : null;
+          if (!Array.isArray(tup) || tup[0] !== 63) return false;
+          return ((tup[1] || {}).pool === row.id);
+        });
+        if (!mine.length) { myBodyEl.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
+        var table = doc.createElement("table"); table.className = "node-table";
+        table.appendChild(u.tableHead(doc, [t("pool.block_col", "Block"), t("pool.sell_col", "Sell"), t("pool.min_recv_row", "Min to receive")]));
+        var tbody = doc.createElement("tbody");
+        mine.slice(0, 20).forEach(function (h) {
+          var d = (h.op && h.op[1]) || {};
+          var tr = doc.createElement("tr");
+          tr.appendChild(u.el(doc, "td", h.block_num !== undefined && h.block_num !== null ? String(h.block_num) : "—"));
+          tr.appendChild(u.el(doc, "td", d.amount_to_sell ? String(d.amount_to_sell.amount) + " " + String(d.amount_to_sell.asset_id) : "—"));
+          tr.appendChild(u.el(doc, "td", d.min_to_receive ? String(d.min_to_receive.amount) + " " + String(d.min_to_receive.asset_id) : "—"));
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody); myBodyEl.appendChild(table);
+      }).catch(function (e) {
+        if (!live(g1, g2)) return;
+        u.clearBox(myBodyEl); u.showError(doc, myBodyEl, e, t("pool.my_history_failed", "Could not load your exchanges."));
+      });
+    }
   }
   function stakeBoxes(doc, box, r, uiGen) { /* op-61 deposit + op-62 withdraw with share previews */
     var u = U();

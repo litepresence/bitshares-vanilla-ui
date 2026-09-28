@@ -1,10 +1,17 @@
 /* DeskGrid: trading-desk grid placement, fixed-height scroll regions, and
  * in-row cumulative-depth bars (bids/asks).
- * Owns: .mkt grid areas on all breakpoints (including the trade panel the
- *   base stylesheet leaves unplaced), .book-grid side wrappers, every desk
- *   scroll region (.book-scroll/.trades-scroll/.orders-scroll/.picker-scroll
- *   plus the phone-card lists), sticky table headers inside those regions,
- *   and .depth-bar geometry + colors. All colors are theme tokens
+ * Owns: .mkt grid areas on all breakpoints — chart on top, then 2 rows x 3
+ *   tables below (row1: book | trades-toggle | open orders; row2: trade
+ *   Buy/Sell/Scaled tabs | depth | 24h stats), market picker rail (mkt-side)
+ *   full-height to the side (mirrors #1 Exchange.jsx below-chart actionCards
+ *   + MyMarkets right rail: orderBook :2466, marketHistory :2551,
+ *   myMarketHistory :2583, myOpenOrders :2618, settlementOrders :2656,
+ *   buyForm :2089/sellForm, myMarkets :2428; toggle group-1 default
+ *   panelTabs :362-371) — plus the trade panel the base stylesheet leaves
+ *   unplaced, every desk scroll region (.book-scroll/.trades-scroll/
+ *   .orders-scroll/.picker-scroll plus the phone-card lists), sticky table
+ *   headers inside those regions, .mkt-tabs toggle styling, and .depth-bar
+ *   geometry + colors. All colors are theme tokens
  *   (var(--buy)/var(--sell)/var(--border)/var(--panel)); the only numeric
  *   styling is the depth alpha (0.15, the original rgba alpha) and row-count
  *   heights. No framework, no CDN, no build step.
@@ -34,20 +41,64 @@
 }
 
 /* Desk grid placement (grid ONLY — areas; columns mirror app.css so the
- * override stays a pure area swap). The trade panel has no area in app.css
- * (it falls out of the grid); here it squares up beside open orders. */
+ * override stays a pure area swap). Chart sits on top full-width of the main
+ * area; below it 2 rows x 3 tables (book|trades-toggle|orders /
+ * trade|depth|stats); the picker rail (side) spans all rows full-height.
+ * Phones (<1200px) stack every cell single-column; the rail drops last. */
 .mkt {
-  grid-template-areas: "head" "charts" "book" "trades" "side" "orders" "trade";
+  grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "depth" "stats" "side";
 }
+.mkt-head { grid-area: head; min-width: 0; }
+.mkt-charts { grid-area: charts; min-width: 0; }
+.mkt-book { grid-area: book; min-width: 0; }
+.mkt-trades { grid-area: trades; min-width: 0; }
+.mkt-orders { grid-area: orders; min-width: 0; }
 .mkt-trade {
   grid-area: trade;
   min-width: 0;
 }
+.mkt-depth { grid-area: depth; min-width: 0; }
+.mkt-stats-panel { grid-area: stats; min-width: 0; }
+.mkt-side { grid-area: side; min-width: 0; }
 @media (min-width: 1200px) {
   .mkt {
-    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr) minmax(0, 4fr);
-    grid-template-areas: "head head head" "book charts side" "book trades side" "orders orders trade";
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
+    grid-template-areas: "head head head side" "charts charts charts side" "book trades orders side" "trade depth stats side";
+    align-items: start;
   }
+  .mkt-side {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+  }
+}
+
+/* Trades/exchanges toggle tabs (Recent/My, Pool/My): tablist row above the
+ * two panes; exactly one pane visible at a time (JS toggles display).
+ * Buttons meet the 44px touch floor; the pressed tab reads via
+ * aria-pressed/aria-selected with theme tokens only. */
+.mkt-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+.mkt-tabs button,
+.swap-hist .mkt-tabs button {
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.mkt-tabs button[aria-pressed="true"],
+.mkt-tabs button[aria-selected="true"] {
+  background: var(--panel);
+  border-color: var(--accent);
+  font-weight: 600;
 }
 
 /* Book sides wrapper (Asks/Bids stack inside the book column). */

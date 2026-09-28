@@ -1,12 +1,25 @@
 /* MarketDesk: DEX desk shell for /market/:marketID (skeleton, fill, refresh).
  * Owns: route entry renderMarket(root, marketID), desk skeleton showDesk
- *   (header, stats, charts hosts, book/trades/side/orders/trade sections,
- *   refresh + 15s timer with cleanup), data fill (book/stats/trades/
- *   timeframes/candles — each section fails inline), last-visited market
- *   persistence (saveLast under LAST_KEY), timer/listener cleanup.
+ *   (header, charts hosts, book/trades-toggle/orders/trade/depth/stats cells,
+ *   side picker rail, refresh + 15s timer with cleanup), data fill
+ *   (book/stats/trades/my-trades/timeframes/candles — each section fails
+ *   inline), last-visited market persistence (saveLast under LAST_KEY),
+ *   timer/listener cleanup.
+ *   LAYOUT (mirrors #1 Exchange.jsx below-chart grid + right rail):
+ *   chart on top (mkt-charts: price pane + indicators + osc + timeframe),
+ *   then 2 rows x 3 tables (row1: book | trades-toggle | open orders;
+ *   row2: trade Buy/Sell/Scaled tabs | depth | 24h stats), market picker rail
+ *   (mkt-side) full-height to the side. Grid areas live in desk-grid.css.
+ *   TRADES TOGGLE (mirrors #1 MarketHistory tabs): one trades cell holds
+ *   Recent (activeMarketHistory, Exchange.jsx:2551-2581 activeTab "history")
+ *   and My (myMarketHistory, Exchange.jsx:2583-2616 activeTab "my_history")
+ *   panes behind Recent/My buttons (MarketHistory.jsx:21 historyTab default
+ *   "history", :127-139 changeTab persists to viewSettings; vanilla keeps the
+ *   tab in desk state only). My pane needs unlock: locked wallets get the
+ *   honest Wallet-link hint (same contract as MarketOrders locked hint).
  *   Picker rendering delegates to MarketPicker, strip/timeframes/charts to
- *   MarketInd, book/trades to MarketBook, my-orders to MarketOrders, panels
- *   to TradeUI (all via lazy globals — same convention as before the split).
+ *   MarketInd, book/recent-trades to MarketBook, my-orders to MarketOrders,
+ *   panels to TradeUI (all via lazy globals — same convention as before).
  * Consumes: Market (book/stats/trades/timeframes/candles/assets/parseId),
  *   Format (via book/orders views, never directly), Store (network for
  *   defaults + connection wait), Chain.status. No signing, no cancel path.
@@ -404,11 +417,7 @@ var MarketDesk = (function () {
     chartsSec.appendChild(oscNote);
     state.oscNote = oscNote;
 
-    var depthCanvas = doc.createElement("canvas");
-    depthCanvas.id = "mkt-depth-canvas";
-    depthCanvas.className = "mkt-canvas";
-    chartsSec.appendChild(depthCanvas);
-
+    /* ROW 1 col 1: order book (OrderBook Exchange.jsx:2466-2537). */
     var bookSec = doc.createElement("section");
     bookSec.className = "mkt-book";
     desk.appendChild(bookSec);
@@ -416,20 +425,70 @@ var MarketDesk = (function () {
     var bookBody = doc.createElement("div");
     bookSec.appendChild(bookBody);
 
+    /* ROW 1 col 2: trades toggle — Recent vs My (ONE cell, two panes).
+     * Mirrors #1's tab group 1: marketHistory (Exchange.jsx:2551-2581,
+     * activeTab "history") + myMarketHistory (Exchange.jsx:2583-2616,
+     * activeTab "my_history"), default active my_history per
+     * Exchange.jsx:362-371 panelTabs {my_history:1, history:1} +
+     * panelTabsActive {1:"my_history"}. Vanilla defaults to Recent (public
+     * chain data renders with NO login per principle #9); My needs unlock
+     * with the honest Wallet-link hint. Buttons keep >=44px touch targets. */
     var tradesSec = doc.createElement("section");
     tradesSec.className = "mkt-trades";
     desk.appendChild(tradesSec);
-    tradesSec.appendChild(el(doc, "h2", t("market.recent_trades", "Recent trades")));
-    var tradesBody = doc.createElement("div");
-    tradesSec.appendChild(tradesBody);
+    tradesSec.appendChild(el(doc, "h2", t("market.trades_title", "Trades")));
+    var tradesTabs = doc.createElement("div");
+    tradesTabs.className = "mkt-tabs";
+    tradesTabs.setAttribute("role", "tablist");
+    tradesTabs.setAttribute("aria-label", t("market.trades_toggle_label", "Recent or my trades"));
+    var tabRecent = touchable(el(doc, "button", t("market.tab_recent", "Recent trades")));
+    tabRecent.type = "button";
+    tabRecent.id = "mkt-trades-tab-recent";
+    tabRecent.setAttribute("role", "tab");
+    var tabMy = touchable(el(doc, "button", t("market.tab_my", "My trades")));
+    tabMy.type = "button";
+    tabMy.id = "mkt-trades-tab-my";
+    tabMy.setAttribute("role", "tab");
+    tradesTabs.appendChild(tabRecent);
+    tradesTabs.appendChild(tabMy);
+    tradesSec.appendChild(tradesTabs);
+    var recentBody = doc.createElement("div");
+    recentBody.id = "mkt-trades-recent";
+    recentBody.setAttribute("role", "tabpanel");
+    tradesSec.appendChild(recentBody);
+    var myBody = doc.createElement("div");
+    myBody.id = "mkt-trades-my";
+    myBody.setAttribute("role", "tabpanel");
+    tradesSec.appendChild(myBody);
+    state.tradesTab = "recent";
+    state.tabRecent = tabRecent;
+    state.tabMy = tabMy;
+    state.recentBody = recentBody;
+    state.myBody = myBody;
+    function paintTradesTab() {
+      var isMy = state.tradesTab === "my";
+      tabRecent.setAttribute("aria-selected", isMy ? "false" : "true");
+      tabMy.setAttribute("aria-selected", isMy ? "true" : "false");
+      tabRecent.setAttribute("aria-pressed", isMy ? "false" : "true");
+      tabMy.setAttribute("aria-pressed", isMy ? "true" : "false");
+      recentBody.style.display = isMy ? "none" : "";
+      myBody.style.display = isMy ? "" : "none";
+    }
+    tabRecent.addEventListener("click", function () {
+      state.tradesTab = "recent";
+      paintTradesTab();
+    });
+    tabMy.addEventListener("click", function () {
+      state.tradesTab = "my";
+      paintTradesTab();
+      renderMyTrades(doc, state);
+    });
+    paintTradesTab();
 
-    var sideSec = doc.createElement("section");
-    sideSec.className = "mkt-side";
-    desk.appendChild(sideSec);
-    var statsBox = doc.createElement("div");
-    sideSec.appendChild(statsBox);
-    MarketPicker.renderPicker(doc, sideSec, id, root);
-
+    /* ROW 1 col 3: my open orders (MarketOrders Exchange.jsx:2618-2654,
+     * activeTab "my_orders"; settlement Exchange.jsx:2656-2693 activeTab
+     * "open_settlement" stays a future tab — vanilla shows my_orders only,
+     * honest scope, no silent stub). */
     var ordersSec = doc.createElement("section");
     ordersSec.className = "mkt-orders";
     desk.appendChild(ordersSec);
@@ -437,15 +496,43 @@ var MarketDesk = (function () {
     var ordersBody = doc.createElement("div");
     ordersSec.appendChild(ordersBody);
 
-    /* Slice-06 mount point: TradeUI owns everything under tradeMount
-     * (panels + cancel boxes); the desk only provides the section. The
-     * mkt-trade class places it in the desk grid (desk-grid.css areas). */
+    /* ROW 2 col 1: trade Buy/Sell/Scaled tabs (BuySell bid Exchange.jsx:2089
+     * + ask counterpart; TradeUI owns the panels, the desk only hosts them). */
     var tradeSec = doc.createElement("section");
     tradeSec.className = "trade mkt-trade";
     desk.appendChild(tradeSec);
     tradeSec.appendChild(el(doc, "h2", t("trade.heading", "Trade")));
     var tradeMount = doc.createElement("div");
     tradeSec.appendChild(tradeMount);
+
+    /* ROW 2 col 2: depth (CPMM-style depth canvas; was inside mkt-charts —
+     * moved here so the chart pane stays price+osc only and the 2x3 grid
+     * has its sixth table. DepthHighChart Exchange.jsx:2716-2751 is the #1
+     * counterpart; vanilla draws from the same book via MarketInd). */
+    var depthSec = doc.createElement("section");
+    depthSec.className = "mkt-depth";
+    desk.appendChild(depthSec);
+    depthSec.appendChild(el(doc, "h2", t("market.depth_title", "Depth")));
+    var depthCanvas = doc.createElement("canvas");
+    depthCanvas.id = "mkt-depth-canvas";
+    depthCanvas.className = "mkt-canvas";
+    depthSec.appendChild(depthCanvas);
+
+    /* ROW 2 col 3: 24h market stats (ticker Latest/change/volume/bid-ask —
+     * was inside the side rail; moved here so the rail is picker-only and
+     * the grid below the chart is a full 2x3). */
+    var statsSec = doc.createElement("section");
+    statsSec.className = "mkt-stats-panel";
+    desk.appendChild(statsSec);
+    var statsBox = doc.createElement("div");
+    statsSec.appendChild(statsBox);
+
+    /* SIDE RAIL full-height: market picker only (MyMarkets Exchange.jsx:2428
+     * right rail; vanilla MarketPicker renders the curated+search list). */
+    var sideSec = doc.createElement("section");
+    sideSec.className = "mkt-side";
+    desk.appendChild(sideSec);
+    MarketPicker.renderPicker(doc, sideSec, id, root);
 
     var foot = doc.createElement("div");
     foot.className = "mkt-foot";
@@ -465,7 +552,9 @@ var MarketDesk = (function () {
     state.oscHost = oscHost;
     state.depthCanvas = depthCanvas;
     state.bookBody = bookBody;
-    state.tradesBody = tradesBody;
+    state.tradesBody = recentBody;
+    state.recentBody = recentBody;
+    state.myBody = myBody;
     state.statsBox = statsBox;
     state.ordersBody = ordersBody;
     state.updated = updated;
@@ -542,6 +631,112 @@ var MarketDesk = (function () {
     }).catch(function (e) {
       sub.textContent = pair.quote + " / " + pair.base;
       showError(doc, head, e, "Unknown market.");
+    });
+  }
+
+  /* My-trades pane (mirrors #1 myMarketHistory, Exchange.jsx:2583-2616 +
+   * MarketHistory.jsx:159-204): the wallet account's fill_order ops (op 4,
+   * protocol/operations.hpp:60) filtered to this QUOTE_BASE pair
+   * (pays/receives touch both legs, MarketHistory.jsx:176-184). Locked
+   * wallets get the honest Wallet-link hint (principle #9: reads never gate
+   * on unlock, but MY fills need a key). Amounts/prices go through Format
+   * (BigInt, 8 places like Market.trades) — never raw integers (#6). */
+  function renderMyTrades(doc, state) {
+    var myBody = state.myBody || state.tradesBody;
+    var assets = state.assets;
+    if (!myBody || !assets) return;
+    while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+    var unlocked = false;
+    try {
+      unlocked = typeof Wallet !== "undefined" && Wallet &&
+        (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
+    } catch (e) { unlocked = false; }
+    if (!unlocked) {
+      var hint = el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
+      var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
+      a.setAttribute("href", "#/wallet");
+      touchable(a);
+      hint.appendChild(a);
+      myBody.appendChild(hint);
+      return;
+    }
+    myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+    var q = assets.quote, b = assets.base;
+    Account.myAccountId().then(function (myId) {
+      return Account.history(myId, 100).then(function (rows) {
+        return { myId: myId, rows: rows || [] };
+      });
+    }).then(function (found) {
+      if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
+      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+      var fills = [];
+      (found.rows || []).forEach(function (r) {
+        var tup = r ? r.op : null;
+        var opId = null, op = null;
+        if (Array.isArray(tup)) { opId = tup[0]; op = tup[1]; }
+        else if (r && r.operation_type !== undefined) { opId = r.operation_type; op = r; }
+        else if (r && r.op_type !== undefined) { opId = r.op_type; op = r; }
+        if (opId !== 4 || !op) return;
+        var pays = op.pays || null, recv = op.receives || null;
+        if (!pays || !recv || !pays.asset_id || !recv.asset_id) return;
+        var hasQ = pays.asset_id === q.id || recv.asset_id === q.id;
+        var hasB = pays.asset_id === b.id || recv.asset_id === b.id;
+        if (!hasQ || !hasB) return;
+        fills.push({ row: r, op: op });
+      });
+      if (fills.length === 0) {
+        myBody.appendChild(el(doc, "p", t("market.no_my_trades", "No fills for your account on this market."), "muted"));
+        return;
+      }
+      var table = doc.createElement("table");
+      table.className = "node-table";
+      var thead = doc.createElement("thead");
+      var hr = doc.createElement("tr");
+      [t("market.th_block", "Block"), t("market.th_price", "Price"), t("market.th_amount", "Amount")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      var tbody = doc.createElement("tbody");
+      var cards = doc.createElement("div");
+      cards.className = "node-cards trades-cards";
+      fills.slice(0, 30).forEach(function (f) {
+        var blk = f.row.block_num !== undefined && f.row.block_num !== null ? String(f.row.block_num) : (f.row.block_time || f.row.time || "—");
+        var price = "—", amt = "—";
+        try {
+          var fp = f.op.fill_price || null;
+          if (fp && fp.base && fp.quote && /^-?\d+$/.test(String(fp.base.amount)) && /^-?\d+$/.test(String(fp.quote.amount))) {
+            var rawB = fp.base.asset_id === b.id ? String(fp.base.amount) : (fp.quote.asset_id === b.id ? String(fp.quote.amount) : null);
+            var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
+            if (rawB !== null && rawQ !== null) {
+              price = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
+            }
+          }
+          var qLeg = f.op.pays && f.op.pays.asset_id === q.id ? f.op.pays : (f.op.receives && f.op.receives.asset_id === q.id ? f.op.receives : null);
+          if (qLeg && /^-?\d+$/.test(String(qLeg.amount))) {
+            amt = Format.formatAmount(String(qLeg.amount), q.precision) + " " + q.symbol;
+          }
+        } catch (e) { /* honest dashes stand */ }
+        var tr = doc.createElement("tr");
+        tr.appendChild(el(doc, "td", String(blk)));
+        tr.appendChild(el(doc, "td", String(price)));
+        tr.appendChild(el(doc, "td", String(amt)));
+        tbody.appendChild(tr);
+        var card = doc.createElement("div");
+        card.className = "node-card";
+        card.appendChild(el(doc, "div", "#" + String(blk)));
+        card.appendChild(el(doc, "div", String(price)));
+        card.appendChild(el(doc, "div", String(amt)));
+        cards.appendChild(card);
+      });
+      table.appendChild(tbody);
+      var scroller = doc.createElement("div");
+      scroller.className = "trades-scroll";
+      scroller.appendChild(table);
+      myBody.appendChild(scroller);
+      myBody.appendChild(cards);
+      rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), fills.slice(0, 30).map(function (f) { return f.row; }));
+    }).catch(function (e) {
+      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+      showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
     });
   }
 
@@ -628,13 +823,16 @@ var MarketDesk = (function () {
     });
 
     Market.trades(b.id, q.id, 30).then(function (rows) {
-      MarketBook.renderTrades(doc, state.tradesBody, { rows: rows, quoteSymbol: q.symbol });
+      MarketBook.renderTrades(doc, state.recentBody || state.tradesBody, { rows: rows, quoteSymbol: q.symbol });
+      renderMyTrades(doc, state);
       MarketInd.maybeDraw(state);
       MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
       done();
     }).catch(function (e) {
-      while (state.tradesBody.firstChild) state.tradesBody.removeChild(state.tradesBody.firstChild);
-      showError(doc, state.tradesBody, e, t("market.fail_trades", "Could not load recent trades."));
+      var rb = state.recentBody || state.tradesBody;
+      while (rb.firstChild) rb.removeChild(rb.firstChild);
+      showError(doc, rb, e, t("market.fail_trades", "Could not load recent trades."));
+      renderMyTrades(doc, state);
       MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
       done();
     });

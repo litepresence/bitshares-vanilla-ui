@@ -5,15 +5,47 @@
  * theme, dark->dex-ux-theme (store.js migrates stored old ids on load). */
 :root,
 :root[data-theme="ref-ui-theme"] {
-  /* Classic BitShares original-blue look — PALETTE.md authority, hues
-   * untouched (only the selector name changed). */
-  --bg: #f5f7fa; --panel: #ffffff; --text: #333333; --muted: #777777;
-  --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
-  --buy: #22d173; --sell: #e3745b; --warn: #fcab53; --danger: #e3745b;
-  --border: #dddddd; --header-bg: #337ab7; --header-text: #ffffff;
-  /* Vendored SVGs ship black-filled (byte-copies); on light surfaces they
-   * render as-is, matching #1's dark-on-light glyphs. */
-  --icon-filter: none;
+  /* Classic BitShares default look = #1 darkTheme (the default per
+   * branding.js:72-74 getDefaultTheme()->"darkTheme", and the theme in all
+   * vanilla/notes/original-pages/ captures: near-black header, dark-grey
+   * body, bright-blue buttons/links). Token mapping, SCSS var (file:line)
+   * -> token; resolved finals cross-checked vs vanilla/assets/PALETTE.md
+   * "dark" column (darken()/lighten() resolved by tooling/extract_palette.py):
+   * base/_colors.scss:1 $border-color rgba(128,128,128,0.45) -> --border
+   *   (the only generic border def; theme-agnostic, shared by all 3 themes)
+   * themes/_dark-theme.scss:17 $bg-color #2a2a2a -> --bg
+   * themes/_dark-theme.scss:18 $panel-bg-color #3f3f3f -> --panel
+   * themes/_dark-theme.scss:7 $primary-text-color #e0e0e0 -> --text
+   * themes/_dark-theme.scss:8 $secondary-text-color (darken 20% = #adadad
+   *   per PALETTE.md:14) -> --muted
+   * themes/_dark-theme.scss:10 $link-text-color #1ec3fa -> --accent
+   *   (captures' cyan links/active tabs; $primary-color #337ab7
+   *   (_dark-theme.scss:98, all 3 themes PALETTE.md:71) drives only
+   *   active-tab/selector borders in #1 and collapses into --accent here —
+   *   one token cannot be both blues; link-cyan wins because links +
+   *   active-tab text dominate --accent surfaces)
+   * themes/_dark-theme.scss:102 $white #fff -> --accent-text/--header-text
+   *   (white type on colored buttons + header, as in #1)
+   * themes/_dark-theme.scss:23 $button-bg-color #049cce -> --button-bg
+   *   (== base/_colors.scss:49 $bs-blue; captures' bright-blue buttons)
+   * themes/_dark-theme.scss:34 $bid-color #6ba583 -> --buy
+   *   (== assets/colors.js:28 darkTheme bidColor; captures' muted buy green)
+   * themes/_dark-theme.scss:35 $ask-color #e3745b -> --sell
+   *   (== assets/colors.js:30 darkTheme askColor; captures' ask red)
+   * themes/_dark-theme.scss:30 $warning-color #fcab53 -> --warn
+   * themes/_dark-theme.scss:11 $error-text-color #ff3950 -> --danger
+   *   (== :27 $alert-color and :38 $negative-color — all three agree)
+   * themes/_dark-theme.scss:109 $header-background-color ($dark, :103
+   *   rgba(0,0,0,0.6)) -> --header-bg (composites over --bg to ~#111,
+   *   exactly as #1's header composites — byte-identical input, not a
+   *   pre-computed hex, so future body changes cannot drift it)
+   * themes/_dark-theme.scss:111 $header-item--color ($white) -> --header-text
+   * Dark surfaces need light glyphs: invert(1), same as dex-ux-theme. */
+  --bg: #2a2a2a; --panel: #3f3f3f; --text: #e0e0e0; --muted: #adadad;
+  --accent: #1ec3fa; --accent-text: #ffffff; --button-bg: #049cce;
+  --buy: #6ba583; --sell: #e3745b; --warn: #fcab53; --danger: #ff3950;
+  --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
+  --icon-filter: invert(1);
 }
 /* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
  * tub photo (workspace root "Homemade Vanilla Ice Cream.jpg", viewed
