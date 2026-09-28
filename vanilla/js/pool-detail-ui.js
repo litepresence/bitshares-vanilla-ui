@@ -19,11 +19,25 @@
  */
 var PoolDetailUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var gen = 0;
   var OP_NAMES = { 59: "create", 60: "delete", 61: "deposit", 62: "withdraw", 63: "exchange" };
   /* Shared-_ui accessor: PoolUI._ui (pool-ui.js loads first); throws when the backend is missing. */
   function U() {
-    if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error("Pool backend missing: pool-ui.js failed to load.");
+    if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error(t("pool.backend_missing", "Pool backend missing: pool-ui.js failed to load."));
     return PoolUI._ui;
   }
   function live(myGen, uiGen) { /* both counters live (debit-ui two-counter precedent) */
@@ -40,7 +54,7 @@ var PoolDetailUI = (function () {
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.className = "wrap mkt-wrap";
-    u.showStatus(doc, ctx.wrap, "Loading pool…");
+    u.showStatus(doc, ctx.wrap,t("pool.loading_detail", "Loading pool…"));
     Pool.get(String(poolId)).then(function (row) {
       if (!live(myGen, uiGen)) return;
       root.innerHTML = "";
@@ -68,24 +82,24 @@ var PoolDetailUI = (function () {
     strip.appendChild(u.el(doc, "span", "Withdrawal: " + u.pctText(r.withdrawal_units)));
     strip.appendChild(u.el(doc, "span", "Share: " + (r.sym_share || r.share_id)));
     var charts = doc.createElement("section"); charts.className = "mkt-charts"; desk.appendChild(charts);
-    charts.appendChild(u.el(doc, "h2", "Price history"));
+    charts.appendChild(u.el(doc, "h2", t("pool.history_title", "Price history")));
     chartPane(doc, charts, r, myGen, uiGen);
     var acts = doc.createElement("section"); acts.className = "mkt-side"; desk.appendChild(acts);
-    acts.appendChild(u.el(doc, "h2", "Stake / unstake"));
+    acts.appendChild(u.el(doc, "h2", t("pool.stake_title", "Stake / unstake")));
     stakeBoxes(doc, acts, r, uiGen);
-    acts.appendChild(u.el(doc, "h2", "Swap in pool"));
+    acts.appendChild(u.el(doc, "h2", t("pool.swap_title", "Swap in pool")));
     swapInlineBox(doc, acts, r, uiGen);
-    acts.appendChild(u.el(doc, "h2", "Update / delete"));
+    acts.appendChild(u.el(doc, "h2", t("pool.manage_title", "Update / delete")));
     manageBoxes(doc, acts, r, uiGen);
     var book = doc.createElement("section"); book.className = "mkt-book"; desk.appendChild(book);
-    book.appendChild(u.el(doc, "h2", "Depth (CPMM curve)"));
+    book.appendChild(u.el(doc, "h2", t("pool.depth_title", "Depth (CPMM curve)")));
     depthPane(doc, book, r);
     var hist = doc.createElement("section"); hist.className = "mkt-trades"; desk.appendChild(hist);
-    hist.appendChild(u.el(doc, "h2", "Pool history"));
+    hist.appendChild(u.el(doc, "h2", t("pool.pool_history_title", "Pool history")));
     historyPane(doc, hist, r, myGen, uiGen);
   }
   function chartPane(doc, charts, r, myGen, uiGen) { /* LWC line from bucketed chain history; honest gap when unavailable */
-    var u = U(), note = u.el(doc, "p", "Loading price history…", "muted"); charts.appendChild(note);
+    var u = U(), note = u.el(doc, "p", t("pool.loading_history", "Loading price history…"), "muted"); charts.appendChild(note);
     Pool.history(r.id, 100).then(function (rows) {
       if (!live(myGen, uiGen)) return;
       note.textContent = rows.length ? rows.length + " pool events." : "No pool history yet.";
@@ -102,9 +116,9 @@ var PoolDetailUI = (function () {
           buckets[k] = (buckets[k] || 0) + 1;
         });
         series.setData(Object.keys(buckets).sort().map(function (t) { return { time: t, value: buckets[t] }; }));
-      } catch (e) { note.textContent = "No pool history yet."; }
+      } catch (e) { note.textContent = t("pool_detail.s1", "No pool history yet."); }
     }).catch(function () {
-      if (live(myGen, uiGen)) note.textContent = "Pool history unavailable (chain-only; no external index).";
+      if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
     });
   }
   function depthPane(doc, book, r) { /* CPMM curve points -> compact table (first 8 steps per side) */
@@ -112,7 +126,7 @@ var PoolDetailUI = (function () {
     try {
       var pts = Pool.depthPoints({ balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw });
       var table = doc.createElement("table"); table.className = "node-table";
-      table.appendChild(u.tableHead(doc, ["Sell %", "A→B out (raw)", "B→A out (raw)"]));
+      table.appendChild(u.tableHead(doc, [t("pool.sell_pct_col", "Sell %"),  t("pool.a_to_b_col", "A→B out (raw)"), t("pool.b_to_a_col", "B→A out (raw)")]));
       var tbody = doc.createElement("tbody");
       for (var i = 0; i < 8; i++) {
         var tr = doc.createElement("tr");
@@ -122,15 +136,15 @@ var PoolDetailUI = (function () {
         tbody.appendChild(tr);
       }
       table.appendChild(tbody); book.appendChild(table);
-    } catch (e) { book.appendChild(u.el(doc, "p", "Depth unavailable (empty pool).", "muted")); }
+    } catch (e) { book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted")); }
   }
   function historyPane(doc, hist, r, myGen, uiGen) { /* pool-history rows coded 59-63; honest gap when unavailable */
-    var u = U(), note = u.el(doc, "p", "Loading history…", "muted"); hist.appendChild(note);
+    var u = U(), note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); hist.appendChild(note);
     Pool.history(r.id, 50).then(function (rows) {
       if (!live(myGen, uiGen)) return; hist.removeChild(note);
-      if (!rows.length) { hist.appendChild(u.el(doc, "p", "No pool events yet.", "muted")); return; }
+      if (!rows.length) { hist.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet."), "muted")); return; }
       var table = doc.createElement("table"); table.className = "node-table";
-      table.appendChild(u.tableHead(doc, ["Time (UTC)", "Event"]));
+      table.appendChild(u.tableHead(doc, [t("pool.time_col", "Time (UTC)"),  t("pool.event_col", "Event")]));
       var tbody = doc.createElement("tbody");
       rows.forEach(function (h) {
         var tr = doc.createElement("tr");
@@ -140,15 +154,15 @@ var PoolDetailUI = (function () {
       });
       table.appendChild(tbody); hist.appendChild(table);
     }).catch(function () {
-      if (live(myGen, uiGen)) note.textContent = "Pool history unavailable (chain-only; no external index).";
+      if (live(myGen, uiGen)) note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
     });
   }
   function stakeBoxes(doc, box, r, uiGen) { /* op-61 deposit + op-62 withdraw with share previews */
     var u = U();
-    var fA = u.field(doc, "Amount A", { inputmode: "decimal", placeholder: "1.0" });
-    var fB = u.field(doc, "Amount B", { inputmode: "decimal", placeholder: "1.0" });
+    var fA = u.field(doc, t("pool.amount_a_field", "Amount A"), { inputmode: "decimal", placeholder: "1.0" });
+    var fB = u.field(doc, t("pool.amount_b_field", "Amount B"), { inputmode: "decimal", placeholder: "1.0" });
     box.appendChild(fA.row); box.appendChild(fB.row);
-    u.reviewSection(doc, box, uiGen, "Review stake", {
+    u.reviewSection(doc, box, uiGen, t("pool.review_stake", "Review stake"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var pair = Pool.buildDeposit({ accountId: me.id, poolId: r.id, assetAId: r.asset_a_id, assetBId: r.asset_b_id,
@@ -163,14 +177,14 @@ var PoolDetailUI = (function () {
         var op = R.pair[1];
         var lA = u.amtText(op.amount_a.amount, op.amount_a.asset_id, precOr5(r.prec_a), r.sym_a);
         var lB = u.amtText(op.amount_b.amount, op.amount_b.asset_id, precOr5(r.prec_b), r.sym_b);
-        return [["Pool", r.id], ["Account", whoText(R.me)],
-          ["Amount A", lA.text, "raw " + lA.raw], ["Amount B", lB.text, "raw " + lB.raw],
-          ["Fee", fee.text, "raw " + fee.raw], ["Network", "testnet"]];
+        return [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)],
+          [t("pool.amount_a_field", "Amount A"),  lA.text, "raw " + lA.raw], [t("pool.amount_b_field", "Amount B"),  lB.text, "raw " + lB.raw],
+          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm stake", ok: function () { return "Staked (deposit broadcast)."; }, fail: "Could not prepare the stake." });
-    var fS = u.field(doc, "LP shares", { inputmode: "decimal", placeholder: "1.0" });
+      title: t("pool.confirm_stake", "Confirm stake"), ok: function () { return "Staked (deposit broadcast)."; }, fail: t("pool.stake_failed", "Could not prepare the stake.") });
+    var fS = u.field(doc, t("pool.shares_field", "LP shares"), { inputmode: "decimal", placeholder: "1.0" });
     box.appendChild(fS.row);
-    u.reviewSection(doc, box, uiGen, "Review unstake", {
+    u.reviewSection(doc, box, uiGen, t("pool.review_unstake", "Review unstake"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var pair = Pool.buildWithdraw({ accountId: me.id, poolId: r.id, shareId: r.share_id,
@@ -183,23 +197,23 @@ var PoolDetailUI = (function () {
       rows: function (R, fee) {
         var op = R.pair[1];
         var sh = u.amtText(op.share_amount.amount, op.share_amount.asset_id, precOr5(r.prec_share), r.sym_share);
-        return [["Pool", r.id], ["Account", whoText(R.me)],
-          ["LP shares", sh.text, "raw " + sh.raw],
-          ["Fee", fee.text, "raw " + fee.raw], ["Network", "testnet"]];
+        return [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)],
+          [t("pool.shares_field", "LP shares"),  sh.text, "raw " + sh.raw],
+          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm unstake", ok: function () { return "Unstaked (withdraw broadcast)."; }, fail: "Could not prepare the unstake." });
+      title: t("pool.confirm_unstake", "Confirm unstake"), ok: function () { return "Unstaked (withdraw broadcast)."; }, fail: t("pool.unstake_failed", "Could not prepare the unstake.") });
   }
   function swapInlineBox(doc, box, r, uiGen) { /* op-63 mini-form: quote + impact + slippage preview */
     var u = U();
-    var fSell = u.field(doc, "Sell amount", { inputmode: "decimal", placeholder: "1.0" });
+    var fSell = u.field(doc, t("pool.sell_amount_field", "Sell amount"), { inputmode: "decimal", placeholder: "1.0" });
     box.appendChild(fSell.row);
     var dir = doc.createElement("select"); u.touchable(dir);
-    var oA = doc.createElement("option"); oA.value = "A"; oA.textContent = "Sell " + (r.sym_a || r.asset_a_id);
-    var oB = doc.createElement("option"); oB.value = "B"; oB.textContent = "Sell " + (r.sym_b || r.asset_b_id);
+    var oA = doc.createElement("option"); oA.value = "A"; oA.textContent = t("account.sell_prefix", "Sell ") + (r.sym_a || r.asset_a_id);
+    var oB = doc.createElement("option"); oB.value = "B"; oB.textContent = t("account.sell_prefix", "Sell ") + (r.sym_b || r.asset_b_id);
     dir.appendChild(oA); dir.appendChild(oB); box.appendChild(dir);
-    var fSlip = u.field(doc, "Slippage %", { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal" });
+    var fSlip = u.field(doc, t("pool.slippage_field", "Slippage %"), { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal" });
     box.appendChild(fSlip.row);
-    u.reviewSection(doc, box, uiGen, "Review swap", {
+    u.reviewSection(doc, box, uiGen, t("pool.review_swap", "Review swap"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var sellIsA = dir.value === "A";
@@ -222,24 +236,24 @@ var PoolDetailUI = (function () {
         var precRecv = precOr5(R.sellIsA ? r.prec_b : r.prec_a);
         var sell = u.amtText(op.amount_to_sell.amount, op.amount_to_sell.asset_id, precSell, R.sellIsA ? r.sym_a : r.sym_b);
         var min = u.amtText(R.minRaw, op.min_to_receive.asset_id, precRecv, R.sellIsA ? r.sym_b : r.sym_a);
-        return [["Pool", r.id], ["Account", whoText(R.me)],
-          ["Sell", sell.text, "raw " + sell.raw],
-          ["Quote out (raw)", R.q.out_raw], ["Min to receive", min.text, "raw " + min.raw],
-          ["Slippage", String(fSlip.input.value.trim() || Pool.DEFAULT_SLIPPAGE_PCT) + "%"],
-          ["Price impact", (R.q.impact_bp / 100) + "%"],
-          ["Fee", fee.text, "raw " + fee.raw], ["Network", "testnet"]];
+        return [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)],
+          [t("account.sell_th", "Sell"),  sell.text, "raw " + sell.raw],
+          [t("pool.quote_row", "Quote out (raw)"),  R.q.out_raw], [t("pool.min_recv_row", "Min to receive"),  min.text, "raw " + min.raw],
+          [t("pool.slippage_row", "Slippage"),  String(fSlip.input.value.trim() || Pool.DEFAULT_SLIPPAGE_PCT) + "%"],
+          [t("pool.impact_row", "Price impact"),  (R.q.impact_bp / 100) + "%"],
+          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm swap", ok: function () { return "Swapped."; }, fail: "Could not prepare the swap." });
+      title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return "Swapped."; }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
   }
   function manageBoxes(doc, box, r, uiGen) { /* op-75 fee edit (withdrawal 0-only) + op-60 owner delete (fee 0) */
     var u = U();
-    var fT = u.field(doc, "New taker fee % (blank = keep)", { inputmode: "decimal", placeholder: Pool.pctUnitsToHuman(r.taker_units) });
+    var fT = u.field(doc, t("pool.taker_field", "New taker fee % (blank = keep)"), { inputmode: "decimal", placeholder: Pool.pctUnitsToHuman(r.taker_units) });
     box.appendChild(fT.row);
     var wSel = doc.createElement("select"); u.touchable(wSel);
-    var wKeep = doc.createElement("option"); wKeep.value = ""; wKeep.textContent = "Withdrawal fee: keep";
-    var wZero = doc.createElement("option"); wZero.value = "0"; wZero.textContent = "Withdrawal fee: set 0 (only allowed change)";
+    var wKeep = doc.createElement("option"); wKeep.value = ""; wKeep.textContent = t("pool_detail.s3", "Withdrawal fee: keep");
+    var wZero = doc.createElement("option"); wZero.value = "0"; wZero.textContent = t("pool_detail.s4", "Withdrawal fee: set 0 (only allowed change)");
     wSel.appendChild(wKeep); wSel.appendChild(wZero); box.appendChild(wSel);
-    u.reviewSection(doc, box, uiGen, "Review update", {
+    u.reviewSection(doc, box, uiGen, t("credit.review_update", "Review update"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var t = String(fT.input.value).trim();
@@ -258,17 +272,17 @@ var PoolDetailUI = (function () {
             } catch (e) { return null; } } };
       },
       rows: function (R, fee) {
-        var op = R.pair[1], rows = [["Pool", r.id], ["Account", whoText(R.me)]];
+        var op = R.pair[1], rows = [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)]];
         if (op.taker_fee_percent !== null && op.taker_fee_percent !== undefined)
-          rows.push(["Taker fee", u.pctText(r.taker_units) + " → " + u.pctText(op.taker_fee_percent)]);
+          rows.push([t("pool.taker_row", "Taker fee"),  u.pctText(r.taker_units) + " → " + u.pctText(op.taker_fee_percent)]);
         if (op.withdrawal_fee_percent !== null && op.withdrawal_fee_percent !== undefined)
-          rows.push(["Withdrawal fee", u.pctText(r.withdrawal_units) + " → 0%"]);
-        rows.push(["Note", "Withdrawal fee can only be set to 0."]);
-        rows.push(["Fee", fee.text, "raw " + fee.raw]); rows.push(["Network", "testnet"]);
+          rows.push([t("pool.withdrawal_row", "Withdrawal fee"),  u.pctText(r.withdrawal_units) + " → 0%"]);
+        rows.push([t("misc.note", "Note"),  "Withdrawal fee can only be set to 0."]);
+        rows.push([t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw]); rows.push([t("borrow.network", "Network"),  "testnet"]);
         return rows;
       },
-      title: "Confirm pool update", ok: function () { return "Pool updated."; }, fail: "Could not prepare the update." });
-    u.reviewSection(doc, box, uiGen, "Review delete", {
+      title: t("pool.confirm_update", "Confirm pool update"), ok: function () { return "Pool updated."; }, fail: t("credit.could_not_prepare_the_update", "Could not prepare the update.") });
+    u.reviewSection(doc, box, uiGen, t("credit.review_delete", "Review delete"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var pair = Pool.buildDelete({ accountId: me.id, poolId: r.id });
@@ -277,11 +291,11 @@ var PoolDetailUI = (function () {
             try { await Pool.get(r.id); return null; } catch (e) { return { gone: true }; } } };
       },
       rows: function (R, fee) {
-        return [["Pool", r.id], ["Account", whoText(R.me)],
-          ["Warning", "Delete is owner-only cleanup. Withdraw all liquidity first."],
-          ["Fee", fee.text + " (expected 0)", "raw " + fee.raw], ["Network", "testnet"]];
+        return [[ t("pool.pool_row", "Pool"), r.id], [t("account.card_account", "Account"),  whoText(R.me)],
+          [t("pool.warning_row", "Warning"),  "Delete is owner-only cleanup. Withdraw all liquidity first."],
+          [t("borrow.fee", "Fee"),  fee.text + " (expected 0)", "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm pool delete", ok: function () { return "Pool deleted."; }, fail: "Could not prepare the delete." });
+      title: t("pool.confirm_delete", "Confirm pool delete"), ok: function () { return "Pool deleted."; }, fail: t("credit.could_not_prepare_the_delete", "Could not prepare the delete.") });
   }
   return { renderPoolDetail: renderPoolDetail };
 })();

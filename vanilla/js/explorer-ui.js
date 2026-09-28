@@ -95,9 +95,11 @@ var ExplorerUI = (function () {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 
+  /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
+   * ≥1200px; children span full width via app.css .wide contract. */
   function makeWrap(doc, root) {
     var wrap = doc.createElement("div");
-    wrap.className = "wrap";
+    wrap.className = "wrap wide";
     root.appendChild(wrap);
     return wrap;
   }

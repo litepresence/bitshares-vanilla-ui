@@ -21,10 +21,24 @@
  */
 var DebitUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var gen = 0;
   /* Shared-_ui accessor: HtlcUI._ui (htlc-ui.js loads first); throws when the backend is missing. */
   function U() { /* shared helpers live in htlc-ui.js; missing file -> named error */
-    if (typeof HtlcUI === "undefined" || !HtlcUI._ui) throw new Error("HTLC backend missing: htlc-ui.js failed to load.");
+    if (typeof HtlcUI === "undefined" || !HtlcUI._ui) throw new Error(t("debit.backend_missing", "HTLC backend missing: htlc-ui.js failed to load."));
     return HtlcUI._ui;
   }
   function usedPct(claimedRaw, limitRaw) { /* claimed share of limit as "xx.xx%" (integer math, no float) */
@@ -41,40 +55,40 @@ var DebitUI = (function () {
   function renderDirectDebit(root) {
     if (!root) return;
     var u = U(), retry = function () { renderDirectDebit(root); };
-    var ctx = u.routeReady(root, "Direct Debit", retry);
+    var ctx = u.routeReady(root, t("debit.title", "Direct Debit"), retry);
     if (!ctx) return;
     var doc = ctx.doc, htlcGen = ctx.myGen, myGen = ++gen;
     /* TWO counters (slice-10 F3 precedent): htlcGen (HtlcUI's) goes to the shared
      * _ui helpers, which check it against HtlcUI's live gen internally; myGen
      * (DebitUI's own) guards this file's continuations. Comparing ctx.myGen
      * against DebitUI's gen stuck the page on "Loading permissions…" forever. */
-    ctx.wrap.appendChild(u.el(doc, "p", "Loading permissions…", "muted"));
+    ctx.wrap.appendChild(u.el(doc, "p", t("debit.loading", "Loading permissions…"), "muted"));
     if (!u.isUnlockedNow()) ctx.wrap.appendChild(u.viewingAsNotice(doc));
     u.loadAccount(htlcGen, function (me) { return Htlc.permissions(me.id); }).then(function (found) {
       if (!found || myGen !== gen) return;
       root.innerHTML = "";
       var box = u.el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(u.el(doc, "h1", "Direct Debit"));
+      box.appendChild(u.el(doc, "h1", t("debit.title", "Direct Debit")));
       if (!u.isUnlockedNow()) box.appendChild(u.viewingAsNotice(doc));
-      box.appendChild(u.el(doc, "p", "Recurring withdrawal rights you granted or received.", "muted"));
+      box.appendChild(u.el(doc, "p", t("debit.list_sub", "Recurring withdrawal rights you granted or received."), "muted"));
       box.appendChild(u.el(doc, "h2", "Granted by you (" + found.data.asGiver.length + ")"));
       box.appendChild(permTable(u, doc, found.data.asGiver, "giver"));
       box.appendChild(u.el(doc, "h2", "Granted to you (" + found.data.asRecipient.length + ")"));
       box.appendChild(permTable(u, doc, found.data.asRecipient, "recipient"));
-      box.appendChild(u.el(doc, "h2", "New / update permission"));
+      box.appendChild(u.el(doc, "h2", t("debit.form_title", "New / update permission")));
       if (!u.isUnlockedNow()) box.appendChild(u.signNotice(doc));
       createUpdateBox(u, doc, box, found.me, found.data, htlcGen);
-      box.appendChild(u.el(doc, "h2", "Claim / delete"));
+      box.appendChild(u.el(doc, "h2", t("debit.action_title", "Claim / delete")));
       if (!u.isUnlockedNow()) box.appendChild(u.signNotice(doc));
       rowActionBox(u, doc, box, found.me, found.data, htlcGen);
     }).catch(function (e) {
-      if (myGen !== gen) return; u.routeFail(root, "Direct Debit", e, "Could not load permissions.", retry); });
+      if (myGen !== gen) return; u.routeFail(root, "Direct Debit", e, t("debit.load_failed", "Could not load permissions."), retry); });
   }
   function permTable(u, doc, rows, side) { /* limit/claimed/available human, period human, status */
     if (!rows.length) return u.el(doc, "p", side === "giver" ? "You granted no permissions." : "No permissions granted to you.", "muted");
     var table = doc.createElement("table"); table.className = "node-table";
-    table.appendChild(u.tableHead(doc, ["Permission", side === "giver" ? "Authorized" : "Giver",
-      "Limit", "Used", "Available", "Period", "Status"]));
+    table.appendChild(u.tableHead(doc, [t("debit.perm_col", "Permission"),  side === "giver" ? t("debit.auth_row", "Authorized") : t("debit.giver_row", "Giver"),
+      t("instant.limit", "Limit"), t("debit.used_col", "Used"), t("debit.avail_col", "Available"), t("debit.period_row", "Period"), t("prediction.hdr_status", "Status")]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var l = u.amtText(r.limit_raw, r.asset_id, r.precision), period, tr = doc.createElement("tr");
@@ -93,17 +107,17 @@ var DebitUI = (function () {
   }
   function createUpdateBox(u, doc, box, me, lists, myGen) { /* fee RE-READ at review; update gets old→new rows */
     var locked = !u.isUnlockedNow();
-    var fPerm = u.field(doc, "Permission id (update only, else blank)", { placeholder: "1.12.N" });
-    var fAuth = u.field(doc, "Authorized account", locked ? { placeholder: "name or 1.2.N", value: "1.2.0" } : { placeholder: "name or 1.2.N" });
-    var fAsset = u.field(doc, "Asset", { value: "BTS" });
-    var fLimit = u.field(doc, "Limit per period", { placeholder: "10", inputmode: "decimal" });
-    var fCount = u.field(doc, "Period count", { value: "12", inputmode: "numeric" });
-    var fStart = u.field(doc, "Start (local time)", {});
+    var fPerm = u.field(doc, t("debit.perm_field", "Permission id (update only, else blank)"), { placeholder: "1.12.N" });
+    var fAuth = u.field(doc, t("debit.auth_field", "Authorized account"), locked ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" } : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+    var fAsset = u.field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
+    var fLimit = u.field(doc, t("debit.limit_field", "Limit per period"), { placeholder: "10", inputmode: "decimal" });
+    var fCount = u.field(doc, t("debit.count_field", "Period count"), { value: "12", inputmode: "numeric" });
+    var fStart = u.field(doc, t("debit.start_field", "Start (local time)"), {});
     fStart.input.type = "datetime-local";
     [fPerm, fAuth, fAsset, fLimit, fCount, fStart].forEach(function (f) { box.appendChild(f.row); });
     var period = u.secsPicker(doc, u.presets.map(function (p) { return [String(p[1]), p[0]]; }), "Period");
     box.appendChild(period.row);
-    u.reviewSection(doc, box, myGen, "Review permission", {
+    u.reviewSection(doc, box, myGen, t("debit.review_perm", "Review permission"), {
       build: async function () {
         var to = await Account.resolve(fAuth.input.value.trim());
         var asset = await Asset.describe(fAsset.input.value.trim() || "BTS");
@@ -134,27 +148,27 @@ var DebitUI = (function () {
         try { periodHuman = Htlc.formatDuration(opData.withdrawal_period_sec) + " (" + opData.withdrawal_period_sec + " s)"; }
         catch (e) { periodHuman = String(opData.withdrawal_period_sec) + " s"; }
         try { startHuman = Htlc.formatDateTime(opData.period_start_time); } catch (e) { startHuman = opData.period_start_time; }
-        var rows = [["From (giver)", me.name + " (" + me.id + ")"], ["Authorized", R.to.name + " (" + R.to.id + ")"],
-          ["Limit per period", limitHuman, "raw " + opData.withdrawal_limit.amount], ["Period", periodHuman],
-          ["Period count", String(opData.periods_until_expiration)], ["Start", startHuman], ["Fee", fee.text, "raw " + fee.raw]];
+        var rows = [[t("debit.from_row", "From (giver)"),  me.name + " (" + me.id + ")"], [t("debit.auth_row", "Authorized"),  R.to.name + " (" + R.to.id + ")"],
+          [t("debit.limit_field", "Limit per period"),  limitHuman, "raw " + opData.withdrawal_limit.amount], [t("debit.period_row", "Period"),  periodHuman],
+          [t("debit.count_field", "Period count"),  String(opData.periods_until_expiration)], [t("debit.start_row", "Start"),  startHuman], [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw]];
         if (R.isUpdate) {
-          rows.unshift(["Permission", opData.permission_to_update]);
-          if (R.old) rows.push(["Limit change", u.amtText(R.old.limit_raw, R.old.asset_id, R.old.precision).text + " → " + limitHuman,
+          rows.unshift([t("debit.perm_col", "Permission"),  opData.permission_to_update]);
+          if (R.old) rows.push([t("debit.limit_change_row", "Limit change"),  u.amtText(R.old.limit_raw, R.old.asset_id, R.old.precision).text + " → " + limitHuman,
             "raw " + R.old.limit_raw + " → " + opData.withdrawal_limit.amount]);
         }
-        rows.push(["Network", "testnet"]);
+        rows.push([t("borrow.network", "Network"),  "testnet"]);
         return rows;
       },
-      title: "Confirm permission", ok: function (R) { return R.isUpdate ? "Permission updated." : "Permission created."; },
-      fail: "Could not prepare the permission." });
+      title: t("debit.confirm_perm", "Confirm permission"), ok: function (R) { return R.isUpdate ? "Permission updated." : "Permission created."; },
+      fail: t("debit.perm_failed", "Could not prepare the permission.") });
   }
   function rowActionBox(u, doc, box, me, lists, myGen) { /* claim (≤ available + plaintext-memo warning) + delete (fee 0) */
-    var fPerm = u.field(doc, "Permission id", { placeholder: "1.12.N" });
-    var fAmount = u.field(doc, "Claim amount (claim only)", { placeholder: "1.0", inputmode: "decimal" });
-    var fMemo = u.field(doc, "Claim memo, optional (claim only)", { placeholder: "stored in PLAINTEXT" });
+    var fPerm = u.field(doc, t("debit.perm_id_field", "Permission id"), { placeholder: "1.12.N" });
+    var fAmount = u.field(doc, t("debit.claim_amount_field", "Claim amount (claim only)"), { placeholder: "1.0", inputmode: "decimal" });
+    var fMemo = u.field(doc, t("debit.memo_field", "Claim memo, optional (claim only)"), { placeholder: t("debit.plaintext_ph", "stored in PLAINTEXT") });
     [fPerm, fAmount, fMemo].forEach(function (f) { box.appendChild(f.row); });
-    box.appendChild(u.el(doc, "p", "Claim memos are plaintext on-chain in v1 — never put secrets in one.", "muted"));
-    u.reviewSection(doc, box, myGen, "Review claim", {
+    box.appendChild(u.el(doc, "p", t("debit.memo_warning", "Claim memos are plaintext on-chain in v1 — never put secrets in one."), "muted"));
+    u.reviewSection(doc, box, myGen, t("vesting.review_claim", "Review claim"), {
       build: async function () {
         var idText = String(fPerm.input.value || "").trim();
         var row = findRow(lists, idText);
@@ -179,17 +193,17 @@ var DebitUI = (function () {
       },
       rows: function (R, fee) {
         var opData = R.pair[1];
-        var rows = [["Permission", R.row.id], ["From", R.row.from_id], ["To (claimant, pays fee)", R.row.to_id],
-          ["Amount", R.amtHuman, "raw " + opData.amount_to_withdraw.amount],
-          ["Available now", u.amtText(R.row.available_raw, R.row.asset_id, R.row.precision).text],
-          ["Fee (paid by claimant)", fee.text, "raw " + fee.raw]];
-        if (R.memoWarning) rows.push(["Memo warning", "Plaintext on-chain — visible to everyone"]);
-        rows.push(["Network", "testnet"]);
+        var rows = [[t("debit.perm_col", "Permission"),  R.row.id], [t("confirm.from", "From"),  R.row.from_id], [t("debit.claimant_row", "To (claimant, pays fee)"),  R.row.to_id],
+          [t("confirm.amount", "Amount"),  R.amtHuman, "raw " + opData.amount_to_withdraw.amount],
+          [t("debit.available_row", "Available now"),  u.amtText(R.row.available_raw, R.row.asset_id, R.row.precision).text],
+          [t("debit.claimant_fee_row", "Fee (paid by claimant)"),  fee.text, "raw " + fee.raw]];
+        if (R.memoWarning) rows.push([t("debit.memo_warning_row", "Memo warning"),  "Plaintext on-chain — visible to everyone"]);
+        rows.push([t("borrow.network", "Network"),  "testnet"]);
         return rows;
       },
-      title: "Confirm claim", ok: function (R) { return "Claimed " + R.amtHuman + "."; },
-      fail: "Could not prepare the claim." });
-    u.reviewSection(doc, box, myGen, "Review delete", {
+      title: t("debit.confirm_claim", "Confirm claim"), ok: function (R) { return "Claimed " + R.amtHuman + "."; },
+      fail: t("debit.claim_failed", "Could not prepare the claim.") });
+    u.reviewSection(doc, box, myGen, t("credit.review_delete", "Review delete"), {
       build: async function () {
         var idText = String(fPerm.input.value || "").trim();
         var row = findRow(lists, idText);
@@ -203,11 +217,11 @@ var DebitUI = (function () {
         } };
       },
       rows: function (R, fee) {
-        return [["Permission", R.row.id], ["Giver", R.row.from_id], ["Authorized", R.row.to_id],
-          ["Fee", fee.text + " (free cancel)", "raw " + fee.raw], ["Network", "testnet"]];
+        return [[t("debit.perm_col", "Permission"),  R.row.id], [t("debit.giver_row", "Giver"),  R.row.from_id], [t("debit.auth_row", "Authorized"),  R.row.to_id],
+          [t("borrow.fee", "Fee"),  fee.text + " (free cancel)", "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm delete", ok: function (R) { return "Permission " + R.row.id + " deleted."; },
-      fail: "Could not estimate the delete fee." });
+      title: t("debit.confirm_delete", "Confirm delete"), ok: function (R) { return "Permission " + R.row.id + " deleted."; },
+      fail: t("debit.delete_fee_failed", "Could not estimate the delete fee.") });
   }
   /* Route entry: #/spotlight — tile grid (ShowcaseGrid parity, no chain op).
    * The grid renders WITHOUT unlock (login-gated tiles link out); only the
@@ -218,13 +232,13 @@ var DebitUI = (function () {
     u.dropOpenSubs();
     root.innerHTML = "";
     var wrap = u.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(u.el(doc, "h1", "Spotlight"));
+    wrap.appendChild(u.el(doc, "h1", t("debit.spotlight_title", "Spotlight")));
     var miss = u.missingBackends();
     if (miss) { u.showError(doc, wrap, "Spotlight backend missing: " + miss + " failed to load."); return; }
     if (Chain.status().state !== "open") { var sretry = function () { renderSpotlight(root); }; u.offlineBox(doc, wrap, sretry); u.autoRetryOnOpen(myGen, sretry, function () { return myGen === gen; }); return; }
-    var tiles = [["HTLC", "Lock funds with a hash + timelock.", "#/htlc", ""], ["Direct Debit", "Recurring withdrawal permissions.", "#/direct-debit", ""],
-      ["Borrow", "Margin positions.", "", "Lands in a later slice"], ["Barter", "Two-sided swap offers.", "", "Lands in a later slice"],
-      ["Prediction", "Prediction markets.", "", "Lands in a later slice"], ["Instant Trade", "Simple buy/sell view.", "", "Lands in a later slice"]];
+    var tiles = [[t("htlc.title", "HTLC"),  "Lock funds with a hash + timelock.", "#/htlc", ""], [t("debit.title", "Direct Debit"),  "Recurring withdrawal permissions.", "#/direct-debit", ""],
+      [t("borrow.title", "Borrow"),  "Margin positions.", "", "Lands in a later slice"], [t("barter.barter", "Barter"),  "Two-sided swap offers.", "", "Lands in a later slice"],
+      [t("debit.tile_prediction", "Prediction"),  "Prediction markets.", "", "Lands in a later slice"], [t("instant.instant_trade", "Instant Trade"),  "Simple buy/sell view.", "", "Lands in a later slice"]];
     var grid = u.el(doc, "div", null, "spot-grid");
     tiles.forEach(function (t) {
       var card = u.el(doc, "div", null, "spot-card");
@@ -234,20 +248,20 @@ var DebitUI = (function () {
       grid.appendChild(card);
     });
     wrap.appendChild(grid);
-    wrap.appendChild(u.el(doc, "h2", "Recurring orders helper"));
+    wrap.appendChild(u.el(doc, "h2", t("debit.recurring_title", "Recurring orders helper")));
     wrap.appendChild(u.el(doc, "p", "Places N limit orders NOW at stepped prices (one transaction per order, " +
       "each with its own confirm). No scheduler runs in a static page: closing the page places nothing further.", "muted"));
     recurringBox(u, doc, wrap, root, myGen);
   }
   function recurringBox(u, doc, wrap, root, myGen) { /* N op-1 orders across [low, high]; per-order confirm */
-    var fSell = u.field(doc, "Sell asset", { value: "BTS" });
-    var fRecv = u.field(doc, "Receive asset", { value: "USD" });
-    var fTotal = u.field(doc, "Total to sell", { placeholder: "10" });
-    var fLow = u.field(doc, "Low price (recv per sell)", { placeholder: "0.9" });
-    var fHigh = u.field(doc, "High price (recv per sell)", { placeholder: "1.1" });
-    var fCount = u.field(doc, "Order count (2–20)", { value: "5" });
+    var fSell = u.field(doc, t("debit.sell_asset_field", "Sell asset"), { value: "BTS" });
+    var fRecv = u.field(doc, t("debit.recv_asset_field", "Receive asset"), { value: "USD" });
+    var fTotal = u.field(doc, t("debit.total_field", "Total to sell"), { placeholder: "10" });
+    var fLow = u.field(doc, t("debit.low_field", "Low price (recv per sell)"), { placeholder: "0.9" });
+    var fHigh = u.field(doc, t("debit.high_field", "High price (recv per sell)"), { placeholder: "1.1" });
+    var fCount = u.field(doc, t("debit.count_orders_field", "Order count (2–20)"), { value: "5" });
     [fSell, fRecv, fTotal, fLow, fHigh, fCount].forEach(function (f) { wrap.appendChild(f.row); });
-    var previewBtn = u.touchable(u.el(doc, "button", "Preview recurring orders")); previewBtn.type = "button"; wrap.appendChild(previewBtn);
+    var previewBtn = u.touchable(u.el(doc, "button", t("debit.preview_ladder", "Preview recurring orders"))); previewBtn.type = "button"; wrap.appendChild(previewBtn);
     var out = u.el(doc, "div", null, "xfer-out"); wrap.appendChild(out);
     previewBtn.addEventListener("click", function () {
       if (myGen !== gen) return;
@@ -256,20 +270,20 @@ var DebitUI = (function () {
        * each per-order Sign & Send gates at click with an unlock notice. */
       if (!u.isUnlockedNow()) out.appendChild(u.viewingAsNotice(doc));
       previewBtn.disabled = true;
-      u.showStatus(doc, out, "Computing order ladder…");
+      u.showStatus(doc, out,t("debit.computing", "Computing order ladder…"));
       Promise.resolve().then(async function () {
         var actId = await Account.myAccountId().catch(function () { return u.viewingAsId; });
         var me = await Account.resolve(actId);
         var sell = await Asset.describe(fSell.input.value.trim() || "BTS");
         var recv = await Asset.describe(fRecv.input.value.trim() || "USD");
         var n = parseInt(String(fCount.input.value).trim(), 10);
-        if (!Number.isInteger(n) || n < 2 || n > 20) throw new Error("Order count must be 2–20.");
+        if (!Number.isInteger(n) || n < 2 || n > 20) throw new Error(t("debit.err_count", "Order count must be 2–20."));
         var lowR = Format.parsePriceRatio(fLow.input.value.trim());
         var highR = Format.parsePriceRatio(fHigh.input.value.trim());
         var D = lowR.den * highR.den, lowD = lowR.num * highR.den, highD = highR.num * lowR.den;
-        if (highD <= lowD) throw new Error("High price must be above low price.");
+        if (highD <= lowD) throw new Error(t("debit.err_range", "High price must be above low price."));
         var total = BigInt(Format.parseAmount(fTotal.input.value.trim(), sell.precision));
-        if (total <= 0n) throw new Error("Total must be greater than zero.");
+        if (total <= 0n) throw new Error(t("debit.err_total", "Total must be greater than zero."));
         var per = total / BigInt(n);
         if (per <= 0n) throw new Error("Total is too small to split into " + n + " orders.");
         var step = (highD - lowD) / BigInt(n - 1), orders = [], i;
@@ -286,7 +300,7 @@ var DebitUI = (function () {
         u.clearBox(out);
         out.appendChild(u.el(doc, "h3", R.orders.length + " orders: review each, then place"));
         var table = doc.createElement("table"); table.className = "node-table";
-        table.appendChild(u.tableHead(doc, ["#", "Sell", "Min receive", "Price", "Status"]));
+        table.appendChild(u.tableHead(doc, ["#", t("account.sell_th", "Sell"), t("debit.min_recv_col", "Min receive"), t("account.price_th", "Price"), t("prediction.hdr_status", "Status")]));
         var tbody = doc.createElement("tbody");
         R.orders.forEach(function (o, i) {
           var tr = doc.createElement("tr"), cell;
@@ -296,18 +310,18 @@ var DebitUI = (function () {
           cell = u.el(doc, "td", Format.formatAmount(o.recvRaw, R.recv.precision) + " " + R.recv.symbol);
           cell.title = "raw " + o.recvRaw; tr.appendChild(cell);
           tr.appendChild(u.el(doc, "td", Format.formatAmount((o.priceNum * (10n ** 8n) / o.priceDen).toString(), 8)));
-          var stCell = u.el(doc, "td", "not placed", "muted"); tr.appendChild(stCell);
+          var stCell = u.el(doc, "td", t("debit.not_placed", "not placed"), "muted"); tr.appendChild(stCell);
           tbody.appendChild(tr);
           var btn = u.touchable(u.el(doc, "button", "Sign & Send #" + (i + 1))); btn.type = "button";
           btn.addEventListener("click", function () {
             if (myGen !== gen) return;
-            btn.disabled = true; stCell.textContent = "signing…";
+            btn.disabled = true; stCell.textContent = t("debit.s1", "signing…");
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) {
-              stCell.textContent = "Wallet is locked — unlock to sign (preview stays visible).";
+              stCell.textContent = t("debit.locked_sign_note", "Wallet is locked — unlock to sign (preview stays visible).");
               stCell.className = "error";
               u.unlockInline(doc, out, function () {
-                out.appendChild(u.el(doc, "p", "Unlocked — press Preview again so the orders use your account, then sign.", "muted"));
+                out.appendChild(u.el(doc, "p", t("debit.unlocked_note", "Unlocked — press Preview again so the orders use your account, then sign."), "muted"));
               });
               btn.disabled = false; return; }
             var pair = [Tx.OP.limit_order_create, { fee: { amount: 0, asset_id: "1.3.0" }, seller: R.me.id,
@@ -315,7 +329,7 @@ var DebitUI = (function () {
               min_to_receive: { amount: o.recvRaw, asset_id: R.recv.id },
               expiration: R.exp, fill_or_kill: false, extensions: [] }];
             Promise.resolve().then(function () { return Htlc.fee(pair, "1.3.0"); }).then(function () { return Tx.buildTx([pair]); }).then(function (unsigned) {
-              stCell.textContent = "broadcasting…";
+              stCell.textContent = t("debit.s3", "broadcasting…");
               return Htlc.sendAndProve(unsigned, wif, async function () {
                 try { return (await u.headBlock()) > 0 ? { head: true } : null; } catch (e) { return null; }
               });
@@ -334,7 +348,7 @@ var DebitUI = (function () {
         table.appendChild(tbody); out.appendChild(table);
       }).catch(function (e) {
         if (myGen !== gen) return;
-        u.clearBox(out); u.showError(doc, out, e, "Could not preview the ladder.");
+        u.clearBox(out); u.showError(doc, out,e,t("debit.preview_failed", "Could not preview the ladder."));
       }).then(function () { previewBtn.disabled = false; });
     });
   }

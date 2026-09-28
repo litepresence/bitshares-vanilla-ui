@@ -1,0 +1,182 @@
+/* DeskGrid: trading-desk grid placement, fixed-height scroll regions, and
+ * in-row cumulative-depth bars (bids/asks).
+ * Owns: .mkt grid areas on all breakpoints (including the trade panel the
+ *   base stylesheet leaves unplaced), .book-grid side wrappers, every desk
+ *   scroll region (.book-scroll/.trades-scroll/.orders-scroll/.picker-scroll
+ *   plus the phone-card lists), sticky table headers inside those regions,
+ *   and .depth-bar geometry + colors. All colors are theme tokens
+ *   (var(--buy)/var(--sell)/var(--border)/var(--panel)); the only numeric
+ *   styling is the depth alpha (0.15, the original rgba alpha) and row-count
+ *   heights. No framework, no CDN, no build step.
+ * Consumes: --depth (percent string set inline per row/card by
+ *   market-book.js from Market.depth cumulative fractions); theme tokens
+ *   from themes.css; row-height estimates documented per variable.
+ * Globals/side effects: stylesheet only (no JS, no globals). Later in
+ *   index.html than app.css, so equal-specificity rules here win.
+ * Created by: building-vanilla-slices skill, desk-grid task (AFK round).
+ */
+
+/* Row-count model. Heights are estimates from app.css metrics (font +
+ * line-height + padding + 1px border), kept as variables so a density change
+ * touches one line. N per region (chosen — original counts where they exist:
+ * bitshares-ui OrderBook.jsx:430 rowCount 20 in a 260px box (:1098/:1261)
+ * with the show-all fold at >11 rows (:1117); our 12-row book fold sits at
+ * that same fold): book sides 12, recent trades/fills 15, open orders 8,
+ * market picker 12. Fills share the trades region (fills ARE the
+ * get_fill_order_history rows rendered by renderTrades). */
+:root {
+  --desk-row-h: 29px;        /* book row: 12px type @1.45 + 5px/5px pad + border */
+  --desk-head-h: 34px;       /* scroll-table thead (14px caps + padding) */
+  --desk-trades-row-h: 34px; /* trades row: 0.9rem type + 6px/8px pad + border */
+  --desk-orders-row-h: 48px; /* orders row: base 12px pad + border */
+  --desk-picker-row-h: 48px; /* picker row: 44px touch target + 4px gap */
+  --desk-depth-alpha: 0.15;  /* original bar alpha (OrderBook.jsx:177-183) */
+}
+
+/* Desk grid placement (grid ONLY — areas; columns mirror app.css so the
+ * override stays a pure area swap). The trade panel has no area in app.css
+ * (it falls out of the grid); here it squares up beside open orders. */
+.mkt {
+  grid-template-areas: "head" "charts" "book" "trades" "side" "orders" "trade";
+}
+.mkt-trade {
+  grid-area: trade;
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .mkt {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr) minmax(0, 4fr);
+    grid-template-areas: "head head head" "book charts side" "book trades side" "orders orders trade";
+  }
+}
+
+/* Book sides wrapper (Asks/Bids stack inside the book column). */
+.book-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Fixed-height scroll regions (native overflow, sticky headers). Max-height
+ * = header + N rows; content beyond scrolls in place like the original. */
+.book-scroll {
+  max-height: calc(var(--desk-head-h) + 12 * var(--desk-row-h));
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.trades-scroll {
+  max-height: calc(var(--desk-head-h) + 15 * var(--desk-trades-row-h));
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.orders-scroll {
+  max-height: calc(var(--desk-head-h) + 8 * var(--desk-orders-row-h));
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.picker-scroll {
+  max-height: calc(12 * var(--desk-picker-row-h));
+  overflow-y: auto;
+}
+/* Phone-card lists (<560px shows cards, tables hide): same fixed regions so
+ * the desk squares up on phones too, with the table region height. */
+.book-cards,
+.trades-cards,
+.orders-cards {
+  overflow-y: auto;
+}
+.book-cards {
+  max-height: calc(var(--desk-head-h) + 12 * var(--desk-row-h));
+}
+.trades-cards {
+  max-height: calc(var(--desk-head-h) + 15 * var(--desk-trades-row-h));
+}
+.orders-cards {
+  max-height: calc(var(--desk-head-h) + 8 * var(--desk-orders-row-h));
+}
+/* Tables sit flush in their scrollers (no trailing margin slack). */
+.book-scroll table,
+.trades-scroll table,
+.orders-scroll table {
+  margin-bottom: 0;
+}
+/* Sticky headers in every scroll region (opaque panel bg so rows slide
+ * under; z-index above the depth bars below). */
+.book-scroll thead th,
+.trades-scroll thead th,
+.orders-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  z-index: 3;
+}
+
+/* In-row depth bars, table version. The table uses the separate border model
+ * (spacing 0 preserves the collapsed look) so td position:relative is a
+ * reliable containing block. ONE .depth-bar per row lives in the price-side
+ * anchor cell and spans --depth of the ROW: the fixed 3-column layout makes
+ * each cell exactly 1/3 of the row, so 3x cell width = full row width
+ * (capped at 300% = the whole row). Text rides above in .cell-text. */
+.mkt-book .book-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.book-cell {
+  position: relative;
+}
+.book-cell .cell-text {
+  position: relative;
+  z-index: 1;
+}
+tr.book-row .depth-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--desk-depth-alpha);
+}
+/* Asks: red, anchored left, growing right (OrderBook.jsx:177-179). */
+tr.book-ask-row .depth-bar {
+  left: 0;
+  width: min(calc(var(--depth, 0%) * 3), 300%);
+  background: var(--sell);
+}
+/* Bids: green, anchored right, growing left (OrderBook.jsx:181-183). */
+tr.book-bid-row .depth-bar {
+  right: 0;
+  width: min(calc(var(--depth, 0%) * 3), 300%);
+  background: var(--buy);
+}
+
+/* In-row depth bars, phone-card version (plain divs: bar width is --depth
+ * of the card directly; text divs ride above). */
+.book-row-card {
+  position: relative;
+  overflow: hidden;
+}
+.book-row-card > div {
+  position: relative;
+  z-index: 1;
+}
+.book-row-card .depth-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: var(--desk-depth-alpha);
+}
+.book-row-card.book-ask-row .depth-bar {
+  left: 0;
+  width: var(--depth, 0%);
+  background: var(--sell);
+}
+.book-row-card.book-bid-row .depth-bar {
+  right: 0;
+  width: var(--depth, 0%);
+  background: var(--buy);
+}

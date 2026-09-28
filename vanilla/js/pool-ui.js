@@ -19,6 +19,20 @@
  */
 var PoolUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var gen = 0;
   var openSubs = [];
   function el(doc, tag, text, cls) {
@@ -29,26 +43,26 @@ var PoolUI = (function () {
   function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    if (m.indexOf("not-connected") !== -1) m = "Network unavailable. Check Settings → Nodes and retry.";
-    if (m.indexOf("wallet-locked") !== -1) m = "Wallet is locked.";
-    if (m.indexOf("unknown-pool") !== -1) m = "Unknown pool.";
+    var m = (e && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
+    if (m.indexOf("not-connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
+    if (m.indexOf("unknown-pool") !== -1) m = t("pool.unknown_pool", "Unknown pool.");
     var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
   function offlineBox(doc, wrap, retryFn) {
-    wrap.appendChild(el(doc, "p", "Network unavailable. Check Settings → Nodes and retry.", "muted"));
-    var b = touchable(el(doc, "button", "Retry")); b.type = "button";
+    wrap.appendChild(el(doc, "p", t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }
   function unlockBox(doc, wrap, retry) {
-    wrap.appendChild(el(doc, "p", "Wallet is locked. Enter your password to continue.", "muted"));
+    wrap.appendChild(el(doc, "p", t("barter.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
     var inp = doc.createElement("input"); inp.type = "password"; touchable(inp); wrap.appendChild(inp);
-    var b = touchable(el(doc, "button", "Unlock")); b.type = "button"; wrap.appendChild(b);
+    var b = touchable(el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; wrap.appendChild(b);
     b.addEventListener("click", function () { b.disabled = true;
-      Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap, e, "Unlock failed."); });
+      Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap,e,t("barter.unlock_failed", "Unlock failed.")); });
     });
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public
@@ -93,7 +107,7 @@ var PoolUI = (function () {
     root.innerHTML = "";
     var doc = root.ownerDocument || document, box = el(doc, "div", null, "wrap");
     root.appendChild(box); box.appendChild(el(doc, "h1", title));
-    showError(doc, box, e, "Could not load pools."); offlineBox(doc, box, retry);
+    showError(doc, box,e,t("pool.load_failed", "Could not load pools.")); offlineBox(doc, box, retry);
   }
   function confirmList(doc, rows) {
     var list = el(doc, "dl", null, "xfer-confirm");
@@ -147,8 +161,8 @@ var PoolUI = (function () {
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     clearBox(out);
     out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(el(doc, "button", "Back")); back.type = "button";
-    var send = touchable(el(doc, "button", "Sign & Send")); send.type = "button";
+    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button";
+    var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
     back.addEventListener("click", function () { clearBox(out); });
     send.addEventListener("click", function () {
@@ -157,7 +171,7 @@ var PoolUI = (function () {
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); send.disabled = false; back.disabled = false; return; }
       Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-        status.textContent = "Broadcasting…";
+        status.textContent = t("htlc.s2", "Broadcasting…");
         return Pool.sendAndProve(unsigned, wif, cfg.prove);
       }).then(async function (res) {
         if (myGen !== gen) return; clearBox(out);
@@ -165,14 +179,14 @@ var PoolUI = (function () {
         out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
-        showError(doc, out, e, "Failed. Check state before retrying (do NOT blindly rebroadcast).");
+        showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
         send.disabled = false; back.disabled = false;
       });
     });
   }
   function reviewPaid(doc, out, myGen, cfg) { /* build {pair,fee,prove} + live fee -> rows -> sendConfirm */
     clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
-    showStatus(doc, out, "Resolving and estimating fee…");
+    showStatus(doc, out,t("account.resolving_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
       if (myGen !== gen) return done();
@@ -182,10 +196,10 @@ var PoolUI = (function () {
           makeUnsigned: function () { return Tx.buildTx([built.pair]); },
           prove: built.prove, okText: cfg.ok(built) }, myGen);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, "Fee lookup failed."); } done(); });
+      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, cfg.fail || "Could not prepare the transaction."); done();
+      clearBox(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
   function reviewSection(doc, box, myGen, label, cfg) {
@@ -199,7 +213,7 @@ var PoolUI = (function () {
       if (myGen !== gen) return;
       if (!isUnlockedNow()) {
         clearBox(out);
-        out.appendChild(el(doc, "p", "Unlock to act — signing needs your wallet password.", "muted"));
+        out.appendChild(el(doc, "p", t("pool.unlock_notice", "Unlock to act — signing needs your wallet password."), "muted"));
         unlockBox(doc, out, function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
         return;
       }
@@ -218,10 +232,10 @@ var PoolUI = (function () {
     *   A QTY / B / B QTY / TAKER / WITHDRAWAL / EXCHANGE (swap) / STAKE.
     *   EXCHANGE + STAKE both open the detail desk (#/pools/:id), which owns
     *   the inline swap and stake panels — the list stays a list. */
-    if (!rows.length) return el(doc, "p", "No pools found.", "muted");
+    if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found."), "muted");
     var table = doc.createElement("table"); table.className = "node-table pools-table";
-    table.appendChild(tableHead(doc, ["Pool ID", "Share asset", "Asset A", "Asset A qty",
-      "Asset B", "Asset B qty", "Taker fee", "Withdrawal fee", "Exchange", "Stake/Unstake"]));
+    table.appendChild(tableHead(doc, [t("pool.id_col", "Pool ID"),  "Share asset", t("pool.asset_a_field", "Asset A"), t("pool.asset_a_qty_col", "Asset A qty"),
+      t("pool.asset_b_field", "Asset B"), t("pool.asset_b_qty_col", "Asset B qty"), t("pool.taker_row", "Taker fee"), t("pool.withdrawal_row", "Withdrawal fee"), t("market.title", "Exchange"), t("pool.stake_unstake_col", "Stake/Unstake")]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var tr = doc.createElement("tr");
@@ -253,10 +267,10 @@ var PoolUI = (function () {
       }
       xl.setAttribute("href", "#/pools/" + r.id);
       xl.setAttribute("aria-label", "Swap in pool " + r.id);
-      xl.title = "Swap in this pool";
+      xl.title = t("pool.swap_title_attr", "Swap in this pool");
       tdX.appendChild(xl); tr.appendChild(tdX);
       var tdSt = doc.createElement("td");
-      var sl = el(doc, "a", "Stake"); sl.setAttribute("href", "#/pools/" + r.id);
+      var sl = el(doc, "a", t("pool.stake_link", "Stake")); sl.setAttribute("href", "#/pools/" + r.id);
       sl.setAttribute("aria-label", "Stake or unstake in pool " + r.id);
       tdSt.appendChild(sl); tr.appendChild(tdSt);
       tbody.appendChild(tr);
@@ -271,20 +285,21 @@ var PoolUI = (function () {
    * previous page's last row is dropped (over-fetch of 2 covers it). */
   function renderPools(root) {
     if (!root) return;
-    var ctx = routeReady(root, "Liquidity Pools", function () { renderPools(root); });
+    var ctx = routeReady(root, t("pools.title", "Liquidity Pools"), function () { renderPools(root); });
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
-    /* Wide wrap (mkt-wrap, detail-desk precedent): the 10-col dense table
-     * needs room; the plain 720px wrap would force scrolling at desktop. */
-    ctx.wrap.className = "wrap mkt-wrap";
-    ctx.wrap.appendChild(el(doc, "p", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares.", "muted"));
+    /* Wide (viewport-gaps fix 2026-09-28): the 10-col dense table
+     * needs full-bleed room; replaces mkt-wrap. Children span full width
+     * via the app.css .wide contract; the table keeps its scroll region. */
+    ctx.wrap.className = "wrap wide";
+    ctx.wrap.appendChild(el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
     var filters = el(doc, "div", null, "pools-filters");
-    var fA = field(doc, "Asset A", { placeholder: "symbol or 1.3.x" });
-    var fB = field(doc, "Asset B", { placeholder: "symbol or 1.3.x" });
-    var fS = field(doc, "Share asset", { placeholder: "symbol or 1.3.x" });
+    var fA = field(doc, "Asset A", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fB = field(doc, "Asset B", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fS = field(doc, "Share asset", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
-    var sizeLab = el(doc, "label", "Per page ");
+    var sizeLab = el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");
     ["10", "25", "50"].forEach(function (n) {
       var o = doc.createElement("option");
@@ -297,15 +312,15 @@ var PoolUI = (function () {
     var sizeWrap = el(doc, "div", null, "xfer-field");
     sizeWrap.appendChild(sizeLab);
     filters.appendChild(sizeWrap);
-    var go = touchable(el(doc, "button", "List pools")); go.type = "button";
+    var go = touchable(el(doc, "button", t("pool.list_btn", "List pools"))); go.type = "button";
     filters.appendChild(go);
     ctx.wrap.appendChild(filters);
     var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
     var mineBox = el(doc, "div");
-    ctx.wrap.appendChild(el(doc, "h2", "My pools"));
+    ctx.wrap.appendChild(el(doc, "h2", t("pool.mine_title", "My pools")));
     ctx.wrap.appendChild(mineBox);
-    ctx.wrap.appendChild(el(doc, "h2", "Create pool"));
-    ctx.wrap.appendChild(el(doc, "p", "Needs a zero-supply non-smartcoin share asset. Create one at #/assets/create first.", "muted"));
+    ctx.wrap.appendChild(el(doc, "h2", t("pool.create_title", "Create pool")));
+    ctx.wrap.appendChild(el(doc, "p", t("pool.share_help", "Needs a zero-supply non-smartcoin share asset. Create one at #/assets/create first."), "muted"));
     createBox(doc, ctx.wrap, myGen);
     async function resolveOpt(v) {
       v = String(v || "").trim(); if (!v) return null;
@@ -315,10 +330,10 @@ var PoolUI = (function () {
      * the following page's startId (list_* paging has no offsets). */
     function pagerBar(pageRows, hasNext) {
       var bar = el(doc, "div", null, "pools-pager");
-      var prev = touchable(el(doc, "button", "‹ Prev")); prev.type = "button";
+      var prev = touchable(el(doc, "button", t("pool.prev_btn", "‹ Prev"))); prev.type = "button";
       prev.disabled = pager.page === 0;
       var note = el(doc, "span", "Page " + (pager.page + 1), "pools-page");
-      var next = touchable(el(doc, "button", "Next ›")); next.type = "button";
+      var next = touchable(el(doc, "button", t("pool.next_btn", "Next ›"))); next.type = "button";
       next.disabled = !hasNext;
       prev.addEventListener("click", function () {
         if (myGen !== gen || pager.page === 0) return;
@@ -336,7 +351,7 @@ var PoolUI = (function () {
     }
     function loadPage() {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
-      showStatus(doc, listBox, "Loading pools…");
+      showStatus(doc, listBox,t("pool.loading", "Loading pools…"));
       Promise.resolve().then(async function () {
         var a = await resolveOpt(fA.input.value), b = await resolveOpt(fB.input.value), s = await resolveOpt(fS.input.value);
         var rows = await Pool.list({ assetA: a ? a.id : null, assetB: b ? b.id : null,
@@ -353,7 +368,7 @@ var PoolUI = (function () {
         listBox.appendChild(scroller);
         listBox.appendChild(pagerBar(pageRows, hasNext));
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, "Could not load pools.");
+        if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox,e,t("pool.load_failed", "Could not load pools."));
       }).then(function () { go.disabled = false; });
     }
     function resetAndLoad() {
@@ -379,18 +394,18 @@ var PoolUI = (function () {
         if (locked) mineBox.appendChild(viewingAsNotice(doc));
         Pool.mine(me.id).then(function (rows) {
           if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows));
-        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", "No owned pools.", "muted")); } });
-      }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, "Could not load your account."); });
+        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", t("pool.no_mine", "No owned pools."), "muted")); } });
+      }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap,e,t("trade.fail_account", "Could not load your account.")); });
     })();
   }
   function createBox(doc, box, myGen) { /* op-59 create: a/b/share resolves, human percents, orientation preview */
     var fA = field(doc, "Asset A", { placeholder: "BTS" });
     var fB = field(doc, "Asset B", { placeholder: "CNY" });
-    var fSh = field(doc, "Share asset", { placeholder: "fresh UIA symbol" });
+    var fSh = field(doc, "Share asset", { placeholder: t("pool.share_ph", "fresh UIA symbol") });
     var fT = field(doc, "Taker fee %", { value: "0.5", inputmode: "decimal" });
     var fW = field(doc, "Withdrawal fee %", { value: "0", inputmode: "decimal" });
     [fA, fB, fSh, fT, fW].forEach(function (f) { box.appendChild(f.row); });
-    reviewSection(doc, box, myGen, "Review create", {
+    reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
         var a = await Asset.describe(fA.input.value.trim()), b = await Asset.describe(fB.input.value.trim());
@@ -406,14 +421,14 @@ var PoolUI = (function () {
       },
       rows: function (R, fee) {
         var op = R.pair[1];
-        return [["Account", whoText(R.me)], ["Asset A", R.a.symbol + " (" + R.a.id + ")"],
-          ["Asset B", R.b.symbol + " (" + R.b.id + ")"], ["Share asset", R.sh.symbol + " (" + R.sh.id + ")"],
-          ["Orientation", "A < B by id: " + op.asset_a + " / " + op.asset_b],
-          ["Taker fee", pctText(op.taker_fee_percent), "raw " + op.taker_fee_percent],
-          ["Withdrawal fee", pctText(op.withdrawal_fee_percent), "raw " + op.withdrawal_fee_percent],
-          ["Fee", fee.text, "raw " + fee.raw], ["Network", "testnet"]];
+        return [[t("account.card_account", "Account"),  whoText(R.me)], [t("pool.asset_a_field", "Asset A"),  R.a.symbol + " (" + R.a.id + ")"],
+          [t("pool.asset_b_field", "Asset B"),  R.b.symbol + " (" + R.b.id + ")"], [t("pool.share_asset_field", "Share asset"),  R.sh.symbol + " (" + R.sh.id + ")"],
+          [t("pool.orientation_row", "Orientation"),  "A < B by id: " + op.asset_a + " / " + op.asset_b],
+          [t("pool.taker_row", "Taker fee"),  pctText(op.taker_fee_percent), "raw " + op.taker_fee_percent],
+          [t("pool.withdrawal_row", "Withdrawal fee"),  pctText(op.withdrawal_fee_percent), "raw " + op.withdrawal_fee_percent],
+          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
-      title: "Confirm pool create", ok: function () { return "Pool created."; }, fail: "Could not prepare the create." });
+      title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
   return { renderPools: renderPools,
     _ui: { el: el, touchable: touchable, clearBox: clearBox, showError: showError, showStatus: showStatus,

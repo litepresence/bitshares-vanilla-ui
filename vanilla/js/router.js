@@ -70,10 +70,71 @@ var Router = (function () {
     placeholder("Settings")(root);
   }
 
-  /* "/" redirects to the DEX desk: last-visited market when stored, else
-   * the network default (MarketUI.homeTarget; branding.js:98-108 source).
-   * A plain link stays behind so the page is never blank if hashing fails. */
+  /* "/" is the account-overview dashboard (DashboardUI), NOT a desk clone:
+   *   #1 App.jsx:503-507 routes "/" to DashboardPage (starred/featured
+   *   market tabs with a LoginSelector gate); vanilla shows the watched
+   *   account (the wallet's own when unlocked, else the committee-account
+   *   watch) with balances, recent activity, favourite markets and quick
+   *   links. dashboard-ui.js lazy-loads here so index.html needs no new
+   *   script tag: when the global is absent we inject js/dashboard-ui.js
+   *   once, paint a loading line, and re-render on load; a failed load
+   *   falls back to the old market redirect so the page is never blank. */
+  var dashLoading = false;
+
+  /* dashSrc: absolute URL for the dashboard script (document.baseURI keeps
+   *   it correct under any served sub-path; file:// included). Params: none.
+   *   Returns a URL string. Fails: never throws — falls back to relative. */
+  function dashSrc() {
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL("js/dashboard-ui.js", document.baseURI).toString();
+      }
+    } catch (e) { /* relative fallback below */ }
+    return "js/dashboard-ui.js";
+  }
+
+  /* ensureDashboard: true when DashboardUI.renderDashboard is callable,
+   *   kicking off the one-time lazy load otherwise. Params: root (element).
+   *   Returns boolean. Fails: never throws — load failure paints the
+   *   redirect fallback inline. False under node (no document to load with). */
+  function ensureDashboard(root) {
+    if (typeof DashboardUI !== "undefined" && DashboardUI &&
+        typeof DashboardUI.renderDashboard === "function") return true;
+    if (typeof document === "undefined" || !root) return false;
+    if (!dashLoading) {
+      dashLoading = true;
+      try {
+        var s = document.createElement("script");
+        s.src = dashSrc();
+        s.async = true;
+        s.onload = function () { dashLoading = false; render(); };
+        s.onerror = function () { dashLoading = false; renderHomeFallback(root); };
+        (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
+      } catch (e) { dashLoading = false; return false; }
+    }
+    return false;
+  }
+
   function renderHome(root) {
+    if (ensureDashboard(root)) {
+      DashboardUI.renderDashboard(root);
+      return;
+    }
+    if (dashLoading) {
+      if (!root) return;
+      root.innerHTML =
+        '<div class="wrap"><h1>' + escapeHtml(t("shell.dashboard", "Dashboard")) + "</h1>" +
+        '<p class="muted">' + escapeHtml(t("transfer.loading", "Loading…")) + "</p></div>";
+      return;
+    }
+    renderHomeFallback(root);
+  }
+
+  /* renderHomeFallback: pre-dashboard "/" behavior (redirect to the DEX
+   * desk: last-visited market when stored, else the network default).
+   * Kept for the dashboard-script-load-failure path only. A plain link
+   * stays behind so the page is never blank if hashing fails. */
+  function renderHomeFallback(root) {
     var target = "BTS_CNY";
     try {
       if (typeof MarketUI !== "undefined" && MarketUI &&

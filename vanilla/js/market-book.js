@@ -152,16 +152,25 @@ var MarketBook = (function () {
   }
 
   /* Book side table + phone cards (same .node-table/.node-cards pattern as
-   * account-ui renderBalances). Amount = quote leg, Total = base leg, both
-   * verbatim chain-human strings; depth shading widths come from Market.depth
-   * cumulative Numbers (pixels, not money). */
+  * account-ui renderBalances). Amount = quote leg, Total = base leg, both
+  * verbatim chain-human strings. Depth fraction per row comes from
+  * Market.depth cumulative totalBase Numbers (pixels, not money — same as
+  * the depth chart); the row stores it as --depth for desk-grid.css, which
+  * paints ONE absolutely-positioned .depth-bar behind the row text
+  * (asks red from the left, bids green from the right —
+  * bitshares-ui OrderBook.jsx:176-184). Scroll regions + grid live in
+  * desk-grid.css (.book-scroll/.book-cards/.book-grid). */
   function renderBookSide(doc, section, title, levels, depthPts) {
+    var isAsk = title === "Asks";
     /* Title doubles as the caller's side key (Asks/Bids drive the depth-bar
      * color below), so the h3 localizes through a static per-side key while
      * `title` itself stays the English logic key. */
-    section.appendChild(el(doc, "h3", title === "Asks" ? t("market.asks", "Asks") : t("market.bids", "Bids")));
+    var sideWrap = doc.createElement("div");
+    sideWrap.className = "book-side " + (isAsk ? "book-asks" : "book-bids");
+    section.appendChild(sideWrap);
+    sideWrap.appendChild(el(doc, "h3", isAsk ? t("market.asks", "Asks") : t("market.bids", "Bids")));
     if (!levels || levels.length === 0) {
-      section.appendChild(el(doc, "p", "No " + title.toLowerCase() + ".", "muted"));
+      sideWrap.appendChild(el(doc, "p", "No " + title.toLowerCase() + ".", "muted"));
       return;
     }
     var maxTot = 0;
@@ -172,7 +181,7 @@ var MarketBook = (function () {
       }
     }
     var table = doc.createElement("table");
-    table.className = "node-table";
+    table.className = "node-table book-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
     [t("market.th_price", "Price"), t("market.th_amount", "Amount"), t("market.th_total", "Total")].forEach(function (h) {
@@ -182,8 +191,7 @@ var MarketBook = (function () {
     table.appendChild(thead);
     var tbody = doc.createElement("tbody");
     var cards = doc.createElement("div");
-    cards.className = "node-cards";
-    var bar = title === "Asks" ? "var(--sell)" : "var(--buy)";
+    cards.className = "node-cards book-cards";
     for (i = 0; i < levels.length; i++) {
       var lv = levels[i] || {};
       var pct = 0; /* width percent: pixel shading from depth Numbers only */
@@ -192,19 +200,44 @@ var MarketBook = (function () {
         if (!(pct >= 0)) pct = 0;
         if (pct > 100) pct = 100;
       }
-      var shade = "linear-gradient(90deg, transparent " + String(100 - pct) + "%, " + bar + "33 " + String(100 - pct) + "%)";
+      var frac = String(pct) + "%";
       var tr = doc.createElement("tr");
-      tr.style.background = shade;
-      tr.appendChild(el(doc, "td", lv.displayPrice !== undefined ? String(lv.displayPrice) : ""));
-      tr.appendChild(el(doc, "td", lv.quote !== undefined ? String(lv.quote) : ""));
-      tr.appendChild(el(doc, "td", lv.base !== undefined ? String(lv.base) : ""));
+      tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
+      try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+      var texts = [
+        lv.displayPrice !== undefined ? String(lv.displayPrice) : "",
+        lv.quote !== undefined ? String(lv.quote) : "",
+        lv.base !== undefined ? String(lv.base) : ""
+      ];
+      texts.forEach(function (text, ci) {
+        var td = doc.createElement("td");
+        td.className = "book-cell";
+        /* The row's single .depth-bar anchors in the price-side cell
+         * (asks: first cell; bids: last cell) so desk-grid.css can grow it
+         * across the row from the price side. */
+        if ((isAsk && ci === 0) || (!isAsk && ci === texts.length - 1)) {
+          var bar = doc.createElement("span");
+          bar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
+          bar.setAttribute("aria-hidden", "true");
+          td.appendChild(bar);
+        }
+        var tx = doc.createElement("span");
+        tx.className = "cell-text";
+        tx.textContent = text;
+        td.appendChild(tx);
+        tr.appendChild(td);
+      });
       tbody.appendChild(tr);
       var card = doc.createElement("div");
-      card.className = "node-card";
-      card.style.background = shade;
-      card.appendChild(el(doc, "div", String(lv.displayPrice || "")));
-      card.appendChild(el(doc, "div", "Amount " + String(lv.quote || "")));
-      card.appendChild(el(doc, "div", "Total " + String(lv.base || "")));
+      card.className = "node-card book-row-card " + (isAsk ? "book-ask-row" : "book-bid-row");
+      try { card.style.setProperty("--depth", frac); } catch (e) { /* cards render without bars */ }
+      var cbar = doc.createElement("span");
+      cbar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
+      cbar.setAttribute("aria-hidden", "true");
+      card.appendChild(cbar);
+      [String(lv.displayPrice || ""), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text) {
+        card.appendChild(el(doc, "div", text, "cell-text"));
+      });
       cards.appendChild(card);
     }
     table.appendChild(tbody);
@@ -214,8 +247,8 @@ var MarketBook = (function () {
     var scroller = doc.createElement("div");
     scroller.className = "book-scroll";
     scroller.appendChild(table);
-    section.appendChild(scroller);
-    section.appendChild(cards);
+    sideWrap.appendChild(scroller);
+    sideWrap.appendChild(cards);
   }
 
   /* Book section fill (moved verbatim from the MarketUI fill book handler):
@@ -228,7 +261,9 @@ var MarketBook = (function () {
     var depth = Market.depth(ctx.book, ctx.basePrec, ctx.quotePrec);
     var bestBid = ctx.book.bids.length > 0 ? ctx.book.bids[0].displayPrice : null;
     /* Chain asks arrive best-first (ascending); the render below reverses for
-     * display, so bestAsk is asks[0] — NOT asks[last] (that was the worst). */
+     * display, so bestAsk is asks[0] — NOT asks[last] (that was the worst).
+     * Levels and depth points reverse TOGETHER, so each row keeps its own
+     * cumulative fraction for the --depth bar. */
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
@@ -237,8 +272,13 @@ var MarketBook = (function () {
     } else {
       ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }
-    renderBookSide(doc, parentEl, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse());
-    renderBookSide(doc, parentEl, "Bids", ctx.book.bids, depth.bids);
+    /* Sides render into a .book-grid wrapper (desk-grid.css squares the book
+     * column); Asks and Bids each own a fixed-height scroll region. */
+    var grid = doc.createElement("div");
+    grid.className = "book-grid";
+    parentEl.appendChild(grid);
+    renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse());
+    renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids);
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
@@ -270,9 +310,14 @@ var MarketBook = (function () {
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    parentEl.appendChild(table);
+    /* Fixed-height scroll region (desk-grid.css: 15-row fold, sticky thead);
+     * fills scroll in place like the original market-history list. */
+    var scroller = doc.createElement("div");
+    scroller.className = "trades-scroll";
+    scroller.appendChild(table);
+    parentEl.appendChild(scroller);
     var cards = doc.createElement("div");
-    cards.className = "node-cards";
+    cards.className = "node-cards trades-cards";
     rows.forEach(function (r) {
       var card = doc.createElement("div");
       card.className = "node-card";

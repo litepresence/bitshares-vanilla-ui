@@ -1,13 +1,23 @@
 # AGENTS.md — Vanilla BitShares UI Replacement Project
 
 > **Workspace root:** `/workspace`
-> **Reference #1 (READ-ONLY, canonical):** `/workspace/bitshares-ui` — upstream `bitshares/bitshares-ui`, branch `develop`
-> **Reference #2 (READ-ONLY, modern/dialog-based):** `/workspace/astro-ui` — `BTS-CM/astro-ui` by grctest, branch `main`
-> **Reference #3 (READ-ONLY, extension/crypto-audit):** `/workspace/wallet-extension` — `pi314x/bitshares-wallet-browser-extension`, branch `master`
-> **Reference #4 (READ-ONLY, chain API contract, sparse):** `/workspace/bitshares-core` — `bitshares/bitshares-core`, branch `develop` (only `libraries/{app/include,protocol,chain/include,wallet/include}` checked out — no build, no submodules)
+> **References live in `/workspace/reference/` (READ-ONLY, each with its own
+> history; root symlinks `bitshares-ui → reference/bitshares-ui` etc. preserve
+> old paths — never edit through either spelling).**
+> **Reference #1 (canonical wallet):** `reference/bitshares-ui` — upstream `bitshares/bitshares-ui`, branch `develop`
+> **Reference #2 (modern/dialog-based):** `reference/astro-ui` — `BTS-CM/astro-ui` by grctest, branch `main`
+> **Reference #3 (extension/crypto-audit):** `reference/wallet-extension` — `pi314x/bitshares-wallet-browser-extension`, branch `master`
+> **Reference #4 (chain API contract, sparse):** `reference/bitshares-core` — `bitshares/bitshares-core`, branch `develop` (only `libraries/{app/include,protocol,chain/include,wallet/include}` checked out — no build, no submodules)
+> **Reference #5 (dashboard/style + indicator/plot math, behavior-only):** `reference/bitshares-dex-ux` — `squidKid-deluxe/bitshares-dex-ux` (Python/Falcon + JS, wrong runtime — NEVER a dependency; consult for dark-theme CSS, market-picker logic, plot ideas)
+> **#1 vs #5 are UNIQUE projects — never confuse them.** #1 is the React-16
+> reference WALLET (wallet.bitshares.org) we behaviorally replace. #5 is a
+> Python dashboard/plot app whose only contributions are styling cues,
+> picker logic, and visualization ideas (its Kibana/ES transport is REFUSED
+> per the doctrine — chain history only). If a note cites one for the other's
+> job, it is wrong — fix the citation.
 > **This file is mission control.** Any agent working here reads this first.
 
-> **Guiding principles (in priority order — all five are binding):**
+> **Guiding principles (in priority order — all nine are binding):**
 > - **#1 — NEVER RE-CREATE #3583.** The replacement cannot rot the way
 >   `bitshares-ui` did (see §4). Every dependency, abstraction, and build step
 >   is a future #3583. Default answer to all three is **no**. Doctrine: §4.5;
@@ -22,8 +32,10 @@
 >   but classy, slick, and reactive: easy, intuitive, solid search and menus.
 >   Internal architecture may be reconsidered freely so long as the original
 >   styling does not change. (Elaboration: §3.3.)
-> - **#5 — THREE THEMES.** Alongside the BitShares "original blue" theme, ship
->   a light theme and a dark theme. (Elaboration: §3.4.)
+> - **#5 — THREE THEMES.** `ref-ui-theme` (the classic BitShares look — default),
+>   `dex-ux-theme` (dark, sampled from #5's CSS), `vanilla-ui-theme` (light,
+>   modern classy cream/chocolate/sky from the user's vanilla-tub photo).
+>   (Elaboration: §3.4.)
 > - **#6 — HUMAN TERMS, NEVER RAW INTEGERS.** Every number the user sees must
 >   have graphene's integer math resolved: asset amounts placed at the right
 >   decimal, percents offset by precision, prices adjusted for both assets'
@@ -39,6 +51,11 @@
 >   function descriptions, honest comments. A final readability pass over the
 >   whole app is a defined step before completion, not a nice-to-have.
 >   (Elaboration: §3.7.)
+> - **#9 — BROWSE AS ANYONE, SIGN AS YOURSELF.** It is a public blockchain:
+>   every page renders any account's data with NO login — reads never gate on
+>   unlock. The password is asked ONLY at signing. Acting-as defaults to
+>   `committee-account` (`1.2.0`, verified on both chains; `1.2.5` is
+>   proxy-to-self, not the default) with an honest viewing-as notice.
 
 ---
 
@@ -62,7 +79,7 @@ pure vanilla code**: plain `HTML + JS + CSS`.
   slick, reactive, intuitive, with solid search and menus (principle #4).
 - Covers every feature of the old UI **plus** every feature of `astro-ui`
   (principle #3).
-- Ships three themes: original blue, light, dark (principle #5).
+- Ships three themes: ref-ui-theme, dex-ux-theme, vanilla-ui-theme (principle #5).
 - Shows numbers in human terms, never raw chain integers (principle #6).
 - Works from a 360px phone to a 4K desktop, not just 2014-era laptops (principle #7).
 - Written and structured to be read and maintained by a stranger (principle #8).
@@ -85,7 +102,7 @@ When in doubt, ship less code, not more tooling.
 ### Primary objectives (in order)
 
 1. **Freeze + inventory the reference.** Done: cloned to
-   `/workspace/bitshares-ui`. Next: catalog every route, store, action,
+   `/workspace/reference/bitshares-ui`. Next: catalog every route, store, action,
    component, and chain-API call it makes.
 2. **Document the rot.** Done (summary in §4): capture issue #3583 + Dockerfile /
    Travis / engines evidence so nobody ever argues "just upgrade React".
@@ -117,7 +134,7 @@ When in doubt, ship less code, not more tooling.
   old UI (principle #2). Internal architecture may be reconsidered freely, and
   reactivity/search/menu quality must be modern from the start (principle #4) —
   polish is never "deferred to later".
-- Do NOT touch `/workspace/bitshares-ui/` except `git fetch`/`git log`. It is
+- Do NOT touch `/workspace/reference/bitshares-ui/` except `git fetch`/`git log`. It is
   evidence, not a workbench.
 
 ---
@@ -201,9 +218,12 @@ Vanilla stack, modern feel. Concretely:
 
 ### 3.4 Three themes (principle #5)
 
-Ship three built-in themes: **original blue** (the BitShares look — default),
-**light**, and **dark**. Implement via CSS custom properties (one
-`themes.css`, `data-theme` switch on `<html>`, persisted in settings) — no
+Ship three built-in themes: **ref-ui-theme** (the classic BitShares look —
+default), **dex-ux-theme** (dark, sampled from #5's CSS), and
+**vanilla-ui-theme** (light, modern classy cream/chocolate/sky from the user's
+vanilla-tub photo). Implement via CSS custom properties (one
+`themes.css`, `data-theme` switch on `<html>`, persisted in settings with
+old-id migration) — no
 theming library, no per-theme stylesheets to drift. Every slice must render
 acceptably in all three themes before it is done; add a per-slice screenshot
 trio to the parity note.
@@ -416,11 +436,11 @@ dependency or a pattern source for architecture.
 
 ## 5. Reference Map (ASCII)
 
-Cloned: `https://github.com/bitshares/bitshares-ui.git` → `/workspace/bitshares-ui`
+Cloned: `https://github.com/bitshares/bitshares-ui.git` → `/workspace/reference/bitshares-ui`
 Branch: `develop` (`origin/develop`), HEAD `79f8cca` as of 2026-09-26.
 Scale: **~547 JS/JSX files, 421 component files, 101 SCSS files.**
 
-Second reference: `https://github.com/BTS-CM/astro-ui.git` → `/workspace/astro-ui`
+Second reference: `https://github.com/BTS-CM/astro-ui.git` → `/workspace/reference/astro-ui`
 Branch: `main`, HEAD `5037d61` as of 2026-09-26 (v0.6.30, ~599 commits).
 Scale: **~1692 files under `src/`, ~70 `.astro` pages, ~221 TSX/JSX components.**
 Form factor: dialog-based, page-per-operation (NOT same layout as old UI).
@@ -433,12 +453,17 @@ See §5.4 for when to consult which reference.
 ```
 /workspace/
 ├── AGENTS.md                  ← YOU ARE HERE (mission control)
-├── bitshares-ui/              ← READ-ONLY reference #1 (do not edit)
-├── astro-ui/                  ← READ-ONLY reference #2 (do not edit)
-├── wallet-extension/          ← READ-ONLY reference #3 (do not edit)
-├── bitshares-core/            ← READ-ONLY reference #4, SPARSE (do not edit,
-│                                 do not expand — see §5.6)
-└── vanilla/                   ← TO BE CREATED: the replacement (static, no deps)
+├── reference/                 ← READ-ONLY checkouts (do not edit; see §5)
+│   ├── bitshares-ui/          ← #1 canonical wallet (develop)
+│   ├── astro-ui/              ← #2 modern dialogs (main)
+│   ├── wallet-extension/      ← #3 extension/crypto-audit (master)
+│   ├── bitshares-core/        ← #4 chain API contract, SPARSE (develop)
+│   └── bitshares-dex-ux/      ← #5 dashboard/style, behavior-only (main)
+├── bitshares-ui → reference/bitshares-ui (symlink, preserves old paths)
+├── astro-ui → reference/astro-ui (symlink)
+├── wallet-extension → reference/wallet-extension (symlink)
+├── bitshares-core → reference/bitshares-core (symlink)
+└── vanilla/                   ← THE REPLACEMENT (static, no deps)
     ├── index.html
     ├── css/
     ├── js/
@@ -712,9 +737,9 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
 
 ## 7. How To Work Here (rules for agents)
 
-1. **Read-only references.** Never edit `/workspace/bitshares-ui/*`,
-   `/workspace/astro-ui/*`, `/workspace/wallet-extension/*`, or
-   `/workspace/bitshares-core/*`. Use
+1. **Read-only references.** Never edit `/workspace/reference/bitshares-ui/*`,
+   `/workspace/reference/astro-ui/*`, `/workspace/reference/wallet-extension/*`, or
+   `/workspace/reference/bitshares-core/*`. Use
    `git -C <dir> log/fetch/status`. If you need to experiment, copy the file
    to `/tmp` or `/workspace/vanilla/notes/`.
 2. **New code lives in `/workspace/vanilla/`** (create on first implementation
@@ -734,8 +759,8 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
 6. **Chain safety.** Real keys only on testnet during dev. Never paste mainnet
    private keys/brainkeys into logs, issues, or commits. Test transfers on
    testnet faucet accounts.
-7. **Commits.** Do not commit to `bitshares-ui/`, `astro-ui/`,
-   `wallet-extension/`, or `bitshares-core/`. Commit `AGENTS.md`, `vanilla/`,
+7. **Commits.** Do not commit to `reference/bitshares-ui/`, `reference/astro-ui/`,
+   `reference/wallet-extension/`, or `reference/bitshares-core/`. Commit `AGENTS.md`, `vanilla/`,
    `tooling/`, `skills/`, `docs/` only, with short messages. No secrets.
 8. **Workspace skills.** `/workspace/skills/` holds this project's repeatable
    workflows — load the matching one via the skill tool before starting the
@@ -753,15 +778,17 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
 
 ### Phase 0 — Freeze (DONE)
 
-- [x] Clone `bitshares/bitshares-ui` @ `develop` → `/workspace/bitshares-ui`
+- [x] Clone `bitshares/bitshares-ui` @ `develop` → `/workspace/reference/bitshares-ui`
 - [x] Record HEAD (`79f8cca`, 2026-09-13), version `5.0.250727-rc1`
 - [x] Capture Rot Report (#3583 + Dockerfile + Travis)
-- [x] Clone `BTS-CM/astro-ui` @ `main` → `/workspace/astro-ui`
+- [x] Clone `BTS-CM/astro-ui` @ `main` → `/workspace/reference/astro-ui`
 - [x] Record HEAD (`5037d61`, 2026-09-20), version `0.6.30` — dialog-based 2nd reference
-- [x] Clone `pi314x/bitshares-wallet-browser-extension` @ `master` → `/workspace/wallet-extension`
+- [x] Clone `pi314x/bitshares-wallet-browser-extension` @ `master` → `/workspace/reference/wallet-extension`
 - [x] Record HEAD (`ebb7451`, 2026-08-21), version `0.8.7` — extension/crypto-audit 3rd reference
-- [x] Sparse-clone `bitshares/bitshares-core` @ `develop` → `/workspace/bitshares-core`
+- [x] Sparse-clone `bitshares/bitshares-core` @ `develop` → `/workspace/reference/bitshares-core`
 - [x] Record HEAD (`fe7000c`, 2026-09-15) — API-contract 4th reference (headers only, ~2 MB)
+- [x] Clone `squidKid-deluxe/bitshares-dex-ux` @ `main` → `/workspace/reference/bitshares-dex-ux`
+- [x] Record HEAD (`bad2545`, 2026-09-28) — dashboard/style 5th reference (Python/Falcon, behavior-only; live shots in `vanilla/notes/dexux-ref/`)
 
 ### Phase 1 — Inventory (folded into slices — no separate inventory docs)
 
@@ -824,19 +851,19 @@ checklist. Parity = §2.6 (both references + responsiveness).
 
 ```bash
 # Reference repo (read-only)
-git -C /workspace/bitshares-ui log --oneline -5
-git -C /workspace/bitshares-ui status --short
-git -C /workspace/astro-ui log --oneline -5
-git -C /workspace/astro-ui status --short
-git -C /workspace/wallet-extension log --oneline -5
-git -C /workspace/wallet-extension status --short
+git -C /workspace/reference/bitshares-ui log --oneline -5
+git -C /workspace/reference/bitshares-ui status --short
+git -C /workspace/reference/astro-ui log --oneline -5
+git -C /workspace/reference/astro-ui status --short
+git -C /workspace/reference/wallet-extension log --oneline -5
+git -C /workspace/reference/wallet-extension status --short
 
 # Structure exploration (prefer read/grep tools; bash for counts only)
-ls /workspace/bitshares-ui/app/components/
-wc -l /workspace/bitshares-ui/app/App.jsx
-grep -rn "get_required_fees" /workspace/bitshares-ui/app --include=*.js* | head
-ls /workspace/astro-ui/src/pages/ | head
-ls /workspace/astro-ui/src/bts/
+ls /workspace/reference/bitshares-ui/app/components/
+wc -l /workspace/reference/bitshares-ui/app/App.jsx
+grep -rn "get_required_fees" /workspace/reference/bitshares-ui/app --include=*.js* | head
+ls /workspace/reference/astro-ui/src/pages/ | head
+ls /workspace/reference/astro-ui/src/bts/
 
 # Future vanilla app (static — no build)
 python3 -m http.server 8080 --directory /workspace/vanilla

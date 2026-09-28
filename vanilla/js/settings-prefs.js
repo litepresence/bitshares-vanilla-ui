@@ -1,6 +1,6 @@
 /* SettingsPrefs: preference sections of the #/settings page.
  * Owns: the network toggle (mainnet/testnet radios), the theme selector
- *   (original-blue/light/dark), and the locale switcher (10 dicts, honest
+ *   (ref-ui-theme/vanilla-ui-theme/dex-ux-theme), and the locale switcher
  *   stub marking). Builds DOM only — the change-event wiring lives in
  *   settings.js (SettingsPage.render passes `t` in; I18n is read here for
  *   the locale names/current tag only, never written — I18n.setLocale owns
@@ -42,15 +42,16 @@ var SettingsPrefs = (function () {
     return netToggle;
   }
 
-  /* Theme selector (original-blue/light/dark, current selected). The change
-   * handler (settings.js) persists + flips data-theme on <html>.
+  /* Theme selector (ref-ui-theme/vanilla-ui-theme/dex-ux-theme, current
+   * selected; option labels stay the ids — honest, no locale churn).
+   * The change handler (settings.js) persists + flips data-theme on <html>.
    * Params: doc, settings, t. Returns: {label, select}. */
   function buildTheme(doc, settings, t) {
     var themeLabel = doc.createElement("label");
     themeLabel.textContent = t("settings.theme_label", "Theme ");
     var themeSelect = doc.createElement("select");
     themeSelect.id = "theme-select";
-    ["original-blue", "light", "dark"].forEach(function (t) {
+    ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"].forEach(function (t) {
       var opt = doc.createElement("option");
       opt.value = t;
       opt.textContent = t;

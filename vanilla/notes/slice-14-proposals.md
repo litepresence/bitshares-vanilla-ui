@@ -51,8 +51,11 @@ Plan: `docs/superpowers/plans/2026-09-28-slice-14-proposals.md` (Tasks 1–4).
 - Whitelist `0→1→0` vs `1.2.25483`, fees 100 — `100932678-700`.
 - Airdrop 2×op-14 (10000+5000 p4), total fee 394 (no batch discount) — `100932700`.
 - Op-37: no claimable → broadcast correctly gated; fee-0 explicit in confirm.
-- Tickets: broadcasts PENDING (fees 50+50 TEST > fixture 38.8; faucet
-  rate-limited `Only one account per IP 30 min`). Builders byte-proven offline.
+- Tickets: PROVEN (faucet-funded throwaway `afk-tkt-75a7` 1.2.26837, 1000 TEST):
+  op-57 create ticket **`1.18.61`** (1 TEST, 180-day, fee 50) — block `100943508`;
+  op-58 update 1→2 (→360-day, fee 50) — block `100943509`; independently
+  re-read on-chain (`account 1.2.26837, amount 100000, target lock_360_days`).
+  Side log: 2000 faucet TEST orphaned on two keyless throwaways (iteration cost).
 - Ambiguities: bare `[t,d]` REJECTED (`bad_cast`), `{op:}` required; op-72
   omit/set both proven (slice 13); maps canonical; TCR ÷1000 both ways.
 

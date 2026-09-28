@@ -438,9 +438,10 @@ var MarketDesk = (function () {
     ordersSec.appendChild(ordersBody);
 
     /* Slice-06 mount point: TradeUI owns everything under tradeMount
-     * (panels + cancel boxes); the desk only provides the section. */
+     * (panels + cancel boxes); the desk only provides the section. The
+     * mkt-trade class places it in the desk grid (desk-grid.css areas). */
     var tradeSec = doc.createElement("section");
-    tradeSec.className = "trade";
+    tradeSec.className = "trade mkt-trade";
     desk.appendChild(tradeSec);
     tradeSec.appendChild(el(doc, "h2", t("trade.heading", "Trade")));
     var tradeMount = doc.createElement("div");

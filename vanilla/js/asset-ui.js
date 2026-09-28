@@ -16,6 +16,20 @@
  */
 var AssetUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var CORE = "1.3.0", SYM_RE = /^[A-Z0-9.]+$/;
   var PERMS = [[1, "charge fee"], [2, "whitelist"], [4, "override"], [8, "restricted"], [16, "no force settle"], [32, "global settle"], [64, "no confidential"], [128, "witness-fed"], [256, "committee-fed"]];
   var FLAGS = [[1, "charge fee"], [2, "whitelist"], [4, "override"], [8, "restricted"], [16, "no force settle"], [64, "no confidential"], [128, "witness-fed"], [256, "committee-fed"]], gen = 0;
@@ -26,14 +40,14 @@ var AssetUI = (function () {
   /* showError: never-blank human panel for named chain errors. */
   function err(d, w, e, fb) {
     var b = el(d, "div", null, "error"); b.setAttribute("aria-live", "polite");
-    var m = (e && e.message) ? e.message : String(e || fb || "Unexpected error");
-    if (m.indexOf("unknown-asset") !== -1) m = fb || "Unknown asset.";
-    else if (m.indexOf("unknown-account") !== -1) m = fb || "Unknown account.";
-    else if (m.indexOf("symbol-taken") !== -1) m = "Symbol is already taken.";
-    else if (m.indexOf("not-issuer") !== -1) m = "Only the issuer can change this.";
-    else if (m.indexOf("not-market-issued") !== -1) m = "Not a market-issued asset.";
-    else if (m.indexOf("wallet-locked") !== -1) m = "Wallet is locked.";
-    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = "Network unavailable. Check Settings → Nodes and retry.";
+    var m = (e && e.message) ? e.message : String(e || fb || t("fees.unexpected_error", "Unexpected error"));
+    if (m.indexOf("unknown-asset") !== -1) m = fb || t("barter.unknown_asset", "Unknown asset.");
+    else if (m.indexOf("unknown-account") !== -1) m = fb || t("barter.unknown_account", "Unknown account.");
+    else if (m.indexOf("symbol-taken") !== -1) m = t("asset.symbol_taken", "Symbol is already taken.");
+    else if (m.indexOf("not-issuer") !== -1) m = t("asset.only_issuer", "Only the issuer can change this.");
+    else if (m.indexOf("not-market-issued") !== -1) m = t("asset.not_market_issued", "Not a market-issued asset.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
+    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     b.textContent = m; w.appendChild(b); return b;
   }
   function status(d, w, t) { var p = el(d, "p", t, "muted"); p.setAttribute("aria-live", "polite"); w.appendChild(p); return p; }
@@ -49,8 +63,8 @@ var AssetUI = (function () {
    * stale offline panel survives after connect). true = caller stops. */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(el(d, "h1", "Assets")); err(d, w, new Error("not-connected"), "Network unavailable.");
-    var b = touch(el(d, "button", "Retry")); b.type = "button"; w.appendChild(b);
+    w.appendChild(el(d, "h1", t("assets.title", "Assets"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    var b = touch(el(d, "button", t("fees.retry", "Retry"))); b.type = "button"; w.appendChild(b);
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -65,13 +79,13 @@ var AssetUI = (function () {
     return true;
   }
   function lock(d, w, rerun) {
-    w.appendChild(el(d, "h1", "Assets"));
-    w.appendChild(el(d, "p", "Wallet is locked. Enter your password.", "muted"));
+    w.appendChild(el(d, "h1", t("assets.title", "Assets")));
+    w.appendChild(el(d, "p", t("asset.locked_prompt", "Wallet is locked. Enter your password."), "muted"));
     var pw = d.createElement("input"); pw.type = "password"; touch(pw); w.appendChild(pw);
-    var b = touch(el(d, "button", "Unlock")); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
+    var b = touch(el(d, "button", t("account.s6", "Unlock"))); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
     b.addEventListener("click", function () { box.textContent = ""; b.disabled = true;
       Promise.resolve().then(function () { return Wallet.unlock(pw.value); }).then(rerun)
-        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : "Unlock failed"; }); });
+        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : t("auth.unlock_failed", "Unlock failed"); }); });
   }
   /* field: labeled input row. bits: checkbox group with read(). */
   function field(d, label, id, val, mode, area, ph) {
@@ -100,16 +114,16 @@ var AssetUI = (function () {
     var dl = el(d, "dl", null, "xfer-confirm");
     rows.forEach(function (r) { dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd); });
     var fh; try { fh = Format.formatAmount(String(feeRaw), fp); } catch (e) { fh = String(feeRaw); }
-    dl.appendChild(el(d, "dt", "Fee")); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
-    dl.appendChild(el(d, "dt", "Network")); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
-    var back = touch(el(d, "button", "Back")); back.type = "button"; w.appendChild(back);
-    var send = touch(el(d, "button", "Sign & Send")); send.type = "button"; w.appendChild(send);
+    dl.appendChild(el(d, "dt", t("borrow.fee", "Fee"))); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
+    dl.appendChild(el(d, "dt", t("borrow.network", "Network"))); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
+    var back = touch(el(d, "button", t("barter.back", "Back"))); back.type = "button"; w.appendChild(back);
+    var send = touch(el(d, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button"; w.appendChild(send);
     back.addEventListener("click", onBack);
     send.addEventListener("click", function () { back.disabled = true; send.disabled = true;
       var st = status(d, w, "Signing…");
       onSend(function (t) { st.textContent = t; }).catch(function (e) {
         try { w.removeChild(st); } catch (x) { /* gone */ }
-        err(d, w, e, "Send failed."); back.disabled = false; }); });
+        err(d, w,e,t("createworker.send_failed", "Send failed.")); back.disabled = false; }); });
   }
   /* done: observed-head result panel (no fabricated txid). */
   function done(d, w, title, headN, via, sub, href, link) {
@@ -130,7 +144,7 @@ var AssetUI = (function () {
   function nav(d, w) {
     var n = el(d, "div", null, "asset-nav");
     n.style.display = "flex"; n.style.flexWrap = "wrap"; n.style.gap = "8px";
-    [["Create asset", "#/assets/create"], ["Issue / reserve", "#/assets/issue"], ["Publish feed", "#/assets/feed"]].forEach(function (l) { var a = el(d, "a", l[0]); a.setAttribute("href", l[1]); touch(a); n.appendChild(a); });
+    [[t("asset.create_title", "Create asset"),  "#/assets/create"], [t("asset.issue_title", "Issue / reserve"),  "#/assets/issue"], [t("asset.feed_title", "Publish feed"),  "#/assets/feed"]].forEach(function (l) { var a = el(d, "a", l[0]); a.setAttribute("href", l[1]); touch(a); n.appendChild(a); });
     w.appendChild(n);
   }
   /* renderAssets: issued-by-account list + fee-schedule section (feed-ui owns). */
@@ -138,32 +152,32 @@ var AssetUI = (function () {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var w = wrap(d, root);
-    if (noBackend()) { err(d, w, "Asset backend missing."); return; }
+    if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderAssets(root); })) return;
-    w.appendChild(el(d, "h1", "Assets")); nav(d, w);
-    var f = field(d, "Issuer (name or 1.2.N)", "asset-issuer", ""); w.appendChild(f.row);
-    var go = touch(el(d, "button", "Load issued assets")); go.type = "button"; w.appendChild(go);
+    w.appendChild(el(d, "h1", t("assets.title", "Assets"))); nav(d, w);
+    var f = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), "asset-issuer", ""); w.appendChild(f.row);
+    var go = touch(el(d, "button", t("asset.load_issued", "Load issued assets"))); go.type = "button"; w.appendChild(go);
     var list = el(d, "div", null, "asset-list"); w.appendChild(list);
     var fees = el(d, "div", null, "asset-fees"); w.appendChild(fees);
     if (typeof AssetFeedUI !== "undefined" && AssetFeedUI.feeSection) AssetFeedUI.feeSection(d, fees);
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (g === gen && !f.input.value) f.input.value = me.name; }).catch(function () { /* manual stands */ });
     go.addEventListener("click", function () {
-      var v = f.input.value.trim(); if (!v) { err(d, list, "Enter an issuer account."); return; }
+      var v = f.input.value.trim(); if (!v) { err(d, list,t("asset.enter_issuer", "Enter an issuer account.")); return; }
       wipe(list); status(d, list, "Loading issued assets…");
       Account.resolve(v).then(function (a) { return Asset.issuedBy(a.id, "1.3.0", 100); }).then(function (rows) {
         if (g !== gen) return; wipe(list);
-        if (!rows.length) { list.appendChild(el(d, "p", "No assets issued by this account.", "muted")); return; }
+        if (!rows.length) { list.appendChild(el(d, "p", t("asset.no_issued", "No assets issued by this account."), "muted")); return; }
         rows.forEach(function (r) {
           var card = el(d, "div", null, "asset-row");
           card.style.display = "flex"; card.style.flexWrap = "wrap"; card.style.gap = "8px";
-          var t = el(d, "strong", r.symbol + " "); t.title = r.id; card.appendChild(t);
+          var nm = el(d, "strong", r.symbol + " "); nm.title = r.id; card.appendChild(nm);
           var sup = "—"; try { sup = (r.supply_raw === null) ? "—" : Format.formatAmount(r.supply_raw, r.precision); } catch (e) { sup = String(r.supply_raw); } /* raw only pre-format */
           card.appendChild(el(d, "span", "p" + r.precision + " · supply " + sup + (r.is_smartcoin ? " · smartcoin" : ""), "muted"));
-          var o = el(d, "a", "Open"); o.setAttribute("href", "#/asset/" + r.symbol); touch(o); card.appendChild(o);
-          var u = el(d, "a", "Update"); u.setAttribute("href", "#/assets/update/" + r.symbol); touch(u); card.appendChild(u);
+          var o = el(d, "a", t("credit.open", "Open")); o.setAttribute("href", "#/asset/" + r.symbol); touch(o); card.appendChild(o);
+          var u = el(d, "a", t("misc.update", "Update")); u.setAttribute("href", "#/assets/update/" + r.symbol); touch(u); card.appendChild(u);
           list.appendChild(card); });
-      }).catch(function (e) { if (g === gen) { wipe(list); err(d, list, e, "Could not load issued assets."); } });
+      }).catch(function (e) { if (g === gen) { wipe(list); err(d, list,e,t("asset.issued_failed", "Could not load issued assets.")); } });
     });
   }
   /* renderCreate: tabbed UIA/Smartcoin/NFT/PMA over one op-10 builder. */
@@ -171,48 +185,48 @@ var AssetUI = (function () {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var w = wrap(d, root);
-    if (noBackend()) { err(d, w, "Asset backend missing."); return; }
+    if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderCreate(root); })) return;
     if (!Wallet.isUnlocked()) { lock(d, w, function () { renderCreate(root); }); return; }
-    w.appendChild(el(d, "h1", "Create asset"));
+    w.appendChild(el(d, "h1", t("asset.create_title", "Create asset")));
     var tab = "uia", bar = el(d, "div", null, "vote-tabs"); w.appendChild(bar);
     var body = el(d, "div", null, "asset-create"); w.appendChild(body);
     function draw() {
       if (g !== gen) return;
       wipe(bar); wipe(body);
-      [["uia", "UIA"], ["smart", "Smartcoin"], ["nft", "NFT"], ["pma", "PMA"]].forEach(function (t) {
+      [["uia", t("asset.tab_uia", "UIA")], ["smart", t("asset.smartcoin_row", "Smartcoin")], ["nft", t("asset.nft_row", "NFT")], ["pma", t("asset.tab_pma", "PMA")]].forEach(function (t) {
         var b = touch(el(d, "button", t[1], tab === t[0] ? "vote-tab active" : "vote-tab"));
         b.type = "button"; b.addEventListener("click", function () { tab = t[0]; draw(); }); bar.appendChild(b); });
       var smart = (tab === "smart" || tab === "pma"), nft = (tab === "nft");
-      if (tab === "pma") body.appendChild(el(d, "p", "Prediction market: is_prediction_market locked ON.", "muted"));
-      var sym = field(d, "Symbol (A-Z0-9.)", null, "", null, false, "AFKTEST01");
-      var prec = field(d, "Precision (0–12)", null, "4", "numeric");
-      var msup = field(d, "Max supply (human)", null, "1000000", "decimal");
-      var fpct = field(d, "Market fee % (human)", null, "0", "decimal");
-      var mfee = field(d, "Max market fee (human)", null, "1000000", "decimal");
-      var cb = field(d, "CER base (human, core)", null, "1", "decimal");
-      var cq = field(d, "CER quote (human, new asset)", null, "1", "decimal");
-      var desc = field(d, "Description", null, "", null, true);
+      if (tab === "pma") body.appendChild(el(d, "p", t("asset.pma_note", "Prediction market: is_prediction_market locked ON."), "muted"));
+      var sym = field(d, t("asset.symbol_field", "Symbol (A-Z0-9.)"), null, "", null, false, "AFKTEST01");
+      var prec = field(d, t("asset.precision_field", "Precision (0–12)"), null, "4", "numeric");
+      var msup = field(d, t("asset.max_supply_field", "Max supply (human)"), null, "1000000", "decimal");
+      var fpct = field(d, t("asset.market_fee_field", "Market fee % (human)"), null, "0", "decimal");
+      var mfee = field(d, t("asset.max_market_fee_field", "Max market fee (human)"), null, "1000000", "decimal");
+      var cb = field(d, t("asset.cer_base_field", "CER base (human, core)"), null, "1", "decimal");
+      var cq = field(d, t("asset.cer_quote_field", "CER quote (human, new asset)"), null, "1", "decimal");
+      var desc = field(d, t("asset.description_row", "Description"), null, "", null, true);
       [sym, prec, msup, fpct, mfee, cb, cq, desc].forEach(function (x) { body.appendChild(x.row); });
-      body.appendChild(el(d, "h3", "Permissions")); var pg = bits(d, PERMS, 79); body.appendChild(pg.box);
-      body.appendChild(el(d, "h3", "Flags")); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
+      body.appendChild(el(d, "h3", t("help.topic_accounts-permissions_title", "Permissions"))); var pg = bits(d, PERMS, 79); body.appendChild(pg.box);
+      body.appendChild(el(d, "h3", t("asset.flags_title", "Flags"))); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
       var nt = null, nu = null, lh = null, mf = null, dl = null, op = null, mv = null, ba = null;
-      if (nft) { body.appendChild(el(d, "h3", "NFT metadata (description nft_object)"));
-        nt = field(d, "NFT title", null, ""); nu = field(d, "NFT URI", null, "");
+      if (nft) { body.appendChild(el(d, "h3", t("asset.nft_meta_title", "NFT metadata (description nft_object)")));
+        nt = field(d, t("asset.nft_title_field", "NFT title"), null, ""); nu = field(d, t("asset.nft_uri_field", "NFT URI"), null, "");
         body.appendChild(nt.row); body.appendChild(nu.row); }
-      if (smart) { body.appendChild(el(d, "h3", "Bitasset options"));
-        lh = field(d, "Feed lifetime (hours)", null, "24", "numeric"); mf = field(d, "Minimum feeds", null, "1", "numeric");
-        dl = field(d, "Settlement delay (sec)", null, "86400", "numeric"); op = field(d, "Settlement offset %", null, "1", "decimal");
-        mv = field(d, "Max settlement vol %", null, "20", "decimal"); ba = field(d, "Backing (1.3.N)", null, "1.3.0");
+      if (smart) { body.appendChild(el(d, "h3", t("asset.bitasset_title", "Bitasset options")));
+        lh = field(d, t("asset.feed_lifetime_field", "Feed lifetime (hours)"), null, "24", "numeric"); mf = field(d, t("explorer.min_feeds", "Minimum feeds"), null, "1", "numeric");
+        dl = field(d, t("asset.settle_delay_field", "Settlement delay (sec)"), null, "86400", "numeric"); op = field(d, t("asset.settle_offset_field", "Settlement offset %"), null, "1", "decimal");
+        mv = field(d, t("asset.max_settle_vol_field", "Max settlement vol %"), null, "20", "decimal"); ba = field(d, t("asset.backing_field", "Backing (1.3.N)"), null, "1.3.0");
         [lh, mf, dl, op, mv, ba].forEach(function (x) { body.appendChild(x.row); }); }
-      var rev = touch(el(d, "button", "Review create")); rev.type = "button"; body.appendChild(rev);
+      var rev = touch(el(d, "button", t("credit.review_create", "Review create"))); rev.type = "button"; body.appendChild(rev);
       rev.addEventListener("click", function () {
         rev.disabled = true;
         (async function () {
           var symbol = sym.input.value.trim().toUpperCase();
-          if (!SYM_RE.test(symbol)) throw new Error("bad-symbol (uppercased A-Z0-9.)");
+          if (!SYM_RE.test(symbol)) throw new Error(t("asset.err_bad_symbol", "bad-symbol (uppercased A-Z0-9.)"));
           var precision = parseInt(prec.input.value.trim(), 10);
-          if (!(precision >= 0 && precision <= 12)) throw new Error("precision must be 0-12");
+          if (!(precision >= 0 && precision <= 12)) throw new Error(t("asset.err_precision", "precision must be 0-12"));
           var db = await Chain.db();
           var taken = await Chain.call(db, "lookup_asset_symbols", [[symbol]]);
           if (taken && taken[0]) throw new Error("symbol-taken");
@@ -220,9 +234,9 @@ var AssetUI = (function () {
           var perms = pg.read(), flags = fg.read();
           if (!smart) { perms &= ~(128 | 256 | 32); flags &= ~(128 | 256); }
           var nftObj = null;
-          if (nft) { var t = nt.input.value.trim(), u = nu.input.value.trim();
-            if (!t && !u) throw new Error("NFT needs a title or URI.");
-            nftObj = { title: t || symbol, type: "nft", uri: u || "" }; }
+          if (nft) { var ntT = nt.input.value.trim(), u = nu.input.value.trim();
+            if (!ntT && !u) throw new Error(t("asset.err_nft_meta", "NFT needs a title or URI."));
+            nftObj = { title: ntT || symbol, type: "nft", uri: u || "" }; }
           var bit = null;
           if (smart) bit = { feed_lifetime_sec: parseInt(lh.input.value.trim(), 10) * 3600,
             minimum_feeds: parseInt(mf.input.value.trim(), 10),
@@ -240,14 +254,14 @@ var AssetUI = (function () {
             cerBaseId: CORE, description: desc.input.value || "", nft: nftObj, bitasset: bit,
             is_prediction_market: (tab === "pma") });
           var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
-          var rows = [["Issuer", me.name + " (" + me.id + ")"], ["Symbol", symbol], ["Precision", String(precision)],
-            ["Max supply", msup.input.value],
-            ["Market fee", AssetOps.hundredthsToPct(pair[1].common_options.market_fee_percent) + "%", String(pair[1].common_options.market_fee_percent)],
-            ["Permissions", bitNames(PERMS, perms)], ["Flags", bitNames(FLAGS, flags)],
-            ["CER", (cb.input.value || "1") + " CORE / " + (cq.input.value || "1") + " " + symbol]];
-          if (bit) rows.push(["Bitasset", "feeds≥" + mf.input.value + ", backing " + bit.short_backing_asset]);
-          if (nftObj) rows.push(["NFT", (nftObj.title || "") + " / nft"]);
-          rows.push(["Prediction market", (tab === "pma") ? "yes" : "no"]);
+          var rows = [[t("explorer.issuer_row", "Issuer"),  me.name + " (" + me.id + ")"], [t("explorer.th_symbol", "Symbol"),  symbol], [t("explorer.precision_row", "Precision"),  String(precision)],
+            [t("explorer.max_supply", "Max supply"),  msup.input.value],
+            [t("explorer.market_fee", "Market fee"),  AssetOps.hundredthsToPct(pair[1].common_options.market_fee_percent) + "%", String(pair[1].common_options.market_fee_percent)],
+            [t("help.topic_accounts-permissions_title", "Permissions"),  bitNames(PERMS, perms)], [t("asset.flags_title", "Flags"),  bitNames(FLAGS, flags)],
+            [t("asset.cer_row", "CER"),  (cb.input.value || "1") + " CORE / " + (cq.input.value || "1") + " " + symbol]];
+          if (bit) rows.push([t("asset.bitasset_row", "Bitasset"),  "feeds≥" + mf.input.value + ", backing " + bit.short_backing_asset]);
+          if (nftObj) rows.push([t("asset.nft_row", "NFT"),  (nftObj.title || "") + " / nft"]);
+          rows.push([t("asset.pma_row", "Prediction market"),  (tab === "pma") ? "yes" : "no"]);
           if (g !== gen) return; wipe(root);
           var w2 = wrap(d, root), fpp = await feePrec(f.asset_id);
           confirm(d, w2, root, "Confirm asset create", rows, f.amount, fpp,
@@ -256,7 +270,7 @@ var AssetUI = (function () {
                 try { return await Asset.describe(symbol); } catch (e) { return null; }
               }, "Asset created", symbol + " precision " + precision + " issued by " + me.name + ".",
                 "#/asset/" + symbol, "Open " + symbol, onStep); });
-        })().catch(function (e) { rev.disabled = false; err(d, body, e, "Could not prepare the create."); });
+        })().catch(function (e) { rev.disabled = false; err(d, body,e,t("credit.could_not_prepare_the_create", "Could not prepare the create.")); });
       });
     }
     draw();

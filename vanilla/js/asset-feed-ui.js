@@ -12,6 +12,20 @@
  */
 var AssetFeedUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var CORE = "1.3.0", PLACES = 8;
   var gen = 0, feeGen = 0;
   function el(d, t, x, c) { var n = d.createElement(t); if (c) n.className = c; if (x !== undefined && x !== null) n.textContent = x; return n; }
@@ -21,12 +35,12 @@ var AssetFeedUI = (function () {
   /* showError: never-blank human panel for named chain errors. */
   function err(d, w, e, fb) {
     var b = el(d, "div", null, "error"); b.setAttribute("aria-live", "polite");
-    var m = (e && e.message) ? e.message : String(e || fb || "Unexpected error");
-    if (m.indexOf("unknown-asset") !== -1) m = fb || "Unknown asset.";
-    else if (m.indexOf("unknown-account") !== -1) m = fb || "Unknown account.";
-    else if (m.indexOf("not-market-issued") !== -1) m = "Not a market-issued asset — feeds exist only on smartcoins.";
-    else if (m.indexOf("wallet-locked") !== -1) m = "Wallet is locked.";
-    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = "Network unavailable. Check Settings → Nodes and retry.";
+    var m = (e && e.message) ? e.message : String(e || fb || t("fees.unexpected_error", "Unexpected error"));
+    if (m.indexOf("unknown-asset") !== -1) m = fb || t("barter.unknown_asset", "Unknown asset.");
+    else if (m.indexOf("unknown-account") !== -1) m = fb || t("barter.unknown_account", "Unknown account.");
+    else if (m.indexOf("not-market-issued") !== -1) m = t("asset.not_mpa_feed", "Not a market-issued asset — feeds exist only on smartcoins.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
+    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     b.textContent = m; w.appendChild(b); return b;
   }
   function status(d, w, t) { var p = el(d, "p", t, "muted"); p.setAttribute("aria-live", "polite"); w.appendChild(p); return p; }
@@ -41,8 +55,8 @@ var AssetFeedUI = (function () {
    * stale offline panel survives after connect). lock: password gate. */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(el(d, "h1", "Publish feed")); err(d, w, new Error("not-connected"), "Network unavailable.");
-    var b = touch(el(d, "button", "Retry")); b.type = "button"; w.appendChild(b);
+    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    var b = touch(el(d, "button", t("fees.retry", "Retry"))); b.type = "button"; w.appendChild(b);
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -57,13 +71,13 @@ var AssetFeedUI = (function () {
     return true;
   }
   function lock(d, w, rerun) {
-    w.appendChild(el(d, "h1", "Publish feed"));
-    w.appendChild(el(d, "p", "Wallet is locked. Enter your password.", "muted"));
+    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed")));
+    w.appendChild(el(d, "p", t("asset.locked_prompt", "Wallet is locked. Enter your password."), "muted"));
     var pw = d.createElement("input"); pw.type = "password"; touch(pw); w.appendChild(pw);
-    var b = touch(el(d, "button", "Unlock")); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
+    var b = touch(el(d, "button", t("account.s6", "Unlock"))); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
     b.addEventListener("click", function () { box.textContent = ""; b.disabled = true;
       Promise.resolve().then(function () { return Wallet.unlock(pw.value); }).then(rerun)
-        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : "Unlock failed"; }); });
+        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : t("auth.unlock_failed", "Unlock failed"); }); });
   }
   /* field: labeled input row. */
   function field(d, label, id, val, mode, area, ph) {
@@ -80,15 +94,15 @@ var AssetFeedUI = (function () {
     var dl = el(d, "dl", null, "xfer-confirm");
     rows.forEach(function (r) { dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd); });
     var fh; try { fh = Format.formatAmount(String(feeRaw), fp); } catch (e) { fh = String(feeRaw); }
-    dl.appendChild(el(d, "dt", "Fee")); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
-    dl.appendChild(el(d, "dt", "Network")); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
-    var back = touch(el(d, "button", "Back")); back.type = "button"; w.appendChild(back);
-    var send = touch(el(d, "button", "Sign & Send")); send.type = "button"; w.appendChild(send);
+    dl.appendChild(el(d, "dt", t("borrow.fee", "Fee"))); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
+    dl.appendChild(el(d, "dt", t("borrow.network", "Network"))); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
+    var back = touch(el(d, "button", t("barter.back", "Back"))); back.type = "button"; w.appendChild(back);
+    var send = touch(el(d, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button"; w.appendChild(send);
     back.addEventListener("click", onBack);
     send.addEventListener("click", function () { back.disabled = true; send.disabled = true;
       var st = status(d, w, "Signing…");
       onSend(function (t) { st.textContent = t; }).catch(function (e) {
-        try { w.removeChild(st); } catch (x) { /* gone */ } err(d, w, e, "Send failed."); back.disabled = false; }); });
+        try { w.removeChild(st); } catch (x) { /* gone */ } err(d, w,e,t("createworker.send_failed", "Send failed.")); back.disabled = false; }); });
   }
   /* feeSection: read-only fee-schedule table (slice-9 deferral, Ref #20).
    * Own per-call token (separate from renderFeed's gen): AssetUI's list
@@ -98,15 +112,15 @@ var AssetFeedUI = (function () {
    * separate counter so it never disturbs renderFeed's gen. */
   function feeSection(d, box) {
     var my = ++feeGen;
-    box.appendChild(el(d, "h3", "Network fees"));
+    box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
     status(d, box, "Loading fee schedule…");
     Asset.feeSchedule().then(function (s) {
       if (my !== feeGen) return; wipe(box);
-      box.appendChild(el(d, "h3", "Network fees"));
-      if (!s.fees.length) { box.appendChild(el(d, "p", "No fee rows returned.", "muted")); return; }
+      box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
+      if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned."), "muted")); return; }
       var sc = el(d, "div", null, "xplore-scroll"); sc.style.overflowX = "auto";
       var tb = d.createElement("table"), th = d.createElement("thead"), hr = d.createElement("tr");
-      ["Op", "Fee"].forEach(function (h) { hr.appendChild(el(d, "th", h)); });
+      [t("asset.op_col", "Op"),  "Fee"].forEach(function (h) { hr.appendChild(el(d, "th", h)); });
       th.appendChild(hr); tb.appendChild(th);
       var tb2 = d.createElement("tbody");
       s.fees.forEach(function (f) {
@@ -118,7 +132,7 @@ var AssetFeedUI = (function () {
         if (f.price_per_kbyte !== undefined) td1.title = (td1.title ? td1.title + " " : "") + "+/kB " + f.price_per_kbyte;
         tr.appendChild(td1); tb2.appendChild(tr); });
       tb.appendChild(tb2); sc.appendChild(tb); box.appendChild(sc);
-    }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h3", "Network fees")); err(d, box, e, "Could not load fees."); } });
+    }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees"))); err(d, box,e,t("asset.fees_failed", "Could not load fees.")); } });
   }
   /* feedPrice: settlement/CER pair -> human string with BOTH precisions. */
   function feedPrice(pair, bp, qp) {
@@ -133,21 +147,21 @@ var AssetFeedUI = (function () {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var w = wrap(d, root);
-    if (noBackend()) { err(d, w, "Asset backend missing."); return; }
+    if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderFeed(root); })) return;
     /* No entry unlock gate: reads are public; signing gates at send time. */
-    w.appendChild(el(d, "h1", "Publish feed"));
+    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed")));
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        w.appendChild(el(d, "p", "Viewing as committee-account (1.2.0) — unlock to sign.", "muted"));
+        w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
     } catch (e) { /* notice is display-only */ }
-    var s = field(d, "Smartcoin symbol", "af-sym", "", null, false, "e.g. TESTMPA");
+    var s = field(d, t("asset.smartcoin_field", "Smartcoin symbol"), "af-sym", "", null, false, "e.g. TESTMPA");
     w.appendChild(s.row);
-    var go = touch(el(d, "button", "Load feed")); go.type = "button"; w.appendChild(go);
+    var go = touch(el(d, "button", t("asset.load_feed", "Load feed"))); go.type = "button"; w.appendChild(go);
     var body = el(d, "div", null, "asset-feed"); w.appendChild(body);
     go.addEventListener("click", function () {
       var sym = s.input.value.trim().toUpperCase();
-      if (!sym) { err(d, body, "Enter a symbol."); return; }
+      if (!sym) { err(d, body,t("asset.enter_symbol", "Enter a symbol.")); return; }
       wipe(body); status(d, body, "Loading feed…");
       loadFeed(d, body, root, g, sym);
     });
@@ -156,11 +170,11 @@ var AssetFeedUI = (function () {
   async function loadFeed(d, body, root, g, sym) {
     var info;
     try { info = await Asset.describe(sym); }
-    catch (e) { if (g === gen) { wipe(body); err(d, body, e, "Unknown asset."); } return; }
+    catch (e) { if (g === gen) { wipe(body); err(d, body,e,t("barter.unknown_asset", "Unknown asset.")); } return; }
     if (g !== gen) return; wipe(body);
     if (!info.is_smartcoin || !info.bitasset || !info.bitasset.short_backing_asset) {
-      err(d, body, new Error("not-market-issued"), "Not a market-issued asset.");
-      body.appendChild(el(d, "p", "Feeds exist only on smartcoins. To test publishing, create your own testnet MPA, add yourself as a feed producer, then publish here.", "muted"));
+      err(d, body,new Error("not-market-issued"),t("asset.not_market_issued", "Not a market-issued asset."));
+      body.appendChild(el(d, "p", t("asset.feed_help", "Feeds exist only on smartcoins. To test publishing, create your own testnet MPA, add yourself as a feed producer, then publish here."), "muted"));
       return;
     }
     var backing = info.bitasset.short_backing_asset, db = await Chain.db();
@@ -174,15 +188,15 @@ var AssetFeedUI = (function () {
       var cur = objs && objs[0] && objs[0].current_feed;
       var dl = el(d, "dl", null, "xplore-fields");
       if (cur && cur.settlement_price) {
-        dl.appendChild(el(d, "dt", "Settlement")); var sd = el(d, "dd", feedPrice(cur.settlement_price, info.precision, backingPrec));
+        dl.appendChild(el(d, "dt", t("explorer.th_settlement", "Settlement"))); var sd = el(d, "dd", feedPrice(cur.settlement_price, info.precision, backingPrec));
         sd.title = "base " + cur.settlement_price.base.amount + " / quote " + cur.settlement_price.quote.amount; dl.appendChild(sd);
-        dl.appendChild(el(d, "dt", "CER")); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
+        dl.appendChild(el(d, "dt", t("asset.cer_row", "CER"))); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
         cd.title = "base " + cur.core_exchange_rate.base.amount + " / quote " + cur.core_exchange_rate.quote.amount; dl.appendChild(cd);
-      } else body.appendChild(el(d, "p", "No live feed published yet.", "muted"));
-      dl.appendChild(el(d, "dt", "MCR")); var m1 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mcr) + "%"); m1.title = String(info.bitasset.mcr); dl.appendChild(m1);
-      dl.appendChild(el(d, "dt", "MSSR")); var m2 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mssr) + "%"); m2.title = String(info.bitasset.mssr); dl.appendChild(m2);
+      } else body.appendChild(el(d, "p", t("asset.no_live_feed", "No live feed published yet."), "muted"));
+      dl.appendChild(el(d, "dt", t("asset.mcr_row", "MCR"))); var m1 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mcr) + "%"); m1.title = String(info.bitasset.mcr); dl.appendChild(m1);
+      dl.appendChild(el(d, "dt", t("explorer.th_mssr", "MSSR"))); var m2 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mssr) + "%"); m2.title = String(info.bitasset.mssr); dl.appendChild(m2);
       body.appendChild(dl);
-    } catch (e) { body.appendChild(el(d, "p", "Feed read-back unavailable.", "muted")); }
+    } catch (e) { body.appendChild(el(d, "p", t("asset.feed_unavailable", "Feed read-back unavailable."), "muted")); }
     publishForm(d, body, root, g, info, backing, backingPrec);
     producerForm(d, body, root, g, info);
   }
@@ -190,28 +204,28 @@ var AssetFeedUI = (function () {
    * Publisher defaults to public 1.2.0 (gate-repair); blank also falls back
    * to 1.2.0 — never myAccountId at render; the WIF throw at send is the gate. */
   function publishForm(d, body, root, g, info, backing, backingPrec) {
-    body.appendChild(el(d, "h3", "Publish feed (op 19)"));
-    var pub = field(d, "Publisher (name or 1.2.N)", null, "1.2.0");
+    body.appendChild(el(d, "h3", t("asset.publish_op19_title", "Publish feed (op 19)")));
+    var pub = field(d, t("asset.publisher_field", "Publisher (name or 1.2.N)"), null, "1.2.0");
     var sb = field(d, "Settlement base (human, " + info.symbol + ")", null, "1", "decimal");
-    var sq = field(d, "Settlement quote (human, backing)", null, "1", "decimal");
-    var mcr = field(d, "MCR % (human, e.g. 175)", null, "175", "decimal");
-    var mssr = field(d, "MSSR % (human, e.g. 150)", null, "150", "decimal");
+    var sq = field(d, t("asset.settle_quote_field", "Settlement quote (human, backing)"), null, "1", "decimal");
+    var mcr = field(d, t("asset.mcr_field", "MCR % (human, e.g. 175)"), null, "175", "decimal");
+    var mssr = field(d, t("asset.mssr_field", "MSSR % (human, e.g. 150)"), null, "150", "decimal");
     var cb = field(d, "CER base (human, " + info.symbol + ")", null, "1", "decimal");
-    var cq = field(d, "CER quote (human, backing)", null, "1", "decimal");
+    var cq = field(d, t("asset.cer_quote_backing_field", "CER quote (human, backing)"), null, "1", "decimal");
     [pub, sb, sq, mcr, mssr, cb, cq].forEach(function (x) { body.appendChild(x.row); });
     var prev = el(d, "p", "", "muted"); body.appendChild(prev);
     function paintPrev() {
-      var t;
-      try { t = "MCR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mcr.input.value)) + "% · MSSR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mssr.input.value)) + "%"; }
-      catch (e) { t = "MCR/MSSR preview unavailable — check the % inputs."; }
-      prev.textContent = t;
+      var txt;
+      try { txt = "MCR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mcr.input.value)) + "% · MSSR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mssr.input.value)) + "%"; }
+      catch (e) { txt = "MCR/MSSR preview unavailable — check the % inputs."; }
+      prev.textContent = txt;
     }
     mcr.input.addEventListener("input", paintPrev); mssr.input.addEventListener("input", paintPrev); paintPrev();
     /* Unlocked prefill: swap the public 1.2.0 default for the wallet
      * account (locked viewers keep 1.2.0). Null-tolerant — manual stands. */
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (g === gen && pub.input.value.trim() === "1.2.0") pub.input.value = me.name; }).catch(function () { /* manual stands */ });
-    var rev = touch(el(d, "button", "Review feed")); rev.type = "button"; body.appendChild(rev);
+    var rev = touch(el(d, "button", t("asset.review_feed", "Review feed"))); rev.type = "button"; body.appendChild(rev);
     rev.addEventListener("click", function () {
       rev.disabled = true;
       (async function () {
@@ -228,9 +242,9 @@ var AssetFeedUI = (function () {
         var stl = sb.input.value + " " + info.symbol + " / " + sq.input.value + " backing";
         var cer = cb.input.value + " " + info.symbol + " / " + cq.input.value + " backing";
         confirm(d, w2, root, "Confirm feed",
-          [["Publisher", who.name + " (" + who.id + ")"], ["Asset", info.symbol + " (" + info.id + ")"],
-            ["Settlement", stl], ["MCR", mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
-            ["MSSR", mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], ["CER", cer]],
+          [[t("asset.publisher_row", "Publisher"),  who.name + " (" + who.id + ")"], [t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
+            [t("explorer.th_settlement", "Settlement"),  stl], [t("asset.mcr_row", "MCR"),  mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
+            [t("explorer.th_mssr", "MSSR"),  mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "CER"),  cer]],
           f.amount, pp, function () { renderFeed(root); }, function (onStep) {
             return (async function () {
               var unsigned = await Tx.buildTx([pair]);
@@ -243,25 +257,25 @@ var AssetFeedUI = (function () {
                 } catch (e) { return null; } });
               var h = await head(); if (g !== gen) return; wipe(root);
               var w3 = wrap(d, root);
-              w3.appendChild(el(d, "h1", "Feed published"));
+              w3.appendChild(el(d, "h1", t("asset.feed_published", "Feed published")));
               var ok = el(d, "p", "Observed at head block #" + h + " (" + r.via + ").", "xfer-ok");
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               w3.appendChild(el(d, "p", info.symbol + " feed re-read matches MCR " + mcr.input.value + "% / MSSR " + mssr.input.value + "%.", "muted"));
               var a = el(d, "a", "Open " + info.symbol); a.setAttribute("href", "#/asset/" + info.symbol); touch(a); w3.appendChild(a);
             })(); });
-      })().catch(function (e) { rev.disabled = false; err(d, body, e, "Could not prepare the feed."); });
+      })().catch(function (e) { rev.disabled = false; err(d, body,e,t("asset.feed_prepare_failed", "Could not prepare the feed.")); });
     });
   }
   /* producerForm: op-13 set editor (one account per line, resolved).
    * Acting account is explicit (public 1.2.0 default, gate-repair) — never
    * myAccountId at render; issuer check + WIF throw gate the write path. */
   function producerForm(d, body, root, g, info) {
-    body.appendChild(el(d, "h3", "Feed producers (op 13)"));
-    var whoF = field(d, "Acting account (name or 1.2.N)", null, "1.2.0");
+    body.appendChild(el(d, "h3", t("asset.producers_title", "Feed producers (op 13)")));
+    var whoF = field(d, t("asset.acting_field", "Acting account (name or 1.2.N)"), null, "1.2.0");
     body.appendChild(whoF.row);
-    var pa = field(d, "Producers (one name or 1.2.N per line)", null, "", null, true);
+    var pa = field(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)"), null, "", null, true);
     body.appendChild(pa.row);
-    var rev = touch(el(d, "button", "Review producers")); rev.type = "button"; body.appendChild(rev);
+    var rev = touch(el(d, "button", t("asset.review_producers", "Review producers"))); rev.type = "button"; body.appendChild(rev);
     rev.addEventListener("click", function () {
       rev.disabled = true;
       (async function () {
@@ -269,12 +283,12 @@ var AssetFeedUI = (function () {
         var ids = [];
         for (var i = 0; i < names.length; i++) ids.push((await Account.resolve(names[i])).id);
         var me = await Account.resolve(whoF.input.value.trim() || "1.2.0");
-        if (me.id !== info.issuer_id) throw new Error("Only the issuer can set producers.");
+        if (me.id !== info.issuer_id) throw new Error(t("asset.only_issuer_producers", "Only the issuer can set producers."));
         var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
         var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
         confirm(d, w2, root, "Confirm feed producers",
-          [["Asset", info.symbol + " (" + info.id + ")"], ["Producers", ids.length ? ids.join(", ") : "(empty)"]],
+          [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"], [t("asset.producers_row", "Producers"),  ids.length ? ids.join(", ") : "(empty)"]],
           f.amount, pp, function () { renderFeed(root); }, function (onStep) {
             return (async function () {
               var unsigned = await Tx.buildTx([pair]);
@@ -283,12 +297,12 @@ var AssetFeedUI = (function () {
               var r = await AssetOps.sendAndProve(unsigned, wif, async function () { return true; });
               var h = await head(); if (g !== gen) return; wipe(root);
               var w3 = wrap(d, root);
-              w3.appendChild(el(d, "h1", "Producers updated"));
+              w3.appendChild(el(d, "h1", t("asset.producers_updated", "Producers updated")));
               var ok = el(d, "p", "Observed at head block #" + h + " (" + r.via + ").", "xfer-ok");
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               var a = el(d, "a", "Open " + info.symbol); a.setAttribute("href", "#/asset/" + info.symbol); touch(a); w3.appendChild(a);
             })(); });
-      })().catch(function (e) { rev.disabled = false; err(d, body, e, "Could not prepare the producer update."); });
+      })().catch(function (e) { rev.disabled = false; err(d, body,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); });
     });
   }
   return { renderFeed: renderFeed, feeSection: feeSection };

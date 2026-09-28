@@ -1,6 +1,12 @@
-/* Theme tokens. Original blue is default; light/dark refined per slice. */
+/* Theme tokens: ref-ui-theme is default (bare :root carries its values, so
+ * first paint before App.boot is always styled); vanilla-ui-theme (light)
+ * and dex-ux-theme (dark) override. Created by: building-vanilla-slices
+ * skill. Renamed 2026-09-28: original-blue->ref-ui-theme, light->vanilla-ui-
+ * theme, dark->dex-ux-theme (store.js migrates stored old ids on load). */
 :root,
-:root[data-theme="original-blue"] {
+:root[data-theme="ref-ui-theme"] {
+  /* Classic BitShares original-blue look — PALETTE.md authority, hues
+   * untouched (only the selector name changed). */
   --bg: #f5f7fa; --panel: #ffffff; --text: #333333; --muted: #777777;
   --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #22d173; --sell: #e3745b; --warn: #fcab53; --danger: #e3745b;
@@ -9,19 +15,58 @@
    * render as-is, matching #1's dark-on-light glyphs. */
   --icon-filter: none;
 }
-:root[data-theme="light"] {
-  --bg: #ffffff; --panel: #f5f7fa; --text: #222222; --muted: #666666;
-  --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
-  --buy: #1da866; --sell: #d35a41; --warn: #e89b3d; --danger: #d35a41;
-  --border: #e2e2e2; --header-bg: #337ab7; --header-text: #ffffff;
+/* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
+ * tub photo (workspace root "Homemade Vanilla Ice Cream.jpg", viewed
+ * 2026-09-28) — warm cream label/ice-cream, chocolate script, sky-blue logo,
+ * golden lid. Token reasoning:
+ * --bg #FAF6EA: the label's warm cream (page ground; panels stay --panel
+ *   white so cards lift off the ground like the photo's white flower).
+ * --panel #FFFFFF: white cards (mission: "white panels").
+ * --text #2A1A12: the "Vanilla"/"Homemade" script's deep chocolate (body
+ *   copy; ~15:1 on cream — AAA).
+ * --muted #6F5F50: chocolate softened toward taupe for secondary text
+ *   (~5.5:1 on cream — readable, still warm; cold grey would fight the tub).
+ * --accent + --button-bg #1E9ED7: the DeConna logo's bright sky blue
+ *   (links, active tabs, primary buttons with white text — same white-on-
+ *   saturated pattern as the other two themes).
+ * --warn #C8961E: the lid's golden ochre (favorite stars, warning stripe —
+ *   graphic/large use only; too light for small body text on cream).
+ * --buy #1DA866 / --sell #D35A41 / --danger #D35A41: kept from the previous
+ *   light block — already tuned for light surfaces, no tub cue to change.
+ * --border #E5DCC8: cream darkened (borders read as shadowed cream, not
+ *   cold office grey #E2E2E2).
+ * --header-bg #2A1A12 + --header-text #FAF6EA: the label inverted —
+ *   cream type on chocolate (the tub's script-on-cream, flipped so the bar
+ *   anchors the page; sky stays reserved for interactive accents).
+ * Glyphs stay unfiltered (dark-on-light, as ref-ui). */
+:root[data-theme="vanilla-ui-theme"] {
+  --bg: #FAF6EA; --panel: #ffffff; --text: #2A1A12; --muted: #6F5F50;
+  --accent: #1E9ED7; --accent-text: #ffffff; --button-bg: #1E9ED7;
+  --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
+  --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --icon-filter: none;
 }
-/* Dark converges on DEX-UX (slice-07 Task 4 exact values: panels #131722,
- * borders #2a2e39, text #e0e3eb, muted #758696, accent #007bff, buy #26de81,
- * sell #ff231f). Original-blue/light keep PALETTE.md authority (untouched). */
-:root[data-theme="dark"] {
+/* dex-ux-theme (dark): sampled from /workspace/reference/bitshares-dex-ux
+ * (TradingView-dark family). Sample log, file:line -> token:
+ * assets/css/style.css:2806 (#dark header bg #131722) -> --bg/--panel/--header-bg
+ * assets/css/style.css:2826 (#dark .market-pairs border #2a2e39) -> --border
+ *   (also buttons.css:4 focus outline, :30 checked bg — the family border)
+ * assets/css/style.css:2810 (#dark header nav a #ffffff) -> dark primary text;
+ *   kept --text/--header-text #e0e3eb (softened white; #e0e3eb's heaviest
+ *   dex-ux use is light-scope borders e.g. style.css:141 — documented, not
+ *   hidden: pure #fff tested harsher, #e0e3eb stays readable at ~13:1)
+ * assets/css/style.css:94 + :384 (muted copy #758696) -> --muted
+ *   (placeholder #69727a :2862 and span #4f5966 stay unmapped by design)
+ * assets/css/style.css:208 (.btn-2 bg #007bff, 29 hits: links/active/primary)
+ *   -> --accent AND --button-bg (was BitShares #049cce leaking in)
+ * style.css:2895 (#dark .green #26de81) + main.js:110 (candle up) -> --buy
+ * style.css:2899 (#dark .red #ff231f) + main.js:111 (candle down) -> --sell
+ * --warn/--danger keep BitShares status hues (weak dex-ux cues: amber #fbbc06
+ *   x1, red-is-red already == --sell); status semantics, not dex-ux surface.
+ * Unmapped dex-ux surfaces by design: #1c2030 sub-nav strip, #343a40 hover. */
+:root[data-theme="dex-ux-theme"] {
   --bg: #131722; --panel: #131722; --text: #e0e3eb; --muted: #758696;
-  --accent: #007bff; --accent-text: #ffffff; --button-bg: #049cce;
+  --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
   --toast-shadow: rgba(0, 0, 0, 0.5);
@@ -32,13 +77,14 @@
   --icon-filter: invert(1);
 }
 /* Slice-16 toast shadow per theme (not a palette value — elevation only):
- * retro default, modern light, DEX-UX dark cue. Level-stripe colors reuse
- * the palette tokens directly in app.css (info→accent, success→buy,
- * warning→warn, error→danger), so no new color tokens are introduced. */
+ * retro default, warm-tinted vanilla (chocolate shadow on cream), DEX-UX
+ * dark cue. Level-stripe colors reuse the palette tokens directly in
+ * app.css (info→accent, success→buy, warning→warn, error→danger), so no
+ * new color tokens are introduced. */
 :root,
-:root[data-theme="original-blue"] {
+:root[data-theme="ref-ui-theme"] {
   --toast-shadow: rgba(0, 0, 0, 0.15);
 }
-:root[data-theme="light"] {
-  --toast-shadow: rgba(0, 0, 0, 0.12);
+:root[data-theme="vanilla-ui-theme"] {
+  --toast-shadow: rgba(42, 26, 18, 0.18);
 }

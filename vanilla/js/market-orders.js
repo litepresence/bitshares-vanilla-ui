@@ -139,7 +139,7 @@ var MarketOrders = (function () {
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
       var cards = doc.createElement("div");
-      cards.className = "node-cards";
+      cards.className = "node-cards orders-cards";
       mine.forEach(function (o) {
         var view = orderView(o, assets);
         var tr = doc.createElement("tr");
@@ -173,7 +173,12 @@ var MarketOrders = (function () {
         cards.appendChild(card);
       });
       table.appendChild(tbody);
-      parentEl.appendChild(table);
+      /* Fixed-height scroll region (desk-grid.css: 8-row fold, sticky thead);
+       * long order lists scroll in place instead of stretching the desk. */
+      var scroller = doc.createElement("div");
+      scroller.className = "orders-scroll";
+      scroller.appendChild(table);
+      parentEl.appendChild(scroller);
       parentEl.appendChild(cards);
       var detAll = doc.createElement("details");
       detAll.className = "raw";

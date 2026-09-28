@@ -212,7 +212,9 @@ var MarketPicker = (function () {
     touchable(search);
     section.appendChild(search);
     var ul = doc.createElement("ul");
-    ul.className = "mkt-picker-list";
+    /* Fixed-height scroll region (desk-grid.css: 12-row fold); the curated
+     * list scrolls in place like the original market sidebar. */
+    ul.className = "mkt-picker-list picker-scroll";
     section.appendChild(ul);
 
     /* Unique symbols across the picker list for the batched kind lookup. */

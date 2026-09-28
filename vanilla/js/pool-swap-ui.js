@@ -21,10 +21,24 @@
  */
 var PoolSwapUI = (function () {
   "use strict";
+
+  /* Batch-2d i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
+   * their code structure (batch-2b precedent): only complete static literals and
+   * word-bearing segments are wrapped, values and punctuation glue stay raw, so
+   * every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   var gen = 0;
   /* Shared-_ui accessor: PoolUI._ui (pool-ui.js loads first); throws when the backend is missing. */
   function U() {
-    if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error("Pool backend missing: pool-ui.js failed to load.");
+    if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error(t("pool.backend_missing", "Pool backend missing: pool-ui.js failed to load."));
     return PoolUI._ui;
   }
   function live(myGen, uiGen) { /* both counters live (debit-ui two-counter precedent) */
@@ -36,28 +50,28 @@ var PoolSwapUI = (function () {
   function renderSwap(root) {
     if (!root) return;
     var u = U(), retry = function () { renderSwap(root); };
-    var ctx = u.routeReady(root, "Swap", retry);
+    var ctx = u.routeReady(root, t("swap.title", "Swap"), retry);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen, wrap = ctx.wrap;
-    wrap.appendChild(u.el(doc, "p", "Single-pool swap (one op-63). No multi-hop routing.", "muted"));
-    var fSell = u.field(doc, "Sell asset", { value: "BTS" });
-    var fBuy = u.field(doc, "Buy asset", { placeholder: "CNY" });
-    var fAmt = u.field(doc, "Sell amount", { inputmode: "decimal", placeholder: "1.0",
+    wrap.appendChild(u.el(doc, "p", t("pool.swap_sub", "Single-pool swap (one op-63). No multi-hop routing."), "muted"));
+    var fSell = u.field(doc, t("pool.sell_asset_field", "Sell asset"), { value: "BTS" });
+    var fBuy = u.field(doc, t("pool.buy_asset_field", "Buy asset"), { placeholder: "CNY" });
+    var fAmt = u.field(doc, t("pool.sell_amount_field", "Sell amount"), { inputmode: "decimal", placeholder: "1.0",
       unit: String(fSell.input.value || "").trim() || "BTS" });
-    var fSlip = u.field(doc, "Slippage %", { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal", unit: "%" });
+    var fSlip = u.field(doc, t("pool.slippage_field", "Slippage %"), { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal", unit: "%" });
     [fSell, fBuy, fAmt, fSlip].forEach(function (f) { wrap.appendChild(f.row); });
-    var find = u.touchable(u.el(doc, "button", "Find pools")); find.type = "button"; wrap.appendChild(find);
+    var find = u.touchable(u.el(doc, "button", t("pool.find_pools", "Find pools"))); find.type = "button"; wrap.appendChild(find);
     var pickBox = u.el(doc, "div"); wrap.appendChild(pickBox);
     var quoteBox = u.el(doc, "div"); wrap.appendChild(quoteBox);
     var actionBox = u.el(doc, "div"); wrap.appendChild(actionBox);
     find.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; find.disabled = true;
       u.clearBox(pickBox); u.clearBox(quoteBox); u.clearBox(actionBox);
-      u.showStatus(doc, pickBox, "Resolving assets and pools…");
+      u.showStatus(doc, pickBox,t("pool.resolving", "Resolving assets and pools…"));
       Promise.resolve().then(async function () {
         var s = await Asset.describe(fSell.input.value.trim() || "BTS");
         var b = await Asset.describe(fBuy.input.value.trim());
-        if (s.id === b.id) throw new Error("order-trap (sell asset must differ from receive asset)");
+        if (s.id === b.id) throw new Error(t("pool.err_same_asset", "order-trap (sell asset must differ from receive asset)"));
         var a = s.id < b.id ? s : b, c = s.id < b.id ? b : s;
         var rows = await Pool.list({ assetA: a.id, assetB: c.id, limit: 10 });
         return { sell: s, buy: b, rows: rows };
@@ -78,14 +92,14 @@ var PoolSwapUI = (function () {
         var row = u.el(doc, "div", null, "xfer-field");
         row.appendChild(u.el(doc, "span", found.rows.length > 1 ? "Pool (several exist — pick one): " : "Pool: "));
         row.appendChild(sel); pickBox.appendChild(row);
-        var quoteBtn = u.touchable(u.el(doc, "button", "Quote")); quoteBtn.type = "button"; pickBox.appendChild(quoteBtn);
+        var quoteBtn = u.touchable(u.el(doc, "button", t("notify.quote_label", "Quote"))); quoteBtn.type = "button"; pickBox.appendChild(quoteBtn);
         quoteBtn.addEventListener("click", function () {
           if (!live(myGen, uiGen)) return;
           quoteFor(doc, u, myGen, uiGen, quoteBox, actionBox, found, sel.value,
             fAmt.input.value.trim(), fSlip.input.value.trim() || Pool.DEFAULT_SLIPPAGE_PCT);
         });
       }).catch(function (e) {
-        if (!live(myGen, uiGen)) return; u.clearBox(pickBox); u.showError(doc, pickBox, e, "Could not find pools.");
+        if (!live(myGen, uiGen)) return; u.clearBox(pickBox); u.showError(doc, pickBox,e,t("pool.find_failed", "Could not find pools."));
       }).then(function () { find.disabled = false; });
     });
   }
@@ -108,7 +122,7 @@ var PoolSwapUI = (function () {
       var r = joined || pool;
       var sellIsA = (found.sell.id === r.asset_a_id);
       if (found.sell.id !== r.asset_a_id && found.sell.id !== r.asset_b_id)
-        throw new Error("order-trap (sell asset is not in this pool)");
+        throw new Error(t("pool.err_not_in_pool", "order-trap (sell asset is not in this pool)"));
       var precSell = sellIsA ? r.prec_a : r.prec_b;
       var precRecv = sellIsA ? r.prec_b : r.prec_a;
       if (precSell === null || precSell === undefined) precSell = 5;
@@ -128,7 +142,7 @@ var PoolSwapUI = (function () {
       var perLeg = u.el(doc, "p", "Pool legs: " + (Q.r.sym_a || Q.r.asset_a_id) + " / " + (Q.r.sym_b || Q.r.asset_b_id) +
         " — market fees apply per asset settings; pool taker " + Pool.pctUnitsToHuman(Q.r.taker_units) + "%.", "muted");
       quoteBox.appendChild(perLeg);
-      u.reviewSection(doc, actionBox, uiGen, "Review swap", {
+      u.reviewSection(doc, actionBox, uiGen, t("pool.review_swap", "Review swap"), {
         build: async function () {
           var me = await Account.resolve(await Account.myAccountId());
           var pair = Pool.buildExchange({ accountId: me.id, poolId: Q.r.id,
@@ -148,17 +162,17 @@ var PoolSwapUI = (function () {
         },
         rows: function (R, fee) {
           var op = R.pair[1];
-          return [["Pool", Q.r.id + " (" + (Q.r.sym_a || Q.r.asset_a_id) + "/" + (Q.r.sym_b || Q.r.asset_b_id) + ")"],
-            ["Account", whoText(R.me)],
-            ["Sell", sellHuman + " " + found.sell.symbol, "raw " + op.amount_to_sell.amount],
-            ["Quote out (raw)", Q.q.out_raw],
-            ["Min to receive", recvHuman + " " + found.buy.symbol, "raw " + Q.minRaw],
-            ["Slippage", slipHuman + "%"], ["Price impact", (Q.q.impact_bp / 100) + "%"],
-            ["Fee", fee.text, "raw " + fee.raw], ["Network", "testnet"]];
+          return [[ t("pool.pool_row", "Pool"), Q.r.id + " (" + (Q.r.sym_a || Q.r.asset_a_id) + "/" + (Q.r.sym_b || Q.r.asset_b_id) + ")"],
+            [t("account.card_account", "Account"),  whoText(R.me)],
+            [t("account.sell_th", "Sell"),  sellHuman + " " + found.sell.symbol, "raw " + op.amount_to_sell.amount],
+            [t("pool.quote_row", "Quote out (raw)"),  Q.q.out_raw],
+            [t("pool.min_recv_row", "Min to receive"),  recvHuman + " " + found.buy.symbol, "raw " + Q.minRaw],
+            [t("pool.slippage_row", "Slippage"),  slipHuman + "%"], [t("pool.impact_row", "Price impact"),  (Q.q.impact_bp / 100) + "%"],
+            [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
         },
-        title: "Confirm swap", ok: function () { return "Swapped."; }, fail: "Could not prepare the swap." });
+        title: t("pool.confirm_swap", "Confirm swap"), ok: function () { return "Swapped."; }, fail: t("pool.swap_failed", "Could not prepare the swap.") });
     }).catch(function (e) {
-      if (!live(myGen, uiGen)) return; u.clearBox(quoteBox); u.showError(doc, quoteBox, e, "Could not quote the swap.");
+      if (!live(myGen, uiGen)) return; u.clearBox(quoteBox); u.showError(doc, quoteBox,e,t("pool.quote_failed", "Could not quote the swap."));
     });
   }
   return { renderSwap: renderSwap };

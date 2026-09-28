@@ -47,6 +47,9 @@ body { margin: 0; background: var(--bg); color: var(--text);
   .node-card .latency { margin-right: 8px; }
 }
 button, select, input { min-height: 44px; font-size: 1rem; }
+/* #1 form controls are square like its buttons (foundation input radius 0);
+ * min-height/font/padding untouched (principle #7 touch floor). */
+input, select, textarea { border-radius: 0; }
 /* #1 buttons: square, condensed, uppercase 0.875rem (see header comment).
  * min-height 44px stays (principle #7 touch floor — #1's density is kept via
  * font/padding, never by shrinking targets). */
@@ -54,16 +57,6 @@ button { background: var(--button-bg); color: #fff; border: 0; border-radius: 0;
   padding: 0 16px; font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
   font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.05em; }
-/* Hollow secondary buttons (#1 _forms.scss:387 .button.hollow — e.g. LOGIN,
- * CHANGE DEFAULT FEE ASSET, CREATE HTLC in the captures). CSS-only: slices
- * opt in with class="hollow"; no view retargeted in this pass. */
-button.hollow, a.btn-hollow { background: transparent; color: var(--button-bg);
-  border: 1px solid var(--button-bg); border-radius: 0;
-  font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
-  font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.05em; }
-a.btn-hollow { display: inline-flex; align-items: center; min-height: 44px;
-  padding: 0 16px; text-decoration: none; }
 /* Table headers match the original: uppercase, small, letterspaced
  * (account/pools captures: ASSET/QTY/IN ORDERS/… grey caps row). */
 .node-table th { text-transform: uppercase; font-size: 0.78rem;
@@ -223,13 +216,13 @@ body { padding-bottom: 44px; }
 
 /* Input unit suffixes (dexux-ref: "0.0  BITUSD / BTS" — unit box inside the
  * input row). The input keeps its id/value behavior; the suffix is a
- * textContent-only span. */
+ * textContent-only span. Square like the input it extends (style batch). */
 .unit-wrap { display: flex; align-items: stretch; gap: 0; }
 .unit-wrap input { flex: 1; min-width: 0; }
 .unit-suffix { display: inline-flex; align-items: center; padding: 0 10px;
   min-height: 44px; white-space: nowrap; font-size: 0.85rem;
   color: var(--muted); background: var(--bg);
-  border: 1px solid var(--border); border-left: 0; border-radius: 0 6px 6px 0; }
+  border: 1px solid var(--border); border-left: 0; border-radius: 0; }
 
 /* Pools list density (dexux-ref btsx-pools.png: filter row + dense 10-col
  * table + pager). Table keeps .node-table striping; this scopes density. */
@@ -312,3 +305,78 @@ table.pools-table td.num { text-align: right; }
 .mkt-bell.has-alerts { border-color: var(--accent); color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent); }
 .mkt-head .mkt-bell { margin: 6px 0 6px 8px; vertical-align: middle; }
+
+/* Viewport-gaps repair (vanilla/notes/viewport-gaps.md, 2026-09-28,
+ * principles #7 + #4). Token-driven only — no colors declared here, so all
+ * three themes (themes.css) keep working unchanged. Sections:
+ * (a) form rows, (b) desk width caps, (c) market ≥1600px grid,
+ * (d) page-level overflow safety, (e) .wide grid child contract +
+ * scroll regions, (f) voting rows ≥720px. */
+
+/* (a) Form rows: every view builds labeled rows as div.xfer-field > label
+ * (text + input nested inside the label, e.g. transfer-ui.js fieldRow,
+ * credit-ui.js field). With no layout rule the label text and input shared
+ * one inline line — cramped at 390px, overlapping at 2560px. Stacked below
+ * ~720px; 2-col grid (label | input) above. Width guard excludes
+ * checkboxes/radios (they must keep their native box, not stretch). */
+.xfer-field { margin: 8px 0; min-width: 0; }
+.xfer-field label { display: grid; gap: 4px 12px;
+  grid-template-columns: minmax(0, 1fr); align-items: center; min-width: 0; }
+.xfer-field input:not([type="checkbox"]):not([type="radio"]),
+.xfer-field select, .xfer-field textarea { width: 100%; min-width: 0;
+  max-width: 100%; box-sizing: border-box; }
+@media (min-width: 720px) {
+  .xfer-field label { grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); }
+}
+
+/* (b) Desk width caps: the 720px / 1400px caps strand 2560px screens in a
+ * centered column (gaps worst-gap #1). Base caps stay for laptop widths;
+ * at ≥1440px the plain wrap breathes to min(94vw,1080px) and the market /
+ * pool desk wrap to min(96vw,2200px). .wide (below) always wins by
+ * specificity (0,2,0 > 0,1,0) — full-bleed, uncapped. */
+@media (min-width: 1440px) {
+  .wrap { max-width: min(94vw, 1080px); }
+  .wrap.mkt-wrap { max-width: min(96vw, 2200px); }
+  .wrap.wide { max-width: none; }
+}
+
+/* (c) Market desk ≥1600px: the 5fr/7fr/4fr split squeezes book and stats;
+ * fixed 320px rails let the chart column take the remaining width. Grid
+ * areas are unchanged (same names as the ≥1200px rule above). */
+@media (min-width: 1600px) {
+  .mkt { grid-template-columns: 320px minmax(0, 1fr) 320px; }
+}
+
+/* (d) Page-level overflow safety: a future wide table can only ever clip
+ * inside its own scroll region, never push the page sideways. clip (not
+ * hidden) preserves position:sticky descendants; the hidden line is a
+ * fallback for browsers without clip support. Fixed-width audit
+ * 2026-09-28: no CSS/JS width above 360px except these max-width caps and
+ * min(360px,…) toast/notification bounds — nothing to clamp. */
+html, body { overflow-x: hidden; overflow-x: clip; }
+img, canvas, pre { max-width: 100%; }
+
+/* (e) .wide grid child contract: .wrap.wide becomes a 12-col grid ≥1200px
+ * but no view assigns children to columns (class-only wiring, no DOM
+ * restructuring), so every direct child spans the full row by default with
+ * min-width:0 so grid items can shrink instead of forcing overflow.
+ * Below 1200px the media rule is off and .wide behaves as a plain .wrap.
+ * Scroll regions: pools keeps its horizontal scroll at every width (was
+ * phone-only — the 10-col table needs it wherever it doesn't fit); the
+ * sticky-first-column rule for .node-table is already global (above). */
+@media (min-width: 1200px) {
+  .wrap.wide > * { grid-column: 1 / -1; min-width: 0; }
+  /* Dense tables earn the freed width instead of huddling left. */
+  .wrap.wide table { width: 100%; }
+}
+.pools-scroll { overflow-x: auto; }
+
+/* (f) Voting rows ≥720px: rows are wrapping flex cards with inline styles
+ * (vote-slate.js rowCard — display:flex, wrap, gap; main flex 1 1 200px).
+ * Keep the wrap (worker sub-rows need their own line) but stop the weight
+ * from dropping to a second line: the main cell absorbs shrinkage with
+ * hidden overflow while the weight stays right, intact, on one line. */
+@media (min-width: 720px) {
+  .vote-row-main { min-width: 0; overflow: hidden; }
+  .vote-weight { white-space: nowrap; margin-left: auto; flex-shrink: 0; }
+}

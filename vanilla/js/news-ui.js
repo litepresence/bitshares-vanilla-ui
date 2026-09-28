@@ -79,7 +79,7 @@ var NewsUI = (function () {
     wrap.appendChild(el(doc, "h3", t("news.start_here", "Start here")));
     var list = doc.createElement("ul");
     [["#/market/BTS_USD", t("news.exchange_trade_on_the_dex", "Exchange — trade on the DEX")],
-     ["#/account/overview", t("news.account_overview_balances_and_history", "Account overview — balances and history")],
+     ["#/account/me", t("news.account_overview_balances_and_history", "Account overview — balances and history")],
      ["#/transfer", t("news.transfer_send_assets", "Transfer — send assets")],
      ["#/voting", t("news.voting_witnesses_committee_workers", "Voting — witnesses, committee, workers")],
      ["#/explorer", t("news.explorer_blocks_and_transactions", "Explorer — blocks and transactions")],

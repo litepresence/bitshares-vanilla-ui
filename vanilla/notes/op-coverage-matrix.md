@@ -96,7 +96,7 @@
 | C15 | blocked-users.astro | block accounts from UX | merged in C14 → PORTED (slice-14) |
 | C16 | airdrop_calculate.astro | large-scale airdrops | `/airdrop` (:128) → PORTED view (slice-14; broadcast path via propose flow) |
 | C17 | create_uia, create_smartcoin, smartcoin, smartcoins, issued_assets, publish_feed.astro | UIA/smartcoin/NFT/PMA create/update + feeds | `/assets` (:164), `/assets/create` (:165), `/assets/update/:symbol` (:166), `/assets/issue` (:167), `/assets/feed` (:168), `/asset/:symbol` → PORTED (slice-10: AFKTEST10/M11 lifecycles) |
-| C18 | create_ticket, ticket_leaderboard.astro | vote-lock tickets + leaderboard | `/tickets` (:124) → PORTED view (slice-14; caveat: create broadcast PENDING — 100 TEST fee > 38.8 fixture, faucet rate-limited; tracked, not dropped) |
+| C18 | create_ticket, ticket_leaderboard.astro | vote-lock tickets + leaderboard | `/tickets` (:124) → PORTED view (slice-14; caveat CLOSED: create→update PROVEN on throwaway afk-tkt-75a7 (ticket 1.18.61, blocks 100943508/509)) |
 | C19 | vote, governance, witnesses, committee, committee_parameters.astro | witnesses/committee lists, proxy, voting | merged in A15 → PORTED (slice-08; see A15 caveat) |
 | C20 | explorer, blocks.astro | chain explorer | merged in A16/A18 → PORTED (slice-09) |
 | C21 | transfer.astro | transfer + memo | `/transfer` (:148) + `/transfer/:to` (:147) → PORTED (slice-04: 2 testnet broadcasts) |
@@ -139,4 +139,4 @@
 - Section B (#1 modals/widgets): 19 rows — PORTED 17, DEFERRED 2 (B18 browser warning, B19 issue reporter), MISSING 0.
 - Section C (astro-only pages): 41 rows = 20 PORTED substantive + 11 merge-pointers to §A rows (C1, C19, C20, C22, C25, C28, C32, C33, C38, C39, C41) + 10 DEFERRED (C3 top-ops stats, C23 blind, C27 bid_collateral, C29 LTM op-8, C30 referrer display, C31 fee-schedule table, C34 password change, C35 favourites dashboard, C36 forum, C37 trollbox — all reasoned), MISSING 0.
 - Section D (out-of-scope, decided): 7 items, all with standing-directive reasons.
-- **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. Former STUB routes (A3, A9–A14, A27, A28, A30, A31) all built out in stub batches 1–3 + op-34; no placeholders remain in §A. DEFERRED items each carry a reason + tracking note (C18 tickets-pending-funds is PORTED-view/pending-broadcast, not deferred-dropped).
+- **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. Former STUB routes (A3, A9–A14, A27, A28, A30, A31) all built out in stub batches 1–3 + op-34; no placeholders remain in §A. DEFERRED items each carry a reason + tracking note (C18 tickets PROVEN on-chain, throwaway-funded).

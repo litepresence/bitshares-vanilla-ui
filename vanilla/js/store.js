@@ -20,18 +20,29 @@ var Store = (function () {
     testnet: "39f5e2ede1f8bc1a3a54a7914414e3779e33193f1f5693510e73cb7a87617447"
   };
 
-  var THEMES = ["original-blue", "light", "dark"];
+  var THEMES = ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"];
+
+  /* THEME_MIGRATION: 2026-09-28 rename (original-blue->ref-ui-theme,
+   *   light->vanilla-ui-theme, dark->dex-ux-theme). Applied in loadSettings
+   *   only — the migrated value persists on the next saveSettings (which
+   *   merges from loadSettings), so old envelopes self-heal with no extra
+   *   write here. Params: none (lookup table). Fails: never (pure data). */
+  var THEME_MIGRATION = {
+    "original-blue": "ref-ui-theme",
+    "light": "vanilla-ui-theme",
+    "dark": "dex-ux-theme"
+  };
 
   var listeners = { settings: [], connection: [] };
 
-  /* baseSettings: fresh defaults (mainnet + first node + original-blue + en).
+  /* baseSettings: fresh defaults (mainnet + first node + ref-ui-theme + en).
    *   Params: none. Returns a new settings object. Fails: never (pure). */
   function baseSettings() {
     return {
       network: "mainnet",
       activeNode: DEFAULT_NODES.mainnet[0],
       customNodes: [],
-      theme: "original-blue",
+      theme: "ref-ui-theme",
       locale: "en"
     };
   }
@@ -54,13 +65,16 @@ var Store = (function () {
 
   /* loadSettings: base defaults overlaid with validated stored fields.
    *   Params: none. Returns a fresh settings object. Fails: never throws —
-   *   unknown network/theme fall back to defaults, non-string nodes filtered. */
+   *   unknown network/theme fall back to defaults, non-string nodes filtered.
+   *   Stored pre-rename theme ids pass through THEME_MIGRATION first, so a
+   *   2026-09-27 envelope ("dark") loads as its successor ("dex-ux-theme"). */
   function loadSettings() {
     var base = baseSettings();
     var stored = readStored();
     if (!stored) return base;
     var network = (stored.network === "testnet" || stored.network === "mainnet") ? stored.network : base.network;
-    var theme = (THEMES.indexOf(stored.theme) !== -1) ? stored.theme : base.theme;
+    var rawTheme = THEME_MIGRATION[stored.theme] || stored.theme;
+    var theme = (THEMES.indexOf(rawTheme) !== -1) ? rawTheme : base.theme;
     var customNodes = Array.isArray(stored.customNodes)
       ? stored.customNodes.filter(function (u) { return typeof u === "string"; })
       : [];
