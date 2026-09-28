@@ -2113,7 +2113,8 @@
       "pool.no_my_exchanges",
       "pool.sell_col",
       "pool.tab_my",
-      "pool.tab_pool"
+      "pool.tab_pool",
+      "pool.retry_load"
     ]
   },
   "nav": {
@@ -4326,7 +4327,8 @@
     "no_my_exchanges": "No exchanges for your account in this pool.",
     "sell_col": "Sell",
     "tab_my": "My exchanges",
-    "tab_pool": "Pool history"
+    "tab_pool": "Pool history",
+    "retry_load": "Retry loading."
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",
