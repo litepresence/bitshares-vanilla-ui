@@ -22,11 +22,16 @@ var App = (function () {
     return dflt;
   }
 
-  /* Full-route shell nav (nav-audit rebuild): every router.js list route is
+  /* Full-route shell nav (mega-menu repair): every router.js list route is
    *   one link, grouped Wallet / Exchange / Governance / Explorer / More.
    *   #1 MenuDataStructure.js:66-152 spreads the same areas across its header
-   *   + burger dropdown; vanilla folds both into the one responsive #nav
-   *   (the hamburger toggle + aria-expanded in finishBoot are untouched).
+   *   + burger dropdown; vanilla does the same split: #nav holds ONLY the
+   *   original 7-link bar (ORIGINAL_NAV below), and the full 46-link grouped
+   *   directory lives in a #nav-directory panel inside #nav, visible ONLY
+   *   while #nav.open (hamburger toggle + aria-expanded in finishBoot are
+   *   untouched; the toggle is forced visible at all widths so desktop
+   *   reaches every route too). Rendering all 46 links inline wrapped into a
+   *   3-row desktop mega-menu (seen in /tmp/grid-2560-tall.png) — never again.
    *   Detail routes (/pools/:id, /proposals/:id, /asset/:symbol,
    *   /block/:height, …) open from their list parents — as in #1, where rows
    *   link to details — so only list routes get links. FIX vs the old nav:
@@ -46,6 +51,12 @@ var App = (function () {
       "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/news"] },
     { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/help"] }
   ];
+
+  /* ORIGINAL_NAV: the 7-link header bar — the pre-existing static index.html
+   *   set (Dashboard, Exchange, Account, Transfer, Explorer, Voting, Settings;
+   *   the NAV_ICONS keys below). "#/account/me" keeps the FIX noted above. */
+  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/account/me", "#/transfer",
+    "#/explorer", "#/voting", "#/settings"];
 
   /* Nav icons (icon-wiring pass): href -> vendored icon name. Mapping cites
    *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242,
@@ -121,50 +132,103 @@ var App = (function () {
     }
   }
 
-  /* buildNav: replaces the static index.html links with the grouped
-   *   full-route nav (idempotent; preserves the .open hamburger state so a
-   *   locale switch never collapses the menu). Params: nav element. Returns
-   *   nothing. Fails: never throws — without Icon (script order) links keep
-   *   plain text. flexWrap is set inline (app.css untouched) so the ~45
-   *   desktop links wrap instead of overflowing; group headings are plain
-   *   bold spans until a theme pass styles .nav-group. */
+  /* buildNavLink: one <a> for an href (icon + label span when the href is
+   *   icon-mapped, else plain text). Params: href string, iconOK bool.
+   *   Returns the anchor. Fails: never throws — Icon failures fall back to
+   *   plain text. */
+  function buildNavLink(href, iconOK) {
+    var a = document.createElement("a");
+    a.setAttribute("href", href);
+    var label = navText(href);
+    var icon = NAV_ICONS[href];
+    try {
+      if (icon && iconOK) {
+        a.appendChild(Icon.img(icon, "nav-icon", ""));
+        var span = document.createElement("span");
+        span.className = "nav-label";
+        span.textContent = label;
+        a.appendChild(span);
+      } else {
+        a.textContent = label;
+      }
+    } catch (e) { a.textContent = label; }
+    return a;
+  }
+
+  /* buildDirectory: the grouped 46-link directory panel (lives inside #nav,
+   *   shown only while #nav.open — see syncDirectory). Styling is inline and
+   *   token-driven (var(--panel)/var(--text)/var(--border)) so all three
+   *   themes keep working with app.css/themes.css untouched. Directory links
+   *   reuse #nav a rules (the panel sits inside #nav). Params: iconOK bool.
+   *   Returns the panel div. Fails: never throws — callers guard. */
+  function buildDirectory(iconOK) {
+    var panel = document.createElement("div");
+    panel.id = "nav-directory";
+    try {
+      panel.style.display = "none";
+      panel.style.position = "absolute";
+      panel.style.top = "100%"; panel.style.left = "0"; panel.style.right = "0";
+      panel.style.zIndex = "50";
+      panel.style.background = "var(--panel)"; panel.style.color = "var(--text)";
+      panel.style.borderBottom = "1px solid var(--border)";
+      panel.style.padding = "12px 16px";
+      panel.style.maxHeight = "70vh"; panel.style.overflowY = "auto";
+    } catch (e) { /* unstyled panel stands */ }
+    NAV_GROUPS.forEach(function (group) {
+      var section = document.createElement("div");
+      section.className = "nav-dir-group";
+      try { section.style.margin = "0 0 10px"; } catch (e) { /* stands */ }
+      var head = document.createElement("span");
+      head.className = "nav-group";
+      head.textContent = group.heading;
+      try { head.style.fontWeight = "700"; head.style.display = "block"; head.style.margin = "0 0 4px"; } catch (e) { /* unstyled heading stands */ }
+      section.appendChild(head);
+      var row = document.createElement("div");
+      try { row.style.display = "flex"; row.style.flexWrap = "wrap"; row.style.gap = "4px"; } catch (e) { /* vertical stack stands */ }
+      group.hrefs.forEach(function (href) {
+        row.appendChild(buildNavLink(href, iconOK));
+      });
+      section.appendChild(row);
+      panel.appendChild(section);
+    });
+    return panel;
+  }
+
+  /* syncDirectory: panel visibility follows #nav.open. Params: nav element.
+   *   Returns nothing. Fails: never throws — a missing panel is a no-op. */
+  function syncDirectory(nav) {
+    try {
+      var panel = nav.querySelector("#nav-directory");
+      if (!panel) return;
+      panel.style.display = nav.classList.contains("open") ? "block" : "none";
+    } catch (e) { /* panel keeps prior state */ }
+  }
+
+  /* buildNav: 7-link bar + burger directory (idempotent; preserves the .open
+   *   hamburger state so a locale switch never collapses the menu). Params:
+   *   nav element. Returns nothing. Fails: never throws — without Icon
+   *   (script order) links keep plain text. */
   function buildNav(nav) {
     if (!nav || typeof document === "undefined") return;
     var wasOpen = nav.classList.contains("open");
     var iconOK = (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function");
-    try { nav.style.flexWrap = "wrap"; } catch (e) { /* static CSS stands */ }
+    try { nav.style.position = "relative"; } catch (e) { /* static CSS stands */ }
     while (nav.firstChild) nav.removeChild(nav.firstChild);
-    NAV_GROUPS.forEach(function (group) {
-      var head = document.createElement("span");
-      head.className = "nav-group";
-      head.textContent = group.heading;
-      try { head.style.fontWeight = "700"; head.style.alignSelf = "center"; } catch (e) { /* unstyled heading stands */ }
-      nav.appendChild(head);
-      group.hrefs.forEach(function (href) {
-        var a = document.createElement("a");
-        a.setAttribute("href", href);
-        var label = navText(href);
-        var icon = NAV_ICONS[href];
-        try {
-          if (icon && iconOK) {
-            a.appendChild(Icon.img(icon, "nav-icon", ""));
-            var span = document.createElement("span");
-            span.className = "nav-label";
-            span.textContent = label;
-            a.appendChild(span);
-          } else {
-            a.textContent = label;
-          }
-        } catch (e) { a.textContent = label; }
-        nav.appendChild(a);
-      });
+    ORIGINAL_NAV.forEach(function (href) {
+      nav.appendChild(buildNavLink(href, iconOK));
     });
     /* Burger-menu theme copy (rebuilt with the nav so locale switches and
-     * re-renders never lose it; the current theme is re-read inside). */
+     * re-renders never lose it; the current theme is re-read inside). Sits
+     * on the bar — reachable without opening the directory. */
     try {
       nav.appendChild(buildThemeSwitcher(document, "nav", false));
     } catch (e) { /* nav works without the theme copy */ }
+    /* Grouped directory: every NAV_GROUPS link, visible only while open. */
+    try {
+      nav.appendChild(buildDirectory(iconOK));
+    } catch (e) { /* bar works without the directory */ }
     if (wasOpen) nav.classList.add("open");
+    syncDirectory(nav);
   }
 
   /* ensureToggleIcon: paint the ☰ menu button with the vendored hamburger
@@ -394,7 +458,6 @@ var App = (function () {
     Store.subscribe("settings", onSettings);
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
-    if (nav) buildNav(nav);
     /* Header theme copy: sits on the bar before the hamburger toggle, so it
      * is visible without opening any menu (guarded: exactly one copy). */
     try {
@@ -405,10 +468,17 @@ var App = (function () {
     } catch (e) { /* settings-page select remains the switcher */ }
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
+    if (toggle) {
+      /* Hamburger at ALL widths (mega-menu repair): app.css shows #nav-toggle
+       * only at <=719px, but the grouped directory must open on desktop too,
+       * so the toggle is forced visible inline (CSS files untouched). */
+      try { toggle.style.display = "inline-flex"; toggle.style.alignItems = "center"; toggle.style.justifyContent = "center"; } catch (e) { /* CSS standing */ }
+    }
     if (toggle && nav) {
       toggle.addEventListener("click", function () {
         var open = nav.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        syncDirectory(nav);
       });
     }
     connect(settings.activeNode);
