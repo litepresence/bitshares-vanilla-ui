@@ -42,6 +42,8 @@
   "shell": {
     "brand": "BitShares",
     "menu": "Menu",
+    "menu_filter": "Filter menu",
+    "menu_no_match": "No matching pages.",
     "badge_initial": "connecting…",
     "not_ported_suffix": " — not yet ported; tracked in slice N",
     "page_not_found": "Page Not Found",

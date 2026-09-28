@@ -152,77 +152,110 @@ var App = (function () {
         a.textContent = label;
       }
     } catch (e) { a.textContent = label; }
+    /* Active-route highlight (command-palette findability): exact hash match
+     * gets aria-current; refreshed on every buildNav (boot, locale, hash). */
+    try {
+      var h = (typeof location !== "undefined" && location.hash) || "#/";
+      if (h === href) a.setAttribute("aria-current", "page");
+    } catch (e) { /* highlight skipped */ }
     return a;
   }
 
-  /* buildDirectory: the grouped 46-link directory panel (lives inside #nav,
-   *   shown only while #nav.open — see syncDirectory). Styling is inline and
-   *   token-driven (var(--panel)/var(--text)/var(--border)) so all three
-   *   themes keep working with app.css/themes.css untouched. Directory links
-   *   reuse #nav a rules (the panel sits inside #nav). Params: iconOK bool.
-   *   Returns the panel div. Fails: never throws — callers guard. */
+  /* buildDirectory: grouped 46-link command palette (lives inside #nav,
+   *   shown only while #nav.open via app.css — no inline positioning).
+   *   Search filters by label+href substring (case-insensitive, no lib);
+   *   empty groups hide, empty query shows all; no-match shows a note.
+   *   Link click closes the panel (wired here); Esc + hashchange close it
+   *   (wired once in finishBoot). Styling is class-driven in app.css so all
+   *   three themes keep working. Returns the panel div. Never throws. */
   function buildDirectory(iconOK) {
     var panel = document.createElement("div");
     panel.id = "nav-directory";
-    try {
-      panel.style.display = "none";
-      panel.style.position = "absolute";
-      panel.style.top = "100%"; panel.style.left = "0"; panel.style.right = "0";
-      panel.style.zIndex = "50";
-      panel.style.background = "var(--panel)"; panel.style.color = "var(--text)";
-      panel.style.borderBottom = "1px solid var(--border)";
-      panel.style.padding = "12px 16px";
-      panel.style.maxHeight = "70vh"; panel.style.overflowY = "auto";
-    } catch (e) { /* unstyled panel stands */ }
+    panel.setAttribute("role", "search");
+    var search = document.createElement("input");
+    search.type = "search";
+    search.className = "nav-dir-search";
+    search.setAttribute("aria-label", t("shell.menu_filter", "Filter menu"));
+    search.placeholder = t("shell.menu_filter", "Filter menu");
+    try { search.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+    panel.appendChild(search);
+    var empty = document.createElement("p");
+    empty.className = "nav-dir-empty muted";
+    empty.textContent = t("shell.menu_no_match", "No matching pages.");
+    empty.style.display = "none";
+    var sections = [];
     NAV_GROUPS.forEach(function (group) {
       var section = document.createElement("div");
       section.className = "nav-dir-group";
-      try { section.style.margin = "0 0 10px"; } catch (e) { /* stands */ }
       var head = document.createElement("span");
       head.className = "nav-group";
       head.textContent = group.heading;
-      try { head.style.fontWeight = "700"; head.style.display = "block"; head.style.margin = "0 0 4px"; } catch (e) { /* unstyled heading stands */ }
       section.appendChild(head);
       var row = document.createElement("div");
-      try { row.style.display = "flex"; row.style.flexWrap = "wrap"; row.style.gap = "4px"; } catch (e) { /* vertical stack stands */ }
+      row.className = "nav-dir-row";
       group.hrefs.forEach(function (href) {
-        row.appendChild(buildNavLink(href, iconOK));
+        var a = buildNavLink(href, iconOK);
+        try { a.dataset.search = (navText(href) + " " + href).toLowerCase(); } catch (e) { /* filter skips */ }
+        a.addEventListener("click", function () { closeDirectory(true); });
+        row.appendChild(a);
       });
       section.appendChild(row);
       panel.appendChild(section);
+      sections.push(section);
+    });
+    panel.appendChild(empty);
+    search.addEventListener("input", function () {
+      var q = "";
+      try { q = (search.value || "").toLowerCase(); } catch (e) { q = ""; }
+      var shown = 0;
+      sections.forEach(function (section) {
+        var links = section.querySelectorAll("a");
+        var vis = 0;
+        Array.prototype.forEach.call(links, function (a) {
+          var hay = "";
+          try { hay = a.dataset.search || (a.textContent || "").toLowerCase(); } catch (e) { hay = ""; }
+          var hit = !q || hay.indexOf(q) !== -1;
+          a.style.display = hit ? "" : "none";
+          if (hit) vis++;
+        });
+        section.style.display = vis ? "" : "none";
+        shown += vis;
+      });
+      empty.style.display = shown ? "none" : "block";
     });
     return panel;
   }
 
-  /* syncDirectory: panel visibility follows #nav.open. Params: nav element.
-   *   Returns nothing. Fails: never throws — a missing panel is a no-op. */
-  function syncDirectory(nav) {
+  /* closeDirectory: collapse #nav.open, refocus the toggle (focus-return).
+   * Params: refocus bool. Never throws — missing DOM is a no-op. */
+  function closeDirectory(refocus) {
     try {
-      var panel = nav.querySelector("#nav-directory");
-      if (!panel) return;
-      panel.style.display = nav.classList.contains("open") ? "block" : "none";
-    } catch (e) { /* panel keeps prior state */ }
+      var nav = document.getElementById("nav");
+      var toggle = document.getElementById("nav-toggle");
+      if (!nav || !nav.classList.contains("open")) return;
+      nav.classList.remove("open");
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+      syncDirectory(nav);
+      if (refocus && toggle && typeof toggle.focus === "function") toggle.focus();
+    } catch (e) { /* menu keeps prior state */ }
   }
 
-  /* buildNav: 7-link bar + burger directory (idempotent; preserves the .open
-   *   hamburger state so a locale switch never collapses the menu). Params:
-   *   nav element. Returns nothing. Fails: never throws — without Icon
-   *   (script order) links keep plain text. */
+  /* syncDirectory: compat no-op — visibility is class-driven
+   *   (#nav.open #nav-directory in app.css). Kept so callers never throw. */
+  function syncDirectory(nav) { return; }
+
+  /* buildNav: 7-link bar + command-palette directory (idempotent; preserves
+   *   the .open state so a locale switch never collapses the menu). Theme
+   *   switching lives in settings + the header-bar copy (finishBoot) — the
+   *   old second copy inside #nav was crowding the palette and is gone. */
   function buildNav(nav) {
     if (!nav || typeof document === "undefined") return;
     var wasOpen = nav.classList.contains("open");
     var iconOK = (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function");
-    try { nav.style.position = "relative"; } catch (e) { /* static CSS stands */ }
     while (nav.firstChild) nav.removeChild(nav.firstChild);
     ORIGINAL_NAV.forEach(function (href) {
       nav.appendChild(buildNavLink(href, iconOK));
     });
-    /* Burger-menu theme copy (rebuilt with the nav so locale switches and
-     * re-renders never lose it; the current theme is re-read inside). Sits
-     * on the bar — reachable without opening the directory. */
-    try {
-      nav.appendChild(buildThemeSwitcher(document, "nav", false));
-    } catch (e) { /* nav works without the theme copy */ }
     /* Grouped directory: every NAV_GROUPS link, visible only while open. */
     try {
       nav.appendChild(buildDirectory(iconOK));
@@ -468,18 +501,38 @@ var App = (function () {
     } catch (e) { /* settings-page select remains the switcher */ }
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
-    if (toggle) {
-      /* Hamburger at ALL widths (mega-menu repair): app.css shows #nav-toggle
-       * only at <=719px, but the grouped directory must open on desktop too,
-       * so the toggle is forced visible inline (CSS files untouched). */
-      try { toggle.style.display = "inline-flex"; toggle.style.alignItems = "center"; toggle.style.justifyContent = "center"; } catch (e) { /* CSS standing */ }
-    }
     if (toggle && nav) {
       toggle.addEventListener("click", function () {
         var open = nav.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
         syncDirectory(nav);
+        /* Focus the filter on open (keyboard path); focus-return on close
+         * lives in closeDirectory. Never throws — missing search is fine. */
+        if (open) {
+          try {
+            var q = nav.querySelector(".nav-dir-search");
+            if (q && typeof q.focus === "function") q.focus();
+          } catch (e) { /* toggle keeps focus */ }
+        }
       });
+      /* Esc closes + refocuses; route change closes without stealing focus. */
+      try {
+        document.addEventListener("keydown", function (ev) {
+          if ((ev && ev.key === "Escape") || (ev && ev.keyCode === 27)) closeDirectory(true);
+        });
+        window.addEventListener("hashchange", function () {
+          try {
+            var n = document.getElementById("nav");
+            var tg = document.getElementById("nav-toggle");
+            if (n && n.classList.contains("open")) {
+              n.classList.remove("open");
+              if (tg) tg.setAttribute("aria-expanded", "false");
+            }
+          } catch (e) { /* menu keeps prior state */ }
+          /* Active highlight follows the new hash on next rebuild. */
+          try { if (typeof localizeShell === "function") localizeShell(); } catch (e) { /* highlight skips */ }
+        });
+      } catch (e) { /* click-toggle still works */ }
     }
     connect(settings.activeNode);
   }

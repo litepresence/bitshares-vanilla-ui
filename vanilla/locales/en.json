@@ -36,6 +36,8 @@
       "settings.down",
       "shell.brand",
       "shell.menu",
+      "shell.menu_filter",
+      "shell.menu_no_match",
       "shell.badge_initial",
       "shell.not_ported_suffix",
       "shell.page_not_found",
@@ -2159,6 +2161,8 @@
   "shell": {
     "brand": "BitShares",
     "menu": "Menu",
+    "menu_filter": "Filter menu",
+    "menu_no_match": "No matching pages.",
     "badge_initial": "connecting…",
     "not_ported_suffix": " — not yet ported; tracked in slice N",
     "page_not_found": "Page Not Found",
