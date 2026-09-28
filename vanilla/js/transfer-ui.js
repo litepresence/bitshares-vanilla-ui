@@ -89,7 +89,7 @@ var TransferUI = (function () {
 
   function makeWrap(doc, root) {
     var wrap = doc.createElement("div");
-    wrap.className = "wrap";
+    wrap.className = "wrap wide";
     root.appendChild(wrap);
     return wrap;
   }

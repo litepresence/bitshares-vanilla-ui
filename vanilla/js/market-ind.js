@@ -1,21 +1,29 @@
 /* MarketInd: chart data prep + pane rendering for the DEX desk (timeframes,
- *   stats strip, overlays, stacked oscillator panes, depth).
+ *   stats strip, overlays, stacked oscillator panes, depth, VWAP strip).
  * Owns: timeframe bucket constants + bucketLabel, theme chart colors
  *   (readVar/themeChartColors), indicator lookup (ind), pixel converters
  *   (numOrNull/numOrNaN — chart-pixel inputs only, kept next to the fill path
  *   they serve), price overlays (priceOverlays), one-pane series builder
  *   (oscOne), header stats strip (renderStrip), candle-count note
- *   (paintCountNote), timeframe radios (paintTimeframes), chart cache +
- *   redraw (maybeDraw/drawCharts). No fetching, no timers, no signing.
+ *   (paintCountNote), timeframe radios (paintTimeframes), session VWAP +
+ *   spread-band canvas strip (drawVwap, dex-ux proposal 3 — collapsible,
+ *   inside the mkt-charts grid area), chart cache + redraw
+ *   (maybeDraw/drawCharts). No fetching, no timers, no signing.
  * Consumes: MarketCharts.drawPricePane/drawOscPane/drawDepth/removePane (via
- *   global), Indicators.* (via ind(), guarded — null means unavailable).
+ *   global), MarketCandles.vwap (session math, guarded — missing means the
+ *   strip renders "unavailable"), Indicators.* (via ind(), guarded — null
+ *   means unavailable).
  * Globals/side effects: DOM under caller-provided hosts only (price/osc hosts
- *   owned by the desk's state object, never stored here); global MarketInd
- *   only. bucketLabel/paintTimeframes take an onBucket callback for refetch so
- *   this file never calls the desk's fill (one-way dependency: desk → ind).
+ *   owned by the desk's state object, never stored here — plus one lazy
+ *   #mkt-vwap-wrap sibling of the price host, tracked on state.vwapWrap);
+ *   global MarketInd only. bucketLabel/paintTimeframes take an onBucket
+ *   callback for refetch so this file never calls the desk's fill (one-way
+ *   dependency: desk → ind).
  * Created by: building-vanilla-slices skill, slice-18 audit (market-ui split —
  *   moved verbatim from market-ui.js strip/cell/timeframe/overlay/draw bodies;
  *   fill-nested helpers re-parameterized to (doc, state), bodies unchanged).
+ * Extended by: dex-ux plots task (AFK round — proposal 3 VWAP strip,
+ *   chain-history only, ES refused).
  */
 var MarketInd = (function () {
   "use strict";
@@ -116,6 +124,185 @@ var MarketInd = (function () {
   /* Null/non-finite -> NaN (Indicators warmup convention). */
   function numOrNaN(v) {
     return (typeof v === "number" && isFinite(v)) ? v : NaN;
+  }
+
+  /* DPR-aware canvas fit (plain duplicate of the market-book.js helper —
+   * doctrine prefers duplication over a shared chart abstraction). Returns
+   * {ctx, w, h} CSS pixels, or null when unusable. */
+  function fitCanvas(canvas, cssH) {
+    if (!canvas || typeof canvas.getContext !== "function") return null;
+    var w = canvas.clientWidth;
+    if (!w && canvas.parentNode && canvas.parentNode.clientWidth) {
+      w = canvas.parentNode.clientWidth;
+    }
+    if (!w || w <= 0) w = 300;
+    var dpr = 1;
+    try {
+      if (typeof window !== "undefined" && window.devicePixelRatio) {
+        dpr = window.devicePixelRatio;
+      }
+    } catch (e) { dpr = 1; }
+    canvas.style.width = "100%";
+    canvas.style.height = cssH + "px";
+    /* Pixel sizing below is Number() on layout pixels only — never money. */
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssH);
+    return { ctx: ctx, w: w, h: cssH };
+  }
+
+  /* Session VWAP + spread band strip (dex-ux proposal 3). Data: the cached
+   * candle buckets (history get_market_history via MarketCandles.candles —
+   * chain-history ONLY, ES refused) plus the desk's asset precisions; math
+   * lives in MarketCandles.vwap (BigInt accumulation, humans via Format).
+   * Renders a collapsible <details open> canvas 2D strip as a SIBLING after
+   * the price host — still INSIDE the mkt-charts grid area (no grid
+   * restructure, LWC price pane untouched): per-bucket VWAP line (accent),
+   * high/low spread band (accent fill, alpha 0.15), session VWAP dashed
+   * line with the exact human string as label. Honest empties: no buckets
+   * -> "No bucket history"; missing math/precisions -> "unavailable".
+   * Rebuilt on every drawCharts call (same redraw path as theme/resize). */
+  function drawVwap(state, C) {
+    var doc = state.doc;
+    var host = state.priceHost;
+    if (!doc || !host || !host.parentNode) return;
+    var parent = host.parentNode;
+    var wrap = state.vwapWrap || null;
+    if (!wrap || wrap.parentNode !== parent ||
+        (typeof wrap.isConnected === "boolean" && !wrap.isConnected)) {
+      wrap = doc.createElement("div");
+      wrap.id = "mkt-vwap-wrap";
+      try {
+        if (host.nextSibling) parent.insertBefore(wrap, host.nextSibling);
+        else parent.appendChild(wrap);
+      } catch (e) { return; }
+      state.vwapWrap = wrap;
+    }
+    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+    var det = doc.createElement("details");
+    det.className = "plot mkt-vwap";
+    det.setAttribute("open", "");
+    var sum = doc.createElement("summary");
+    sum.setAttribute("aria-label", t("market_ind.vwap_label", "Session VWAP and spread band plot"));
+    touchable(sum);
+    sum.textContent = t("market_ind.vwap", "Session VWAP + spread");
+    det.appendChild(sum);
+    wrap.appendChild(det);
+    var buckets = (state.chartData && Array.isArray(state.chartData.buckets))
+      ? state.chartData.buckets : [];
+    var assets = state.assets || null;
+    if (buckets.length === 0) {
+      det.appendChild(el(doc, "p",
+        t("market_ind.vwap_no_history", "No bucket history — VWAP unavailable on this market."), "muted"));
+      return;
+    }
+    if (typeof MarketCandles === "undefined" || !MarketCandles ||
+        typeof MarketCandles.vwap !== "function" ||
+        !assets || !assets.base || !assets.quote ||
+        typeof assets.base.precision !== "number" ||
+        typeof assets.quote.precision !== "number") {
+      det.appendChild(el(doc, "p",
+        t("market_ind.vwap_unavailable", "VWAP unavailable (bucket math or asset precisions missing)."), "muted"));
+      return;
+    }
+    var v;
+    try {
+      v = MarketCandles.vwap(buckets, assets.base.precision, assets.quote.precision);
+    } catch (e) {
+      det.appendChild(el(doc, "p",
+        t("market_ind.vwap_unavailable", "VWAP unavailable (bucket math or asset precisions missing)."), "muted"));
+      return;
+    }
+    if (!v || !Array.isArray(v.per) || v.per.length === 0 || v.human === null) {
+      det.appendChild(el(doc, "p",
+        t("market_ind.vwap_no_volume", "No bucket volume — VWAP needs fills in this session."), "muted"));
+      return;
+    }
+    var note = el(doc, "p",
+      t("market_ind.vwap_session", "Session VWAP") + ": " + String(v.human) +
+      " " + assets.base.symbol + "/" + assets.quote.symbol +
+      (v.skipped > 0 ? " · " + String(v.skipped) + " " +
+        t("market_ind.vwap_skipped", "empty slots skipped") : ""),
+      "muted");
+    det.appendChild(note);
+    var canvas = doc.createElement("canvas");
+    canvas.className = "mkt-canvas";
+    det.appendChild(canvas);
+    var g = fitCanvas(canvas, 140);
+    if (!g) return;
+    var n = v.per.length;
+    /* Pixel series below are Number() on human-string coordinates only
+     * (chart positions, never money — integer math already settled in
+     * MarketCandles.vwap). */
+    var vs = [], hs = [], ls = [], i;
+    for (i = 0; i < n; i++) {
+      vs.push(Number(v.per[i].vwap));
+      hs.push(Number(v.per[i].high));
+      ls.push(Number(v.per[i].low));
+    }
+    var lo = Infinity, hi = -Infinity;
+    for (i = 0; i < n; i++) {
+      if (isFinite(ls[i]) && ls[i] < lo) lo = ls[i];
+      if (isFinite(hs[i]) && hs[i] > hi) hi = hs[i];
+    }
+    if (!(hi > lo)) { hi = lo + 1; lo = lo - 1; }
+    var sess = Number(v.human);
+    if (isFinite(sess)) {
+      if (sess < lo) lo = sess;
+      if (sess > hi) hi = sess;
+    }
+    var padL = 8, padR = 8, padT = 24, padB = 18;
+    var plotW = g.w - padL - padR;
+    var plotH = g.h - padT - padB;
+    function x(i) { return padL + (n <= 1 ? plotW / 2 : (i * plotW) / (n - 1)); }
+    function y(val) { return padT + (1 - (val - lo) / (hi - lo)) * plotH; }
+    var ctx = g.ctx;
+    /* Spread band: high edge forward, low edge back, accent at 0.15. */
+    ctx.beginPath();
+    for (i = 0; i < n; i++) {
+      if (!isFinite(hs[i])) continue;
+      if (i === 0) ctx.moveTo(x(i), y(hs[i]));
+      else ctx.lineTo(x(i), y(hs[i]));
+    }
+    for (i = n - 1; i >= 0; i--) {
+      if (isFinite(ls[i])) ctx.lineTo(x(i), y(ls[i]));
+    }
+    ctx.closePath();
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = C.accent;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    /* VWAP line, breaking across non-finite slots (never dives to zero). */
+    ctx.strokeStyle = C.accent;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    var started = false, drew = false;
+    for (i = 0; i < n; i++) {
+      if (!isFinite(vs[i])) { started = false; continue; }
+      if (!started) { ctx.moveTo(x(i), y(vs[i])); started = true; }
+      else ctx.lineTo(x(i), y(vs[i]));
+      drew = true;
+    }
+    if (drew) ctx.stroke();
+    /* Session line (dashed muted) + verbatim human label. */
+    if (isFinite(sess)) {
+      ctx.strokeStyle = C.muted;
+      ctx.lineWidth = 1;
+      try { ctx.setLineDash([5, 4]); } catch (e) { /* solid stands */ }
+      ctx.beginPath();
+      ctx.moveTo(padL, y(sess));
+      ctx.lineTo(padL + plotW, y(sess));
+      ctx.stroke();
+      try { ctx.setLineDash([]); } catch (e) { /* no-op */ }
+      ctx.fillStyle = C.muted;
+      ctx.font = "11px system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("VWAP " + String(v.human), g.w - 6, y(sess) - 4);
+      ctx.textAlign = "left";
+    }
   }
 
   /* Price-pane overlay lines from the picker checkboxes. Each entry is
@@ -335,6 +522,12 @@ var MarketInd = (function () {
         previous: state.panes.price
       });
     } catch (e) { /* pane failure must not break the desk */ }
+    /* VWAP + spread strip (proposal 3): same redraw path, own canvas, the
+     * LWC price pane above is untouched. Pane failure must not break it
+     * either — drawVwap guards internally and fails to honest text. */
+    try {
+      drawVwap(state, C);
+    } catch (e) { /* strip failure must not break the desk */ }
     try {
       if (!state.panes.oscs) state.panes.oscs = {};
       if (!state.paneEls) state.paneEls = {};

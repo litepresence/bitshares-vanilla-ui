@@ -1,15 +1,23 @@
 /* MarketBook: order-book + recent-trades rendering for the DEX desk.
  * Owns: book side tables/cards with depth shading, spread/midpoint header
- *   text, trades tables/cards with raw-JSON details. No fetching, no timers,
- *   no signing — pure DOM fill from caller-supplied data.
+ *   text, trades tables/cards with raw-JSON details, plus the cumulative
+ *   depth staircase canvas (dex-ux plot proposal 1, canvas 2D step-fill from
+ *   Market.depth points — collapsible, inside the mkt-book grid area).
+ *   The fill-size tape histogram (proposal 2) is owned by MarketOrders and
+ *   mounted here into the recent-trades pane (mkt-trades area) when loaded.
+ *   No fetching, no timers, no signing — pure DOM fill from
+ *   caller-supplied data.
  * Consumes: Market (depth computation only, via global — same as before the
- *   split), Format not needed (chain-human strings render verbatim).
+ *   split), MarketOrders.renderTape (optional tape histogram, guarded),
+ *   Format not needed (chain-human strings render verbatim).
  * Globals/side effects: DOM under the given parent element only; global
  *   MarketBook only. Exact decimal-string math is a private copy of the
  *   market-ui.js helpers (split/add/sub/half/trim: BigInt + digit loops —
- *   binary float never touches money); Number() appears ONLY for depth-bar
- *   widths (pixels, same as before).
+ *   binary float never touches money); Number() appears ONLY for canvas
+ *   pixels and depth-bar widths (commented at each site).
  * Created by: building-vanilla-slices skill, slice-05 refactor (market-ui split).
+ * Extended by: dex-ux plots task (AFK round — proposals 1+2, chain-history
+ *   only, no new chain methods).
  */
 var MarketBook = (function () {
   "use strict";
@@ -120,6 +128,170 @@ var MarketBook = (function () {
     } catch (e) {
       return null;
     }
+  }
+
+  /* Read a CSS custom property off <html> (theme-aware plot colors);
+   * falls back headlessly. Token-driven: all three renamed themes supply
+   * --buy/--sell/--accent/--border/--muted/--text (themes.css). */
+  function cssVar(name, fallback) {
+    try {
+      if (typeof getComputedStyle !== "undefined" && typeof document !== "undefined") {
+        var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+        if (v && v.trim()) return v.trim();
+      }
+    } catch (e) { /* fallback stands */ }
+    return fallback;
+  }
+
+  /* Size a canvas to its layout width (300px fallback when hidden) at a fixed
+   * CSS height, scaled by devicePixelRatio. Returns {ctx, w, h} CSS pixels,
+   * or null when the canvas is unusable. Plain duplicate of the
+   * market-charts.js fit helper (doctrine: duplicated plain code over a
+   * shared abstraction with a future migration cost). */
+  function fitCanvas(canvas, cssH) {
+    if (!canvas || typeof canvas.getContext !== "function") return null;
+    var w = canvas.clientWidth;
+    if (!w && canvas.parentNode && canvas.parentNode.clientWidth) {
+      w = canvas.parentNode.clientWidth;
+    }
+    if (!w || w <= 0) w = 300;
+    var dpr = 1;
+    try {
+      if (typeof window !== "undefined" && window.devicePixelRatio) {
+        dpr = window.devicePixelRatio;
+      }
+    } catch (e) { dpr = 1; }
+    canvas.style.width = "100%";
+    canvas.style.height = cssH + "px";
+    /* Pixel sizing below is Number() on layout pixels only — never money. */
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    var ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, cssH);
+    return { ctx: ctx, w: w, h: cssH };
+  }
+
+  /* Centered muted empty text on a fitted canvas (never a blank canvas). */
+  function canvasEmpty(g, text, muted) {
+    g.ctx.fillStyle = muted;
+    g.ctx.font = "13px system-ui, sans-serif";
+    g.ctx.textAlign = "center";
+    /* Pixel centering only (g.w/g.h are CSS-pixel layout sizes). */
+    g.ctx.fillText(text, g.w / 2, g.h / 2);
+    g.ctx.textAlign = "left";
+  }
+
+  /* Cumulative depth staircase (dex-ux proposal 1 — the portable pattern is
+   * json_to_html.py:24-44 cumulative quote-volume + main.js:267-338
+   * plotDepth step-fill; we port the MATH, never Plotly). Cumulative sums
+   * are already exact upstream (Market.depth totals via BigInt decimal
+   * addition; totalBaseStr kept per point); here each point's priceFloat /
+   * totalBase becomes a step corner via Number() for PIXELS ONLY (chart
+   * coordinates, never money — raw integers never enter). Renders as a
+   * collapsible <details open> INSIDE the mkt-book grid area (no grid
+   * restructure): bids green steps + asks red steps with a filled band to
+   * the baseline. Empty both sides -> honest muted sentence, no canvas. */
+  function drawStaircase(doc, parentEl, depth) {
+    var bids = depth && Array.isArray(depth.bids) ? depth.bids : [];
+    var asks = depth && Array.isArray(depth.asks) ? depth.asks : [];
+    function finite(side) {
+      return side.filter(function (p) {
+        return p && typeof p.priceFloat === "number" && isFinite(p.priceFloat) &&
+          typeof p.totalBase === "number" && isFinite(p.totalBase);
+      });
+    }
+    var fb = finite(bids), fa = finite(asks);
+    if (fb.length === 0 && fa.length === 0) {
+      parentEl.appendChild(el(doc, "p",
+        t("market_book.no_depth_plot", "No depth data — the book is empty on both sides."), "muted"));
+      return;
+    }
+    var det = doc.createElement("details");
+    det.className = "plot mkt-depth-plot";
+    det.setAttribute("open", "");
+    var sum = doc.createElement("summary");
+    sum.setAttribute("aria-label", t("market_book.depth_plot_label", "Cumulative depth staircase plot"));
+    touchable(sum);
+    sum.textContent = t("market_book.depth_plot", "Depth staircase");
+    det.appendChild(sum);
+    var canvas = doc.createElement("canvas");
+    canvas.className = "mkt-canvas";
+    det.appendChild(canvas);
+    parentEl.appendChild(det);
+    var g = fitCanvas(canvas, 180);
+    if (!g) return;
+    var buy = cssVar("--buy", "#22d173");
+    var sell = cssVar("--sell", "#e3745b");
+    var muted = cssVar("--muted", "#777777");
+    var text = cssVar("--text", "#c5cbce");
+    var all = fb.concat(fa);
+    var pmin = Infinity, pmax = -Infinity, tmax = 0, i;
+    /* Min/max scan over pixel inputs only (layout domain, not money). */
+    for (i = 0; i < all.length; i++) {
+      if (all[i].priceFloat < pmin) pmin = all[i].priceFloat;
+      if (all[i].priceFloat > pmax) pmax = all[i].priceFloat;
+      if (all[i].totalBase > tmax) tmax = all[i].totalBase;
+    }
+    if (!(pmax > pmin)) { pmax = pmin + 1; pmin = pmin - 1; }
+    if (!(tmax > 0)) tmax = 1;
+    var padL = 8, padR = 8, padT = 24, padB = 18;
+    var plotW = g.w - padL - padR;
+    var plotH = g.h - padT - padB;
+    function x(v) { return padL + ((v - pmin) / (pmax - pmin)) * plotW; }
+    function y(v) { return padT + (1 - v / tmax) * plotH; }
+    function stair(side, color) {
+      var pts = side.slice().sort(function (a, b) { return a.priceFloat - b.priceFloat; });
+      if (pts.length === 0) return;
+      var ctx = g.ctx;
+      ctx.beginPath();
+      ctx.moveTo(x(pts[0].priceFloat), y(0));
+      var j, prev = 0;
+      for (j = 0; j < pts.length; j++) {
+        ctx.lineTo(x(pts[j].priceFloat), y(prev));
+        ctx.lineTo(x(pts[j].priceFloat), y(pts[j].totalBase));
+        prev = pts[j].totalBase;
+      }
+      ctx.lineTo(x(pts[pts.length - 1].priceFloat), y(0));
+      ctx.closePath();
+      ctx.globalAlpha = 0.25;
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      prev = 0;
+      for (j = 0; j < pts.length; j++) {
+        if (j === 0) ctx.moveTo(x(pts[j].priceFloat), y(prev));
+        else ctx.lineTo(x(pts[j].priceFloat), y(prev));
+        ctx.lineTo(x(pts[j].priceFloat), y(pts[j].totalBase));
+        prev = pts[j].totalBase;
+      }
+      ctx.stroke();
+    }
+    stair(fb, buy);
+    stair(fa, sell);
+    /* Legend swatches + exact cumulative totals (verbatim totalBaseStr
+     * strings from Market.depth — never recomputed here). */
+    var ctx = g.ctx;
+    ctx.font = "11px system-ui, sans-serif";
+    var lx = 8;
+    [["Bid", buy], ["Ask", sell]].forEach(function (e) {
+      ctx.fillStyle = e[1];
+      ctx.fillRect(lx, 6, 10, 10);
+      ctx.fillStyle = muted;
+      ctx.fillText(e[0], lx + 14, 15);
+      lx += ctx.measureText(e[0]).width + 30;
+    });
+    ctx.fillStyle = text;
+    ctx.textAlign = "right";
+    var lastB = fb.length ? fb[fb.length - 1].totalBaseStr : null;
+    var lastA = fa.length ? fa[fa.length - 1].totalBaseStr : null;
+    var tot = [lastB, lastA].filter(function (s) { return s !== null; }).join(" / ");
+    if (tot) ctx.fillText("Σ " + tot, g.w - 6, g.h - 6);
+    ctx.textAlign = "left";
   }
 
   /* Compact ISO time ("2026-09-26T12:00:00" from "…T…Z"); verbatim fallback. */
@@ -279,6 +451,9 @@ var MarketBook = (function () {
     parentEl.appendChild(grid);
     renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse());
     renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids);
+    /* Depth staircase plot (proposal 1): collapsible canvas inside the
+     * mkt-book area, drawn from the same depth points as the row bars. */
+    drawStaircase(doc, parentEl, depth);
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
@@ -292,6 +467,8 @@ var MarketBook = (function () {
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
     if (!rows || rows.length === 0) {
       parentEl.appendChild(el(doc, "p", t("market.no_fills", "No recent fills on this market."), "muted"));
+      /* Honest tape empty state too (same guarded mount as below). */
+      mountTape(doc, parentEl, []);
       return;
     }
     var table = doc.createElement("table");
@@ -327,7 +504,22 @@ var MarketBook = (function () {
       cards.appendChild(card);
     });
     parentEl.appendChild(cards);
+    /* Fill-size tape histogram (proposal 2, owned by MarketOrders): mounts
+     * into this same mkt-trades pane from the already-fetched fill rows —
+     * no new chain call. Guarded: trades render fully when the module is
+     * absent (same convention as TradeUI guards in market-orders.js). */
+    mountTape(doc, parentEl, rows);
     rawDetails(doc, parentEl, t("market.raw_fills", "Raw fills"), rows.map(function (r) { return r.raw; }));
+  }
+
+  /* Guarded tape mount (single call site for both trades branches above). */
+  function mountTape(doc, parentEl, rows) {
+    try {
+      if (typeof MarketOrders !== "undefined" && MarketOrders &&
+          typeof MarketOrders.renderTape === "function") {
+        MarketOrders.renderTape(doc, parentEl, rows);
+      }
+    } catch (e) { /* tape is optional decoration; trades stand alone */ }
   }
 
   return {

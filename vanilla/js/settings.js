@@ -39,7 +39,7 @@ var SettingsPage = (function () {
     while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild);
 
     var wrap = doc.createElement("div");
-    wrap.className = "wrap";
+    wrap.className = "wrap wide";
     rootEl.appendChild(wrap);
 
     var h1 = doc.createElement("h1");

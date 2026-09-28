@@ -1,7 +1,9 @@
 /* MarketCandles: OHLCV candles + timeframe buckets for the DEX desk.
  * Owns: live bucket list (timeframes), slot-boundary ISO (_slotISO), exact
  *   red/green compare (_isRed), and candles() with timeframe + gap
- *   interpolation. No rendering, no signing.
+ *   interpolation, plus session VWAP + per-bucket spread band math (vwap(),
+ *   dex-ux plot proposal 3 — BigInt volume accumulation, humans via Format).
+ *   No rendering, no signing.
  * Consumes: Chain.db/.history/.call (single chain-facing module),
  *   Format.formatPrice/.formatAmount (BigInt/string math only).
  * Globals/side effects: exposes global MarketCandles only; no DOM, no
@@ -13,6 +15,8 @@
  * Created by: building-vanilla-slices skill, slice-18 audit (market.js split —
  *   moved verbatim from market.js timeframes/_slotISO/_isRed/candles; Market
  *   delegates its timeframes/candles to this file, API unchanged).
+ * Extended by: dex-ux plots task (AFK round — proposal 3 VWAP math,
+ *   chain-history only, ES refused).
  */
 var MarketCandles = (function () {
   "use strict";
@@ -263,9 +267,62 @@ var MarketCandles = (function () {
     return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes };
   }
 
+  /* Session VWAP + per-bucket spread band (dex-ux proposal 3 — the portable
+   * math is kibana.py discrete_to_candles bucketing SHAPE only; its ES
+   * source is REFUSED, we feed the same algorithm from get_market_history
+   * buckets built by candles() above). Pure: no fetching.
+   * Params: buckets (candles() entries with volumeBaseRaw/volumeQuoteRaw +
+   *   high/low raw pairs), basePrec/quotePrec numeric precisions.
+   * Math: per bucket vwap_num += BigInt(base_vol_int),
+   *   vwap_den += BigInt(quote_vol_int); session VWAP renders as num/den
+   *   via Format.formatPrice (BigInt, both precisions applied); band = the
+   *   bucket (high, low) raw pairs as human strings. Zero-volume gap slots
+   *   ("0"/"0") carry no VWAP and are skipped, never averaged in.
+   * Returns: {num, den} session raw-integer strings, human session string
+   *   (null when den is 0), per[] of {timeMs, vwap, high, low} human
+   *   strings for the overlay renderer, skipped count. Empty input is VALID
+   *   ({human: null, per: []} renders "VWAP unavailable").
+   * Fails: "bad-precision" on non-numeric precisions. */
+  function vwap(buckets, basePrec, quotePrec) {
+    if (typeof basePrec !== "number" || typeof quotePrec !== "number") {
+      throw new Error("bad-precision");
+    }
+    _needPriceMath();
+    var list = Array.isArray(buckets) ? buckets : [];
+    var num = 0n, den = 0n, per = [], skipped = 0, i;
+    for (i = 0; i < list.length; i++) {
+      var e = list[i] || {};
+      var bRaw = e.volumeBaseRaw !== undefined && e.volumeBaseRaw !== null
+        ? String(e.volumeBaseRaw) : null;
+      var qRaw = e.volumeQuoteRaw !== undefined && e.volumeQuoteRaw !== null
+        ? String(e.volumeQuoteRaw) : null;
+      if (!_isIntStr(bRaw) || !_isIntStr(qRaw)) { skipped++; continue; }
+      var bB = BigInt(bRaw), qB = BigInt(qRaw);
+      if (qB <= 0n || bB < 0n) { skipped++; continue; }
+      num += bB;
+      den += qB;
+      try {
+        per.push({
+          timeMs: e.timeMs || 0,
+          vwap: Format.formatPrice(bRaw, basePrec, qRaw, quotePrec, PRICE_PLACES),
+          high: Format.formatPrice(String(e.highBase), basePrec, String(e.highQuote), quotePrec, PRICE_PLACES),
+          low: Format.formatPrice(String(e.lowBase), basePrec, String(e.lowQuote), quotePrec, PRICE_PLACES)
+        });
+      } catch (err) { skipped++; continue; }
+    }
+    var human = null;
+    if (den > 0n) {
+      try {
+        human = Format.formatPrice(num.toString(), basePrec, den.toString(), quotePrec, PRICE_PLACES);
+      } catch (err) { human = null; }
+    }
+    return { num: num.toString(), den: den.toString(), human: human, per: per, skipped: skipped };
+  }
+
   return {
     timeframes: timeframes,
-    candles: candles
+    candles: candles,
+    vwap: vwap
   };
 })();
 
