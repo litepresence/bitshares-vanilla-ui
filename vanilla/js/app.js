@@ -1,6 +1,6 @@
 /* App: boot wiring (settings -> theme -> router -> chain connect).
  * Owns: boot/finishBoot sequencing, theme application, shell localization,
- *   badge painting, settings-change reconnect. Consumes: Store.loadSettings/
+ *   footer status painting, settings-change reconnect. Consumes: Store.loadSettings/
  *   subscribe (sole settings owner, read-only), Router.start, Chain.connect,
  *   I18n.loadCached/t (guarded fallbacks). Side effects: sets
  *   data-theme + shell strings + #view content, opens the chain socket,
@@ -12,9 +12,9 @@ var App = (function () {
   var lastNode = null, lastNetwork = null, lastTheme = null;
 
   /* Batch-1 i18n (slice-17 Task 2): localize the static shell chrome that
-   * lives in index.html (brand, nav links, menu toggle, initial badge).
-   * Called at boot and after every locale switch; the dynamic connection
-   * badge (paintBadge states) stays English until its per-view batch. */
+ *   lives in index.html (brand, nav links, menu toggle).
+ *   Called at boot and after every locale switch; connection status paints
+ *   through the footer subscription only. */
   function t(key, dflt) {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
@@ -385,10 +385,6 @@ var App = (function () {
       if (toggle) toggle.setAttribute("aria-label", t("shell.menu", "Menu"));
       var nav = document.getElementById("nav");
       if (nav) localizeNav(nav);
-      var badge = document.getElementById("conn-badge");
-      if (badge && badge.getAttribute("data-state") === "unknown") {
-        badge.textContent = t("shell.badge_initial", "connecting…");
-      }
     } catch (e) { /* shell keeps previous strings */ }
   }
 
@@ -494,37 +490,43 @@ var App = (function () {
     } catch (e) { /* copies keep stale selection until next rebuild */ }
   }
 
-  /* paintBadge: connection status -> #conn-badge. Params: status ({state,
-   *   chainId, latencyMs}). Returns nothing. Fails: never — a missing badge
-   *   is a no-op, unknown states render as their state name. */
-  function paintBadge(status) {
-    var badge = document.getElementById("conn-badge");
-    if (!badge) return;
-    var s = status || {};
-    var state = s.state || "unknown";
-    badge.setAttribute("data-state", state);
-    badge.textContent = state === "open"
-      ? "connected · " + String(s.chainId || "").slice(0, 8) + " · " + s.latencyMs + "ms"
-      : state;
-  }
-
-  /* paintFooter: persistent status bar (dexux-ref footer cue: version left,
-   *   latency/block right). Params: status ({state, node, latencyMs,
-   *   headBlock}). Returns nothing. Fails: never — missing footer is a
-   *   no-op. No sockets: reads the connection status only (head block is the
-   *   connect-time value Chain stashes; it refreshes on reconnect). */
+  /* paintFooter: persistent status bar — the connectivity signal (#1
+   *   parity: the node location name carries the state in COLOR, green when
+   *   connected, red otherwise; no topbar badge). Params: status ({state,
+   *   node, latencyMs, headBlock}). Returns nothing. Fails: never — missing
+   *   footer is a no-op. Latency + head block are heartbeat-live. */
   function paintFooter(status) {
     var foot = document.getElementById("appfoot-status");
     if (!foot) return;
     var s = status || {};
-    if (s.state === "open") {
+    var state = s.state || "unknown";
+    while (foot.firstChild) foot.removeChild(foot.firstChild);
+    var doc = foot.ownerDocument || document;
+    function span(text, cls, st) {
+      var n = doc.createElement("span");
+      if (cls) n.className = cls;
+      if (st) n.setAttribute("data-state", st);
+      n.textContent = text;
+      return n;
+    }
+    if (state === "open") {
       var host = shortHost(s.node);
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
-      /* Head block is heartbeat-live (chain.js refreshes every 20s). */
       var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
-      foot.textContent = (host ? host + " · " : "") + "LATENCY " + lat + blk;
+      if (host) {
+        foot.appendChild(span(host, "appfoot-host", "open"));
+        foot.appendChild(doc.createTextNode(" · "));
+      }
+      foot.appendChild(doc.createTextNode("LATENCY " + lat + blk));
     } else {
-      foot.textContent = (s.state && s.state !== "unknown") ? String(s.state) : "connecting…";
+      var host = shortHost(s.node);
+      if (host) {
+        foot.appendChild(span(host, "appfoot-host", "closed"));
+        foot.appendChild(doc.createTextNode(" · "));
+      }
+      var label = (state && state !== "unknown") ? state : "connecting…";
+      if (state && state !== "unknown") foot.appendChild(span(label, "appfoot-host", "closed"));
+      else foot.appendChild(doc.createTextNode(label));
     }
   }
 
@@ -542,7 +544,7 @@ var App = (function () {
 
   /* connect: opens the chain socket (failures via connection events).
    *   Params: node (wss:// URL string). Returns nothing. Fails: never throws —
-   *   Chain.connect rejections are swallowed; the badge carries the error. */
+   *   Chain.connect rejections are swallowed; the footer carries the error. */
   function connect(node) {
     if (node) Chain.connect(node).catch(function () { /* failures surface via connection events */ });
   }
@@ -582,9 +584,8 @@ var App = (function () {
   }
 
   function finishBoot(settings) {
-    Store.subscribe("connection", paintBadge);
     Store.subscribe("connection", paintFooter);
-    try { paintFooter(typeof Chain !== "undefined" && Chain ? Chain.status() : null); } catch (e) { /* badge carries errors */ }
+    try { paintFooter(typeof Chain !== "undefined" && Chain ? Chain.status() : null); } catch (e) { /* footer carries errors */ }
     Store.subscribe("settings", onSettings);
     /* Warning banner (static #1-parity notice): visible until dismissed;
      * dismissal persists in localStorage. Never throws — banner works

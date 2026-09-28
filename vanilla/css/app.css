@@ -11,12 +11,12 @@ body { margin: 0; background: var(--bg); color: var(--text);
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
   min-height: 56px; background: var(--header-bg); color: var(--header-text); }
 .brand { color: inherit; font-weight: 700; font-size: 1.1rem; text-decoration: none; }
-.badge { margin-left: auto; padding: 4px 12px; border-radius: 999px; font-size: 0.85rem;
-  background: var(--muted); color: var(--accent-text); min-height: 44px; display: inline-flex; align-items: center; }
-.badge[data-state="open"] { background: var(--buy); }
-.badge[data-state="closed"], .badge[data-state="error"] { background: var(--danger); }
+/* Footer host = the connectivity signal (#1 parity): node name green when
+ * connected, red otherwise. Status hues, theme-token driven. */
+.appfoot-host[data-state="open"] { color: var(--buy); font-weight: 700; }
+.appfoot-host[data-state="closed"] { color: var(--danger); font-weight: 700; }
 #nav-toggle { display: inline-flex; align-items: center; justify-content: center;
-  margin-left: 8px; min-width: 44px; min-height: 44px;
+  margin-left: auto; min-width: 44px; min-height: 44px;
   background: transparent; border: 1px solid currentColor; border-radius: 6px;
   color: inherit; font-size: 1.2rem; }
 #nav { display: flex; gap: 4px; padding: 8px 16px; background: var(--panel);
@@ -113,7 +113,6 @@ a.btn-ghost { background: transparent; color: var(--accent);
   #nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
   #nav { display: none; flex-direction: column; }
   #nav.open { display: flex; }
-  .badge { font-size: 0.75rem; }
 }
 .node-table { width: 100%; border-collapse: collapse; background: var(--panel); }
 .node-table th, .node-table td { padding: 12px; border-bottom: 1px solid var(--border);

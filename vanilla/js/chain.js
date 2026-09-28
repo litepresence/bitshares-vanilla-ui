@@ -1,11 +1,11 @@
 /* Chain: sole WebSocket owner for all node traffic (principle: one chain module).
  * Owns: the shared socket (ws/pending/nextId), status (lastStatus), api-id
  *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net,
- *   plus keepalive (20s heartbeat refreshing the head block) and capped
- *   same-node auto-reconnect ([2,5,10,20,30]s, then closed for manual failover).
- * Consumes: Store.emitConnection (status fan-out, read-only), document badge
- *   #conn-badge (painted in setStatus, never read). Side effects: opens/closes
- *   WebSockets, mutates lastStatus + api-id caches, paints the badge DOM.
+ *   plus keepalive (20s heartbeat refreshing head block + RTT latency) and
+ *   capped same-node auto-reconnect. Status fans out via Store.emitConnection
+ *   (the footer is the connectivity signal — no topbar badge, #1 parity).
+ * Consumes: Store.emitConnection (status fan-out, read-only). Side effects:
+ *   opens/closes WebSockets, mutates lastStatus + api-id caches.
  * Created by: building-vanilla-slices skill, slice-01-shell-settings plan. */
 var Chain = (function () {
   "use strict";
@@ -21,13 +21,6 @@ var Chain = (function () {
   function setStatus(patch) {
     lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
     Store.emitConnection(lastStatus);
-    var badge = document.getElementById("conn-badge");
-    if (badge) {
-      badge.setAttribute("data-state", lastStatus.state);
-      badge.textContent = lastStatus.state === "open"
-        ? "connected · " + (lastStatus.chainId || "").slice(0, 8) + " · " + lastStatus.latencyMs + "ms"
-        : lastStatus.state;
-    }
   }
 
   /* call: one JSON-RPC "call" on the shared socket. Params: apiId (number),
@@ -63,17 +56,18 @@ var Chain = (function () {
 
   /* Heartbeat: one get_dynamic_global_properties per interval on the open
    * socket (traffic both directions defeats idle timeouts) + the reply
-   * refreshes the footer head block, so it goes live instead of @connect.
-   * Failures are silent — the next beat retries; a dead socket surfaces
-   * via onclose, never here. */
+   * refreshes the footer head block AND latency (round-trip time — the
+   * footer latency is live, not the connect-time sample). Failures are
+   * silent — the next beat retries; a dead socket surfaces via onclose. */
   function beat() {
     if (!ws || ws.readyState !== 1) return;
+    var t0 = Date.now();
     db().then(function (dbId) {
       if (!ws || ws.readyState !== 1) return;
       return call(dbId, "get_dynamic_global_properties", [], 10000);
     }).then(function (props) {
       if (props && props.head_block_number && ws && ws.readyState === 1) {
-        setStatus({headBlock: props.head_block_number});
+        setStatus({headBlock: props.head_block_number, latencyMs: Date.now() - t0});
       }
     }).catch(function () { /* next beat retries */ });
   }
@@ -94,7 +88,7 @@ var Chain = (function () {
 
   /* scheduleReconnect: same-node redial with capped backoff after an
    * UNEXPECTED close (manual disconnects never redial). Gives up after the
-   * delay list is spent — the badge stays "closed" and the user picks a
+   * delay list is spent — the footer stays "closed" and the user picks a
    * node (failover), instead of hammering a dead endpoint forever. */
   function scheduleReconnect() {
     if (manualClose || !lastUrl) return;
