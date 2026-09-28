@@ -1,5 +1,5 @@
 /* ExplorerUI: the explorer shell (search + tabs + deep-link dispatch).
- * Owns: DOM for #/explorer (+blocks|assets|feeds tabs), the global search
+ * Owns: DOM for #/explorer (ref-order tabs + feeds extra), the global search
  *   box, the head strip, the 1.x.y inline object panel slot, the single
  *   generation counter + connect-gate teardown, and the route entry points
  *   (renderExplorer/renderBlock/renderTx/renderAsset — router.js calls
@@ -44,7 +44,11 @@ var ExplorerUI = (function () {
 
 
   var CONNECT_TIMEOUT_MS = 15000; /* slice-1 offline pattern */
-  var TABS = ["blocks", "assets", "feeds"];
+  /* Ref tab order (Explorer.jsx:18-64): blocks/assets/pools/accounts/
+   * witnesses/committee/markets/fees — plus vanilla's feeds extra (kept as
+   * documented superset, last). Labels render capitalized from the ids. */
+  var TABS = ["blocks", "assets", "pools", "accounts", "witnesses",
+    "committee", "markets", "fees", "feeds"];
 
   /* Generation counter: every route entry bumps it; async continuations
    * capture their generation and bail when it no longer matches. Single
@@ -198,10 +202,11 @@ var ExplorerUI = (function () {
     showError(doc, wrap, t("explorer.view_missing_prefix", "Explorer view missing: ") + file + t("explorer.view_missing_suffix", " failed to load."));
   }
 
-  /* #/explorer + #/explorer/:tab (blocks|assets|feeds; unknown tab falls
-   * back to Blocks with a note, never blank). Shell: search box, tabs,
-   * head strip, tab body, pending inline-object panel. Tab bodies delegate
-   * to ExplorerBlocks / ExplorerAssets (lazy globals). */
+  /* #/explorer + #/explorer/:tab (ref order + feeds extra; unknown tab
+   * falls back to Blocks with a note, never blank). Shell: search box,
+   * tabs, head strip, tab body, pending inline-object panel. Tab bodies
+   * delegate to ExplorerBlocks / ExplorerAssets / ExplorerTabs (lazy
+   * globals). */
   function renderExplorer(root, tab) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -321,12 +326,33 @@ var ExplorerUI = (function () {
       } else {
         showError(doc, body, t("explorer.assets_missing", "Explorer assets view missing: js/explorer-assets.js failed to load."));
       }
-    } else {
+    } else if (want === "feeds") {
       if (typeof ExplorerAssets !== "undefined" && ExplorerAssets &&
           typeof ExplorerAssets.feedsTab === "function") {
         ExplorerAssets.feedsTab(doc, body, root, myGen);
       } else {
         showError(doc, body, t("explorer.feeds_missing", "Explorer feeds view missing: js/explorer-assets.js failed to load."));
+      }
+    } else {
+      /* Ref-parity tabs (ExplorerTabs owns bodies; missing file -> honest
+       * panel, never blank). live() closes over the shell gen counter. */
+      if (typeof ExplorerTabs === "undefined" || !ExplorerTabs) {
+        showError(doc, body, t("explorer.tabs_missing", "Explorer tabs view missing: js/explorer-tabs.js failed to load."));
+        return;
+      }
+      var fns = {
+        pools: "poolsTab", accounts: "accountsTab", witnesses: "witnessesTab",
+        committee: "committeeTab", markets: "marketsTab", fees: "feesTab"
+      };
+      var fn = fns[want];
+      if (typeof fn === "string" && typeof ExplorerTabs[fn] === "function") {
+        try {
+          ExplorerTabs[fn](doc, body, function () { return myGen === gen; });
+        } catch (e) {
+          showError(doc, body, e, t("explorer.unexpected", "Unexpected error"));
+        }
+      } else {
+        showError(doc, body, t("explorer.unexpected", "Unexpected error"));
       }
     }
   }

@@ -2145,7 +2145,8 @@
       "pool.synth_note",
       "pool.hist_source_es",
       "pool.hist_source_chain",
-      "pool.book_title"
+      "pool.book_title",
+      "explorer.tabs_missing"
     ]
   },
   "nav": {
@@ -2799,7 +2800,8 @@
     "virtual_mark": " (virtual)",
     "votes_unit": " votes",
     "witness_row": "Witness",
-    "yes": "yes"
+    "yes": "yes",
+    "tabs_missing": "Explorer tabs view missing: js/explorer-tabs.js failed to load."
   },
   "gateway": {
     "title": "Deposit / Withdraw",
