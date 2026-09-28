@@ -25,6 +25,17 @@ var MarketPicker = (function () {
    * rule as the desk's LAST_KEY). Value: JSON array of "QUOTE_BASE" ids. */
   var FAV_KEY = "bts-vanilla-fav-markets-v1";
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -61,19 +72,19 @@ var MarketPicker = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
     if (msg.indexOf("bad-market") !== -1) {
       msg = "Unknown market. Check the QUOTE_BASE pair (e.g. " + defaultMarket() + ").";
     } else if (msg.indexOf("bad-asset-shape") !== -1) {
-      msg = "Unexpected asset data from the node; stopped instead of guessing.";
+      msg = t("market.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     } else if (msg.indexOf("history-unavailable") !== -1) {
-      msg = "History unavailable on this node (fills and charts need the history plugin).";
+      msg = t("market.err_history", "History unavailable on this node (fills and charts need the history plugin).");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("market.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -168,7 +179,7 @@ var MarketPicker = (function () {
 
   /* Paint the market picker list (search + kind radios + favorites + typed entry). */
   function renderPicker(doc, section, currentID, root) {
-    section.appendChild(el(doc, "h2", "Markets"));
+    section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
     var list = (CURATED[network()] || CURATED.mainnet).slice();
     if (list.indexOf(currentID) === -1 && currentID) list.unshift(currentID);
     var favs = loadFavs();
@@ -176,8 +187,8 @@ var MarketPicker = (function () {
     var kinds = doc.createElement("div");
     kinds.className = "mkt-kinds";
     kinds.setAttribute("role", "radiogroup");
-    kinds.setAttribute("aria-label", "Asset type filter");
-    var kindDefs = [["ALL", "All"], ["BTS", "BTS"], ["MPA", "MPA"], ["UIA", "UIA"]];
+    kinds.setAttribute("aria-label", t("market.kind_filter_label", "Asset type filter"));
+    var kindDefs = [["ALL", t("market.kind_all", "All")], ["BTS", "BTS"], ["MPA", "MPA"], ["UIA", "UIA"]];
     kindDefs.forEach(function (def) {
       var lab = doc.createElement("label");
       lab.className = "mkt-kind";
@@ -196,8 +207,8 @@ var MarketPicker = (function () {
     var search = doc.createElement("input");
     search.id = "mkt-search";
     search.type = "search";
-    search.setAttribute("placeholder", "Search markets…");
-    search.setAttribute("aria-label", "Search markets");
+    search.setAttribute("placeholder", t("market.search_placeholder", "Search markets…"));
+    search.setAttribute("aria-label", t("market.search_label", "Search markets"));
     touchable(search);
     section.appendChild(search);
     var ul = doc.createElement("ul");
@@ -250,21 +261,47 @@ var MarketPicker = (function () {
         return a < b ? -1 : (a > b ? 1 : 0);
       });
       if (rows.length === 0) {
-        ul.appendChild(el(doc, "li", "No markets match.", "muted"));
+        ul.appendChild(el(doc, "li", t("market.no_match", "No markets match."), "muted"));
         return;
       }
       rows.forEach(function (id) {
         var li = doc.createElement("li");
         li.className = "mkt-picker-row";
-        var a = el(doc, "a", (isFav(favs, id) ? "★ " : "") + id);
+        var fav = isFav(favs, id);
+        /* Icon wiring (fi-star.svg; #1 market sidebar shows ★ only on
+         * starred rows — same prefix rule kept). fav state cue changes from
+         * gold color to full-vs-dimmed opacity (SVG <img> cannot take the
+         * --warn text color); aria-pressed, sort-first, and the click ->
+         * toggleFav -> repaint toggle logic are byte-identical in behavior.
+         * Without Icon the previous ★/☆ text renders. */
+        var a = doc.createElement("a");
+        try {
+          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+            if (fav) a.appendChild(Icon.img("fi-star", "star-icon", ""));
+            a.appendChild(doc.createTextNode((fav ? " " : "") + id));
+          } else {
+            a.textContent = (fav ? "★ " : "") + id;
+          }
+        } catch (e) {
+          a.textContent = (fav ? "★ " : "") + id;
+        }
         a.setAttribute("href", "#/market/" + id);
         touchable(a);
         if (id === currentID) a.setAttribute("aria-current", "page");
         li.appendChild(a);
-        var star = touchable(el(doc, "button",
-          isFav(favs, id) ? "★" : "☆", "mkt-star"));
+        var star = touchable(doc.createElement("button"));
+        star.className = "mkt-star";
+        try {
+          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+            star.appendChild(Icon.img("fi-star", fav ? "star-icon" : "star-icon star-off", ""));
+          } else {
+            star.textContent = fav ? "★" : "☆";
+          }
+        } catch (e) {
+          star.textContent = fav ? "★" : "☆";
+        }
         star.type = "button";
-        star.setAttribute("aria-pressed", isFav(favs, id) ? "true" : "false");
+        star.setAttribute("aria-pressed", fav ? "true" : "false");
         star.setAttribute("aria-label", "Favorite " + id);
         star.addEventListener("click", function () {
           favs = toggleFav(loadFavs(), id);
@@ -288,12 +325,12 @@ var MarketPicker = (function () {
     go.id = "mkt-direct-input";
     go.type = "text";
     go.setAttribute("placeholder", "QUOTE_BASE, e.g. " + defaultMarket());
-    go.setAttribute("aria-label", "Open market QUOTE_BASE directly");
+    go.setAttribute("aria-label", t("market.direct_label", "Open market QUOTE_BASE directly"));
     go.setAttribute("autocapitalize", "characters");
     go.setAttribute("spellcheck", "false");
     touchable(go);
     form.appendChild(go);
-    var btn = touchable(el(doc, "button", "Open market"));
+    var btn = touchable(el(doc, "button", t("market.open_market", "Open market")));
     btn.type = "submit";
     btn.id = "mkt-direct-go";
     form.appendChild(btn);

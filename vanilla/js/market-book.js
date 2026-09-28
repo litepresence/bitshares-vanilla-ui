@@ -14,6 +14,17 @@
 var MarketBook = (function () {
   "use strict";
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -127,7 +138,7 @@ var MarketBook = (function () {
     var d = doc.createElement("details");
     d.className = "raw";
     var s = doc.createElement("summary");
-    s.setAttribute("aria-label", label || "Show raw JSON");
+    s.setAttribute("aria-label", label || t("market.raw_fallback", "Show raw JSON"));
     touchable(s);
     d.appendChild(s);
     var pre = doc.createElement("pre");
@@ -145,7 +156,10 @@ var MarketBook = (function () {
    * verbatim chain-human strings; depth shading widths come from Market.depth
    * cumulative Numbers (pixels, not money). */
   function renderBookSide(doc, section, title, levels, depthPts) {
-    section.appendChild(el(doc, "h3", title));
+    /* Title doubles as the caller's side key (Asks/Bids drive the depth-bar
+     * color below), so the h3 localizes through a static per-side key while
+     * `title` itself stays the English logic key. */
+    section.appendChild(el(doc, "h3", title === "Asks" ? t("market.asks", "Asks") : t("market.bids", "Bids")));
     if (!levels || levels.length === 0) {
       section.appendChild(el(doc, "p", "No " + title.toLowerCase() + ".", "muted"));
       return;
@@ -161,8 +175,8 @@ var MarketBook = (function () {
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    ["Price", "Amount", "Total"].forEach(function (t) {
-      hr.appendChild(el(doc, "th", t));
+    [t("market.th_price", "Price"), t("market.th_amount", "Amount"), t("market.th_total", "Total")].forEach(function (h) {
+      hr.appendChild(el(doc, "th", h));
     });
     thead.appendChild(hr);
     table.appendChild(thead);
@@ -221,11 +235,11 @@ var MarketBook = (function () {
       ctx.spreadLine.textContent = "Spread " + sm.spread + " · Midpoint " + sm.mid +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
     } else {
-      ctx.spreadLine.textContent = "Spread — (empty book side)";
+      ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }
     renderBookSide(doc, parentEl, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse());
     renderBookSide(doc, parentEl, "Bids", ctx.book.bids, depth.bids);
-    rawDetails(doc, parentEl, "Raw order book", ctx.book);
+    rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
 
@@ -237,14 +251,14 @@ var MarketBook = (function () {
     var rows = ctx.rows;
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
     if (!rows || rows.length === 0) {
-      parentEl.appendChild(el(doc, "p", "No recent fills on this market.", "muted"));
+      parentEl.appendChild(el(doc, "p", t("market.no_fills", "No recent fills on this market."), "muted"));
       return;
     }
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    ["Time", "Price", "Amount"].forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    [t("market.th_time", "Time"), t("market.th_price", "Price"), t("market.th_amount", "Amount")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = doc.createElement("tbody");
@@ -268,7 +282,7 @@ var MarketBook = (function () {
       cards.appendChild(card);
     });
     parentEl.appendChild(cards);
-    rawDetails(doc, parentEl, "Raw fills", rows.map(function (r) { return r.raw; }));
+    rawDetails(doc, parentEl, t("market.raw_fills", "Raw fills"), rows.map(function (r) { return r.raw; }));
   }
 
   return {

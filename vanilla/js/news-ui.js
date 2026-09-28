@@ -14,6 +14,21 @@
  */
 var NewsUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   /* textContent-only element (chain strings never reach HTML). */
   function el(doc, tag, text, cls) {
@@ -51,8 +66,8 @@ var NewsUI = (function () {
     var myGen = ++gen;
     clearRoot(root);
     var wrap = doc.createElement("div"); wrap.className = "wrap"; root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", "News"));
-    wrap.appendChild(el(doc, "p", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current.", "muted"));
+    wrap.appendChild(el(doc, "h1", t("news.news", "News")));
+    wrap.appendChild(el(doc, "p", t("news.this_wallet_ships_no_in_app_news_feed_the_ref", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current."), "muted"));
     var conn = el(doc, "p", connectionLine(), "muted");
     wrap.appendChild(conn);
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -61,15 +76,15 @@ var NewsUI = (function () {
         try { conn.textContent = connectionLine(); } catch (e) { /* line stays */ }
       });
     }
-    wrap.appendChild(el(doc, "h3", "Start here"));
+    wrap.appendChild(el(doc, "h3", t("news.start_here", "Start here")));
     var list = doc.createElement("ul");
-    [["#/market/BTS_USD", "Exchange — trade on the DEX"],
-     ["#/account/overview", "Account overview — balances and history"],
-     ["#/transfer", "Transfer — send assets"],
-     ["#/voting", "Voting — witnesses, committee, workers"],
-     ["#/explorer", "Explorer — blocks and transactions"],
-     ["#/help", "Help — how each part works"],
-     ["#/settings", "Settings — nodes and themes"]].forEach(function (pr) {
+    [["#/market/BTS_USD", t("news.exchange_trade_on_the_dex", "Exchange — trade on the DEX")],
+     ["#/account/overview", t("news.account_overview_balances_and_history", "Account overview — balances and history")],
+     ["#/transfer", t("news.transfer_send_assets", "Transfer — send assets")],
+     ["#/voting", t("news.voting_witnesses_committee_workers", "Voting — witnesses, committee, workers")],
+     ["#/explorer", t("news.explorer_blocks_and_transactions", "Explorer — blocks and transactions")],
+     ["#/help", t("news.help_how_each_part_works", "Help — how each part works")],
+     ["#/settings", t("news.settings_nodes_and_themes", "Settings — nodes and themes")]].forEach(function (pr) {
       var li = doc.createElement("li"), a = doc.createElement("a");
       a.href = pr[0]; a.textContent = pr[1]; li.appendChild(a); list.appendChild(li);
     });

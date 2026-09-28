@@ -47,6 +47,20 @@
  */
 var VoteUI = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   var PROXY_SENTINEL = "1.2.5";
   var CORE_ASSET = "1.3.0";
@@ -99,13 +113,13 @@ var VoteUI = (function () {
     box.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("unknown-account") !== -1) msg = fallback || "Unknown account.";
-    else if (msg.indexOf("no-account") !== -1) msg = "No on-chain account found for the wallet's active key. Enter an account name below.";
-    else if (msg.indexOf("wallet-locked") !== -1) msg = "Wallet is locked.";
+      : String(e || fallback || t("vote.unexpected", "Unexpected error"));
+    if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("vote.unknown_account", "Unknown account.");
+    else if (msg.indexOf("no-account") !== -1) msg = t("vote.no_account", "No on-chain account found for the wallet's active key. Enter an account name below.");
+    else if (msg.indexOf("wallet-locked") !== -1) msg = t("vote.wallet_locked", "Wallet is locked.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
-    } else if (msg.indexOf("empty-list") !== -1) msg = "The node returned no witnesses or committee members.";
+      msg = t("vote.offline", "Network unavailable. Check Settings → Nodes and retry.");
+    } else if (msg.indexOf("empty-list") !== -1) msg = t("vote.empty_list", "The node returned no witnesses or committee members.");
     box.textContent = msg;
     wrap.appendChild(box);
     return box;
@@ -118,8 +132,10 @@ var VoteUI = (function () {
     return p;
   }
 
-  /* Route entry: renderVoting(root). Waits for the shared connection, gates
-   * on unlock, resolves the voting account, loads lists + slate, shows view. */
+  /* Route entry: renderVoting(root). Waits for the shared connection, then
+   * renders governance LISTS publicly (gate-repair): locked viewers browse as
+   * the committee-account 1.2.0 default; the password gate lives ONLY at
+   * Publish-sign time (showConfirm WIF check + sendAndProve wallet-locked). */
   function renderVoting(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -132,13 +148,13 @@ var VoteUI = (function () {
         typeof Account === "undefined" || !Account ||
         typeof Wallet === "undefined" || !Wallet ||
         typeof Format === "undefined" || !Format) {
-      showError(doc, wrap, "Voting backend missing: js/vote.js, js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load.");
+      showError(doc, wrap, t("vote.backend_missing", "Voting backend missing: js/vote.js, js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load."));
       return;
     }
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", "Voting"));
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      wrap.appendChild(el(doc, "p", t("vote.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -155,22 +171,24 @@ var VoteUI = (function () {
         if (myGen !== gen) return;
         clearRoot(root);
         var failed = makeWrap(doc, root);
-        failed.appendChild(el(doc, "h1", "Voting"));
-        showError(doc, failed, new Error("not-connected"), "Network unavailable.");
-        var retry = touchable(el(doc, "button", "Retry"));
+        failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+        showError(doc, failed, new Error("not-connected"), t("vote.offline_short", "Network unavailable."));
+        var retry = touchable(el(doc, "button", t("vote.retry", "Retry")));
         retry.type = "button";
         retry.addEventListener("click", function () { renderVoting(root); });
         failed.appendChild(retry);
       }, 15000);
       return;
     }
-    if (typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked()) {
-      renderUnlockPrompt(doc, wrap, root, myGen);
-      return;
-    }
-    wrap.appendChild(el(doc, "p", "Loading governance data…", "muted"));
+    /* No entry unlock gate: public lists render locked. Resolve the
+     * wallet account when unlocked, else preview as committee-account 1.2.0.
+     * myAccountId is null-tolerant here (fallback); it stays loud only at
+     * sign time (sendAndProve throws wallet-locked). */
+    wrap.appendChild(el(doc, "p", t("vote.loading", "Loading governance data…"), "muted"));
     Account.myAccountId().then(function (id) {
       return Account.resolve(id);
+    }).catch(function () {
+      return Account.resolve("1.2.0");
     }).then(function (me) {
       if (myGen !== gen) return;
       loadAll(root, doc, me, myGen);
@@ -178,20 +196,22 @@ var VoteUI = (function () {
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", "Voting"));
-      showError(doc, failed, e, "Could not load your account.");
-      showAccountPicker(doc, failed, root, myGen, "");
+      failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      showError(doc, failed, e, t("vote.load_account_failed", "Could not load your account."));
+      showAccountPicker(doc, failed, root, myGen, "1.2.0");
     });
   }
 
-  /* Unlock gate with return path: after unlock, re-render this route (same
-   * pattern as transfer-ui.js renderUnlockPrompt). */
+  /* Unlock gate with return path: ENTRY no longer calls this (public
+   * lists render locked); kept for the sign-time path — showConfirm's
+   * wallet-locked error directs here via the wallet page. Same pattern as
+   * transfer-ui.js renderUnlockPrompt. */
   function renderUnlockPrompt(doc, wrap, root, myGen) {
-    wrap.appendChild(el(doc, "h1", "Voting"));
+    wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
     wrap.appendChild(el(doc, "p",
-      "Wallet is locked. Enter your password to manage your votes.", "muted"));
+      t("vote.unlock_prompt", "Wallet is locked. Enter your password to manage your votes."), "muted"));
     var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", "Password ");
+    var label = el(doc, "label", t("vote.password_label", "Password "));
     var input = doc.createElement("input");
     input.type = "password";
     input.setAttribute("autocomplete", "current-password");
@@ -199,7 +219,7 @@ var VoteUI = (function () {
     label.appendChild(input);
     row.appendChild(label);
     wrap.appendChild(row);
-    var btn = touchable(el(doc, "button", "Unlock"));
+    var btn = touchable(el(doc, "button", t("vote.unlock", "Unlock")));
     btn.type = "button";
     wrap.appendChild(btn);
     var errBox = el(doc, "div", null, "error");
@@ -213,7 +233,7 @@ var VoteUI = (function () {
         .then(function () { if (myGen === gen) renderVoting(root); })
         .catch(function (e) {
           btn.disabled = false;
-          errBox.textContent = (e && e.message) ? e.message : String(e || "Unlock failed");
+          errBox.textContent = (e && e.message) ? e.message : String(e || t("vote.unlock_failed", "Unlock failed"));
         });
     });
   }
@@ -222,7 +242,7 @@ var VoteUI = (function () {
    * name/id input + resolve, then load the view as that account. */
   function showAccountPicker(doc, wrap, root, myGen, preset) {
     var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", "Vote as (name or 1.2.N) ");
+    var label = el(doc, "label", t("vote.vote_as_label", "Vote as (name or 1.2.N) "));
     var input = doc.createElement("input");
     input.type = "text";
     input.setAttribute("autocomplete", "off");
@@ -231,7 +251,7 @@ var VoteUI = (function () {
     label.appendChild(input);
     row.appendChild(label);
     wrap.appendChild(row);
-    var btn = touchable(el(doc, "button", "Load votes"));
+    var btn = touchable(el(doc, "button", t("vote.load_votes", "Load votes")));
     btn.type = "button";
     wrap.appendChild(btn);
     var errBox = el(doc, "div", null, "error");
@@ -245,7 +265,7 @@ var VoteUI = (function () {
         if (myGen === gen) { clearRoot(root); loadAll(root, doc, acct, myGen); }
       }).catch(function (e) {
         btn.disabled = false;
-        errBox.textContent = (e && e.message) ? "Unknown account." : String(e || "Unknown account.");
+        errBox.textContent = (e && e.message) ? t("vote.unknown_account", "Unknown account.") : String(e || t("vote.unknown_account", "Unknown account."));
       });
     });
   }
@@ -256,7 +276,7 @@ var VoteUI = (function () {
   async function loadAll(root, doc, me, myGen) {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "p", "Loading governance data…", "muted"));
+    wrap.appendChild(el(doc, "p", t("vote.loading", "Loading governance data…"), "muted"));
     try {
       var lists = await Vote.lists();
       if (myGen !== gen) return;
@@ -270,9 +290,9 @@ var VoteUI = (function () {
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", "Voting"));
-      showError(doc, failed, e, "Could not load governance data.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      showError(doc, failed, e, t("vote.load_failed", "Could not load governance data."));
+      var retry = touchable(el(doc, "button", t("vote.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () { renderVoting(root); });
       failed.appendChild(retry);
@@ -297,10 +317,17 @@ var VoteUI = (function () {
     var st = VoteSlate.newState(me, lists, slate);
     st.supply = supplyRaw || "";
 
-    wrap.appendChild(el(doc, "h1", "Voting"));
+    wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
     var meLine = el(doc, "p", null, "muted");
-    meLine.textContent = "Voting as: " + me.name + " (" + me.id + ")";
+    meLine.textContent = t("vote.voting_as", "Voting as: ") + me.name + " (" + me.id + ")";
     wrap.appendChild(meLine);
+    /* Public-preview notice: locked viewers see the committee-account slate
+     * until they unlock and vote as themselves. */
+    try {
+      var lockedView = (typeof Wallet === "undefined" || typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked());
+      if (lockedView || (me && me.id === "1.2.0"))
+        wrap.appendChild(el(doc, "p", t("vote.viewing_as", "Viewing as committee-account (1.2.0) — unlock to vote as yourself."), "muted"));
+    } catch (e) { /* notice is display-only */ }
 
     var proxyBox = el(doc, "div", null, "vote-proxy");
     wrap.appendChild(proxyBox);
@@ -348,14 +375,14 @@ var VoteUI = (function () {
     var hasProxy = st.draft.proxyId !== PROXY_SENTINEL;
     var line = el(doc, "p", null, hasProxy ? "" : "muted");
     line.textContent = hasProxy
-      ? "Proxy: " + (st.proxyName || st.draft.proxyId) + " — your stake follows this account; the slate below is read-only."
-      : "Proxy: none — voting directly.";
+      ? t("vote.proxy_prefix", "Proxy: ") + (st.proxyName || st.draft.proxyId) + t("vote.proxy_follows", " — your stake follows this account; the slate below is read-only.")
+      : t("vote.proxy_none", "Proxy: none — voting directly.");
     box.appendChild(line);
     if (hasProxy && st.proxySlate) {
       var n = (st.proxySlate.votes || []).length;
       box.appendChild(el(doc, "p", n === 0
-        ? "This proxy has no votes set."
-        : "This proxy votes " + n + " item(s).", "muted"));
+        ? t("vote.proxy_empty", "This proxy has no votes set.")
+        : t("vote.proxy_votes_prefix", "This proxy votes ") + n + t("vote.proxy_votes_suffix", " item(s)."), "muted"));
     }
     var row = el(doc, "div", null, "vote-proxy-row");
     row.style.display = "flex";
@@ -363,16 +390,16 @@ var VoteUI = (function () {
     row.style.gap = "8px";
     var input = doc.createElement("input");
     input.type = "text";
-    input.setAttribute("placeholder", "proxy account name or 1.2.N");
+    input.setAttribute("placeholder", t("vote.proxy_ph", "proxy account name or 1.2.N"));
     input.setAttribute("autocomplete", "off");
-    input.setAttribute("aria-label", "Proxy account");
+    input.setAttribute("aria-label", t("vote.proxy_aria", "Proxy account"));
     touchable(input);
     input.style.flex = "1 1 200px";
     row.appendChild(input);
-    var setBtn = touchable(el(doc, "button", "Set proxy"));
+    var setBtn = touchable(el(doc, "button", t("vote.set_proxy", "Set proxy")));
     setBtn.type = "button";
     row.appendChild(setBtn);
-    var rmBtn = touchable(el(doc, "button", "Remove proxy"));
+    var rmBtn = touchable(el(doc, "button", t("vote.remove_proxy", "Remove proxy")));
     rmBtn.type = "button";
     rmBtn.disabled = !hasProxy;
     row.appendChild(rmBtn);
@@ -413,7 +440,7 @@ var VoteUI = (function () {
 
     setBtn.addEventListener("click", function () {
       var v = input.value.trim();
-      if (!v) { msg.textContent = "Enter a proxy account name or id."; return; }
+      if (!v) { msg.textContent = t("vote.proxy_needed", "Enter a proxy account name or id."); return; }
       setBtn.disabled = true;
       Account.resolve(v).then(function (acct) {
         st.draft.proxyId = acct.id;
@@ -430,7 +457,7 @@ var VoteUI = (function () {
         refresh();
       }).catch(function () {
         setBtn.disabled = false;
-        msg.textContent = "Unknown account.";
+        msg.textContent = t("vote.unknown_account", "Unknown account.");
       });
     });
 
@@ -450,16 +477,16 @@ var VoteUI = (function () {
   function renderActions(doc, bar, root, st, myGen) {
     while (bar.firstChild) bar.removeChild(bar.firstChild);
     var changed = VoteSlate.isChanged(st);
-    var pub = touchable(el(doc, "button", "Publish votes"));
+    var pub = touchable(el(doc, "button", t("vote.publish", "Publish votes")));
     pub.type = "button";
     pub.disabled = !changed;
-    var reset = touchable(el(doc, "button", "Reset"));
+    var reset = touchable(el(doc, "button", t("vote.reset", "Reset")));
     reset.type = "button";
     reset.disabled = !changed;
     bar.appendChild(pub);
     bar.appendChild(reset);
     if (!changed) {
-      bar.appendChild(el(doc, "p", "Slate matches the chain — no changes to publish.", "muted"));
+      bar.appendChild(el(doc, "p", t("vote.in_sync", "Slate matches the chain — no changes to publish."), "muted"));
     }
     reset.addEventListener("click", function () {
       st.draft.proxyId = st.published.proxyId;
@@ -484,15 +511,15 @@ var VoteUI = (function () {
   async function preparePublish(doc, root, st, myGen) {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Confirm votes"));
-    var status = showStatus(doc, wrap, "Estimating fee…");
+    wrap.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
+    var status = showStatus(doc, wrap, t("vote.estimating_fee", "Estimating fee…"));
     try {
       var dbId = await Chain.db();
       var rows = await Chain.call(dbId, "get_accounts", [[st.me.id]]);
       if (myGen !== gen) return;
       if (!rows || !rows[0] || !rows[0].options) throw new Error("unknown-account");
       var memoKey = rows[0].options.memo_key;
-      if (!memoKey) throw new Error("Account has no memo key.");
+      if (!memoKey) throw new Error(t("vote.no_memo", "Account has no memo key."));
       var witness = Object.keys(st.draft.witness).sort();
       var committee = Object.keys(st.draft.committee).sort();
       var worker = Object.keys(st.draft.worker).sort();
@@ -520,9 +547,9 @@ var VoteUI = (function () {
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", "Confirm votes"));
-      showError(doc, failed, e, "Could not prepare the vote.");
-      var back = touchable(el(doc, "button", "Back to voting"));
+      failed.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
+      showError(doc, failed, e, t("vote.prepare_failed", "Could not prepare the vote."));
+      var back = touchable(el(doc, "button", t("vote.back_to_voting", "Back to voting")));
       back.type = "button";
       back.addEventListener("click", function () { renderVoting(root); });
       failed.appendChild(back);
@@ -540,10 +567,13 @@ var VoteUI = (function () {
   }
 
   /* Confirm screen: NAMED rows only — proxy, added/removed names per tab,
-   * final counts, human fee + network. No raw JSON anywhere. */
+   * final counts, human fee + network. No raw JSON anywhere.
+   * SIGN GATE (gate-repair): Publish is the ONLY password gate on this
+   * route — the Send handler below requires the unlocked WIF; reads and
+   * slate preview stay public. */
   function showConfirm(doc, wrap, root, st, myGen, newOptions, feeRaw, feePrec, network) {
     var hasProxy = newOptions.voting_account !== PROXY_SENTINEL;
-    wrap.appendChild(el(doc, "h1", "Confirm votes"));
+    wrap.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
     var list = el(doc, "dl", null, "vote-confirm");
     function row(term, text, title) {
       var dt = el(doc, "dt", term);
@@ -552,32 +582,38 @@ var VoteUI = (function () {
       list.appendChild(dt);
       list.appendChild(dd);
     }
-    row("Account", st.me.name + " (" + st.me.id + ")");
-    row("Proxy", hasProxy
+    row(t("vote.account_row", "Account"), st.me.name + " (" + st.me.id + ")");
+    row(t("vote.proxy_row", "Proxy"), hasProxy
       ? (st.proxyName || st.draft.proxyId) + " (" + newOptions.voting_account + ")"
-      : "none — voting directly");
+      : t("vote.directly", "none — voting directly"));
     ["witness", "committee", "worker"].forEach(function (tab) {
       var d = VoteSlate.diffNames(st, tab);
       var label = tab.charAt(0).toUpperCase() + tab.slice(1);
       var finalCount = Object.keys(st.draft[tab]).length;
-      var text = "final: " + finalCount;
+      var text = t("vote.row_final", "final: ") + finalCount;
       if (d.added.length) text += " · + " + d.added.join(", ");
       if (d.removed.length) text += " · − " + d.removed.join(", ");
-      if (!d.added.length && !d.removed.length) text += " (unchanged)";
-      row(label + " votes", text);
+      if (!d.added.length && !d.removed.length) text += t("vote.row_unchanged", " (unchanged)");
+      row(label + t("vote.conf_votes", " votes"), text);
     });
     var feeHuman;
     try {
       feeHuman = Format.formatAmount(feeRaw, feePrec);
     } catch (e) { feeHuman = feeRaw; }
-    row("Fee", feeHuman + " (core)", feeRaw);
-    row("Network", network);
+    row(t("vote.fee_row", "Fee"), feeHuman + t("vote.fee_core", " (core)"), feeRaw);
+    row(t("vote.network_row", "Network"), network);
     wrap.appendChild(list);
+    /* Sign-time notice while locked: lists above stay browsable, only
+     * Sign & Publish needs the password. */
+    try {
+      if (typeof Wallet === "undefined" || typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked())
+        wrap.appendChild(el(doc, "p", t("vote.locked_sign_note", "Wallet is locked — browsing is public; unlock to sign."), "muted"));
+    } catch (e) { /* notice is display-only */ }
 
-    var backBtn = touchable(el(doc, "button", "Back"));
+    var backBtn = touchable(el(doc, "button", t("vote.back", "Back")));
     backBtn.type = "button";
     wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Publish"));
+    var sendBtn = touchable(el(doc, "button", t("vote.sign_publish", "Sign & Publish")));
     sendBtn.type = "button";
     wrap.appendChild(sendBtn);
 
@@ -585,11 +621,11 @@ var VoteUI = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, "Signing…");
+      var status = showStatus(doc, wrap, t("vote.signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), "Wallet is locked.");
+        showError(doc, wrap, new Error("wallet-locked"), t("vote.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
@@ -602,7 +638,7 @@ var VoteUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return;
         wrap.removeChild(status);
-        showError(doc, wrap, (e && e.message) ? e.message : String(e || "Publish failed"), "Vote publish failed.");
+        showError(doc, wrap, (e && e.message) ? e.message : String(e || t("vote.publish_fallback", "Publish failed")), t("vote.publish_failed", "Vote publish failed."));
         backBtn.disabled = false;
       });
     });
@@ -618,14 +654,14 @@ var VoteUI = (function () {
   async function publishWithRetry(st, newOptions, feeRaw, onStep) {
     var attempt = await buildSigned(st.me.id, newOptions, feeRaw);
     try {
-      onStep("Broadcasting…");
+      onStep(t("vote.broadcasting", "Broadcasting…"));
       var proof = await sendAndProve(st, attempt, newOptions);
       return { blockNum: proof.head, via: proof.via, retried: false };
     } catch (e) {
       var sendRejected = e && e.sendRejected === true;
       var isSentinel = (newOptions.voting_account || PROXY_SENTINEL) === PROXY_SENTINEL;
       if (!sendRejected || !isSentinel) throw e;
-      onStep("Node rejected the 1.2.5 proxy mode — retrying once as self…");
+      onStep(t("vote.retry_self", "Node rejected the 1.2.5 proxy mode — retrying once as self…"));
       var selfOptions = {
         memo_key: newOptions.memo_key,
         voting_account: st.me.id,
@@ -686,9 +722,9 @@ var VoteUI = (function () {
       }
       await sleep(PROVE_INTERVAL_MS);
     }
-    throw new Error("Sent (" + via + ") but the new slate was not observed within " +
-      (PROVE_TIMEOUT_MS / 1000) + "s; check #/voting before retrying " +
-      "(do NOT blindly rebroadcast).");
+    throw new Error(t("vote.sent_prefix", "Sent (") + via + t("vote.sent_middle", ") but the new slate was not observed within ") +
+      (PROVE_TIMEOUT_MS / 1000) + t("vote.sent_suffix", "s; check #/voting before retrying ") +
+      t("vote.sent_note", "(do NOT blindly rebroadcast)."));
   }
 
   /* Intended-vs-on-chain slate comparison (sorted vote arrays + proxy). */
@@ -712,20 +748,20 @@ var VoteUI = (function () {
    * blank, never a fabricated txid. Reports which proxy mode the chain
    * accepted (the retry-rule outcome Task 4 records). */
   function showResult(doc, wrap, root, st, errText, res) {
-    wrap.appendChild(el(doc, "h1", errText ? "Vote failed" : "Votes published"));
+    wrap.appendChild(el(doc, "h1", errText ? t("vote.result_failed", "Vote failed") : t("vote.result_ok", "Votes published")));
     if (errText) {
-      showError(doc, wrap, errText, "Vote publish failed.");
+      showError(doc, wrap, errText, t("vote.publish_failed", "Vote publish failed."));
     } else {
-      var ok = el(doc, "p", "Observed at head block #" + String(res.blockNum) +
+      var ok = el(doc, "p", t("vote.observed_prefix", "Observed at head block #") + String(res.blockNum) +
         " (" + res.via + ").", "xfer-ok");
       ok.setAttribute("aria-live", "polite");
       wrap.appendChild(ok);
       wrap.appendChild(el(doc, "p",
         res.retried
-          ? "The node rejected proxy mode 1.2.5, so the vote was published as self (voting_account " + st.me.id + ")."
-          : "Published voting directly (voting_account 1.2.5).", "muted"));
+          ? t("vote.retried_prefix", "The node rejected proxy mode 1.2.5, so the vote was published as self (voting_account ") + st.me.id + ")."
+          : t("vote.direct_note", "Published voting directly (voting_account 1.2.5)."), "muted"));
     }
-    var back = touchable(el(doc, "a", "Back to voting"));
+    var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
     back.setAttribute("href", "#/voting");
     wrap.appendChild(back);
   }

@@ -4,6 +4,10 @@
  * Consumes: Htlc (reads/builders/fee/sendAndProve/formatters), Tx (buildTx),
  * Format, Account, Asset, Wallet (unlock + memory WIF), Chain, Store (WIFs stay JS values).
  * Created by: building-vanilla-slices skill, slice-11-htlc plan Task 3 (generation counter drops stale work).
+ * PUBLIC-FIRST (gate repair): routeReady never gates on unlock — tables/detail/
+ * create-preview render locked under committee-account 1.2.0 with a viewing
+ * notice (pool-ui.js precedent). Password is asked only at Sign & Send
+ * (sendConfirm sign-time gate + inline unlock); reviews stay read-only.
  * CHAIN TRUTH (#4 wins): op 49 create / 50 redeem / 52 extend (protocol/
  * htlc.hpp); 51/53 VIRTUAL, never dispatched. Secrecy: HASH ONLY on screen;
  * plaintext lives only in the redeem password input; create clears secrets.
@@ -38,13 +42,35 @@ var HtlcUI = (function () {
     var b = touchable(el(doc, "button", "Retry")); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }
-  function unlockBox(doc, wrap, retry) { /* locked gate: unlock re-runs the retry closure */
-    wrap.appendChild(el(doc, "p", "Wallet is locked. Enter your password to continue.", "muted"));
+  /* Default viewing account while locked: committee-account 1.2.0 (a public
+   * chain object on testnet+mainnet, verified live 2026-09-28). Reads stay
+   * public under it; writes gate at Sign & Send (sendConfirm). Never throws
+   * — locked render is normal. */
+  var VIEWING_AS_ID = "1.2.0", VIEWING_AS_NAME = "committee-account";
+  function isUnlockedNow() {
+    try {
+      if (typeof Wallet !== "undefined" && typeof Wallet.isUnlocked === "function") return !!Wallet.isUnlocked();
+      return !!(typeof Wallet !== "undefined" && Wallet.keys);
+    } catch (e) { return false; }
+  }
+  function viewingAsNotice(doc) {
+    return el(doc, "p", "Viewing as " + VIEWING_AS_NAME + " (" + VIEWING_AS_ID + ") — unlock to act as your account.", "muted");
+  }
+  function signNotice(doc) {
+    return el(doc, "p", "Wallet locked — preview only. Password is asked at Sign & Send, never to view.", "muted");
+  }
+  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
+    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
+    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password"); touchable(inp); wrap.appendChild(inp);
-    var b = touchable(el(doc, "button", "Unlock")); b.type = "button"; wrap.appendChild(b);
+    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
+    inp.setAttribute("placeholder", "password"); inp.setAttribute("aria-label", "Password");
+    touchable(inp); row.appendChild(inp);
+    var b = touchable(el(doc, "button", "Unlock")); b.type = "button"; row.appendChild(b);
+    parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
-      Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap, e, "Unlock failed."); });
+      Wallet.unlock(inp.value).then(function () { inp.value = ""; if (onUnlock) onUnlock(); })
+        .catch(function (e) { b.disabled = false; showError(doc, parent, e, "Unlock failed."); });
     });
   }
   function missingBackends() { /* first missing backend id, or null */
@@ -71,7 +97,8 @@ var HtlcUI = (function () {
       openSubs.push(off);
     } catch (e) { /* subscribe unavailable: manual Retry remains */ }
   }
-  function routeReady(root, title, retry) { /* preamble (backends/offline/unlock); null = gate painted */
+  function routeReady(root, title, retry) { /* preamble (backends/offline); null = gate painted.
+    PUBLIC-FIRST: no wallet gate here — lists/details/previews render locked. */
     var doc = root.ownerDocument || document, myGen = ++gen, miss = missingBackends();
     dropOpenSubs();
     root.innerHTML = "";
@@ -79,7 +106,6 @@ var HtlcUI = (function () {
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetryOnOpen(myGen, retry); return null; }
-    if (!Wallet.isUnlocked()) { unlockBox(doc, wrap, retry); return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function routeFail(root, title, e, fallback, retry) { /* shared load-failure page */
@@ -88,8 +114,9 @@ var HtlcUI = (function () {
     root.appendChild(failed); failed.appendChild(el(doc, "h1", title));
     showError(doc, failed, e, fallback); offlineBox(doc, failed, retry);
   }
-  function loadAccount(myGen, loader) { /* resolve wallet account, run loader(me); stale gens bail */
-    return Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
+  function loadAccount(myGen, loader) { /* wallet account when unlocked, else committee-account 1.2.0; stale gens bail */
+    return Account.myAccountId().catch(function () { return VIEWING_AS_ID; })
+      .then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return null;
       return loader(me).then(function (data) { return { me: me, data: data }; }); });
   }
@@ -160,7 +187,14 @@ var HtlcUI = (function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, "Signing…");
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); send.disabled = false; back.disabled = false; return; }
+      if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+        out.removeChild(status);
+        if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
+          out.appendChild(el(doc, "p", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing.", "muted")).className = "muted xfer-sign-note";
+        unlockInline(doc, out, function () {
+          out.appendChild(el(doc, "p", "Unlocked — press Back and re-run Review so the transaction uses your account.", "muted"));
+        });
+        send.disabled = false; back.disabled = false; return; }
       Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
         status.textContent = "Broadcasting…";
         return Htlc.sendAndProve(unsigned, wif, cfg.prove);
@@ -208,11 +242,13 @@ var HtlcUI = (function () {
     var ctx = routeReady(root, "Hashed Timelock Contracts", function () { renderHtlc(root); });
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen; ctx.wrap.appendChild(el(doc, "p", "Loading contracts…", "muted"));
+    if (!isUnlockedNow()) ctx.wrap.appendChild(viewingAsNotice(doc));
     loadAccount(myGen, function (me) { return Htlc.mine(me.id); }).then(function (found) {
       if (!found || myGen !== gen) return;
       root.innerHTML = "";
       var box = el(doc, "div", null, "wrap"); root.appendChild(box);
       box.appendChild(el(doc, "h1", "Hashed Timelock Contracts"));
+      if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       box.appendChild(el(doc, "p", "Locked transfers redeemable with a secret preimage before expiry.", "muted"));
       box.appendChild(el(doc, "h2", "Sent (" + found.data.sent.length + ")"));
       box.appendChild(htlcTable(doc, found.data.sent, "sent"));
@@ -242,6 +278,7 @@ var HtlcUI = (function () {
     table.appendChild(tbody); return table;
   }
   function createBox(doc, box, me, myGen) { /* create form; fee RE-READ at review; no preimage echo */
+    if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var fTo = field(doc, "To account", { placeholder: "name or 1.2.N" });
     var fAsset = field(doc, "Asset", { value: "BTS" });
     var fAmount = field(doc, "Amount", { inputmode: "decimal", placeholder: "1.23456" });
@@ -311,12 +348,14 @@ var HtlcUI = (function () {
       var back = el(doc, "a", "Back to HTLCs"); back.setAttribute("href", "#/htlc"); ctx.wrap.appendChild(back); return;
     }
     ctx.wrap.appendChild(el(doc, "p", "Loading contract…", "muted"));
+    if (!isUnlockedNow()) ctx.wrap.appendChild(viewingAsNotice(doc));
     loadAccount(myGen, function () { return Htlc.htlc(id); }).then(function (found) {
       if (!found || myGen !== gen) return;
       var me = found.me, row = found.data, a = amtText(row.amount_raw, row.asset_id, row.precision), exp;
       root.innerHTML = "";
       var box = el(doc, "div", null, "wrap"); root.appendChild(box);
       box.appendChild(el(doc, "h1", "HTLC " + row.id));
+      if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       try { exp = Htlc.formatDateTime(row.expiration_iso); } catch (e) { exp = String(row.expiration_iso || "unknown"); }
       box.appendChild(confirmList(doc, [["Contract", row.id], ["From", row.from_id], ["To", row.to_id],
         ["Amount", a.text, "raw " + a.raw], ["Hash algorithm", row.algo], ["Preimage hash", row.hash_hex],
@@ -334,6 +373,7 @@ var HtlcUI = (function () {
   }
   function redeemBox(doc, box, me, row, myGen) { /* password input + LIVE hash-match; LENGTH ONLY in confirm */
     box.appendChild(el(doc, "h2", "Redeem"));
+    if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var typeId = row.algo === "sha256" ? 2 : (row.algo === "ripemd160" ? 0 : -1);
     if (typeId < 0) { box.appendChild(el(doc, "p", "Unsupported hash (" + row.algo + "): redeem is disabled.", "muted")); return; }
     var inp = doc.createElement("input");
@@ -376,6 +416,7 @@ var HtlcUI = (function () {
   }
   function extendBox(doc, box, me, row, myGen) { /* presets + custom, new-expiry preview, live fee */
     box.appendChild(el(doc, "h2", "Extend timelock"));
+    if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var picker = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), "+" + p[0]]; }), "Add");
     box.appendChild(picker.row);
     var preview = el(doc, "p", "", "muted"); preview.setAttribute("aria-live", "polite"); box.appendChild(preview);
@@ -410,10 +451,12 @@ var HtlcUI = (function () {
   }
   return { renderHtlc: renderHtlc, renderHtlcDetail: renderHtlcDetail, _ui: {
       el: el, touchable: touchable, clearBox: clearBox, shortHash: shortHash, showError: showError, showStatus: showStatus,
-      offlineBox: offlineBox, unlockBox: unlockBox, confirmList: confirmList, field: field, selectOpts: selectOpts, tableHead: tableHead,
+      offlineBox: offlineBox, confirmList: confirmList, field: field, selectOpts: selectOpts, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady, routeFail: routeFail, loadAccount: loadAccount, amtText: amtText, secsPicker: secsPicker,
       autoRetryOnOpen: autoRetryOnOpen, dropOpenSubs: dropOpenSubs,
+      isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, signNotice: signNotice, unlockInline: unlockInline,
+      viewingAsId: VIEWING_AS_ID,
       missingBackends: missingBackends, presets: PRESETS } };
 })();
 

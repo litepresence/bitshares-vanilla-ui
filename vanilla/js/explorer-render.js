@@ -31,6 +31,20 @@
  */
 var ExplorerRender = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   var PRICE_PLACES = 8; /* market.js/market-orders.js convention */
 
@@ -114,7 +128,7 @@ var ExplorerRender = (function () {
   /* Owning-asset amount span with async precision resolve (Explorer.asset):
    * shows raw + " (raw)" meanwhile, and keeps it when unresolvable. */
   function ownedAmountSpan(doc, raw, assetId, myGen) {
-    var s = el(doc, "span", String(raw) + " (raw)");
+    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
     s.title = String(raw) + " " + assetId;
     Explorer.asset(assetId).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -130,7 +144,7 @@ var ExplorerRender = (function () {
    * resolves. Shows the raw int meanwhile (with a "raw" marker, never as
    * a final money display). */
   function amountSpan(doc, raw, assetId, myGen) {
-    var s = el(doc, "span", String(raw) + " (raw)");
+    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
     s.title = String(raw) + " " + assetId;
     Explorer.asset(assetId).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -148,7 +162,7 @@ var ExplorerRender = (function () {
   /* Price-pair leaf -> span filled in once both precisions resolve. */
   function priceSpan(doc, base, quote, myGen) {
     var s = el(doc, "span", "…");
-    s.title = "base " + base.amount + " " + base.asset_id + " / quote " + quote.amount + " " + quote.asset_id;
+    s.title = t("explorer.price_base", "base ") + base.amount + " " + base.asset_id + t("explorer.price_quote", " / quote ") + quote.amount + " " + quote.asset_id;
     var pb = Explorer.asset(base.asset_id).then(function (j) { return j.asset.precision; });
     var pq = Explorer.asset(quote.asset_id).then(function (j) { return j.asset.precision; });
     Promise.all([pb, pq]).then(function (precs) {
@@ -301,7 +315,7 @@ var ExplorerRender = (function () {
       var coreSpan;
       try { coreSpan = humanAmount(doc, String(value), CORE_PRECISION); }
       catch (e) {
-        coreSpan = el(doc, "span", String(value) + " (raw)");
+        coreSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
         coreSpan.title = String(value);
       }
       dd.appendChild(coreSpan);
@@ -314,14 +328,14 @@ var ExplorerRender = (function () {
         var ownSpan;
         try { ownSpan = humanAmount(doc, String(value), ctx.assetPrecision); }
         catch (e) {
-          ownSpan = el(doc, "span", String(value) + " (raw)");
+          ownSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
           ownSpan.title = String(value);
         }
         dd.appendChild(ownSpan);
       } else if (ctx && typeof ctx.assetId === "string" && ctx.assetId) {
         dd.appendChild(ownedAmountSpan(doc, String(value), ctx.assetId, myGen));
       } else {
-        var rawSpan = el(doc, "span", String(value) + " (raw)");
+        var rawSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
         rawSpan.title = String(value);
         dd.appendChild(rawSpan);
       }
@@ -329,7 +343,7 @@ var ExplorerRender = (function () {
     }
     if (Array.isArray(value)) {
       if (value.length === 0) { dd.appendChild(el(doc, "span", "—", "muted")); return; }
-      if (depth >= 2) { dd.appendChild(el(doc, "span", value.length + " items", "muted")); return; }
+      if (depth >= 2) { dd.appendChild(el(doc, "span", value.length + t("explorer.items_unit", " items"), "muted")); return; }
       var ul = doc.createElement("ul");
       value.forEach(function (item, i) {
         var li = doc.createElement("li");
@@ -383,13 +397,13 @@ var ExplorerRender = (function () {
    *   div. Fails: never (missing fields render "No fields."). */
   function opSection(doc, op, ctx, label) {
     var box = el(doc, "div", null, "xplore-op");
-    var head = el(doc, "h3", (label || "Operation") + ": " + op.type_name +
-      (op.virtual ? " (virtual)" : "") + " [op " + op.type_idx + "]");
+    var head = el(doc, "h3", (label || t("explorer.op_label", "Operation")) + ": " + op.type_name +
+      (op.virtual ? t("explorer.virtual_mark", " (virtual)") : "") + t("explorer.op_badge_prefix", " [op ") + op.type_idx + "]");
     box.appendChild(head);
     var dl = el(doc, "dl", null, "xplore-fields");
     var fields = (op.fields && typeof op.fields === "object") ? op.fields : {};
     var keys = Object.keys(fields);
-    if (keys.length === 0) box.appendChild(el(doc, "p", "No fields.", "muted"));
+    if (keys.length === 0) box.appendChild(el(doc, "p", t("explorer.no_fields", "No fields."), "muted"));
     keys.forEach(function (k) { fieldRow(doc, dl, k, fields[k], ctx, 0); });
     box.appendChild(dl);
     return box;
@@ -409,11 +423,11 @@ var ExplorerRender = (function () {
      * total_votes at core precision) — sync Format math, never float. */
     var votes = entry.object && entry.object.total_votes;
     if (isIntLike(votes)) {
-      try { title += " · " + Format.formatAmount(String(votes), CORE_PRECISION) + " votes"; }
+      try { title += " · " + Format.formatAmount(String(votes), CORE_PRECISION) + t("explorer.votes_unit", " votes"); }
       catch (e) { /* header stays id + type */ }
     }
     box.appendChild(el(doc, "h3", title));
-    if (entry.op) box.appendChild(opSection(doc, entry.op, ctx, "History op"));
+    if (entry.op) box.appendChild(opSection(doc, entry.op, ctx, t("explorer.history_op", "History op")));
     var dl = el(doc, "dl", null, "xplore-fields");
     var obj = entry.object || {};
     /* Owning-asset hint for bare supply/fee leaves: asset objects carry
@@ -429,10 +443,10 @@ var ExplorerRender = (function () {
       shown++;
     });
     box.appendChild(dl);
-    var note = "Full management view lives in its owning slice — this is a read-only summary.";
-    if (entry.space === 1 && (entry.type === 7 || entry.type === 8)) note += " (orders: trading slice)";
-    else if (entry.space === 1 && entry.type === 10) note += " (proposals: governance slice)";
-    else if (entry.space === 1 && entry.type === 16) note += " (HTLC: transfers slice)";
+    var note = t("explorer.full_view_note", "Full management view lives in its owning slice — this is a read-only summary.");
+    if (entry.space === 1 && (entry.type === 7 || entry.type === 8)) note += t("explorer.note_orders", " (orders: trading slice)");
+    else if (entry.space === 1 && entry.type === 10) note += t("explorer.note_proposals", " (proposals: governance slice)");
+    else if (entry.space === 1 && entry.type === 16) note += t("explorer.note_htlc", " (HTLC: transfers slice)");
     box.appendChild(el(doc, "p", note, "muted"));
     return box;
   }

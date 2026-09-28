@@ -41,6 +41,17 @@ var TradeForm = (function () {
   var PROVE_INTERVAL_MS = 2500;
   var PRICE_PLACES = 8;
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Expiry presets mirror #1 exactly (titles + YEAR default); durations are
    * plain ms offsets (#1 uses moment calendar adds — a 365-day YEAR is close
    * enough for an order expiry and is documented, not guessed, here). */
@@ -90,13 +101,13 @@ var TradeForm = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("market.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -202,7 +213,7 @@ var TradeForm = (function () {
   /* Expiry select + custom datetime (shown only for SPECIFIC, like #1). */
   function renderExpiry(doc, wrap, st) {
     var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", "Expiration ");
+    var label = el(doc, "label", t("trade.expiration", "Expiration "));
     var sel = doc.createElement("select");
     sel.id = "trade-expiry";
     EXPIRATIONS.forEach(function (p) {
@@ -219,7 +230,7 @@ var TradeForm = (function () {
     custom.type = "datetime-local";
     custom.id = "trade-expiry-custom";
     if (st.custom) custom.value = st.custom;
-    custom.setAttribute("aria-label", "Custom expiration date and time");
+    custom.setAttribute("aria-label", t("trade.expiry_custom_label", "Custom expiration date and time"));
     touchable(custom);
     custom.style.display = (st.key === "SPECIFIC") ? "" : "none";
     row.appendChild(custom);
@@ -370,10 +381,10 @@ var TradeForm = (function () {
    * successful unlock the panels render in place. */
   function renderUnlock(doc, mount, ctx) {
     clearBox(mount);
-    mount.appendChild(el(doc, "p", "Unlock your wallet to trade on this market.", "muted"));
-    var f = fieldRow(doc, "Password ", { id: "trade-unlock-password", type: "password" });
+    mount.appendChild(el(doc, "p", t("trade.unlock_hint", "Unlock your wallet to trade on this market."), "muted"));
+    var f = fieldRow(doc, t("trade.password_label", "Password "), { id: "trade-unlock-password", type: "password" });
     mount.appendChild(f.row);
-    var btn = touchable(el(doc, "button", "Unlock"));
+    var btn = touchable(el(doc, "button", t("trade.unlock_button", "Unlock")));
     btn.id = "trade-unlock-do";
     btn.type = "button";
     mount.appendChild(btn);
@@ -388,7 +399,7 @@ var TradeForm = (function () {
         .then(function () { renderPanels(doc, mount, ctx); })
         .catch(function (e) {
           btn.disabled = false;
-          errBox.textContent = (e && e.message) ? e.message : String(e || "Unlock failed");
+          errBox.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
         });
     });
   }
@@ -403,11 +414,11 @@ var TradeForm = (function () {
         typeof Wallet === "undefined" || !Wallet ||
         typeof Format === "undefined" || !Format ||
         typeof Chain === "undefined" || !Chain) {
-      showError(doc, mount, "Trade backend missing: js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load.");
+      showError(doc, mount, t("trade.backend_missing", "Trade backend missing: js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load."));
       return;
     }
     if (!ctx || !ctx.base || !ctx.quote) {
-      showError(doc, mount, "Trade panels need the market assets; reload the market.");
+      showError(doc, mount, t("trade.need_assets", "Trade panels need the market assets; reload the market."));
       return;
     }
     var unlocked = false;
@@ -418,7 +429,7 @@ var TradeForm = (function () {
       renderUnlock(doc, mount, ctx);
       return;
     }
-    mount.appendChild(el(doc, "p", "Loading trading…", "muted"));
+    mount.appendChild(el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
     Account.myAccountId().then(function (myId) {
       return Account.resolve(myId).then(function (me) {
         return { id: myId, name: me.name };
@@ -432,7 +443,7 @@ var TradeForm = (function () {
       });
     }).catch(function (e) {
       clearBox(mount);
-      showError(doc, mount, e, "Could not load your account.");
+      showError(doc, mount, e, t("trade.fail_account", "Could not load your account."));
     });
   }
 
@@ -442,14 +453,14 @@ var TradeForm = (function () {
     var ctx = P.ctx;
     mount.appendChild(el(doc, "p", "Trade " + ctx.quoteSym + " / " + ctx.baseSym, "muted"));
     var bar = el(doc, "div", null, "trade-tabs");
-    [["buy", "Buy"], ["sell", "Sell"], ["scaled", "Scaled"]].forEach(function (t) {
-      var b = touchable(el(doc, "button", t[1]));
+    [["buy", t("trade.tab_buy", "Buy")], ["sell", t("trade.tab_sell", "Sell")], ["scaled", t("trade.tab_scaled", "Scaled")]].forEach(function (d) {
+      var b = touchable(el(doc, "button", d[1]));
       b.type = "button";
-      b.id = "trade-tab-" + t[0];
-      b.setAttribute("aria-pressed", P.tab === t[0] ? "true" : "false");
-      if (P.tab === t[0]) b.setAttribute("aria-current", "true");
+      b.id = "trade-tab-" + d[0];
+      b.setAttribute("aria-pressed", P.tab === d[0] ? "true" : "false");
+      if (P.tab === d[0]) b.setAttribute("aria-current", "true");
       b.addEventListener("click", function () {
-        P.tab = t[0];
+        P.tab = d[0];
         paintTabs(doc, mount, P);
       });
       bar.appendChild(b);
@@ -478,7 +489,7 @@ var TradeForm = (function () {
     });
     body.appendChild(priceF.row);
     var fokRow = el(doc, "div", null, "xfer-field");
-    var fokLabel = el(doc, "label", "Fill or kill ");
+    var fokLabel = el(doc, "label", t("trade.fok_label", "Fill or kill "));
     var fokBox = doc.createElement("input");
     fokBox.type = "checkbox";
     fokBox.id = "trade-fok";
@@ -487,10 +498,10 @@ var TradeForm = (function () {
     fokLabel.appendChild(fokBox);
     fokRow.appendChild(fokLabel);
     fokRow.appendChild(el(doc, "span",
-      " (cancel unless the whole order fills at once)", "muted"));
+      t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
     body.appendChild(fokRow);
     var exp = renderExpiry(doc, body, st);
-    var reviewBtn = touchable(el(doc, "button", "Review order"));
+    var reviewBtn = touchable(el(doc, "button", t("trade.review", "Review order")));
     reviewBtn.id = "trade-review";
     reviewBtn.type = "button";
     body.appendChild(reviewBtn);
@@ -504,7 +515,7 @@ var TradeForm = (function () {
       st.key = exp.select.value;
       st.custom = exp.custom.value;
       reviewBtn.disabled = true;
-      var status = showStatus(doc, body, "Checking balance and fee…");
+      var status = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
       reviewSingle(P, side, {
         amount: st.amount, price: st.price, fok: st.fok,
         key: st.key, custom: st.custom
@@ -523,7 +534,7 @@ var TradeForm = (function () {
         }
         body.removeChild(status);
         reviewBtn.disabled = false;
-        showError(doc, body, msg, "Could not prepare the order.");
+        showError(doc, body, msg, t("trade.fail_prepare", "Could not prepare the order."));
       });
     });
   }
@@ -607,7 +618,7 @@ var TradeForm = (function () {
   function paintConfirmSingle(doc, mount, P, side, R) {
     var ctx = P.ctx;
     clearBox(mount);
-    mount.appendChild(el(doc, "h3", "Confirm order"));
+    mount.appendChild(el(doc, "h3", t("trade.confirm_title", "Confirm order")));
     var list = el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(el(doc, "dt", term));
@@ -623,35 +634,35 @@ var TradeForm = (function () {
     var recvS = R.recvAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
     var priceHuman = ratioToDec(R.ratio.num, R.ratio.den, PRICE_PLACES) +
       " " + ctx.baseSym + " per " + ctx.quoteSym;
-    row("Side", (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
-    row("Seller", P.me.name + " (" + P.me.id + ")");
-    row("Price", priceHuman, R.ratio.num.toString() + "/" + R.ratio.den.toString());
-    row("Amount", (side === "buy" ? recvHuman : sellHuman) + " " + ctx.quoteSym);
-    row("Total", (side === "buy" ? sellHuman : recvHuman) + " " + ctx.baseSym);
-    row("Sell (Amount to Sell)", sellHuman + " " + sellS, R.sellRaw);
-    row("Buy (Min to Receive)", recvHuman + " " + recvS, R.recvRaw);
-    row("Fee", humanFee(R.feeRaw, R.feeMeta), R.feeRaw);
-    row("Expiration", R.expWire);
-    row("Fill or Kill", R.fok ? "Yes" : "No");
-    row("Network", networkName());
+    row(t("trade.row_side", "Side"), (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
+    row(t("trade.row_seller", "Seller"), P.me.name + " (" + P.me.id + ")");
+    row(t("trade.row_price", "Price"), priceHuman, R.ratio.num.toString() + "/" + R.ratio.den.toString());
+    row(t("trade.row_amount", "Amount"), (side === "buy" ? recvHuman : sellHuman) + " " + ctx.quoteSym);
+    row(t("trade.row_total", "Total"), (side === "buy" ? sellHuman : recvHuman) + " " + ctx.baseSym);
+    row(t("trade.row_sell", "Sell (Amount to Sell)"), sellHuman + " " + sellS, R.sellRaw);
+    row(t("trade.row_buy", "Buy (Min to Receive)"), recvHuman + " " + recvS, R.recvRaw);
+    row(t("trade.row_fee", "Fee"), humanFee(R.feeRaw, R.feeMeta), R.feeRaw);
+    row(t("trade.row_expiration", "Expiration"), R.expWire);
+    row(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
+    row(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
     /* The exact operation about to be signed (unsigned, no secrets).
      * Review bytes before Sign & Send. */
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
-    sumOp.setAttribute("aria-label", "Show unsigned operation JSON");
+    sumOp.setAttribute("aria-label", t("trade.raw_op", "Show unsigned operation JSON"));
     detOp.appendChild(sumOp);
     var preOp = doc.createElement("pre");
     try { preOp.textContent = JSON.stringify(R.unsigned.operations, null, 2); }
     catch (e) { preOp.textContent = String(R.unsigned && R.unsigned.operations); }
     detOp.appendChild(preOp);
     mount.appendChild(detOp);
-    var backBtn = touchable(el(doc, "button", "Back"));
+    var backBtn = touchable(el(doc, "button", t("trade.back", "Back")));
     backBtn.id = "trade-back";
     backBtn.type = "button";
     mount.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Send"));
+    var sendBtn = touchable(el(doc, "button", t("trade.sign_send", "Sign & Send")));
     sendBtn.id = "trade-send";
     sendBtn.type = "button";
     mount.appendChild(sendBtn);
@@ -659,7 +670,7 @@ var TradeForm = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, mount, "Signing…");
+      var status = showStatus(doc, mount, t("trade.signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         mount.removeChild(status);
@@ -675,18 +686,18 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = "Broadcasting…";
+          status.textContent = t("trade.s1", "Broadcasting…");
           return sendTx(signed, proveNewOrder(P.me.id, before, R.sellAssetId, R.sellRaw));
         })
         .then(function (res) {
           TradeCancel.paintResult(doc, mount, {
-            title: "Order placed",
+            title: t("trade.placed_title", "Order placed"),
             lines: [
               "Order " + res.found.id + " is on the book (" +
               pairLabel(ctx) + ").",
               "Observed at head block #" + String(res.head) + " via " + res.via + "."
             ],
-            backLabel: "Place another order",
+            backLabel: t("trade.place_another", "Place another order"),
             onBack: function () { paintTabs(doc, mount, P); }
           });
           if (typeof P.ctx.refresh === "function") {
@@ -695,7 +706,7 @@ var TradeForm = (function () {
         })
         .catch(function (e) {
           mount.removeChild(status);
-          showError(doc, mount, e, "Order failed.");
+          showError(doc, mount, e, t("trade.fail_order", "Order failed."));
           backBtn.disabled = false;
           sendBtn.disabled = false;
         });
@@ -707,9 +718,9 @@ var TradeForm = (function () {
   function scaledForm(doc, body, mount, P) {
     var ctx = P.ctx;
     var st = P.scaled;
-    body.appendChild(el(doc, "h3", "Scaled orders (one transaction)"));
+    body.appendChild(el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
     var sideRow = el(doc, "div", null, "xfer-field");
-    var sideLabel = el(doc, "label", "Side ");
+    var sideLabel = el(doc, "label", t("trade.side_label", "Side "));
     var sideSel = doc.createElement("select");
     [["sell", "Sell " + ctx.quoteSym + " (spend " + ctx.quoteSym + ")"],
      ["buy", "Buy " + ctx.quoteSym + " (spend " + ctx.baseSym + ")"]].forEach(function (o) {
@@ -723,7 +734,7 @@ var TradeForm = (function () {
     sideLabel.appendChild(sideSel);
     sideRow.appendChild(sideLabel);
     body.appendChild(sideRow);
-    var nF = fieldRow(doc, "Order count (2-20) ", {
+    var nF = fieldRow(doc, t("trade.count_label", "Order count (2-20) "), {
       id: "trade-n", value: st.n, placeholder: "3", inputmode: "numeric"
     });
     body.appendChild(nF.row);
@@ -749,7 +760,7 @@ var TradeForm = (function () {
       paintTabs(doc, mount, P);
     });
     var exp = renderExpiry(doc, body, st);
-    var prevBtn = touchable(el(doc, "button", "Preview scaled orders"));
+    var prevBtn = touchable(el(doc, "button", t("trade.preview", "Preview scaled orders")));
     prevBtn.id = "trade-preview";
     prevBtn.type = "button";
     body.appendChild(prevBtn);
@@ -763,7 +774,7 @@ var TradeForm = (function () {
       st.key = exp.select.value;
       st.custom = exp.custom.value;
       prevBtn.disabled = true;
-      var status = showStatus(doc, body, "Checking balance and fee…");
+      var status = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
       reviewScaled(P, {
         n: st.n, low: st.low, high: st.high, total: st.total,
         side: st.side, key: st.key, custom: st.custom
@@ -784,7 +795,7 @@ var TradeForm = (function () {
         }
         body.removeChild(status);
         prevBtn.disabled = false;
-        showError(doc, body, msg, "Could not prepare scaled orders.");
+        showError(doc, body, msg, t("trade.fail_scaled_prepare", "Could not prepare scaled orders."));
       });
     });
   }
@@ -877,8 +888,8 @@ var TradeForm = (function () {
     var table = doc.createElement("table");
     table.className = "node-table";
     var hr = doc.createElement("tr");
-    ["#", "Price", "Sell", "Receive"].forEach(function (t) {
-      hr.appendChild(el(doc, "th", t));
+    ["#", t("trade.row_price", "Price"), t("trade.col_sell", "Sell"), t("trade.col_receive", "Receive")].forEach(function (h) {
+      hr.appendChild(el(doc, "th", h));
     });
     var thead = doc.createElement("thead");
     thead.appendChild(hr);
@@ -909,23 +920,23 @@ var TradeForm = (function () {
       if (title) dd.title = title;
       list.appendChild(dd);
     }
-    confirmRow("Seller", P.me.name + " (" + P.me.id + ")");
+    confirmRow(t("trade.row_seller", "Seller"), P.me.name + " (" + P.me.id + ")");
     confirmRow("Fee (total, " + R.calc.orders.length + " ops)", humanFee(R.feeRaw, R.feeMeta), R.feeRaw);
-    confirmRow("Expiration", R.expWire);
-    confirmRow("Network", networkName());
+    confirmRow(t("trade.row_expiration", "Expiration"), R.expWire);
+    confirmRow(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
     /* All N operations about to be signed (unsigned, no secrets). */
     var detOps = doc.createElement("details");
     detOps.className = "raw";
     var sumOps = doc.createElement("summary");
-    sumOps.setAttribute("aria-label", "Show unsigned operations JSON");
+    sumOps.setAttribute("aria-label", t("trade.raw_ops", "Show unsigned operations JSON"));
     detOps.appendChild(sumOps);
     var preOps = doc.createElement("pre");
     try { preOps.textContent = JSON.stringify(R.unsigned.operations, null, 2); }
     catch (e) { preOps.textContent = String(R.unsigned && R.unsigned.operations); }
     detOps.appendChild(preOps);
     mount.appendChild(detOps);
-    var backBtn = touchable(el(doc, "button", "Back"));
+    var backBtn = touchable(el(doc, "button", t("trade.back", "Back")));
     backBtn.id = "trade-back";
     backBtn.type = "button";
     mount.appendChild(backBtn);
@@ -937,7 +948,7 @@ var TradeForm = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, mount, "Signing…");
+      var status = showStatus(doc, mount, t("trade.signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         mount.removeChild(status);
@@ -953,7 +964,7 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = "Broadcasting…";
+          status.textContent = t("trade.s1", "Broadcasting…");
           return sendTx(signed, async function () {
             var dbId = await Chain.db();
             var rows = await Chain.call(dbId, "get_limit_orders_by_account", [P.me.id, 100]);
@@ -971,7 +982,7 @@ var TradeForm = (function () {
               res.found.count + " new orders on the book (" + pairLabel(ctx) + ").",
               "Observed at head block #" + String(res.head) + " via " + res.via + "."
             ],
-            backLabel: "Place more orders",
+            backLabel: t("trade.place_more", "Place more orders"),
             onBack: function () { paintTabs(doc, mount, P); }
           });
           if (typeof P.ctx.refresh === "function") {
@@ -980,7 +991,7 @@ var TradeForm = (function () {
         })
         .catch(function (e) {
           mount.removeChild(status);
-          showError(doc, mount, e, "Scaled orders failed.");
+          showError(doc, mount, e, t("trade.fail_scaled", "Scaled orders failed."));
           backBtn.disabled = false;
           sendBtn.disabled = false;
         });

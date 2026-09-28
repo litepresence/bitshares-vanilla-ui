@@ -1,6 +1,13 @@
 * { box-sizing: border-box; }
+/* Original-pages style pass (buttons + fonts only; layout untouched):
+ * #1 body stack is Roboto-Regular/Helvetica/Arial (base/_fonts.scss:27-32 +
+ * vendors/_foundation_settings.scss:92); buttons are RobotoCondensed,
+ * UPPERCASE, 0.875rem (base/_fonts.scss:99-104) with square corners
+ * (foundation _button.scss:12: $button-radius: 0). No webfont download —
+ * the stack resolves to system Roboto where present (Android/most Linux),
+ * else Helvetica/Arial (documented fallback, never a CDN per check_rot). */
 body { margin: 0; background: var(--bg); color: var(--text);
-  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  font: 16px/1.45 "Roboto-Regular", "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
   min-height: 56px; background: var(--header-bg); color: var(--header-text); }
 .brand { color: inherit; font-weight: 700; font-size: 1.1rem; text-decoration: none; }
@@ -40,8 +47,49 @@ body { margin: 0; background: var(--bg); color: var(--text);
   .node-card .latency { margin-right: 8px; }
 }
 button, select, input { min-height: 44px; font-size: 1rem; }
-button { background: var(--button-bg); color: #fff; border: 0; border-radius: 6px;
-  padding: 0 16px; }
+/* #1 buttons: square, condensed, uppercase 0.875rem (see header comment).
+ * min-height 44px stays (principle #7 touch floor — #1's density is kept via
+ * font/padding, never by shrinking targets). */
+button { background: var(--button-bg); color: #fff; border: 0; border-radius: 0;
+  padding: 0 16px; font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
+  font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; }
+/* Hollow secondary buttons (#1 _forms.scss:387 .button.hollow — e.g. LOGIN,
+ * CHANGE DEFAULT FEE ASSET, CREATE HTLC in the captures). CSS-only: slices
+ * opt in with class="hollow"; no view retargeted in this pass. */
+button.hollow, a.btn-hollow { background: transparent; color: var(--button-bg);
+  border: 1px solid var(--button-bg); border-radius: 0;
+  font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
+  font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; }
+a.btn-hollow { display: inline-flex; align-items: center; min-height: 44px;
+  padding: 0 16px; text-decoration: none; }
+/* Table headers match the original: uppercase, small, letterspaced
+ * (account/pools captures: ASSET/QTY/IN ORDERS/… grey caps row). */
+.node-table th { text-transform: uppercase; font-size: 0.78rem;
+  letter-spacing: 0.05em; font-weight: 600; }
+/* Vendored icons (js/icon.js <img>): 1em box, baseline-aligned; monochrome
+ * glyphs follow the theme via --icon-filter (themes.css). Text fallback
+ * (load failure) inherits surrounding color — never a broken image. */
+.icon-img { width: 1em; height: 1em; vertical-align: -0.12em;
+  filter: var(--icon-filter, none); }
+.icon-fallback { font-size: 0.9em; }
+/* Shell nav icons: 18px like #1 Header.jsx:478-488 icon-18px hamburger. */
+#nav a .nav-icon, #nav-toggle .nav-icon { width: 18px; height: 18px;
+  vertical-align: middle; }
+/* The toggle sits on the header bar (blue/dark in every theme, light text)
+ * so its glyph is always inverted to light — independent of --icon-filter. */
+#nav-toggle .nav-icon { filter: invert(1); }
+#nav a { font-weight: 700; }
+#nav a .nav-icon { margin-right: 8px; }
+/* Bell/star/cell icons: image replaces emoji 1:1; star-off dims the
+ * un-favorited state (shape carries state; aria-pressed is the source). */
+.mkt-bell .bell-icon { width: 1.2em; height: 1.2em; }
+.mkt-bell .bell-dot { color: var(--accent); font-size: 0.8em; margin-left: 2px; }
+.mkt-star .star-icon { width: 1.2em; height: 1.2em; }
+.mkt-star .star-off { opacity: 0.35; }
+.mkt-picker-row .star-icon { width: 1em; height: 1em; margin-right: 4px; }
+td .cell-icon { width: 1.1em; height: 1.1em; }
 .error { color: var(--danger); } .muted { color: var(--muted); }
 /* Market desk (slice-05): single column stacked chart/book/trades/side on
  * phones; three-column book|charts+trades|side desk at >=1200px. Tables and

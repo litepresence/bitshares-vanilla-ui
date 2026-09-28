@@ -22,24 +22,84 @@ var App = (function () {
     return dflt;
   }
 
+  /* Nav icons (icon-wiring pass): href -> vendored icon name. Mapping cites
+   *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242,
+   *   transfer:251, cogs:296); "user"/"voting" are the same icons-loader.js
+   *   names #1 uses for account/voting affordances. Icons are decorative
+   *   (aria-hidden <img>); the label span keeps the accessible name, so
+   *   routing, order, and i18n strings are untouched — skin only. */
+  var NAV_ICONS = {
+    "#/": "dashboard",
+    "#/market/BTS_USD": "trade",
+    "#/account/overview": "user",
+    "#/transfer": "transfer",
+    "#/explorer": "server",
+    "#/voting": "voting",
+    "#/settings": "cogs"
+  };
+
+  /* ensureNavIcons: prepend one Icon.img + wrap the label in span.nav-label
+   *   per link (idempotent via data-iconified). Params: nav element. Returns
+   *   nothing. Fails: never throws — without Icon (script order) links keep
+   *   plain text and localizeNav falls back to textContent. */
+  function ensureNavIcons(nav) {
+    if (!nav || typeof document === "undefined") return;
+    if (typeof Icon === "undefined" || !Icon || typeof Icon.img !== "function") return;
+    var links = nav.querySelectorAll("a[href]");
+    for (var i = 0; i < links.length; i++) {
+      (function (a) {
+        try {
+          var href = a.getAttribute("href");
+          var name = NAV_ICONS[href];
+          if (!name || a.getAttribute("data-iconified") === "true") return;
+          var label = a.textContent;
+          while (a.firstChild) a.removeChild(a.firstChild);
+          a.appendChild(Icon.img(name, "nav-icon", ""));
+          var span = document.createElement("span");
+          span.className = "nav-label";
+          span.textContent = label;
+          a.appendChild(span);
+          a.setAttribute("data-iconified", "true");
+        } catch (e) { /* link keeps previous content */ }
+      })(links[i]);
+    }
+  }
+
+  /* setNavLabel: icon-safe label paint (span when iconified, else text).
+   *   Params: nav, href, text. Returns nothing. Fails: never throws. */
+  function setNavLabel(nav, href, text) {
+    var a = nav.querySelector('a[href="' + href + '"]');
+    if (!a) return;
+    var span = a.querySelector("span.nav-label");
+    if (span) span.textContent = text;
+    else a.textContent = text;
+  }
+
+  /* ensureToggleIcon: paint the ☰ menu button with the vendored hamburger
+   *   glyph (#1 Header.jsx:477-489 hamburger/hamburger-x). Decorative only;
+   *   the click handler + aria-expanded in finishBoot are untouched. */
+  function ensureToggleIcon(toggle) {
+    if (!toggle || typeof document === "undefined") return;
+    if (typeof Icon === "undefined" || !Icon || typeof Icon.img !== "function") return;
+    try {
+      if (toggle.getAttribute("data-iconified") === "true") return;
+      while (toggle.firstChild) toggle.removeChild(toggle.firstChild);
+      toggle.appendChild(Icon.img("hamburger", "nav-icon", ""));
+      toggle.setAttribute("data-iconified", "true");
+    } catch (e) { /* ☰ text stays */ }
+  }
+
   /* Explicit per-link calls (not a loop over dynamic keys) so the
    * check_i18n.py drift gate scans every default against en.json. */
   function localizeNav(nav) {
-    var a;
-    a = nav.querySelector('a[href="#/"]');
-    if (a) a.textContent = t("nav.dashboard", "Dashboard");
-    a = nav.querySelector('a[href="#/market/BTS_USD"]');
-    if (a) a.textContent = t("nav.exchange", "Exchange");
-    a = nav.querySelector('a[href="#/account/overview"]');
-    if (a) a.textContent = t("nav.account", "Account");
-    a = nav.querySelector('a[href="#/transfer"]');
-    if (a) a.textContent = t("nav.transfer", "Transfer");
-    a = nav.querySelector('a[href="#/explorer"]');
-    if (a) a.textContent = t("nav.explorer", "Explorer");
-    a = nav.querySelector('a[href="#/voting"]');
-    if (a) a.textContent = t("nav.voting", "Voting");
-    a = nav.querySelector('a[href="#/settings"]');
-    if (a) a.textContent = t("nav.settings", "Settings");
+    ensureNavIcons(nav);
+    setNavLabel(nav, "#/", t("nav.dashboard", "Dashboard"));
+    setNavLabel(nav, "#/market/BTS_USD", t("nav.exchange", "Exchange"));
+    setNavLabel(nav, "#/account/overview", t("nav.account", "Account"));
+    setNavLabel(nav, "#/transfer", t("nav.transfer", "Transfer"));
+    setNavLabel(nav, "#/explorer", t("nav.explorer", "Explorer"));
+    setNavLabel(nav, "#/voting", t("nav.voting", "Voting"));
+    setNavLabel(nav, "#/settings", t("nav.settings", "Settings"));
   }
 
   /* localizeShell: paints static index.html chrome in the current locale.
@@ -158,6 +218,8 @@ var App = (function () {
     Store.subscribe("settings", onSettings);
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
+    if (nav) ensureNavIcons(nav);
+    if (toggle) ensureToggleIcon(toggle);
     if (toggle && nav) {
       toggle.addEventListener("click", function () {
         var open = nav.classList.toggle("open");

@@ -18,6 +18,20 @@
  */
 var ExplorerBlocks = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   var RECENT_N = 20; /* blocks per page */
 
@@ -67,7 +81,7 @@ var ExplorerBlocks = (function () {
         typeof ExplorerAssets.opSection === "function") {
       return ExplorerAssets.opSection(doc, op, ctx, label);
     }
-    return el(doc, "p", "Operation view unavailable.", "muted");
+    return el(doc, "p", t("explorer.op_unavailable", "Operation view unavailable."), "muted");
   }
 
   /* Account-id link (canonical implementation in explorer-assets.js). Falls
@@ -121,14 +135,14 @@ var ExplorerBlocks = (function () {
     var box = el(doc, "div", null, "error");
     box.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
-      ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("unknown-block") !== -1) msg = "Unknown block.";
-    else if (msg.indexOf("unknown-tx") !== -1) msg = "Unknown transaction.";
-    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || "Unknown asset.";
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || "Nothing found for that search.";
-    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = "Transaction hash lookup covers recent transactions only — this one is expired or unknown.";
+      ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
+    if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
+    else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
+    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     box.textContent = msg;
     wrap.appendChild(box);
@@ -193,7 +207,7 @@ var ExplorerBlocks = (function () {
   /* Blocks tab: recent-blocks table + "Older" paging by height decrement
    * (no infinite-scroll lib). Rows: height link, time, witness link, txs. */
   function blocksTab(doc, body, root, myGen, oldest) {
-    showStatus(doc, body, "Loading blocks…");
+    showStatus(doc, body, t("explorer.loading_blocks", "Loading blocks…"));
     function rowsFor(top) {
       if (top === null || top === undefined) return Explorer.recentBlocks(RECENT_N);
       var heights = [];
@@ -208,7 +222,7 @@ var ExplorerBlocks = (function () {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (rows.length === 0) {
-        body.appendChild(el(doc, "p", "No blocks found.", "muted"));
+        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found."), "muted"));
         return;
       }
       var tableRows = rows.map(function (r) {
@@ -218,10 +232,10 @@ var ExplorerBlocks = (function () {
           r.timestamp || "—", witnessCell(doc, r.witness, myGen),
           (n === null || n === undefined) ? "—" : String(n)];
       });
-      body.appendChild(scrollTable(doc, ["Height", "Time", "Witness", "Txs"], tableRows));
+      body.appendChild(scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows));
       var oldestRow = rows[rows.length - 1];
       if (oldestRow.height > 1) {
-        var older = touchable(el(doc, "button", "Older blocks"));
+        var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
         older.type = "button";
         older.addEventListener("click", function () {
           while (body.firstChild) body.removeChild(body.firstChild);
@@ -232,8 +246,8 @@ var ExplorerBlocks = (function () {
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
-      showError(doc, body, e, "Could not load blocks.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      showError(doc, body, e, t("explorer.blocks_failed", "Could not load blocks."));
+      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
         while (body.firstChild) body.removeChild(body.firstChild);
@@ -254,24 +268,24 @@ var ExplorerBlocks = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
-      showError(doc, wrap, "Explorer backend missing: js/explorer.js failed to load.");
+      showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
       return;
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderBlock(root, height); })) return;
     var h = parseInt(height, 10);
     if (!(h >= 1)) {
-      wrap.appendChild(el(doc, "h1", "Block"));
-      showError(doc, wrap, new Error("unknown-block"), "Unknown block.");
+      wrap.appendChild(el(doc, "h1", t("explorer.block_title", "Block")));
+      showError(doc, wrap, new Error("unknown-block"), t("explorer.unknown_block", "Unknown block."));
       return;
     }
-    wrap.appendChild(el(doc, "h1", "Block #" + h));
-    showStatus(doc, wrap, "Loading block…");
+    wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+    showStatus(doc, wrap, t("explorer.loading_block", "Loading block…"));
     Promise.all([Explorer.block(h), Explorer.head().catch(function () { return null; })])
       .then(function (pair) {
         if (!isCurrent(myGen)) return;
         var b = pair[0], head = pair[1];
         while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-        wrap.appendChild(el(doc, "h1", "Block #" + b.height));
+        wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + b.height));
         var dl = el(doc, "dl", null, "xplore-fields");
         function row(t, node) {
           dl.appendChild(el(doc, "dt", t));
@@ -280,23 +294,23 @@ var ExplorerBlocks = (function () {
           else if (node) dd.appendChild(node);
           dl.appendChild(dd);
         }
-        row("Time", b.timestamp || "—");
-        row("Witness", witnessCell(doc, b.witness_account_id, myGen));
-        row("Transactions", String(b.tx_count));
+        row(t("explorer.time_row", "Time"), b.timestamp || "—");
+        row(t("explorer.witness_row", "Witness"), witnessCell(doc, b.witness_account_id, myGen));
+        row(t("explorer.txs_row", "Transactions"), String(b.tx_count));
         if (head && typeof head.last_irreversible_block_num === "number") {
-          row("Irreversible", b.height <= head.last_irreversible_block_num ? "yes" : "no (recent)");
+          row(t("explorer.irreversible_row", "Irreversible"), b.height <= head.last_irreversible_block_num ? t("explorer.yes", "yes") : t("explorer.no_recent", "no (recent)"));
         }
         wrap.appendChild(dl);
         if (b.transactions.length === 0) {
-          wrap.appendChild(el(doc, "p", "No transactions in this block.", "muted"));
+          wrap.appendChild(el(doc, "p", t("explorer.no_txs", "No transactions in this block."), "muted"));
           return;
         }
         var ctx = { gen: myGen, root: root, tab: "blocks" };
-        b.transactions.forEach(function (t) {
+        b.transactions.forEach(function (tx) {
           var line = el(doc, "div", null, "xplore-txline");
-          line.appendChild(anchor(doc, "Tx " + t.index + " (" + t.op_count + " op" +
-            (t.op_count === 1 ? "" : "s") + ")", "#/block/" + b.height + "/" + t.index));
-          var chips = t.ops.map(function (o) {
+          line.appendChild(anchor(doc, t("explorer.tx_prefix", "Tx ") + tx.index + " (" + tx.op_count + " op" +
+            (tx.op_count === 1 ? "" : "s") + ")", "#/block/" + b.height + "/" + tx.index));
+          var chips = tx.ops.map(function (o) {
             return o.type_name + (o.virtual ? " (virtual)" : "");
           }).join(", ");
           line.appendChild(el(doc, "span", chips ? " — " + chips : "", "muted"));
@@ -306,8 +320,8 @@ var ExplorerBlocks = (function () {
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-        wrap.appendChild(el(doc, "h1", "Block #" + h));
-        showError(doc, wrap, e, "Unknown block.");
+        wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+        showError(doc, wrap, e, t("explorer.unknown_block", "Unknown block."));
       });
   }
 
@@ -320,31 +334,31 @@ var ExplorerBlocks = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
-      showError(doc, wrap, "Explorer backend missing: js/explorer.js failed to load.");
+      showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
       return;
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderTx(root, height, txIndex); })) return;
     var h = parseInt(height, 10), ix = parseInt(txIndex, 10);
-    wrap.appendChild(el(doc, "h1", "Transaction " + h + " / " + txIndex));
+    wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
     if (!(h >= 1) || !(ix >= 0)) {
-      showError(doc, wrap, new Error("unknown-tx"), "Unknown transaction.");
+      showError(doc, wrap, new Error("unknown-tx"), t("explorer.unknown_tx", "Unknown transaction."));
       return;
     }
-    showStatus(doc, wrap, "Loading transaction…");
-    Explorer.tx(h, ix).then(function (t) {
+    showStatus(doc, wrap, t("explorer.loading_tx", "Loading transaction…"));
+    Explorer.tx(h, ix).then(function (tx) {
       if (!isCurrent(myGen)) return;
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", "Transaction " + t.block + " / " + t.index));
-      wrap.appendChild(anchor(doc, "← Block #" + t.block, "#/block/" + t.block));
+      wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index));
+      wrap.appendChild(anchor(doc, t("explorer.back_to_block_prefix", "← Block #") + tx.block, "#/block/" + tx.block));
       var ctx = { gen: myGen, root: root, tab: "blocks" };
-      if (t.ops.length === 0) wrap.appendChild(el(doc, "p", "No operations in this transaction.", "muted"));
-      t.ops.forEach(function (op, k) {
-        wrap.appendChild(opSection(doc, op, ctx, "Op " + k));
+      if (tx.ops.length === 0) wrap.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction."), "muted"));
+      tx.ops.forEach(function (op, k) {
+        wrap.appendChild(opSection(doc, op, ctx, t("explorer.op_prefix", "Op ") + k));
       });
-      if (t.signatures.length > 0) {
-        wrap.appendChild(el(doc, "h3", "Signatures (" + t.signatures.length + ")"));
+      if (tx.signatures.length > 0) {
+        wrap.appendChild(el(doc, "h3", t("explorer.signatures_prefix", "Signatures (") + tx.signatures.length + ")"));
         var ul = doc.createElement("ul");
-        t.signatures.forEach(function (sig) {
+        tx.signatures.forEach(function (sig) {
           ul.appendChild(el(doc, "li", String(sig), "muted"));
         });
         wrap.appendChild(ul);
@@ -352,8 +366,8 @@ var ExplorerBlocks = (function () {
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", "Transaction " + h + " / " + txIndex));
-      showError(doc, wrap, e, "Unknown transaction.");
+      wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
+      showError(doc, wrap, e, t("explorer.unknown_tx", "Unknown transaction."));
     });
   }
 

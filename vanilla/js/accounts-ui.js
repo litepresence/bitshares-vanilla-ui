@@ -7,6 +7,8 @@
  * Consumes: Account (myAccountId/resolve), Wallet (isUnlocked/unlock),
  *   Chain (status), Store (connection subscribe). Global AccountsUI only; gen
  *   counter tears down stale work (unlock/connect races).
+ *   No amounts on screen: ids + names only, so no Format vectors apply.
+ * I18n.t (display strings with verbatim en defaults — batch-2a i18n).
  * Refs: App.jsx:512 (DashboardAccountsOnly); no astro equiv (matrix A3).
  *   No amounts on screen: ids + names only, so no Format vectors apply.
  * Created by: stub-queue build (matrix §A STUB queue, batch 2).
@@ -14,6 +16,16 @@
 var AccountsUI = (function () {
   "use strict";
   var gen = 0;
+  /* Batch-2a i18n: display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back
+   * to the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
   /* textContent-only element (user/chain strings never reach HTML). */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -27,11 +39,11 @@ var AccountsUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("not connected") !== -1) msg = "Network unavailable. Check Settings → Nodes and retry.";
-    else if (msg.indexOf("wallet-locked") !== -1) msg = "Wallet is locked.";
-    else if (msg.indexOf("no-account") !== -1) msg = "No on-chain account found for the wallet's active key.";
-    else if (msg.indexOf("unknown-account") !== -1) msg = "Unknown account name.";
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (msg.indexOf("wallet-locked") !== -1) msg = t("transfer.err_locked", "Wallet is locked.");
+    else if (msg.indexOf("no-account") !== -1) msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
+    else if (msg.indexOf("unknown-account") !== -1) msg = t("account.unknown_name", "Unknown account name.");
     var err = el(doc, "div", msg, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
@@ -68,12 +80,12 @@ var AccountsUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     if (typeof Account === "undefined" || !Account || typeof Wallet === "undefined" || !Wallet) {
-      showError(doc, wrap, "Account backend missing: js/account.js or js/wallet.js failed to load.");
+      showError(doc, wrap, t("account.manager_backend_missing", "Account backend missing: js/account.js or js/wallet.js failed to load."));
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", "Accounts"));
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "h1", t("account.manager_title", "Accounts")));
+      wrap.appendChild(el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -87,7 +99,7 @@ var AccountsUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), "Network unavailable.");
+        showError(doc, makeWrap(doc, root), new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
       }, 15000);
       return;
     }
@@ -100,16 +112,16 @@ var AccountsUI = (function () {
     if (myGen !== gen) return;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Accounts"));
+    wrap.appendChild(el(doc, "h1", t("account.manager_title", "Accounts")));
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
     catch (e) { unlocked = false; }
-    wrap.appendChild(el(doc, "h3", "This wallet"));
+    wrap.appendChild(el(doc, "h3", t("account.this_wallet", "This wallet")));
     if (!unlocked) {
-      wrap.appendChild(el(doc, "p", "Unlock your wallet to see which on-chain account it controls.", "muted"));
-      var f = fieldRow(doc, "Password ", { id: "accts-unlock-password", type: "password" });
+      wrap.appendChild(el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
+      var f = fieldRow(doc, t("account.password_label", "Password "), { id: "accts-unlock-password", type: "password" });
       wrap.appendChild(f.row);
-      var btn = touchable(el(doc, "button", "Unlock"));
+      var btn = touchable(el(doc, "button", t("account.s6", "Unlock")));
       btn.id = "accts-unlock-do"; btn.type = "button"; wrap.appendChild(btn);
       var errBox = el(doc, "div", null, "error");
       errBox.setAttribute("aria-live", "polite"); wrap.appendChild(errBox);
@@ -120,33 +132,33 @@ var AccountsUI = (function () {
           .catch(function (e) {
             if (myGen !== gen) return;
             btn.disabled = false;
-            errBox.textContent = (e && e.message) ? e.message : String(e || "Unlock failed");
+            errBox.textContent = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");
           });
       });
     } else {
       var card = el(doc, "div"); card.id = "accts-wallet-card";
-      card.appendChild(el(doc, "p", "Resolving the wallet account…", "muted"));
+      card.appendChild(el(doc, "p", t("account.resolving", "Resolving the wallet account…"), "muted"));
       wrap.appendChild(card);
       resolveWalletAccount(doc, myGen, card);
     }
-    wrap.appendChild(el(doc, "h3", "Look up an account"));
-    wrap.appendChild(el(doc, "p", "Public data — no unlock needed. Opens the full account page (balances, orders, history).", "muted"));
-    var nameF = fieldRow(doc, "Account name ", { id: "accts-lookup", placeholder: "account-name", inputmode: "text" });
+    wrap.appendChild(el(doc, "h3", t("account.lookup_title", "Look up an account")));
+    wrap.appendChild(el(doc, "p", t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history)."), "muted"));
+    var nameF = fieldRow(doc, t("account.lookup_label", "Account name "), { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
     wrap.appendChild(nameF.row);
-    var goBtn = touchable(el(doc, "button", "Open account page"));
+    var goBtn = touchable(el(doc, "button", t("account.open_account", "Open account page")));
     goBtn.id = "accts-open"; goBtn.type = "button"; wrap.appendChild(goBtn);
     goBtn.addEventListener("click", function () {
       var name = nameF.input.value.trim().toLowerCase();
-      if (!name) { setFieldError(nameF, "Enter an account name."); return; }
+      if (!name) { setFieldError(nameF, t("account.enter_name", "Enter an account name.")); return; }
       setFieldError(nameF, "");
       if (typeof location !== "undefined") location.hash = "#/account/" + encodeURIComponent(name);
     });
-    wrap.appendChild(el(doc, "h3", "Manage"));
+    wrap.appendChild(el(doc, "h3", t("account.manage", "Manage")));
     wrap.appendChild(linkPara(doc, [
-      ["#/create-wallet-brainkey", "Create new wallet"],
-      ["#/existing-account", "Import existing account"],
-      ["#/create-account", "Register a new on-chain account"],
-      ["#/wallet", "Wallet manager"]
+      ["#/create-wallet-brainkey", t("account.create_wallet", "Create new wallet")],
+      ["#/existing-account", t("account.import_account", "Import existing account")],
+      ["#/create-account", t("account.register_account", "Register a new on-chain account")],
+      ["#/wallet", t("account.wallet_manager", "Wallet manager")]
     ]));
   }
 
@@ -161,25 +173,25 @@ var AccountsUI = (function () {
         var list = el(doc, "dl", null, "xfer-confirm");
         function row(term, text) {
           list.appendChild(el(doc, "dt", term)); list.appendChild(el(doc, "dd", text)); }
-        row("Account", found.name + " (" + found.id + ")");
+        row(t("account.card_account", "Account"), found.name + " (" + found.id + ")");
         card.appendChild(list);
         var p = el(doc, "p", null, "muted"), a = doc.createElement("a");
         a.href = "#/account/" + encodeURIComponent(found.name);
-        a.textContent = "Open " + found.name;
+        a.textContent = t("account.open_prefix", "Open ") + found.name;
         p.appendChild(a); card.appendChild(p);
       })
       .catch(function (e) {
         if (myGen !== gen) return;
         while (card.firstChild) card.removeChild(card.firstChild);
-        var msg = (e && e.message) ? e.message : String(e || "Lookup failed");
+        var msg = (e && e.message) ? e.message : t("account.lookup_failed", "Lookup failed");
         if (msg === "no-account") {
-          card.appendChild(el(doc, "p", "The wallet is unlocked but its active key controls no on-chain account yet. Register one or import a funded brainkey.", "muted"));
+          card.appendChild(el(doc, "p", t("account.no_account_yet", "The wallet is unlocked but its active key controls no on-chain account yet. Register one or import a funded brainkey."), "muted"));
           card.appendChild(linkPara(doc, [
-            ["#/create-account", "Register a new account"],
-            ["#/existing-account", "Import existing account"]
+            ["#/create-account", t("account.register_short", "Register a new account")],
+            ["#/existing-account", t("account.import_account", "Import existing account")]
           ]));
         } else {
-          showError(doc, card, e, "Could not resolve the wallet account.");
+          showError(doc, card, e, t("account.resolve_failed", "Could not resolve the wallet account."));
         }
       });
   }

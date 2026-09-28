@@ -28,6 +28,20 @@
  */
 var ExplorerUI = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   var CONNECT_TIMEOUT_MS = 15000; /* slice-1 offline pattern */
   var TABS = ["blocks", "assets", "feeds"];
@@ -94,14 +108,14 @@ var ExplorerUI = (function () {
     var box = el(doc, "div", null, "error");
     box.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
-      ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("unknown-block") !== -1) msg = "Unknown block.";
-    else if (msg.indexOf("unknown-tx") !== -1) msg = "Unknown transaction.";
-    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || "Unknown asset.";
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || "Nothing found for that search.";
-    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = "Transaction hash lookup covers recent transactions only — this one is expired or unknown.";
+      ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
+    if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
+    else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
+    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     box.textContent = msg;
     wrap.appendChild(box);
@@ -124,8 +138,8 @@ var ExplorerUI = (function () {
   function waitForOpen(doc, wrap, root, myGen, rerun) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
-    wrap.appendChild(el(doc, "h1", "Explorer"));
-    wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
+    wrap.appendChild(el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false;
     var off = function () {};
@@ -144,9 +158,9 @@ var ExplorerUI = (function () {
       if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", "Explorer"));
-      showError(doc, failed, new Error("not-connected"), "Network unavailable.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      failed.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
+      showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
+      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () { rerun(); });
       failed.appendChild(retry);
@@ -161,12 +175,12 @@ var ExplorerUI = (function () {
       if (myGen !== gen) return;
       while (box.firstChild) box.removeChild(box.firstChild);
       box.appendChild(el(doc, "p",
-        "Head #" + h.head_block_number + " · " + h.head_block_time +
-        " · irreversible #" + h.last_irreversible_block_num, "muted"));
+        t("explorer.head_prefix", "Head #") + h.head_block_number + " · " + h.head_block_time +
+        t("explorer.head_lib", " · irreversible #") + h.last_irreversible_block_num, "muted"));
     }).catch(function () {
       if (myGen !== gen) return;
       while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "p", "Head block unavailable.", "muted"));
+      box.appendChild(el(doc, "p", t("explorer.head_unavailable", "Head block unavailable."), "muted"));
     });
   }
 
@@ -179,7 +193,7 @@ var ExplorerUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", title));
-    showError(doc, wrap, "Explorer view missing: " + file + " failed to load.");
+    showError(doc, wrap, t("explorer.view_missing_prefix", "Explorer view missing: ") + file + t("explorer.view_missing_suffix", " failed to load."));
   }
 
   /* #/explorer + #/explorer/:tab (blocks|assets|feeds; unknown tab falls
@@ -197,25 +211,25 @@ var ExplorerUI = (function () {
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer ||
         typeof Format === "undefined" || !Format) {
-      showError(doc, wrap, "Explorer backend missing: js/explorer.js or js/format.js failed to load.");
+      showError(doc, wrap, t("explorer.backend_missing", "Explorer backend missing: js/explorer.js or js/format.js failed to load."));
       return;
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderExplorer(root, want); })) return;
 
-    wrap.appendChild(el(doc, "h1", "Explorer"));
-    if (noted) wrap.appendChild(el(doc, "p", "Unknown tab “" + noted + "” — showing Blocks.", "muted"));
+    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
+    if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blocks."), "muted"));
 
     /* Search: single box, 1.x.y / account / symbol, keyboard-submit. */
     var form = doc.createElement("form");
     form.className = "xplore-search";
     var input = doc.createElement("input");
     input.type = "search";
-    input.setAttribute("placeholder", "Search: 1.x.y, account, or asset symbol");
-    input.setAttribute("aria-label", "Search blocks, accounts, assets");
+    input.setAttribute("placeholder", t("explorer.search_ph", "Search: 1.x.y, account, or asset symbol"));
+    input.setAttribute("aria-label", t("explorer.search_aria", "Search blocks, accounts, assets"));
     touchable(input);
     input.style.minWidth = "220px";
     form.appendChild(input);
-    var go = touchable(el(doc, "button", "Search"));
+    var go = touchable(el(doc, "button", t("explorer.search", "Search")));
     go.type = "submit";
     form.appendChild(go);
     var msg = el(doc, "div", "", "error");
@@ -240,7 +254,7 @@ var ExplorerUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return;
         go.disabled = false;
-        showError(doc, msg, e, "Nothing found for that search.");
+        showError(doc, msg, e, t("explorer.not_found", "Nothing found for that search."));
       });
     });
 
@@ -272,20 +286,20 @@ var ExplorerUI = (function () {
       pendingObject = null;
       var panel = el(doc, "div", null, "xplore-object");
       wrap.appendChild(panel);
-      showStatus(doc, panel, "Loading " + id + "…");
+      showStatus(doc, panel, t("explorer.loading_prefix", "Loading ") + id + "…");
       Explorer.resolveObject(id).then(function (entry) {
         if (myGen !== gen) return;
         while (panel.firstChild) panel.removeChild(panel.firstChild);
         if (typeof ExplorerAssets === "undefined" || !ExplorerAssets ||
             typeof ExplorerAssets.renderObjectPanel !== "function") {
-          showError(doc, panel, "Explorer object view missing: js/explorer-assets.js failed to load.");
+          showError(doc, panel, t("explorer.object_missing", "Explorer object view missing: js/explorer-assets.js failed to load."));
           return;
         }
         panel.appendChild(ExplorerAssets.renderObjectPanel(doc, entry, { gen: myGen, root: root, tab: want }));
       }).catch(function (e) {
         if (myGen !== gen) return;
         while (panel.firstChild) panel.removeChild(panel.firstChild);
-        showError(doc, panel, e, "Could not load " + id + ".");
+        showError(doc, panel, e, t("explorer.object_failed_prefix", "Could not load ") + id + ".");
       });
     }
 
@@ -296,21 +310,21 @@ var ExplorerUI = (function () {
           typeof ExplorerBlocks.blocksTab === "function") {
         ExplorerBlocks.blocksTab(doc, body, root, myGen, null);
       } else {
-        showError(doc, body, "Explorer blocks view missing: js/explorer-blocks.js failed to load.");
+        showError(doc, body, t("explorer.blocks_missing", "Explorer blocks view missing: js/explorer-blocks.js failed to load."));
       }
     } else if (want === "assets") {
       if (typeof ExplorerAssets !== "undefined" && ExplorerAssets &&
           typeof ExplorerAssets.assetsTab === "function") {
         ExplorerAssets.assetsTab(doc, body, root, myGen, "", []);
       } else {
-        showError(doc, body, "Explorer assets view missing: js/explorer-assets.js failed to load.");
+        showError(doc, body, t("explorer.assets_missing", "Explorer assets view missing: js/explorer-assets.js failed to load."));
       }
     } else {
       if (typeof ExplorerAssets !== "undefined" && ExplorerAssets &&
           typeof ExplorerAssets.feedsTab === "function") {
         ExplorerAssets.feedsTab(doc, body, root, myGen);
       } else {
-        showError(doc, body, "Explorer feeds view missing: js/explorer-assets.js failed to load.");
+        showError(doc, body, t("explorer.feeds_missing", "Explorer feeds view missing: js/explorer-assets.js failed to load."));
       }
     }
   }

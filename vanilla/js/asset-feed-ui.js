@@ -125,15 +125,22 @@ var AssetFeedUI = (function () {
     try { return Format.formatPrice(String(pair.base.amount), bp, String(pair.quote.amount), qp, PLACES); }
     catch (e) { return "unavailable"; }
   }
-  /* renderFeed: symbol loader + live read-back + publish + producer forms. */
+  /* renderFeed: symbol loader + live read-back + publish + producer forms.
+   * PUBLIC reads render LOCKED (gate-repair): the symbol loader and live
+   * feed read-back need no wallet; publish/producers gate at sign time via
+   * the fresh-WIF throw in their confirm send paths. */
   function renderFeed(root) {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var w = wrap(d, root);
     if (noBackend()) { err(d, w, "Asset backend missing."); return; }
     if (cold(d, w, root, function () { renderFeed(root); })) return;
-    if (!Wallet.isUnlocked()) { lock(d, w, function () { renderFeed(root); }); return; }
+    /* No entry unlock gate: reads are public; signing gates at send time. */
     w.appendChild(el(d, "h1", "Publish feed"));
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        w.appendChild(el(d, "p", "Viewing as committee-account (1.2.0) — unlock to sign.", "muted"));
+    } catch (e) { /* notice is display-only */ }
     var s = field(d, "Smartcoin symbol", "af-sym", "", null, false, "e.g. TESTMPA");
     w.appendChild(s.row);
     var go = touch(el(d, "button", "Load feed")); go.type = "button"; w.appendChild(go);
@@ -179,10 +186,12 @@ var AssetFeedUI = (function () {
     publishForm(d, body, root, g, info, backing, backingPrec);
     producerForm(d, body, root, g, info);
   }
-  /* publishForm: op-19 inputs with ratio previews (helpers only, no /1000). */
+  /* publishForm: op-19 inputs with ratio previews (helpers only, no /1000).
+   * Publisher defaults to public 1.2.0 (gate-repair); blank also falls back
+   * to 1.2.0 — never myAccountId at render; the WIF throw at send is the gate. */
   function publishForm(d, body, root, g, info, backing, backingPrec) {
     body.appendChild(el(d, "h3", "Publish feed (op 19)"));
-    var pub = field(d, "Publisher (name or 1.2.N)", null, "");
+    var pub = field(d, "Publisher (name or 1.2.N)", null, "1.2.0");
     var sb = field(d, "Settlement base (human, " + info.symbol + ")", null, "1", "decimal");
     var sq = field(d, "Settlement quote (human, backing)", null, "1", "decimal");
     var mcr = field(d, "MCR % (human, e.g. 175)", null, "175", "decimal");
@@ -198,13 +207,15 @@ var AssetFeedUI = (function () {
       prev.textContent = t;
     }
     mcr.input.addEventListener("input", paintPrev); mssr.input.addEventListener("input", paintPrev); paintPrev();
+    /* Unlocked prefill: swap the public 1.2.0 default for the wallet
+     * account (locked viewers keep 1.2.0). Null-tolerant — manual stands. */
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
-      if (g === gen && !pub.input.value) pub.input.value = me.name; }).catch(function () { /* manual stands */ });
+      if (g === gen && pub.input.value.trim() === "1.2.0") pub.input.value = me.name; }).catch(function () { /* manual stands */ });
     var rev = touch(el(d, "button", "Review feed")); rev.type = "button"; body.appendChild(rev);
     rev.addEventListener("click", function () {
       rev.disabled = true;
       (async function () {
-        var who = await Account.resolve(pub.input.value.trim() || await Account.myAccountId());
+        var who = await Account.resolve(pub.input.value.trim() || "1.2.0");
         var pair = await AssetOps.buildFeed({ publisherId: who.id, assetId: info.id,
           settleBaseRaw: Format.parseAmount(sb.input.value, info.precision),
           settleQuoteRaw: Format.parseAmount(sq.input.value, backingPrec),
@@ -241,9 +252,13 @@ var AssetFeedUI = (function () {
       })().catch(function (e) { rev.disabled = false; err(d, body, e, "Could not prepare the feed."); });
     });
   }
-  /* producerForm: op-13 set editor (one account per line, resolved). */
+  /* producerForm: op-13 set editor (one account per line, resolved).
+   * Acting account is explicit (public 1.2.0 default, gate-repair) — never
+   * myAccountId at render; issuer check + WIF throw gate the write path. */
   function producerForm(d, body, root, g, info) {
     body.appendChild(el(d, "h3", "Feed producers (op 13)"));
+    var whoF = field(d, "Acting account (name or 1.2.N)", null, "1.2.0");
+    body.appendChild(whoF.row);
     var pa = field(d, "Producers (one name or 1.2.N per line)", null, "", null, true);
     body.appendChild(pa.row);
     var rev = touch(el(d, "button", "Review producers")); rev.type = "button"; body.appendChild(rev);
@@ -253,7 +268,7 @@ var AssetFeedUI = (function () {
         var names = pa.input.value.split("\n").map(function (x) { return x.trim(); }).filter(function (x) { return !!x; });
         var ids = [];
         for (var i = 0; i < names.length; i++) ids.push((await Account.resolve(names[i])).id);
-        var me = await Account.resolve(await Account.myAccountId());
+        var me = await Account.resolve(whoF.input.value.trim() || "1.2.0");
         if (me.id !== info.issuer_id) throw new Error("Only the issuer can set producers.");
         var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
         var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };

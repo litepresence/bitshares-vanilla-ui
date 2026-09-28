@@ -170,6 +170,7 @@ var Router = (function () {
     { path: "/fees", title: "Network Fees", render: function (root) { FeesUI.renderFees(root); } },
     { path: "/referrals", title: "Referrals", render: function (root) { ReferralsUI.renderReferrals(root); } },
     { path: "/favourites", title: "Favourites", render: function (root) { FavouritesUI.renderFavourites(root); } },
+    { path: "/ops", title: "Top Operations", render: function (root) { OpsUI.renderOps(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 

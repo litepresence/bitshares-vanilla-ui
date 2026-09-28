@@ -19,6 +19,21 @@
  */
 var CreateAccountUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   var FAUCET_URL = "https://testnet-faucet.xbts.io/api/v1/accounts";
   var FETCH_TIMEOUT_MS = 20000;
@@ -35,8 +50,8 @@ var CreateAccountUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to text. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("not connected") !== -1) msg = "Network unavailable. Check Settings → Nodes and retry.";
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("createaccount.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("createaccount.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     var err = el(doc, "div", msg, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
@@ -57,7 +72,7 @@ var CreateAccountUI = (function () {
     var err = el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
-  function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : "none"; }
+  function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("createaccount.none", "none"); }
   /* Settings network (sole owner: Store); testnet enables the faucet. */
   function networkName() {
     try {
@@ -69,13 +84,13 @@ var CreateAccountUI = (function () {
    * lowercase, starts with a letter, [a-z0-9.-] inside, dot labels 1..63).
    * The faucet + get_account_by_name stay the final validators. */
   function nameFormatError(name) {
-    if (!name) return "Enter an account name.";
-    if (name.length > 63) return "Account names are at most 63 characters.";
-    if (!/^[a-z][a-z0-9.\-]*$/.test(name)) return "Lowercase letters only, starting with a letter (digits, dots and dashes allowed).";
+    if (!name) return t("createaccount.enter_an_account_name", "Enter an account name.");
+    if (name.length > 63) return t("createaccount.account_names_are_at_most_63_characters", "Account names are at most 63 characters.");
+    if (!/^[a-z][a-z0-9.\-]*$/.test(name)) return t("createaccount.lowercase_letters_only_starting_with_a_letter", "Lowercase letters only, starting with a letter (digits, dots and dashes allowed).");
     var labels = name.split(".");
     for (var i = 0; i < labels.length; i++) {
-      if (!labels[i] || labels[i].length > 63) return "Each dot-separated part must be 1–63 characters.";
-      if (labels[i].length > 1 && !/^[a-z][a-z0-9\-]*[a-z0-9]$/.test(labels[i])) return "Each dot-separated part must start with a letter and end with a letter or digit.";
+      if (!labels[i] || labels[i].length > 63) return t("createaccount.each_dot_separated_part_must_be_1_63_characte", "Each dot-separated part must be 1–63 characters.");
+      if (labels[i].length > 1 && !/^[a-z][a-z0-9\-]*[a-z0-9]$/.test(labels[i])) return t("createaccount.each_dot_separated_part_must_start_with_a_let", "Each dot-separated part must start with a letter and end with a letter or digit.");
     }
     return null;
   }
@@ -91,12 +106,12 @@ var CreateAccountUI = (function () {
     var wrap = makeWrap(doc, root);
     if (typeof Crypto === "undefined" || !Crypto || typeof Account === "undefined" || !Account ||
         typeof Wallet === "undefined" || !Wallet) {
-      showError(doc, wrap, "Account backend missing: js/crypto.js, js/account.js or js/wallet.js failed to load.");
+      showError(doc, wrap, t("createaccount.account_backend_missing_js_crypto_js_js_accou", "Account backend missing: js/crypto.js, js/account.js or js/wallet.js failed to load."));
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", "Create Account"));
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
+      wrap.appendChild(el(doc, "p", t("createaccount.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -110,7 +125,7 @@ var CreateAccountUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), "Network unavailable.");
+        showError(doc, makeWrap(doc, root), new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
       }, 15000);
       return;
     }
@@ -123,27 +138,27 @@ var CreateAccountUI = (function () {
     if (myGen !== gen) return;
     clearRoot(root);
     var wrap = makeWrap(doc, root), testnet = networkName() === "testnet";
-    wrap.appendChild(el(doc, "h1", "Create Account"));
+    wrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
     wrap.appendChild(el(doc, "p", testnet
       ? "Register a new testnet account through the faucet (testnet network)."
       : "Registration uses the testnet faucet — switch to testnet in Settings to register. Name checks work on either network.", "muted"));
-    var nameF = fieldRow(doc, "Account name ", { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
+    var nameF = fieldRow(doc, t("createaccount.account_name", "Account name "), { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
     wrap.appendChild(nameF.row);
-    var checkBtn = touchable(el(doc, "button", "Check availability"));
+    var checkBtn = touchable(el(doc, "button", t("createaccount.check_availability", "Check availability")));
     checkBtn.id = "ca-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
     var avail = el(doc, "p", availabilityText(P), "muted");
     avail.id = "ca-avail"; avail.setAttribute("aria-live", "polite"); wrap.appendChild(avail);
-    wrap.appendChild(el(doc, "h3", "Brainkey (back it up)"));
-    wrap.appendChild(el(doc, "p", "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys.", "muted"));
+    wrap.appendChild(el(doc, "h3", t("createaccount.brainkey_back_it_up", "Brainkey (back it up)")));
+    wrap.appendChild(el(doc, "p", t("createaccount.a_fresh_brainkey_is_generated_for_the_new_acc", "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys."), "muted"));
     var bkArea = doc.createElement("textarea");
     bkArea.id = "ca-brainkey"; bkArea.rows = 3; bkArea.readOnly = true; bkArea.style.width = "100%";
     bkArea.setAttribute("spellcheck", "false"); bkArea.setAttribute("autocomplete", "off");
-    bkArea.placeholder = "Generating brainkey…";
+    bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…");
     if (P.brainkey) bkArea.value = P.brainkey;
     wrap.appendChild(bkArea);
-    var regenBtn = touchable(el(doc, "button", "Generate new brainkey"));
+    var regenBtn = touchable(el(doc, "button", t("createaccount.generate_new_brainkey", "Generate new brainkey")));
     regenBtn.id = "ca-regen"; regenBtn.type = "button"; wrap.appendChild(regenBtn);
-    var regBtn = touchable(el(doc, "button", testnet ? "Register account" : "Register account (testnet only)"));
+    var regBtn = touchable(el(doc, "button", testnet ? t("createaccount.register_account", "Register account") : t("createaccount.register_account_testnet_only", "Register account (testnet only)")));
     regBtn.id = "ca-register"; regBtn.type = "button";
     if (!testnet) regBtn.disabled = true;
     wrap.appendChild(regBtn);
@@ -155,7 +170,7 @@ var CreateAccountUI = (function () {
       avail.textContent = availabilityText(P);
     });
     regenBtn.addEventListener("click", function () {
-      out.innerHTML = ""; bkArea.placeholder = "Generating brainkey…"; bkArea.value = ""; P.brainkey = "";
+      out.innerHTML = ""; bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…"); bkArea.value = ""; P.brainkey = "";
       genBrainkey(doc, myGen, P, out);
     });
     checkBtn.addEventListener("click", function () {
@@ -164,7 +179,7 @@ var CreateAccountUI = (function () {
       var bad = nameFormatError(P.name);
       if (bad) { setFieldError(nameF, bad); return; }
       checkBtn.disabled = true;
-      var status = showStatus(doc, out, "Checking name…");
+      var status = showStatus(doc, out, t("createaccount.checking_name", "Checking name…"));
       checkAvailability(P.name).then(function (r) {
         if (myGen !== gen) return;
         P.checked = r.free ? "free" : "taken"; P.takenId = r.id || null;
@@ -173,7 +188,7 @@ var CreateAccountUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return;
         out.removeChild(status); checkBtn.disabled = false;
-        showError(doc, out, e, "Could not check the name.");
+        showError(doc, out, e, t("createaccount.could_not_check_the_name", "Could not check the name."));
       });
     });
     regBtn.addEventListener("click", function () {
@@ -181,9 +196,9 @@ var CreateAccountUI = (function () {
       P.name = nameF.input.value.trim().toLowerCase(); nameF.input.value = P.name;
       var bad = nameFormatError(P.name);
       if (bad) { setFieldError(nameF, bad); return; }
-      if (!P.brainkey) { showError(doc, out, new Error("Wait for the brainkey to generate first."), null); return; }
+      if (!P.brainkey) { showError(doc, out, new Error(t("createaccount.err_brainkey_wait", "Wait for the brainkey to generate first.")), null); return; }
       checkBtn.disabled = true; regBtn.disabled = true;
-      var status = showStatus(doc, out, "Checking name…");
+      var status = showStatus(doc, out, t("createaccount.checking_name", "Checking name…"));
       /* Re-check right before registering: names are first-come, so a stale
        * "free" must never send a doomed POST. */
       checkAvailability(P.name).then(function (r) {
@@ -193,14 +208,14 @@ var CreateAccountUI = (function () {
           throw new Error("Name is already taken" + (r.id ? " (" + r.id + ")" : "") + ".");
         }
         P.checked = "free"; avail.textContent = availabilityText(P);
-        status.textContent = "Registering with the faucet…";
+        status.textContent = t("createaccount.registering_with_the_faucet", "Registering with the faucet…");
         return registerViaFaucet(P.name, P.brainkey);
       }).then(function (reg) { if (reg && myGen === gen) paintResult(doc, root, myGen, P, reg); })
         .catch(function (e) {
           if (myGen !== gen) return;
           try { out.removeChild(status); } catch (err) { /* already replaced */ }
           checkBtn.disabled = false; regBtn.disabled = false;
-          showError(doc, out, e, "Registration failed.");
+          showError(doc, out, e, t("createaccount.registration_failed", "Registration failed."));
         });
     });
   }
@@ -213,7 +228,7 @@ var CreateAccountUI = (function () {
       var area = doc.getElementById("ca-brainkey");
       if (area) area.value = bk;
     }).catch(function (e) {
-      if (myGen === gen) showError(doc, out, e, "Could not generate a brainkey.");
+      if (myGen === gen) showError(doc, out, e, t("createaccount.could_not_generate_a_brainkey", "Could not generate a brainkey."));
     });
   }
 
@@ -221,7 +236,7 @@ var CreateAccountUI = (function () {
   function availabilityText(P) {
     if (P.checked === "free") return "“" + P.name + "” is available.";
     if (P.checked === "taken") return "“" + P.name + "” is taken" + (P.takenId ? " (" + P.takenId + ")" : "") + ".";
-    return "Check whether the name is free before registering.";
+    return t("createaccount.check_whether_the_name_is_free_before_registe", "Check whether the name is free before registering.");
   }
 
   /* Availability via get_account_by_name (Account.resolve): found = taken,
@@ -268,7 +283,7 @@ var CreateAccountUI = (function () {
     }
     /* On-chain verify: must now resolve (same bar as the t9-vanilla-6742 proof). */
     var acct = await Chain.call(await Chain.db(), "get_account_by_name", [name]);
-    if (!acct || !acct.id) throw new Error("Faucet said created but the account is not on-chain yet; retry the name check.");
+    if (!acct || !acct.id) throw new Error(t("createaccount.faucet_said_created_but_the_account_is_not_on", "Faucet said created but the account is not on-chain yet; retry the name check."));
     return { name: acct.name || name, id: acct.id, pubs: pubs };
   }
 
@@ -278,25 +293,25 @@ var CreateAccountUI = (function () {
     if (myGen !== gen) return;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Account created"));
+    wrap.appendChild(el(doc, "h1", t("createaccount.account_created", "Account created")));
     var list = el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(el(doc, "dt", term));
       var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
-    row("Account", reg.name + " (" + reg.id + ")");
-    row("Owner key", reg.pubs.owner);
-    row("Active key", reg.pubs.active);
-    row("Memo key", reg.pubs.memo);
-    row("Network", networkName());
+    row(t("createaccount.account", "Account"), reg.name + " (" + reg.id + ")");
+    row(t("createaccount.owner_key", "Owner key"), reg.pubs.owner);
+    row(t("createaccount.active_key", "Active key"), reg.pubs.active);
+    row(t("createaccount.memo_key", "Memo key"), reg.pubs.memo);
+    row(t("createaccount.network", "Network"), networkName());
     wrap.appendChild(list);
-    wrap.appendChild(el(doc, "p", "Back up this brainkey — it is the only way to recover the account.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createaccount.back_up_this_brainkey_it_is_the_only_way_to_r", "Back up this brainkey — it is the only way to recover the account."), "muted"));
     var saved = doc.createElement("textarea");
     saved.id = "ca-backup-text"; saved.rows = 3; saved.readOnly = true; saved.value = P.brainkey; saved.style.width = "100%";
     wrap.appendChild(saved);
-    wrap.appendChild(el(doc, "h3", "Save to this wallet (optional)"));
-    var pwF = fieldRow(doc, "Password ", { id: "ca-password", type: "password" });
+    wrap.appendChild(el(doc, "h3", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
+    var pwF = fieldRow(doc, t("createaccount.password", "Password "), { id: "ca-password", type: "password" });
     wrap.appendChild(pwF.row);
-    var saveBtn = touchable(el(doc, "button", "Save wallet with this brainkey"));
+    var saveBtn = touchable(el(doc, "button", t("createaccount.save_wallet_with_this_brainkey", "Save wallet with this brainkey")));
     saveBtn.id = "ca-save"; saveBtn.type = "button"; wrap.appendChild(saveBtn);
     var out = el(doc, "div"); wrap.appendChild(out);
     var acctP = el(doc, "p", null, "muted"), acctA = doc.createElement("a");
@@ -305,19 +320,19 @@ var CreateAccountUI = (function () {
     acctP.appendChild(acctA); wrap.appendChild(acctP);
     saveBtn.addEventListener("click", function () {
       setFieldError(pwF, ""); out.innerHTML = "";
-      if (!pwF.input.value) { setFieldError(pwF, "Password required: enter a non-empty password."); return; }
+      if (!pwF.input.value) { setFieldError(pwF, t("createaccount.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); return; }
       saveBtn.disabled = true;
-      var status = showStatus(doc, out, "Saving wallet…");
+      var status = showStatus(doc, out, t("createaccount.saving_wallet", "Saving wallet…"));
       Promise.resolve().then(function () { return Wallet.create(pwF.input.value, P.brainkey); })
         .then(function () {
           if (myGen !== gen) return;
           out.removeChild(status);
-          out.appendChild(el(doc, "p", "Wallet saved. The account keys are now unlocked on this device.", "muted"));
+          out.appendChild(el(doc, "p", t("createaccount.wallet_saved_the_account_keys_are_now_unlocke", "Wallet saved. The account keys are now unlocked on this device."), "muted"));
         })
         .catch(function (e) {
           if (myGen !== gen) return;
           out.removeChild(status); saveBtn.disabled = false;
-          showError(doc, out, e, "Could not save the wallet.");
+          showError(doc, out, e, t("createaccount.could_not_save_the_wallet", "Could not save the wallet."));
         });
     });
   }

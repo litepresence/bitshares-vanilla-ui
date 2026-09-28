@@ -15,6 +15,8 @@
  *   TransferConfirm only. WIFs pass as JS values into Tx.sign/
  *   Crypto.encryptMemo — never into the DOM (no key material in
  *   textContent, value, title, or href, ever).
+ * I18n.t (display strings with verbatim en defaults — batch-2a i18n;
+ *   thrown codes double as indexOf routing keys, see review()).
  * Created by: building-vanilla-slices skill, slice-18 audit (transfer-ui
  *   split — review/showConfirm/row/showResult moved verbatim here;
  *   transfer-ui.js keeps form/unlock and the stable renderTransfer entry).
@@ -37,6 +39,20 @@
  */
 var TransferConfirm = (function () {
   "use strict";
+
+  /* Batch-2a i18n: display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back
+   * to the default when i18n.js failed to load: never blank, never throws.
+   * vars fills %(name)s placeholders (Reference #6 shape); without I18n
+   * the raw default returns unfilled — i18n.js is a local script tag,
+   * absent only when the file itself is missing. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
 
   /* Create an element with optional text + class (textContent only — user
    * and chain strings never reach innerHTML). */
@@ -72,15 +88,15 @@ var TransferConfirm = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
-      msg = fallback || "Unknown account.";
+      msg = fallback || t("transfer.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("transfer.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -119,28 +135,34 @@ var TransferConfirm = (function () {
    * {id, symbol, precision}. Throws "Unknown asset: X." when absent. */
   async function lookupAsset(symbol) {
     var sym = String(symbol || "").trim().toUpperCase();
-    if (!sym) throw new Error("Asset symbol is required.");
+    if (!sym) throw new Error(t("transfer.asset_required", "Asset symbol is required."));
     var dbId = await Chain.db();
     var rows = await Chain.call(dbId, "lookup_asset_symbols", [[sym]]);
-    if (!rows || !rows[0]) throw new Error("Unknown asset: " + sym + ".");
-    if (typeof rows[0].precision !== "number") throw new Error("bad-asset-shape");
+    if (!rows || !rows[0]) throw new Error(t("transfer.unknown_asset", "Unknown asset: %(sym)s.", {sym: sym}));
+    if (typeof rows[0].precision !== "number") throw new Error(t("transfer.bad_asset_shape", "bad-asset-shape"));
     return { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision };
   }
 
   /* Validate everything and build the unsigned tx + live fee. Resolves a
    * confirm context; rejects with a human-readable Error. Amounts stay
-   * integer strings throughout — Format.parseAmount is the only parser. */
+   * integer strings throughout — Format.parseAmount is the only parser.
+   * Thrown messages below are DISPLAY strings (they reach setFieldError /
+   * showError verbatim), so each carries its t() call site — EXCEPT the
+   * bare routing codes ("unknown-account", "wallet-locked"): those never
+   * render raw (every showError maps them first) and transfer-ui.js routes
+   * on them via msg.indexOf, so they stay byte-stable codes. When batch-2a
+   * keys gain real translations, that indexOf routing must move to codes. */
   async function review(vals) {
-    if (!vals.to) throw new Error("Recipient is required.");
+    if (!vals.to) throw new Error(t("transfer.recipient_required", "Recipient is required."));
     var to = await Account.resolve(vals.to);
     var asset = await lookupAsset(vals.asset);
     var amountInt;
     try {
       amountInt = Format.parseAmount(vals.amount, asset.precision);
     } catch (e) {
-      throw new Error(e && e.message ? e.message : "bad amount");
+      throw new Error(e && e.message ? e.message : t("transfer.bad_amount", "bad amount"));
     }
-    if (!/[1-9]/.test(amountInt)) throw new Error("Amount must be greater than zero.");
+    if (!/[1-9]/.test(amountInt)) throw new Error(t("transfer.amount_positive", "Amount must be greater than zero."));
 
     var memoText = String(vals.memo || "");
     var memoObj = null;
@@ -149,7 +171,7 @@ var TransferConfirm = (function () {
       var toFull = await fullAccount(to.id);
       var toMemoKey = toFull && toFull.options ? toFull.options.memo_key : null;
       if (!toMemoKey) {
-        throw new Error("Recipient " + to.name + " has no memo key; clear the memo to continue.");
+        throw new Error(t("transfer.no_memo_key", "Recipient %(name)s has no memo key; clear the memo to continue.", {name: to.name}));
       }
       if (vals.encrypted) {
         if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) {
@@ -201,7 +223,7 @@ var TransferConfirm = (function () {
    * Back leaves via onBack (the form file's re-render closure) — this file
    * never reaches back into transfer-ui.js. */
   function showConfirm(doc, wrap, root, from, ctx, onBack) {
-    wrap.appendChild(el(doc, "h1", "Confirm transfer"));
+    wrap.appendChild(el(doc, "h1", t("confirm.title", "Confirm transfer")));
     var list = el(doc, "dl", null, "xfer-confirm");
 
     function row(term, text, title) {
@@ -212,16 +234,16 @@ var TransferConfirm = (function () {
       list.appendChild(dd);
     }
 
-    row("From", from.name + " (" + from.id + ")");
-    row("To", ctx.to.name + " (" + ctx.to.id + ")");
+    row(t("confirm.from", "From"), from.name + " (" + from.id + ")");
+    row(t("confirm.to", "To"), ctx.to.name + " (" + ctx.to.id + ")");
     var amountHuman = Format.formatAmount(ctx.amountInt, ctx.asset.precision) + " " + ctx.asset.symbol;
-    row("Amount", amountHuman, ctx.amountInt);
-    if (ctx.memoKind === "encrypted") row("Memo", "Encrypted");
-    else if (ctx.memoKind === "plain") row("Memo", "Plain: " + ctx.memoText);
-    else row("Memo", "(none)");
+    row(t("confirm.amount", "Amount"), amountHuman, ctx.amountInt);
+    if (ctx.memoKind === "encrypted") row(t("confirm.memo", "Memo"), t("confirm.memo_encrypted", "Encrypted"));
+    else if (ctx.memoKind === "plain") row(t("confirm.memo", "Memo"), t("confirm.memo_plain", "Plain: %(text)s", {text: ctx.memoText}));
+    else row(t("confirm.memo", "Memo"), t("confirm.memo_none", "(none)"));
     var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
-    row("Fee", feeHuman, String(ctx.fee.amount));
-    row("Network", ctx.network);
+    row(t("confirm.fee", "Fee"), feeHuman, String(ctx.fee.amount));
+    row(t("confirm.network", "Network"), ctx.network);
 
     wrap.appendChild(list);
 
@@ -230,7 +252,7 @@ var TransferConfirm = (function () {
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
-    sumOp.setAttribute("aria-label", "Show unsigned operation JSON");
+    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
     detOp.appendChild(sumOp);
     var preOp = doc.createElement("pre");
     try { preOp.textContent = JSON.stringify(ctx.unsigned.operations, null, 2); }
@@ -238,11 +260,11 @@ var TransferConfirm = (function () {
     detOp.appendChild(preOp);
     wrap.appendChild(detOp);
 
-    var backBtn = touchable(el(doc, "button", "Back"));
+    var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
     backBtn.id = "xfer-back";
     backBtn.type = "button";
     wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Send"));
+    var sendBtn = touchable(el(doc, "button", t("confirm.sign_send", "Sign & Send")));
     sendBtn.id = "xfer-send";
     sendBtn.type = "button";
     wrap.appendChild(sendBtn);
@@ -254,18 +276,18 @@ var TransferConfirm = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, "Signing…");
+      var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), "Wallet is locked.");
+        showError(doc, wrap, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
       Promise.resolve()
         .then(function () { return Tx.sign(ctx.unsigned, activeWIF); })
         .then(function (signed) {
-          status.textContent = "Broadcasting…";
+          status.textContent = t("transfer.s1", "Broadcasting…");
           return Tx.broadcast(signed);
         })
         .then(function (proof) {
@@ -273,9 +295,9 @@ var TransferConfirm = (function () {
           showResult(doc, makeWrap(doc, root), from, ctx, null, proof);
         })
         .catch(function (e) {
-          var msg = (e && e.message) ? e.message : String(e || "Broadcast failed");
+          var msg = (e && e.message) ? e.message : t("confirm.broadcast_failed", "Broadcast failed");
           wrap.removeChild(status);
-          showError(doc, wrap, msg, "Transfer failed.");
+          showError(doc, wrap, msg, t("confirm.transfer_failed", "Transfer failed."));
           backBtn.disabled = false;
         });
     });
@@ -284,12 +306,11 @@ var TransferConfirm = (function () {
   /* Result screen: inclusion proof (block # + position) or the node error
    * text inline — never blank. Links back to the sender account page. */
   function showResult(doc, wrap, from, ctx, errText, proof) {
-    wrap.appendChild(el(doc, "h1", errText ? "Transfer failed" : "Transfer sent"));
+    wrap.appendChild(el(doc, "h1", errText ? t("confirm.failed_title", "Transfer failed") : t("confirm.sent_title", "Transfer sent")));
     if (errText) {
-      showError(doc, wrap, errText, "Transfer failed.");
+      showError(doc, wrap, errText, t("confirm.transfer_failed", "Transfer failed."));
     } else {
-      var ok = el(doc, "p", "Included in block #" + String(proof.blockNum) +
-        " (position " + String(proof.trxInBlock) + ").", "xfer-ok");
+      var ok = el(doc, "p", t("confirm.included", "Included in block #%(block)s (position %(pos)s).", {block: String(proof.blockNum), pos: String(proof.trxInBlock)}), "xfer-ok");
       ok.setAttribute("aria-live", "polite");
       wrap.appendChild(ok);
       /* Slice-16 (F1d): tx-confirmed toast supplement (inline panel stays
@@ -309,7 +330,7 @@ var TransferConfirm = (function () {
         ctx.asset.symbol + " → " + ctx.to.name, "muted");
       wrap.appendChild(sent);
     }
-    var link = el(doc, "a", "View account " + from.name);
+    var link = el(doc, "a", t("confirm.view_account", "View account ") + from.name);
     link.setAttribute("href", "#/account/" + from.name);
     touchable(link);
     wrap.appendChild(link);

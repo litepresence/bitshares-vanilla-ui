@@ -23,6 +23,20 @@
  */
 var NotifyHost = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   var gen = 0;
   var _unsub = null;
   /* Element helper: textContent only, user/chain strings never reach HTML. */
@@ -87,33 +101,33 @@ var NotifyHost = (function () {
     while (host.firstChild) host.removeChild(host.firstChild);
     var items = [];
     try { items = Notify.list() || []; } catch (e) { items = []; }
-    items.forEach(function (t) {
+    items.forEach(function (item) {
       var card = document.createElement("div");
-      card.className = "toast toast-" + String(t.level || "info");
+      card.className = "toast toast-" + String(item.level || "info");
       /* Card skin lives in css/app.css (.toast + level stripes). No inline
        * border/padding/background here so the stylesheet wins without
        * !important; host positioning inline above stays as pre-CSS fallback. */
       var head = el(document, "div", null, "toast-head");
-      if (t.title) head.appendChild(el(document, "strong", t.title));
+      if (item.title) head.appendChild(el(document, "strong", item.title));
       var x = touchable(el(document, "button", "×", "toast-x"));
       x.type = "button";
-      x.setAttribute("aria-label", "Dismiss notification");
+      x.setAttribute("aria-label", t("notify.dismiss", "Dismiss notification"));
       x.addEventListener("click", function () {
-        try { Notify.dismiss(t.id); } catch (e) { /* host still repaints */ }
+        try { Notify.dismiss(item.id); } catch (e) { /* host still repaints */ }
       });
       head.appendChild(x);
       card.appendChild(head);
-      if (t.body) card.appendChild(el(document, "div", t.body, "toast-body"));
+      if (item.body) card.appendChild(el(document, "div", item.body, "toast-body"));
       /* Tap-to-dismiss anywhere on the card; nothing is hover-only. */
       card.addEventListener("click", function (ev) {
         if (ev.target === x) return;
-        try { Notify.dismiss(t.id); } catch (e) { /* repaint follows */ }
+        try { Notify.dismiss(item.id); } catch (e) { /* repaint follows */ }
       });
       host.appendChild(card);
     });
     var more = 0;
     try { more = Notify.overflow() || 0; } catch (e) { more = 0; }
-    if (more > 0) host.appendChild(el(document, "div", "+" + String(more) + " more", "muted"));
+    if (more > 0) host.appendChild(el(document, "div", "+" + String(more) + t("notify.more_suffix", " more"), "muted"));
   }
   /* bellFor: market-desk entry point (Reference #6 shape, link flavour).
    * Indicator class when the pair has rules; links to #/alerts (NOT a
@@ -124,10 +138,27 @@ var NotifyHost = (function () {
     var b = String(base || "").trim().toUpperCase();
     var a = touchable(el(document, "a", "", "mkt-bell"));
     a.setAttribute("href", "#/alerts");
-    a.setAttribute("aria-label", "Price Alert");
-    a.setAttribute("title", "Price Alert");
+    a.setAttribute("aria-label", t("notify.bell", "Price Alert"));
+    a.setAttribute("title", t("notify.bell", "Price Alert"));
     var on = (q && b) ? _hasAny(q, b) : false;
-    a.textContent = on ? "🔔●" : "🔔";
+    /* Icon wiring (alarm.svg = #1's bell affordance; ExchangeHeader.jsx:210-232
+     * shape kept: link to #/alerts + has-alerts indicator class). Synchronous
+     * <img> — the _hasAny toggle + repaint logic below is byte-identical in
+     * behavior; without Icon the previous 🔔 text remains (never blank). */
+    try {
+      if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+        a.appendChild(Icon.img("alarm", "bell-icon", ""));
+        if (on) {
+          var dot = el(document, "span", "●", "bell-dot");
+          dot.setAttribute("aria-hidden", "true");
+          a.appendChild(dot);
+        }
+      } else {
+        a.textContent = on ? "🔔●" : "🔔";
+      }
+    } catch (e) {
+      try { a.textContent = on ? "🔔●" : "🔔"; } catch (e2) { /* bell keeps href */ }
+    }
     if (on) a.className = "mkt-bell has-alerts";
     return a;
   }

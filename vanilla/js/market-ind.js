@@ -33,6 +33,17 @@ var MarketInd = (function () {
     ["atr", "ATR"], ["fisher", "Fisher"], ["volume", "Volume"]
   ];
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -208,7 +219,7 @@ var MarketInd = (function () {
     var st = state.ticker;
     while (state.strip.firstChild) state.strip.removeChild(state.strip.firstChild);
     if (!st) {
-      state.strip.appendChild(el(doc, "span", "Loading stats…", "muted"));
+      state.strip.appendChild(el(doc, "span", t("market.loading_stats", "Loading stats…"), "muted"));
       return;
     }
     /* One label/value chip appended to the strip (missing values show —). */
@@ -216,18 +227,18 @@ var MarketInd = (function () {
       var s = doc.createElement("span");
       s.className = "mkt-stat";
       s.appendChild(el(doc, "span", label + " ", "muted"));
-      s.appendChild(el(doc, "strong", value === null || value === undefined ? "—" : String(value)));
+      s.appendChild(el(doc, "strong", value === null || value === undefined ? t("market.stat_empty", "—") : String(value)));
       state.strip.appendChild(s);
     }
-    cell("Latest", st.latest);
+    cell(t("market.stat_latest", "Latest"), st.latest);
     var chg = (st.raw && st.raw.percent_change !== undefined && st.raw.percent_change !== null)
       ? String(st.raw.percent_change) : null;
-    cell("24h Δ", chg);
+    cell(t("market.stat_chg", "24h Δ"), chg);
     var bv = (st.raw && st.raw.base_volume !== undefined && st.raw.base_volume !== null)
       ? String(st.raw.base_volume) + " " + state.assets.base.symbol : null;
-    cell("24h Vol", bv);
+    cell(t("market.stat_vol", "24h Vol"), bv);
     var bb = [st.highestBid, st.lowestAsk].filter(function (x) { return x !== null; }).join(" / ");
-    cell("Bid–Ask", bb || null);
+    cell(t("market.stat_bidask", "Bid–Ask"), bb || null);
   }
 
   /* Refresh the "N × timeframe candles" note under the timeframe radios. */
@@ -320,7 +331,7 @@ var MarketInd = (function () {
     try {
       state.panes.price = MarketCharts.drawPricePane(doc, state.priceHost, {
         candles: d.buckets, overlays: d.overlays, logScale: state.logScale,
-        colors: frame, emptyText: "No price history on this market.",
+        colors: frame, emptyText: t("market.no_price_history", "No price history on this market."),
         previous: state.panes.price
       });
     } catch (e) { /* pane failure must not break the desk */ }

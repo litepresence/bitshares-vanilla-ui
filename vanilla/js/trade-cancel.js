@@ -32,6 +32,17 @@ var TradeCancel = (function () {
   var PROVE_TIMEOUT_MS = 30000;
   var PROVE_INTERVAL_MS = 2500;
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -60,13 +71,13 @@ var TradeCancel = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("market.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -171,7 +182,7 @@ var TradeCancel = (function () {
       p.setAttribute("aria-live", "polite");
       mount.appendChild(p);
     });
-    var back = touchable(el(doc, "button", spec.backLabel || "Back"));
+    var back = touchable(el(doc, "button", spec.backLabel || t("trade.back", "Back")));
     back.type = "button";
     back.addEventListener("click", spec.onBack);
     mount.appendChild(back);
@@ -184,7 +195,7 @@ var TradeCancel = (function () {
   function orderCancelBox(doc, box, order, assets, onDone) {
     clearBox(box);
     if (typeof Tx === "undefined" || !Tx || typeof Chain === "undefined" || !Chain) {
-      showError(doc, box, "Trade backend missing: js/tx.js failed to load.");
+      showError(doc, box, t("trade.cancel_backend", "Trade backend missing: js/tx.js failed to load."));
       return;
     }
     var id = order && order.id ? String(order.id) : "";
@@ -195,31 +206,31 @@ var TradeCancel = (function () {
     box.appendChild(el(doc, "h3", "Cancel order " + id + "?"));
     var view = cancelView(order, assets);
     var list = el(doc, "dl", null, "xfer-confirm");
-    list.appendChild(el(doc, "dt", "Order ID"));
+    list.appendChild(el(doc, "dt", t("trade.co_orderid", "Order ID")));
     list.appendChild(el(doc, "dd", id));
-    list.appendChild(el(doc, "dt", "Market"));
+    list.appendChild(el(doc, "dt", t("trade.co_market", "Market")));
     list.appendChild(el(doc, "dd", view.pair));
-    list.appendChild(el(doc, "dt", "Details"));
+    list.appendChild(el(doc, "dt", t("trade.co_details", "Details")));
     list.appendChild(el(doc, "dd", view.details));
     box.appendChild(list);
     box.appendChild(el(doc, "p",
-      "Warning: canceling permanently removes this order from the book.", "muted"));
-    var backBtn = touchable(el(doc, "button", "Keep order"));
+      t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted"));
+    var backBtn = touchable(el(doc, "button", t("trade.keep_order", "Keep order")));
     backBtn.type = "button";
     box.appendChild(backBtn);
-    var goBtn = touchable(el(doc, "button", "Confirm cancel"));
+    var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel", "Confirm cancel")));
     goBtn.type = "button";
     box.appendChild(goBtn);
     backBtn.addEventListener("click", function () { clearBox(box); });
     goBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       goBtn.disabled = true;
-      var status = showStatus(doc, box, "Checking fee…");
+      var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
       var seller = (order.seller && String(order.seller)) || null;
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         box.removeChild(status);
-        showError(doc, box, new Error("wallet-locked"), "Wallet is locked.");
+        showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
         backBtn.disabled = false;
         goBtn.disabled = false;
         return;
@@ -242,7 +253,7 @@ var TradeCancel = (function () {
           });
         }).then(function (R) {
           return Tx.sign(R.unsigned, wif).then(function (signed) {
-            status.textContent = "Broadcasting cancel…";
+            status.textContent = t("trade.s2", "Broadcasting cancel…");
             return sendTx(signed, proveGone(myId, [id])).then(function (res) {
               return { res: res, R: R };
             });
@@ -256,13 +267,13 @@ var TradeCancel = (function () {
           box.appendChild(ok);
           box.appendChild(el(doc, "p",
             "Cancel fee: " + humanFee(out.R.feeRaw, out.R.meta) + ".", "muted"));
-          var done = touchable(el(doc, "button", "Back to orders"));
+          var done = touchable(el(doc, "button", t("trade.back_orders", "Back to orders")));
           done.type = "button";
           done.addEventListener("click", function () { clearBox(box); onDone(); });
           box.appendChild(done);
         }).catch(function (e) {
           try { box.removeChild(status); } catch (rm) { /* already gone */ }
-          showError(doc, box, e, "Cancel failed.");
+          showError(doc, box, e, t("trade.fail_cancel", "Cancel failed."));
           backBtn.disabled = false;
           goBtn.disabled = false;
         });
@@ -313,10 +324,10 @@ var TradeCancel = (function () {
         "This sends ONE transaction canceling " + ids.length +
         " orders on " + assets.quote.symbol + "/" + assets.base.symbol +
         ". Warning: canceling permanently removes these orders from the book.", "muted"));
-      var backBtn = touchable(el(doc, "button", "Keep orders"));
+      var backBtn = touchable(el(doc, "button", t("trade.keep_orders", "Keep orders")));
       backBtn.type = "button";
       box.appendChild(backBtn);
-      var goBtn = touchable(el(doc, "button", "Confirm cancel-all"));
+      var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel_all", "Confirm cancel-all")));
       goBtn.type = "button";
       box.appendChild(goBtn);
       backBtn.addEventListener("click", function () {
@@ -325,11 +336,11 @@ var TradeCancel = (function () {
       goBtn.addEventListener("click", function () {
         backBtn.disabled = true;
         goBtn.disabled = true;
-        var status = showStatus(doc, box, "Checking fee…");
+        var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (!wif) {
           box.removeChild(status);
-          showError(doc, box, new Error("wallet-locked"), "Wallet is locked.");
+          showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
           backBtn.disabled = false;
           goBtn.disabled = false;
           return;
@@ -365,13 +376,13 @@ var TradeCancel = (function () {
             " (total fee " + humanFee(out.R.feeRaw, out.R.meta) + ").", "xfer-ok");
           ok.setAttribute("aria-live", "polite");
           box.appendChild(ok);
-          var done = touchable(el(doc, "button", "Back to orders"));
+          var done = touchable(el(doc, "button", t("trade.back_orders", "Back to orders")));
           done.type = "button";
           done.addEventListener("click", function () { clearBox(box); onDone(); });
           box.appendChild(done);
         }).catch(function (e) {
           try { box.removeChild(status); } catch (rm) { /* already gone */ }
-          showError(doc, box, e, "Cancel-all failed.");
+          showError(doc, box, e, t("trade.fail_cancel_all", "Cancel-all failed."));
           backBtn.disabled = false;
           goBtn.disabled = false;
         });

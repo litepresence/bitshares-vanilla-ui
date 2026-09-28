@@ -22,6 +22,21 @@
  */
 var ReferralsUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   var ID_RE = /^1\.2\.\d+$/;
   /* textContent-only element (chain/user strings never reach HTML). */
@@ -37,9 +52,9 @@ var ReferralsUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("unknown-account") !== -1) msg = fallback || "Unknown account.";
-    else if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) msg = "Network unavailable. Check Settings → Nodes and retry.";
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("referrals.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("referrals.unknown_account", "Unknown account.");
+    else if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) msg = t("referrals.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     var err = el(doc, "div", msg, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
@@ -88,17 +103,15 @@ var ReferralsUI = (function () {
     var myGen = ++gen;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Referrals"));
-    wrap.appendChild(el(doc, "p",
-      "Who registered and referred an account, the fee-split percents, and any pending cashback. " +
-      "Read-only: referral COUNTS need an off-chain history service the reference UI used, so counts are not shown here.",
+    wrap.appendChild(el(doc, "h1", t("referrals.referrals", "Referrals")));
+    wrap.appendChild(el(doc, "p", t("referrals.intro", "Who registered and referred an account, the fee-split percents, and any pending cashback. Read-only: referral COUNTS need an off-chain history service the reference UI used, so counts are not shown here."),
       "muted"));
     if (typeof Chain === "undefined" || !Chain) {
-      showError(doc, wrap, "Chain backend missing: js/chain.js failed to load.");
+      showError(doc, wrap, t("referrals.chain_backend_missing_js_chain_js_failed_to_l", "Chain backend missing: js/chain.js failed to load."));
       return;
     }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "p", t("referrals.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = function () {};
       if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -117,41 +130,41 @@ var ReferralsUI = (function () {
       return;
     }
     var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", "Account ");
+    var label = el(doc, "label", t("referrals.account", "Account "));
     var input = doc.createElement("input");
     input.id = "ref-lookup"; input.type = "text";
-    input.setAttribute("placeholder", "account name or 1.2.N");
+    input.setAttribute("placeholder", t("referrals.account_name_or_1_2_n", "account name or 1.2.N"));
     input.setAttribute("autocomplete", "off");
     input.setAttribute("autocapitalize", "off");
     input.setAttribute("spellcheck", "false");
     touchable(input); label.appendChild(input); row.appendChild(label);
     wrap.appendChild(row);
-    var go = touchable(el(doc, "button", "Look up"));
+    var go = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
     go.id = "ref-go"; go.type = "button"; wrap.appendChild(go);
-    var mine = touchable(el(doc, "button", "Use my account"));
+    var mine = touchable(el(doc, "button", t("referrals.use_my_account", "Use my account")));
     mine.id = "ref-mine"; mine.type = "button"; wrap.appendChild(mine);
     var err = el(doc, "div", null, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err);
     var body = doc.createElement("div"); wrap.appendChild(body);
     function fail(e, fallback) {
       err.textContent = "";
-      var msg = (e && e.message) ? e.message : String(e || fallback || "Lookup failed");
-      if (msg.indexOf("unknown-account") !== -1) msg = fallback || "Unknown account.";
-      else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) msg = "Network unavailable. Check Settings → Nodes and retry.";
-      else if (msg.indexOf("wallet-locked") !== -1) msg = "Wallet is locked — enter the name manually instead.";
-      else if (msg.indexOf("no-account") !== -1) msg = "The unlocked wallet controls no on-chain account yet.";
+      var msg = (e && e.message) ? e.message : String(e || fallback || t("referrals.lookup_failed", "Lookup failed"));
+      if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("referrals.unknown_account", "Unknown account.");
+      else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) msg = t("referrals.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+      else if (msg.indexOf("wallet-locked") !== -1) msg = t("referrals.wallet_is_locked_enter_the_name_manually_inst", "Wallet is locked — enter the name manually instead.");
+      else if (msg.indexOf("no-account") !== -1) msg = t("referrals.the_unlocked_wallet_controls_no_on_chain_acco", "The unlocked wallet controls no on-chain account yet.");
       err.textContent = msg;
     }
     go.addEventListener("click", function () {
       var v = input.value.trim().toLowerCase();
-      if (!v) { err.textContent = "Enter an account name or 1.2.N id."; return; }
+      if (!v) { err.textContent = t("referrals.enter_an_account_name_or_1_2_n_id", "Enter an account name or 1.2.N id."); return; }
       err.textContent = "";
       paint(doc, body, myGen, v, fail);
     });
     mine.addEventListener("click", function () {
       err.textContent = "";
       if (typeof Account === "undefined" || !Account || typeof Account.myAccountId !== "function") {
-        err.textContent = "Account backend missing: js/account.js failed to load."; return;
+        err.textContent = t("referrals.account_backend_missing_js_account_js_failed", "Account backend missing: js/account.js failed to load."); return;
       }
       mine.disabled = true;
       Promise.resolve().then(function () { return Account.myAccountId(); })
@@ -190,8 +203,8 @@ var ReferralsUI = (function () {
   /* Registrar / referrer / lifetime-referrer ids -> linked names. */
   async function paintParties(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", "Registrar & referrer"));
-    var loading = el(doc, "p", "Resolving names…", "muted");
+    box.appendChild(el(doc, "h3", t("referrals.registrar_referrer", "Registrar & referrer")));
+    var loading = el(doc, "p", t("referrals.resolving_names", "Resolving names…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     var ids = [acct.registrar, acct.referrer, acct.lifetime_referrer].filter(function (x) {
       return typeof x === "string" && !!x;
@@ -204,12 +217,12 @@ var ReferralsUI = (function () {
     if (myGen !== gen) return;
     box.removeChild(loading);
     if (!ids.length) {
-      box.appendChild(el(doc, "p", "No registrar or referrer recorded for this account.", "muted"));
+      box.appendChild(el(doc, "p", t("referrals.no_registrar_or_referrer_recorded_for_this_ac", "No registrar or referrer recorded for this account."), "muted"));
       return;
     }
     var dl = el(doc, "dl", null, "xplore-fields");
-    [["Registrar", acct.registrar], ["Referrer", acct.referrer],
-     ["Lifetime referrer", acct.lifetime_referrer]].forEach(function (pr) {
+    [[t("referrals.registrar", "Registrar"), acct.registrar], [t("referrals.referrer", "Referrer"), acct.referrer],
+     [t("referrals.lifetime_referrer", "Lifetime referrer"), acct.lifetime_referrer]].forEach(function (pr) {
       if (!pr[1]) return;
       dl.appendChild(el(doc, "dt", pr[0]));
       var dd = doc.createElement("dd");
@@ -225,12 +238,12 @@ var ReferralsUI = (function () {
   /* Fee-split percent fields, raw + human (never raw alone). */
   function paintPercents(doc, body, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", "Fee split"));
+    box.appendChild(el(doc, "h3", t("referrals.fee_split", "Fee split")));
     var have = (acct.network_fee_percentage !== undefined) ||
       (acct.lifetime_referrer_fee_percentage !== undefined) ||
       (acct.referrer_rewards_percentage !== undefined);
     if (!have) {
-      box.appendChild(el(doc, "p", "No fee-split fields returned for this account.", "muted"));
+      box.appendChild(el(doc, "p", t("referrals.no_fee_split_fields_returned_for_this_account", "No fee-split fields returned for this account."), "muted"));
       body.appendChild(box);
       return;
     }
@@ -242,11 +255,11 @@ var ReferralsUI = (function () {
       dl.appendChild(dd);
     }
     if (acct.network_fee_percentage !== undefined)
-      row("Network share", acct.network_fee_percentage, pctHuman(acct.network_fee_percentage), "of every fee");
+      row(t("referrals.network_share", "Network share"), acct.network_fee_percentage, pctHuman(acct.network_fee_percentage), "of every fee");
     if (acct.lifetime_referrer_fee_percentage !== undefined)
-      row("Lifetime-referrer share", acct.lifetime_referrer_fee_percentage, pctHuman(acct.lifetime_referrer_fee_percentage), "of every fee");
+      row(t("referrals.lifetime_referrer_share", "Lifetime-referrer share"), acct.lifetime_referrer_fee_percentage, pctHuman(acct.lifetime_referrer_fee_percentage), "of every fee");
     if (acct.referrer_rewards_percentage !== undefined)
-      row("Referrer reward", acct.referrer_rewards_percentage, pctHuman(acct.referrer_rewards_percentage) + " of the referrer slice", "share of the remainder after network + lifetime cuts");
+      row(t("referrals.referrer_reward", "Referrer reward"), acct.referrer_rewards_percentage, pctHuman(acct.referrer_rewards_percentage) + " of the referrer slice", "share of the remainder after network + lifetime cuts");
     box.appendChild(dl);
     body.appendChild(box);
   }
@@ -254,8 +267,8 @@ var ReferralsUI = (function () {
   /* Pending cashback from the statistics object (core units -> human). */
   async function paintCashback(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", "Pending cashback"));
-    var loading = el(doc, "p", "Loading statistics…", "muted");
+    box.appendChild(el(doc, "h3", t("referrals.pending_cashback", "Pending cashback")));
+    var loading = el(doc, "p", t("referrals.loading_statistics", "Loading statistics…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
       if (!acct.statistics) throw new Error("no-statistics");
@@ -270,7 +283,7 @@ var ReferralsUI = (function () {
       if (myGen !== gen) return;
       box.removeChild(loading);
       var dl = el(doc, "dl", null, "xplore-fields");
-      [["Pending fees", st.pending_fees], ["Pending vested fees", st.pending_vested_fees]].forEach(function (pr) {
+      [[t("referrals.pending_fees", "Pending fees"), st.pending_fees], [t("referrals.pending_vested_fees", "Pending vested fees"), st.pending_vested_fees]].forEach(function (pr) {
         dl.appendChild(el(doc, "dt", pr[0]));
         var raw = (pr[1] !== undefined && pr[1] !== null) ? String(pr[1]) : "0";
         var human = raw;
@@ -286,22 +299,22 @@ var ReferralsUI = (function () {
     } catch (e) {
       if (myGen !== gen) return;
       box.removeChild(loading);
-      box.appendChild(el(doc, "p", "No cashback statistics available for this account.", "muted"));
+      box.appendChild(el(doc, "p", t("referrals.no_cashback_statistics_available_for_this_acc", "No cashback statistics available for this account."), "muted"));
     }
   }
 
   /* Vesting balances for the account; empty state when none/unavailable. */
   async function paintVesting(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", "Vesting balances"));
-    var loading = el(doc, "p", "Loading vesting balances…", "muted");
+    box.appendChild(el(doc, "h3", t("referrals.vesting_balances", "Vesting balances")));
+    var loading = el(doc, "p", t("referrals.loading_vesting_balances", "Loading vesting balances…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
       var rows = await dbCall("get_vesting_balances", [acct.id]);
       if (myGen !== gen) return;
       box.removeChild(loading);
       if (!rows || rows.length === 0) {
-        box.appendChild(el(doc, "p", "No vesting balances for this account.", "muted"));
+        box.appendChild(el(doc, "p", t("referrals.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
         return;
       }
       var ul = doc.createElement("ul");
@@ -318,7 +331,7 @@ var ReferralsUI = (function () {
     } catch (e) {
       if (myGen !== gen) return;
       box.removeChild(loading);
-      box.appendChild(el(doc, "p", "Vesting balances unavailable on this node.", "muted"));
+      box.appendChild(el(doc, "p", t("referrals.vesting_balances_unavailable_on_this_node", "Vesting balances unavailable on this node."), "muted"));
     }
   }
 

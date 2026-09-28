@@ -105,7 +105,9 @@ var AssetManageUI = (function () {
     ok.setAttribute("aria-live", "polite"); w.appendChild(ok); w.appendChild(el(d, "p", sub, "muted"));
     var a = el(d, "a", link); a.setAttribute("href", href); touch(a); w.appendChild(a);
   }
-  /* publish: buildTx + fresh-WIF sendAndProve + head-marked result. No auto-retry. */
+  /* publish: buildTx + fresh-WIF sendAndProve + head-marked result. No auto-retry.
+   * SIGN GATE (gate-repair): the missing-WIF throw below is the ONLY password
+   * gate on these routes — everything above it renders locked. */
   async function publish(root, d, g, pair, prove, title, sub, href, link, onStep) {
     var unsigned = await Tx.buildTx([pair]);
     var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
@@ -119,21 +121,49 @@ var AssetManageUI = (function () {
     var r = await Chain.call(await Chain.db(), "lookup_asset_symbols", [[s]]);
     if (!r || !r[0]) throw new Error("unknown-asset"); return r[0];
   }
-  /* renderUpdate: op-11 common + op-12 bitasset (MPA) + op-13 producers. */
+  /* renderUpdate: op-11 common + op-12 bitasset (MPA) + op-13 producers.
+   * PUBLIC reads render LOCKED (gate-repair): asset info shows first for any
+   * viewer; the edit forms only appear for the issuer and Sign & Send still
+   * needs the unlocked WIF in publish(). */
   function renderUpdate(root, symbol) {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var w = wrap(d, root);
     if (noBackend()) { err(d, w, "Asset backend missing."); return; }
     if (cold(d, w, root, function () { renderUpdate(root, symbol); })) return;
-    if (!Wallet.isUnlocked()) { lock(d, w, function () { renderUpdate(root, symbol); }); return; }
+    /* No entry unlock gate: reads are public; signing gates in publish(). */
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        w.appendChild(el(d, "p", "Viewing as committee-account (1.2.0) — unlock to act as yourself.", "muted"));
+    } catch (e) { /* notice is display-only */ }
     if (!symbol) { w.appendChild(el(d, "h1", "Update asset")); err(d, w, new Error("unknown-asset"), "Unknown asset."); return; }
     w.appendChild(el(d, "h1", "Update " + symbol)); status(d, w, "Loading asset…");
     (async function () {
       var info = await Asset.describe(symbol);
+      /* Null-tolerant at render: locked viewers get "" (never the issuer),
+       * so they see the public read panel below and no edit forms; the
+       * password stays loud only at sign time in publish(). */
       var mine = await Account.myAccountId().catch(function () { return ""; });
       if (g !== gen) return; wipe(root);
       var v = wrap(d, root); v.appendChild(el(d, "h1", "Update " + info.symbol));
+      try {
+        if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+          v.appendChild(el(d, "p", "Viewing as committee-account (1.2.0) — unlock to act as yourself.", "muted"));
+      } catch (e) { /* notice is display-only */ }
+      /* Public read panel first: symbol/id/issuer/precision/supply/fee. */
+      (function () {
+        var supH = info.supply_raw;
+        try { supH = (info.supply_raw === null || info.supply_raw === undefined) ? "unavailable" : Format.formatAmount(String(info.supply_raw), info.precision) + " " + info.symbol; }
+        catch (e) { supH = String(info.supply_raw); }
+        var dl = d.createElement("dl"); dl.className = "xfer-confirm";
+        [["Asset", info.symbol + " (" + info.id + ")"], ["Issuer", (info.issuer_name || info.issuer_id)],
+          ["Precision", String(info.precision)], ["Supply", supH, info.supply_raw === null ? null : String(info.supply_raw)],
+          ["Market fee", AssetOps.hundredthsToPct(info.market_fee_hundredths) + "%"],
+          ["Smartcoin", info.is_smartcoin ? "yes" : "no"]].forEach(function (r) {
+          dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd);
+        });
+        v.appendChild(dl);
+      })();
       if (info.issuer_id !== mine) {
         err(d, v, new Error("not-issuer"), "Only the issuer can edit this asset.");
         v.appendChild(el(d, "p", "Issuer: " + (info.issuer_name || info.issuer_id) + ". Read-only.", "muted")); return; }
@@ -217,14 +247,18 @@ var AssetManageUI = (function () {
     })().catch(function (e) { if (g === gen) { wipe(root); var w2 = wrap(d, root);
       w2.appendChild(el(d, "h1", "Update " + symbol)); err(d, w2, e, "Unknown asset."); } });
   }
-  /* half: one issue/reserve half-form wired to its builder + supply-delta proof. */
+  /* half: one issue/reserve half-form wired to its builder + supply-delta proof.
+   * PUBLIC preview (gate-repair): the acting account is an explicit input
+   * defaulting to 1.2.0 (never Account.myAccountId at render); Sign & Send
+   * still needs the unlocked WIF in publish(). */
   function half(d, v, root, g, title, btnLabel, isReserve) {
     v.appendChild(el(d, "h3", title));
     if (isReserve) v.appendChild(el(d, "p", "Market-issued assets cannot be reserved.", "muted"));
     var s = field(d, "Symbol", null, "", null, false, "AFKTEST01");
     var t = isReserve ? null : field(d, "To (name or 1.2.N)", null, "");
     var a = field(d, "Amount (human)", null, "1", "decimal");
-    v.appendChild(s.row); if (t) v.appendChild(t.row); v.appendChild(a.row);
+    var who = field(d, isReserve ? "Payer (name or 1.2.N)" : "Acting account (name or 1.2.N)", null, "1.2.0");
+    v.appendChild(s.row); if (t) v.appendChild(t.row); v.appendChild(a.row); v.appendChild(who.row);
     var r = touch(el(d, "button", btnLabel)); r.type = "button"; v.appendChild(r);
     r.addEventListener("click", function () { r.disabled = true;
       (async function () {
@@ -233,7 +267,9 @@ var AssetManageUI = (function () {
         if (isReserve && info.is_smartcoin) throw new Error("not-market-issued");
         var raw = Format.parseAmount(a.input.value, info.precision);
         if (!/[1-9]/.test(raw)) throw new Error("Amount must be greater than zero.");
-        var me = await Account.resolve(await Account.myAccountId());
+        /* Explicit acting account (public default 1.2.0) — never
+         * myAccountId at render; the wallet is proven only at sign time. */
+        var me = await Account.resolve(who.input.value.trim() || "1.2.0");
         if (isReserve && me.id !== info.issuer_id) throw new Error("not-issuer");
         var to = isReserve ? null : await Account.resolve(t.input.value.trim());
         var pair = isReserve
@@ -257,15 +293,20 @@ var AssetManageUI = (function () {
               "#/asset/" + info.symbol, "Open " + info.symbol, st); });
       })().catch(function (e) { r.disabled = false; err(d, v, e, isReserve ? "Could not prepare the reserve." : "Could not prepare the issue."); }); });
   }
-  /* renderIssue: op-14 issue + op-15 reserve halves. */
+  /* renderIssue: op-14 issue + op-15 reserve halves. PUBLIC preview renders
+   * LOCKED (gate-repair); Sign & Send gates in publish() via fresh WIF. */
   function renderIssue(root) {
     if (!root) return;
     var d = root.ownerDocument || document, g = ++gen;
     wipe(root); var v = wrap(d, root);
     if (noBackend()) { err(d, v, "Asset backend missing."); return; }
     if (cold(d, v, root, function () { renderIssue(root); })) return;
-    if (!Wallet.isUnlocked()) { lock(d, v, function () { renderIssue(root); }); return; }
+    /* No entry unlock gate: reads/preview are public; signing gates in publish(). */
     v.appendChild(el(d, "h1", "Issue / reserve"));
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        v.appendChild(el(d, "p", "Viewing as committee-account (1.2.0) — unlock to sign.", "muted"));
+    } catch (e) { /* notice is display-only */ }
     half(d, v, root, g, "Issue to account (op 14)", "Review issue", false);
     half(d, v, root, g, "Reserve / burn back (op 15)", "Review reserve", true);
   }

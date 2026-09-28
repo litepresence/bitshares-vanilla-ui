@@ -4,6 +4,9 @@
  *   pool-detail-ui.js (#/pools/:id desk) and pool-swap-ui.js (#/swap). No money
  *   math here (Pool builders do it); no serializers (tx.js owns bytes). WIFs
  *   are JS values, never DOM. Unknown ids -> empty state, never blank.
+ *   PUBLIC-FIRST: routeReady never gates on unlock (list/detail/quote render
+ *   locked); reviewSection gates write reviews at click with an unlock notice;
+ *   locked account reads default to committee-account 1.2.0 with a notice.
  * Consumes: Pool (list/mine/buildCreate/fee/sendAndProve/percent helpers),
  *   Tx.buildTx, Format (human strings only), Account (resolve/myAccountId),
  *   Asset.describe (symbols + precisions), Wallet (unlock + memory WIF),
@@ -48,6 +51,19 @@ var PoolUI = (function () {
       Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap, e, "Unlock failed."); });
     });
   }
+  /* Default viewing account while locked: committee-account 1.2.0 (a public
+   * chain object on testnet+mainnet). Reads stay public under it; writes gate
+   * at review click (reviewSection). Never throws — locked render is normal. */
+  var VIEWING_AS_ID = "1.2.0", VIEWING_AS_NAME = "committee-account";
+  function isUnlockedNow() {
+    try {
+      if (typeof Wallet !== "undefined" && typeof Wallet.isUnlocked === "function") return !!Wallet.isUnlocked();
+      return !!(typeof Wallet !== "undefined" && Wallet.keys);
+    } catch (e) { return false; }
+  }
+  function viewingAsNotice(doc) {
+    return el(doc, "p", "Viewing as " + VIEWING_AS_NAME + " (" + VIEWING_AS_ID + ") — unlock to act as your account.", "muted");
+  }
   function dropSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
   function autoRetry(myGen, retryFn) {
     try {
@@ -69,7 +85,8 @@ var PoolUI = (function () {
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); return null; }
-    if (!Wallet.isUnlocked()) { unlockBox(doc, wrap, retry); return null; }
+    /* PUBLIC-FIRST: no wallet gate here — list/detail/quote render locked.
+     * Write paths gate at review click (reviewSection) with an unlock notice. */
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function routeFail(root, title, e, retry) {
@@ -175,7 +192,19 @@ var PoolUI = (function () {
     var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
     var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
-    btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
+    /* SIGN-TIME GATE: password asked only here, never at render. A locked
+     * click shows an honest notice + inline unlock; success flows into review
+     * (read-only until the user presses Sign & Send). */
+    btn.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      if (!isUnlockedNow()) {
+        clearBox(out);
+        out.appendChild(el(doc, "p", "Unlock to act — signing needs your wallet password.", "muted"));
+        unlockBox(doc, out, function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
+        return;
+      }
+      reviewPaid(doc, out, myGen, cfg);
+    });
     return btn;
   }
   /* assetLink: symbol -> #/asset/:symbol anchor (existing route; join misses
@@ -209,7 +238,20 @@ var PoolUI = (function () {
       tr.appendChild(el(doc, "td", pctText(r.taker_units), "num"));
       tr.appendChild(el(doc, "td", pctText(r.withdrawal_units), "num"));
       var tdX = doc.createElement("td");
-      var xl = el(doc, "a", "⇄"); xl.setAttribute("href", "#/pools/" + r.id);
+      /* Icon wiring (swap.svg; #1 pools table shows ⇄ in EXCHANGE). href,
+       * aria-label, and title unchanged — skin only; without Icon the ⇄
+       * text renders so the link is never blank. */
+      var xl = doc.createElement("a");
+      try {
+        if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+          xl.appendChild(Icon.img("swap", "cell-icon", ""));
+        } else {
+          xl.textContent = "⇄";
+        }
+      } catch (e) {
+        xl.textContent = "⇄";
+      }
+      xl.setAttribute("href", "#/pools/" + r.id);
       xl.setAttribute("aria-label", "Swap in pool " + r.id);
       xl.title = "Swap in this pool";
       tdX.appendChild(xl); tr.appendChild(tdX);
@@ -325,13 +367,21 @@ var PoolUI = (function () {
       pager.size = (n === 25 || n === 50) ? n : 10;
       resetAndLoad();
     });
-    Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
-      if (myGen !== gen) return;
-      Pool.mine(me.id).then(function (rows) {
-        if (myGen !== gen) return; clearBox(mineBox); mineBox.appendChild(poolTable(doc, rows));
-      }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", "No owned pools.", "muted")); } });
-      loadPage();
-    }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, "Could not load your account."); });
+    /* Public list loads locked or not. Mine resolves the wallet account when
+     * unlocked, else defaults to committee-account 1.2.0 with an honest
+     * notice — both are public get_liquidity_pools_by_owner reads, never throws. */
+    loadPage();
+    (function () {
+      var locked = !isUnlockedNow();
+      var idP = locked ? Promise.resolve(VIEWING_AS_ID) : Account.myAccountId();
+      idP.then(function (id) { return Account.resolve(id); }).then(function (me) {
+        if (myGen !== gen) return;
+        if (locked) mineBox.appendChild(viewingAsNotice(doc));
+        Pool.mine(me.id).then(function (rows) {
+          if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows));
+        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", "No owned pools.", "muted")); } });
+      }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, "Could not load your account."); });
+    })();
   }
   function createBox(doc, box, myGen) { /* op-59 create: a/b/share resolves, human percents, orientation preview */
     var fA = field(doc, "Asset A", { placeholder: "BTS" });
@@ -371,6 +421,7 @@ var PoolUI = (function () {
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady, routeFail: routeFail, autoRetry: autoRetry, dropSubs: dropSubs,
+      isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, viewingAsId: VIEWING_AS_ID,
       live: function (g) { return g === gen; } } };
 })();
 

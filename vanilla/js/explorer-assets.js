@@ -34,6 +34,20 @@
  */
 var ExplorerAssets = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   var ASSETS_PAGE = 25; /* #1 Assets.jsx 25/page */
   var FEED_SCAN_PAGES = 4; /* asset pages scanned for smartcoins */
@@ -117,14 +131,14 @@ var ExplorerAssets = (function () {
     var box = el(doc, "div", null, "error");
     box.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
-      ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("unknown-block") !== -1) msg = "Unknown block.";
-    else if (msg.indexOf("unknown-tx") !== -1) msg = "Unknown transaction.";
-    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || "Unknown asset.";
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || "Nothing found for that search.";
-    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = "Transaction hash lookup covers recent transactions only — this one is expired or unknown.";
+      ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
+    if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
+    else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
+    else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     box.textContent = msg;
     wrap.appendChild(box);
@@ -160,9 +174,9 @@ var ExplorerAssets = (function () {
   function lifetimeText(raw) {
     if (!/^\d+$/.test(String(raw || ""))) return String(raw);
     var s = parseInt(String(raw), 10);
-    if (s % 3600 === 0) return (s / 3600) + " hours";
-    if (s % 60 === 0) return (s / 60) + " minutes";
-    return s + " seconds";
+    if (s % 3600 === 0) return (s / 3600) + t("explorer.hours_unit", " hours");
+    if (s % 60 === 0) return (s / 60) + t("explorer.minutes_unit", " minutes");
+    return s + t("explorer.seconds_unit", " seconds");
   }
 
   /* Scrollable table shell (principle #7: dense tables scroll horizontally
@@ -196,13 +210,13 @@ var ExplorerAssets = (function () {
   /* Assets tab: 25/page table (symbol, issuer, precision, supply human)
    * with lower-bound paging (Next/Prev stack, Reference #18 pattern). */
   function assetsTab(doc, body, root, myGen, lower, stack) {
-    showStatus(doc, body, "Loading assets…");
+    showStatus(doc, body, t("explorer.loading_assets", "Loading assets…"));
     Explorer.assetsPage(lower, ASSETS_PAGE).then(function (rows) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       rows = rows || [];
       if (rows.length === 0) {
-        body.appendChild(el(doc, "p", "No assets on this page.", "muted"));
+        body.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
         return;
       }
       var precById = {};
@@ -215,10 +229,10 @@ var ExplorerAssets = (function () {
       var supplyOf = {};
       function paint(tableRows) {
         while (body.firstChild) body.removeChild(body.firstChild);
-        body.appendChild(scrollTable(doc, ["Symbol", "Issuer", "Precision", "Supply"], tableRows));
+        body.appendChild(scrollTable(doc, [t("explorer.th_symbol", "Symbol"), t("explorer.th_issuer", "Issuer"), t("explorer.th_precision", "Precision"), t("explorer.th_supply", "Supply")], tableRows));
         var nav = el(doc, "div", null, "xplore-nav");
         if (stack.length > 0) {
-          var prev = touchable(el(doc, "button", "← Prev"));
+          var prev = touchable(el(doc, "button", t("explorer.prev", "← Prev")));
           prev.type = "button";
           prev.addEventListener("click", function () {
             var back = stack.slice(0, -1);
@@ -229,7 +243,7 @@ var ExplorerAssets = (function () {
           nav.appendChild(prev);
         }
         if (rows.length >= ASSETS_PAGE) {
-          var next = touchable(el(doc, "button", "Next →"));
+          var next = touchable(el(doc, "button", t("explorer.next", "Next →")));
           next.type = "button";
           next.addEventListener("click", function () {
             while (body.firstChild) body.removeChild(body.firstChild);
@@ -272,8 +286,8 @@ var ExplorerAssets = (function () {
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
-      showError(doc, body, e, "Could not load assets.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      showError(doc, body, e, t("explorer.assets_failed", "Could not load assets."));
+      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
         while (body.firstChild) body.removeChild(body.firstChild);
@@ -294,23 +308,23 @@ var ExplorerAssets = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
-      showError(doc, wrap, "Explorer backend missing: js/explorer.js failed to load.");
+      showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
       return;
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderAsset(root, symbol); })) return;
     if (typeof symbol !== "string" || !symbol) {
-      wrap.appendChild(el(doc, "h1", "Asset"));
-      showError(doc, wrap, new Error("unknown-asset"), "Unknown asset.");
+      wrap.appendChild(el(doc, "h1", t("explorer.asset_title", "Asset")));
+      showError(doc, wrap, new Error("unknown-asset"), t("explorer.unknown_asset", "Unknown asset."));
       return;
     }
-    wrap.appendChild(el(doc, "h1", "Asset " + symbol));
-    showStatus(doc, wrap, "Loading asset…");
+    wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+    showStatus(doc, wrap, t("explorer.loading_asset", "Loading asset…"));
     Explorer.asset(symbol).then(function (j) {
       if (!isCurrent(myGen)) return;
       var a = j.asset, dyn = j.dynamic || {};
       var prec = a.precision;
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", "Asset " + a.symbol));
+      wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
       var dl = el(doc, "dl", null, "xplore-fields");
       function humanRow(term, raw) {
         dl.appendChild(el(doc, "dt", term));
@@ -323,48 +337,48 @@ var ExplorerAssets = (function () {
         }
         dl.appendChild(dd);
       }
-      dl.appendChild(el(doc, "dt", "ID"));
+      dl.appendChild(el(doc, "dt", t("explorer.id_row", "ID")));
       var idDd = doc.createElement("dd");
       idDd.textContent = a.id;
       dl.appendChild(idDd);
-      dl.appendChild(el(doc, "dt", "Issuer"));
+      dl.appendChild(el(doc, "dt", t("explorer.issuer_row", "Issuer")));
       var issuerDd = doc.createElement("dd");
       issuerDd.appendChild((typeof a.issuer === "string" && ACCT_RE.test(a.issuer))
         ? ExplorerRender.accountLink(doc, a.issuer, myGen) : el(doc, "span", String(a.issuer)));
       dl.appendChild(issuerDd);
-      dl.appendChild(el(doc, "dt", "Precision"));
+      dl.appendChild(el(doc, "dt", t("explorer.precision_row", "Precision")));
       var pDd = doc.createElement("dd");
       pDd.textContent = String(prec);
       dl.appendChild(pDd);
       wrap.appendChild(dl);
       var dl2 = el(doc, "dl", null, "xplore-fields");
       wrap.appendChild(dl2);
-      humanRow("Max supply", a.options && a.options.max_supply);
-      humanRow("Current supply", dyn.current_supply);
-      humanRow("Accumulated fees", dyn.accumulated_fees);
-      humanRow("Fee pool", dyn.fee_pool);
+      humanRow(t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
+      humanRow(t("explorer.current_supply", "Current supply"), dyn.current_supply);
+      humanRow(t("explorer.accumulated_fees", "Accumulated fees"), dyn.accumulated_fees);
+      humanRow(t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
       var feeDd = doc.createElement("dd");
       var feeKey = a.options && a.options.market_fee_percent;
       if (feeKey !== undefined && /^\d+$/.test(String(feeKey))) {
         feeDd.textContent = pctHundredths(String(feeKey));
         feeDd.title = String(feeKey);
       } else feeDd.textContent = "—";
-      dl2.appendChild(el(doc, "dt", "Market fee"));
+      dl2.appendChild(el(doc, "dt", t("explorer.market_fee", "Market fee")));
       dl2.appendChild(feeDd);
       if (!j.is_smartcoin) {
-        wrap.appendChild(el(doc, "p", "Not a smartcoin — no price feeds.", "muted"));
+        wrap.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;
       }
-      wrap.appendChild(el(doc, "h3", "Price feeds"));
+      wrap.appendChild(el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
       var feedBox = el(doc, "div", null, "xplore-feed");
       wrap.appendChild(feedBox);
-      showStatus(doc, feedBox, "Loading feeds…");
+      showStatus(doc, feedBox, t("explorer.loading_feeds", "Loading feeds…"));
       Explorer.feeds([a.symbol]).then(function (rows) {
         if (!isCurrent(myGen)) return;
         while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild);
         var f = (rows || [])[0];
         if (!f || !f.is_smartcoin || !f.settlement_raw) {
-          feedBox.appendChild(el(doc, "p", "No live feeds published.", "muted"));
+          feedBox.appendChild(el(doc, "p", t("explorer.no_feeds", "No live feeds published."), "muted"));
           return;
         }
         var fdl = el(doc, "dl", null, "xplore-fields");
@@ -372,18 +386,18 @@ var ExplorerAssets = (function () {
           fdl.appendChild(el(doc, "dt", term));
           var dd = doc.createElement("dd");
           if (!pair || f.quote_precision === null || f.quote_precision === undefined) {
-            dd.textContent = "unavailable (quote precision unknown)";
+            dd.textContent = t("explorer.unavailable_quote", "unavailable (quote precision unknown)");
           } else {
             try {
               dd.textContent = Format.formatPrice(String(pair.base.amount), f.base_precision,
                 String(pair.quote.amount), f.quote_precision, PRICE_PLACES);
               dd.title = "base " + pair.base.amount + " / quote " + pair.quote.amount;
-            } catch (e) { dd.textContent = "unavailable"; }
+            } catch (e) { dd.textContent = t("explorer.unavailable", "unavailable"); }
           }
           fdl.appendChild(dd);
         }
-        priceRow("Settlement price", f.settlement_raw);
-        priceRow("Feed price", f.feed_raw);
+        priceRow(t("explorer.settlement_row", "Settlement price"), f.settlement_raw);
+        priceRow(t("explorer.feed_row", "Feed price"), f.feed_raw);
         var ctx = { gen: myGen, root: root, tab: "assets" };
         if (f.mssr_hundredths !== null && f.mssr_hundredths !== undefined) {
           ExplorerRender.fieldRow(doc, fdl, "maximum_short_squeeze_ratio", f.mssr_hundredths, ctx, 0);
@@ -392,14 +406,14 @@ var ExplorerAssets = (function () {
           ExplorerRender.fieldRow(doc, fdl, "maintenance_collateral_ratio", f.mcr, ctx, 0);
         }
         if (f.feed_lifetime_sec !== null && f.feed_lifetime_sec !== undefined) {
-          fdl.appendChild(el(doc, "dt", "Feed lifetime"));
+          fdl.appendChild(el(doc, "dt", t("explorer.feed_lifetime", "Feed lifetime")));
           var lt = doc.createElement("dd");
           lt.textContent = lifetimeText(f.feed_lifetime_sec);
-          lt.title = String(f.feed_lifetime_sec) + " seconds";
+          lt.title = String(f.feed_lifetime_sec) + t("explorer.seconds_unit", " seconds");
           fdl.appendChild(lt);
         }
         if (f.min_feeds !== null && f.min_feeds !== undefined) {
-          fdl.appendChild(el(doc, "dt", "Minimum feeds"));
+          fdl.appendChild(el(doc, "dt", t("explorer.min_feeds", "Minimum feeds")));
           var mf = doc.createElement("dd");
           mf.textContent = String(f.min_feeds);
           fdl.appendChild(mf);
@@ -408,13 +422,13 @@ var ExplorerAssets = (function () {
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild);
-        showError(doc, feedBox, e, "Could not load feeds.");
+        showError(doc, feedBox, e, t("explorer.feeds_failed", "Could not load feeds."));
       });
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", "Asset " + symbol));
-      showError(doc, wrap, e, "Unknown asset.");
+      wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+      showError(doc, wrap, e, t("explorer.unknown_asset", "Unknown asset."));
     });
   }
 
@@ -422,7 +436,7 @@ var ExplorerAssets = (function () {
    * rows (symbol, settlement, feed, MSSR). Verified empty state when the
    * chain has none (ambiguity C) — never faked, never blank. */
   function feedsTab(doc, body, root, myGen) {
-    showStatus(doc, body, "Scanning for smartcoins…");
+    showStatus(doc, body, t("explorer.scanning", "Scanning for smartcoins…"));
     var lower = "", pages = 0, found = [];
     function scan() {
       Explorer.assetsPage(lower, ASSETS_PAGE).then(function (rows) {
@@ -441,17 +455,17 @@ var ExplorerAssets = (function () {
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         while (body.firstChild) body.removeChild(body.firstChild);
-        showError(doc, body, e, "Could not scan assets.");
+        showError(doc, body, e, t("explorer.scan_failed", "Could not scan assets."));
       });
     }
     function paint() {
       while (body.firstChild) body.removeChild(body.firstChild);
       if (found.length === 0) {
         body.appendChild(el(doc, "p",
-          "No smartcoins with feeds found on this node. User-issued assets show here once they publish feeds.", "muted"));
+          t("explorer.no_smartcoins", "No smartcoins with feeds found on this node. User-issued assets show here once they publish feeds."), "muted"));
         return;
       }
-      showStatus(doc, body, "Loading feeds for " + found.length + " asset(s)…");
+      showStatus(doc, body, t("explorer.loading_feeds_for", "Loading feeds for ") + found.length + t("explorer.asset_count_suffix", " asset(s)…"));
       Explorer.feeds(found).then(function (rows) {
         if (!isCurrent(myGen)) return;
         while (body.firstChild) body.removeChild(body.firstChild);
@@ -469,11 +483,11 @@ var ExplorerAssets = (function () {
           return [sym, priceCell(f.settlement_raw), priceCell(f.feed_raw), mssr];
         });
         body.appendChild(scrollTable(doc,
-          ["Symbol", "Settlement", "Feed", "MSSR"], tableRows));
+          [t("explorer.th_symbol", "Symbol"), t("explorer.th_settlement", "Settlement"), t("explorer.th_feed", "Feed"), t("explorer.th_mssr", "MSSR")], tableRows));
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         while (body.firstChild) body.removeChild(body.firstChild);
-        showError(doc, body, e, "Could not load feeds.");
+        showError(doc, body, e, t("explorer.feeds_failed", "Could not load feeds."));
       });
     }
     scan();

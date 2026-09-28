@@ -7,13 +7,33 @@
  *   Chain, Store. Global InstantTradeUI only; gen counter tears down stale work.
  * Refs: App.jsx:639-648 (QUOTE_BASE per MarketRow.jsx:70); QuickTrade.jsx +
  *   QuickTradeHelper.js; confirm names <- popup.js:5724-5731; astro
- *   instant_trade.astro (Beet signing NOT copied). Deviations: fixed 1-year expiry,
- *   fill_or_kill=false, single orders only (scaled stays on the desk). P = BASE per
- *   1 QUOTE (trade-form.js). Money: integer strings + BigInt until render, Format only.
- * Created by: stub-queue build (matrix §A row A31).
+  *   instant_trade.astro (Beet signing NOT copied). Deviations: fixed 1-year expiry,
+  *   fill_or_kill=false, single orders only (scaled stays on the desk). P = BASE per
+  *   1 QUOTE (trade-form.js). Money: integer strings + BigInt until render, Format only.
+  * PUBLIC-FIRST (gate repair): no wallet gate — market/stats/book-best quote
+  *   renders locked; review previews as committee-account 1.2.0 with a viewing
+  *   notice (balance checks need the wallet, so they are skipped locked with an
+  *   honest warning). Password is asked only at Sign & Send (sign-time gate +
+  *   inline unlock).
+  * Created by: stub-queue build (matrix §A row A31).
  */
 var InstantTradeUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   var FEE_ASSET = "1.3.0";
   var PROVE_TIMEOUT_MS = 30000, PROVE_INTERVAL_MS = 2500, PRICE_PLACES = 8;
@@ -30,11 +50,11 @@ var InstantTradeUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    if (msg.indexOf("not connected") !== -1) msg = "Network unavailable. Check Settings → Nodes and retry.";
-    else if (msg.indexOf("wallet-locked") !== -1) msg = "Wallet is locked.";
-    else if (msg.indexOf("no-account") !== -1) msg = "No on-chain account found for the wallet's active key.";
-    else if (msg.indexOf("unknown-account") !== -1) msg = "Unknown market asset.";
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("instant.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("instant.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (msg.indexOf("wallet-locked") !== -1) msg = t("instant.wallet_is_locked", "Wallet is locked.");
+    else if (msg.indexOf("no-account") !== -1) msg = t("instant.no_on_chain_account_found_for_the_wallet_s_ac", "No on-chain account found for the wallet's active key.");
+    else if (msg.indexOf("unknown-account") !== -1) msg = t("instant.unknown_market_asset", "Unknown market asset.");
     var err = el(doc, "div", msg, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
@@ -65,7 +85,7 @@ var InstantTradeUI = (function () {
     var err = el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
-  function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : "none"; }
+  function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("instant.none", "none"); }
   /* Network label from Store (sole settings owner); mainnet when unreadable. */
   function networkName() {
     try {
@@ -88,9 +108,34 @@ var InstantTradeUI = (function () {
     while (v.length <= places) v = "0" + v;
     return places === 0 ? v : v.slice(0, -places) + "." + v.slice(-places); }
   function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+  /* Default viewing account while locked: committee-account 1.2.0 (a public
+   * chain object on testnet+mainnet, verified live 2026-09-28). Quotes stay
+   * public under it; signing gates at Sign & Send. Never throws. */
+  var VIEWING_AS_ID = "1.2.0", VIEWING_AS_NAME = "committee-account";
+  function isUnlockedNow() {
+    try {
+      if (typeof Wallet !== "undefined" && typeof Wallet.isUnlocked === "function") return !!Wallet.isUnlocked();
+      return !!(typeof Wallet !== "undefined" && Wallet.keys);
+    } catch (e) { return false; }
+  }
+  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
+    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
+    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var inp = doc.createElement("input");
+    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
+    inp.setAttribute("placeholder", t("instant.password", "Password ")); inp.setAttribute("aria-label", t("instant.password", "Password "));
+    touchable(inp); row.appendChild(inp);
+    var b = touchable(el(doc, "button", t("instant.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
+    parent.appendChild(row);
+    b.addEventListener("click", function () { b.disabled = true;
+      Wallet.unlock(inp.value).then(function () { inp.value = ""; if (onUnlock) onUnlock(); })
+        .catch(function (e) { b.disabled = false; showError(doc, parent, e, t("instant.unlock_failed", "Unlock failed")); });
+    });
+  }
 
   /* Route entry. Gates backends, waits for the shared socket (transfer-ui.js
-   * connect-wait pattern), unlock-gates, then paints the single-screen form. */
+   * connect-wait pattern), then paints the single-screen form.
+   * PUBLIC-FIRST: no wallet gate — the quote form renders locked. */
   function renderInstant(root, marketID) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -101,12 +146,12 @@ var InstantTradeUI = (function () {
     if (typeof Tx === "undefined" || !Tx || typeof Market === "undefined" || !Market ||
         typeof Account === "undefined" || !Account || typeof Wallet === "undefined" || !Wallet ||
         typeof Format === "undefined" || !Format) {
-      showError(doc, wrap, "Trade backend missing: js/tx.js, js/market.js, js/account.js, js/wallet.js or js/format.js failed to load.");
+      showError(doc, wrap, t("instant.trade_backend_missing_js_tx_js_js_market_js_j", "Trade backend missing: js/tx.js, js/market.js, js/account.js, js/wallet.js or js/format.js failed to load."));
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", "Instant Trade"));
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+      wrap.appendChild(el(doc, "p", t("instant.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -120,31 +165,8 @@ var InstantTradeUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), "Network unavailable.");
+        showError(doc, makeWrap(doc, root), new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
       }, 15000);
-      return;
-    }
-    if (typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked()) {
-      clearRoot(root);
-      var w0 = makeWrap(doc, root);
-      w0.appendChild(el(doc, "h1", "Instant Trade"));
-      w0.appendChild(el(doc, "p", "Unlock your wallet to trade.", "muted"));
-      var f = fieldRow(doc, "Password ", { id: "it-unlock-password", type: "password" });
-      w0.appendChild(f.row);
-      var btn = touchable(el(doc, "button", "Unlock"));
-      btn.id = "it-unlock-do"; btn.type = "button"; w0.appendChild(btn);
-      var errBox = el(doc, "div", null, "error");
-      errBox.setAttribute("aria-live", "polite"); w0.appendChild(errBox);
-      btn.addEventListener("click", function () {
-        errBox.textContent = ""; btn.disabled = true;
-        Promise.resolve().then(function () { return Wallet.unlock(f.input.value); })
-          .then(function () { if (myGen === gen) renderInstant(root, marketID); })
-          .catch(function (e) {
-            if (myGen !== gen) return;
-            btn.disabled = false;
-            errBox.textContent = (e && e.message) ? e.message : String(e || "Unlock failed");
-          });
-      });
       return;
     }
     paintTrade(doc, root, myGen, { marketID: (typeof marketID === "string" && marketID) ? marketID : "", side: "buy", amount: "", price: "", M: null });
@@ -156,47 +178,48 @@ var InstantTradeUI = (function () {
     if (myGen !== gen) return;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Instant Trade"));
-    wrap.appendChild(el(doc, "p", "Pick a market, choose a side, enter an amount. The price fills from the order book; review and sign one limit order.", "muted"));
+    wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.viewing_as_committee_account_1_2_0_unlock_to", "Viewing as committee-account (1.2.0) — unlock to trade as your account."), "muted"));
+    wrap.appendChild(el(doc, "p", t("instant.pick_a_market_choose_a_side_enter_an_amount_t", "Pick a market, choose a side, enter an amount. The price fills from the order book; review and sign one limit order."), "muted"));
     /* Order-type strip (dexux-ref LIMIT/SCALED shape): this view is
      * limit-only, so LIMIT is the active tab and SCALED links to the full
      * desk (existing route, no behavior change to the form itself). */
     var tabs = el(doc, "div", null, "order-tabs");
-    tabs.appendChild(el(doc, "span", "Limit", "order-tab-active"));
+    tabs.appendChild(el(doc, "span", t("instant.limit", "Limit"), "order-tab-active"));
     var scaledLink = doc.createElement("a");
-    scaledLink.textContent = "Scaled";
+    scaledLink.textContent = t("instant.scaled", "Scaled");
     scaledLink.setAttribute("href", "#/market/" + (P.marketID || "BTS_CNY"));
     tabs.appendChild(scaledLink);
     wrap.appendChild(tabs);
-    var mktF = fieldRow(doc, "Market (QUOTE_BASE) ", { id: "it-market", value: P.marketID, placeholder: "BTS_CNY", inputmode: "text" });
+    var mktF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) "), { id: "it-market", value: P.marketID, placeholder: "BTS_CNY", inputmode: "text" });
     wrap.appendChild(mktF.row);
-    var sideRow = el(doc, "div", null, "xfer-field"), sideLabel = el(doc, "label", "Side ");
+    var sideRow = el(doc, "div", null, "xfer-field"), sideLabel = el(doc, "label", t("instant.side", "Side "));
     var sideSel = doc.createElement("select");
-    [["buy", "Buy QUOTE (spend BASE)"], ["sell", "Sell QUOTE (receive BASE)"]].forEach(function (o) {
+    [["buy", t("instant.buy_quote_spend_base", "Buy QUOTE (spend BASE)")], ["sell", t("instant.sell_quote_receive_base", "Sell QUOTE (receive BASE)")]].forEach(function (o) {
       var opt = doc.createElement("option"); opt.value = o[0]; opt.textContent = o[1];
       if (o[0] === P.side) opt.selected = true;
       sideSel.appendChild(opt);
     });
     touchable(sideSel); sideLabel.appendChild(sideSel); sideRow.appendChild(sideLabel);
     wrap.appendChild(sideRow);
-    var loadBtn = touchable(el(doc, "button", "Load market"));
+    var loadBtn = touchable(el(doc, "button", t("instant.load_market", "Load market")));
     loadBtn.id = "it-load"; loadBtn.type = "button"; wrap.appendChild(loadBtn);
     var out = el(doc, "div"); wrap.appendChild(out);
     function load() {
       setFieldError(mktF, ""); out.innerHTML = "";
       P.marketID = mktF.input.value.trim(); P.side = sideSel.value;
-      if (!P.marketID) { setFieldError(mktF, "Enter a market like BTS_CNY."); return; }
+      if (!P.marketID) { setFieldError(mktF, t("instant.enter_a_market_like_bts_cny", "Enter a market like BTS_CNY.")); return; }
       loadBtn.disabled = true;
-      var status = showStatus(doc, out, "Loading market…");
+      var status = showStatus(doc, out, t("instant.loading_market", "Loading market…"));
       loadMarket(P.marketID).then(function (M) {
         if (myGen !== gen) return;
         P.M = M; paintLoaded(doc, root, myGen, P);
       }).catch(function (e) {
         if (myGen !== gen) return;
         out.removeChild(status); loadBtn.disabled = false;
-        var msg = (e && e.message) ? e.message : String(e || "Could not load the market.");
-        if (msg === "bad-market") msg = "Market must look like QUOTE_BASE (e.g. BTS_CNY).";
-        setFieldError(mktF, msg); showError(doc, out, msg, "Could not load the market.");
+        var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_load_the_market", "Could not load the market."));
+        if (msg === "bad-market") msg = t("instant.market_must_look_like_quote_base_e_g_bts_cny", "Market must look like QUOTE_BASE (e.g. BTS_CNY).");
+        setFieldError(mktF, msg); showError(doc, out, msg, t("instant.could_not_load_the_market", "Could not load the market."));
       });
     }
     loadBtn.addEventListener("click", load);
@@ -231,36 +254,39 @@ var InstantTradeUI = (function () {
     } catch (e) { /* strip keeps its default desk link */ }
     box.appendChild(el(doc, "p", "Trade " + ctx.quoteSym + " / " + ctx.baseSym + " — " + (P.side === "buy" ? "Buy " + ctx.quoteSym : "Sell " + ctx.quoteSym), "muted"));
     box.appendChild(el(doc, "p", "Latest: " + (M.stats && M.stats.latest ? M.stats.latest : "—") + " · Best bid: " + (M.bestBid || "—") + " · Best ask: " + (M.bestAsk || "—"), "muted"));
-    if (!M.bestBid && !M.bestAsk) box.appendChild(el(doc, "p", "The order book is empty — type a price manually.", "muted"));
+    if (!M.bestBid && !M.bestAsk) box.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
     if (!P.price) P.price = P.side === "buy" ? (M.bestAsk || "") : (M.bestBid || "");
-    var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal", unit: ctx.quoteSym });
+    var amountF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: ctx.quoteSym }), { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal", unit: ctx.quoteSym });
     box.appendChild(amountF.row);
-    var priceF = fieldRow(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal", unit: ctx.baseSym + " / " + ctx.quoteSym });
+    var priceF = fieldRow(doc, t("instant.price_tpl", "Price (%(base)s per %(quote)s) ", { base: ctx.baseSym, quote: ctx.quoteSym }), { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal", unit: ctx.baseSym + " / " + ctx.quoteSym });
     box.appendChild(priceF.row);
-    var reviewBtn = touchable(el(doc, "button", "Review order"));
+    var reviewBtn = touchable(el(doc, "button", t("instant.review_order", "Review order")));
     reviewBtn.id = "it-review"; reviewBtn.type = "button"; box.appendChild(reviewBtn);
     reviewBtn.addEventListener("click", function () {
       setFieldError(amountF, ""); setFieldError(priceF, "");
       P.amount = amountF.input.value; P.price = priceF.input.value;
       reviewBtn.disabled = true;
-      var status = showStatus(doc, box, "Checking balance and fee…");
+      var status = showStatus(doc, box, t("instant.checking_balance_and_fee", "Checking balance and fee…"));
       reviewOrder(P, M).then(function (R) { if (myGen === gen) paintConfirm(doc, root, myGen, P, M, R); })
         .catch(function (e) {
           if (myGen !== gen) return;
-          var msg = (e && e.message) ? e.message : String(e || "Could not prepare the order.");
+          var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_prepare_the_order", "Could not prepare the order."));
           if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 || msg.indexOf("Amount must be") === 0 || msg.indexOf("Insufficient") === 0) setFieldError(amountF, msg);
           else if (msg.indexOf("bad price") === 0 || msg.indexOf("Price must be") === 0) setFieldError(priceF, msg);
           box.removeChild(status); reviewBtn.disabled = false;
-          showError(doc, box, msg, "Could not prepare the order.");
+          showError(doc, box, msg, t("instant.could_not_prepare_the_order", "Could not prepare the order."));
         });
     });
   }
 
   /* Validate, balance-check, build unsigned op-1, live fee (ONE feeMulti).
-   * Amounts stay integer strings. */
+   * Amounts stay integer strings. Locked previews act as committee-account
+   * 1.2.0 with balance checks skipped (honest warn on the confirm); the
+   * Sign & Send gate requires unlock + a re-review under the wallet account. */
   async function reviewOrder(P, M) {
     var ctx = M.ctx, qp = ctx.quotePrec, bp = ctx.basePrec;
-    var myId = await Account.myAccountId();
+    var locked = !isUnlockedNow();
+    var myId = locked ? VIEWING_AS_ID : await Account.myAccountId();
     var me = await Account.resolve(myId).then(function (a) { return { id: myId, name: a.name }; });
     var quoteRaw;
     try { quoteRaw = Format.parseAmount(P.amount, qp); }
@@ -275,13 +301,16 @@ var InstantTradeUI = (function () {
     var recvAssetId = P.side === "buy" ? ctx.quote : ctx.base;
     var sellRaw = P.side === "buy" ? quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp) : quoteRaw;
     var recvRaw = P.side === "buy" ? quoteRaw : quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp);
-    if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(recvRaw)) throw new Error("Price is too small for this amount: one leg rounds to zero.");
+    if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(recvRaw)) throw new Error(t("instant.price_is_too_small_for_this_amount_one_leg_ro", "Price is too small for this amount: one leg rounds to zero."));
     var bals = await Account.balances(me.id), sellBal = null, feeHave = 0n;
     bals.forEach(function (b) {
       if (b.asset_id === sellAssetId) sellBal = b;
       if (b.asset_id === FEE_ASSET) feeHave = BigInt(b.raw);
     });
-    if (!sellBal || BigInt(sellBal.raw) < BigInt(sellRaw)) {
+    var previewWarn = null;
+    if (locked) {
+      previewWarn = t("instant.previewing_as_committee_account_balances_not_ch", "Previewing as committee-account (1.2.0) — balances not checked. Unlock to validate yours before signing.");
+    } else if (!sellBal || BigInt(sellBal.raw) < BigInt(sellRaw)) {
       throw new Error("Insufficient balance: have " + (sellBal ? Format.formatAmount(sellBal.raw, sellBal.precision) + " " + sellBal.symbol : "0") + ".");
     }
     var ops = [[Tx.OP.limit_order_create, {
@@ -292,17 +321,18 @@ var InstantTradeUI = (function () {
     var unsigned = await Tx.buildTx(ops), feeRes = await Tx.feeMulti(unsigned.operations, FEE_ASSET);
     var dbId = await Chain.db();
     var feeRows = await Chain.call(dbId, "get_assets", [[unsigned.operations[0][1].fee.asset_id]]);
-    if (!feeRows || !feeRows[0] || typeof feeRows[0].precision !== "number") throw new Error("bad-asset-shape for fee asset");
+    if (!feeRows || !feeRows[0] || typeof feeRows[0].precision !== "number") throw new Error(t("instant.bad_asset_shape_for_fee_asset", "bad-asset-shape for fee asset"));
     var feeMeta = { symbol: feeRows[0].symbol, precision: feeRows[0].precision };
     var feeRaw = BigInt(feeRes.totalRaw), sameAsset = unsigned.operations[0][1].fee.asset_id === sellAssetId;
     var need = sameAsset ? BigInt(sellRaw) + feeRaw : feeRaw;
-    if ((sameAsset ? BigInt(sellBal.raw) : feeHave) < need) {
+    if (!locked && (sameAsset ? BigInt(sellBal.raw) : feeHave) < need) {
       throw new Error("Insufficient " + feeMeta.symbol + " for the fee: need " + Format.formatAmount(need.toString(), feeMeta.precision) + " " + feeMeta.symbol + ".");
     }
     return {
       me: me, ratio: ratio, sellAssetId: sellAssetId, recvAssetId: recvAssetId,
       sellRaw: sellRaw, recvRaw: recvRaw, expWire: expWire,
-      unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta
+      unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta,
+      previewWarn: previewWarn
     };
   }
 
@@ -313,7 +343,7 @@ var InstantTradeUI = (function () {
     var ctx = M.ctx;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Confirm order"));
+    wrap.appendChild(el(doc, "h1", t("instant.confirm_order", "Confirm order")));
     var list = el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(el(doc, "dt", term));
@@ -322,50 +352,59 @@ var InstantTradeUI = (function () {
     var recvHuman = Format.formatAmount(R.recvRaw, R.recvAssetId === ctx.base ? ctx.basePrec : ctx.quotePrec);
     var sellS = R.sellAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
     var recvS = R.recvAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
-    row("Side", (P.side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
-    row("Seller", R.me.name + " (" + R.me.id + ")");
-    row("Price", ratioToDec(R.ratio.num, R.ratio.den, PRICE_PLACES) + " " + ctx.baseSym + " per " + ctx.quoteSym, R.ratio.num.toString() + "/" + R.ratio.den.toString());
-    row("Amount", (P.side === "buy" ? recvHuman : sellHuman) + " " + ctx.quoteSym);
-    row("Total", (P.side === "buy" ? sellHuman : recvHuman) + " " + ctx.baseSym);
-    row("Sell (Amount to Sell)", sellHuman + " " + sellS, R.sellRaw);
-    row("Buy (Min to Receive)", recvHuman + " " + recvS, R.recvRaw);
-    row("Fee", Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw);
-    row("Expiration", R.expWire + " (1 year)");
-    row("Fill or Kill", "No");
-    row("Network", networkName());
+    row(t("instant.side_2", "Side"), (P.side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
+    row(t("instant.seller", "Seller"), R.me.name + " (" + R.me.id + ")");
+    row(t("instant.price", "Price"), ratioToDec(R.ratio.num, R.ratio.den, PRICE_PLACES) + " " + ctx.baseSym + " per " + ctx.quoteSym, R.ratio.num.toString() + "/" + R.ratio.den.toString());
+    row(t("instant.amount", "Amount"), (P.side === "buy" ? recvHuman : sellHuman) + " " + ctx.quoteSym);
+    row(t("instant.total", "Total"), (P.side === "buy" ? sellHuman : recvHuman) + " " + ctx.baseSym);
+    row(t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + sellS, R.sellRaw);
+    row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), recvHuman + " " + recvS, R.recvRaw);
+    row(t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw);
+    row(t("instant.expiration", "Expiration"), R.expWire + " (1 year)");
+    row(t("instant.fill_or_kill", "Fill or Kill"), t("instant.no", "No"));
+    row(t("instant.network", "Network"), networkName());
     wrap.appendChild(list);
-    var backBtn = touchable(el(doc, "button", "Back"));
+    if (R.previewWarn) wrap.appendChild(el(doc, "p", R.previewWarn, "error"));
+    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.wallet_locked_preview_only_password_is_asked", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    var backBtn = touchable(el(doc, "button", t("instant.back", "Back")));
     backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Send"));
+    var sendBtn = touchable(el(doc, "button", t("instant.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintTrade(doc, root, myGen, P); });
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true; sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, "Signing…");
+      var status = showStatus(doc, wrap, t("instant.signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) {
-        wrap.removeChild(status); showError(doc, wrap, new Error("wallet-locked"), "Wallet is locked.");
-        backBtn.disabled = false; return;
+      if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+        wrap.removeChild(status);
+        if (!wrap.querySelector || !wrap.querySelector(".xfer-sign-note")) {
+          var note = el(doc, "p", t("instant.wallet_is_locked_unlock_to_sign_the_preview", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          note.className = "muted xfer-sign-note"; wrap.appendChild(note);
+        }
+        unlockInline(doc, wrap, function () {
+          wrap.appendChild(el(doc, "p", t("instant.unlocked_press_back_and_review_again_so_the", "Unlocked — press Back and review again so the order uses your account."), "muted"));
+        });
+        backBtn.disabled = false; sendBtn.disabled = false; return;
       }
       var before;
       Promise.resolve().then(function () { return snapshotIds(R.me.id); })
         .then(function (s) { before = s; return Tx.sign(R.unsigned, wif); })
         .then(function (signed) {
-          status.textContent = "Broadcasting…";
+          status.textContent = t("instant.broadcasting", "Broadcasting…");
           return sendTx(signed, proveNewOrder(R.me.id, before, R.sellAssetId, R.sellRaw));
         })
         .then(function (res) {
           if (myGen !== gen) return;
           clearRoot(root);
           var done = makeWrap(doc, root);
-          done.appendChild(el(doc, "h1", "Order placed"));
+          done.appendChild(el(doc, "h1", t("instant.order_placed", "Order placed")));
           done.appendChild(el(doc, "p", "Order " + res.found.id + " is on the book (" + ctx.quoteSym + "/" + ctx.baseSym + ")."));
           done.appendChild(el(doc, "p", "Observed at head block #" + String(res.head) + " via " + res.via + ".", "muted"));
-          var again = touchable(el(doc, "button", "Trade again"));
+          var again = touchable(el(doc, "button", t("instant.trade_again", "Trade again")));
           again.id = "it-again"; again.type = "button"; done.appendChild(again);
           var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
           deskA.href = "#/market/" + ctx.quoteSym + "_" + ctx.baseSym;
-          deskA.textContent = "Open the full desk";
+          deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
           deskP.appendChild(deskA); done.appendChild(deskP);
           again.addEventListener("click", function () {
             if (myGen === gen) paintTrade(doc, root, myGen, { marketID: "", side: "buy", amount: "", price: "", M: null });
@@ -373,7 +412,7 @@ var InstantTradeUI = (function () {
         })
         .catch(function (e) {
           if (myGen !== gen) return;
-          wrap.removeChild(status); showError(doc, wrap, e, "Order failed.");
+          wrap.removeChild(status); showError(doc, wrap, e, t("instant.order_failed", "Order failed."));
           backBtn.disabled = false; sendBtn.disabled = false;
         });
     });

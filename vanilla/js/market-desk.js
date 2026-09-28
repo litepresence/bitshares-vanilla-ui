@@ -42,6 +42,17 @@ var MarketDesk = (function () {
   var _timer = null;
   var _cleanups = [];
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -111,19 +122,19 @@ var MarketDesk = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
     if (msg.indexOf("bad-market") !== -1) {
       msg = "Unknown market. Check the QUOTE_BASE pair (e.g. " + defaultMarket() + ").";
     } else if (msg.indexOf("bad-asset-shape") !== -1) {
-      msg = "Unexpected asset data from the node; stopped instead of guessing.";
+      msg = t("market.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     } else if (msg.indexOf("history-unavailable") !== -1) {
-      msg = "History unavailable on this node (fills and charts need the history plugin).";
+      msg = t("market.err_history", "History unavailable on this node (fills and charts need the history plugin).");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("market.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -136,7 +147,7 @@ var MarketDesk = (function () {
     var d = doc.createElement("details");
     d.className = "raw";
     var s = doc.createElement("summary");
-    s.setAttribute("aria-label", label || "Show raw JSON");
+    s.setAttribute("aria-label", label || t("market.raw_fallback", "Show raw JSON"));
     touchable(s);
     d.appendChild(s);
     var pre = doc.createElement("pre");
@@ -169,12 +180,12 @@ var MarketDesk = (function () {
         typeof MarketCharts === "undefined" || !MarketCharts ||
         typeof MarketPicker === "undefined" || !MarketPicker ||
         typeof MarketInd === "undefined" || !MarketInd) {
-      showError(doc, wrap, "Market backend missing: js/market.js, js/format.js, js/indicators.js, js/market-charts.js, js/market-picker.js or js/market-ind.js failed to load.");
+      showError(doc, wrap, t("market.backend_missing", "Market backend missing: js/market.js, js/format.js, js/indicators.js, js/market-charts.js, js/market-picker.js or js/market-ind.js failed to load."));
       return;
     }
     if (typeof marketID !== "string" || !marketID) {
-      wrap.appendChild(el(doc, "h1", "Exchange"));
-      wrap.appendChild(el(doc, "p", "Pick a market to start.", "muted"));
+      wrap.appendChild(el(doc, "h1", t("market.title", "Exchange")));
+      wrap.appendChild(el(doc, "p", t("market.pick_to_start", "Pick a market to start."), "muted"));
       var emptySec = doc.createElement("section");
       emptySec.className = "mkt-side";
       wrap.appendChild(emptySec);
@@ -185,8 +196,8 @@ var MarketDesk = (function () {
     try {
       pair = Market.parseId(marketID);
     } catch (e) {
-      wrap.appendChild(el(doc, "h1", "Market not found"));
-      showError(doc, wrap, e, "Unknown market.");
+      wrap.appendChild(el(doc, "h1", t("market.not_found", "Market not found")));
+      showError(doc, wrap, e, t("market.err_unknown", "Unknown market."));
       return;
     }
     var id = (pair.quote + "_" + pair.base).toUpperCase();
@@ -195,7 +206,7 @@ var MarketDesk = (function () {
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", "Connecting to network…", "muted"));
+      wrap.appendChild(el(doc, "p", t("market.connecting", "Connecting to network…"), "muted"));
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled) return;
@@ -209,9 +220,9 @@ var MarketDesk = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
         var failed = makeWrap(doc, root);
-        failed.appendChild(el(doc, "h1", "Exchange"));
-        showError(doc, failed, new Error("not connected"), "Network unavailable.");
-        var retry = touchable(el(doc, "button", "Retry"));
+        failed.appendChild(el(doc, "h1", t("market.title", "Exchange")));
+        showError(doc, failed, new Error("not connected"), t("market.err_offline_short", "Network unavailable."));
+        var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
         retry.id = "mkt-retry";
         retry.type = "button";
         retry.addEventListener("click", function () { renderMarket(root, id); });
@@ -251,7 +262,7 @@ var MarketDesk = (function () {
     head.className = "mkt-head";
     desk.appendChild(head);
     head.appendChild(el(doc, "h1", pair.quote + " / " + pair.base));
-    var sub = el(doc, "p", "Loading market…", "muted");
+    var sub = el(doc, "p", t("market.loading", "Loading market…"), "muted");
     head.appendChild(sub);
     /* Slice-16 bell: price-alert entry point (ExchangeHeader.jsx:210-232
      * shape, link flavour — opens #/alerts, never a modal). Optional: the
@@ -276,13 +287,13 @@ var MarketDesk = (function () {
     var chartsSec = doc.createElement("section");
     chartsSec.className = "mkt-charts";
     desk.appendChild(chartsSec);
-    chartsSec.appendChild(el(doc, "h2", "Charts"));
+    chartsSec.appendChild(el(doc, "h2", t("market.charts", "Charts")));
 
     /* Timeframe radios (from the live bucket list) + candle count note. */
     var tfBox = doc.createElement("div");
     tfBox.className = "mkt-tfrow";
     tfBox.setAttribute("role", "radiogroup");
-    tfBox.setAttribute("aria-label", "Candle timeframe");
+    tfBox.setAttribute("aria-label", t("market.timeframe_label", "Candle timeframe"));
     chartsSec.appendChild(tfBox);
     state.tfBox = tfBox;
     var countNote = el(doc, "p", "", "muted mkt-count-note");
@@ -294,7 +305,7 @@ var MarketDesk = (function () {
     var indRow = doc.createElement("div");
     indRow.className = "mkt-indrow";
     chartsSec.appendChild(indRow);
-    [["sma", "SMA"], ["ema", "EMA"], ["bb", "BB"], ["psar", "PSAR"]].forEach(function (def) {
+    [["sma", t("market.ov_sma", "SMA")], ["ema", t("market.ov_ema", "EMA")], ["bb", t("market.ov_bb", "BB")], ["psar", t("market.ov_psar", "PSAR")]].forEach(function (def) {
       var lab = doc.createElement("label");
       lab.className = "mkt-ind";
       var box = doc.createElement("input");
@@ -315,21 +326,21 @@ var MarketDesk = (function () {
     var logBox = doc.createElement("input");
     logBox.type = "checkbox";
     logBox.checked = false;
-    logBox.setAttribute("aria-label", "Logarithmic price scale");
+    logBox.setAttribute("aria-label", t("market.log_scale_label", "Logarithmic price scale"));
     touchable(logBox);
     logBox.addEventListener("change", function () {
       state.logScale = logBox.checked;
       MarketInd.drawCharts(state);
     });
     logLab.appendChild(logBox);
-    logLab.appendChild(el(doc, "span", "Log"));
+    logLab.appendChild(el(doc, "span", t("market.log_label", "Log")));
     indRow.appendChild(logLab);
     /* Invert toggle (ported from DEX-UX): re-render the swapped QUOTE_BASE
      * pair via the hash router — cheap, no state to keep in sync. */
-    var invBtn = touchable(el(doc, "button", "Invert"));
+    var invBtn = touchable(el(doc, "button", t("market.invert", "Invert")));
     invBtn.type = "button";
     invBtn.id = "mkt-invert";
-    invBtn.setAttribute("aria-label", "Invert market pair");
+    invBtn.setAttribute("aria-label", t("market.invert_label", "Invert market pair"));
     invBtn.addEventListener("click", function () {
       try {
         var p = Market.parseId(state.id);
@@ -355,7 +366,7 @@ var MarketDesk = (function () {
     var oscRow = doc.createElement("div");
     oscRow.className = "mkt-oscrow";
     oscRow.setAttribute("role", "group");
-    oscRow.setAttribute("aria-label", "Oscillators and volume");
+    oscRow.setAttribute("aria-label", t("market.osc_group_label", "Oscillators and volume"));
     chartsSec.appendChild(oscRow);
     MarketInd.OSC_ORDER.forEach(function (def) {
       var key = def[0], label = def[1];
@@ -401,14 +412,14 @@ var MarketDesk = (function () {
     var bookSec = doc.createElement("section");
     bookSec.className = "mkt-book";
     desk.appendChild(bookSec);
-    bookSec.appendChild(el(doc, "h2", "Order book"));
+    bookSec.appendChild(el(doc, "h2", t("market.order_book", "Order book")));
     var bookBody = doc.createElement("div");
     bookSec.appendChild(bookBody);
 
     var tradesSec = doc.createElement("section");
     tradesSec.className = "mkt-trades";
     desk.appendChild(tradesSec);
-    tradesSec.appendChild(el(doc, "h2", "Recent trades"));
+    tradesSec.appendChild(el(doc, "h2", t("market.recent_trades", "Recent trades")));
     var tradesBody = doc.createElement("div");
     tradesSec.appendChild(tradesBody);
 
@@ -422,7 +433,7 @@ var MarketDesk = (function () {
     var ordersSec = doc.createElement("section");
     ordersSec.className = "mkt-orders";
     desk.appendChild(ordersSec);
-    ordersSec.appendChild(el(doc, "h2", "My open orders"));
+    ordersSec.appendChild(el(doc, "h2", t("market.my_orders", "My open orders")));
     var ordersBody = doc.createElement("div");
     ordersSec.appendChild(ordersBody);
 
@@ -431,13 +442,13 @@ var MarketDesk = (function () {
     var tradeSec = doc.createElement("section");
     tradeSec.className = "trade";
     desk.appendChild(tradeSec);
-    tradeSec.appendChild(el(doc, "h2", "Trade"));
+    tradeSec.appendChild(el(doc, "h2", t("trade.heading", "Trade")));
     var tradeMount = doc.createElement("div");
     tradeSec.appendChild(tradeMount);
 
     var foot = doc.createElement("div");
     foot.className = "mkt-foot";
-    var refreshBtn = touchable(el(doc, "button", "Refresh"));
+    var refreshBtn = touchable(el(doc, "button", t("market.refresh", "Refresh")));
     refreshBtn.id = "mkt-refresh";
     refreshBtn.type = "button";
     foot.appendChild(refreshBtn);
@@ -561,8 +572,8 @@ var MarketDesk = (function () {
       MarketInd.maybeDraw(state);
     }).catch(function (e) {
       while (state.bookBody.firstChild) state.bookBody.removeChild(state.bookBody.firstChild);
-      showError(doc, state.bookBody, e, "Could not load the order book.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      showError(doc, state.bookBody, e, t("market.fail_book", "Could not load the order book."));
+      var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () { fill(state); });
       state.bookBody.appendChild(retry);
@@ -587,19 +598,19 @@ var MarketDesk = (function () {
         }
       } catch (e) { /* notify optional here */ }
       while (state.statsBox.firstChild) state.statsBox.removeChild(state.statsBox.firstChild);
-      state.statsBox.appendChild(el(doc, "h2", "24h stats"));
+      state.statsBox.appendChild(el(doc, "h2", t("market.stats_24h", "24h stats")));
       var dl = el(doc, "dl", null, "mkt-stats");
       function row(term, text) {
         if (text === null || text === undefined || text === "") return;
         dl.appendChild(el(doc, "dt", term));
         dl.appendChild(el(doc, "dd", String(text)));
       }
-      row("Latest", st.latest);
-      row("Best bid", st.highestBid);
-      row("Best ask", st.lowestAsk);
+      row(t("market.stat_latest", "Latest"), st.latest);
+      row(t("market.stat_best_bid", "Best bid"), st.highestBid);
+      row(t("market.stat_best_ask", "Best ask"), st.lowestAsk);
       if (st.raw) {
         if (st.raw.percent_change !== undefined && st.raw.percent_change !== null) {
-          row("24h change %", st.raw.percent_change);
+          row(t("market.stat_chg_pct", "24h change %"), st.raw.percent_change);
         }
         if (st.raw.base_volume !== undefined && st.raw.base_volume !== null) {
           row("24h volume (" + b.symbol + ")", st.raw.base_volume);
@@ -612,7 +623,7 @@ var MarketDesk = (function () {
       rawDetails(doc, state.statsBox, "Raw ticker", st.raw);
     }).catch(function (e) {
       while (state.statsBox.firstChild) state.statsBox.removeChild(state.statsBox.firstChild);
-      showError(doc, state.statsBox, e, "Could not load market stats.");
+      showError(doc, state.statsBox, e, t("market.fail_stats", "Could not load market stats."));
     });
 
     Market.trades(b.id, q.id, 30).then(function (rows) {
@@ -622,7 +633,7 @@ var MarketDesk = (function () {
       done();
     }).catch(function (e) {
       while (state.tradesBody.firstChild) state.tradesBody.removeChild(state.tradesBody.firstChild);
-      showError(doc, state.tradesBody, e, "Could not load recent trades.");
+      showError(doc, state.tradesBody, e, t("market.fail_trades", "Could not load recent trades."));
       MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
       done();
     });
@@ -641,7 +652,7 @@ var MarketDesk = (function () {
         MarketInd.paintTimeframes(doc, state, function () { fill(state); });
       }).catch(function () {
         while (state.tfBox.firstChild) state.tfBox.removeChild(state.tfBox.firstChild);
-        state.tfBox.appendChild(el(doc, "span", "Timeframes unavailable on this node.", "muted"));
+        state.tfBox.appendChild(el(doc, "span", t("market.fail_timeframes", "Timeframes unavailable on this node."), "muted"));
         MarketInd.paintCountNote(state);
       });
     }

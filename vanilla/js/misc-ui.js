@@ -24,10 +24,25 @@
  */
 var MiscUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   /* Shared-_ui accessor: ProposalUI._ui (proposal-ui.js loads first); throws proposal-ui-missing otherwise. */
   function U() {
-    if (typeof ProposalUI === "undefined" || !ProposalUI._ui) throw new Error("proposal-ui-missing (proposal-ui.js first)");
+    if (typeof ProposalUI === "undefined" || !ProposalUI._ui) throw new Error(t("misc.proposal_ui_missing_proposal_ui_js_first", "proposal-ui-missing (proposal-ui.js first)"));
     return ProposalUI._ui;
   }
   /* Two-counter liveness: own gen (this route) + ProposalUI uiGen (shared gate). */
@@ -41,15 +56,15 @@ var MiscUI = (function () {
       root.innerHTML = "";
       var d0 = root.ownerDocument || document, w0 = d0.createElement("div");
       w0.className = "wrap"; root.appendChild(w0);
-      w0.appendChild(d0.createTextNode("Vesting backend missing: proposal-ui.js failed to load."));
+      w0.appendChild(d0.createTextNode(t("misc.vesting_backend_missing_proposal_ui_js_failed", "Vesting backend missing: proposal-ui.js failed to load.")));
       return null;
     }
   }
   function iso16(v) { v = String(v || "").trim(); return v.length === 16 ? v + ":00" : v; }
   function dateHuman(iso) {
-    if (!iso) return "none";
-    var t = Date.parse(/Z$/.test(iso) ? iso : iso + "Z");
-    return isNaN(t) ? String(iso) : new Date(t).toLocaleString();
+    if (!iso) return t("misc.none", "none");
+    var ts = Date.parse(/Z$/.test(iso) ? iso : iso + "Z");
+    return isNaN(ts) ? String(iso) : new Date(ts).toLocaleString();
   }
   /* Op-type number -> "N (name)" via ProposalUI.opName (same table the
    * proposal desk uses); degrades to the bare number if unavailable. */
@@ -65,44 +80,48 @@ var MiscUI = (function () {
     if (!root) return;
     var ui = entry(root);
     if (!ui) return;
-    var ctx = ui.routeReady(root, "Custom Authorities", function () { renderAuthorities(root); },
+    var ctx = ui.routeReady(root, t("misc.custom_authorities", "Custom Authorities"), function () { renderAuthorities(root); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
-    ctx.wrap.appendChild(ui.el(doc, "p", "Custom authorities restrict which operations an account key may sign. The chain has no list method — look authorities up by explicit 1.17.x id. Issuer-only override_transfer (op 38) is not offered here.", "muted"));
-    var fA = ui.field(doc, "Account or authority id", { placeholder: "name, 1.2.N or 1.17.N" });
+    ctx.wrap.appendChild(ui.el(doc, "p", t("misc.custom_authorities_restrict_which_operations", "Custom authorities restrict which operations an account key may sign. The chain has no list method — look authorities up by explicit 1.17.x id. Issuer-only override_transfer (op 38) is not offered here."), "muted"));
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        ctx.wrap.appendChild(ui.el(doc, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+    } catch (e) { /* notice is display-only */ }
+    var fA = ui.field(doc, t("misc.account_or_authority_id", "Account or authority id"), { placeholder: t("misc.name_1_2_n_or_1_17_n", "name, 1.2.N or 1.17.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
-    var go = ui.touchable(ui.el(doc, "button", "Look up")); go.type = "button"; ctx.wrap.appendChild(go);
+    var go = ui.touchable(ui.el(doc, "button", t("misc.look_up", "Look up"))); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
     /* Authority detail table + Update/Delete boxes (blank update fields = unchanged). Params: a (authority row). */
     function drawAuth(a) {
       ui.clearBox(box);
-      box.appendChild(ui.deskTable(doc, ["Field", "Value"], [
-        { cells: [{ text: "ID" }, { text: String(a.id) }], cardLines: ["ID " + String(a.id)] },
-        { cells: [{ text: "Account" }, { text: String(a.account || "?") }], cardLines: ["Account " + String(a.account || "?")] },
-        { cells: [{ text: "Enabled" }, { text: a.enabled ? "yes" : "no" }], cardLines: ["Enabled: " + (a.enabled ? "yes" : "no")] },
-        { cells: [{ text: "Valid" }, { text: dateHuman(a.valid_from) + " → " + dateHuman(a.valid_to) }],
+      box.appendChild(ui.deskTable(doc, [t("misc.field", "Field"), t("misc.value", "Value")], [
+        { cells: [{ text: t("misc.id", "ID") }, { text: String(a.id) }], cardLines: ["ID " + String(a.id)] },
+        { cells: [{ text: t("misc.account", "Account") }, { text: String(a.account || "?") }], cardLines: ["Account " + String(a.account || "?")] },
+        { cells: [{ text: t("misc.enabled", "Enabled") }, { text: a.enabled ? "yes" : "no" }], cardLines: ["Enabled: " + (a.enabled ? t("misc.yes", "yes") : t("misc.no", "no"))] },
+        { cells: [{ text: t("misc.valid", "Valid") }, { text: dateHuman(a.valid_from) + " → " + dateHuman(a.valid_to) }],
           cardLines: ["Valid " + dateHuman(a.valid_from) + " → " + dateHuman(a.valid_to)] },
-        { cells: [{ text: "Operation type" }, { text: String(a.operation_type) }], cardLines: ["Operation type " + String(a.operation_type)] },
-        { cells: [{ text: "Restrictions" }, { text: String((a.restrictions || []).length) }], cardLines: [String((a.restrictions || []).length) + " restriction(s)"] }]));
-      var up = ui.touchable(ui.el(doc, "button", "Update")); up.type = "button"; box.appendChild(up);
-      var del = ui.touchable(ui.el(doc, "button", "Delete")); del.type = "button"; box.appendChild(del);
+        { cells: [{ text: t("misc.operation_type", "Operation type") }, { text: String(a.operation_type) }], cardLines: ["Operation type " + String(a.operation_type)] },
+        { cells: [{ text: t("misc.restrictions", "Restrictions") }, { text: String((a.restrictions || []).length) }], cardLines: [String((a.restrictions || []).length) + " restriction(s)"] }]));
+      var up = ui.touchable(ui.el(doc, "button", t("misc.update", "Update"))); up.type = "button"; box.appendChild(up);
+      var del = ui.touchable(ui.el(doc, "button", t("misc.delete", "Delete"))); del.type = "button"; box.appendChild(del);
       var o2 = ui.el(doc, "div", null, "xfer-out"); box.appendChild(o2);
       up.addEventListener("click", function () {
         if (!live(myGen, uiGen)) return;
         ui.clearBox(o2);
-        o2.appendChild(ui.el(doc, "p", "Blank = leave unchanged. Only changed fields are sent.", "muted"));
+        o2.appendChild(ui.el(doc, "p", t("misc.blank_leave_unchanged_only_changed_fields_are", "Blank = leave unchanged. Only changed fields are sent."), "muted"));
         var sE = doc.createElement("select"); ui.touchable(sE);
-        [["", "enabled: unchanged"], ["true", "enabled: yes"], ["false", "enabled: no"]].forEach(function (o) {
+        [["", t("misc.enabled_unchanged", "enabled: unchanged")], ["true", t("misc.enabled_yes", "enabled: yes")], ["false", t("misc.enabled_no", "enabled: no")]].forEach(function (o) {
           var op = doc.createElement("option"); op.value = o[0]; op.textContent = o[1]; sE.appendChild(op);
         });
         o2.appendChild(sE);
-        var vF = ui.field(doc, "New valid-from (blank = keep)", { type: "datetime-local" });
-        var vT = ui.field(doc, "New valid-to (blank = keep)", { type: "datetime-local" });
-        var vTh = ui.field(doc, "New threshold (blank = keep)", { placeholder: "", inputmode: "numeric" });
+        var vF = ui.field(doc, t("misc.new_valid_from_blank_keep", "New valid-from (blank = keep)"), { type: "datetime-local" });
+        var vT = ui.field(doc, t("misc.new_valid_to_blank_keep", "New valid-to (blank = keep)"), { type: "datetime-local" });
+        var vTh = ui.field(doc, t("misc.new_threshold_blank_keep", "New threshold (blank = keep)"), { placeholder: "", inputmode: "numeric" });
         o2.appendChild(vF.row); o2.appendChild(vT.row); o2.appendChild(vTh.row);
         var ibox = ui.el(doc, "div"); o2.appendChild(ibox);
-        ui.reviewSection(doc, ibox, uiGen, "Review update", {
+        ui.reviewSection(doc, ibox, uiGen, t("misc.review_update", "Review update"), {
           build: async function () {
             var th = vTh.input.value.trim();
             var authOrNull = th === "" ? null : { weight_threshold: parseInt(th, 10), account_auths: [], key_auths: [], address_auths: [] };
@@ -114,18 +133,18 @@ var MiscUI = (function () {
             return { pair: pair, fee: pair[1].fee,
               prove: async function () { return ProposalMisc.authority(String(a.id)); } };
           },
-          title: "Confirm authority update (op 55)",
+          title: t("misc.confirm_authority_update_op_55", "Confirm authority update (op 55)"),
           rows: function (built, f) {
-            var r = [["Authority", String(a.id)], ["Account", String(a.account)]];
-            if (sE.value !== "") r.push(["Enabled", (a.enabled ? "yes" : "no") + " → " + (sE.value === "true" ? "yes" : "no")]);
-            if (vF.input.value.trim() !== "") r.push(["Valid-from", dateHuman(a.valid_from) + " → " + dateHuman(iso16(vF.input.value))]);
-            if (vT.input.value.trim() !== "") r.push(["Valid-to", dateHuman(a.valid_to) + " → " + dateHuman(iso16(vT.input.value))]);
-            if (vTh.input.value.trim() !== "") r.push(["Threshold", "→ " + vTh.input.value.trim()]);
-            if (r.length === 2) r.push(["Changed fields", "none — this would be a no-op"]);
-            r.push(["Fee (live)", f]);
+            var r = [[t("misc.authority", "Authority"), String(a.id)], [t("misc.account", "Account"), String(a.account)]];
+            if (sE.value !== "") r.push([t("misc.enabled", "Enabled"), (a.enabled ? t("misc.yes", "yes") : t("misc.no", "no")) + " → " + (sE.value === "true" ? t("misc.yes", "yes") : t("misc.no", "no"))]);
+            if (vF.input.value.trim() !== "") r.push([t("misc.valid_from", "Valid-from"), dateHuman(a.valid_from) + " → " + dateHuman(iso16(vF.input.value))]);
+            if (vT.input.value.trim() !== "") r.push([t("misc.valid_to", "Valid-to"), dateHuman(a.valid_to) + " → " + dateHuman(iso16(vT.input.value))]);
+            if (vTh.input.value.trim() !== "") r.push([t("misc.threshold", "Threshold"), "→ " + vTh.input.value.trim()]);
+            if (r.length === 2) r.push([t("misc.changed_fields", "Changed fields"), t("misc.none_this_would_be_a_no_op", "none — this would be a no-op")]);
+            r.push([t("misc.fee_live", "Fee (live)"), f]);
             return r;
           },
-          ok: function () { return "Authority updated and re-read on chain."; } });
+          ok: function () { return t("misc.authority_updated_and_re_read_on_chain", "Authority updated and re-read on chain."); } });
       });
       del.addEventListener("click", function () {
         if (!live(myGen, uiGen)) return;
@@ -140,38 +159,38 @@ var MiscUI = (function () {
                 catch (e) { return String((e && e.message) || e).indexOf("unknown-authority") !== -1 ? { gone: true } : null; }
               } };
           },
-          title: "Confirm authority delete (op 56)",
-          rows: function (built, f) { return [["Authority", String(a.id)], ["Account", String(a.account)], ["Fee (live)", f]]; },
-          ok: function () { return "Authority deleted (re-read confirms it is gone)."; } });
+          title: t("misc.confirm_authority_delete_op_56", "Confirm authority delete (op 56)"),
+          rows: function (built, f) { return [[t("misc.authority", "Authority"), String(a.id)], [t("misc.account", "Account"), String(a.account)], [t("misc.fee_live", "Fee (live)"), f]]; },
+          ok: function () { return t("misc.authority_deleted_re_read_confirms_it_is_gone", "Authority deleted (re-read confirms it is gone)."); } });
       });
     }
     go.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; go.disabled = true; ui.clearBox(box);
-      ui.showStatus(doc, box, "Loading…");
+      ui.showStatus(doc, box, t("misc.loading", "Loading…"));
       ProposalMisc.authorities(fA.input.value.trim() || "").then(function (rows) {
         if (!live(myGen, uiGen)) return;
         ui.clearBox(box);
-        if (!rows.length) { box.appendChild(ui.el(doc, "p", "No authorities listed — the chain has no list method, so enter an explicit 1.17.x id.", "muted")); go.disabled = false; return; }
+        if (!rows.length) { box.appendChild(ui.el(doc, "p", t("misc.no_authorities_listed_the_chain_has_no_list_m", "No authorities listed — the chain has no list method, so enter an explicit 1.17.x id."), "muted")); go.disabled = false; return; }
         drawAuth(rows[0]); go.disabled = false;
-      }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, "Lookup failed."); go.disabled = false; });
+      }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, t("misc.lookup_failed", "Lookup failed.")); go.disabled = false; });
     });
-    ctx.wrap.appendChild(ui.el(doc, "h2", "Create authority (op 54)"));
-    var cA = ui.field(doc, "Account", { placeholder: "name or 1.2.N" });
-    var cF = ui.field(doc, "Valid from", { type: "datetime-local" });
-    var cT = ui.field(doc, "Valid to", { type: "datetime-local" });
-    var cO = ui.field(doc, "Operation type number", { placeholder: "0 = transfer", inputmode: "numeric" });
-    var cTh = ui.field(doc, "Threshold", { placeholder: "1", inputmode: "numeric" });
-    var cK = ui.field(doc, "Key auth (public key, weight 1)", { placeholder: "BTS…" });
+    ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.create_authority_op_54", "Create authority (op 54)")));
+    var cA = ui.field(doc, t("misc.account", "Account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var cF = ui.field(doc, t("misc.valid_from_2", "Valid from"), { type: "datetime-local" });
+    var cT = ui.field(doc, t("misc.valid_to_2", "Valid to"), { type: "datetime-local" });
+    var cO = ui.field(doc, t("misc.operation_type_number", "Operation type number"), { placeholder: t("misc.0_transfer", "0 = transfer"), inputmode: "numeric" });
+    var cTh = ui.field(doc, t("misc.threshold", "Threshold"), { placeholder: "1", inputmode: "numeric" });
+    var cK = ui.field(doc, t("misc.key_auth_public_key_weight_1", "Key auth (public key, weight 1)"), { placeholder: "BTS…" });
     ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cF.row); ctx.wrap.appendChild(cT.row);
     ctx.wrap.appendChild(cO.row); ctx.wrap.appendChild(cTh.row); ctx.wrap.appendChild(cK.row);
     var en = doc.createElement("input"); en.type = "checkbox"; en.checked = true; ui.touchable(en);
-    var enRow = ui.el(doc, "div", null, "xfer-field"), enL = ui.el(doc, "label", "Enabled ");
+    var enRow = ui.el(doc, "div", null, "xfer-field"), enL = ui.el(doc, "label", t("misc.enabled_2", "Enabled "));
     enL.appendChild(en); enRow.appendChild(enL); ctx.wrap.appendChild(enRow);
-    ctx.wrap.appendChild(ui.el(doc, "p", "Restrictions default to zero (the proven path). Adding any restriction is blocked until testnet proves it.", "muted"));
+    ctx.wrap.appendChild(ui.el(doc, "p", t("misc.restrictions_default_to_zero_the_proven_path", "Restrictions default to zero (the proven path). Adding any restriction is blocked until testnet proves it."), "muted"));
     var crbox = ui.el(doc, "div"); ctx.wrap.appendChild(crbox);
-    ui.reviewSection(doc, crbox, uiGen, "Review authority", {
+    ui.reviewSection(doc, crbox, uiGen, t("misc.review_authority", "Review authority"), {
       build: async function () {
-        var acct = await Account.resolve(cA.input.value.trim());
+        var acct = await Account.resolve(cA.input.value.trim() || "1.2.0");
         var auth = { weight_threshold: parseInt(cTh.input.value.trim() || "1", 10), account_auths: [], key_auths: [], address_auths: [] };
         if (cK.input.value.trim() !== "") auth.key_auths = [[cK.input.value.trim(), 1]];
         var pair = ProposalMisc.buildAuthorityCreate({ accountId: acct.id, enabled: !!en.checked,
@@ -186,30 +205,34 @@ var MiscUI = (function () {
             return now.length > before ? now[now.length - 1] : null;
           } };
       },
-      title: "Confirm authority create (op 54)",
+      title: t("misc.confirm_authority_create_op_54", "Confirm authority create (op 54)"),
       rows: function (built, f) {
-        return [["Account", built.pair[1].account], ["Enabled", built.pair[1].enabled ? "yes" : "no"],
-          ["Valid", dateHuman(built.pair[1].valid_from) + " → " + dateHuman(built.pair[1].valid_to)],
-          ["Operation type", String(built.pair[1].operation_type) + typeName(built.pair[1].operation_type)], ["Threshold", String(built.pair[1].auth.weight_threshold)],
-          ["Restrictions", "none (proven path)"], ["Fee (live)", f]];
+        return [[t("misc.account", "Account"), built.pair[1].account], [t("misc.enabled", "Enabled"), built.pair[1].enabled ? t("misc.yes", "yes") : t("misc.no", "no")],
+          [t("misc.valid", "Valid"), dateHuman(built.pair[1].valid_from) + " → " + dateHuman(built.pair[1].valid_to)],
+          [t("misc.operation_type", "Operation type"), String(built.pair[1].operation_type) + typeName(built.pair[1].operation_type)], [t("misc.threshold", "Threshold"), String(built.pair[1].auth.weight_threshold)],
+          [t("misc.restrictions", "Restrictions"), t("misc.none_proven_path", "none (proven path)")], [t("misc.fee_live", "Fee (live)"), f]];
       },
-      ok: function () { return "Authority created."; },
-      fail: "Could not build the authority (check account, dates, op type and key)." });
+      ok: function () { return t("misc.authority_created", "Authority created."); },
+      fail: t("misc.could_not_build_the_authority_check_account_d", "Could not build the authority (check account, dates, op type and key).") });
   }
   /* Route entry: #/lists — whitelist/blacklist manager (op 7). */
   function renderLists(root) {
     if (!root) return;
     var ui = entry(root);
     if (!ui) return;
-    var ctx = ui.routeReady(root, "Account Lists", function () { renderLists(root); },
+    var ctx = ui.routeReady(root, t("misc.account_lists", "Account Lists"), function () { renderLists(root); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
-    ctx.wrap.appendChild(ui.el(doc, "p", "Listing is a bitfield: none 0, whitelisted 1, blacklisted 2, both 3. Adding ORs the bit; removing subtracts it.", "muted"));
-    var fA = ui.field(doc, "Authorizing account", { placeholder: "name or 1.2.N" });
-    var fL = ui.field(doc, "Counterparty", { placeholder: "name or 1.2.N" });
+    ctx.wrap.appendChild(ui.el(doc, "p", t("misc.listing_is_a_bitfield_none_0_whitelisted_1_bl", "Listing is a bitfield: none 0, whitelisted 1, blacklisted 2, both 3. Adding ORs the bit; removing subtracts it."), "muted"));
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        ctx.wrap.appendChild(ui.el(doc, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+    } catch (e) { /* notice is display-only */ }
+    var fA = ui.field(doc, t("misc.authorizing_account", "Authorizing account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fL = ui.field(doc, t("misc.counterparty", "Counterparty"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N") });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fL.row);
-    var go = ui.touchable(ui.el(doc, "button", "Check current")); go.type = "button"; ctx.wrap.appendChild(go);
+    var go = ui.touchable(ui.el(doc, "button", t("misc.check_current", "Check current"))); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
     /* Apply one listing bit change via an op-7 confirm (toAdd ? listingAdd : listingRemove). Params: authId, listeeId, cur, bit, toAdd. */
     function setListing(authId, listeeId, cur, bit, toAdd) {
@@ -221,19 +244,19 @@ var MiscUI = (function () {
           await Proposal.fee(pair, "1.3.0");
           return { pair: pair, fee: pair[1].fee, prove: async function () { return { listed: true }; } };
         },
-        title: "Confirm whitelist (op 7)",
+        title: t("misc.confirm_whitelist_op_7", "Confirm whitelist (op 7)"),
         rows: function (built, f) {
-          return [["Authorizer", authId], ["Account", listeeId],
-            ["Listing", ProposalMisc.listingLabel(cur) + " → " + ProposalMisc.listingLabel(next), cur + "→" + next],
-            ["Fee (live)", f]];
+          return [[t("misc.authorizer", "Authorizer"), authId], [t("misc.account", "Account"), listeeId],
+            [t("misc.listing", "Listing"), ProposalMisc.listingLabel(cur) + " → " + ProposalMisc.listingLabel(next), cur + "→" + next],
+            [t("misc.fee_live", "Fee (live)"), f]];
         },
-        ok: function () { return "Listing updated (re-check the counterparty to see the echoed state)."; } });
+        ok: function () { return t("misc.listing_updated_re_check_the_counterparty_to", "Listing updated (re-check the counterparty to see the echoed state)."); } });
     }
     go.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; go.disabled = true; ui.clearBox(box);
-      ui.showStatus(doc, box, "Reading current listing…");
+      ui.showStatus(doc, box, t("misc.reading_current_listing", "Reading current listing…"));
       Promise.resolve().then(async function () {
-        var auth = await Account.resolve(fA.input.value.trim()), listee = await Account.resolve(fL.input.value.trim());
+        var auth = await Account.resolve(fA.input.value.trim() || "1.2.0"), listee = await Account.resolve(fL.input.value.trim() || "1.2.0");
         var rows = await Chain.call(await Chain.db(), "get_accounts", [[auth.id]]);
         var full = (rows && rows[0]) || {};
         var cur = ((full.whitelisted_accounts || []).indexOf(listee.id) !== -1 ? 1 : 0) +
@@ -242,14 +265,14 @@ var MiscUI = (function () {
       }).then(function (st) {
         if (!live(myGen, uiGen)) return; ui.clearBox(box);
         box.appendChild(ui.el(doc, "p", st.listee.name + " (" + st.listee.id + ") is currently: " + ProposalMisc.listingLabel(st.cur) + " (" + st.cur + ").", ""));
-        [["Whitelist", 1], ["Blacklist", 2]].forEach(function (p) {
+        [[t("misc.whitelist", "Whitelist"), 1], [t("misc.blacklist", "Blacklist"), 2]].forEach(function (p) {
           var on = (st.cur & p[1]) !== 0;
           var b = ui.touchable(ui.el(doc, "button", (on ? "Remove from " : "Add to ") + p[0].toLowerCase())); b.type = "button";
           box.appendChild(b);
           b.addEventListener("click", function () { setListing(st.auth.id, st.listee.id, st.cur, p[1], !on); });
         });
         go.disabled = false;
-      }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, "Could not read the listing."); go.disabled = false; });
+      }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, t("misc.could_not_read_the_listing", "Could not read the listing.")); go.disabled = false; });
     });
   }
   /* Invoice object -> human lines (tolerant: {to,asset,lines[],note,id} or {to,asset,amount}). */
@@ -265,7 +288,7 @@ var MiscUI = (function () {
     if (!root) return;
     var ui = entry(root);
     if (!ui) return;
-    var ctx = ui.routeReady(root, "Invoice", function () { renderInvoice(root, data); },
+    var ctx = ui.routeReady(root, t("misc.invoice", "Invoice"), function () { renderInvoice(root, data); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
@@ -273,50 +296,50 @@ var MiscUI = (function () {
     if (data) {
       try {
         var inv = Proposal.unpackInvoice(data), lines = invoiceLines(inv);
-        if (!inv.to || !inv.asset || !lines.length) throw new Error("invoice-unparseable (missing to/asset/amount)");
+        if (!inv.to || !inv.asset || !lines.length) throw new Error(t("misc.invoice_unparseable_missing_to_asset_amount", "invoice-unparseable (missing to/asset/amount)"));
         ctx.wrap.appendChild(ui.confirmList(doc, [
-          ["Recipient", String(inv.to)], ["Asset", String(inv.asset)],
-          ["Note", String(inv.note || inv.memo || "none")], ["Identifier", String(inv.id || "none")]]));
+          [t("misc.recipient", "Recipient"), String(inv.to)], [t("misc.asset", "Asset"), String(inv.asset)],
+          [t("misc.note", "Note"), String(inv.note || inv.memo || t("misc.none", "none"))], [t("misc.identifier", "Identifier"), String(inv.id || t("misc.none", "none"))]]));
         Promise.resolve().then(async function () {
           var info = await Asset.describe(String(inv.asset)), total = 0n;
           lines.forEach(function (l) { total += BigInt(Format.parseAmount(l.amount, info.precision)); });
           if (!live(myGen, uiGen)) return;
-          box.appendChild(ui.deskTable(doc, ["Line", "Amount"], lines.map(function (l, i) {
+          box.appendChild(ui.deskTable(doc, [t("misc.line", "Line"), t("misc.amount", "Amount")], lines.map(function (l, i) {
             var h = Format.formatAmount(Format.parseAmount(l.amount, info.precision), info.precision) + " " + info.symbol;
             return { cells: [{ text: l.label || ("line " + (i + 1)) }, { text: h, raw: l.amount }],
               cardLines: [(l.label || ("line " + (i + 1))) + ": " + h] };
           })));
           box.appendChild(ui.el(doc, "p", "Total: " + Format.formatAmount(String(total), info.precision) + " " + info.symbol, ""));
-          var pay = ui.touchable(ui.el(doc, "a", "Pay via transfer"));
+          var pay = ui.touchable(ui.el(doc, "a", t("misc.pay_via_transfer", "Pay via transfer")));
           pay.setAttribute("href", "#/transfer/" + encodeURIComponent(String(inv.to)));
           box.appendChild(pay);
           box.appendChild(ui.el(doc, "p", "Paying opens the transfer page for " + String(inv.to) + " — enter the total above there.", "muted"));
-        }).catch(function (e) { if (live(myGen, uiGen)) ui.showError(doc, box, e, "Could not render the invoice amounts."); });
+        }).catch(function (e) { if (live(myGen, uiGen)) ui.showError(doc, box, e, t("misc.could_not_render_the_invoice_amounts", "Could not render the invoice amounts.")); });
       } catch (e) {
-        ui.showError(doc, ctx.wrap, e, "This invoice link cannot be parsed.");
+        ui.showError(doc, ctx.wrap, e, t("misc.this_invoice_link_cannot_be_parsed", "This invoice link cannot be parsed."));
         var sample = Proposal.packInvoice({ to: "alice", asset: "BTS", lines: [{ label: "coffee", amount: "1.5" }], note: "sample", id: "demo-1" });
-        var a = ui.touchable(ui.el(doc, "a", "Open a sample invoice"));
+        var a = ui.touchable(ui.el(doc, "a", t("misc.open_a_sample_invoice", "Open a sample invoice")));
         a.setAttribute("href", "#/invoice/" + sample); ctx.wrap.appendChild(a);
-        ctx.wrap.appendChild(ui.el(doc, "p", "Foreign (compressed) invoice URLs from the old UI cannot be parsed — only links created below.", "muted"));
+        ctx.wrap.appendChild(ui.el(doc, "p", t("misc.foreign_compressed_invoice_urls_from_the_old", "Foreign (compressed) invoice URLs from the old UI cannot be parsed — only links created below."), "muted"));
       }
     } else {
-      ctx.wrap.appendChild(ui.el(doc, "p", "No invoice data in the URL — create one below.", "muted"));
+      ctx.wrap.appendChild(ui.el(doc, "p", t("misc.no_invoice_data_in_the_url_create_one_below", "No invoice data in the URL — create one below."), "muted"));
     }
-    ctx.wrap.appendChild(ui.el(doc, "h2", "Create invoice"));
-    var cT = ui.field(doc, "Recipient", { placeholder: "account name" });
-    var cA = ui.field(doc, "Asset", { placeholder: "BTS", value: "BTS" });
-    var cN = ui.field(doc, "Note (optional)", { placeholder: "" });
+    ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.create_invoice", "Create invoice")));
+    var cT = ui.field(doc, t("misc.recipient", "Recipient"), { placeholder: t("misc.account_name", "account name") });
+    var cA = ui.field(doc, t("misc.asset", "Asset"), { placeholder: "BTS", value: "BTS" });
+    var cN = ui.field(doc, t("misc.note_optional", "Note (optional)"), { placeholder: "" });
     ctx.wrap.appendChild(cT.row); ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cN.row);
     var area = doc.createElement("textarea");
     area.setAttribute("placeholder", "coffee|1.5\ncake|2"); area.setAttribute("rows", "4");
     ui.touchable(area); area.style.width = "100%"; ctx.wrap.appendChild(area);
-    var mk = ui.touchable(ui.el(doc, "button", "Make invoice link")); mk.type = "button"; ctx.wrap.appendChild(mk);
+    var mk = ui.touchable(ui.el(doc, "button", t("misc.make_invoice_link", "Make invoice link"))); mk.type = "button"; ctx.wrap.appendChild(mk);
     var o2 = ui.el(doc, "div"); ctx.wrap.appendChild(o2);
     mk.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; ui.clearBox(o2);
       try {
         var to = cT.input.value.trim(), asset = cA.input.value.trim() || "BTS";
-        if (!to) throw new Error("Recipient is required.");
+        if (!to) throw new Error(t("misc.recipient_is_required", "Recipient is required."));
         var out = [];
         area.value.split("\n").forEach(function (ln, i) {
           var line = ln.trim();
@@ -325,12 +348,12 @@ var MiscUI = (function () {
           if (!amount) throw new Error("Line " + (i + 1) + ": amount is required.");
           out.push({ label: parts.length > 1 ? parts[0].trim() : "", amount: amount });
         });
-        if (!out.length) throw new Error("Add at least one amount line.");
+        if (!out.length) throw new Error(t("misc.add_at_least_one_amount_line", "Add at least one amount line."));
         var url = "#/invoice/" + Proposal.packInvoice({ to: to, asset: asset, lines: out, note: cN.input.value.trim(), id: "inv-" + Date.now() });
-        var link = ui.el(doc, "a", "Open invoice"); link.setAttribute("href", url); o2.appendChild(link);
+        var link = ui.el(doc, "a", t("misc.open_invoice", "Open invoice")); link.setAttribute("href", url); o2.appendChild(link);
         var ta = doc.createElement("textarea"); ta.value = url; ta.setAttribute("rows", "3");
         ui.touchable(ta); ta.style.width = "100%"; o2.appendChild(ta);
-      } catch (e) { ui.showError(doc, o2, e, "Could not create the invoice."); }
+      } catch (e) { ui.showError(doc, o2, e, t("misc.could_not_create_the_invoice", "Could not create the invoice.")); }
     });
   }
 

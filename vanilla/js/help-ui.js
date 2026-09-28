@@ -14,6 +14,21 @@
  */
 var HelpUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   /* key, title, one-line guide (own words, navigational), in-app route or null. */
   var TOPICS = [
     ["disclaimer", "Disclaimer", "Keys stay on your device; nothing here is financial advice. Back up before funding.", null],
@@ -59,44 +74,44 @@ var HelpUI = (function () {
     var wrap = makeWrap(doc, root);
     var key = params && typeof params.wildcard === "string" ? params.wildcard.replace(/^\/+|\/+$/g, "") : "";
     if (!key) { paintIndex(doc, wrap); return; }
-    var t = topicByKey(key);
-    if (!t) {
-      wrap.appendChild(el(doc, "h1", "Help"));
+    var hit = topicByKey(key);
+    if (!hit) {
+      wrap.appendChild(el(doc, "h1", t("help.help", "Help")));
       wrap.appendChild(el(doc, "p", "No help topic named “" + key + "”. Pick one from the index.", "muted"));
       paintIndexList(doc, wrap);
       return;
     }
-    paintTopic(doc, wrap, t);
+    paintTopic(doc, wrap, hit);
   }
 
   /* Index: every topic as a link (mirrors the #1 toc structure). */
   function paintIndex(doc, wrap) {
-    wrap.appendChild(el(doc, "h1", "Help"));
-    wrap.appendChild(el(doc, "p", "Short guides for each part of the wallet. These are summaries written for this app, not the reference UI's full help pages.", "muted"));
+    wrap.appendChild(el(doc, "h1", t("help.help", "Help")));
+    wrap.appendChild(el(doc, "p", t("help.short_guides_for_each_part_of_the_wallet_thes", "Short guides for each part of the wallet. These are summaries written for this app, not the reference UI's full help pages."), "muted"));
     paintIndexList(doc, wrap);
   }
   function paintIndexList(doc, wrap) {
     var list = doc.createElement("ul");
-    TOPICS.forEach(function (t) {
+    TOPICS.forEach(function (e) {
       var li = doc.createElement("li"), a = doc.createElement("a");
-      a.href = "#/help/" + t[0]; a.textContent = t[1]; li.appendChild(a); list.appendChild(li);
+      a.href = "#/help/" + e[0]; a.textContent = t("help.topic_" + e[0] + "_title", e[1]); li.appendChild(a); list.appendChild(li);
     });
     wrap.appendChild(list);
   }
 
   /* Topic: title + guide summary + in-app pointer + back to index. */
-  function paintTopic(doc, wrap, t) {
-    wrap.appendChild(el(doc, "h1", t[1]));
-    wrap.appendChild(el(doc, "p", t[2]));
-    if (t[3]) {
+  function paintTopic(doc, wrap, topic) {
+    wrap.appendChild(el(doc, "h1", t("help.topic_" + topic[0] + "_title", topic[1])));
+    wrap.appendChild(el(doc, "p", t("help.topic_" + topic[0] + "_text", topic[2])));
+    if (topic[3]) {
       var p = el(doc, "p", null, "muted"), a = doc.createElement("a");
-      a.href = t[3]; a.textContent = "Open in the wallet";
+      a.href = topic[3]; a.textContent = t("help.open_in_the_wallet", "Open in the wallet");
       p.appendChild(a); wrap.appendChild(p);
     } else {
-      wrap.appendChild(el(doc, "p", "Reference reading — no dedicated wallet screen.", "muted"));
+      wrap.appendChild(el(doc, "p", t("help.reference_reading_no_dedicated_wallet_screen", "Reference reading — no dedicated wallet screen."), "muted"));
     }
     var back = el(doc, "p", null, "muted"), b = doc.createElement("a");
-    b.href = "#/help"; b.textContent = "All help topics";
+    b.href = "#/help"; b.textContent = t("help.all_help_topics", "All help topics");
     back.appendChild(b); wrap.appendChild(back);
   }
 

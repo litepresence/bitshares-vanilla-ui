@@ -5,12 +5,16 @@
   --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #22d173; --sell: #e3745b; --warn: #fcab53; --danger: #e3745b;
   --border: #dddddd; --header-bg: #337ab7; --header-text: #ffffff;
+  /* Vendored SVGs ship black-filled (byte-copies); on light surfaces they
+   * render as-is, matching #1's dark-on-light glyphs. */
+  --icon-filter: none;
 }
 :root[data-theme="light"] {
   --bg: #ffffff; --panel: #f5f7fa; --text: #222222; --muted: #666666;
   --accent: #337ab7; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #1da866; --sell: #d35a41; --warn: #e89b3d; --danger: #d35a41;
   --border: #e2e2e2; --header-bg: #337ab7; --header-text: #ffffff;
+  --icon-filter: none;
 }
 /* Dark converges on DEX-UX (slice-07 Task 4 exact values: panels #131722,
  * borders #2a2e39, text #e0e3eb, muted #758696, accent #007bff, buy #26de81,
@@ -21,6 +25,11 @@
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
   --toast-shadow: rgba(0, 0, 0, 0.5);
+  /* Dark surfaces need light glyphs: full invert maps the vendored
+   * black fills to white. Only monochrome glyphs are wired (nav, alarm,
+   * fi-star, swap, hamburger) so no colored icon distorts; a colored
+   * glyph stays unwired until the inline-SVG pass. */
+  --icon-filter: invert(1);
 }
 /* Slice-16 toast shadow per theme (not a palette value — elevation only):
  * retro default, modern light, DEX-UX dark cue. Level-stripe colors reuse

@@ -162,7 +162,7 @@ var Htlc = (function () {
     var precMap = await _precisions(aids), nowSecs = Math.floor(Date.now() / 1000);
     /* Raw 1.16.x rows -> display rows (closed over precMap + nowSecs). */
     function mapHtlcRows(rows) { return rows.map(function (o) { return _htlcRow(o, precMap, nowSecs); }); }
-    return { sent: map(res[0] || []), received: map(res[1] || []) };
+    return { sent: mapHtlcRows(res[0] || []), received: mapHtlcRows(res[1] || []) };
   }
   /* Permissions as giver + recipient (start "1.12.0", limit 100). Returns {asGiver[], asRecipient[]}.
    * Fails "unknown-account" / "not-connected". */
@@ -174,7 +174,7 @@ var Htlc = (function () {
     var precMap = await _precisions(aids), nowSecs = Math.floor(Date.now() / 1000);
     /* Raw 1.12.x rows -> display rows (closed over precMap + nowSecs). */
     function mapPermRows(rows) { return rows.map(function (o) { return _permRow(o, precMap, nowSecs); }); }
-    return { asGiver: map(res[0] || []), asRecipient: map(res[1] || []) };
+    return { asGiver: mapPermRows(res[0] || []), asRecipient: mapPermRows(res[1] || []) };
   }
   /* Typed preimage -> {typeId, hex, size} over UTF-8 BYTES (ambiguity B: size = byte length).
    * sha256 via WebCrypto (Tx.sha256Bytes precedent); ripemd160 unvendored -> explicit-hash-only.

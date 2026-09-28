@@ -20,6 +20,17 @@ var MarketOrders = (function () {
 
   var PRICE_PLACES = 8;
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Element helper: textContent only, user/chain strings never reach HTML. */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -56,19 +67,19 @@ var MarketOrders = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || "Unexpected error");
+      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
     if (msg.indexOf("bad-market") !== -1) {
       msg = "Unknown market. Check the QUOTE_BASE pair (e.g. " + defaultMarket() + ").";
     } else if (msg.indexOf("bad-asset-shape") !== -1) {
-      msg = "Unexpected asset data from the node; stopped instead of guessing.";
+      msg = t("market.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     } else if (msg.indexOf("history-unavailable") !== -1) {
-      msg = "History unavailable on this node (fills and charts need the history plugin).";
+      msg = t("market.err_history", "History unavailable on this node (fills and charts need the history plugin).");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = "Wallet is locked.";
+      msg = t("market.err_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
-      msg = "No on-chain account found for the wallet's active key.";
+      msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = "Network unavailable. Check Settings → Nodes and retry.";
+      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -89,20 +100,20 @@ var MarketOrders = (function () {
         (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
     } catch (e) { unlocked = false; }
     if (!unlocked) {
-      var hint = el(doc, "p", "Unlock your wallet to see your open orders on this market. ", "muted");
-      var a = el(doc, "a", "Go to Wallet");
+      var hint = el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
+      var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
       touchable(a);
       hint.appendChild(a);
       parentEl.appendChild(hint);
       return;
     }
-    parentEl.appendChild(el(doc, "p", "Loading your orders…", "muted"));
+    parentEl.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
     Market.myOrders().then(function (rows) {
       while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
       var mine = (rows || []).filter(function (o) { return isMine(o, assets); });
       if (mine.length === 0) {
-        parentEl.appendChild(el(doc, "p", "No open orders on this market.", "muted"));
+        parentEl.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
         return;
       }
       var canCancel = typeof TradeUI !== "undefined" && TradeUI &&
@@ -122,8 +133,8 @@ var MarketOrders = (function () {
       table.className = "node-table";
       var thead = doc.createElement("thead");
       var hr = doc.createElement("tr");
-      ["Order", "Side", "Amount", "Price"].forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
-      if (canCancel) hr.appendChild(el(doc, "th", "Action"));
+      [t("market.col_order", "Order"), t("market.col_side", "Side"), t("market.th_amount", "Amount"), t("market.col_price", "Price")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      if (canCancel) hr.appendChild(el(doc, "th", t("market.col_action", "Action")));
       thead.appendChild(hr);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
@@ -151,7 +162,7 @@ var MarketOrders = (function () {
         var det = doc.createElement("details");
         det.className = "raw";
         var sum = doc.createElement("summary");
-        sum.setAttribute("aria-label", "Show raw order JSON");
+        sum.setAttribute("aria-label", t("market.raw_order", "Show raw order JSON"));
         touchable(sum);
         det.appendChild(sum);
         var pre = doc.createElement("pre");
@@ -167,7 +178,7 @@ var MarketOrders = (function () {
       var detAll = doc.createElement("details");
       detAll.className = "raw";
       var sumAll = doc.createElement("summary");
-      sumAll.setAttribute("aria-label", "Show raw orders JSON");
+      sumAll.setAttribute("aria-label", t("market.raw_orders", "Show raw orders JSON"));
       touchable(sumAll);
       detAll.appendChild(sumAll);
       var preAll = doc.createElement("pre");
@@ -177,14 +188,14 @@ var MarketOrders = (function () {
       parentEl.appendChild(detAll);
     }).catch(function (e) {
       while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
-      showError(doc, parentEl, e, "Could not load your orders.");
+      showError(doc, parentEl, e, t("market.fail_orders", "Could not load your orders."));
     });
   }
 
   /* Per-row Cancel button: paints TradeUI's inline confirm into the shared
    * box (order id 1.7.x shown there). Done callback re-renders this list. */
   function cancelButton(doc, order, assets, cancelBox, rerender) {
-    var b = touchable(el(doc, "button", "Cancel"));
+    var b = touchable(el(doc, "button", t("trade.cancel_button", "Cancel")));
     b.type = "button";
     b.setAttribute("aria-label", "Cancel order " + String(order.id));
     b.addEventListener("click", function () {

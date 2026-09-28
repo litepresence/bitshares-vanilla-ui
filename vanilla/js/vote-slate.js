@@ -24,6 +24,20 @@
  */
 var VoteSlate = (function () {
   "use strict";
+  /* Batch-2c i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws.
+   * Dynamic sentences keep their code structure (batch-2b precedent): only
+   * complete static literals are wrapped, values and punctuation glue stay
+   * raw, so every default below is byte-verbatim in the HEAD blob. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
 
   /* Proxy-to-self sentinel: voting_account == this means "no proxy, my
    * slate counts" (protocol/config.hpp:150; #1 AccountVoting.jsx:290).
@@ -185,9 +199,9 @@ var VoteSlate = (function () {
   function renderTabs(doc, bar, st, refresh) {
     while (bar.firstChild) bar.removeChild(bar.firstChild);
     var tabs = [
-      ["witness", "Witnesses (" + setSize(st.draft.witness) + ")"],
-      ["committee", "Committee (" + setSize(st.draft.committee) + ")"],
-      ["worker", "Workers (" + setSize(st.draft.worker) + ")"]
+      ["witness", t("vote.tab_witnesses", "Witnesses (") + setSize(st.draft.witness) + ")"],
+      ["committee", t("vote.tab_committee", "Committee (") + setSize(st.draft.committee) + ")"],
+      ["worker", t("vote.tab_workers", "Workers (") + setSize(st.draft.worker) + ")"]
     ];
     tabs.forEach(function (t) {
       var b = touchable(el(doc, "button", t[1], st.tab === t[0] ? "vote-tab active" : "vote-tab"));
@@ -214,8 +228,8 @@ var VoteSlate = (function () {
 
     var search = doc.createElement("input");
     search.type = "search";
-    search.setAttribute("placeholder", "Search " + st.tab + "…");
-    search.setAttribute("aria-label", "Search " + st.tab);
+    search.setAttribute("placeholder", t("vote.search_prefix", "Search ") + st.tab + "…");
+    search.setAttribute("aria-label", t("vote.search_prefix", "Search ") + st.tab);
     search.value = st.search[st.tab] || "";
     touchable(search);
     search.style.width = "100%";
@@ -238,12 +252,12 @@ var VoteSlate = (function () {
       if (entries.length === 0) {
         rowsBox.appendChild(el(doc, "p",
           st.tab === "worker"
-            ? "No workers found. Testnets often have none — this is valid, not an error."
-            : "Nothing in this list.", "muted"));
+            ? t("vote.no_workers", "No workers found. Testnets often have none — this is valid, not an error.")
+            : t("vote.empty_tab", "Nothing in this list."), "muted"));
         return;
       }
       if (shown.length === 0) {
-        rowsBox.appendChild(el(doc, "p", "No matches for this search.", "muted"));
+        rowsBox.appendChild(el(doc, "p", t("vote.no_matches", "No matches for this search."), "muted"));
         return;
       }
       shown.forEach(function (e) {
@@ -270,7 +284,7 @@ var VoteSlate = (function () {
     box.type = "checkbox";
     box.checked = !!st.draft[st.tab === "witness" ? "witness" : st.tab === "committee" ? "committee" : "worker"][e.vote_id];
     box.disabled = hasProxy;
-    box.setAttribute("aria-label", "Vote for " + (e.name || e.id));
+    box.setAttribute("aria-label", t("vote.vote_for", "Vote for ") + (e.name || e.id));
     touchable(box);
     box.addEventListener("change", function () {
       var set = st.draft[st.tab === "witness" ? "witness" : st.tab === "committee" ? "committee" : "worker"];
@@ -281,9 +295,9 @@ var VoteSlate = (function () {
     card.appendChild(box);
     var main = el(doc, "div", null, "vote-row-main");
     main.style.flex = "1 1 200px";
-    var title = el(doc, "strong", (e.name || "(unnamed)") + " ");
+    var title = el(doc, "strong", (e.name || t("vote.unnamed", "(unnamed)")) + " ");
     main.appendChild(title);
-    main.appendChild(el(doc, "span", e.id + (e.active ? " ● active" : ""), "muted"));
+    main.appendChild(el(doc, "span", e.id + (e.active ? t("vote.active_mark", " ● active") : ""), "muted"));
     card.appendChild(main);
     var weight = el(doc, "div", humanWeight(e.total_raw, st.supply), "vote-weight");
     weight.title = String(e.total_raw);
@@ -294,9 +308,9 @@ var VoteSlate = (function () {
         pay = Format.formatAmount(String(e.extra.daily_pay_raw || "0"), CORE_PRECISION_FALLBACK);
       } catch (err) { pay = String(e.extra.daily_pay_raw || "0"); }
       var sub = el(doc, "div",
-        "Pay/day " + pay + " · " + (e.extra.work_begin_date || "?") + " → " +
-        (e.extra.work_end_date || "?") + " · for " +
-        humanWeight(e.total_raw, st.supply) + " / against " +
+        t("vote.worker_pay", "Pay/day ") + pay + " · " + (e.extra.work_begin_date || "?") + " → " +
+        (e.extra.work_end_date || "?") + t("vote.worker_for", " · for ") +
+        humanWeight(e.total_raw, st.supply) + t("vote.worker_against", " / against ") +
         humanWeight(e.extra.total_against_raw || "0", st.supply), "muted");
       sub.style.flex = "1 1 100%";
       card.appendChild(sub);

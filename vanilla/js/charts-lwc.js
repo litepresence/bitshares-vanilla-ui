@@ -35,6 +35,17 @@ var ChartsLwc = (function () {
   var PANE_H = 320;
   var OSC_H = 170;
 
+  /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Read a CSS custom property off <html> (theme-aware); fall back when the
    * property is missing (headless use, unknown theme). Private copy of the
    * market-charts.js helper for the canvas fallback below. */
@@ -200,7 +211,7 @@ var ChartsLwc = (function () {
   function emptyPane(doc, hostEl, text) {
     var d = doc.createElement("div");
     d.className = "mkt-chart-empty muted";
-    d.textContent = text || "No data.";
+    d.textContent = text || t("market.empty_pane", "No data.");
     hostEl.appendChild(d);
   }
 
@@ -273,7 +284,7 @@ var ChartsLwc = (function () {
     var colors = paneColors(opts.colors);
     var bars = toLwcCandles(opts.candles);
     if (bars.length === 0) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || "No price history on this market.");
+      if (doc) emptyPane(doc, hostEl, opts.emptyText || t("market.no_price_history", "No price history on this market."));
       return handle;
     }
     var LW = hasLightweight() ? lw() : null;
@@ -372,7 +383,7 @@ var ChartsLwc = (function () {
       if (anyPts) break;
     }
     if (!anyPts) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || "No oscillator data.");
+      if (doc) emptyPane(doc, hostEl, opts.emptyText || t("market.no_osc_data", "No oscillator data."));
       return handle;
     }
     var LW = hasLightweight() ? lw() : null;

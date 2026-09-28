@@ -6,6 +6,10 @@
  * Side effects: DOM under the router root; global DebitUI only. Generation
  * counter drops stale async work on teardown (router reuses #view).
  * Created by: building-vanilla-slices skill, slice-11-htlc plan Task 3.
+ * PUBLIC-FIRST (gate repair): the shared HtlcUI routeReady no longer gates on
+ * unlock — tables/forms render locked under committee-account 1.2.0 with a
+ * viewing notice. Party inputs default to 1.2.0 while locked; password is
+ * asked only at Sign & Send (shared sendConfirm sign-time gate).
  * CHAIN TRUTH (#4 wins): op 25 create / 26 update (TRAP: period_start_time
  * serializes BEFORE periods_until_expiration) / 27 claim (payer = CLAIMANT
  * withdraw_to_account) / 28 delete (fee 0, free cancel). Claim memo is
@@ -45,19 +49,23 @@ var DebitUI = (function () {
      * (DebitUI's own) guards this file's continuations. Comparing ctx.myGen
      * against DebitUI's gen stuck the page on "Loading permissions…" forever. */
     ctx.wrap.appendChild(u.el(doc, "p", "Loading permissions…", "muted"));
+    if (!u.isUnlockedNow()) ctx.wrap.appendChild(u.viewingAsNotice(doc));
     u.loadAccount(htlcGen, function (me) { return Htlc.permissions(me.id); }).then(function (found) {
       if (!found || myGen !== gen) return;
       root.innerHTML = "";
       var box = u.el(doc, "div", null, "wrap"); root.appendChild(box);
       box.appendChild(u.el(doc, "h1", "Direct Debit"));
+      if (!u.isUnlockedNow()) box.appendChild(u.viewingAsNotice(doc));
       box.appendChild(u.el(doc, "p", "Recurring withdrawal rights you granted or received.", "muted"));
       box.appendChild(u.el(doc, "h2", "Granted by you (" + found.data.asGiver.length + ")"));
       box.appendChild(permTable(u, doc, found.data.asGiver, "giver"));
       box.appendChild(u.el(doc, "h2", "Granted to you (" + found.data.asRecipient.length + ")"));
       box.appendChild(permTable(u, doc, found.data.asRecipient, "recipient"));
       box.appendChild(u.el(doc, "h2", "New / update permission"));
+      if (!u.isUnlockedNow()) box.appendChild(u.signNotice(doc));
       createUpdateBox(u, doc, box, found.me, found.data, htlcGen);
       box.appendChild(u.el(doc, "h2", "Claim / delete"));
+      if (!u.isUnlockedNow()) box.appendChild(u.signNotice(doc));
       rowActionBox(u, doc, box, found.me, found.data, htlcGen);
     }).catch(function (e) {
       if (myGen !== gen) return; u.routeFail(root, "Direct Debit", e, "Could not load permissions.", retry); });
@@ -84,8 +92,9 @@ var DebitUI = (function () {
     table.appendChild(tbody); return table;
   }
   function createUpdateBox(u, doc, box, me, lists, myGen) { /* fee RE-READ at review; update gets old→new rows */
+    var locked = !u.isUnlockedNow();
     var fPerm = u.field(doc, "Permission id (update only, else blank)", { placeholder: "1.12.N" });
-    var fAuth = u.field(doc, "Authorized account", { placeholder: "name or 1.2.N" });
+    var fAuth = u.field(doc, "Authorized account", locked ? { placeholder: "name or 1.2.N", value: "1.2.0" } : { placeholder: "name or 1.2.N" });
     var fAsset = u.field(doc, "Asset", { value: "BTS" });
     var fLimit = u.field(doc, "Limit per period", { placeholder: "10", inputmode: "decimal" });
     var fCount = u.field(doc, "Period count", { value: "12", inputmode: "numeric" });
@@ -243,11 +252,14 @@ var DebitUI = (function () {
     previewBtn.addEventListener("click", function () {
       if (myGen !== gen) return;
       u.clearBox(out);
-      if (!Wallet.isUnlocked()) { u.unlockBox(doc, out, function () { renderSpotlight(root); }); return; }
+      /* PUBLIC-FIRST: the ladder preview renders locked (acting as 1.2.0);
+       * each per-order Sign & Send gates at click with an unlock notice. */
+      if (!u.isUnlockedNow()) out.appendChild(u.viewingAsNotice(doc));
       previewBtn.disabled = true;
       u.showStatus(doc, out, "Computing order ladder…");
       Promise.resolve().then(async function () {
-        var me = await Account.resolve(await Account.myAccountId());
+        var actId = await Account.myAccountId().catch(function () { return u.viewingAsId; });
+        var me = await Account.resolve(actId);
         var sell = await Asset.describe(fSell.input.value.trim() || "BTS");
         var recv = await Asset.describe(fRecv.input.value.trim() || "USD");
         var n = parseInt(String(fCount.input.value).trim(), 10);
@@ -291,7 +303,13 @@ var DebitUI = (function () {
             if (myGen !== gen) return;
             btn.disabled = true; stCell.textContent = "signing…";
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { stCell.textContent = "Wallet is locked."; btn.disabled = false; return; }
+            if (!wif) {
+              stCell.textContent = "Wallet is locked — unlock to sign (preview stays visible).";
+              stCell.className = "error";
+              u.unlockInline(doc, out, function () {
+                out.appendChild(u.el(doc, "p", "Unlocked — press Preview again so the orders use your account, then sign.", "muted"));
+              });
+              btn.disabled = false; return; }
             var pair = [Tx.OP.limit_order_create, { fee: { amount: 0, asset_id: "1.3.0" }, seller: R.me.id,
               amount_to_sell: { amount: o.sellRaw, asset_id: R.sell.id },
               min_to_receive: { amount: o.recvRaw, asset_id: R.recv.id },

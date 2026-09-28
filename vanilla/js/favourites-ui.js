@@ -22,6 +22,21 @@
  */
 var FavouritesUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   /* Market stars live here (owned by market-picker.js — read/remove here,
    * never renamed). Assets/accounts are new keys owned by this file. */
@@ -95,11 +110,8 @@ var FavouritesUI = (function () {
     var myGen = ++gen;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", "Favourites"));
-    wrap.appendChild(el(doc, "p",
-      "Your starred markets, assets, and accounts on this device. " +
-      "Star a market from any market page picker; add assets and accounts below. " +
-      "Stored locally — never synced, never broadcast.",
+    wrap.appendChild(el(doc, "h1", t("favourites.favourites", "Favourites")));
+    wrap.appendChild(el(doc, "p", t("favourites.intro", "Your starred markets, assets, and accounts on this device. Star a market from any market page picker; add assets and accounts below. Stored locally — never synced, never broadcast."),
       "muted"));
     marketSection(doc, wrap, myGen, root);
     assetSection(doc, wrap, myGen, root);
@@ -114,7 +126,7 @@ var FavouritesUI = (function () {
     a.setAttribute("href", href); touchable(a);
     li.appendChild(a);
     if (sub) li.appendChild(el(doc, "span", " " + sub, "muted"));
-    var rm = touchable(el(doc, "button", "Remove"));
+    var rm = touchable(el(doc, "button", t("favourites.remove", "Remove")));
     rm.type = "button";
     rm.setAttribute("aria-label", "Remove " + label);
     rm.addEventListener("click", onRemove);
@@ -145,7 +157,7 @@ var FavouritesUI = (function () {
     return { form: form, input: input, btn: btn, err: err };
   }
   function formError(f, msg) {
-    f.err.textContent = msg || ""; f.err.style.display = msg ? "" : "none";
+    f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("favourites.none", "none");
   }
   function refresh(root, myGen) {
     if (myGen === gen) renderFavourites(root);
@@ -158,7 +170,7 @@ var FavouritesUI = (function () {
     var list = loadStrings(MARKETS_KEY);
     section.appendChild(el(doc, "h3", "Markets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
-      empty(doc, section, "No favourite markets yet. Star one from any market page picker, or add a pair below.");
+      empty(doc, section, t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below."));
     } else {
       var ul = doc.createElement("ul");
       ul.className = "mkt-picker-list";
@@ -178,9 +190,9 @@ var FavouritesUI = (function () {
       var typed = String(f.input.value || "").trim().toUpperCase();
       var parts = typed.split("_");
       if (parts.length !== 2 || !parts[0] || !parts[1] || parts[0] === parts[1]) {
-        formError(f, "Use QUOTE_BASE with two different symbols (e.g. BTS_USD)."); return;
+        formError(f, t("favourites.use_quote_base_with_two_different_symbols_e_g", "Use QUOTE_BASE with two different symbols (e.g. BTS_USD).")); return;
       }
-      if (!online()) { formError(f, "Network unavailable — new pairs are validated live. Check Settings → Nodes."); return; }
+      if (!online()) { formError(f, t("favourites.network_unavailable_new_pairs_are_validated_l", "Network unavailable — new pairs are validated live. Check Settings → Nodes.")); return; }
       f.btn.disabled = true;
       validateMarket(parts[0], parts[1]).then(function () {
         if (myGen !== gen) return;
@@ -214,7 +226,7 @@ var FavouritesUI = (function () {
     var list = loadPairs(ASSETS_KEY, "symbol");
     section.appendChild(el(doc, "h3", "Assets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
-      empty(doc, section, "No favourite assets yet. Add one by symbol below.");
+      empty(doc, section, t("favourites.no_favourite_assets_yet_add_one_by_symbol_bel", "No favourite assets yet. Add one by symbol below."));
     } else {
       var ul = doc.createElement("ul");
       ul.className = "mkt-picker-list";
@@ -231,8 +243,8 @@ var FavouritesUI = (function () {
       ev.preventDefault();
       formError(f, "");
       var sym = String(f.input.value || "").trim().toUpperCase();
-      if (!sym) { formError(f, "Enter an asset symbol."); return; }
-      if (!online()) { formError(f, "Network unavailable — symbols are validated live. Check Settings → Nodes."); return; }
+      if (!sym) { formError(f, t("favourites.enter_an_asset_symbol", "Enter an asset symbol.")); return; }
+      if (!online()) { formError(f, t("favourites.network_unavailable_symbols_are_validated_liv", "Network unavailable — symbols are validated live. Check Settings → Nodes.")); return; }
       f.btn.disabled = true;
       dbCall("lookup_asset_symbols", [[sym]]).then(function (rows) {
         if (myGen !== gen) return;
@@ -259,7 +271,7 @@ var FavouritesUI = (function () {
     var list = loadPairs(ACCOUNTS_KEY, "name");
     section.appendChild(el(doc, "h3", "Accounts" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
-      empty(doc, section, "No favourite accounts yet. Add one by name below.");
+      empty(doc, section, t("favourites.no_favourite_accounts_yet_add_one_by_name_bel", "No favourite accounts yet. Add one by name below."));
     } else {
       var ul = doc.createElement("ul");
       ul.className = "mkt-picker-list";
@@ -276,8 +288,8 @@ var FavouritesUI = (function () {
       ev.preventDefault();
       formError(f, "");
       var name = String(f.input.value || "").trim().toLowerCase();
-      if (!name) { formError(f, "Enter an account name."); return; }
-      if (!online()) { formError(f, "Network unavailable — names are validated live. Check Settings → Nodes."); return; }
+      if (!name) { formError(f, t("favourites.enter_an_account_name", "Enter an account name.")); return; }
+      if (!online()) { formError(f, t("favourites.network_unavailable_names_are_validated_live", "Network unavailable — names are validated live. Check Settings → Nodes.")); return; }
       f.btn.disabled = true;
       resolveAccount(name).then(function (found) {
         if (myGen !== gen) return;

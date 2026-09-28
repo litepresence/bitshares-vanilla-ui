@@ -27,6 +27,21 @@
  */
 var PredictionUI = (function () {
   "use strict";
+
+  /* Batch-2e i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. vars supports
+   * %(name)s templates at a few asset/named-count labels. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
+    return dflt;
+  }
   var gen = 0;
   var SCAN_PAGES = 8, PAGE_SIZE = 25; /* bounded: 200 assets max per entry */
   var openSubs = [];
@@ -47,10 +62,10 @@ var PredictionUI = (function () {
     return miss;
   }
   function showError(doc, wrap, e, fallback) {
-    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
-    var map = [["not-connected", "Network unavailable. Check Settings → Nodes and retry."],
-      ["unknown-asset", "Asset not found on this network."],
-      ["not-a-pma", "That asset is not a prediction market (no is_prediction_market flag)."]];
+    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("prediction.unexpected_error", "Unexpected error"));
+    var map = [["not-connected", t("prediction.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.")],
+      ["unknown-asset", t("prediction.asset_not_found_on_this_network", "Asset not found on this network.")],
+      ["not-a-pma", t("prediction.that_asset_is_not_a_prediction_market_no_is_p", "That asset is not a prediction market (no is_prediction_market flag).")]];
     if (m.indexOf("not connected") !== -1) m = map[0][1];
     for (var i = 0; i < map.length; i++) if (m.indexOf(map[i][0]) !== -1) { m = map[i][1]; break; }
     var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
@@ -59,7 +74,7 @@ var PredictionUI = (function () {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
   function retryButton(doc, wrap, retryFn) {
-    var b = touchable(el(doc, "button", "Retry")); b.type = "button";
+    var b = touchable(el(doc, "button", t("prediction.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }
   function autoRetryOnOpen(myGen, retryFn) {
@@ -100,10 +115,10 @@ var PredictionUI = (function () {
   function invalidReason(row) {
     var a = row.asset || {}, opts = a.options || {};
     var d = parsePMADescription(typeof opts.description === "string" ? opts.description : "");
-    if (!d.condition || !d.main) return "missing condition/description";
-    if (d.condition.length < 10 || d.main.length < 20) return "description too short";
-    if (d.expiry) { var t = new Date(d.expiry); if (t instanceof Date && isNaN(t.getTime())) return "bad expiry date"; }
-    if ((opts.market_fee_percent || 0) / 100 >= 10) return "market fee ≥ 10%";
+    if (!d.condition || !d.main) return t("prediction.missing_condition_description", "missing condition/description");
+    if (d.condition.length < 10 || d.main.length < 20) return t("prediction.description_too_short", "description too short");
+    if (d.expiry) { var dt = new Date(d.expiry); if (dt instanceof Date && isNaN(dt.getTime())) return t("prediction.bad_expiry_date", "bad expiry date"); }
+    if ((opts.market_fee_percent || 0) / 100 >= 10) return t("prediction.market_fee_10", "market fee ≥ 10%");
     return "";
   }
 
@@ -159,12 +174,12 @@ var PredictionUI = (function () {
     tr.appendChild(cell(a.symbol || a.id));
     tr.appendChild(cell(d.condition || "—"));
     tr.appendChild(cell(d.expiry || "—"));
-    tr.appendChild(cell(settled ? "Settled" : "Open"));
+    tr.appendChild(cell(settled ? t("prediction.settled", "Settled") : t("prediction.open", "Open")));
     var bad = invalidReason(row);
     tr.appendChild(cell(bad ? ("Invalid: " + bad) : "—"));
     var td = doc.createElement("td"), link = doc.createElement("a");
     link.href = "#/prediction/" + encodeURIComponent(a.symbol || a.id);
-    link.textContent = "Details"; touchable(link); td.appendChild(link);
+    link.textContent = t("prediction.details", "Details"); touchable(link); td.appendChild(link);
     tr.appendChild(td);
     tbody.appendChild(tr);
   }
@@ -177,37 +192,37 @@ var PredictionUI = (function () {
     dropOpenSubs();
     clearBox(root);
     var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", "Prediction Markets"));
-    wrap.appendChild(el(doc, "p", "Prediction-market assets (YES/NO shares). Positions are ordinary limit orders on the asset's market — open a market below and trade from the desk.", "muted"));
+    wrap.appendChild(el(doc, "h1", t("prediction.prediction_markets", "Prediction Markets")));
+    wrap.appendChild(el(doc, "p", t("prediction.prediction_market_assets_yes_no_shares_positi", "Prediction-market assets (YES/NO shares). Positions are ordinary limit orders on the asset's market — open a market below and trade from the desk."), "muted"));
     if (miss) { showError(doc, wrap, "Prediction backend missing: " + miss + " failed to load."); return; }
     var self = function () { if (myGen === gen) renderList(root); };
 
     var toolbar = el(doc, "div", null, "toolbar"); wrap.appendChild(toolbar);
     var search = doc.createElement("input");
-    search.type = "search"; search.placeholder = "Filter by symbol or condition…";
-    search.setAttribute("aria-label", "Filter prediction markets"); touchable(search);
+    search.type = "search"; search.placeholder = t("prediction.filter_by_symbol_or_condition", "Filter by symbol or condition…");
+    search.setAttribute("aria-label", t("prediction.filter_prediction_markets", "Filter prediction markets")); touchable(search);
     toolbar.appendChild(search);
     var filterSel = doc.createElement("select");
-    filterSel.setAttribute("aria-label", "Open or settled filter"); touchable(filterSel);
-    [["open", "Open"], ["settled", "Settled"], ["all", "All"]].forEach(function (pr) {
+    filterSel.setAttribute("aria-label", t("prediction.open_or_settled_filter", "Open or settled filter")); touchable(filterSel);
+    [["open", t("prediction.open", "Open")], ["settled", t("prediction.settled", "Settled")], ["all", t("prediction.all", "All")]].forEach(function (pr) {
       var o = doc.createElement("option"); o.value = pr[0]; o.textContent = pr[1]; filterSel.appendChild(o);
     });
     toolbar.appendChild(filterSel);
     var sym = doc.createElement("input");
-    sym.type = "text"; sym.placeholder = "Look up symbol or 1.3.x id…";
-    sym.setAttribute("aria-label", "Look up a prediction asset directly"); touchable(sym);
+    sym.type = "text"; sym.placeholder = t("prediction.look_up_symbol_or_1_3_x_id", "Look up symbol or 1.3.x id…");
+    sym.setAttribute("aria-label", t("prediction.look_up_a_prediction_asset_directly", "Look up a prediction asset directly")); touchable(sym);
     toolbar.appendChild(sym);
-    var go = touchable(el(doc, "button", "Open")); go.type = "button"; toolbar.appendChild(go);
+    var go = touchable(el(doc, "button", t("prediction.open", "Open"))); go.type = "button"; toolbar.appendChild(go);
     go.addEventListener("click", function () {
       var v = (sym.value || "").trim();
       if (v) location.hash = "#/prediction/" + encodeURIComponent(v);
     });
 
-    var status = showStatus(doc, wrap, "Scanning assets for prediction markets…");
+    var status = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
     var tableWrap = el(doc, "div", null, "table-scroll"); wrap.appendChild(tableWrap);
     var note = el(doc, "p", "", "muted"); wrap.appendChild(note);
     var createP = el(doc, "p", "", "muted"); wrap.appendChild(createP);
-    var ca = doc.createElement("a"); ca.href = "#/assets/create"; ca.textContent = "Create one under Assets → Create (PMA tab)";
+    var ca = doc.createElement("a"); ca.href = "#/assets/create"; ca.textContent = t("prediction.create_one_under_assets_create_pma_tab", "Create one under Assets → Create (PMA tab)");
     createP.textContent = "No market you expected? The scan covers the first " + (SCAN_PAGES * PAGE_SIZE) +
       " assets — use the lookup box above, or ";
     createP.appendChild(ca); createP.appendChild(doc.createTextNode("."));
@@ -218,7 +233,7 @@ var PredictionUI = (function () {
       var q = (search.value || "").toUpperCase(), f = filterSel.value;
       var table = doc.createElement("table");
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-      ["Asset", "Condition", "Expiry", "Status", "Validity", ""].forEach(function (h) {
+      [t("prediction.hdr_asset", "Asset"), t("prediction.hdr_condition", "Condition"), t("prediction.hdr_expiry", "Expiry"), t("prediction.hdr_status", "Status"), t("prediction.hdr_validity", "Validity"), ""].forEach(function (h) {
         var th = doc.createElement("th"); th.textContent = h; th.setAttribute("scope", "col"); hr.appendChild(th);
       });
       thead.appendChild(hr); table.appendChild(thead);
@@ -255,7 +270,7 @@ var PredictionUI = (function () {
     }).catch(function (e) {
       if (myGen !== gen) return;
       status.textContent = "";
-      showError(doc, wrap, e, "Could not load prediction markets.");
+      showError(doc, wrap, e, t("prediction.could_not_load_prediction_markets", "Could not load prediction markets."));
       retryButton(doc, wrap, self);
       autoRetryOnOpen(myGen, self);
     });
@@ -286,7 +301,7 @@ var PredictionUI = (function () {
     try { key = decodeURIComponent(key); } catch (e) { /* raw key stands */ }
     wrap.appendChild(el(doc, "h1", "Prediction Market" + (key ? ": " + key : "")));
     if (miss) { showError(doc, wrap, "Prediction backend missing: " + miss + " failed to load."); return; }
-    if (!key) { showError(doc, wrap, "unknown-asset", "No market given."); return; }
+    if (!key) { showError(doc, wrap, "unknown-asset", t("prediction.no_market_given", "No market given.")); return; }
     var self = function () { if (myGen === gen) renderDetail(root, market); };
     var status = showStatus(doc, wrap, "Loading " + key + "…");
 
@@ -310,12 +325,12 @@ var PredictionUI = (function () {
             var dt = doc.createElement("dt"); dt.textContent = k; dl.appendChild(dt);
             var dd = doc.createElement("dd"); dd.textContent = v; dl.appendChild(dd);
           }
-          row("Asset", info.symbol + " (" + info.id + ")");
-          row("Issuer", (info.issuer_name || info.issuer_id || "—"));
-          row("Backing asset", backSym);
+          row(t("prediction.asset", "Asset"), info.symbol + " (" + info.id + ")");
+          row(t("prediction.issuer", "Issuer"), (info.issuer_name || info.issuer_id || "—"));
+          row(t("prediction.backing_asset", "Backing asset"), backSym);
           if (info.supply_raw !== null && info.supply_raw !== undefined) {
-            try { row("Current supply", Format.formatAmount(info.supply_raw, info.precision) + " " + info.symbol); }
-            catch (e) { row("Current supply", String(info.supply_raw)); }
+            try { row(t("prediction.current_supply", "Current supply"), Format.formatAmount(info.supply_raw, info.precision) + " " + info.symbol); }
+            catch (e) { row(t("prediction.current_supply", "Current supply"), String(info.supply_raw)); }
           }
           /* Settlement status: settlement_fund > 0 means globally settled
            * (#1 _filterMarkets :419-421). Asset.describe does not join the
@@ -326,13 +341,13 @@ var PredictionUI = (function () {
             var fund = (b.settlement_fund !== undefined && b.settlement_fund !== null) ? String(b.settlement_fund) : "0";
             var isSettled = false;
             try { isSettled = BigInt(fund) > 0n; } catch (e) { isSettled = fund !== "0"; }
-            var sRow = doc.createElement("dt"); sRow.textContent = "Settlement";
+            var sRow = doc.createElement("dt"); sRow.textContent = t("prediction.settlement", "Settlement");
             dl.appendChild(sRow);
             var sVal = doc.createElement("dd");
-            sVal.textContent = isSettled ? "Settled (global settlement executed)" : "Open (not settled)";
+            sVal.textContent = isSettled ? t("prediction.settled_global_settlement_executed", "Settled (global settlement executed)") : t("prediction.open_not_settled", "Open (not settled)");
             dl.appendChild(sVal);
             if (isSettled) {
-              var fRow = doc.createElement("dt"); fRow.textContent = "Settlement fund";
+              var fRow = doc.createElement("dt"); fRow.textContent = t("prediction.settlement_fund", "Settlement fund");
               dl.appendChild(fRow);
               var fVal = doc.createElement("dd");
               try { fVal.textContent = Format.formatAmount(fund, info.precision) + " " + info.symbol; }
@@ -358,13 +373,13 @@ var PredictionUI = (function () {
                   String(quote.amount), qp, 6);
               } catch (e) { human = null; }
             }
-            row("Settlement price", human !== null ? (human + " " + backSym + " per " + info.symbol) : "No usable feed published");
+            row(t("prediction.settlement_price", "Settlement price"), human !== null ? (human + " " + backSym + " per " + info.symbol) : "No usable feed published");
           } else {
-            row("Settlement price", "No feed published");
+            row(t("prediction.settlement_price", "Settlement price"), "No feed published");
           }
           wrap.appendChild(dl);
 
-          var h = el(doc, "h3", "Take a position"); wrap.appendChild(h);
+          var h = el(doc, "h3", t("prediction.take_a_position", "Take a position")); wrap.appendChild(h);
           wrap.appendChild(el(doc, "p", "YES and NO are ordinary limit orders on the " +
             info.symbol + " / " + backSym + " market. You trade from the desk — nothing here signs.", "muted"));
           var desk = doc.createElement("a");
@@ -373,16 +388,16 @@ var PredictionUI = (function () {
           touchable(desk); wrap.appendChild(desk);
           var more = el(doc, "p", "", "muted"); wrap.appendChild(more);
           var a1 = doc.createElement("a"); a1.href = "#/asset/" + encodeURIComponent(info.symbol);
-          a1.textContent = "Asset detail"; more.appendChild(a1);
+          a1.textContent = t("prediction.asset_detail", "Asset detail"); more.appendChild(a1);
           more.appendChild(doc.createTextNode(" · "));
           var a2 = doc.createElement("a"); a2.href = "#/prediction";
-          a2.textContent = "All prediction markets"; more.appendChild(a2);
+          a2.textContent = t("prediction.all_prediction_markets", "All prediction markets"); more.appendChild(a2);
         });
       });
     }).catch(function (e) {
       if (myGen !== gen) return;
       status.textContent = "";
-      showError(doc, wrap, e, "Could not load this prediction market.");
+      showError(doc, wrap, e, t("prediction.could_not_load_this_prediction_market", "Could not load this prediction market."));
       retryButton(doc, wrap, self);
       autoRetryOnOpen(myGen, self);
     });
