@@ -148,7 +148,38 @@ a.btn-ghost { background: transparent; color: var(--accent);
 button, select, input { min-height: 44px; font-size: 1rem; }
 /* #1 form controls are square like its buttons (foundation input radius 0);
  * min-height/font/padding untouched (principle #7 touch floor). */
-input, select, textarea { border-radius: 0; }
+/* Retro recapture round 1 (2026-09-29, vanilla/notes/retro-round-1.md):
+ * cheap exact deltas vs vanilla/notes/original-pages/ + the 2026-09-28
+ * header/buy-sell captures. Theme tokens only — all three themes keep
+ * working. No DOM/JS touched by this block. */
+a { color: var(--accent); }
+input, select, textarea { background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 0; padding: 0 10px; }
+textarea { padding: 8px 10px; }
+::placeholder { color: var(--muted); opacity: 1; }
+/* Native check/radio boxes: the global 44px min-height above stretches them
+ * into giant squares (transfer encrypted-memo box). #1 uses small boxes, so
+ * reset to 18px here; the wrapping label row keeps the 44px touch target. */
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px;
+  min-width: 0; min-height: 0; padding: 0; margin: 0;
+  background: transparent; border: 0; accent-color: var(--accent); }
+.xfer-field label:has(input[type="checkbox"]),
+.xfer-field label:has(input[type="radio"]) { min-height: 44px;
+  align-content: center; }
+/* Page titles: #1 has no giant H1s (pools/explorer/voting pages carry tabs +
+ * tables, not 2rem headings). Shrink wrap-level titles toward that density;
+ * desk (.mkt h1) already has its own size. */
+.wrap > h1 { font-size: 1.35rem; margin: 12px 0 8px; }
+/* Warn-banner dismiss: #1 root.png shows a plain x, not a bordered button. */
+#warn-dismiss { border-width: 0; }
+/* Phone stat strip: long bid/ask fractions must break, not clip past 390px.
+ * (0,2,0) specificity beats the later .mkt-stat desk rules regardless of
+ * source order. */
+@media (max-width: 559px) {
+  .mkt-statstrip .mkt-stat { white-space: normal; min-width: 0; }
+  .mkt-statstrip { min-width: 0; }
+  .mkt-statstrip .mkt-stat strong { overflow-wrap: anywhere; word-break: break-all; }
+}
 /* #1 buttons: square, condensed, uppercase 0.875rem (see header comment).
  * min-height 44px stays (principle #7 touch floor — #1's density is kept via
  * font/padding, never by shrinking targets). */
@@ -318,8 +349,9 @@ details.raw > pre { user-select: text; -webkit-user-select: text;
 
 /* Persistent status footer (dexux-ref: version left, latency/block right).
  * Theme-aware via tokens; sticks to the viewport bottom without covering
- * content (body gets bottom padding). */
-body { padding-bottom: 44px; }
+ * content (body gets bottom padding; 64px clears the ~52px bar plus the
+ * transfer REVIEW-button edge seen in round 1). */
+body { padding-bottom: 64px; }
 #appfoot { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000;
   display: flex; align-items: center; gap: 8px; min-height: 44px;
   padding: 4px 16px; font-size: 0.8rem;
@@ -571,7 +603,8 @@ img, canvas, pre { max-width: 100%; }
   border-bottom: 1px solid var(--border); }
 #nav a { color: var(--header-text); }
 #nav a:hover { background: rgba(255, 255, 255, 0.08); }
-#nav a[aria-current="page"] { outline-color: var(--accent); background: rgba(255, 255, 255, 0.08); }
+#nav a[aria-current="page"] { outline: none; background: rgba(255, 255, 255, 0.08); }
+#nav a[aria-current="page"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #nav-directory { background: var(--header-bg); color: var(--header-text);
   border-top: 1px solid var(--border); }
 #nav-directory a { color: var(--header-text); }
@@ -597,7 +630,10 @@ img, canvas, pre { max-width: 100%; }
 /* REPORT + HELP (#1 Footer.jsx:666-699 introjs-launcher pair, $bs-blue #049cce
  * == var(--button-bg) in ref-ui-theme): accent-blue square buttons, bottom-right. */
 .appfoot-actions { display: inline-flex; gap: 8px; margin-left: 8px; }
-.appfoot-actions a { display: inline-flex; align-items: center; justify-content: center;
+/* ID-qualified so it beats the generic #appfoot a accent rule above: without
+ * this, button text resolves to --accent, which equals --button-bg in
+ * dex-ux-theme (and vanilla-ui-theme) — invisible REPORT/HELP (round 1). */
+#appfoot .appfoot-actions a { display: inline-flex; align-items: center; justify-content: center;
   min-width: 44px; min-height: 32px; padding: 4px 10px;
   background: var(--button-bg); color: var(--accent-text); text-decoration: none;
   border-radius: 0; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
@@ -624,7 +660,7 @@ img, canvas, pre { max-width: 100%; }
  * so the bar wraps to two lines and the body padding grows with it — every
  * element stays visible, no horizontal overflow (principle #7). */
 @media (max-width: 559px) {
-  body { padding-bottom: 88px; }
+  body { padding-bottom: 104px; }
   #appfoot { flex-wrap: wrap; row-gap: 4px; }
 }
 
