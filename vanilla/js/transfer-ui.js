@@ -31,9 +31,42 @@
  * Confirm rows follow #3's op-0 table
  * (wallet-extension/src/popup/popup.js:5717-5722): From / To / Amount /
  * Memo, plus Fee and Network (plan Task 4 spec).
- * Fee is looked up IN THE TRANSFER ASSET (feeAssetId = assetId): one asset
- * lookup, fee displays in the same symbol the user typed. Tx.fee supports
- * any fee asset; the node answers the equivalent fee.
+ * Fee asset selector (punchlist-2026-09-29 HIGH+MEDs): the form offers the
+ * transfer asset plus the sender's non-zero balance assets when unlocked
+ * (transfer asset alone when locked) and quotes get_required_fees in the
+ * chosen asset — Tx.fee answers any asset the chain allows. The default
+ * stays the transfer asset, so the default path is unchanged. The locked
+ * preview looks the fee up AND displays it in the chosen asset (correct
+ * precision/symbol — owned here). The unlocked Review delegates charging
+ * to TransferConfirm.review, which settles feeAssetId = transfer asset id
+ * today: the choice travels in the review vals as feeAsset (forward-compat
+ * hook) with an inline note naming the settling asset, and full
+ * pay-threading is the confirm-file follow-up below — a fee is never
+ * charged in a mislabeled asset.
+ * Asset dropdown (HIGH): unlocked restricts the asset to the sender's
+ * non-zero balances (SendModal.jsx:288-304 concept); locked keeps the
+ * free-text input, balances-load failure keeps it too (the form never
+ * blocks), the ?asset= prefill survives via union, and the unknown-asset
+ * review catch is kept for every path.
+ * Available balance (MED): "Current balance: X SYM" click-fills the max
+ * amount (SendModal.jsx:458-484 concept, same dotted-underline affordance).
+ * Same-asset fees subtract best-effort (exact op shape with memo when the
+ * recipient and memo key resolve, memo-less shape otherwise; the fill
+ * itself never fails — the confirm always shows the exact fee).
+ * Review gating (SendModal.jsx:496-509 concept): the button stays disabled
+ * until from+to+amount+asset are present and syntactically valid with
+ * from != to (case-insensitive; id-level equality re-checks at review).
+ * Every disabled state lists its reasons inline — honest, never silent.
+ * DEFERRED (same punchlist page): Send/Propose toggle (SendModal.jsx:551-564
+ * concept — propose-as-another-account lands with the proposal slice) and
+ * the known-scammer recipient flag (AccountSelector.jsx:592,709 concept —
+ * lands with the auth/contacts slice). Recorded here so neither is lost.
+ * Pending-i18n plain strings (3 — the next locales batch moves them to
+ * transfer.* with matching defaults; check_i18n scans t() calls only, so
+ * it stays green meanwhile): "Sender is required.",
+ * "Sender and recipient must be different.",
+ * "Confirm settles the fee in " + SYM + ".".
+ * Tx.fee supports any fee asset; the node answers the equivalent fee.
  * Tx.broadcast returns {blockNum, trxInBlock, via} — NO txid (history rows
  * carry none, see tx.js pollHistoryForTransfer). The result screen shows
  * block # + position and does not fabricate a txid.
@@ -237,6 +270,7 @@ var TransferUI = (function () {
         amount: "",
         memo: q.memo || "",
         encrypted: !q.memo,
+        feeAsset: null,
         error: null
       });
     }).catch(function (e) {
@@ -276,6 +310,9 @@ var TransferUI = (function () {
       }).catch(function () {
         setFieldError(fromF, t("transfer.unknown_account_name", "Unknown account: %(name)s.", {name: v}));
       });
+      /* Sender changed while unlocked: reload their balances so the asset
+       * dropdown, fee options, and available line follow the new sender. */
+      if (!locked && v !== balWho) loadBalancesForSender();
     });
 
     var toF = fieldRow(doc, t("transfer.to_label", "To (name or 1.2.N) "), {
@@ -293,10 +330,21 @@ var TransferUI = (function () {
       });
     });
 
+    /* Asset field (punchlist HIGH). assetF.input is SWAPPABLE: unlocked it
+     * becomes a <select> restricted to the sender's non-zero balances once
+     * they load (free-text fallback when locked or when the load fails, so
+     * the form never blocks). Every reader below uses assetF.input at event
+     * time, never a cached node. */
     var assetF = fieldRow(doc, t("transfer.asset_label", "Asset "), {
       id: "xfer-asset", value: state.asset, placeholder: coreSymbol(), autocomplete: "off"
     });
     wrap.appendChild(assetF.row);
+
+    /* Available balance (punchlist MED): a click-to-fill button when the
+     * selected asset has a known sender balance (unlocked only), a status
+     * line while loading or when the load failed, empty otherwise. */
+    var availBox = el(doc, "div", null, "xfer-avail");
+    wrap.appendChild(availBox);
 
     var amountF = fieldRow(doc, t("transfer.amount_label", "Amount "), {
       id: "xfer-amount", value: state.amount, placeholder: "0.00", inputmode: "decimal", autocomplete: "off"
@@ -319,12 +367,319 @@ var TransferUI = (function () {
     encRow.appendChild(encLabel);
     wrap.appendChild(encRow);
 
+    /* Fee asset (punchlist MED): the transfer asset plus the sender's
+     * non-zero balances when unlocked, the transfer asset alone when
+     * locked. The choice follows the transfer asset until touched. */
+    var feeRow = el(doc, "div", null, "xfer-field");
+    var feeLabel = el(doc, "label", t("confirm.fee", "Fee") + " ");
+    var feeSel = doc.createElement("select");
+    feeSel.id = "xfer-fee-asset";
+    touchable(feeSel);
+    feeLabel.appendChild(feeSel);
+    feeRow.appendChild(feeLabel);
+    wrap.appendChild(feeRow);
+    /* Equivalent-fee quote in an alternate fee asset (unlocked only, hidden
+     * otherwise and on any lookup failure — the confirm stays the source
+     * of truth; a missing quote is never a wrong number). */
+    var feeQuote = el(doc, "div", "", "muted");
+    feeQuote.setAttribute("aria-live", "polite");
+    wrap.appendChild(feeQuote);
+
     var reviewBtn = touchable(el(doc, "button", t("transfer.review", "Review transfer")));
     reviewBtn.id = "xfer-review";
     reviewBtn.type = "button";
+    reviewBtn.disabled = true; /* gating owns this from here on */
     wrap.appendChild(reviewBtn);
+    /* Gating reasons: every disabled state names its reasons inline
+     * (honest, never silent). Empty when the form is submittable. */
+    var gateBox = el(doc, "div", null, "xfer-gate");
+    gateBox.setAttribute("aria-live", "polite");
+    wrap.appendChild(gateBox);
     var previewBox = el(doc, "div", null, "xfer-out");
     wrap.appendChild(previewBox);
+
+    /* Sender balances cache (unlocked only) in Account.balances shape,
+     * non-zero raw amounts only. bySym maps uppercased symbol to entry.
+     * feeSym is the fee selector choice; feeTouched stops the transfer
+     * asset from clobbering a deliberate pick on rebuilds. */
+    var bals = [];
+    var bySym = {};
+    var feeSym = String(state.feeAsset || state.asset || coreSymbol()).trim().toUpperCase();
+    var feeTouched = !!state.feeAsset;
+    var balWho = null;
+    var balsState = locked ? "locked" : "loading"; /* loading|ready|failed|locked */
+
+    /* Live asset value across the input/select swap (never cached). */
+    function assetVal() {
+      return String((assetF.input && assetF.input.value) || "").trim();
+    }
+
+    function findBal(sym) {
+      var s = String(sym || "").trim().toUpperCase();
+      if (!s) return null;
+      return bySym[s] || null;
+    }
+
+    /* Rebuild the fee selector: transfer asset first (the kept default),
+     * then sender balances. Preserves a deliberate choice, otherwise
+     * follows the transfer asset. */
+    function refreshFeeOpts() {
+      var tSym = assetVal().toUpperCase() || feeSym;
+      if (!feeTouched) feeSym = tSym;
+      var seen = {};
+      var opts = [];
+      function push(sym) {
+        var s = String(sym || "").trim().toUpperCase();
+        if (!s || seen[s]) return;
+        seen[s] = 1;
+        opts.push(s);
+      }
+      push(tSym);
+      push(feeSym);
+      for (var i = 0; i < bals.length; i++) push(bals[i].symbol);
+      while (feeSel.firstChild) feeSel.removeChild(feeSel.firstChild);
+      for (var k = 0; k < opts.length; k++) {
+        var o = doc.createElement("option");
+        o.value = opts[k];
+        o.textContent = opts[k];
+        if (opts[k] === feeSym) o.selected = true;
+        feeSel.appendChild(o);
+      }
+      refreshFeeQuote();
+    }
+
+    /* Available-balance line: click-to-fill button on a balance hit,
+     * loading/failed text while unresolved, empty when locked or when the
+     * selected asset is not a sender balance. */
+    function refreshAvail() {
+      while (availBox.firstChild) availBox.removeChild(availBox.firstChild);
+      if (locked) return;
+      if (balsState === "loading") {
+        availBox.appendChild(el(doc, "span", t("account.loading_balances", "Loading balances…"), "muted"));
+        return;
+      }
+      if (balsState === "failed") {
+        availBox.appendChild(el(doc, "span", t("account.load_balances_failed", "Could not load balances."), "muted"));
+        return;
+      }
+      var b = findBal(assetVal());
+      if (!b) return;
+      var btn = el(doc, "button", t("credit.current_balance", "Current balance") + ": " + b.display + " " + b.symbol);
+      btn.type = "button";
+      btn.id = "xfer-max";
+      btn.style.borderBottom = "#A09F9F 1px dotted"; /* SendModal affordance */
+      btn.style.cursor = "pointer";
+      touchable(btn);
+      btn.addEventListener("click", function () { fillMax(b); });
+      availBox.appendChild(btn);
+    }
+
+    /* Click-to-fill the max amount (SendModal._setTotal concept): the full
+     * balance lands immediately; when the fee is paid in the same asset the
+     * quoted fee subtracts best-effort (exact op shape with memo when the
+     * recipient and memo key resolve, memo-less shape otherwise). Any
+     * lookup failure keeps the full balance — the confirm always shows the
+     * exact fee, so a quote never blocks the fill. Integer strings only. */
+    function fillMax(b) {
+      amountF.input.value = b.display;
+      updateGate();
+      if (locked) return;
+      if (feeSym !== String(b.symbol).toUpperCase()) return;
+      var stamp = b.display;
+      Promise.resolve().then(async function () {
+        var wid = await Account.myAccountId();
+        var toId = wid;
+        try { toId = (await Account.resolve(toF.input.value.trim())).id; } catch (e) { /* self shape */ }
+        var amountInt = Format.parseAmount(b.display, b.precision);
+        var memoObj = null;
+        var memoText = String(memoF.input.value || "");
+        if (memoText) {
+          var toFull = await fullAccountLocal(toId);
+          var memoKey = toFull && toFull.options ? toFull.options.memo_key : null;
+          if (!memoKey) throw new Error("no-memo-key");
+          if (encBox.checked) {
+            if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) throw new Error("wallet-locked");
+            if (typeof Crypto === "undefined" || !Crypto.encryptMemo) throw new Error("no-crypto");
+            memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, memoKey);
+          } else {
+            memoObj = { from: "", to: memoKey, nonce: "0", message: utf8HexLocal(memoText) };
+          }
+        }
+        var unsigned = await Tx.buildTransfer({
+          fromId: wid, toId: toId, amountInt: amountInt, assetId: b.asset_id, memoObj: memoObj
+        });
+        var fee = await Tx.fee(0, unsigned.operations[0][1], b.asset_id);
+        var diff = BigInt(amountInt) - BigInt(String(fee.amount));
+        if (diff <= 0n) return;
+        if (amountF.input.value !== stamp) return; /* user typed meanwhile */
+        amountF.input.value = Format.formatAmount(diff.toString(), b.precision);
+        updateGate();
+      }).catch(function () { /* best-effort: the full balance stands */ });
+    }
+
+    /* Equivalent-fee quote in an alternate fee asset (unlocked, alternate
+     * only — the default path shows nothing new). Memo-less shape: the
+     * recipient and memo keys may not resolve yet, so this is a QUOTE and
+     * the confirm settles the exact fee in the transfer asset (named in
+     * the note). Hidden on any failure. */
+    function refreshFeeQuote() {
+      while (feeQuote.firstChild) feeQuote.removeChild(feeQuote.firstChild);
+      if (locked) return;
+      var tSym = assetVal().toUpperCase();
+      if (!feeSym || feeSym === tSym) return;
+      var b = findBal(feeSym);
+      if (!b) return;
+      var stampSym = feeSym, stampT = tSym;
+      Promise.resolve().then(async function () {
+        var tBal = findBal(assetVal());
+        var tAsset = tBal
+          ? { id: tBal.asset_id, symbol: tBal.symbol, precision: tBal.precision }
+          : await lookupAssetLocal(assetVal());
+        var wid = await Account.myAccountId();
+        var toId = wid;
+        try { toId = (await Account.resolve(toF.input.value.trim())).id; } catch (e) { /* self shape */ }
+        var amountInt;
+        try {
+          amountInt = Format.parseAmount(amountF.input.value, tAsset.precision);
+          if (!/[1-9]/.test(amountInt)) amountInt = Format.parseAmount("1", tAsset.precision);
+        } catch (e) {
+          amountInt = Format.parseAmount("1", tAsset.precision);
+        }
+        var unsigned = await Tx.buildTransfer({
+          fromId: wid, toId: toId, amountInt: amountInt, assetId: tAsset.id, memoObj: null
+        });
+        var fee = await Tx.fee(0, unsigned.operations[0][1], b.asset_id);
+        if (feeSym !== stampSym || assetVal().toUpperCase() !== stampT) return; /* stale */
+        feeQuote.textContent = t("confirm.fee", "Fee") + " (" + b.symbol + "): " +
+          Format.formatAmount(String(fee.amount), b.precision);
+        feeQuote.appendChild(doc.createTextNode(" — Confirm settles the fee in " + stampT + "."));
+      }).catch(function () { /* quote hidden; confirm stays source of truth */ });
+    }
+
+    /* Review gating (SendModal isSubmitNotValid concept): disabled until
+     * from+to+amount+asset are present and syntactically valid with
+     * from != to (case-insensitive; id-level equality re-checks at
+     * review). Every disabled state lists its reasons — never silent. */
+    function updateGate() {
+      var reasons = [];
+      var fromV = fromF.input.value.trim();
+      var toV = toF.input.value.trim();
+      var assetV = assetVal();
+      var amountV = amountF.input.value.trim();
+      if (!fromV) reasons.push("Sender is required.");
+      if (!toV) reasons.push(t("transfer.recipient_required", "Recipient is required."));
+      if (!assetV) reasons.push(t("transfer.asset_required", "Asset symbol is required."));
+      if (!amountV) {
+        reasons.push(t("transfer.amount_positive", "Amount must be greater than zero."));
+      } else if (!/^\d+(\.\d+)?$/.test(amountV)) {
+        reasons.push(t("transfer.bad_amount", "bad amount"));
+      } else if (!/[1-9]/.test(amountV.replace(".", ""))) {
+        reasons.push(t("transfer.amount_positive", "Amount must be greater than zero."));
+      }
+      if (fromV && toV && fromV.toLowerCase() === toV.toLowerCase()) {
+        reasons.push("Sender and recipient must be different.");
+      }
+      while (gateBox.firstChild) gateBox.removeChild(gateBox.firstChild);
+      for (var i = 0; i < reasons.length; i++) {
+        gateBox.appendChild(el(doc, "div", reasons[i], "xfer-gate-reason"));
+      }
+      reviewBtn.disabled = reasons.length > 0;
+    }
+
+    /* Asset input events, rebound after the input/select swap. */
+    function bindAssetEvents() {
+      assetF.input.addEventListener("input", function () {
+        refreshFeeOpts(); refreshAvail(); updateGate();
+      });
+      assetF.input.addEventListener("change", function () {
+        refreshFeeOpts(); refreshAvail(); updateGate();
+      });
+    }
+
+    /* Unlocked asset dropdown: resolve the sender, load non-zero balances,
+     * swap the text input for a restricted <select> (the current/prefill
+     * value survives via union). Any failure keeps the free-text input —
+     * the form never blocks, and the unknown-asset review catch still
+     * guards every path. */
+    function swapAssetToSelect() {
+      if (!assetF.input || assetF.input.tagName !== "INPUT") return;
+      var cur = assetVal().toUpperCase();
+      var seen = {};
+      var opts = [];
+      var i, k;
+      for (i = 0; i < bals.length; i++) {
+        seen[String(bals[i].symbol).toUpperCase()] = 1;
+        opts.push(bals[i].symbol);
+      }
+      if (cur && !seen[cur]) opts.push(cur);
+      if (!opts.length) return;
+      var sel = doc.createElement("select");
+      sel.id = "xfer-asset";
+      touchable(sel);
+      for (k = 0; k < opts.length; k++) {
+        var o = doc.createElement("option");
+        o.value = opts[k];
+        o.textContent = opts[k];
+        if (opts[k].toUpperCase() === cur) o.selected = true;
+        sel.appendChild(o);
+      }
+      assetF.input.parentNode.replaceChild(sel, assetF.input);
+      assetF.input = sel;
+      bindAssetEvents();
+    }
+
+    function loadBalancesForSender() {
+      var who = fromF.input.value.trim() || from.id;
+      balWho = who;
+      balsState = "loading";
+      refreshAvail();
+      Promise.resolve().then(async function () {
+        var acc = await Account.resolve(who);
+        var rows = await Account.balances(acc.id);
+        if (balWho !== who || (fromF.input.value.trim() || from.id) !== who) return; /* stale */
+        bals = (rows || []).filter(function (e) {
+          return e && /[1-9]/.test(String(e.raw));
+        });
+        bySym = {};
+        bals.forEach(function (e) {
+          bySym[String(e.symbol).toUpperCase()] = e;
+        });
+        balsState = "ready";
+        /* A fee choice the new sender does not hold falls back openly to
+         * the transfer asset — never a quote for an asset they lack. */
+        if (feeTouched && feeSym !== assetVal().toUpperCase() && !bySym[feeSym]) {
+          feeSym = assetVal().toUpperCase() || feeSym;
+          feeTouched = false;
+        }
+        swapAssetToSelect();
+        refreshFeeOpts();
+        refreshAvail();
+        updateGate();
+      }).catch(function () {
+        if (balWho !== who) return; /* stale */
+        bals = [];
+        bySym = {};
+        balsState = "failed";
+        refreshFeeOpts();
+        refreshAvail();
+        updateGate();
+      });
+    }
+
+    fromF.input.addEventListener("input", updateGate);
+    toF.input.addEventListener("input", updateGate);
+    amountF.input.addEventListener("input", updateGate);
+    memoF.input.addEventListener("input", function () { refreshFeeQuote(); });
+    feeSel.addEventListener("change", function () {
+      feeSym = String(feeSel.value || "").trim().toUpperCase() || feeSym;
+      feeTouched = true;
+      refreshFeeQuote();
+    });
+    bindAssetEvents();
+    refreshFeeOpts();
+    refreshAvail();
+    updateGate();
+    if (!locked) loadBalancesForSender();
 
     reviewBtn.addEventListener("click", function () {
       setFieldError(fromF, "");
@@ -350,7 +705,9 @@ var TransferUI = (function () {
             asset: assetF.input.value,
             amount: amountF.input.value,
             memo: memoF.input.value,
-            encrypted: encBox.checked
+            encrypted: encBox.checked,
+            feeAsset: feeSym /* forward-compat hook; review settles the
+              transfer asset today, see header */
           });
         }).then(function (ctx) {
           clearRoot(root);
@@ -363,6 +720,7 @@ var TransferUI = (function () {
               amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
               memo: ctx.memoText,
               encrypted: ctx.memoKind !== "plain",
+              feeAsset: feeSym,
               error: null
             });
           });
@@ -388,6 +746,7 @@ var TransferUI = (function () {
             amount: amountF.input.value,
             memo: memoF.input.value,
             encrypted: encBox.checked,
+            feeAsset: String(feeSel.value || feeSym),
             error: msg
           });
         });
@@ -399,7 +758,8 @@ var TransferUI = (function () {
           asset: assetF.input.value,
           amount: amountF.input.value,
           memo: memoF.input.value,
-          encrypted: encBox.checked
+          encrypted: encBox.checked,
+          feeAsset: feeSym
         }, reviewBtn);
       }
     });
@@ -491,13 +851,26 @@ var TransferUI = (function () {
           memoKind = "plain";
         }
       }
+      /* Fee in the chosen asset (transfer asset by default): resolved to
+       * id + precision here so the preview displays the right symbol at
+       * the right decimals. An unresolvable choice fails loudly below —
+       * never a wrong number. */
+      var wantFeeSym = String(vals.feeAsset || asset.symbol).trim().toUpperCase() || asset.symbol;
+      var feeId = asset.id, feePrec = asset.precision, feeSym = asset.symbol;
+      if (wantFeeSym !== asset.symbol) {
+        var feeAsset = await lookupAssetLocal(wantFeeSym);
+        feeId = feeAsset.id;
+        feePrec = feeAsset.precision;
+        feeSym = feeAsset.symbol;
+      }
       var unsigned = await Tx.buildTransfer({
         fromId: fromAcc.id, toId: to.id, amountInt: amountInt, assetId: asset.id, memoObj: memoObj
       });
-      var fee = await Tx.fee(0, unsigned.operations[0][1], asset.id);
+      var fee = await Tx.fee(0, unsigned.operations[0][1], feeId);
       return { fromAcc: fromAcc, to: to, asset: asset, amountInt: amountInt,
         memoText: memoText, memoKind: memoKind, lockedEnc: lockedEnc,
-        encrypted: !!vals.encrypted, fee: fee };
+        encrypted: !!vals.encrypted, fee: fee,
+        feeSym: feeSym, feePrec: feePrec };
     }).then(function (P) {
       while (box.firstChild) box.removeChild(box.firstChild);
       box.appendChild(el(doc, "h3", t("transfer.preview_title", "Transfer preview (locked)")));
@@ -516,9 +889,9 @@ var TransferUI = (function () {
         (P.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : "(none)"));
       var feeHuman;
       try {
-        feeHuman = Format.formatAmount(String(P.fee.amount), P.asset.precision) + " " + P.asset.symbol;
-      } catch (e) { feeHuman = String(P.fee.amount); }
-      row(t("confirm.fee", "Fee"), feeHuman, String(P.fee.amount));
+        feeHuman = Format.formatAmount(String(P.fee.amount), P.feePrec) + " " + P.feeSym;
+      } catch (e) { feeHuman = String(P.fee.amount) + " " + P.feeSym; }
+      row(t("confirm.fee", "Fee") + " (" + P.feeSym + ")", feeHuman, String(P.fee.amount));
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
       box.appendChild(el(doc, "p",
@@ -543,7 +916,8 @@ var TransferUI = (function () {
             return TransferConfirm.review({
               to: P.to.name, asset: P.asset.symbol,
               amount: Format.formatAmount(P.amountInt, P.asset.precision),
-              memo: P.memoText, encrypted: !!(P.encrypted && P.memoText)
+              memo: P.memoText, encrypted: !!(P.encrypted && P.memoText),
+              feeAsset: P.feeSym
             });
           })
           .then(function (ctx) {
@@ -553,7 +927,8 @@ var TransferUI = (function () {
               showForm(doc, makeWrap(doc, root), root, P.fromAcc, {
                 from: P.fromAcc.name, to: ctx.to.name, asset: ctx.asset.symbol,
                 amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
-                memo: ctx.memoText, encrypted: ctx.memoKind !== "plain", error: null
+                memo: ctx.memoText, encrypted: ctx.memoKind !== "plain",
+                feeAsset: P.feeSym, error: null
               });
             });
           })
