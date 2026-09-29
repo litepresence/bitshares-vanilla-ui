@@ -2276,6 +2276,7 @@
     "sort_by": "Sort by ",
     "virgin_note": "First deposit into an empty pool mints shares equal to the larger leg — fund both legs accordingly.",
     "swap_failed": "Could not prepare the swap.",
+    "swap_stake_col": "Swap/Stake",
     "swap_sub": "Single-pool swap (one op-63). No multi-hop routing.",
     "swap_title": "Swap in pool",
     "swap_title_attr": "Swap in this pool",

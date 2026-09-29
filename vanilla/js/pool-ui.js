@@ -258,7 +258,7 @@ var PoolUI = (function () {
     var hr = doc.createElement("tr");
     var cols = [
       { key: "id", label: t("pool.id_col", "Pool ID"), sortable: true },
-      { key: null, label: t("market.title", "Exchange") },
+      { key: null, label: t("pool.swap_stake_col", "Swap/Stake") },
       { key: null, label: t("pool.share_asset_field", "Share asset") },
       { key: null, label: t("pool.asset_a_field", "Asset A") },
       { key: null, label: t("pool.asset_a_qty_col", "Asset A qty") },
