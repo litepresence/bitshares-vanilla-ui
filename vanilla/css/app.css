@@ -81,11 +81,19 @@ a.btn-ghost { background: transparent; color: var(--accent);
 .mkt-quotes button { min-height: 44px; padding: 6px 12px; border: 1px solid var(--border);
   border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 .mkt-quotes button[aria-pressed="true"] { border-color: var(--accent); font-weight: 700; }
-/* Picker row ticker stats (PRICE · CHANGE, fail-open "—"). */
-.mkt-picker-row { display: flex; align-items: center; gap: 8px; }
-.mkt-picker-row > a { flex: 1 1 auto; }
-.mkt-stat-inline { flex: 0 1 auto; min-width: 0; font-size: 0.85rem;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Market picker table (retro round 2 D2 — original MY/FIND MARKETS language):
+ * star first-column, MARKET/VOL/PRICE/CHANGE header, tabular numbers. Grid
+ * keeps the columns aligned across rows; the name link ellipsizes. */
+.mkt-picker-row { display: grid; align-items: center; gap: 4px 8px;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto auto; }
+.mkt-pk-star { min-width: 44px; justify-self: start; }
+.mkt-picker-row > a.mkt-pk-mkt { min-width: 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.mkt-pk-num { text-align: right; font-variant-numeric: tabular-nums;
+  font-size: 0.85rem; white-space: nowrap; }
+.mkt-picker-head { color: var(--muted); font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.mkt-picker-head .mkt-pk-num { font-size: inherit; }
 /* Sortable table headers (pools page-sort): text button in the th. */
 .th-sort { background: transparent; color: inherit; border: 0; padding: 0;
   font: inherit; text-transform: inherit; letter-spacing: inherit;
@@ -289,10 +297,9 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 @media (max-width: 719px) {
   .mkt-chartgrid { grid-template-columns: minmax(0, 1fr); }
 }
-/* Picker: asset-type radios + favorite stars (favorites sort first). */
+/* Picker: asset-type radios + favorite stars (favorites sort first).
+ * Row layout lives in the grid block above (D2 table); nothing flex here. */
 .mkt-kinds { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
-.mkt-picker-row { display: flex; align-items: center; gap: 4px; }
-.mkt-picker-row a { flex: 1; min-width: 0; }
 .mkt-star { background: transparent; color: var(--warn); border: 0;
   min-width: 44px; min-height: 44px; font-size: 1.2rem; padding: 0 8px; }
 /* Desk tables stay dense on wide screens (pool .mkt-book cell + exchange
@@ -640,7 +647,8 @@ img, canvas, pre { max-width: 100%; }
   letter-spacing: 0.05em; white-space: nowrap; }
 
 /* Pools swap + detail tabs (.mkt-tabs hosts in pool-swap-ui.js:80,
- * pool-detail-ui.js:606, market-desk.js:422, dashboard-ui.js:461 — previously
+ * pool-detail-ui.js:606, market-desk.js:422, dashboard-ui.js:461,
+ * market-picker.js (All/Starred), account-ui.js (acct-tabs) — previously
  * unstyled): same uppercase accent-underline treatment as .trade-tabs, so the
  * swap page's Pool/My history toggle reads like the desk. Buttons keep ids. */
 .mkt-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
@@ -652,6 +660,14 @@ img, canvas, pre { max-width: 100%; }
 .mkt-tabs button:hover { color: var(--text); }
 .mkt-tabs button[aria-pressed="true"], .mkt-tabs button[aria-selected="true"] {
   color: var(--accent); border-bottom-color: var(--accent); }
+/* Account page tabs + density (retro round 2 D3 — original 5-tab language).
+ * .acct-tabs rides .mkt-tabs (shared tab treatment); wraps on phones so all
+ * five tabs stay visible at 360px. Density: smaller cell padding + tabular
+ * numbers on account tables only — no column dropped. */
+.mkt-tabs.acct-tabs { flex-wrap: wrap; row-gap: 0; }
+.wrap.acct .node-table th, .wrap.acct .node-table td { padding: 6px 8px;
+  font-variant-numeric: tabular-nums; }
+.wrap.acct .node-table td { font-size: 0.9rem; }
 /* Swap quote + history surfaces sit on --plot-bg like the desk chart panes
  * (visual only — pool-swap-ui.js / pool-detail-ui.js untouched). */
 .swap-hist table td { font-size: 0.9rem; }

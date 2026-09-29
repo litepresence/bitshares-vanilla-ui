@@ -790,8 +790,12 @@ var AccountUI = (function () {
     });
   }
 
-  /* Fill an account page: header (name + id), then balances and history
-   * sections that each fail inline (never blank, never wiping the other). */
+  /* Fill an account page: header (name + id), then Balances / Open orders /
+   * History / Membership / Equity sections behind a tab row (retro round 2
+   * D3 — the original's 5-tab language; our sections, not its 13-column
+   * table). Balances is the default tab like #1. Sections fill
+   * independently and fail inline (never blank, never wiping each other);
+   * hidden tabs keep filling so switching never shows a stale loader. */
   function showAccount(doc, wrap, root, acct) {
     var h1 = doc.createElement("h1");
     h1.textContent = acct.name;
@@ -800,13 +804,9 @@ var AccountUI = (function () {
     sub.className = "muted";
     sub.textContent = acct.id;
     wrap.appendChild(sub);
-
-    var memSection = doc.createElement("section");
-    var memH = doc.createElement("h2");
-    memH.textContent = t("account.membership", "Membership");
-    memSection.appendChild(memH);
-    wrap.appendChild(memSection);
-    renderMembership(doc, memSection, acct);
+    /* Dense-table scope for the CSS below (smaller padding, tabular numbers
+     * — columns untouched). */
+    try { wrap.classList.add("acct"); } catch (e) { /* density skips */ }
 
     var balSection = doc.createElement("section");
     var balH = doc.createElement("h2");
@@ -817,16 +817,6 @@ var AccountUI = (function () {
     balLoading.textContent = t("account.loading_balances", "Loading balances…");
     balSection.appendChild(balLoading);
     wrap.appendChild(balSection);
-
-    var eqSection = doc.createElement("section");
-    var eqH = doc.createElement("h2");
-    eqH.textContent = "Equity";
-    eqSection.appendChild(eqH);
-    var eqLoading = doc.createElement("p");
-    eqLoading.className = "muted";
-    eqLoading.textContent = "Replaying recent history…";
-    eqSection.appendChild(eqLoading);
-    wrap.appendChild(eqSection);
 
     var ordSection = doc.createElement("section");
     var ordH = doc.createElement("h2");
@@ -847,6 +837,57 @@ var AccountUI = (function () {
     histLoading.textContent = t("account.loading_history", "Loading history…");
     histSection.appendChild(histLoading);
     wrap.appendChild(histSection);
+
+    var memSection = doc.createElement("section");
+    var memH = doc.createElement("h2");
+    memH.textContent = t("account.membership", "Membership");
+    memSection.appendChild(memH);
+    wrap.appendChild(memSection);
+    renderMembership(doc, memSection, acct);
+
+    var eqSection = doc.createElement("section");
+    var eqH = doc.createElement("h2");
+    eqH.textContent = t("account.equity_tab", "Equity");
+    eqSection.appendChild(eqH);
+    var eqLoading = doc.createElement("p");
+    eqLoading.className = "muted";
+    eqLoading.textContent = "Replaying recent history…";
+    eqSection.appendChild(eqLoading);
+    wrap.appendChild(eqSection);
+
+    /* Tab row (original Balances-first language; hidden sections keep their
+     * h2s for screen readers via tabpanel roles). Buttons ride the shared
+     * .mkt-tabs style (dashboard/pool/desk precedent) — 44px from CSS. */
+    var tabDefs = [
+      { label: t("account.s7", "Balances"), sec: balSection },
+      { label: t("account.orders_title", "Open orders"), sec: ordSection },
+      { label: t("account.history_title", "History"), sec: histSection },
+      { label: t("account.membership", "Membership"), sec: memSection },
+      { label: t("account.equity_tab", "Equity"), sec: eqSection }
+    ];
+    var tabBar = doc.createElement("div");
+    tabBar.className = "mkt-tabs acct-tabs";
+    tabBar.setAttribute("role", "tablist");
+    tabBar.setAttribute("aria-label", t("account.title", "Account"));
+    tabDefs.forEach(function (def, i) {
+      try { def.sec.setAttribute("role", "tabpanel"); } catch (e) { /* sections stand */ }
+      if (i !== 0) def.sec.style.display = "none";
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = def.label;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      b.addEventListener("click", function () {
+        tabDefs.forEach(function (d) {
+          d.sec.style.display = (d === def) ? "" : "none";
+        });
+        Array.prototype.forEach.call(tabBar.querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-selected", x === b ? "true" : "false");
+        });
+      });
+      tabBar.appendChild(b);
+    });
+    wrap.insertBefore(tabBar, balSection);
 
     Account.balances(acct.id).then(function (list) {
       balSection.removeChild(balLoading);

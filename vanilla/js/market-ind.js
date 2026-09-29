@@ -626,11 +626,26 @@ var MarketInd = (function () {
     return { series: [], missing: null, histogram: false };
   }
 
+  /* Display-only 6-decimal trim (retro round 2 D1): the chain's human price
+   * strings can carry 16 decimals (get_ticker latest/bid/ask); the original
+   * shows 6. Pure string truncation at RENDER — Format math untouched, and
+   * the full-precision string stays on the value's title attr. Non-numeric
+   * strings (percents, volumes with symbols, "—") pass through unchanged. */
+  function trim6(s) {
+    s = String(s);
+    var m = /^(-?\d+)\.(\d+)$/.exec(s);
+    if (m && m[2].length > 6) return m[1] + "." + m[2].slice(0, 6);
+    return s;
+  }
+
   /* Compact header stats strip: Latest / 24h change / 24h volume / Best
-   * bid-ask. Renders the chain's human strings verbatim (ticker
-   * latest/highest_bid/lowest_ask are already base-per-quote strings —
-   * same fields as the side panel, no money math). Moved verbatim out of
-   * fill; state carries {ticker, strip, assets} exactly as before. */
+   * bid-ask, plus Feed Price + Settlement for bitasset markets (state.feed,
+   * filled once per desk by market-desk.js fetchFeed — absent on non-MPA
+   * pairs, exactly like #1 which hides both columns there). Price-like
+   * values render trim6 with the full chain string on title; ticker/volume
+   * fields pass through verbatim (same fields as the side panel, no money
+   * math). Moved verbatim out of fill; state carries {ticker, strip, assets,
+   * feed} exactly as before. */
   function renderStrip(doc, state) {
     var st = state.ticker;
     while (state.strip.firstChild) state.strip.removeChild(state.strip.firstChild);
@@ -638,12 +653,19 @@ var MarketInd = (function () {
       state.strip.appendChild(el(doc, "span", t("market.loading_stats", "Loading stats…"), "muted"));
       return;
     }
-    /* One label/value chip appended to the strip (missing values show —). */
-    function cell(label, value) {
+    /* One label/value chip appended to the strip (missing values show —).
+     * Display is trim6; the full-precision chain string stays on title. */
+    function cell(label, value, full) {
       var s = doc.createElement("span");
       s.className = "mkt-stat";
       s.appendChild(el(doc, "span", label + " ", "muted"));
-      s.appendChild(el(doc, "strong", value === null || value === undefined ? t("market.stat_empty", "—") : String(value)));
+      var shown = (value === null || value === undefined)
+        ? t("market.stat_empty", "—") : trim6(String(value));
+      var v = el(doc, "strong", shown);
+      if (value !== null && value !== undefined) {
+        try { v.title = (full !== undefined && full !== null) ? String(full) : String(value); } catch (e) { /* text stands */ }
+      }
+      s.appendChild(v);
       state.strip.appendChild(s);
     }
     cell(t("market.stat_latest", "Latest"), st.latest);
@@ -653,8 +675,23 @@ var MarketInd = (function () {
     var bv = (st.raw && st.raw.base_volume !== undefined && st.raw.base_volume !== null)
       ? String(st.raw.base_volume) + " " + state.assets.base.symbol : null;
     cell(t("market.stat_vol", "24h Vol"), bv);
-    var bb = [st.highestBid, st.lowestAsk].filter(function (x) { return x !== null; }).join(" / ");
-    cell(t("market.stat_bidask", "Bid–Ask"), bb || null);
+    var bidFull = [st.highestBid, st.lowestAsk].filter(function (x) { return x !== null; });
+    var bidTrim = bidFull.map(function (x) { return trim6(String(x)); });
+    cell(t("market.stat_bidask", "Bid–Ask"), bidTrim.length ? bidTrim.join(" / ") : null,
+      bidFull.length ? bidFull.join(" / ") : null);
+    /* Feed + settlement (D1): state.feed is filled once per desk by
+     * market-desk.js fetchFeed ({feed, settle} human base-per-quote strings
+     * from the bitasset_data object, or null). No feed state -> no cells
+     * (non-MPA pairs, pending/failed fetch) — the strip stands on ticker. */
+    var feed = state.feed || null;
+    if (feed && feed.feed !== null && feed.feed !== undefined) {
+      cell(t("market.stat_feed", "Feed Price"), feed.feed);
+    }
+    if (feed && feed.settle && feed.settle.value !== null && feed.settle.value !== undefined) {
+      cell(feed.settle.global
+        ? t("market.stat_global_settle", "Global Settlement")
+        : t("market.stat_settle", "Settlement Price"), feed.settle.value);
+    }
   }
 
   /* Refresh the "N × timeframe candles" note under the timeframe radios. */

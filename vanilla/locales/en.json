@@ -2161,7 +2161,12 @@
       "market.px_log",
       "market.px_lin",
       "market.vol_log",
-      "market.vol_lin"
+      "market.vol_lin",
+      "market.stat_feed",
+      "market.stat_settle",
+      "market.stat_global_settle",
+      "market.vol_label",
+      "account.equity_tab"
     ]
   },
   "nav": {
@@ -2307,7 +2312,8 @@
     "upgrade_row_account": "Account",
     "upgrade_row_upgrade": "Upgrade",
     "upgraded_ok": "Lifetime upgrade broadcast (%(via)s). %(name)s is now a lifetime member.",
-    "wallet_manager": "Wallet manager"
+    "wallet_manager": "Wallet manager",
+    "equity_tab": "Equity"
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -3090,7 +3096,11 @@
     "px_log": "Price: Log",
     "px_lin": "Price: Linear",
     "vol_log": "Vol: Log",
-    "vol_lin": "Vol: Linear"
+    "vol_lin": "Vol: Linear",
+    "stat_feed": "Feed Price",
+    "stat_settle": "Settlement Price",
+    "stat_global_settle": "Global Settlement",
+    "vol_label": "Vol"
   },
   "misc": {
     "title": "Invoice",

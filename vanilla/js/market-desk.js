@@ -696,6 +696,9 @@ var MarketDesk = (function () {
       fill(state);
       /* Pool-map provenance (lazy, never blocks desk; stale-route guarded). */
       try { fetchPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
+      /* Strip feed + settlement (retro round 2 D1: one lookup + one object
+       * fetch per desk; fail-open, never blocks desk). */
+      try { fetchFeed(doc, state); } catch (e) { /* feed best-effort */ }
       /* Deep-candles Task 4: live tip with poll fallback (exactness-first:
        * re-fetch the tip window via Market.candles + Market.stats — no
        * hand-rolled money math. Push path is Chain.subscribeMarket with a
@@ -1215,6 +1218,91 @@ var MarketDesk = (function () {
 
   /* Repaint the pool-map canvas from cached graphData (theme/resize path).
    * Skips when toggled off or stale. Never throws outward. */
+  /* Feed + settlement for the strip (retro round 2 D1 — read path mirrors
+   * asset-feed-ui.js loadFeed: lookup_asset_symbols -> bitasset_data_id ->
+   * get_objects -> current_feed.settlement_price, formatted with BOTH
+   * precisions via Format.formatPrice). Runs ONCE per desk (not per stats
+   * refresh): exactly 2 RPCs, stale-route guarded. Orientation is market
+   * base-per-quote: the settlement amounts map by asset_id onto the market
+   * legs (precisions already known from state.assets); legs that don't match
+   * the pair skip the feed (backing differs from the market quote) instead
+   * of guessing. Settlement follows #1 ExchangeHeader.jsx:160-198 halfway:
+   * globally-settled assets (settlement_fund > 0) show the on-chain
+   * settlement_price as "Global Settlement" (same object, zero extra calls);
+   * the offset-adjusted estimate for live assets needs exact
+   * reciprocal-percent math that #1 does in float — out of display-only
+   * scope, so no Settlement cell there (recorded in retro-round-1.md).
+   * Non-MPA pairs and every failure fail OPEN (state.feed null, no cells,
+   * the ticker strip stands). Params: (doc, state) with state.assets set.
+   * Never throws outward. */
+  function fetchFeed(doc, state) {
+    var myId = state.id;
+    function alive() {
+      try { return deskAlive(state) && state.id === myId; } catch (e) { return false; }
+    }
+    function novalue() {
+      if (!alive()) return;
+      state.feed = null;
+      try { MarketInd.renderStrip(doc, state); } catch (e) { /* strip stands */ }
+    }
+    try {
+      if (typeof Chain === "undefined" || !Chain ||
+          typeof Format === "undefined" || !Format ||
+          typeof MarketInd === "undefined" || !MarketInd) return;
+      var q = state.assets.quote, b = state.assets.base;
+      var dbId;
+      Chain.db().then(function (id) {
+        dbId = id;
+        return Chain.call(dbId, "lookup_asset_symbols", [[q.symbol, b.symbol]]);
+      }).then(function (rows) {
+        if (!alive()) return null;
+        var bid = null;
+        (rows || []).forEach(function (r) {
+          if (r && r.bitasset_data_id && !bid) bid = r.bitasset_data_id;
+        });
+        if (!bid) { novalue(); return null; }
+        return Chain.call(dbId, "get_objects", [[bid]]);
+      }).then(function (objs) {
+        if (!objs || !alive()) return;
+        var bit = objs[0] || null;
+        var cur = bit && bit.current_feed;
+        var pair = cur && cur.settlement_price;
+        if (!pair || !pair.base || !pair.quote) { novalue(); return; }
+        var rawB = null, rawQ = null;
+        [pair.base, pair.quote].forEach(function (leg) {
+          if (leg.asset_id === b.id) rawB = String(leg.amount);
+          else if (leg.asset_id === q.id) rawQ = String(leg.amount);
+        });
+        if (rawB === null || rawQ === null) { novalue(); return; }
+        var feed;
+        try {
+          feed = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
+        } catch (e) { novalue(); return; }
+        var out = { feed: feed, settle: null };
+        try {
+          var fund = bit && bit.settlement_fund;
+          var sp = bit && bit.settlement_price;
+          if (Number(fund) > 0 && sp && sp.base && sp.quote) {
+            var sB = null, sQ = null;
+            [sp.base, sp.quote].forEach(function (leg) {
+              if (leg.asset_id === b.id) sB = String(leg.amount);
+              else if (leg.asset_id === q.id) sQ = String(leg.amount);
+            });
+            if (sB !== null && sQ !== null) {
+              out.settle = {
+                global: true,
+                value: Format.formatPrice(sB, b.precision, sQ, q.precision, 8)
+              };
+            }
+          }
+        } catch (e) { out.settle = null; }
+        if (!alive()) return;
+        state.feed = out;
+        try { MarketInd.renderStrip(doc, state); } catch (e) { /* strip stands */ }
+      }).catch(function () { novalue(); });
+    } catch (e) { /* feed optional, strip stands */ }
+  }
+
   function redrawPoolMap(doc, state) {
     if (!state.graphData || !state.graphCanvas) return;
     if (state.showPoolMap === false) return;

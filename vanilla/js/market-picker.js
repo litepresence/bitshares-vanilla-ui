@@ -50,10 +50,23 @@ var MarketPicker = (function () {
     return n;
   }
 
-  /* Session ticker cache (id -> "latest · chg" or null-miss). Fail-open:
-   * misses render "—", never an error. Small curated lists only. */
+  /* Display-only 6-decimal trim (retro round 2 D1 — same rule as the strip):
+   * ticker latest strings can carry 16 decimals; the original table shows 6.
+   * Pure string truncation at RENDER, full string stays on title. Plain
+   * duplicate of the market-ind.js helper (doctrine: duplication). */
+  function trim6(s) {
+    s = String(s);
+    var m = /^(-?\d+)\.(\d+)$/.exec(s);
+    if (m && m[2].length > 6) return m[1] + "." + m[2].slice(0, 6);
+    return s;
+  }
+
+  /* Session ticker cache (id -> {latest, chg, vol} or null-miss). Fail-open:
+   * misses render "—", never an error. Vol is the SAME already-fetched
+   * get_ticker row (raw.base_volume) — no added batch, no invented data
+   * (dexux-plots.md N+1 ban: per-row ticker stays capped, see paint). */
   var _tickCache = {};
-  function tickText(id, done) {
+  function tickData(id, done) {
     if (Object.prototype.hasOwnProperty.call(_tickCache, id)) { done(_tickCache[id]); return; }
     var pair = null;
     try {
@@ -63,12 +76,15 @@ var MarketPicker = (function () {
     Market.assets(pair.quote, pair.base).then(function (a) {
       return Market.stats(a.base.id, a.quote.id);
     }).then(function (s) {
-      var chg = (s.raw && s.raw.percent_change !== undefined && s.raw.percent_change !== null)
-        ? String(s.raw.percent_change) : null;
-      var text = (s.latest !== null && s.latest !== undefined ? s.latest : "—") +
-        (chg !== null ? " · " + chg : "");
-      _tickCache[id] = text;
-      done(text);
+      var row = {
+        latest: (s.latest !== null && s.latest !== undefined) ? String(s.latest) : null,
+        chg: (s.raw && s.raw.percent_change !== undefined && s.raw.percent_change !== null)
+          ? String(s.raw.percent_change) : null,
+        vol: (s.raw && s.raw.base_volume !== undefined && s.raw.base_volume !== null)
+          ? String(s.raw.base_volume) : null
+      };
+      _tickCache[id] = row;
+      done(row);
     }).catch(function () { _tickCache[id] = null; done(null); });
   }
   /* Network from Store (sole settings owner); mainnet when unreadable. */
@@ -198,12 +214,38 @@ var MarketPicker = (function () {
     });
   }
 
-  /* Paint the market picker list (search + kind radios + favorites + typed entry). */
+  /* Paint the market picker list (search + kind radios + favorites + typed entry).
+   * Retro round 2 D2: rows read as the original MY/FIND MARKETS table —
+   * star first-column, MARKET/VOL/PRICE/CHANGE header, one row per pair.
+   * All/Starred tabs mirror MY vs FIND (favs-first sort kept on All);
+   * VOL/PRICE/CHANGE come from the same per-row ticker row (no new calls).
+   * Prices render trim6 with full precision on title (D1 rule). */
   function renderPicker(doc, section, currentID, root) {
     section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
     var list = (CURATED[network()] || CURATED.mainnet).slice();
     if (list.indexOf(currentID) === -1 && currentID) list.unshift(currentID);
     var favs = loadFavs();
+    var favOnly = false;
+
+    var tabs = doc.createElement("div");
+    tabs.className = "mkt-tabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", t("market.picker_title", "Markets"));
+    var tabAll = doc.createElement("button");
+    tabAll.type = "button";
+    tabAll.textContent = t("market.kind_all", "All");
+    tabAll.setAttribute("role", "tab");
+    tabAll.setAttribute("aria-selected", "true");
+    touchable(tabAll);
+    var tabStar = doc.createElement("button");
+    tabStar.type = "button";
+    tabStar.textContent = "★ " + t("market.starred_tab", "Starred");
+    tabStar.setAttribute("role", "tab");
+    tabStar.setAttribute("aria-selected", "false");
+    touchable(tabStar);
+    tabs.appendChild(tabAll);
+    tabs.appendChild(tabStar);
+    section.appendChild(tabs);
 
     var kinds = doc.createElement("div");
     kinds.className = "mkt-kinds";
@@ -304,6 +346,8 @@ var MarketPicker = (function () {
       var rows = [];
       list.forEach(function (id) {
         if (f && id.toUpperCase().indexOf(f) === -1) return;
+        /* Starred tab = MY MARKETS (favs only); All keeps favs-first sort. */
+        if (favOnly && !isFav(favs, id)) return;
         var k = rowKind(id);
         /* Fail OPEN: unknown kinds ignore the kind filter, never vanish. */
         if (_kindFilter !== "ALL" && k !== null && k !== _kindFilter) return;
@@ -314,45 +358,31 @@ var MarketPicker = (function () {
         if (fa !== fb) return fa - fb;
         return a < b ? -1 : (a > b ? 1 : 0);
       });
+      /* N+1 guard (dexux-plots.md ban): curated lists are ≤5 rows, but the
+       * per-row ticker fetch below must never grow unbounded — hard slice. */
+      rows = rows.slice(0, 20);
       if (rows.length === 0) {
         ul.appendChild(el(doc, "li", t("market.no_match", "No markets match."), "muted"));
         return;
       }
+      /* Column header (original MARKET/VOL/PRICE/CHANGE language). */
+      var head = doc.createElement("li");
+      head.className = "mkt-picker-row mkt-picker-head";
+      head.setAttribute("aria-hidden", "true");
+      head.appendChild(el(doc, "span", "", "mkt-pk-star"));
+      head.appendChild(el(doc, "span", t("pool.market_col", "Market"), "mkt-pk-mkt"));
+      head.appendChild(el(doc, "span", t("market.vol_label", "Vol"), "mkt-pk-num"));
+      head.appendChild(el(doc, "span", t("market.th_price", "Price"), "mkt-pk-num"));
+      head.appendChild(el(doc, "span", t("market.chg_label", "24h Δ"), "mkt-pk-num"));
+      ul.appendChild(head);
       rows.forEach(function (id) {
         var li = doc.createElement("li");
         li.className = "mkt-picker-row";
         var fav = isFav(favs, id);
-        /* Icon wiring (fi-star.svg; #1 market sidebar shows ★ only on
-         * starred rows — same prefix rule kept). fav state cue changes from
-         * gold color to full-vs-dimmed opacity (SVG <img> cannot take the
-         * --warn text color); aria-pressed, sort-first, and the click ->
-         * toggleFav -> repaint toggle logic are byte-identical in behavior.
-         * Without Icon the previous ★/☆ text renders. */
-        var a = doc.createElement("a");
-        try {
-          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
-            if (fav) a.appendChild(Icon.img("fi-star", "star-icon", ""));
-            a.appendChild(doc.createTextNode((fav ? " " : "") + id));
-          } else {
-            a.textContent = (fav ? "★ " : "") + id;
-          }
-        } catch (e) {
-          a.textContent = (fav ? "★ " : "") + id;
-        }
-        a.setAttribute("href", "#/market/" + id);
-        touchable(a);
-        if (id === currentID) a.setAttribute("aria-current", "page");
-        li.appendChild(a);
-        /* Ticker stats (mirrors #1 FIND MARKETS PRICE/CHANGE columns):
-         * fail-open "—", fills in when the lookup lands. */
-        var stat = el(doc, "span", "—", "muted mkt-stat-inline");
-        li.appendChild(stat);
-        tickText(id, function (text) {
-          stat.textContent = text || "—";
-          try { stat.title = text || ""; } catch (e) { /* text stands */ }
-        });
+        /* Star FIRST column (original table language); the name link stays
+         * plain text (no ★ prefix — the column owns the state). */
         var star = touchable(doc.createElement("button"));
-        star.className = "mkt-star";
+        star.className = "mkt-star mkt-pk-star";
         try {
           if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
             star.appendChild(Icon.img("fi-star", fav ? "star-icon" : "star-icon star-off", ""));
@@ -370,9 +400,49 @@ var MarketPicker = (function () {
           paint(search.value);
         });
         li.appendChild(star);
+        /* Icon wiring (fi-star.svg; #1 market sidebar shows ★ only on
+         * starred rows — the first-column button above carries that now). */
+        var a = doc.createElement("a");
+        a.className = "mkt-pk-mkt";
+        a.textContent = id;
+        a.setAttribute("href", "#/market/" + id);
+        touchable(a);
+        if (id === currentID) a.setAttribute("aria-current", "page");
+        li.appendChild(a);
+        /* VOL / PRICE / CHANGE columns (mirrors #1 FIND MARKETS columns):
+         * same per-row ticker fetch as before, split into three cells;
+         * fail-open "—", fills in when the lookup lands. */
+        var volCell = el(doc, "span", "—", "muted mkt-pk-num");
+        var priceCell = el(doc, "span", "—", "muted mkt-pk-num");
+        var chgCell = el(doc, "span", "—", "muted mkt-pk-num");
+        li.appendChild(volCell);
+        li.appendChild(priceCell);
+        li.appendChild(chgCell);
+        tickData(id, function (r) {
+          if (!r) return;
+          if (r.vol !== null) {
+            volCell.textContent = trim6(r.vol);
+            try { volCell.title = r.vol; } catch (e) { /* text stands */ }
+          }
+          if (r.latest !== null) {
+            priceCell.textContent = trim6(r.latest);
+            try { priceCell.title = r.latest; } catch (e) { /* text stands */ }
+          }
+          if (r.chg !== null) chgCell.textContent = r.chg;
+        });
         ul.appendChild(li);
       });
     }
+    function paintTabs() {
+      tabAll.setAttribute("aria-selected", favOnly ? "false" : "true");
+      tabStar.setAttribute("aria-selected", favOnly ? "true" : "false");
+    }
+    tabAll.addEventListener("click", function () {
+      favOnly = false; paintTabs(); paint(search.value);
+    });
+    tabStar.addEventListener("click", function () {
+      favOnly = true; paintTabs(); paint(search.value);
+    });
     kinds.addEventListener("change", function (ev) {
       var t = ev && ev.target;
       if (t && t.value) { _kindFilter = t.value; paint(search.value); }

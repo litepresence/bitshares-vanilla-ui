@@ -214,7 +214,8 @@
     "upgrade_row_account": "Account",
     "upgrade_row_upgrade": "Upgrade",
     "upgraded_ok": "Lifetime upgrade broadcast (%(via)s). %(name)s is now a lifetime member.",
-    "wallet_manager": "Wallet manager"
+    "wallet_manager": "Wallet manager",
+    "equity_tab": "Equity"
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -997,7 +998,11 @@
     "px_log": "Price: Log",
     "px_lin": "Price: Linear",
     "vol_log": "Vol: Log",
-    "vol_lin": "Vol: Linear"
+    "vol_lin": "Vol: Linear",
+    "stat_feed": "Feed Price",
+    "stat_settle": "Settlement Price",
+    "stat_global_settle": "Global Settlement",
+    "vol_label": "Vol"
   },
   "misc": {
     "title": "Invoice",
@@ -1242,9 +1247,9 @@
     "cancel_backend": "Trade backend missing: js/tx.js failed to load.",
     "cancel_button": "Cancel",
     "balance": "Balance: ",
-    "balance_fail": "Balance unavailable \u2014 will check at review.",
-    "balance_loading": "Balance: loading\u2026",
-    "balance_locked": "Balance: 0 \u2014 unlock for balances",
+    "balance_fail": "Balance unavailable — will check at review.",
+    "balance_loading": "Balance: loading…",
+    "balance_locked": "Balance: 0 — unlock for balances",
     "cancel_warn": "Warning: canceling permanently removes this order from the book.",
     "checking": "Checking balance and fee…",
     "checking_fee": "Checking fee…",
@@ -1267,7 +1272,7 @@
     "fail_scaled": "Scaled orders failed.",
     "fail_scaled_prepare": "Could not prepare scaled orders.",
     "fee_preview": "Fee (preview): ",
-    "fee_preview_dash": "Fee (preview): \u2014",
+    "fee_preview_dash": "Fee (preview): —",
     "fok_hint": " (cancel unless the whole order fills at once)",
     "fok_label": "Fill or kill ",
     "heading": "Trade",
@@ -1306,7 +1311,7 @@
     "unlock_failed": "Unlock failed",
     "unlock_hint": "Unlock your wallet to trade on this market.",
     "unlock_review": "Unlock & review",
-    "unlocking": "Unlocking\u2026",
+    "unlocking": "Unlocking…",
     "yes": "Yes"
   },
   "transfer": {

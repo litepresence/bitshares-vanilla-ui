@@ -154,6 +154,18 @@ var MarketBook = (function () {
     return s === "" ? "0" : s;
   }
 
+  /* Display-only 6-decimal trim (retro round 2 D1/D8 — same rule as the
+   * strip): spread/midpoint come from exact string math but can print 16+
+   * decimals; the original shows 6. Pure string truncation at RENDER, the
+   * full string stays on the line's title attr. Plain duplicate of the
+   * market-ind.js helper (doctrine: duplication over shared abstraction). */
+  function trim6(s) {
+    s = String(s);
+    var m = /^(-?\d+)\.(\d+)$/.exec(s);
+    if (m && m[2].length > 6) return m[1] + "." + m[2].slice(0, 6);
+    return s;
+  }
+
   /* Spread + midpoint header from best bid/ask strings via exact string math
    * (unit: base-symbol per quote-symbol). Null when either side is empty. */
   function spreadMid(bestBid, bestAsk) {
@@ -357,8 +369,12 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+      ctx.spreadLine.textContent = "Spread " + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
+      try {
+        ctx.spreadLine.title = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+          " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
+      } catch (e) { /* text stands */ }
     } else {
       ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }
@@ -391,8 +407,12 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+      ctx.spreadLine.textContent = "Spread " + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
+      try {
+        ctx.spreadLine.title = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+          " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
+      } catch (e) { /* text stands */ }
     } else {
       ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }

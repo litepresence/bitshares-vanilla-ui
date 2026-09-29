@@ -113,3 +113,110 @@ retro2-desk-phone, retro3-desk-phone, retro4-desk-phone (wrap fix verified).
 - Anti-rot gates: (a) 10-year test — pure CSS + tokens, no new dependency;
   (b) newly depended on: nothing; (c) smallest deletable subset: the whole
   round-1 block is one revertible unit (single comment header).
+
+---
+
+# Round 2 (2026-09-29) — D1/D2/D3 structural deferreds
+
+Closes the three structural deferreds above with small-JS + CSS (no
+behavior/session change: no new routes, no signing path touched, no settings
+shape touched). Same server + shooter as round 1
+(`python3 -m http.server 8081 --directory vanilla`,
+`PLAYWRIGHT_BROWSERS_PATH=/workspace/tooling/visual/.browsers node
+tooling/visual/shot.mjs`). Every shot below was READ (no blind claims).
+Touched files: `vanilla/js/{market-ind,market-desk,market-book,
+market-picker,account-ui}.js` + `vanilla/css/app.css` + 5 locale keys × 10
+dicts. Untouched per scope: reference/, docs/, tooling/, chain.js, tx.js,
+wallet.js, crypto.js.
+
+## D1 — strip precision + Feed/Settlement (CLOSED, one honest gap recorded)
+
+- **trim6 at RENDER** (`market-ind.js` trim6, duplicated in `market-book.js`
+  and `market-picker.js` per the no-shared-abstraction doctrine): pure string
+  truncation of `^\d+\.\d{7,}$` to 6 decimals. Format math untouched; the
+  full-precision chain string stays on each value's `title` attr (strip
+  cells, spread line, picker cells). Live proof on BTS/CNY:
+  Latest `0.064343`, Bid–Ask `0.063417 / 0.064337` (was 16-decimal raw),
+  spread `0.000920 · Midpoint 0.063877`.
+- **Feed Price cell** (`market-desk.js` fetchFeed, 2 RPCs once per desk:
+  `lookup_asset_symbols` → `get_objects([bitasset_data_id])` →
+  `current_feed.settlement_price`, oriented to market base-per-quote by
+  asset_id via `Format.formatPrice`, legs that don't match the pair skip
+  instead of guessing). Same read path as `asset-feed-ui.js` loadFeed —
+  the clean path EXISTS, so NANO did not apply. Live: `0.066686` on
+  BTS/CNY. Fails open (no cells) on non-MPA pairs and every error.
+- **Settlement: honest half.** Globally-settled assets (`settlement_fund >
+  0`) show the on-chain `settlement_price` as "Global Settlement" (same
+  object, zero extra calls — #1 ExchangeHeader.jsx:161-189 rule). Live
+  assets show NO Settlement cell: #1's estimate is feed ×/÷
+  `(1 + force_settlement_offset_percent/10000)` in float on the
+  reciprocal-oriented value; porting it needs exact reciprocal-percent
+  string math — out of display-only scope. bitCNY is not globally settled,
+  so the shot shows Feed only.
+- D8 (spread/midpoint line) closed by the same trim.
+
+## D2 — picker as MY/FIND table (CLOSED)
+
+- Rows: star FIRST column, MARKET/VOL/PRICE/CHANGE header, one grid row per
+  pair (CSS grid `44px 1fr auto auto auto`, tabular numbers, name
+  ellipsizes). VOL comes from the SAME already-fetched get_ticker row
+  (`raw.base_volume`) — no added batch, no invented data; rows hard-capped
+  at 20 (dexux-plots.md N+1 ban). Prices trim6 + full title.
+- All/★ Starred tabs mirror MY vs FIND (Starred = favs only; All keeps
+  favs-first sort; `role=tablist`, `.mkt-tabs` style, 44px). Kind radios,
+  quote buttons, search, typed QUOTE_BASE entry unchanged.
+- Residual: change values stay uncolored (original is red/green) — candy,
+  not structure; no new strings needed for it later.
+
+## D3 — account tabs + density (CLOSED)
+
+- Tab row Balances / Open Orders / History / Membership / Equity (our
+  sections behind the original's 5-tab language; Balances default like #1;
+  `role=tablist/tab/tabpanel`, `.mkt-tabs` style, wraps to 2 rows at 390px).
+  Sections keep their h2s + independent async fills (hidden tabs keep
+  filling, so switching never shows a stale loader).
+- Density via CSS only: `.wrap.acct .node-table` 6px/8px padding +
+  tabular numbers, no column dropped; phone <560px keeps the card swap.
+- Also fixed while inside: the Equity h2 was a bare literal — now
+  `t("account.equity_tab", "Equity")` (was an i18n hole).
+- Residual: original's 13-column balance table (in-orders/vesting/
+  collateral/price/24hr/value + SEND/DEPOSIT/TRADE/BORROW/SETTLE actions)
+  is NOT ported — data columns we don't fetch (per-account price/value
+  needs N tickers) and per-row action affordances are new behavior, out of
+  this round. Tabs + density were the scoped ask.
+
+## i18n (5 new keys, all 10 locales)
+
+`market.stat_feed` "Feed Price", `market.stat_settle` "Settlement Price",
+`market.stat_global_settle` "Global Settlement", `market.vol_label` "Vol",
+`account.equity_tab` "Equity" — via `tooling/sync_locale_keys.py` (honest
+stubs). Picker header otherwise reuses `pool.market_col`, `market.th_price`,
+`market.chg_label`; tabs reuse `market.kind_all`, `market.starred_tab`.
+
+## Shots (all in /tmp, all READ)
+
+- r2-desk.png (1440, ref-ui): 6-decimal strip + Feed cell + trimmed spread +
+  picker table with header/tabs. r2-desk-dexux.png: same legible in
+  dex-ux-theme. r2-desk-phone.png (390): strip wraps, no sideways overflow.
+- r2-acct.png (1440, ref-ui): 5 tabs (Balances active) + dense table.
+  r2-acct-vanilla.png: same clean in vanilla-ui-theme. r2-acct-phone.png
+  (390): tabs wrap 2 rows, cards view intact.
+
+## Verify
+
+- `node --check` on all 5 touched JS files: OK.
+- `python3 tooling/check_rot.py`: PASS.
+- `python3 tooling/check_i18n.py`: OK (2164 keys, 2833 call sites).
+- 6 shots, zero console errors on every one (shooter exits 2 on errors).
+- 44px: star buttons + links + tab buttons keep min-height 44px (JS
+  touchable() + `.mkt-tabs`/`.mkt-picker-list` CSS); grid change adds no
+  sub-44px target (header row is aria-hidden, non-interactive).
+- Anti-rot gates: (a) 10-year test — platform APIs + vendored Format only,
+  2-RPC read uses the single chain module; (b) newly depended on: nothing
+  (no package, no service, no toolchain); (c) deletable subset: fetchFeed +
+  feed cells revert independently of trim6; tabs revert to stacked sections
+  by deleting the tab bar block.
+- NOT verified headlessly: tab CLICK-through (shot.mjs has no click step;
+  toggle mirrors the proven dashboard tab pattern) — needs the human
+  browser pass: click each account tab + picker Starred tab + inspect a
+  strip Feed title attr.
