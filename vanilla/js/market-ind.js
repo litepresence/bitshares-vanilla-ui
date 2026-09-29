@@ -815,6 +815,25 @@ var MarketInd = (function () {
       MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
         { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
     } catch (e) { /* canvas failure must not break the desk */ }
+    /* Time-scale sync: scrolling/zooming the price pane moves every
+     * oscillator sub-pane with it (and vice versa). Charts are rebuilt on
+     * each drawCharts, so the previous link is dropped first; canvas
+     * fallbacks have no scrollable scale and are skipped by kind. */
+    try {
+      if (typeof state.timeUnlink === "function") state.timeUnlink();
+      state.timeUnlink = null;
+      var lwcCharts = [];
+      if (state.panes && state.panes.price && state.panes.price.kind === "lwc" &&
+          state.panes.price.chart) lwcCharts.push(state.panes.price.chart);
+      Object.keys((state.panes && state.panes.oscs) || {}).forEach(function (k) {
+        var h = state.panes.oscs[k];
+        if (h && h.kind === "lwc" && h.chart) lwcCharts.push(h.chart);
+      });
+      if (lwcCharts.length > 1 && typeof ChartsLwc !== "undefined" && ChartsLwc &&
+          typeof ChartsLwc.linkTimeScales === "function") {
+        state.timeUnlink = ChartsLwc.linkTimeScales(lwcCharts);
+      }
+    } catch (e) { /* sync is chrome — panes stand unlinked */ }
   }
 
   /* Indicator dropdown menu (parity round, shared by market + pool desks):

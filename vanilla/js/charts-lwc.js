@@ -3,7 +3,8 @@
  *   LWC row builders (toLwcCandles/lineData), price pane (drawPricePane:
  *   candles + volume + overlay lines), ONE oscillator sub-pane
  *   (drawOscPane: lines, or histogram for the Volume pane), and teardown
- *   (removePane/clearHost). Canvas fallback retained when the vendored
+ *   (removePane/clearHost) plus time-scale linking across panes
+ *   (linkTimeScales: scrolling one pane scrolls them all).
  *   global is absent. No chain, no storage, no signing.
  * Consumes: window.LightweightCharts UMD global (vendored, loaded BEFORE
  *   this file in index.html) plus CSS custom properties (theme colors read
@@ -493,10 +494,62 @@ var ChartsLwc = (function () {
     } catch (e) { /* already gone */ }
   }
 
+  /* Link several LWC charts' time scales so scrolling/zooming one scrolls
+   * them all (price pane + oscillator sub-panes share bar indices — every
+   * pane is fed the same times array — so a LOGICAL range {from, to} means
+   * the same bars on each chart; price scales stay independent per pane).
+   * Params: charts (array of LWC chart objects; nulls and non-LWC entries
+   *   are skipped). Returns an unlink function (no-op when <2 linkable).
+   *   Reentrancy: setVisibleLogicalRange fires the target's own subscriber,
+   *   so a shared flag swallows the echo (else A→B→A loops). A null range
+   *   (chart with no data) never propagates. Never throws — sync is
+   *   best-effort chrome, the panes draw fine unlinked. */
+  function linkTimeScales(charts) {
+    var noop = function () { /* unlinked */ };
+    try {
+      var live = (Array.isArray(charts) ? charts : []).filter(function (c) {
+        try {
+          return !!c && c.timeScale &&
+            typeof c.timeScale === "function" &&
+            typeof c.timeScale().subscribeVisibleLogicalRangeChange === "function" &&
+            typeof c.timeScale().setVisibleLogicalRange === "function";
+        } catch (e) { return false; }
+      });
+      if (live.length < 2) return noop;
+      var syncing = false;
+      var subs = live.map(function (src) {
+        var handler = function (range) {
+          if (syncing || !range) return;
+          syncing = true;
+          try {
+            live.forEach(function (dst) {
+              if (dst === src) return;
+              try { dst.timeScale().setVisibleLogicalRange(range); }
+              catch (e) { /* one stuck pane never blocks the rest */ }
+            });
+          } finally {
+            syncing = false;
+          }
+        };
+        try { src.timeScale().subscribeVisibleLogicalRangeChange(handler); }
+        catch (e) { handler = null; }
+        return { chart: src, handler: handler };
+      });
+      return function unlink() {
+        subs.forEach(function (s) {
+          try {
+            if (s.handler) s.chart.timeScale().unsubscribeVisibleLogicalRangeChange(s.handler);
+          } catch (e) { /* already gone */ }
+        });
+      };
+    } catch (e) { return noop; }
+  }
+
   return {
     drawPricePane: drawPricePane,
     drawOscPane: drawOscPane,
     removePane: removePane,
+    linkTimeScales: linkTimeScales,
     hasLightweight: hasLightweight
   };
 })();
