@@ -48,9 +48,8 @@
  *   footer gains the #/existing-account restore link (natural: a visitor
  *   with an account needs the import path); renderRegistration footer
  *   already covers #/create-account + #/existing-account both ways.
- *   ZERO new t() keys (locales untouched so parallel rounds don't
- *   conflict) — every new string below is a plain literal for the next
- *   i18n batch:
+ *   Batch-3 i18n: the new strings below are keyed via t() (were plain
+ *   literals for the next i18n batch):
  *   "Best security — stays in this browser. Move it with the brainkey backup.",
  *   "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.",
  *   "Local wallet — keys on this device", "Recommended",
@@ -186,7 +185,7 @@ var AuthUI = (function () {
      * owns the same call; this view adds no new crypto path). */
     var cardA = cardHead(doc, wrap, t("auth.local_wallet_unlock_on_this_device", "Local wallet — unlock on this device"),
       "Uses the password you set when this wallet was created. Keys never leave this device.",
-      { hint: "Best security — stays in this browser. Move it with the brainkey backup." });
+      { hint: t("auth.best_security_stays_in_this_browser_move", "Best security — stays in this browser. Move it with the brainkey backup.") });
     var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
     cardA.appendChild(f.row);
     var btn = touchable(el(doc, "button", t("auth.unlock", "Unlock")));
@@ -223,7 +222,7 @@ var AuthUI = (function () {
     var cardB = cardHead(doc, wrap, t("auth.cloud_account_model_find_by_name", "Cloud / account model — find by name"),
       "Look an on-chain account up by name, then unlock the local wallet above " +
       "(or import its brainkey). Account-password key derivation from the old UI is not supported here.",
-      { hint: "No login from anywhere with name + password here — find the name below, then unlock the local wallet above." });
+      { hint: t("auth.no_login_from_anywhere_with_name_password", "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.") });
     var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
     cardB.appendChild(g.row);
     var lookBtn = touchable(el(doc, "button", t("auth.look_up_account", "Look up account")));
@@ -299,34 +298,34 @@ var AuthUI = (function () {
     /* Local-wallet card: the recommended model (WalletHeaderSelection's
      * "recommended" badge concept). */
     var local = doc.createElement("section");
-    local.appendChild(el(doc, "h2", "Local wallet — keys on this device"));
+    local.appendChild(el(doc, "h2", t("auth.local_wallet_keys_on_this_device", "Local wallet — keys on this device")));
     var badge = doc.createElement("p");
     var star = doc.createElement("strong");
-    star.textContent = "Recommended";
+    star.textContent = t("auth.recommended", "Recommended");
     badge.appendChild(star);
     local.appendChild(badge);
-    ["Security: High",
-     "Login by: password on this device",
-     "Back up: yes — write down the brainkey"].forEach(function (line) {
+    [t("auth.security_high", "Security: High"),
+     t("auth.login_by_password_on_this_device", "Login by: password on this device"),
+     t("auth.back_up_yes_write_down_the_brainkey", "Back up: yes — write down the brainkey")].forEach(function (line) {
       local.appendChild(el(doc, "p", line, "muted"));
     });
-    local.appendChild(goButton(doc, "reg-card-local", "Continue", "#/registration/local"));
+    local.appendChild(goButton(doc, "reg-card-local", t("auth.continue", "Continue"), "#/registration/local"));
     wrap.appendChild(local);
     /* Cloud-style card: faucet-sponsored names, weaker security
      * (AccountBlockSelection's Medium concept). */
     var cloud = doc.createElement("section");
-    cloud.appendChild(el(doc, "h2", "Cloud-style account — name via the faucet"));
-    ["Security: Medium",
-     "Login by: account-name lookup (password-derived keys are not supported here)",
-     "Back up: no file — the new account's brainkey is shown once at creation"].forEach(function (line) {
+    cloud.appendChild(el(doc, "h2", t("auth.cloud_style_account_name_via_the_faucet", "Cloud-style account — name via the faucet")));
+    [t("auth.security_medium", "Security: Medium"),
+     t("auth.login_by_account_name_lookup_password_der", "Login by: account-name lookup (password-derived keys are not supported here)"),
+     t("auth.back_up_no_file_the_new_account_s_brainke", "Back up: no file — the new account's brainkey is shown once at creation")].forEach(function (line) {
       cloud.appendChild(el(doc, "p", line, "muted"));
     });
-    cloud.appendChild(goButton(doc, "reg-card-cloud", "Continue", "#/registration/cloud"));
+    cloud.appendChild(goButton(doc, "reg-card-cloud", t("auth.continue", "Continue"), "#/registration/cloud"));
     wrap.appendChild(cloud);
     /* Direct shortcuts: faucet register + brainkey import (both exist). */
     var list = doc.createElement("ul");
-    [["#/create-account", "Register a new on-chain account (testnet faucet)"],
-     ["#/existing-account", "Import an existing account (brainkey)"]].forEach(function (pr) {
+    [["#/create-account", t("auth.register_a_new_on_chain_account_testnet_fauce", "Register a new on-chain account (testnet faucet)")],
+     ["#/existing-account", t("auth.import_an_existing_account_brainkey", "Import an existing account (brainkey)")]].forEach(function (pr) {
       var li = doc.createElement("li"), a = doc.createElement("a");
       a.href = pr[0]; a.textContent = pr[1]; li.appendChild(a); list.appendChild(li);
     });
@@ -423,9 +422,9 @@ var AuthUI = (function () {
     ]));
     /* MEDs (4): create-account-ui.js is forbidden, so the restore path lives
      * here — natural fit: a visitor who already has an account needs the
-     * import page, not the faucet. Plain literal for the next i18n batch. */
+     * import page, not the faucet. Batch-3 i18n: keyed via t(). */
     wrap.appendChild(linkPara(doc, [
-      ["#/existing-account", "Already have an account? Import it instead of registering."]
+      ["#/existing-account", t("auth.already_have_an_account_import_it_instead", "Already have an account? Import it instead of registering.")]
     ]));
   }
 

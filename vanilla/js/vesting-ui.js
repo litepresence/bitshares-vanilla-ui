@@ -276,7 +276,7 @@ var VestingUI = (function () {
     /* Per-row Claim button + amount/review box (over-claims blocked client-side; chain re-enforces). Params: vr (vestRow shape), box (results container — the filter re-paint passes its own box). */
     function claimBox(vr, box) {
       var host = box || listBox;
-      var b = ui.touchable(ui.el(doc, "button", "Claim " + vr.r.id)); b.type = "button"; host.appendChild(b);
+      var b = ui.touchable(ui.el(doc, "button", t("vesting.claim_prefix", "Claim ") + vr.r.id)); b.type = "button"; host.appendChild(b);
       var o2 = ui.el(doc, "div", null, "xfer-out"); host.appendChild(o2);
       b.addEventListener("click", function () {
         if (!live(myGen, uiGen)) return;
@@ -359,9 +359,9 @@ var VestingUI = (function () {
           /* Client-side filter over the rendered rows (ref AccountVesting
            * SearchInput): id/owner/asset/policy words, case-insensitive.
            * Re-paints table + Claim buttons from the cached mapped array —
-           * no re-fetch. All words are plain literals (no new t() keys). */
-          var fQ2 = ui.field(doc, "Filter", { placeholder: "Search id, owner, asset…" });
-          try { fQ2.input.setAttribute("type", "search"); fQ2.input.setAttribute("aria-label", "Filter vesting rows"); } catch (e) { /* label wraps input already */ }
+           * no re-fetch. Batch-3 i18n: keyed via t(). */
+          var fQ2 = ui.field(doc, t("vesting.filter", "Filter"), { placeholder: t("vesting.search_id_owner_asset_ph", "Search id, owner, asset…") });
+          try { fQ2.input.setAttribute("type", "search"); fQ2.input.setAttribute("aria-label", t("vesting.filter_vesting_rows_aria", "Filter vesting rows")); } catch (e) { /* label wraps input already */ }
           listBox.appendChild(fQ2.row);
           var results = ui.el(doc, "div"); listBox.appendChild(results);
           function paintVest(q) {
@@ -373,11 +373,11 @@ var VestingUI = (function () {
               return hay.indexOf(needle) !== -1;
             });
             if (!shown.length) {
-              results.appendChild(ui.el(doc, "p", needle ? "No matching vesting rows." : t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+              results.appendChild(ui.el(doc, "p", needle ? t("vesting.no_matching_vesting_rows", "No matching vesting rows.") : t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
               return;
             }
             results.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),
-              "Required (days)", "Earned (days)", "Remaining (days)", "Available"], shown));
+              t("vesting.required_days", "Required (days)"), t("vesting.earned_days", "Earned (days)"), t("vesting.remaining_days", "Remaining (days)"), t("vesting.available", "Available")], shown));
             shown.forEach(function (vr) { claimBox(vr, results); });
           }
           fQ2.input.addEventListener("input", function () { paintVest(fQ2.input.value); });

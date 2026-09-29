@@ -188,10 +188,10 @@ var PredictionUI = (function () {
     var td = doc.createElement("td");
     if (enrich.backSym && (a.symbol || a.id)) {
       var deskHref = "#/market/" + encodeURIComponent(a.symbol || a.id) + "_" + encodeURIComponent(enrich.backSym);
-      var agree = doc.createElement("a"); agree.href = deskHref; agree.textContent = "Agree";
+      var agree = doc.createElement("a"); agree.href = deskHref; agree.textContent = t("prediction.agree", "Agree");
       touchable(agree); td.appendChild(agree);
       td.appendChild(doc.createTextNode(" / "));
-      var disagree = doc.createElement("a"); disagree.href = deskHref; disagree.textContent = "Disagree";
+      var disagree = doc.createElement("a"); disagree.href = deskHref; disagree.textContent = t("prediction.disagree", "Disagree");
       touchable(disagree); td.appendChild(disagree);
     } else {
       td.textContent = "—";
@@ -237,14 +237,13 @@ var PredictionUI = (function () {
     /* MED create button (#1 PredictionMarkets.jsx create_market modal entry):
      * vanilla creates under the existing #/assets/create PMA tab (verified:
      * router.js maps /assets/create -> AssetUI.renderCreate, which draws a
-     * PMA tab locking is_prediction_market ON). Plain literal, zero new
-     * t() keys. */
-    var mk = touchable(el(doc, "button", "Create prediction market")); mk.type = "button";
+     * PMA tab locking is_prediction_market ON). Batch-3 i18n: keyed. */
+    var mk = touchable(el(doc, "button", t("prediction.create_prediction_market", "Create prediction market"))); mk.type = "button";
     toolbar.appendChild(mk);
     mk.addEventListener("click", function () { location.hash = "#/assets/create"; });
     /* MED client-side toggles (#1 PredictionMarkets.jsx:37-38 defaults ON,
      * :378-400 _filterMarkets): unknown house = issuer name unresolvable on
-     * this network; invalid = invalidReason() non-empty. Plain literals. */
+     * this network; invalid = invalidReason() non-empty. Batch-3 i18n: keyed. */
     var toggleRow = el(doc, "div", null, "toolbar"); wrap.appendChild(toggleRow);
     function checkBox(labelText, checked) {
       var lab = doc.createElement("label");
@@ -254,9 +253,9 @@ var PredictionUI = (function () {
       toggleRow.appendChild(lab);
       return box;
     }
-    var chkU = checkBox("Hide unknown houses", true);
-    var chkI = checkBox("Hide invalid assets", true);
-    wrap.appendChild(el(doc, "p", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network.", "muted"));
+    var chkU = checkBox(t("prediction.hide_unknown_houses", "Hide unknown houses"), true);
+    var chkI = checkBox(t("prediction.hide_invalid_assets", "Hide invalid assets"), true);
+    wrap.appendChild(el(doc, "p", t("prediction.new_markets_are_created_under_assets_", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network."), "muted"));
 
     var status = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
     var tableWrap = el(doc, "div", null, "table-scroll"); wrap.appendChild(tableWrap);
@@ -335,8 +334,8 @@ var PredictionUI = (function () {
       var table = doc.createElement("table");
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
       /* MED columns: HOUSE / MARKET CONFIDENCE / PREDICTED LIKELIHOOD /
-       * RESOLUTION DATE / ACTION (plain literals, zero new t() keys). */
-      ["Asset", "House", "Market confidence", "Predicted likelihood", "Resolution date", "Action"].forEach(function (h) {
+       * RESOLUTION DATE / ACTION (batch-3 keyed). */
+      [t("prediction.hdr_asset", "Asset"), t("prediction.house", "House"), t("prediction.market_confidence", "Market confidence"), t("prediction.predicted_likelihood", "Predicted likelihood"), t("prediction.resolution_date", "Resolution date"), t("prediction.action", "Action")].forEach(function (h) {
         var th = doc.createElement("th"); th.textContent = h; th.setAttribute("scope", "col"); hr.appendChild(th);
       });
       thead.appendChild(hr); table.appendChild(thead);

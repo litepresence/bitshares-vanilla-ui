@@ -295,17 +295,16 @@ var CreditUI = (function () {
    * links/buttons) and the Borrow button both open the loan modal
    * (openLoanModal — name verified from commit 123f034); Enter on a focused
    * row too. hostBox owns the modal overlay so a list reload clears a stale
-   * modal. Header words Available/Expiration/Loan are plain literals (no new
-   * t() keys — locales untouched). */
+   * modal. Header words Available/Expiration/Loan are batch-3-keyed. */
   function openOffersTable(doc, hostBox, myGen, rows) {
     var box = el(doc, "div");
     if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table offers-table";
     table.appendChild(tableHead(doc, [t("credit.offer", "Offer"), t("credit.asset", "Asset"), t("credit.owner", "Owner"),
-      t("credit.total", "Total"), "Available", t("credit.min_deal_amount", "Min deal amount"),
+      t("credit.total", "Total"), t("credit.available", "Available"), t("credit.min_deal_amount", "Min deal amount"),
       t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"),
-      "Expiration", t("credit.collateral", "Collateral"),
-      "Loan", ""]));
+      t("credit.expiration", "Expiration"), t("credit.collateral", "Collateral"),
+      t("credit.loan", "Loan"), ""]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (o) {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
@@ -350,8 +349,8 @@ var CreditUI = (function () {
       var c = el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
       c.appendChild(el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
       c.appendChild(el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
-      c.appendChild(el(doc, "div", "Total " + tot.text + " / Available " + availC));
-      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + " · Expiration " + expC));
+      c.appendChild(el(doc, "div", t("credit.total_prefix", "Total ") + tot.text + t("credit.available_mid", " / Available ") + availC));
+      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + t("credit.expiration_mid", " · Expiration ") + expC));
       var cb = touchable(el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
       cb.addEventListener("click", function () { openLoanModal(doc, hostBox, myGen, o); });
       c.appendChild(cb);

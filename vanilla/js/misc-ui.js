@@ -189,13 +189,13 @@ var MiscUI = (function () {
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.restrictions_default_to_zero_the_proven_path", "Restrictions default to zero (the proven path). Adding any restriction is blocked until testnet proves it."), "muted"));
     /* LOW punchlist: multiple key/account/address auth rows. This form
      * supports one key-auth plus threshold only — extra rows stay a
-     * disabled, honestly labelled control (no new serializers here). */
+     * disabled, honestly labelled control (no new serializers here). Batch-3 i18n: keyed. */
     (function authRowsNote() {
-      var p = ui.el(doc, "p", "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form.", "muted");
-      var b = ui.touchable(ui.el(doc, "button", "Add auth row (unsupported)"));
+      var p = ui.el(doc, "p", t("misc.one_key_auth_row_is_supported_here_key_ab", "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form."), "muted");
+      var b = ui.touchable(ui.el(doc, "button", t("misc.add_auth_row_unsupported", "Add auth row (unsupported)")));
       b.type = "button";
       b.disabled = true;
-      b.title = "Only one key-auth row is supported — extra authority rows need new serializers.";
+      b.title = t("misc.only_one_key_auth_row_is_supported_extra_", "Only one key-auth row is supported — extra authority rows need new serializers.");
       b.setAttribute("aria-disabled", "true");
       ctx.wrap.appendChild(p);
       ctx.wrap.appendChild(b);

@@ -68,11 +68,11 @@ var NewsUI = (function () {
     var wrap = doc.createElement("div"); wrap.className = "wrap"; root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", t("news.news", "News")));
     wrap.appendChild(el(doc, "p", t("news.this_wallet_ships_no_in_app_news_feed_the_ref", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current."), "muted"));
-    wrap.appendChild(el(doc, "p", "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page.", "muted"));
-    var conn = el(doc, "p", "Checking connection…", "muted");
+    wrap.appendChild(el(doc, "p", t("news.no_feed_fetch_is_attempted_so_there_is_no", "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page."), "muted"));
+    var conn = el(doc, "p", t("news.checking_connection", "Checking connection…"), "muted");
     conn.setAttribute("aria-live", "polite");
     wrap.appendChild(conn);
-    try { conn.textContent = connectionLine(); } catch (e) { conn.textContent = "Network: unknown · connection: unknown (see Settings → Nodes)"; }
+    try { conn.textContent = connectionLine(); } catch (e) { conn.textContent = t("news.network_unknown_connection_unknown_see_se", "Network: unknown · connection: unknown (see Settings → Nodes)"); }
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
       var off = Store.subscribe("connection", function () {
         if (myGen !== gen) { try { off(); } catch (e) {} return; }

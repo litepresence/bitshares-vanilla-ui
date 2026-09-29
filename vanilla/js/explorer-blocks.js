@@ -546,14 +546,14 @@ var ExplorerBlocks = (function () {
       }
       if (idx === 3) {
         sent.appendChild(accountLink(doc, String(f.funding_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " updated margin position"));
+        sent.appendChild(el(doc, "span", t("explorer.updated_margin_position", " updated margin position")));
         if (f.delta_collateral && typeof f.delta_collateral === "object") {
-          sent.appendChild(el(doc, "span", " (+collateral "));
+          sent.appendChild(el(doc, "span", t("explorer.collateral_prefix", " (+collateral ")));
           sent.appendChild(amtObj(doc, f.delta_collateral, myGen));
           sent.appendChild(el(doc, "span", ")"));
         }
         if (f.delta_debt && typeof f.delta_debt === "object") {
-          sent.appendChild(el(doc, "span", " (+debt "));
+          sent.appendChild(el(doc, "span", t("explorer.debt_prefix", " (+debt ")));
           sent.appendChild(amtObj(doc, f.delta_debt, myGen));
           sent.appendChild(el(doc, "span", ")"));
         }
@@ -561,7 +561,7 @@ var ExplorerBlocks = (function () {
       }
       if (idx === 4) {
         sent.appendChild(accountLink(doc, String(f.account_id || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " filled order: "));
+        sent.appendChild(el(doc, "span", t("explorer.filled_order_prefix", " filled order: ")));
         sent.appendChild(amtObj(doc, f.pays, myGen));
         sent.appendChild(el(doc, "span", " → "));
         sent.appendChild(amtObj(doc, f.receives, myGen));
@@ -569,25 +569,25 @@ var ExplorerBlocks = (function () {
       }
       if (idx === 5) {
         sent.appendChild(accountLink(doc, String(f.registrar || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " created account " + String(f.name || "—")));
+        sent.appendChild(el(doc, "span", t("explorer.created_account_prefix", " created account ") + String(f.name || "—")));
         return sent;
       }
       if (idx === 6) {
         sent.appendChild(accountLink(doc, String(f.account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " updated account"));
+        sent.appendChild(el(doc, "span", t("explorer.updated_account", " updated account")));
         return sent;
       }
       if (idx === 14) {
         sent.appendChild(accountLink(doc, String(f.issuer || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " issued "));
+        sent.appendChild(el(doc, "span", t("explorer.issued_mid", " issued ")));
         sent.appendChild(amtObj(doc, f.asset_to_issue, myGen));
-        sent.appendChild(el(doc, "span", " to "));
+        sent.appendChild(el(doc, "span", t("explorer.to_mid", " to ")));
         sent.appendChild(accountLink(doc, String(f.issue_to_account || "—"), myGen));
         return sent;
       }
       if (idx === 19) {
         sent.appendChild(accountLink(doc, String(f.publisher || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " published feed for " + String(f.asset_id || "—")));
+        sent.appendChild(el(doc, "span", t("explorer.published_feed_for_prefix", " published feed for ") + String(f.asset_id || "—")));
         return sent;
       }
       if (idx === 22) {
@@ -597,7 +597,7 @@ var ExplorerBlocks = (function () {
           var pi = Array.isArray(p) ? p[0] : (p && (p.type !== undefined ? p.type : p.op));
           return opName(pi).replace(/_/g, " ");
         }).join(", ");
-        sent.appendChild(el(doc, "span", " proposed " + pops.length + " operation" +
+        sent.appendChild(el(doc, "span", t("explorer.proposed_prefix", " proposed ") + pops.length + t("explorer.operation_mid", " operation") +
           (pops.length === 1 ? "" : "s") + (names ? " (" + names + ")" : "")));
         return sent;
       }
@@ -1055,18 +1055,18 @@ var ExplorerBlocks = (function () {
      * height -> #/block/N. Plain literals only (no new i18n keys). Invalid
      * input flags aria-invalid instead of navigating anywhere. Built by a
      * function because the success/error paths below clear the wrap and must
-     * re-add it (otherwise the pre-load row is wiped on paint). */
+     * re-add it (otherwise the pre-load row is wiped on paint). Batch-3 i18n: keyed. */
     function buildJump() {
       var jumpRow = el(doc, "div", null, "xplore-jump");
-      jumpRow.appendChild(el(doc, "span", "Go to block: "));
+      jumpRow.appendChild(el(doc, "span", t("explorer.go_to_block_prefix", "Go to block: ")));
       var jumpInput = doc.createElement("input");
       jumpInput.type = "number";
       jumpInput.min = "1";
       jumpInput.step = "1";
-      jumpInput.setAttribute("placeholder", "height");
-      jumpInput.setAttribute("aria-label", "Block height");
+      jumpInput.setAttribute("placeholder", t("explorer.height_ph", "height"));
+      jumpInput.setAttribute("aria-label", t("explorer.block_height_aria", "Block height"));
       touchable(jumpInput);
-      var jumpBtn = touchable(el(doc, "button", "Go"));
+      var jumpBtn = touchable(el(doc, "button", t("explorer.go", "Go")));
       jumpBtn.type = "button";
       jumpRow.appendChild(jumpInput);
       jumpRow.appendChild(jumpBtn);
@@ -1096,20 +1096,20 @@ var ExplorerBlocks = (function () {
          * The height-1 link is the prev-minimum the punchlist requires (a
          * parent-hash row would also satisfy it; the backend strips that
          * field, so height navigation stands). A next past head renders an
-         * honest muted note instead of a dead link. Plain literals only. */
+         * honest muted note instead of a dead link. Batch-3 i18n: keyed. */
         var nav = el(doc, "div", null, "xplore-blocknav");
         if (b.height > 1) {
-          nav.appendChild(anchor(doc, "← Prev block", "#/block/" + (b.height - 1)));
+          nav.appendChild(anchor(doc, t("explorer.prev_block", "← Prev block"), "#/block/" + (b.height - 1)));
         } else {
-          nav.appendChild(el(doc, "span", "← Genesis (first block)", "muted"));
+          nav.appendChild(el(doc, "span", t("explorer.genesis_first_block", "← Genesis (first block)"), "muted"));
         }
         nav.appendChild(el(doc, "span", " "));
         var headNum = (head && typeof head.head_block_number === "number") ? head.head_block_number : null;
         if (headNum !== null && b.height >= headNum) {
-          nav.appendChild(el(doc, "span", "Next → (no newer block yet)", "muted"));
+          nav.appendChild(el(doc, "span", t("explorer.next_no_newer_block", "Next → (no newer block yet)"), "muted"));
         } else {
-          var nx = anchor(doc, "Next →", "#/block/" + (b.height + 1));
-          if (headNum !== null) nx.title = "Head #" + headNum;
+          var nx = anchor(doc, t("explorer.next", "Next →"), "#/block/" + (b.height + 1));
+          if (headNum !== null) nx.title = t("explorer.head_prefix", "Head #") + headNum;
           nav.appendChild(nx);
         }
         wrap.appendChild(nav);
@@ -1133,8 +1133,8 @@ var ExplorerBlocks = (function () {
         }
         wrap.appendChild(dl);
         /* Return-to-top link (original Block.jsx scrollToTop concept): plain
-         * button, smooth scroll with instant fallback. Plain literal only. */
-        var topBtn = touchable(el(doc, "button", "Return to top"));
+         * button, smooth scroll with instant fallback. Batch-3 i18n: keyed. */
+        var topBtn = touchable(el(doc, "button", t("explorer.return_to_top", "Return to top")));
         topBtn.type = "button";
         topBtn.addEventListener("click", function () {
           try {

@@ -29,8 +29,8 @@
  *   those options are stated-unsupported, not linked; the brainkey form
  *   below IS this page's import path; balance-claim (op 37) lives at
  *   #/vesting (vesting-ui.js), the honest nearest target.
- *   ZERO new t() keys: every new string in existingOptions is a plain
- *   literal for the next i18n batch (locales untouched):
+ *   Batch-3 i18n: the new strings in existingOptions are keyed via t()
+ *   (were plain literals for the next i18n batch):
  *   "Ways in:", "Brainkey import (this page's form below)",
  *   "Create new wallet instead", "Wallet manager",
  *   "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.",
@@ -577,10 +577,10 @@ var WalletUI = (function () {
     var box = doc.createElement("div");
     var ways = doc.createElement("p");
     ways.className = "muted";
-    ways.appendChild(doc.createTextNode("Ways in: "));
+    ways.appendChild(doc.createTextNode(t("wallet.ways_in", "Ways in: ")));
     var pairs = [
-      ["#/create-wallet-brainkey", "Create new wallet instead"],
-      ["#/wallet", "Wallet manager"]
+      ["#/create-wallet-brainkey", t("wallet.create_new_wallet_instead", "Create new wallet instead")],
+      ["#/wallet", t("wallet.wallet_manager", "Wallet manager")]
     ];
     pairs.forEach(function (pr, i) {
       if (i > 0) ways.appendChild(doc.createTextNode(" · "));
@@ -590,27 +590,25 @@ var WalletUI = (function () {
       ways.appendChild(a);
     });
     var self = doc.createElement("span");
-    self.textContent = " · Brainkey import (this page's form below)";
+    self.textContent = t("wallet.brainkey_import_this_page_form_below", " · Brainkey import (this page's form below)");
     ways.appendChild(self);
     box.appendChild(ways);
     var honesty = doc.createElement("p");
     honesty.className = "muted";
-    honesty.textContent = "Have a .bin backup file or bare private keys " +
-      "instead? This wallet imports brainkeys only — .bin decrypt and WIF " +
-      "import are not supported. Nothing is uploaded anywhere.";
+    honesty.textContent = t("wallet.have_a_bin_backup_file_or_bare_private_k", "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.");
     box.appendChild(honesty);
     if (hasStoredWallet()) {
       var have = doc.createElement("p");
       have.className = "muted";
-      have.appendChild(doc.createTextNode("A wallet already exists on this device. "));
+      have.appendChild(doc.createTextNode(t("wallet.a_wallet_already_exists_on_this_device_2", "A wallet already exists on this device. ")));
       var claim = doc.createElement("a");
       claim.href = "#/vesting";
-      claim.textContent = "Claim vesting balances";
+      claim.textContent = t("wallet.claim_vesting_balances", "Claim vesting balances");
       have.appendChild(claim);
       have.appendChild(doc.createTextNode(" · "));
       var dash = doc.createElement("a");
       dash.href = "#/";
-      dash.textContent = "Open the dashboard";
+      dash.textContent = t("wallet.open_the_dashboard", "Open the dashboard");
       have.appendChild(dash);
       box.appendChild(have);
     }

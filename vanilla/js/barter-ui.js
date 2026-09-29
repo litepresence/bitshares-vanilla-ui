@@ -179,9 +179,9 @@ var BarterUI = (function () {
      * the chain serializes no escrow party on op-22 (verified: no "escrow"
      * in tx.js nor proposal.js), so escrow stays preview-only; the toggle
      * makes that explicit instead of an always-visible field implying
-     * broadcast. Plain literals below (zero new t() keys). */
+     * broadcast. Batch-3 i18n: literals below keyed via t(). */
     var escState = { on: false };
-    var escrowBtn = touchable(el(doc, "button", "Add escrow")); escrowBtn.type = "button";
+    var escrowBtn = touchable(el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button";
     wrap.appendChild(escrowBtn);
     var escBox = el(doc, "div"); escBox.style.display = "none"; wrap.appendChild(escBox);
     var fEsc = field(doc, t("barter.escrow_account_optional", "Escrow account (optional)"), { placeholder: t("barter.blank_none", "blank = none") });
@@ -189,15 +189,15 @@ var BarterUI = (function () {
     escrowBtn.addEventListener("click", function () {
       escState.on = !escState.on;
       escBox.style.display = escState.on ? "" : "none";
-      escrowBtn.textContent = escState.on ? "Remove escrow" : "Add escrow";
+      escrowBtn.textContent = escState.on ? t("barter.remove_escrow", "Remove escrow") : t("barter.add_escrow", "Add escrow");
       if (!escState.on) fEsc.input.value = "";
     });
     /* MED fee assets (#1 Barter.jsx:1226-1283 per-side FeeAssetSelector +
-     * proposal fee + total): plain-literal inputs (zero new t() keys); every
+     * proposal fee + total): batch-3-keyed inputs; every
      * fee sum below is BigInt via Format, never float. Defaults 1.3.0. */
-    var fFeeA = field(doc, "Side A fee asset (1.3.x)", { placeholder: "1.3.0", value: "1.3.0" });
-    var fFeeB = field(doc, "Side B fee asset (1.3.x)", { placeholder: "1.3.0", value: "1.3.0" });
-    var fPropFee = field(doc, "Proposal fee asset (1.3.x, due now)", { placeholder: "1.3.0", value: "1.3.0" });
+    var fFeeA = field(doc, t("barter.side_a_fee_asset_1_3_x", "Side A fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
+    var fFeeB = field(doc, t("barter.side_b_fee_asset_1_3_x", "Side B fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
+    var fPropFee = field(doc, t("barter.proposal_fee_asset_1_3_x_due_now", "Proposal fee asset (1.3.x, due now)"), { placeholder: "1.3.0", value: "1.3.0" });
     wrap.appendChild(fFeeA.row); wrap.appendChild(fFeeB.row); wrap.appendChild(fPropFee.row);
     var check = touchable(el(doc, "button", t("barter.preview_barter", "Preview barter"))); check.type = "button";
     if (lockedBar) wrap.appendChild(signNotice(doc));
@@ -303,15 +303,15 @@ var BarterUI = (function () {
       list.appendChild(el(doc, "dt", r[0])); list.appendChild(el(doc, "dd", r[1]));
     });
     out.appendChild(list);
-    /* MED fee recap (plain literals, zero new t() keys): timing + assets +
+    /* MED fee recap (batch-3 keyed): timing + assets +
      * proposal estimate + BigInt total ride along from preview so the confirm
      * shows what signing pays. */
     if (prev.timing) out.appendChild(el(doc, "p", prev.timing, "muted"));
-    out.appendChild(el(doc, "p", "Side A fee asset: " + (prev.feeAId || "1.3.0") +
-      "; Side B fee asset: " + (prev.feeBId || "1.3.0") +
-      "; proposal fee asset: " + (prev.propFeeId || "1.3.0") + " (due now).", "muted"));
-    if (prev.propHuman) out.appendChild(el(doc, "p", "Proposal fee estimate: " + prev.propHuman, "muted"));
-    if (prev.totalText) out.appendChild(el(doc, "p", "Total fees: " + prev.totalText, "muted"));
+    out.appendChild(el(doc, "p", t("barter.side_a_fee_asset_prefix", "Side A fee asset: ") + (prev.feeAId || "1.3.0") +
+      t("barter.side_b_fee_asset_mid", "; Side B fee asset: ") + (prev.feeBId || "1.3.0") +
+      t("barter.proposal_fee_asset_mid", "; proposal fee asset: ") + (prev.propFeeId || "1.3.0") + t("barter.due_now_suffix", " (due now)."), "muted"));
+    if (prev.propHuman) out.appendChild(el(doc, "p", t("barter.proposal_fee_estimate_prefix", "Proposal fee estimate: ") + prev.propHuman, "muted"));
+    if (prev.totalText) out.appendChild(el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + prev.totalText, "muted"));
     prev.A.items.forEach(function (it) {
       out.appendChild(el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
         " " + it.symbol + " → " + prev.B.acct.name, ""));
@@ -404,7 +404,7 @@ var BarterUI = (function () {
       sums[pid] = (sums[pid] === undefined ? 0n : sums[pid]) + BigInt(String(propRaw));
     }
     var ids = Object.keys(sums);
-    if (!ids.length) return "fee hints unavailable";
+    if (!ids.length) return t("barter.fee_hints_unavailable", "fee hints unavailable");
     var parts = [];
     for (var i = 0; i < ids.length; i++) {
       try {
@@ -440,8 +440,8 @@ var BarterUI = (function () {
     /* Escrow display upgrade (preview-only): no escrow party is serialized
      * by tx.js/proposal.js (grep "escrow" hits this file only), so the
      * proposal below encloses just the two sides' A↔B transfers. */
-    if (esc) out.appendChild(el(doc, "p", "Escrow " + esc.name + " (" + esc.id + ") holds off-proposal — preview-only: the proposal below encloses only A↔B transfers (no escrow party serialized).", "muted"));
-    else if (escrowOn) out.appendChild(el(doc, "p", "Escrow enabled but no account set — legs settle peer-to-peer.", "muted"));
+    if (esc) out.appendChild(el(doc, "p", t("barter.escrow_prefix", "Escrow ") + esc.name + " (" + esc.id + t("barter.escrow_holds_off_proposal_suffix", ") holds off-proposal — preview-only: the proposal below encloses only A↔B transfers (no escrow party serialized)."), "muted"));
+    else if (escrowOn) out.appendChild(el(doc, "p", t("barter.escrow_enabled_but_no_account_set_legs_", "Escrow enabled but no account set — legs settle peer-to-peer."), "muted"));
     var warns = A.warnings.concat(B.warnings);
     if (warns.length) warns.forEach(function (w) { out.appendChild(el(doc, "p", "Warning: " + w, "error")); });
     else out.appendChild(el(doc, "p", t("barter.both_sides_hold_every_leg_amount_integer_chec", "Both sides hold every leg amount (integer check)."), "muted"));
@@ -449,8 +449,8 @@ var BarterUI = (function () {
      * fee_when_proposal_executes): escrow custodian path pays now, the plain
      * proposal path pays when the proposal executes. */
     var timing = (escrowOn && esc)
-      ? "Side fees: due now (escrow custodian path — legs route via escrow)."
-      : "Side fees: when proposal executes (no escrow — enclosed transfers pay on execution).";
+      ? t("barter.side_fees_due_now_escrow_custodian_path", "Side fees: due now (escrow custodian path — legs route via escrow).")
+      : t("barter.side_fees_when_proposal_executes_no_escr", "Side fees: when proposal executes (no escrow — enclosed transfers pay on execution).");
     out.appendChild(el(doc, "p", timing, "muted"));
     var status = showStatus(doc, out, t("barter.estimating_leg_fees", "Estimating leg fees…"));
     var hintsA = [], hintsB = [], rawA = [], rawB = [];
@@ -468,7 +468,7 @@ var BarterUI = (function () {
         } catch (e2) { human = String(f.amount) + " (" + String(f.asset_id) + ")"; }
         hints.push(it.symbol + ": " + human);
         raws.push({ raw: String(f.amount), asset_id: String(f.asset_id) });
-      } catch (e) { hints.push(it.symbol + ": fee hint unavailable"); }
+      } catch (e) { hints.push(it.symbol + ": " + t("barter.fee_hint_unavailable", "fee hint unavailable")); }
     }
     for (var i = 0; i < A.items.length; i++) { await legFee(A.acct.id, B.acct.id, A.items[i], feeAId, hintsA, rawA); if (myGen !== gen) return; }
     for (var k = 0; k < B.items.length; k++) { await legFee(B.acct.id, A.acct.id, B.items[k], feeBId, hintsB, rawB); if (myGen !== gen) return; }
@@ -476,16 +476,16 @@ var BarterUI = (function () {
     async function feeAssetLine(sideName, feeId, hints) {
       var sym = feeId;
       try { var d = await Asset.describe(feeId); sym = d.symbol + " (" + feeId + ")"; } catch (e) { /* id stands */ }
-      return sideName + " fee asset: " + sym + " — " + (hints.length ? hints.join("; ") : "no legs");
+      return sideName + t("barter.fee_asset_mid", " fee asset: ") + sym + " — " + (hints.length ? hints.join("; ") : t("barter.no_legs", "no legs"));
     }
     out.removeChild(status);
-    out.appendChild(el(doc, "p", await feeAssetLine("Side A", feeAId, hintsA), "muted"));
-    out.appendChild(el(doc, "p", await feeAssetLine("Side B", feeBId, hintsB), "muted"));
+    out.appendChild(el(doc, "p", await feeAssetLine(t("barter.side_a", "Side A"), feeAId, hintsA), "muted"));
+    out.appendChild(el(doc, "p", await feeAssetLine(t("barter.side_b", "Side B"), feeBId, hintsB), "muted"));
     if (myGen !== gen) return;
     /* Proposal-fee estimate (due now, paid by Peer A at PROPOSE): draft the
      * same pairs proposeBarter builds and ask the chain once. Degrades
      * honestly to "proposal fee hint unavailable". */
-    var propHuman = "proposal fee hint unavailable", propRaw = null, propAsset = propFeeId;
+    var propHuman = t("barter.proposal_fee_hint_unavailable", "proposal fee hint unavailable"), propRaw = null, propAsset = propFeeId;
     try {
       var pairs = [];
       A.items.forEach(function (it) { pairs.push([0, { fee: { amount: "0", asset_id: propFeeId }, from: A.acct.id, to: B.acct.id, amount: { amount: it.raw, asset_id: it.id }, extensions: [] }]); });
@@ -499,12 +499,12 @@ var BarterUI = (function () {
         propHuman = Format.formatAmount(propRaw, pa.precision) + " " + pa.symbol;
       } catch (e3) { propHuman = propRaw + " (" + propAsset + ")"; }
     } catch (e) { /* hint unavailable stands */ }
-    out.appendChild(el(doc, "p", "Proposal fee (due now, paid by " + A.acct.name + "): " + propHuman, "muted"));
+    out.appendChild(el(doc, "p", t("barter.proposal_fee_due_now_paid_by_prefix", "Proposal fee (due now, paid by ") + A.acct.name + t("barter.paid_by_suffix", "): ") + propHuman, "muted"));
     /* TOTAL FEES line (BigInt only): leg raws + proposal raw grouped by fee
      * asset, formatted human per asset. */
     var totalText = await totalFeesText(rawA.concat(rawB), propRaw, propAsset);
     if (myGen !== gen) return;
-    out.appendChild(el(doc, "p", "Total fees: " + totalText, "muted"));
+    out.appendChild(el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + totalText, "muted"));
     return { A: A, B: B, esc: esc, feeAId: feeAId, feeBId: feeBId, propFeeId: propFeeId,
       timing: timing, totalText: totalText, propHuman: propHuman };
   }

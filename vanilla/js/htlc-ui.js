@@ -269,7 +269,7 @@ var HtlcUI = (function () {
       box.appendChild(el(doc, "h1", t("htlc.list_title", "Hashed Timelock Contracts")));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       box.appendChild(el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
-      box.appendChild(el(doc, "h2", "Sent (" + found.data.sent.length + ") · Received (" + found.data.received.length + ")"));
+      box.appendChild(el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
       box.appendChild(htlcTable(doc, found.data.sent, found.data.received));
       box.appendChild(el(doc, "h2", t("htlc.new_title", "New HTLC")));
       createBox(doc, box, found.me, myGen);
@@ -283,17 +283,18 @@ var HtlcUI = (function () {
    * (honest and filterable; names resolve on the detail page). The filter
    * matches id, from, to, and hash hex case-insensitively; an empty result is
    * an honest note, never blank. Plain literals only for new strings (no new
-   * i18n keys per punchlist rules); pre-existing t() keys below are reused. */
+   * i18n keys per punchlist rules); pre-existing t() keys below are reused.
+   * Batch-3 i18n: new strings keyed via t(). */
   function htlcTable(doc, sent, received) {
     var box = el(doc, "div", null, "htlc-all");
     var filter = doc.createElement("input");
     filter.type = "search";
-    filter.setAttribute("placeholder", "Filter by id, account, or hash…");
-    filter.setAttribute("aria-label", "Filter contracts");
+    filter.setAttribute("placeholder", t("htlc.filter_ph", "Filter by id, account, or hash…"));
+    filter.setAttribute("aria-label", t("htlc.filter_aria", "Filter contracts"));
     touchable(filter);
     box.appendChild(filter);
     var table = doc.createElement("table"); table.className = "node-table";
-    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"), "Direction", "From", "To",
+    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"), t("htlc.direction", "Direction"), t("htlc.from", "From"), t("htlc.to", "To"),
       t("confirm.amount", "Amount"), t("htlc.hashlock_col", "Hash lock"), t("proposal.expires", "Expires"), ""]));
     var tbody = doc.createElement("tbody");
     table.appendChild(tbody);
@@ -301,12 +302,12 @@ var HtlcUI = (function () {
     var note = el(doc, "p", "", "muted");
     note.setAttribute("aria-live", "polite");
     box.appendChild(note);
-    var all = (Array.isArray(sent) ? sent : []).map(function (r) { return { r: r, dir: "Sent" }; })
-      .concat((Array.isArray(received) ? received : []).map(function (r) { return { r: r, dir: "Received" }; }));
+    var all = (Array.isArray(sent) ? sent : []).map(function (r) { return { r: r, dir: t("htlc.sent", "Sent") }; })
+      .concat((Array.isArray(received) ? received : []).map(function (r) { return { r: r, dir: t("htlc.received", "Received") }; }));
     function paint(q) {
       while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
       if (!all.length) {
-        note.textContent = "No contracts.";
+        note.textContent = t("htlc.no_contracts", "No contracts.");
         return;
       }
       var n = 0;
@@ -329,10 +330,10 @@ var HtlcUI = (function () {
         td = doc.createElement("td"); td.appendChild(link);
         tr.appendChild(el(doc, "td", r.id)); tr.appendChild(dirTd);
         tr.appendChild(fromTd); tr.appendChild(toTd); tr.appendChild(ac); tr.appendChild(hc);
-        tr.appendChild(el(doc, "td", r.expired ? exp + " (expired)" : exp)); tr.appendChild(td);
+        tr.appendChild(el(doc, "td", r.expired ? exp + t("htlc.expired_suffix", " (expired)") : exp)); tr.appendChild(td);
         tbody.appendChild(tr);
       });
-      note.textContent = q ? ("Showing " + n + " of " + all.length + " contracts.") : "";
+      note.textContent = q ? (t("htlc.showing_prefix", "Showing ") + n + t("htlc.of_mid", " of ") + all.length + t("htlc.contracts_suffix", " contracts.")) : "";
     }
     filter.addEventListener("input", function () { paint(filter.value.trim().toLowerCase()); });
     paint("");

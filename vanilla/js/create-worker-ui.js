@@ -151,26 +151,26 @@ var CreateWorkerUI = (function () {
     wrap.appendChild(el(doc, "h1", t("createworker.create_worker", "Create Worker")));
     wrap.appendChild(el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op 34). Preview is live; review quotes the live fee, then Sign & Send broadcasts op 34 directly — workers are created by direct op, not by proposal."), "muted"));
     /* LOW punchlist: lifetime-member requirement note + per-field helper
-     * texts (CreateWorker concept). Plain literals only, no new routes. */
-    wrap.appendChild(el(doc, "p", "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded.", "muted"));
+     * texts (CreateWorker concept). Batch-3 i18n: keyed, no new routes. */
+    wrap.appendChild(el(doc, "p", t("createworker.publishing_a_worker_requires_a_lifeti", "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded."), "muted"));
     var ownerF = fieldRow(doc, t("createworker.owner_account", "Owner account "), { id: "cw-owner", value: P.owner, placeholder: "account-name", inputmode: "text" });
     wrap.appendChild(ownerF.row);
-    wrap.appendChild(el(doc, "p", "Owner pays the fee and receives the worker pay — use a lifetime-member account you control.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.owner_pays_the_fee_and_receives_the_", "Owner pays the fee and receives the worker pay — use a lifetime-member account you control."), "muted"));
     var beginF = fieldRow(doc, t("createworker.work_begins", "Work begins "), { id: "cw-begin", value: P.begin, type: "datetime-local" });
     wrap.appendChild(beginF.row);
-    wrap.appendChild(el(doc, "p", "Start date must be before the end date (chain rule) — pick both in UTC.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.start_date_must_be_before_the_end_da", "Start date must be before the end date (chain rule) — pick both in UTC."), "muted"));
     var endF = fieldRow(doc, t("createworker.work_ends", "Work ends "), { id: "cw-end", value: P.end, type: "datetime-local" });
     wrap.appendChild(endF.row);
-    wrap.appendChild(el(doc, "p", "End date must be after the start date; pay accrues only inside this window.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.end_date_must_be_after_the_start_dat", "End date must be after the start date; pay accrues only inside this window."), "muted"));
     var payF = fieldRow(doc, t("createworker.daily_pay_tpl", "Daily pay (%(sym)s) ", { sym: CORE_SYMBOL }), { id: "cw-pay", value: P.pay, placeholder: "0.00", inputmode: "decimal" });
     wrap.appendChild(payF.row);
-    wrap.appendChild(el(doc, "p", "Daily pay in core asset (BTS, precision 5), greater than zero and below the chain maximum.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.daily_pay_in_core_asset_bts_precision", "Daily pay in core asset (BTS, precision 5), greater than zero and below the chain maximum."), "muted"));
     var nameF = fieldRow(doc, t("createworker.worker_name", "Worker name "), { id: "cw-name", value: P.name, placeholder: "2026-maintenance", inputmode: "text" });
     wrap.appendChild(nameF.row);
-    wrap.appendChild(el(doc, "p", "Short name under 63 bytes — shown on the voting page.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.short_name_under_63_bytes_shown_on_th", "Short name under 63 bytes — shown on the voting page."), "muted"));
     var urlF = fieldRow(doc, t("createworker.proposal_url", "Proposal URL "), { id: "cw-url", value: P.url, placeholder: "https://…", inputmode: "url" });
     wrap.appendChild(urlF.row);
-    wrap.appendChild(el(doc, "p", "Link to the full proposal text, under 127 bytes.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.link_to_the_full_proposal_text_under_1", "Link to the full proposal text, under 127 bytes."), "muted"));
     var kindRow = el(doc, "div", null, "xfer-field"), kindLab = el(doc, "label", t("createworker.pay_destination", "Pay destination "));
     var kindSel = doc.createElement("select");
     KINDS.forEach(function (o) {
@@ -182,7 +182,7 @@ var CreateWorkerUI = (function () {
     wrap.appendChild(kindRow);
     var daysF = fieldRow(doc, "Vesting period (days) ", { id: "cw-days", value: P.days, placeholder: "30", inputmode: "numeric" });
     wrap.appendChild(daysF.row);
-    wrap.appendChild(el(doc, "p", "Vesting choice only: whole days 0..65535 for the vesting pay destination; hidden otherwise.", "muted"));
+    wrap.appendChild(el(doc, "p", t("createworker.vesting_choice_only_whole_days_0_6553", "Vesting choice only: whole days 0..65535 for the vesting pay destination; hidden otherwise."), "muted"));
     function syncDays() { daysF.row.style.display = (kindSel.value === "vesting") ? "" : t("createworker.none", "none"); }
     kindSel.addEventListener("change", syncDays); syncDays();
     var previewBtn = touchable(el(doc, "button", t("createworker.preview_worker", "Preview worker")));

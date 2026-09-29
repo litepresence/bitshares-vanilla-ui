@@ -71,10 +71,10 @@ var PoolSwapUI = (function () {
     /* LOW punchlist: sell/buy balance display. Balances are account-scoped
      * (no new chain read here) — the honest pointer is the account page. */
     (function balanceHint() {
-      var p = u.el(doc, "p", "Balances for the sell and buy assets live on the account page — open it to check before swapping.", "muted");
+      var p = u.el(doc, "p", t("pool.balances_for_the_sell_and_buy_assets_live_", "Balances for the sell and buy assets live on the account page — open it to check before swapping."), "muted");
       var a = doc.createElement("a");
       a.setAttribute("href", "#/account/committee-account");
-      a.textContent = "Open account balances";
+      a.textContent = t("pool.open_account_balances", "Open account balances");
       try { u.touchable(a); } catch (e) { /* link stands */ }
       p.appendChild(doc.createTextNode(" · "));
       p.appendChild(a);

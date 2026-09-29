@@ -25,7 +25,7 @@
  *   approver from proposal object fields — no threshold tree), raw-JSON
  *   <details> per proposal (:313-328 JSONModal concept; market-desk.js
  *   rawDetails is module-private, so the minimal inline <details> lives here).
- *   ZERO new t() keys: every new word below is a plain literal.
+ *   Batch-3 i18n: the new words below are keyed via t().
  * MONEY DISCIPLINE (#6): amounts stay RAW digit strings until Format renders
  *   them at THEIR asset precision (joined via lookup_asset_symbols). No
  *   Number()/parseFloat on money — ever. Timestamps use Date only.
@@ -401,7 +401,7 @@ var ProposalUI = (function () {
    * Plain literals only — no t() keys. Pure (reads localStorage via
    * localTrust). */
   function trustBadge(touched) {
-    var DEFERRED = "No scam registry is vendored in vanilla — this is an unverified-source flag, not a scam verdict (deferred: vendor scamAccounts lists + on-chain blacklist check).";
+    var DEFERRED = t("proposal.no_scam_registry_is_vendored_in_vanilla", "No scam registry is vendored in vanilla — this is an unverified-source flag, not a scam verdict (deferred: vendor scamAccounts lists + on-chain blacklist check).");
     try {
       var g = (typeof globalThis !== "undefined") ? globalThis : null;
       var hook = null;
@@ -411,18 +411,18 @@ var ProposalUI = (function () {
       }
       if (hook) {
         for (var i = 0; i < (touched || []).length; i++) {
-          try { if (hook(touched[i])) return { label: "SCAM ATTEMPT", title: "Flagged by the local scam registry as a known scammer." }; }
+          try { if (hook(touched[i])) return { label: t("proposal.scam_attempt", "SCAM ATTEMPT"), title: t("proposal.flagged_by_the_local_scam_registry_as_a", "Flagged by the local scam registry as a known scammer.") }; }
           catch (e2) { /* keep checking */ }
         }
       }
     } catch (e) { /* hook is best-effort only */ }
-    if (!touched || !touched.length) return { label: "unverified", title: "Empty proposal — no touched accounts to check. " + DEFERRED };
+    if (!touched || !touched.length) return { label: t("proposal.unverified", "unverified"), title: t("proposal.empty_proposal_no_touched_accounts_to_", "Empty proposal — no touched accounts to check. ") + DEFERRED };
     var trust = localTrust();
     for (var j = 0; j < touched.length; j++) {
       var id = touched[j];
-      if (trust.ids[id] || trust.names[String(id).toLowerCase()]) return { label: "trusted", title: "A touched account is in your local contacts or favourite accounts." };
+      if (trust.ids[id] || trust.names[String(id).toLowerCase()]) return { label: t("proposal.trusted", "trusted"), title: t("proposal.a_touched_account_is_in_your_local_cont", "A touched account is in your local contacts or favourite accounts.") };
     }
-    return { label: "UNKNOWN SOURCE", title: "No touched account is in your local contacts or favourite accounts. " + DEFERRED };
+    return { label: t("proposal.unknown_source", "UNKNOWN SOURCE"), title: t("proposal.no_touched_account_is_in_your_local_con", "No touched account is in your local contacts or favourite accounts. ") + DEFERRED };
   }
   /* Per-approver approval status from proposal object fields (Proposals.jsx:
    * 333-346 available/required split + :399-404 NestedApprovalState concept).
@@ -437,28 +437,28 @@ var ProposalUI = (function () {
     reqA.forEach(function (id) {
       var approved = avA.indexOf(id) !== -1;
       if (approved) ok++;
-      lines.push(String(id) + " (active): " + (approved ? "approved" : "pending"));
+      lines.push(String(id) + t("proposal.active_suffix", " (active): ") + (approved ? t("proposal.approved", "approved") : t("proposal.pending", "pending")));
     });
     reqO.forEach(function (id) {
       var approved2 = avO.indexOf(id) !== -1;
       if (approved2) ok++;
-      lines.push(String(id) + " (owner): " + (approved2 ? "approved" : "pending"));
+      lines.push(String(id) + t("proposal.owner_suffix", " (owner): ") + (approved2 ? t("proposal.approved", "approved") : t("proposal.pending", "pending")));
     });
-    if (!lines.length) lines.push("none required");
-    lines.push("key approvals: " + (avK.length ? avK.join(", ") : "none"));
+    if (!lines.length) lines.push(t("proposal.none_required", "none required"));
+    lines.push(t("proposal.key_approvals_prefix", "key approvals: ") + (avK.length ? avK.join(", ") : t("proposal.none", "none")));
     return { req: req, ok: ok, lines: lines };
   }
-  /* One-line approval summary for table cells. Plain literals only. */
+  /* One-line approval summary for table cells. Batch-3 i18n: keyed. */
   function approvalCell(p) {
-    if (!p) return "n/a";
+    if (!p) return t("proposal.n_a", "n/a");
     var s = approvalLines(p);
-    if (!s.req) return "none required";
-    return s.req + " required · " + s.ok + " approved";
+    if (!s.req) return t("proposal.none_required", "none required");
+    return s.req + t("proposal.required_mid", " required · ") + s.ok + t("proposal.approved_suffix", " approved");
   }
   /* Raw-JSON <details> (JSONModal :313-328 concept). market-desk.js:166-183
    * rawDetails is module-private (not exported), so this minimal inline copy
    * lives here per the punchlist. textContent only — chain strings never
-   * reach HTML. Plain-literal label, touch-sized summary. */
+   * reach HTML. Batch-3 i18n: label keyed, touch-sized summary. */
   function rawJson(doc, label, value) {
     var d = doc.createElement("details");
     d.className = "raw";
@@ -650,7 +650,7 @@ var ProposalUI = (function () {
         })).then(function (enriched) {
           if (myGen !== gen) return;
           clearBox(listBox);
-          listBox.appendChild(deskTable(doc, [t("proposal.id", "ID"), t("proposal.fee_payer", "Fee payer"), t("proposal.expires", "Expires"), t("proposal.review", "Review"), t("proposal.enclosed", "Enclosed"), "Trust", "Approvals"], enriched.map(function (en) {
+          listBox.appendChild(deskTable(doc, [t("proposal.id", "ID"), t("proposal.fee_payer", "Fee payer"), t("proposal.expires", "Expires"), t("proposal.review", "Review"), t("proposal.enclosed", "Enclosed"), t("proposal.trust", "Trust"), t("proposal.approvals", "Approvals")], enriched.map(function (en) {
             var r = en.slim, full = en.full;
             var tx = (full && full.proposed_transaction) || {}, entries = tx.operations || (full && full.proposed_ops) || r.proposed_ops || [];
             var badge = trustBadge(touchedIds(entries, r.fee_paying_account || r.proposer));
@@ -662,15 +662,15 @@ var ProposalUI = (function () {
                 { text: (entries.length || r.proposed_ops_count) + " × (" + first + ")" },
                 { text: badge.label, raw: badge.title },
                 { text: ap }],
-              cardLines: [r.id + " · payer " + r.fee_paying_account, "Expires " + timeHuman(r.expiration_time),
-                ((entries.length || r.proposed_ops_count) || 0) + " enclosed op(s), first: " + first,
-                "Source: " + badge.label, "Approvals: " + ap] };
+              cardLines: [r.id + t("proposal.payer_mid", " · payer ") + r.fee_paying_account, t("proposal.expires_prefix", "Expires ") + timeHuman(r.expiration_time),
+                ((entries.length || r.proposed_ops_count) || 0) + t("proposal.enclosed_ops_mid", " enclosed op(s), first: ") + first,
+                t("proposal.source_prefix", "Source: ") + badge.label, t("proposal.approvals_prefix", "Approvals: ") + ap] };
           })));
           /* Raw JSON per proposal (JSONModal concept, inline <details>). */
           var rawBox = el(doc, "div");
-          rawBox.appendChild(el(doc, "h3", "Raw JSON"));
+          rawBox.appendChild(el(doc, "h3", t("proposal.raw_json", "Raw JSON")));
           enriched.forEach(function (en) {
-            rawBox.appendChild(rawJson(doc, "Raw proposal " + en.slim.id,
+            rawBox.appendChild(rawJson(doc, t("proposal.raw_proposal_prefix", "Raw proposal ") + en.slim.id,
               en.full ? (en.full.proposed_transaction || en.full) : en.slim));
           });
           listBox.appendChild(rawBox);
@@ -703,16 +703,16 @@ var ProposalUI = (function () {
         [t("proposal.active_approvals", "Active approvals"), (p.available_active_approvals || []).length ? p.available_active_approvals.join(", ") : t("proposal.none_yet", "none yet")],
         [t("proposal.owner_approvals", "Owner approvals"), (p.available_owner_approvals || []).length ? p.available_owner_approvals.join(", ") : t("proposal.none_yet", "none yet")]]));
       ctx.wrap.appendChild(el(doc, "h2", "Enclosed operations (" + entries.length + ")"));
-      /* MED badges + per-approver status + raw JSON (literals only). */
+      /* MED badges + per-approver status + raw JSON (batch-3 keyed). */
       var badge = trustBadge(touchedIds(entries, p.proposer || p.fee_paying_account));
-      var srcLine = el(doc, "p", "Source: " + badge.label + " — " + badge.title, "muted");
+      var srcLine = el(doc, "p", t("proposal.source_prefix", "Source: ") + badge.label + " — " + badge.title, "muted");
       srcLine.title = badge.title;
       ctx.wrap.appendChild(srcLine);
-      ctx.wrap.appendChild(el(doc, "h2", "Approver status"));
+      ctx.wrap.appendChild(el(doc, "h2", t("proposal.approver_status", "Approver status")));
       var ap = approvalLines(p);
       ctx.wrap.appendChild(el(doc, "p", approvalCell(p), "muted"));
       ap.lines.forEach(function (ln) { ctx.wrap.appendChild(el(doc, "p", ln)); });
-      ctx.wrap.appendChild(rawJson(doc, "Raw proposal JSON", p));
+      ctx.wrap.appendChild(rawJson(doc, t("proposal.raw_proposal_json", "Raw proposal JSON"), p));
       if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations."), "muted"));
       symJoin(innerAssetIds(entries)).then(function (join) {
         if (myGen !== gen) return;

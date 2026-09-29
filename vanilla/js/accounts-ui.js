@@ -173,18 +173,18 @@ var AccountsUI = (function () {
       ["#/wallet", t("account.wallet_manager", "Wallet manager")]
     ]));
     /* LOW punchlist: restore-your-account / advanced-form links (logged-out).
-     * Both targets exist — plain literals, no new routes. */
+     * Both targets exist — batch-3-keyed, no new routes. */
     (function restoreLinks() {
       var p = el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/existing-account";
-      a.textContent = "Restore your account";
+      a.textContent = t("account.restore_your_account", "Restore your account");
       touchable(a);
       p.appendChild(a);
       p.appendChild(doc.createTextNode(" · "));
       var b = doc.createElement("a");
       b.href = "#/create-account";
-      b.textContent = "Advanced form";
+      b.textContent = t("account.advanced_form", "Advanced form");
       touchable(b);
       p.appendChild(b);
       wrap.appendChild(p);

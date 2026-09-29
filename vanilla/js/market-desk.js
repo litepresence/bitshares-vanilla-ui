@@ -296,13 +296,13 @@ var MarketDesk = (function () {
     head.appendChild(sub);
     /* LOW punchlist: header star favourite next to the pair (same FAV_KEY the
      * picker owns) + disabled column-chooser gear (columns are fixed; the
-     * reference Personalize dialog is not rebuilt). Plain literals only. */
+     * reference Personalize dialog is not rebuilt). Batch-3 i18n: keyed. */
     try {
       var favKey = "bts-vanilla-fav-markets-v1";
       var starBtn = doc.createElement("button");
       starBtn.type = "button";
       starBtn.id = "mkt-head-star";
-      starBtn.setAttribute("aria-label", "Favourite " + id);
+      starBtn.setAttribute("aria-label", t("market.favourite_prefix", "Favourite ") + id);
       touchable(starBtn);
       function paintStar() {
         var fav = false;
@@ -312,7 +312,7 @@ var MarketDesk = (function () {
         } catch (e) { fav = false; }
         starBtn.textContent = fav ? "★" : "☆";
         starBtn.setAttribute("aria-pressed", fav ? "true" : "false");
-        starBtn.title = fav ? "Starred — click to unstar" : "Star this market";
+        starBtn.title = fav ? t("market.starred_click_to_unstar", "Starred — click to unstar") : t("market.star_this_market", "Star this market");
       }
       paintStar();
       starBtn.addEventListener("click", function () {
@@ -333,8 +333,8 @@ var MarketDesk = (function () {
       var gearBtn = doc.createElement("button");
       gearBtn.type = "button";
       gearBtn.disabled = true;
-      gearBtn.textContent = "⚙ Columns (fixed)";
-      gearBtn.title = "Column chooser is not offered — the book, history and orders tables have fixed columns.";
+      gearBtn.textContent = t("market.columns_fixed", "⚙ Columns (fixed)");
+      gearBtn.title = t("market.column_chooser_is_not_offered_the_book_h", "Column chooser is not offered — the book, history and orders tables have fixed columns.");
       gearBtn.setAttribute("aria-disabled", "true");
       touchable(gearBtn);
       head.appendChild(gearBtn);

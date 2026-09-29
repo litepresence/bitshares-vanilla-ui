@@ -129,7 +129,9 @@
     "welcome": "Welcome to BitShares",
     "tagline": "Your Decentralized Platform",
     "create": "Create Account",
-    "restore_prefix": "Optionally, "
+    "restore_prefix": "Optionally, ",
+    "full_balances_suffix": " — full balances",
+    "top_holdings_for_the_watched_account_": "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."
   },
   "account": {
     "title": "Account",
@@ -238,7 +240,9 @@
     "margin_positions": "Margin Positions",
     "proposals_page": "proposals page",
     "borrow_page": "borrow page",
-    "total": "Total ≈ "
+    "total": "Total ≈ ",
+    "advanced_form": "Advanced form",
+    "restore_your_account": "Restore your account"
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -310,7 +314,32 @@
     "locked_sign_note": "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing.",
     "password": "password",
     "unlocked_repreview_note": "Unlocked — preview again so the proposal uses your account, then propose.",
-    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as your account."
+    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as your account.",
+    "add_escrow": "Add escrow",
+    "due_now_suffix": " (due now).",
+    "escrow_enabled_but_no_account_set_legs_": "Escrow enabled but no account set — legs settle peer-to-peer.",
+    "escrow_holds_off_proposal_suffix": ") holds off-proposal — preview-only: the proposal below encloses only A↔B transfers (no escrow party serialized).",
+    "escrow_prefix": "Escrow ",
+    "fee_asset_mid": " fee asset: ",
+    "fee_hint_unavailable": "fee hint unavailable",
+    "fee_hints_unavailable": "fee hints unavailable",
+    "no_legs": "no legs",
+    "paid_by_suffix": "): ",
+    "proposal_fee_asset_1_3_x_due_now": "Proposal fee asset (1.3.x, due now)",
+    "proposal_fee_asset_mid": "; proposal fee asset: ",
+    "proposal_fee_due_now_paid_by_prefix": "Proposal fee (due now, paid by ",
+    "proposal_fee_estimate_prefix": "Proposal fee estimate: ",
+    "proposal_fee_hint_unavailable": "proposal fee hint unavailable",
+    "remove_escrow": "Remove escrow",
+    "side_a": "Side A",
+    "side_a_fee_asset_1_3_x": "Side A fee asset (1.3.x)",
+    "side_a_fee_asset_prefix": "Side A fee asset: ",
+    "side_b": "Side B",
+    "side_b_fee_asset_1_3_x": "Side B fee asset (1.3.x)",
+    "side_b_fee_asset_mid": "; Side B fee asset: ",
+    "side_fees_due_now_escrow_custodian_path": "Side fees: due now (escrow custodian path — legs route via escrow).",
+    "side_fees_when_proposal_executes_no_escr": "Side fees: when proposal executes (no escrow — enclosed transfers pay on execution).",
+    "total_fees_prefix": "Total fees: "
   },
   "borrow": {
     "title": "Borrow",
@@ -579,7 +608,13 @@
     "password": "password",
     "unlocked_rereview_note": "Unlocked — press Back and re-run Review so the transaction uses your account.",
     "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as your account.",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "available": "Available",
+    "available_mid": " / Available ",
+    "expiration": "Expiration",
+    "expiration_mid": " · Expiration ",
+    "loan": "Loan",
+    "total_prefix": "Total "
   },
   "debit": {
     "title": "Direct Debit",
@@ -815,7 +850,28 @@
     "actions": "ACTIONS",
     "short": "Short: ",
     "market_3": "Market",
-    "rows": " Rows "
+    "rows": " Rows ",
+    "block_height_aria": "Block height",
+    "collateral_prefix": " (+collateral ",
+    "created_account_prefix": " created account ",
+    "debt_prefix": " (+debt ",
+    "filled_order_prefix": " filled order: ",
+    "genesis_first_block": "← Genesis (first block)",
+    "go": "Go",
+    "go_to_block_prefix": "Go to block: ",
+    "height_ph": "height",
+    "issued_mid": " issued ",
+    "next_no_newer_block": "Next → (no newer block yet)",
+    "operation_mid": " operation",
+    "prev_block": "← Prev block",
+    "proposed_prefix": " proposed ",
+    "published_feed_for_prefix": " published feed for ",
+    "return_to_top": "Return to top",
+    "thin_summary_top_20_by_volume_full_orde": "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page.",
+    "thin_summary_top_50_names_and_activity": "Thin summary (top 50, names and activity only) — weights and publishing live on the voting page.",
+    "to_mid": " to ",
+    "updated_account": " updated account",
+    "updated_margin_position": " updated margin position"
   },
   "gateway": {
     "title": "Deposit / Withdraw",
@@ -904,7 +960,11 @@
     "withdraw_prefix": "Withdraw ",
     "withdraw_tab": "WITHDRAW",
     "your_account": "Your BitShares account ",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "display_terms": "Gateway display + terms",
+    "show_mid": " Show ",
+    "show_prefix": "Show ",
+    "use_at_your_own_risk_external_hosts_set_": "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed."
   },
   "htlc": {
     "title": "HTLC",
@@ -968,7 +1028,21 @@
     "locktime_label": "Lock time",
     "size_field": "Preimage size (bytes)",
     "to_account": "To account",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "contracts_suffix": " contracts.",
+    "direction": "Direction",
+    "expired_suffix": " (expired)",
+    "filter_aria": "Filter contracts",
+    "filter_ph": "Filter by id, account, or hash…",
+    "from": "From",
+    "no_contracts": "No contracts.",
+    "of_mid": " of ",
+    "received": "Received",
+    "sent": "Sent",
+    "sent_prefix": "Sent (",
+    "sent_received_mid": ") · Received (",
+    "showing_prefix": "Showing ",
+    "to": "To"
   },
   "market_book": {
     "title": "Exchange",
@@ -1092,7 +1166,12 @@
     "stat_feed": "Feed Price",
     "stat_settle": "Settlement Price",
     "stat_global_settle": "Global Settlement",
-    "vol_label": "Vol"
+    "vol_label": "Vol",
+    "column_chooser_is_not_offered_the_book_h": "Column chooser is not offered — the book, history and orders tables have fixed columns.",
+    "columns_fixed": "⚙ Columns (fixed)",
+    "favourite_prefix": "Favourite ",
+    "star_this_market": "Star this market",
+    "starred_click_to_unstar": "Starred — click to unstar"
   },
   "misc": {
     "title": "Invoice",
@@ -1187,7 +1266,10 @@
     "vesting_backend_missing_proposal_ui_js_failed": "Vesting backend missing: proposal-ui.js failed to load.",
     "whitelist": "Whitelist",
     "yes": "yes",
-    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself."
+    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
+    "add_auth_row_unsupported": "Add auth row (unsupported)",
+    "one_key_auth_row_is_supported_here_key_ab": "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form.",
+    "only_one_key_auth_row_is_supported_extra_": "Only one key-auth row is supported — extra authority rows need new serializers."
   },
   "notify": {
     "title": "Price Alerts",
@@ -1404,7 +1486,9 @@
     "unlock_hint": "Unlock your wallet to trade on this market.",
     "unlock_review": "Unlock & review",
     "unlocking": "Unlocking…",
-    "yes": "Yes"
+    "yes": "Yes",
+    "highest_bid_lives_in_the_order_book_above": "Highest bid lives in the order book above — click a bid row to fill the price.",
+    "lowest_ask_lives_in_the_order_book_above": "Lowest ask lives in the order book above — click an ask row to fill the price."
   },
   "transfer": {
     "title": "Transfer",
@@ -1450,7 +1534,8 @@
     "unlock_sign": "Unlock & Sign",
     "unlocking": "Unlocking…",
     "viewing_as_committee": "Viewing as committee-account (1.2.0) — public data visible while locked; password is asked only at signing.",
-    "confirm_settles_the_fee_in": " — Confirm settles the fee in "
+    "confirm_settles_the_fee_in": " — Confirm settles the fee in ",
+    "no_scam_list_is_loaded_here_double_che": "No scam list is loaded here — double-check the recipient name before reviewing."
   },
   "vesting": {
     "title": "Vesting",
@@ -1520,7 +1605,16 @@
     "vesting_locks_funds_under_a_release_policy_cl": "Vesting locks funds under a release policy. Claim with op 33; genesis balances claim with op 37 (fee 0, owner-key signature — see below).",
     "vesting_withdrawn_and_re_read_on_chain": "Vesting withdrawn and re-read on chain.",
     "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
-    "balance_2": "Balance: "
+    "balance_2": "Balance: ",
+    "available": "Available",
+    "claim_prefix": "Claim ",
+    "earned_days": "Earned (days)",
+    "filter": "Filter",
+    "filter_vesting_rows_aria": "Filter vesting rows",
+    "no_matching_vesting_rows": "No matching vesting rows.",
+    "remaining_days": "Remaining (days)",
+    "required_days": "Required (days)",
+    "search_id_owner_asset_ph": "Search id, owner, asset…"
   },
   "voting": {
     "title": "Voting",
@@ -1548,7 +1642,15 @@
     "wallet_name": "Wallet name",
     "brainkey": "Brainkey",
     "password": "Password",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "a_wallet_already_exists_on_this_device_2": "A wallet already exists on this device. ",
+    "brainkey_import_this_page_form_below": " · Brainkey import (this page's form below)",
+    "claim_vesting_balances": "Claim vesting balances",
+    "create_new_wallet_instead": "Create new wallet instead",
+    "have_a_bin_backup_file_or_bare_private_k": "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.",
+    "open_the_dashboard": "Open the dashboard",
+    "wallet_manager": "Wallet manager",
+    "ways_in": "Ways in: "
   },
   "auth": {
     "a_local_wallet_creates_a_brainkey_on_this_dev": "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password.",
@@ -1599,7 +1701,20 @@
     "looking_up": "Looking up “",
     "is_taken": "” is taken (",
     "found": "Found ",
-    "open": "Open "
+    "open": "Open ",
+    "already_have_an_account_import_it_instead": "Already have an account? Import it instead of registering.",
+    "back_up_no_file_the_new_account_s_brainke": "Back up: no file — the new account's brainkey is shown once at creation",
+    "back_up_yes_write_down_the_brainkey": "Back up: yes — write down the brainkey",
+    "best_security_stays_in_this_browser_move": "Best security — stays in this browser. Move it with the brainkey backup.",
+    "cloud_style_account_name_via_the_faucet": "Cloud-style account — name via the faucet",
+    "continue": "Continue",
+    "local_wallet_keys_on_this_device": "Local wallet — keys on this device",
+    "login_by_account_name_lookup_password_der": "Login by: account-name lookup (password-derived keys are not supported here)",
+    "login_by_password_on_this_device": "Login by: password on this device",
+    "no_login_from_anywhere_with_name_password": "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.",
+    "recommended": "Recommended",
+    "security_high": "Security: High",
+    "security_medium": "Security: Medium"
   },
   "confirm": {
     "amount": "Amount",
@@ -1665,7 +1780,9 @@
     "save_wallet_with_this_brainkey": "Save wallet with this brainkey",
     "saving_wallet": "Saving wallet…",
     "unexpected_error": "Unexpected error",
-    "wallet_saved_the_account_keys_are_now_unlocke": "Wallet saved. The account keys are now unlocked on this device."
+    "wallet_saved_the_account_keys_are_now_unlocke": "Wallet saved. The account keys are now unlocked on this device.",
+    "advanced_form": "Advanced form",
+    "restore_your_account": "Restore your account"
   },
   "createworker": {
     "back": "Back",
@@ -1718,7 +1835,15 @@
     "worker_backend_missing_js_account_js_or_js_fo": "Worker backend missing: js/account.js or js/format.js failed to load.",
     "worker_backend_missing_js_asset_ops_js_failed": "Worker backend missing: js/asset-ops.js failed to load.",
     "worker_name": "Worker name ",
-    "worker_preview_op_34": "Worker preview (op 34)"
+    "worker_preview_op_34": "Worker preview (op 34)",
+    "daily_pay_in_core_asset_bts_precision": "Daily pay in core asset (BTS, precision 5), greater than zero and below the chain maximum.",
+    "end_date_must_be_after_the_start_dat": "End date must be after the start date; pay accrues only inside this window.",
+    "link_to_the_full_proposal_text_under_1": "Link to the full proposal text, under 127 bytes.",
+    "owner_pays_the_fee_and_receives_the_": "Owner pays the fee and receives the worker pay — use a lifetime-member account you control.",
+    "publishing_a_worker_requires_a_lifeti": "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded.",
+    "short_name_under_63_bytes_shown_on_th": "Short name under 63 bytes — shown on the voting page.",
+    "start_date_must_be_before_the_end_da": "Start date must be before the end date (chain rule) — pick both in UTC.",
+    "vesting_choice_only_whole_days_0_6553": "Vesting choice only: whole days 0..65535 for the vesting pay destination; hidden otherwise."
   },
   "favourites": {
     "enter_an_account_name": "Enter an account name.",
@@ -1875,7 +2000,10 @@
     "start_here": "Start here",
     "this_wallet_ships_no_in_app_news_feed_the_ref": "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current.",
     "transfer_send_assets": "Transfer — send assets",
-    "voting_witnesses_committee_workers": "Voting — witnesses, committee, workers"
+    "voting_witnesses_committee_workers": "Voting — witnesses, committee, workers",
+    "checking_connection": "Checking connection…",
+    "network_unknown_connection_unknown_see_se": "Network: unknown · connection: unknown (see Settings → Nodes)",
+    "no_feed_fetch_is_attempted_so_there_is_no": "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page."
   },
   "password": {
     "back_to_wallet_manager": "Back to Wallet manager",
@@ -1941,7 +2069,18 @@
     "settlement_price": "Settlement price",
     "take_a_position": "Take a position",
     "that_asset_is_not_a_prediction_market_no_is_p": "That asset is not a prediction market (no is_prediction_market flag).",
-    "unexpected_error": "Unexpected error"
+    "unexpected_error": "Unexpected error",
+    "action": "Action",
+    "agree": "Agree",
+    "create_prediction_market": "Create prediction market",
+    "disagree": "Disagree",
+    "hide_invalid_assets": "Hide invalid assets",
+    "hide_unknown_houses": "Hide unknown houses",
+    "house": "House",
+    "market_confidence": "Market confidence",
+    "new_markets_are_created_under_assets_": "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network.",
+    "predicted_likelihood": "Predicted likelihood",
+    "resolution_date": "Resolution date"
   },
   "proposal": {
     "account": "Account",
@@ -2090,7 +2229,36 @@
     "yes_veto": "yes (veto)",
     "locked_sign_note": "Wallet is locked — browsing is public; unlock to sign.",
     "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
-    "retry_load": "Retry loading."
+    "retry_load": "Retry loading.",
+    "a_touched_account_is_in_your_local_cont": "A touched account is in your local contacts or favourite accounts.",
+    "active_suffix": " (active): ",
+    "approvals": "Approvals",
+    "approvals_prefix": "Approvals: ",
+    "approved": "approved",
+    "approved_suffix": " approved",
+    "approver_status": "Approver status",
+    "empty_proposal_no_touched_accounts_to_": "Empty proposal — no touched accounts to check. ",
+    "enclosed_ops_mid": " enclosed op(s), first: ",
+    "expires_prefix": "Expires ",
+    "flagged_by_the_local_scam_registry_as_a": "Flagged by the local scam registry as a known scammer.",
+    "key_approvals_prefix": "key approvals: ",
+    "n_a": "n/a",
+    "no_scam_registry_is_vendored_in_vanilla": "No scam registry is vendored in vanilla — this is an unverified-source flag, not a scam verdict (deferred: vendor scamAccounts lists + on-chain blacklist check).",
+    "no_touched_account_is_in_your_local_con": "No touched account is in your local contacts or favourite accounts. ",
+    "none_required": "none required",
+    "payer_mid": " · payer ",
+    "pending": "pending",
+    "raw_json": "Raw JSON",
+    "raw_proposal_json": "Raw proposal JSON",
+    "raw_proposal_prefix": "Raw proposal ",
+    "required_mid": " required · ",
+    "scam_attempt": "SCAM ATTEMPT",
+    "source_prefix": "Source: ",
+    "trust": "Trust",
+    "trusted": "trusted",
+    "unknown_source": "UNKNOWN SOURCE",
+    "unverified": "unverified",
+    "owner_suffix": " (owner): "
   },
   "referrals": {
     "account": "Account ",
@@ -2286,7 +2454,9 @@
     "review_join": "Review join",
     "witness": "Witness",
     "role": "Role",
-    "url": "URL"
+    "url": "URL",
+    "proxies_follow_another_account_s_slate_re": "Proxies follow another account's slate — read how voting works before setting one.",
+    "what_is_a_proxy": "? What is a proxy?"
   },
   "asset": {
     "acting_field": "Acting account (name or 1.2.N)",
@@ -2390,7 +2560,11 @@
     "reserve_prepare_failed": "Could not prepare the reserve.",
     "review_issue": "Review issue",
     "review_reserve": "Review reserve",
-    "updated": "Asset updated"
+    "updated": "Asset updated",
+    "description_is_one_text_box_write_the_fu": "Description is one text box: write the full description here (main, short name, market pair and details as plain text).",
+    "issue": "Issue",
+    "issuer_defaults_to_the_viewing_as_accoun": "Issuer defaults to the viewing-as account (1.2.0 locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here.",
+    "open_an_account": "Open an account"
   },
   "pool": {
     "a_to_b_col": "A→B out (raw)",
@@ -2506,7 +2680,9 @@
     "hist_source_es": "Swap history via community index.",
     "hist_source_chain": "Swap history via chain.",
     "book_title": "Order book",
-    "fill_swap": "Fill swap"
+    "fill_swap": "Fill swap",
+    "balances_for_the_sell_and_buy_assets_live_": "Balances for the sell and buy assets live on the account page — open it to check before swapping.",
+    "open_account_balances": "Open account balances"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

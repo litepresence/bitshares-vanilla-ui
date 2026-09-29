@@ -164,18 +164,18 @@ var CreateAccountUI = (function () {
     wrap.appendChild(regBtn);
     var out = el(doc, "div"); wrap.appendChild(out);
     /* LOW punchlist: restore-your-account / advanced-form links on this page
-     * (original create-account.png). Plain literals, existing routes only. */
+     * (original create-account.png). Batch-3 i18n: keyed, existing routes only. */
     (function restoreLinks() {
       var p = el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/existing-account";
-      a.textContent = "Restore your account";
+      a.textContent = t("createaccount.restore_your_account", "Restore your account");
       touchable(a);
       p.appendChild(a);
       p.appendChild(doc.createTextNode(" · "));
       var b = doc.createElement("a");
       b.href = "#/registration/cloud";
-      b.textContent = "Advanced form";
+      b.textContent = t("createaccount.advanced_form", "Advanced form");
       touchable(b);
       p.appendChild(b);
       wrap.appendChild(p);

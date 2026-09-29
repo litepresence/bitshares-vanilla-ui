@@ -363,7 +363,7 @@ var DashboardUI = (function () {
       if (myGen !== gen) return;
       clearRoot(section);
       section.appendChild(el(doc, "h2", t("account.s7", "Balances")));
-      section.appendChild(el(doc, "p", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page.", "muted"));
+      section.appendChild(el(doc, "p", t("dashboard.top_holdings_for_the_watched_account_", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."), "muted"));
       if (!list || list.length === 0) {
         section.appendChild(el(doc, "p", t("account.s1", "No balances."), "muted"));
         return;
@@ -413,7 +413,7 @@ var DashboardUI = (function () {
       section.appendChild(linkPara(doc, [
         ["#/account/" + encodeURIComponent(found.name),
           t("account.open_prefix", "Open ") + found.name +
-          (list.length > 5 ? " (" + list.length + ")" : " — full balances")]
+          (list.length > 5 ? " (" + list.length + ")" : t("dashboard.full_balances_suffix", " — full balances"))]
       ]));
     }).catch(function (e) {
       if (myGen !== gen) return;

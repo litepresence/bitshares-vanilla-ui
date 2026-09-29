@@ -18,6 +18,17 @@
 var ExplorerTabs = (function () {
   "use strict";
 
+  /* Batch-3 i18n (slice-17 precedent): display strings resolve via I18n.t with
+   * the pre-conversion literal kept verbatim as enDefault (English-identical
+   * on any transport, incl. file:// where dict fetch fails). Falls back to
+   * the default when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Local element helpers (textContent-only; per-file copies per doctrine
    * rule 5 — WHY: no shared-DOM-util module may grow inside vanilla/). */
   function el(doc, tag, text, cls) {
@@ -140,7 +151,7 @@ var ExplorerTabs = (function () {
    * Vote weights are raw stake ints — intentionally NOT shown here (principle
    * #6: the voting page owns human weight math; this summary links there).
    * LOW punchlist: thin-summary honesty — the scope line below names the
-   * full page for weights and slates. Plain literals only. */
+   * full page for weights and slates. Batch-3 i18n: keyed. */
   function memberTab(doc, body, live, kind) {
     var isWit = kind === "witnesses";
     if (typeof Vote === "undefined" || !Vote || typeof Vote.lists !== "function") {
@@ -156,7 +167,7 @@ var ExplorerTabs = (function () {
         body.appendChild(el(doc, "p", "No " + kind + " found.", "muted"));
         return;
       }
-      var t = table(doc, ["Name", "Account", "Active"]);
+      var tbl = table(doc, ["Name", "Account", "Active"]);
       rows.slice(0, 50).forEach(function (m) {
         var tr = doc.createElement("tr");
         var td = doc.createElement("td");
@@ -164,13 +175,13 @@ var ExplorerTabs = (function () {
         tr.appendChild(td);
         tr.appendChild(el(doc, "td", m.account_id || "—"));
         tr.appendChild(el(doc, "td", m.active ? "yes" : "—"));
-        t.tbody.appendChild(tr);
+        tbl.tbody.appendChild(tr);
       });
-      body.appendChild(t.table);
+      body.appendChild(tbl.table);
       var p = el(doc, "p", null, "muted");
       p.appendChild(link(doc, "#/voting", "Open voting for weights and slates →"));
       body.appendChild(p);
-      body.appendChild(el(doc, "p", "Thin summary (top 50, names and activity only) — weights and publishing live on the voting page.", "muted"));
+      body.appendChild(el(doc, "p", t("explorer.thin_summary_top_50_names_and_activity", "Thin summary (top 50, names and activity only) — weights and publishing live on the voting page."), "muted"));
     }).catch(function (e) {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
@@ -210,7 +221,7 @@ var ExplorerTabs = (function () {
       });
       return Promise.all(jobs).then(function () {
         if (!live()) return;
-        var t = table(doc, ["Market", "Price", "Volume", "Change"]);
+        var tbl = table(doc, ["Market", "Price", "Volume", "Change"]);
         pend.forEach(function (r) {
           var tr = doc.createElement("tr");
           var td = doc.createElement("td");
@@ -221,10 +232,10 @@ var ExplorerTabs = (function () {
           tr.appendChild(el(doc, "td", r.m.latest !== undefined && r.m.latest !== null ? String(r.m.latest) : "—"));
           tr.appendChild(el(doc, "td", r.m.base_volume !== undefined && r.m.base_volume !== null ? String(r.m.base_volume) : "—"));
           tr.appendChild(el(doc, "td", r.m.percent_change !== undefined && r.m.percent_change !== null ? String(r.m.percent_change) : "—"));
-          t.tbody.appendChild(tr);
+          tbl.tbody.appendChild(tr);
         });
-        body.appendChild(t.table);
-        body.appendChild(el(doc, "p", "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page.", "muted"));
+        body.appendChild(tbl.table);
+        body.appendChild(el(doc, "p", t("explorer.thin_summary_top_20_by_volume_full_orde", "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page."), "muted"));
       });
     }).catch(function (e) {
       if (!live()) return;

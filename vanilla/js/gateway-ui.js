@@ -141,7 +141,7 @@ var GatewayUI = (function () {
       t("gateway.intro_a", "Deposits never broadcast — you send external coins to the shown address. ") +
       t("gateway.intro_b", "Withdraws continue in the standard transfer form with its live fee and confirm."), "muted"));
     /* LOW punchlist: per-service display toggles (persisted viewSettings) +
-     * terms/agreement disclosure. Plain literals only; toggles hide tab
+     * terms/agreement disclosure. Batch-3-keyed literals; toggles hide tab
      * buttons (direct hashes still load); terms are display-only. */
     (function gwPrefs() {
       var KEY = "bts-vanilla-gw-toggles-v1";
@@ -156,7 +156,7 @@ var GatewayUI = (function () {
       var det = ctx.doc.createElement("details");
       det.className = "muted";
       var sum = ctx.doc.createElement("summary");
-      sum.textContent = "Gateway display + terms";
+      sum.textContent = t("gateway.display_terms", "Gateway display + terms");
       touchable(sum);
       det.appendChild(sum);
       ORDER.forEach(function (id) {
@@ -165,17 +165,17 @@ var GatewayUI = (function () {
         box.type = "checkbox";
         box.checked = prefs[id] !== false;
         touchable(box);
-        box.setAttribute("aria-label", "Show " + id);
+        box.setAttribute("aria-label", t("gateway.show_prefix", "Show ") + id);
         box.addEventListener("change", function () {
           prefs[id] = !!box.checked;
           try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* session-only */ }
           paintTabs(ctx);
         });
         lab.appendChild(box);
-        lab.appendChild(ctx.doc.createTextNode(" Show " + id + " "));
+        lab.appendChild(ctx.doc.createTextNode(t("gateway.show_mid", " Show ") + id + " "));
         det.appendChild(lab);
       });
-      var terms = el(ctx.doc, "p", "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed.", "muted");
+      var terms = el(ctx.doc, "p", t("gateway.use_at_your_own_risk_external_hosts_set_", "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed."), "muted");
       det.appendChild(terms);
       ctx.wrap.appendChild(det);
     })();
