@@ -571,10 +571,11 @@ var App = (function () {
   }
 
   /* paintFooter: persistent status bar — the connectivity signal (#1
-   *   parity: the node location name carries the state in COLOR, green when
-   *   connected, red otherwise; no topbar badge). Params: status ({state,
-   *   node, latencyMs, headBlock}). Returns nothing. Fails: never — missing
-   *   footer is a no-op. Latency + head block are heartbeat-live. */
+   *   parity: the node location name carries the state in COLOR, vivid
+   *   --live green when connected, red otherwise; no topbar badge).
+   *   Params: status ({state, node, latencyMs, headBlock}). Returns nothing.
+   *   Fails: never — missing footer is a no-op. Latency + head block are
+   *   heartbeat-live inside span.appfoot-telemetry (grey caps via CSS). */
   function paintFooter(status) {
     var foot = document.getElementById("appfoot-status");
     if (!foot) return;
@@ -597,7 +598,7 @@ var App = (function () {
         foot.appendChild(span(host, "appfoot-host", "open"));
         foot.appendChild(doc.createTextNode(" · "));
       }
-      foot.appendChild(doc.createTextNode("LATENCY " + lat + blk));
+      foot.appendChild(span("LATENCY " + lat + blk, "appfoot-telemetry", null));
     } else {
       var host = shortHost(s.node);
       if (host) {

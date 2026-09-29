@@ -51,11 +51,19 @@ var TradeForm = (function () {
   /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
-   * the default when i18n.js failed to load: never blank, never throws. */
-  function t(key, dflt) {
+   * the default when i18n.js failed to load: never blank, never throws.
+   * vars (optional) fills %(name)s placeholders per the I18n contract. */
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof vars === "object") {
+      try {
+        return String(dflt).replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m;
+        });
+      } catch (e) { /* default below */ }
+    }
     return dflt;
   }
 
@@ -297,6 +305,67 @@ var TradeForm = (function () {
     return Format.formatAmount(String(totalRaw), meta.precision) + " " + meta.symbol;
   }
 
+  /* Market-fee math (display-only, BigInt — never float for money).
+   * Reference: bitshares-ui/app/components/Exchange/BuySell.jsx:227-260:
+   *   fee = min(max_market_fee, amount * market_fee_percent / 10000),
+   *   percent label = market_fee_percent / 100 + "%" (:243-246).
+   * Only the RECEIVE leg carries a row (Buy shows the quote leg, Sell the
+   * base leg — BuySell.jsx:495-502 isBid mapping; in this file's terms both
+   * sides' receive leg is already recvRaw/recvAssetId). Charge flag bit:
+   * asset_constants.js:3 charge_market_fee 0x01. Every helper here is
+   * fail-silent (null, never throws) so an unreadable asset skips the row
+   * instead of blanking or breaking the form. */
+
+  /* marketPctLabel: hundredths int -> "X%" display (BuySell :243-246 shape:
+   * pct/100 + "%", so 8 -> "0.08%", 200 -> "2%"). Params: pct number.
+   * Returns string. Never throws (non-numbers yield "0%"). */
+  function marketPctLabel(pct) {
+    var p = Number(pct);
+    if (!isFinite(p) || p < 0) p = 0;
+    p = Math.floor(p);
+    var whole = Math.floor(p / 100), rest = p % 100;
+    if (rest === 0) return whole + "%";
+    var frac = rest < 10 ? "0" + rest : String(rest);
+    if (frac.charAt(frac.length - 1) === "0") frac = frac.charAt(0);
+    return whole + "." + frac + "%";
+  }
+
+  /* marketFeeRaw: min(maxRaw, amountRaw * pct / 10000) in integer strings.
+   * Params: amountRaw (int string), pct (hundredths int), maxRaw (int
+   * string). Returns fee raw string, or null on bad input. Never throws. */
+  function marketFeeRaw(amountRaw, pct, maxRaw) {
+    try {
+      if (typeof amountRaw !== "string" || !/^\d+$/.test(amountRaw)) return null;
+      var p = Number(pct);
+      if (!isFinite(p) || p <= 0) return "0";
+      if (typeof maxRaw !== "string" || !/^\d+$/.test(maxRaw)) return null;
+      var fee = (BigInt(amountRaw) * BigInt(Math.floor(p))) / 10000n;
+      var max = BigInt(maxRaw);
+      if (fee > max) fee = max;
+      return fee.toString();
+    } catch (e) { return null; }
+  }
+
+  /* fetchMarketFeeOpts: asset options for the market-fee row. Params:
+   * assetId ("1.3.x"). Returns {pct, symbol, precision, maxRaw} when the
+   * asset charges a market fee ((flags & 0x01) per asset_constants.js:3),
+   * else null (flag off OR unreadable — both skip silently). Never throws. */
+  async function fetchMarketFeeOpts(assetId) {
+    try {
+      var dbId = await Chain.db();
+      var rows = await Chain.call(dbId, "get_assets", [[assetId]]);
+      var a = rows && rows[0];
+      if (!a || !a.options || typeof a.precision !== "number" || !a.symbol) return null;
+      var flags = Number(a.options.flags || 0);
+      if (!(flags & 1)) return null;
+      var pct = Math.floor(Number(a.options.market_fee_percent || 0));
+      var maxRaw = (a.options.max_market_fee !== undefined && a.options.max_market_fee !== null)
+        ? String(a.options.max_market_fee) : null;
+      if (maxRaw === null || !/^\d+$/.test(maxRaw)) return null;
+      return { pct: pct, symbol: a.symbol, precision: a.precision, maxRaw: maxRaw };
+    } catch (e) { return null; }
+  }
+
   /* Head block number for result screens (observation marker, not a txid —
    * history rows carry none, same convention as transfer-ui.js). */
   async function headBlock() {
@@ -513,6 +582,54 @@ var TradeForm = (function () {
     var line = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
     line.id = "trade-fee-preview-" + side;
     wrap.appendChild(line);
+    /* Market-fee row (BuySell.jsx:227-260 + :495-502): the RECEIVE leg's
+     * asset (buy->quote, sell->base — fixed per side) carries the row. The
+     * options fetch runs ONCE per mount (fail-silent -> the row stays
+     * hidden); per-keystroke updates only redo the BigInt fee. Locked and
+     * unlocked share this path — never blank (dash until a valid quote),
+     * never throws. */
+    var mktLine = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
+    mktLine.id = "trade-market-fee-" + side;
+    try { mktLine.style.display = "none"; } catch (e) { /* shown on first fee */ }
+    wrap.appendChild(mktLine);
+    var mktOptsPromise = null;
+    function mktOpts() {
+      if (!mktOptsPromise) {
+        var recvId = side === "buy" ? P.ctx.quote : P.ctx.base;
+        mktOptsPromise = fetchMarketFeeOpts(recvId);
+      }
+      return mktOptsPromise;
+    }
+    /* paintMkt: render the market-fee row for a receive-leg raw amount
+     * (null/zero -> dash with the pct label; no-fee/unreadable asset ->
+     * row hidden). Params: recvRaw (int string or null). Never throws. */
+    function paintMkt(recvRaw) {
+      mktOpts().then(function (opt) {
+        if (!opt) {
+          try { mktLine.style.display = "none"; } catch (e) { /* hidden stands */ }
+          return;
+        }
+        try { mktLine.style.display = ""; } catch (e) { /* shown stands */ }
+        var label = t("trade.market_fee_label", "Market fee, %(pct)s", { pct: marketPctLabel(opt.pct) });
+        if (!recvRaw || !/[1-9]/.test(recvRaw)) {
+          mktLine.textContent = label + ": —";
+          try { mktLine.title = ""; } catch (e) { /* title best-effort */ }
+          return;
+        }
+        var feeRaw = marketFeeRaw(recvRaw, opt.pct, opt.maxRaw);
+        if (feeRaw === null) {
+          mktLine.textContent = label + ": —";
+          return;
+        }
+        try {
+          mktLine.textContent = label + ": " + Format.formatAmount(feeRaw, opt.precision) + " " + opt.symbol;
+        } catch (e) {
+          mktLine.textContent = label + ": —";
+          return;
+        }
+        try { mktLine.title = feeRaw; } catch (e) { /* title best-effort */ }
+      }).catch(function () { /* preview best-effort: row keeps its state */ });
+    }
     var timer = null;
     /* schedule: debounce the fee preview 400ms (resets on each keystroke;
      * timers-unavailable keeps the last preview). Never throws. */
@@ -533,6 +650,7 @@ var TradeForm = (function () {
       if (!a || !p) {
         line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
         try { line.title = ""; } catch (e) { /* title best-effort */ }
+        paintMkt(null);
         return;
       }
       try {
@@ -561,9 +679,11 @@ var TradeForm = (function () {
         var feeMeta = await feeAssetMeta(op[1].fee.asset_id);
         line.textContent = t("trade.fee_preview", "Fee (preview): ") + humanFee(feeRes.totalRaw, feeMeta);
         try { line.title = String(feeRes.totalRaw); } catch (e) { /* title best-effort */ }
+        paintMkt(recvRaw);
       } catch (e) {
         line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
         try { line.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
+        paintMkt(null);
       }
     }
     schedule();
@@ -1049,6 +1169,22 @@ var TradeForm = (function () {
     var unsigned = await Tx.buildTx(ops);
     var feeRes = await Tx.feeMulti(unsigned.operations, FEE_ASSET);
     var feeMeta = await feeAssetMeta(unsigned.operations[0][1].fee.asset_id);
+    /* Market fee on the receive leg (BuySell.jsx:227-260, same row as the
+     * preview): fail-silent — an unreadable asset yields no row, never a
+     * blank and never a throw. */
+    var mktFee = null;
+    try {
+      var mktOpt = await fetchMarketFeeOpts(recvAssetId);
+      if (mktOpt) {
+        var mktRaw = marketFeeRaw(recvRaw, mktOpt.pct, mktOpt.maxRaw);
+        if (mktRaw !== null) {
+          mktFee = {
+            pct: mktOpt.pct, raw: mktRaw,
+            human: Format.formatAmount(mktRaw, mktOpt.precision) + " " + mktOpt.symbol
+          };
+        }
+      }
+    } catch (e) { mktFee = null; }
     var feeRaw = BigInt(feeRes.totalRaw);
     var feeBal = bals[unsigned.operations[0][1].fee.asset_id];
     var feeHave = feeBal ? feeBal.raw : 0n;
@@ -1063,7 +1199,7 @@ var TradeForm = (function () {
     return {
       side: side, ratio: ratio, sellAssetId: sellAssetId, recvAssetId: recvAssetId,
       sellRaw: sellRaw, recvRaw: recvRaw, expWire: expWire, fok: !!vals.fok,
-      unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta
+      unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta, mktFee: mktFee
     };
   }
 
@@ -1105,6 +1241,10 @@ var TradeForm = (function () {
     row(t("trade.row_sell", "Sell (Amount to Sell)"), sellHuman + " " + sellS, R.sellRaw);
     row(t("trade.row_buy", "Buy (Min to Receive)"), recvHuman + " " + recvS, R.recvRaw);
     row(t("trade.row_fee", "Fee"), humanFee(R.feeRaw, R.feeMeta), R.feeRaw);
+    if (R.mktFee) {
+      row(t("trade.market_fee_label", "Market fee, %(pct)s", { pct: marketPctLabel(R.mktFee.pct) }),
+        R.mktFee.human, R.mktFee.raw);
+    }
     row(t("trade.row_expiration", "Expiration"), R.expWire);
     row(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
     row(t("trade.row_network", "Network"), networkName());

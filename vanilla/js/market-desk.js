@@ -11,7 +11,11 @@
  *   + timeframe), then row 1 Buy panel | Sell panel | trades toggle, then
  *   row 2 BUY ORDERS (bids) | SELL ORDERS (asks) | my open orders — six
  *   equal thirds on desktop (grid-template-columns 1fr 1fr 1fr + 320px
- *   rail), single-column stack on phones <1200px. The 24h stats strip lives
+  *   rail), single-column stack on phones <1200px. GAP FIX: the six cells
+  *   are grouped in three column stacks (buy+bids | sell+asks |
+  *   trades+orders, .mkt-col-* in desk-grid.css) so row heights no longer
+  *   couple — the tall trades cell used to strand a ~400px void under the
+  *   forms. Same six cells, same desktop thirds, same phone order. The 24h stats strip lives
  *   in the head (MarketInd.renderStrip); there is no stats grid cell. Grid
  *   areas live in desk-grid.css (.mkt-exchange scope; the pool desk keeps
  *   the legacy .mkt areas).
@@ -411,17 +415,33 @@ var MarketDesk = (function () {
      * Exchange.jsx:2089-2210 — two panels side by side, always visible).
      * TradeUI owns the panels; the desk only hosts the mounts. Headings
      * name the side + QUOTE symbol (reference 2x3 shot: BUY BTS/SELL BTS);
-     * the Scaled swap lives on the buy panel's own tab row. */
+     * the Scaled swap lives on the buy panel's own tab row.
+     * GAP FIX (desk columns): the six desk cells live in three column
+     * stacks (buy+bids | sell+asks | trades+orders) so a tall trades cell
+     * can no longer stretch the buy/sell row and strand a void under the
+     * forms (measured 340-397px at 1440px: trades 931px vs buy 591px).
+     * Below 1200px the columns dissolve (display:contents) and the six
+     * cells stack by their own grid areas in the original order — phones
+     * keep the established sequence; ids/listeners/fill paths untouched. */
+    var colBuy = doc.createElement("div");
+    colBuy.className = "mkt-col-buy";
+    var colSell = doc.createElement("div");
+    colSell.className = "mkt-col-sell";
+    var colTrade = doc.createElement("div");
+    colTrade.className = "mkt-col-trades";
+    desk.appendChild(colBuy);
+    desk.appendChild(colSell);
+    desk.appendChild(colTrade);
     var buySec = doc.createElement("section");
     buySec.className = "mkt-buy";
-    desk.appendChild(buySec);
+    colBuy.appendChild(buySec);
     buySec.appendChild(el(doc, "h2", "Buy " + pair.quote));
     var buyMount = doc.createElement("div");
     buySec.appendChild(buyMount);
 
     var sellSec = doc.createElement("section");
     sellSec.className = "mkt-sell";
-    desk.appendChild(sellSec);
+    colSell.appendChild(sellSec);
     sellSec.appendChild(el(doc, "h2", "Sell " + pair.quote));
     var sellMount = doc.createElement("div");
     sellSec.appendChild(sellMount);
@@ -436,7 +456,7 @@ var MarketDesk = (function () {
      * with the honest Wallet-link hint. Buttons keep >=44px touch targets. */
     var tradesSec = doc.createElement("section");
     tradesSec.className = "mkt-trades";
-    desk.appendChild(tradesSec);
+    colTrade.appendChild(tradesSec);
     tradesSec.appendChild(el(doc, "h2", t("market.trades_title", "Trades")));
     var tradesTabs = doc.createElement("div");
     tradesTabs.className = "mkt-tabs";
@@ -494,14 +514,14 @@ var MarketDesk = (function () {
      * each cell owns a fixed-height scroll region like the old book. */
     var bidsSec = doc.createElement("section");
     bidsSec.className = "mkt-bids";
-    desk.appendChild(bidsSec);
+    colBuy.appendChild(bidsSec);
     bidsSec.appendChild(el(doc, "h2", "Buy orders"));
     var bidsBody = doc.createElement("div");
     bidsSec.appendChild(bidsBody);
 
     var asksSec = doc.createElement("section");
     asksSec.className = "mkt-asks";
-    desk.appendChild(asksSec);
+    colSell.appendChild(asksSec);
     asksSec.appendChild(el(doc, "h2", "Sell orders"));
     var asksBody = doc.createElement("div");
     asksSec.appendChild(asksBody);
@@ -512,7 +532,7 @@ var MarketDesk = (function () {
      * honest scope, no silent stub). */
     var ordersSec = doc.createElement("section");
     ordersSec.className = "mkt-orders";
-    desk.appendChild(ordersSec);
+    colTrade.appendChild(ordersSec);
     ordersSec.appendChild(el(doc, "h2", t("market.my_orders", "My open orders")));
     var ordersBody = doc.createElement("div");
     ordersSec.appendChild(ordersBody);

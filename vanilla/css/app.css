@@ -16,10 +16,14 @@ body { margin: 0; background: var(--bg); color: var(--text);
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
   min-height: 56px; background: var(--header-bg); color: var(--header-text); }
 .brand { color: inherit; font-weight: 700; font-size: 1.1rem; text-decoration: none; }
-/* Footer host = the connectivity signal (#1 parity): node name green when
+/* Footer host = the connectivity signal (#1 parity): node name vivid green
+ * (--live: #1 $success-color #7bd500 per themes.css provenance) when
  * connected, red otherwise. Status hues, theme-token driven. */
-.appfoot-host[data-state="open"] { color: var(--buy); font-weight: 700; }
+.appfoot-host[data-state="open"] { color: var(--live); font-weight: 700; }
 .appfoot-host[data-state="closed"] { color: var(--danger); font-weight: 700; }
+/* Footer telemetry (latency/block): grey caps — muted token + uppercase via
+ * CSS (the text node itself is plain; paintFooter wraps it in this span). */
+.appfoot-telemetry { color: var(--muted); text-transform: uppercase; }
 #nav-toggle { display: inline-flex; align-items: center; justify-content: center;
   margin-left: auto; min-width: 44px; min-height: 44px;
   background: transparent; border: 1px solid currentColor; border-radius: 6px;
@@ -643,8 +647,8 @@ img, canvas, pre { max-width: 100%; }
 .mkt-stat .muted { font-size: 0.72rem; }
 
 /* Footer: host is the connectivity signal, UPPERCASED (city-style cue),
- * green when open / red when closed (tokens --buy/--danger); latency + block
- * inherit the grey --muted (no extra rule — plain text nodes do that). */
+ * vivid --live green when open / red when closed; latency + block ride in
+ * .appfoot-telemetry (grey --muted caps, own rule above). */
 .appfoot-host { text-transform: uppercase; }
 /* REPORT + HELP (#1 Footer.jsx:666-699 introjs-launcher pair, $bs-blue #049cce
  * == var(--button-bg) in ref-ui-theme): accent-blue square buttons, bottom-right. */

@@ -1279,6 +1279,8 @@
     "keep_order": "Keep order",
     "keep_orders": "Keep orders",
     "loading": "Loading trading…",
+    "market_fee_label": "Market fee, %(pct)s",
+    "market_fee_preview_dash": "Market fee (preview): —",
     "need_assets": "Trade panels need the market assets; reload the market.",
     "no": "No",
     "password_label": "Password ",

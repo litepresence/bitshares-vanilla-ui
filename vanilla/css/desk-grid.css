@@ -95,6 +95,34 @@
   }
 }
 
+/* Exchange-desk columns (gap fix, 2026-09-29): the six desk cells are
+ * grouped buy+bids | sell+asks | trades+orders (.mkt-col-* wrappers built by
+ * market-desk.js) so grid ROW heights no longer couple across the desk — the
+ * tall trades cell (scroll + tape + raw ≈ 931px at 1440px) used to stretch
+ * row 1 and strand a ~400px void under the buy/sell forms (measured live:
+ * buy 591px, sell 534px vs trades 931px). Same six cells, same desktop
+ * thirds + 320px rail, same phone stacking order. Below 1200px the wrappers
+ * dissolve (display:contents) and the six cells place by their own areas in
+ * the original buy/sell/trades/bids/asks/orders sequence — phones unchanged.
+ * Inside a column the cells stack with the desk gap and never stretch. */
+.mkt-col-buy, .mkt-col-sell, .mkt-col-trades { display: contents; }
+@media (min-width: 1200px) {
+  .mkt-exchange {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
+    grid-template-areas: "head head head side" "charts charts charts side" "colbuy colsell coltrades side";
+  }
+  .mkt-col-buy, .mkt-col-sell, .mkt-col-trades {
+    display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
+    align-content: start; min-width: 0;
+  }
+  .mkt-col-buy { grid-area: colbuy; }
+  .mkt-col-sell { grid-area: colsell; }
+  .mkt-col-trades { grid-area: coltrades; }
+  .mkt-col-buy > section, .mkt-col-sell > section, .mkt-col-trades > section {
+    grid-area: auto; min-width: 0;
+  }
+}
+
 /* Trades/exchanges toggle tabs (Recent/My, Pool/My): tablist row above the
  * two panes; exactly one pane visible at a time (JS toggles display).
  * Buttons meet the 44px touch floor; the pressed tab reads via

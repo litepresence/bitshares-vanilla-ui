@@ -44,6 +44,13 @@
   --bg: #2a2a2a; --panel: #3f3f3f; --text: #e0e0e0; --muted: #adadad;
   --accent: #1ec3fa; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #6ba583; --sell: #e3745b; --warn: #fcab53; --danger: #ff3950;
+  /* --live: connected-state vivid green (footer host when open). Provenance:
+   * #1 themes/_dark-theme.scss:29 $success-color #7bd500 — the old UI's own
+   * success green, distinct from the muted --buy bid green (#6ba583) above.
+   * dex-ux-theme #26de81 (== its --buy: style.css:2895 + main.js:110 candle
+   * up); vanilla-ui-theme #1DA866 (== its --buy, kept from the previous
+   * light block — already tuned for light surfaces). */
+  --live: #7bd500;
 --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
   --plot-bg: #1e1e1e;
   /* HELP button: #1's own hover treatment (darken($bs-blue, 10%),
@@ -79,6 +86,7 @@
   --bg: #FAF6EA; --panel: #ffffff; --text: #2A1A12; --muted: #6F5F50;
   --accent: #1E9ED7; --accent-text: #ffffff; --button-bg: #1E9ED7;
   --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
+  --live: #1DA866;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --plot-bg: #ffffff;
   --button-bg-deep: #1786bb;
@@ -108,6 +116,7 @@
   --button-bg-deep: #0062cc;
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
+  --live: #26de81;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
   --toast-shadow: rgba(0, 0, 0, 0.5);
   /* Dark surfaces need light glyphs: full invert maps the vendored
