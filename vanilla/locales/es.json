@@ -122,7 +122,8 @@
     "lock": "Lock",
     "unlock": "Unlock",
     "follow": "Follow",
-    "unfollow": "Unfollow"
+    "unfollow": "Unfollow",
+    "report": "REPORT"
   },
   "dashboard": {
     "welcome": "Welcome to BitShares",

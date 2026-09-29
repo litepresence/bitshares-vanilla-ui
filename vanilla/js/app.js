@@ -375,17 +375,97 @@ var App = (function () {
 
   /* localizeShell: paints static index.html chrome in the current locale.
    *   Params: none. Returns nothing. Fails: never throws — missing DOM nodes
-   *   are skipped, I18n failures keep previous strings. */
+   *   are skipped, I18n failures keep previous strings. The brand holds a
+   *   logo <img> (branding.js:64-66 file, Header.jsx:399 height 40), so the
+   *   shell string feeds its alt/aria-label — never textContent (that would
+   *   wipe the image). Lock + footer actions repaint here too (called at boot,
+   *   on locale switch, and on every hashchange). */
   function localizeShell() {
     if (typeof document === "undefined") return;
     try {
       var brand = document.querySelector(".brand");
-      if (brand) brand.textContent = t("shell.brand", "BitShares");
+      if (brand) {
+        var logo = brand.querySelector("img.brand-logo");
+        var name = t("shell.brand", "BitShares");
+        if (logo) {
+          logo.setAttribute("alt", name);
+          brand.setAttribute("aria-label", name);
+        } else {
+          brand.textContent = name;
+        }
+      }
       var toggle = document.getElementById("nav-toggle");
       if (toggle) toggle.setAttribute("aria-label", t("shell.menu", "Menu"));
+      paintLock();
+      paintFootActions();
       var nav = document.getElementById("nav");
       if (nav) localizeNav(nav);
     } catch (e) { /* shell keeps previous strings */ }
+  }
+
+  /* walletUnlockedNow: guarded peek at the keystore state. Params: none.
+   *   Returns true when Wallet reports unlocked keys. Fails: never throws —
+   *   unknown states read as locked (the safe direction). */
+  function walletUnlockedNow() {
+    try {
+      if (typeof Wallet !== "undefined" && Wallet) {
+        if (typeof Wallet.isUnlocked === "function") return !!Wallet.isUnlocked();
+        if (Wallet.keys) return true;
+      }
+    } catch (e) { /* locked below */ }
+    return false;
+  }
+
+  /* paintLock: lock affordance next to the hamburger (Header.jsx:663-681).
+   *   Unlocked -> vendored unlocked glyph, click locks in place; locked ->
+   *   locked glyph linking to #/login. Params: none. Returns nothing. Fails:
+   *   never throws — missing Wallet/Icon keeps the static 🔒 login link. */
+  function paintLock() {
+    if (typeof document === "undefined") return;
+    var lock = document.getElementById("lock-toggle");
+    if (!lock) return;
+    var open = walletUnlockedNow();
+    var iconOK = (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function");
+    try {
+      while (lock.firstChild) lock.removeChild(lock.firstChild);
+      if (iconOK) lock.appendChild(Icon.img(open ? "unlocked" : "locked", "nav-icon", ""));
+      else lock.textContent = open ? "🔓" : "🔒";
+    } catch (e) { lock.textContent = open ? "🔓" : "🔒"; }
+    lock.setAttribute("aria-label", open ? t("shell.lock", "Lock") : t("shell.unlock", "Unlock"));
+    if (open) lock.setAttribute("href", "#/wallet");
+    else lock.setAttribute("href", "#/login");
+  }
+
+  /* bindLockOnce: click behavior for #lock-toggle (wired once in finishBoot;
+   *   painting stays in paintLock). Unlocked click locks the keystore in place
+   *   and repaints; locked click follows the #/login link. Never throws. */
+  function bindLockOnce() {
+    if (typeof document === "undefined") return;
+    var lock = document.getElementById("lock-toggle");
+    if (!lock || lock.getAttribute("data-bound") === "true") return;
+    lock.setAttribute("data-bound", "true");
+    lock.addEventListener("click", function (ev) {
+      if (!walletUnlockedNow()) return; /* follow #/login */
+      try {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        if (typeof Wallet !== "undefined" && Wallet && typeof Wallet.lock === "function") Wallet.lock();
+      } catch (e) { /* stays unlocked */ }
+      paintLock();
+    });
+  }
+
+  /* paintFootActions: footer REPORT + HELP buttons (Footer.jsx:666-699
+   *   introjs-launcher pair). REPORT is an external invite link (no locale);
+   *   HELP reuses the help key and routes to the onboard-docs index (#/help,
+   *   router.js /help/** -> HelpUI.renderHelp — verified present). Never throws. */
+  function paintFootActions() {
+    if (typeof document === "undefined") return;
+    try {
+      var report = document.getElementById("foot-report");
+      if (report) report.textContent = t("shell.report", "REPORT");
+      var help = document.getElementById("foot-help");
+      if (help) help.textContent = t("help.help", "Help");
+    } catch (e) { /* static skeleton stands */ }
   }
 
   function applyTheme(theme) {
@@ -615,6 +695,7 @@ var App = (function () {
     } catch (e) { /* settings-page select remains the switcher */ }
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
+    bindLockOnce();
     if (toggle && nav) {
       toggle.addEventListener("click", function () {
         var open = nav.classList.toggle("open");

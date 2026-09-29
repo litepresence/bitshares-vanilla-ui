@@ -489,3 +489,104 @@ img, canvas, pre { max-width: 100%; }
   .vote-row-main { min-width: 0; overflow: hidden; }
   .vote-weight { white-space: nowrap; margin-left: auto; flex-shrink: 0; }
 }
+
+/* Retro forgery pass (target: vanilla/notes/original-header-exchange-2026-09-28.png).
+ * Token-driven wherever a token exists so all three themes keep working;
+ * literal hex appears ONLY for the banner (provenance below), which is a
+ * fixed light notice in every theme — same as #1, whose banner is an antd
+ * Alert independent of the theme stylesheets. */
+
+/* Gold banner: #1 renders its top notice via <Alert type="warning|info" banner />
+ * (NewsHeadline.jsx:139; grep for "background" in NewsHeadline.jsx/Deprecate.jsx
+ * finds no inline background — the color lives in the antd Alert stylesheet).
+ * antd v3 Alert warning banner = background #fffbe6, border #ffe58f, dark text.
+ * The target capture shows that pale-gold treatment, so #warn-banner samples
+ * #fffbe6 (not the solid --warn #fcab53) with the dark #1a1a1a text kept. */
+#warn-banner { background: #fffbe6; border-bottom: 1px solid #ffe58f; color: #1a1a1a; }
+.warn-icon { flex: 0 0 auto; font-size: 1rem; line-height: 1; }
+
+/* Brand logo (#1 branding.js:64-66 getLogo() -> assets/logo-ico-blue.png,
+ * Header.jsx:399 height 40): same file, same height; alt="BitShares" is the
+ * text fallback. Deliberate deviation: #1's logo links to the account
+ * dashboard when logged in; vanilla links home (#/) in every state. */
+.brand { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+.brand-logo { height: 40px; width: auto; display: block; }
+
+/* Lock affordance (Header.jsx:663-681 lock/unlock next to the hamburger):
+ * anchor to #/login when locked (works without JS); app.js enhances it to a
+ * lock toggle + vendored icon when Wallet is present. 44px target. */
+#lock-toggle { display: inline-flex; align-items: center; justify-content: center;
+  margin-left: auto; min-width: 44px; min-height: 44px; padding: 0 8px;
+  color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
+#lock-toggle .nav-icon { width: 18px; height: 18px; filter: invert(1); }
+/* The theme switcher sits before lock+hamburger on the bar; at 360px the four
+ * items wrap instead of overflowing (principle #7). */
+.topbar { flex-wrap: wrap; }
+#nav-toggle { margin-left: 0; }
+
+/* Black nav bar (target: single black strip, white icon+label items in
+ * Exchange / Credit Offer / Liquidity Pools / Explore order): #nav reuses the
+ * header tokens, so ref-ui-theme composites to the same near-black ~#111 as
+ * #1's header (themes.css header note) while light/dark themes stay readable.
+ * NOT pure #000 — #1's header is rgba(0,0,0,0.6) over #2a2a2a, not black.
+ * Order + icons live in app.js ORIGINAL_NAV/NAV_ICONS (unchanged). */
+#nav { background: var(--header-bg); color: var(--header-text);
+  border-bottom: 1px solid var(--border); }
+#nav a { color: var(--header-text); }
+#nav a:hover { background: rgba(255, 255, 255, 0.08); }
+#nav a[aria-current="page"] { outline-color: var(--accent); background: rgba(255, 255, 255, 0.08); }
+#nav-directory { background: var(--header-bg); color: var(--header-text);
+  border-top: 1px solid var(--border); }
+#nav-directory a { color: var(--header-text); }
+#nav-directory a:hover, .nav-dir-actions a:hover { background: rgba(255, 255, 255, 0.08); }
+.nav-dir-actions .nav-dir-btn { color: var(--header-text); border-color: var(--header-text); }
+.nav-dir-search { background: transparent; color: var(--header-text);
+  border: 1px solid var(--header-text); border-radius: 0; }
+
+/* Pair stats strip type (target: big white values, small grey labels beneath).
+ * DOM order (market-ind.js renderStrip, pool-detail-ui.js detailFill) is
+ * label-then-value; column-reverse stacks value over label with CSS only —
+ * market-desk.js / market-ind.js / pool-detail-ui.js untouched. */
+.mkt-statstrip { gap: 8px 28px; padding: 10px 16px; }
+.mkt-stat { display: inline-flex; flex-direction: column-reverse; gap: 0;
+  white-space: nowrap; }
+.mkt-stat strong { font-size: 1.05rem; font-weight: 600; line-height: 1.3; }
+.mkt-stat .muted { font-size: 0.72rem; }
+
+/* Footer: host is the connectivity signal, UPPERCASED (city-style cue),
+ * green when open / red when closed (tokens --buy/--danger); latency + block
+ * inherit the grey --muted (no extra rule — plain text nodes do that). */
+.appfoot-host { text-transform: uppercase; }
+/* REPORT + HELP (#1 Footer.jsx:666-699 introjs-launcher pair, $bs-blue #049cce
+ * == var(--button-bg) in ref-ui-theme): accent-blue square buttons, bottom-right. */
+.appfoot-actions { display: inline-flex; gap: 8px; margin-left: 8px; }
+.appfoot-actions a { display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 32px; padding: 4px 10px;
+  background: var(--button-bg); color: var(--accent-text); text-decoration: none;
+  border-radius: 0; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; white-space: nowrap; }
+
+/* Pools swap + detail tabs (.mkt-tabs hosts in pool-swap-ui.js:80,
+ * pool-detail-ui.js:606, market-desk.js:422, dashboard-ui.js:461 — previously
+ * unstyled): same uppercase accent-underline treatment as .trade-tabs, so the
+ * swap page's Pool/My history toggle reads like the desk. Buttons keep ids. */
+.mkt-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
+  margin: 8px 0 12px; }
+.mkt-tabs button { background: transparent; color: var(--muted); border: 0;
+  border-radius: 0; border-bottom: 2px solid transparent;
+  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; }
+.mkt-tabs button:hover { color: var(--text); }
+.mkt-tabs button[aria-pressed="true"], .mkt-tabs button[aria-selected="true"] {
+  color: var(--accent); border-bottom-color: var(--accent); }
+/* Swap quote + history surfaces sit on --plot-bg like the desk chart panes
+ * (visual only — pool-swap-ui.js / pool-detail-ui.js untouched). */
+.swap-hist table td { font-size: 0.9rem; }
+.swap-hist table td:first-child { color: var(--muted); }
+/* Phone footer (360px): host + latency + REPORT/HELP cannot fit one 360px row,
+ * so the bar wraps to two lines and the body padding grows with it — every
+ * element stays visible, no horizontal overflow (principle #7). */
+@media (max-width: 559px) {
+  body { padding-bottom: 88px; }
+  #appfoot { flex-wrap: wrap; row-gap: 4px; }
+}

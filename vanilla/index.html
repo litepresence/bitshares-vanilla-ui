@@ -11,11 +11,13 @@
 </head>
 <body>
 <div id="warn-banner" role="note">
+  <span class="warn-icon" aria-hidden="true">⚠</span>
   <span>WARNING: Users of the BitShares blockchain, DO NOT ACCEPT suspicious offers to trade tokens on private markets or tokens that are not listed in the Withdrawals section or in default market pairs.</span>
   <button id="warn-dismiss" type="button" aria-label="Dismiss warning">×</button>
 </div>
 <header class="topbar">
-  <a class="brand" href="#/">BitShares</a>
+  <a class="brand" href="#/" aria-label="BitShares"><img class="brand-logo" src="assets/logo-ico-blue.png" alt="BitShares" width="40" height="40"></a>
+  <a id="lock-toggle" href="#/login" aria-label="Unlock">🔒</a>
   <button id="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
 <nav id="nav" aria-label="Main">
@@ -29,6 +31,7 @@
 <footer id="appfoot" aria-label="Node status">
   <span class="appfoot-left">BitShares vanilla · <a href="#/help">Disclaimer</a></span>
   <span class="appfoot-right" id="appfoot-status" aria-live="polite">connecting…</span>
+  <span class="appfoot-actions"><a id="foot-report" href="https://t.me/bitsharesDEV" target="_blank" rel="noopener">REPORT</a><a id="foot-help" href="#/help">Help</a></span>
 </footer>
 <script src="js/vendor/noble-classic.js"></script>
 <script src="js/data/brainkey-dict.js"></script>
