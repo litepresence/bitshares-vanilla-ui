@@ -1,21 +1,52 @@
-/* instant-trade-ui.js — simple buy/sell view (slice-6 limit-order path, simpler form).
- * Owns: /instant-trade + /instant-trade/:marketID (market pick, side, amount, review,
- *   done). Price pre-fills from the book best (buy = lowest ask, sell = highest bid),
- *   then ONE op-1 via Tx.buildTx + Tx.feeMulti + Tx.sign + Chain broadcast with
- *   get_limit_orders_by_account proof. No new serializers. Consumes: Market, Tx,
- *   Format (only money entries), Wallet (unlock/WIF as JS value, never DOM), Account,
- *   Chain, Store. Global InstantTradeUI only; gen counter tears down stale work.
- * Refs: App.jsx:639-648 (QUOTE_BASE per MarketRow.jsx:70); QuickTrade.jsx +
- *   QuickTradeHelper.js; confirm names <- popup.js:5724-5731; astro
-  *   instant_trade.astro (Beet signing NOT copied). Deviations: fixed 1-year expiry,
-  *   fill_or_kill=false, single orders only (scaled stays on the desk). P = BASE per
-  *   1 QUOTE (trade-form.js). Money: integer strings + BigInt until render, Format only.
-  * PUBLIC-FIRST (gate repair): no wallet gate — market/stats/book-best quote
-  *   renders locked; review previews as committee-account 1.2.0 with a viewing
-  *   notice (balance checks need the wallet, so they are skipped locked with an
-  *   honest warning). Password is asked only at Sign & Send (sign-time gate +
-  *   inline unlock).
-  * Created by: stub-queue build (matrix §A row A31).
+/* instant-trade-ui.js — QuickTrade dual SELL/RECEIVE convert flow with order walkthrough.
+ * Owns: /instant-trade + /instant-trade/:marketID as the reference QuickTrade
+ *   convert screen (dual SELL/RECEIVE panels + swap + per-side balances +
+ *   order-walkthrough with effective price + fee display, then Review/Sign of
+ *   ONE op-1 limit_order_create). Legacy QUOTE_BASE loader compat: a deep link
+ *   like #/instant-trade/BTS_CNY auto-loads as sell=BTS receive=CNY (same
+ *   SYM_SYM split as the old limit path, so the old auto-load does not
+ *   regress). No new serializers. Consumes: Market, Tx, Format (only money
+ *   entries), Wallet (unlock/WIF as JS value, never DOM), Account, Chain,
+ *   Store. Global InstantTradeUI only; gen counter tears down stale work.
+ * Refs (concepts only, never ported verbatim): QuickTrade.jsx:37-83 (sell/
+ *   receive asset+amount state + active input), SellReceive.jsx (dual
+ *   selectors + swap button, stacked under 850px), QuickTrade.jsx:837-944
+ *   (quick_trade_details: effective price + your/feed/last price + liquidity/
+ *   market/transaction fee rows), QuickTrade.jsx:1102-1137 (orders table
+ *   columns id/seller/amount/price), QuickTradeHelper getOrders/getFees
+ *   (walk bids until the amount is covered; market_fee_percent/100 label +
+ *   min(max_fee, amount*pct/10000) + checkFeeStatusAsync). Confirm names <-
+ *   popup.js:5724-5731; fill_or_kill=true <- QuickTrade.jsx:657 (convert
+ *   takes liquidity now; old vanilla limit path used false — noted here).
+ *   Expiry stays fixed 1-year (old path + QuickTrade 365-day shape).
+ *   P = BASE per 1 QUOTE orientation is the desk's (trade-form.js); here the
+ *   effective price is RECEIVE per 1 SELL (receive_human/sell_human).
+ * Trade-form math: quoteToBaseRaw/baseToQuoteRaw + market-fee trio are
+ *   DUPLICATED small below because TradeForm exposes only renderDual (no
+ *   math exports) and index.html loads this file BEFORE trade-form.js — same
+ *   doctrine as the old file's pow10/quoteToBaseRaw copy. Provenance:
+ *   trade-form.js:199-218 (quote/base converters), :322-367 (pct label +
+ *   fee raw + fetch opts).
+ * Money: integer strings + BigInt until render, Format only (no Number/
+ *   parseFloat on money; book human strings re-enter via parseAmount).
+ *   Book levels come from Market.book (get_order_book human strings, already
+ *   base-per-quote); the walk re-parses them to raw with each side's
+ *   precision, so the effective price + table stay exact.
+ * PUBLIC-FIRST: no wallet gate — pickers, book walk, effective price, both
+ *   fee previews and the walkthrough table are all computable locked (fee
+ *   preview uses placeholder seller 1.2.0, fees are account-invariant;
+ *   balances read 0 locked with an honest hint). Password is asked ONLY at
+ *   Sign & Send (sign-time gate + inline unlock). Locked previews act as
+ *   committee-account 1.2.0 with balance checks skipped + warn; Sign forces
+ *   unlock + Back re-review under the wallet account.
+ * i18n (slice-17): every display string reuses an EXISTING en.json key with
+ *   its verbatim default (instant.* + trade.* + market.* + swap.title), so
+ *   check_i18n stays green with this file alone and no locale edits. New
+ *   concepts (SELL/RECEIVE headers, Swap, effective-price suffix) compose
+ *   those keys plus untranslatable symbols (asset codes, "->", "(effective)",
+ *   em-dash) — full convert copy stays deferred to a later i18n batch.
+ * Created by: stub-queue build (matrix row A31); rebuilt to the QuickTrade
+ *   convert flow per slice-18 follow-up (single-file constraint).
  */
 var InstantTradeUI = (function () {
   "use strict";
@@ -37,6 +68,7 @@ var InstantTradeUI = (function () {
   var gen = 0;
   var FEE_ASSET = "1.3.0";
   var PROVE_TIMEOUT_MS = 30000, PROVE_INTERVAL_MS = 2500, PRICE_PLACES = 8;
+  var BOOK_LIMIT = 50, FEE_DEBOUNCE_MS = 400, WALK_ROWS_MAX = 10;
   /* textContent-only element (user/chain strings never reach HTML). */
   function el(doc, tag, text, cls) {
     var n = doc.createElement(tag);
@@ -95,12 +127,22 @@ var InstantTradeUI = (function () {
     return "mainnet"; }
   /* 10n ** exp without Number (money-safe; same helper as trade-form.js). */
   function pow10(exp) { var out = 1n, i; for (i = 0; i < exp; i++) out *= 10n; return out; }
-  /* QUOTE raw -> BASE raw at price num/den, BigInt floor (trade-form.js:162). */
+  /* QUOTE raw -> BASE raw at price num/den, BigInt floor (trade-form.js:199).
+   * Duplicated (not imported): TradeForm exposes only renderDual and this
+   * file loads before trade-form.js — see header. */
   function quoteToBaseRaw(quoteRaw, num, den, qp, bp) {
     if (num <= 0n || den <= 0n) throw new Error("Price must be greater than zero.");
     var n = BigInt(quoteRaw) * num, d = den, shift = bp - qp;
     if (shift >= 0) n = n * pow10(shift); else d = d * pow10(-shift);
     return (n / d).toString(); }
+  /* BASE raw -> QUOTE raw at price num/den, BigInt floor (trade-form.js:210).
+   * Same duplication note as quoteToBaseRaw. */
+  function baseToQuoteRaw(baseRaw, num, den, qp, bp) {
+    if (num <= 0n || den <= 0n) throw new Error("Price must be greater than zero.");
+    var n = BigInt(baseRaw) * den, d = num, shift = qp - bp;
+    if (shift >= 0) n = n * pow10(shift); else d = d * pow10(-shift);
+    return (n / d).toString(); }
+  void quoteToBaseRaw; void baseToQuoteRaw;
   /* Exact BigInt ratio -> fixed-places decimal string (floor, display only). */
   function ratioToDec(num, den, places) {
     if (den <= 0n) throw new Error("bad price ratio");
@@ -148,9 +190,151 @@ var InstantTradeUI = (function () {
     });
   }
 
+  /* SELL_RECEIVE pair split (QuickTradeRouter.jsx:33-36 shape: head=sell,
+   * tail=receive; identical SYM_SYM shape to the old QUOTE_BASE loader, so
+   * #/instant-trade/BTS_CNY auto-loads as sell=BTS receive=CNY). Uppercase,
+   * trims, rejects same-asset (Page404 in #1). Throws "bad-market". */
+  function parsePair(marketID) {
+    if (typeof marketID !== "string") throw new Error("bad-market");
+    var parts = marketID.toUpperCase().split("_");
+    if (parts.length !== 2 || !parts[0] || !parts[1]) throw new Error("bad-market");
+    if (parts[0] === parts[1]) throw new Error("bad-market");
+    return { sellSym: parts[0], receiveSym: parts[1] };
+  }
+
+  /* Resolve convert assets + stats/book. ctx carries sell/receive ids, syms,
+   * precisions. Book orientation: base=receive, quote=sell, so each level's
+   * price is RECEIVE per SELL and level.quote/level.base are the SELL/
+   * RECEIVE human totals at that level. Stats use the same orientation, so
+   * latest/bid/ask already read as receive-per-sell. Empty books and null
+   * stats are VALID (walkthrough shows the empty note + dashes). */
+  async function loadConvert(sellSym, receiveSym) {
+    var am = await Market.assets(sellSym, receiveSym);
+    var ctx = { sellId: am.quote.id, receiveId: am.base.id,
+      sellSym: am.quote.symbol, receiveSym: am.base.symbol,
+      sellPrec: am.quote.precision, receivePrec: am.base.precision };
+    var stats = null, book = { bids: [], asks: [] };
+    try { stats = await Market.stats(ctx.receiveId, ctx.sellId); } catch (e) { stats = null; }
+    try { book = await Market.book(ctx.receiveId, ctx.sellId, BOOK_LIMIT); } catch (e) { book = { bids: [], asks: [] }; }
+    return { ctx: ctx, stats: stats, book: book };
+  }
+
+  /* One book level -> raw pair. Level.quote is SELL human, level.base is
+   * RECEIVE human (see loadConvert). Re-parses via Format (BigInt only);
+   * returns null on unreadable levels (fail-silent: that level is skipped,
+   * the walk never blanks on one bad row). */
+  function parseLevelRaw(level, sellPrec, receivePrec) {
+    try {
+      var q = (level && level.quote !== undefined && level.quote !== null) ? String(level.quote) : "";
+      var b = (level && level.base !== undefined && level.base !== null) ? String(level.base) : "";
+      if (!q || !b) return null;
+      var sellRaw = Format.parseAmount(q, sellPrec);
+      var receiveRaw = Format.parseAmount(b, receivePrec);
+      if (!/^\d+$/.test(sellRaw) || !/^\d+$/.test(receiveRaw)) return null;
+      if (BigInt(sellRaw) <= 0n || BigInt(receiveRaw) <= 0n) return null;
+      return { sellRaw: sellRaw, receiveRaw: receiveRaw,
+        price: (level.displayPrice !== undefined && level.displayPrice !== null) ? String(level.displayPrice) : String(level.price || "") };
+    } catch (e) { return null; }
+  }
+
+  /* Forward walk (QuickTradeHelper getOrders "sell" concept): cover sellRaw
+   * with bids in order, taking each level's SELL up to its size and accruing
+   * RECEIVE pro-rata (floor). Params: sellRaw int string, bids array,
+   * precisions. Returns {rows, receiveRaw, covered, shortRaw}. Pure BigInt,
+   * never throws on book shape (bad levels skipped). */
+  function walkSellToReceive(sellRaw, bids, sellPrec, receivePrec) {
+    var remaining = BigInt(sellRaw), totalReceive = 0n, rows = [], i, lv, takeSell, takeReceive;
+    for (i = 0; i < (bids || []).length; i++) {
+      if (remaining <= 0n) break;
+      lv = parseLevelRaw(bids[i], sellPrec, receivePrec);
+      if (!lv) continue;
+      var levelSell = BigInt(lv.sellRaw), levelRecv = BigInt(lv.receiveRaw);
+      takeSell = remaining < levelSell ? remaining : levelSell;
+      takeReceive = (takeSell * levelRecv) / levelSell;
+      rows.push({ price: lv.price, sellTake: takeSell.toString(), receiveTake: takeReceive.toString() });
+      totalReceive += takeReceive;
+      remaining -= takeSell;
+    }
+    return { rows: rows, receiveRaw: totalReceive.toString(),
+      covered: remaining <= 0n, shortRaw: (remaining < 0n ? 0n : remaining).toString() };
+  }
+
+  /* Reverse walk (getOrders "receive" concept): cover receiveRaw, accruing
+   * the SELL needed pro-rata (floor). Same purity/shape contract as forward. */
+  function walkReceiveToSell(receiveRaw, bids, sellPrec, receivePrec) {
+    var remaining = BigInt(receiveRaw), totalSell = 0n, rows = [], i, lv, takeRecv, takeSell;
+    for (i = 0; i < (bids || []).length; i++) {
+      if (remaining <= 0n) break;
+      lv = parseLevelRaw(bids[i], sellPrec, receivePrec);
+      if (!lv) continue;
+      var levelSell = BigInt(lv.sellRaw), levelRecv = BigInt(lv.receiveRaw);
+      takeRecv = remaining < levelRecv ? remaining : levelRecv;
+      takeSell = (takeRecv * levelSell) / levelRecv;
+      rows.push({ price: lv.price, sellTake: takeSell.toString(), receiveTake: takeRecv.toString() });
+      totalSell += takeSell;
+      remaining -= takeRecv;
+    }
+    return { rows: rows, sellRaw: totalSell.toString(),
+      covered: remaining <= 0n, shortRaw: (remaining < 0n ? 0n : remaining).toString() };
+  }
+
+  /* Effective price human (RECEIVE per 1 SELL) from walked raw totals:
+   * (receiveRaw/10^rp)/(sellRaw/10^sp), floored to PRICE_PLACES. BigInt only. */
+  function effectiveHuman(sellRaw, receiveRaw, sellPrec, receivePrec) {
+    var s = BigInt(sellRaw), r = BigInt(receiveRaw);
+    if (s <= 0n || r <= 0n) throw new Error("bad walk totals");
+    return ratioToDec(r * pow10(sellPrec), s * pow10(receivePrec), PRICE_PLACES);
+  }
+
+  /* Market-fee trio (trade-form.js:322-367, duplicated — TradeForm exports
+   * only renderDual; see header). Display-only BigInt, fail-silent (null). */
+  function marketPctLabel(pct) {
+    var p = Number(pct);
+    if (!isFinite(p) || p < 0) p = 0;
+    p = Math.floor(p);
+    var whole = Math.floor(p / 100), rest = p % 100;
+    if (rest === 0) return whole + "%";
+    var frac = rest < 10 ? "0" + rest : String(rest);
+    if (frac.charAt(frac.length - 1) === "0") frac = frac.charAt(0);
+    return whole + "." + frac + "%";
+  }
+  function marketFeeRaw(amountRaw, pct, maxRaw) {
+    try {
+      if (typeof amountRaw !== "string" || !/^\d+$/.test(amountRaw)) return null;
+      var p = Number(pct);
+      if (!isFinite(p) || p <= 0) return "0";
+      if (typeof maxRaw !== "string" || !/^\d+$/.test(maxRaw)) return null;
+      var fee = (BigInt(amountRaw) * BigInt(Math.floor(p))) / 10000n;
+      var max = BigInt(maxRaw);
+      if (fee > max) fee = max;
+      return fee.toString();
+    } catch (e) { return null; }
+  }
+  async function fetchMarketFeeOpts(assetId) {
+    try {
+      var dbId = await Chain.db();
+      var rows = await Chain.call(dbId, "get_assets", [[assetId]]);
+      var a = rows && rows[0];
+      if (!a || !a.options || typeof a.precision !== "number" || !a.symbol) return null;
+      var flags = Number(a.options.flags || 0);
+      if (!(flags & 1)) return null;
+      var pct = Math.floor(Number(a.options.market_fee_percent || 0));
+      var maxRaw = (a.options.max_market_fee !== undefined && a.options.max_market_fee !== null)
+        ? String(a.options.max_market_fee) : null;
+      if (maxRaw === null || !/^\d+$/.test(maxRaw)) return null;
+      return { pct: pct, symbol: a.symbol, precision: a.precision, maxRaw: maxRaw };
+    } catch (e) { return null; }
+  }
+  async function feeAssetMeta(feeAssetId) {
+    var dbId = await Chain.db();
+    var rows = await Chain.call(dbId, "get_assets", [[feeAssetId]]);
+    if (!rows || !rows[0] || typeof rows[0].precision !== "number") throw new Error(t("instant.bad_asset_shape_for_fee_asset", "bad-asset-shape for fee asset"));
+    return { symbol: rows[0].symbol, precision: rows[0].precision };
+  }
+
   /* Route entry. Gates backends, waits for the shared socket (transfer-ui.js
-   * connect-wait pattern), then paints the single-screen form.
-   * PUBLIC-FIRST: no wallet gate — the quote form renders locked. */
+   * connect-wait pattern), then paints the dual convert form.
+   * PUBLIC-FIRST: no wallet gate — pickers + walkthrough render locked. */
   function renderInstant(root, marketID) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -184,97 +368,178 @@ var InstantTradeUI = (function () {
       }, 15000);
       return;
     }
-    paintTrade(doc, root, myGen, { marketID: (typeof marketID === "string" && marketID) ? marketID : "", side: "buy", amount: "", price: "", M: null });
+    var init = { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", M: null, pairErr: "" };
+    if (typeof marketID === "string" && marketID) {
+      try {
+        var pr = parsePair(marketID);
+        init.sellSym = pr.sellSym; init.receiveSym = pr.receiveSym;
+      } catch (e) {
+        init.pairErr = t("instant.market_must_look_like_quote_base_e_g_bts_cny", "Market must look like QUOTE_BASE (e.g. BTS_CNY).");
+      }
+    }
+    paintConvert(doc, root, myGen, init);
   }
 
-  /* Single-screen form: market + side + Load; once loaded, stats + amount +
-   * price (book-best prefill) + Review. State P survives Back/re-renders. */
-  function paintTrade(doc, root, myGen, P) {
+  /* Dual convert screen: SELL panel + swap + RECEIVE panel, per-side balances,
+   * Load/Quote, stats, order-walkthrough (effective price + fee display +
+   * orders table) and Review. State P survives Back/re-renders. Everything
+   * above Review is computable locked. */
+  function paintConvert(doc, root, myGen, P) {
     if (myGen !== gen) return;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
     if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.viewing_as", "Viewing as committee-account (1.2.0) — unlock to trade as your account."), "muted"));
-    wrap.appendChild(el(doc, "p", t("instant.pick_a_market_choose_a_side_enter_an_amount_t", "Pick a market, choose a side, enter an amount. The price fills from the order book; review and sign one limit order."), "muted"));
-    /* Order-type strip (dexux-ref LIMIT/SCALED shape): this view is
-     * limit-only, so LIMIT is the active tab and SCALED links to the full
-     * desk (existing route, no behavior change to the form itself). */
-    var tabs = el(doc, "div", null, "order-tabs");
-    tabs.appendChild(el(doc, "span", t("instant.limit", "Limit"), "order-tab-active"));
-    var scaledLink = doc.createElement("a");
-    scaledLink.textContent = t("instant.scaled", "Scaled");
-    scaledLink.setAttribute("href", "#/market/" + (P.marketID || "BTS_CNY"));
-    tabs.appendChild(scaledLink);
-    wrap.appendChild(tabs);
-    var mktF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) "), { id: "it-market", value: P.marketID, placeholder: "BTS_CNY", inputmode: "text" });
-    wrap.appendChild(mktF.row);
-    var sideRow = el(doc, "div", null, "xfer-field"), sideLabel = el(doc, "label", t("instant.side", "Side "));
-    var sideSel = doc.createElement("select");
-    [["buy", t("instant.buy_quote_spend_base", "Buy QUOTE (spend BASE)")], ["sell", t("instant.sell_quote_receive_base", "Sell QUOTE (receive BASE)")]].forEach(function (o) {
-      var opt = doc.createElement("option"); opt.value = o[0]; opt.textContent = o[1];
-      if (o[0] === P.side) opt.selected = true;
-      sideSel.appendChild(opt);
-    });
-    touchable(sideSel); sideLabel.appendChild(sideSel); sideRow.appendChild(sideLabel);
-    wrap.appendChild(sideRow);
+    if (P.pairErr) {
+      var pe = el(doc, "div", P.pairErr, "error");
+      pe.setAttribute("aria-live", "polite"); wrap.appendChild(pe);
+    }
+    /* Duo layout (SellReceive.jsx concept: side-by-side wide, stacked narrow).
+     * Inline flex (no stylesheet edit — this file owns its layout): wraps at
+     * phone width, splits at desk width. */
+    var duo = el(doc, "div", null, "it-duo");
+    try {
+      duo.style.display = "flex"; duo.style.flexWrap = "wrap";
+      duo.style.gap = "12px"; duo.style.alignItems = "stretch";
+    } catch (e) { /* layout still stacks without inline flex */ }
+    var sellBox = el(doc, "div", null, "it-panel");
+    var recvBox = el(doc, "div", null, "it-panel");
+    try {
+      sellBox.style.flex = "1 1 280px"; sellBox.style.minWidth = "0";
+      recvBox.style.flex = "1 1 280px"; recvBox.style.minWidth = "0";
+    } catch (e) { /* widths best-effort */ }
+    sellBox.appendChild(el(doc, "h2", t("trade.col_sell", "Sell") + (P.sellSym ? " " + P.sellSym : "")));
+    recvBox.appendChild(el(doc, "h2", t("trade.col_receive", "Receive") + (P.receiveSym ? " " + P.receiveSym : "")));
+    var sellSymF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) ").replace("Market (QUOTE_BASE) ", "Sell asset "), { id: "it-sell-sym", value: P.sellSym, placeholder: "BTS", inputmode: "text" });
+    sellSymF.input.setAttribute("aria-label", "Sell asset symbol");
+    sellSymF.input.setAttribute("autocapitalize", "characters");
+    sellBox.appendChild(sellSymF.row);
+    var sellAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.sellSym || "SELL" }), { id: "it-sell-amount", value: P.sellAmount, placeholder: "0.00", inputmode: "decimal", unit: P.sellSym || "SELL" });
+    sellBox.appendChild(sellAmtF.row);
+    var sellBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.sellSym ? " " + P.sellSym : ""), "muted");
+    sellBal.id = "it-sell-bal"; sellBox.appendChild(sellBal);
+    var recvSymF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) ").replace("Market (QUOTE_BASE) ", "Receive asset "), { id: "it-receive-sym", value: P.receiveSym, placeholder: "CNY", inputmode: "text" });
+    recvSymF.input.setAttribute("aria-label", "Receive asset symbol");
+    recvSymF.input.setAttribute("autocapitalize", "characters");
+    recvBox.appendChild(recvSymF.row);
+    var recvAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.receiveSym || "RECEIVE" }), { id: "it-receive-amount", value: P.receiveAmount, placeholder: "0.00", inputmode: "decimal", unit: P.receiveSym || "RECEIVE" });
+    recvBox.appendChild(recvAmtF.row);
+    var recvBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.receiveSym ? " " + P.receiveSym : ""), "muted");
+    recvBal.id = "it-receive-bal"; recvBox.appendChild(recvBal);
+    var swapCell = el(doc, "div", null, "it-swap-cell");
+    try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
+    var swapBtn = touchable(el(doc, "button", t("swap.title", "Swap") + " ⇅"));
+    swapBtn.id = "it-swap"; swapBtn.type = "button";
+    swapBtn.setAttribute("aria-label", t("swap.title", "Swap") + " sell/receive");
+    swapCell.appendChild(swapBtn);
+    duo.appendChild(sellBox); duo.appendChild(swapCell); duo.appendChild(recvBox);
+    wrap.appendChild(duo);
     var loadBtn = touchable(el(doc, "button", t("instant.load_market", "Load market")));
     loadBtn.id = "it-load"; loadBtn.type = "button"; wrap.appendChild(loadBtn);
-    var out = el(doc, "div"); wrap.appendChild(out);
+    var out = el(doc, "div"); out.id = "it-quote-out"; wrap.appendChild(out);
+    var walkBox = el(doc, "div"); walkBox.id = "it-walk"; wrap.appendChild(walkBox);
+    var reviewBtn = touchable(el(doc, "button", t("instant.review_order", "Review order")));
+    reviewBtn.id = "it-review"; reviewBtn.type = "button"; wrap.appendChild(reviewBtn);
+    var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
+    deskA.href = "#/market/" + ((P.sellSym || "BTS") + "_" + (P.receiveSym || "CNY"));
+    deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
+    deskP.appendChild(deskA); wrap.appendChild(deskP);
+
+    function readSyms() {
+      return { sell: (sellSymF.input.value || "").trim().toUpperCase(),
+        receive: (recvSymF.input.value || "").trim().toUpperCase() };
+    }
     function load() {
-      setFieldError(mktF, ""); out.innerHTML = "";
-      P.marketID = mktF.input.value.trim(); P.side = sideSel.value;
-      if (!P.marketID) { setFieldError(mktF, t("instant.enter_a_market_like_bts_cny", "Enter a market like BTS_CNY.")); return; }
-      loadBtn.disabled = true;
+      setFieldError(sellSymF, ""); setFieldError(recvSymF, "");
+      out.innerHTML = "";
+      var s = readSyms();
+      P.sellSym = s.sell; P.receiveSym = s.receive;
+      P.sellAmount = sellAmtF.input.value; P.receiveAmount = recvAmtF.input.value;
+      if (!P.sellSym || !P.receiveSym) {
+        var need = t("instant.enter_a_market_like_bts_cny", "Enter a market like BTS_CNY.");
+        setFieldError(!P.sellSym ? sellSymF : recvSymF, need);
+        showError(doc, out, need, t("instant.could_not_load_the_market", "Could not load the market."));
+        return;
+      }
+      if (P.sellSym === P.receiveSym) {
+        var same = t("instant.market_must_look_like_quote_base_e_g_bts_cny", "Market must look like QUOTE_BASE (e.g. BTS_CNY).");
+        setFieldError(recvSymF, same);
+        showError(doc, out, same, t("instant.could_not_load_the_market", "Could not load the market."));
+        return;
+      }
+      loadBtn.disabled = true; swapBtn.disabled = true;
       var status = showStatus(doc, out, t("instant.loading_market", "Loading market…"));
-      loadMarket(P.marketID).then(function (M) {
+      loadConvert(P.sellSym, P.receiveSym).then(function (M) {
         if (myGen !== gen) return;
         try { if (status.parentNode === out) out.removeChild(status); } catch (e) { /* gone */ }
-        loadBtn.disabled = false;
-        P.M = M; paintLoaded(doc, root, myGen, P);
+        loadBtn.disabled = false; swapBtn.disabled = false;
+        P.M = M; P.pairErr = "";
+        paintLoadedConvert(doc, root, myGen, P);
       }).catch(function (e) {
         if (myGen !== gen) return;
-        out.removeChild(status); loadBtn.disabled = false;
+        try { if (status.parentNode === out) out.removeChild(status); } catch (x) { /* gone */ }
+        loadBtn.disabled = false; swapBtn.disabled = false;
         var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_load_the_market", "Could not load the market."));
-        if (msg === "bad-market") msg = t("instant.market_must_look_like_quote_base_e_g_bts_cny", "Market must look like QUOTE_BASE (e.g. BTS_CNY).");
-        setFieldError(mktF, msg); showError(doc, out, msg, t("instant.could_not_load_the_market", "Could not load the market."));
+        if (msg === "bad-market" || msg === "bad-asset-shape") msg = t("instant.unknown_market_asset", "Unknown market asset.");
+        setFieldError(sellSymF, msg); showError(doc, out, msg, t("instant.could_not_load_the_market", "Could not load the market."));
       });
     }
     loadBtn.addEventListener("click", load);
-    sideSel.addEventListener("change", function () { P.side = sideSel.value; P.price = ""; });
-    if (P.marketID && !P.M) load();
-    else if (P.M) paintLoaded(doc, root, myGen, P);
+    swapBtn.addEventListener("click", function () {
+      var s = sellSymF.input.value; sellSymF.input.value = recvSymF.input.value; recvSymF.input.value = s;
+      var a = sellAmtF.input.value; sellAmtF.input.value = recvAmtF.input.value; recvAmtF.input.value = a;
+      P.activeInput = (P.activeInput === "sell") ? "receive" : "sell";
+      /* No _routeTo push (deviation from QuickTrade.jsx:107-128): keeping the
+       * typed amounts in P beats a hash round-trip that would drop them. The
+       * URL stays the entry pair; the panels hold the live swapped pair. */
+      load();
+    });
+    reviewBtn.addEventListener("click", function () {
+      setFieldError(sellAmtF, ""); setFieldError(recvAmtF, "");
+      P.sellSym = (sellSymF.input.value || "").trim().toUpperCase();
+      P.receiveSym = (recvSymF.input.value || "").trim().toUpperCase();
+      P.sellAmount = sellAmtF.input.value; P.receiveAmount = recvAmtF.input.value;
+      if (!P.M) { load(); return; }
+      reviewBtn.disabled = true;
+      var status = showStatus(doc, walkBox, t("instant.checking_balance_and_fee", "Checking balance and fee…"));
+      reviewConvert(P).then(function (R) { if (myGen === gen) paintConfirm(doc, root, myGen, P, R); })
+        .catch(function (e) {
+          if (myGen !== gen) return;
+          var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_prepare_the_order", "Could not prepare the order."));
+          if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 || msg.indexOf("Amount must be") === 0 || msg.indexOf("Insufficient") === 0 || msg.indexOf("Price is too small") === 0) setFieldError(sellAmtF, msg);
+          try { walkBox.removeChild(status); } catch (x) { /* gone */ }
+          reviewBtn.disabled = false;
+          showError(doc, walkBox, msg, t("instant.could_not_prepare_the_order", "Could not prepare the order."));
+        });
+    });
+    if (P.sellSym && P.receiveSym && !P.M && !P.pairErr) load();
+    else if (P.M) paintLoadedConvert(doc, root, myGen, P);
+    else paintWalkEmpty(doc, walkBox, P);
   }
 
-  /* Resolve market assets + stats/book. bestBid/bestAsk are human strings. */
-  async function loadMarket(marketID) {
-    var pair = Market.parseId(marketID), am = await Market.assets(pair.quote, pair.base);
-    var ctx = { quote: am.quote.id, base: am.base.id, quoteSym: am.quote.symbol, baseSym: am.base.symbol, quotePrec: am.quote.precision, basePrec: am.base.precision };
-    var stats = null, book = { bids: [], asks: [] };
-    try { stats = await Market.stats(ctx.base, ctx.quote); } catch (e) { stats = null; }
-    try { book = await Market.book(ctx.base, ctx.quote, 5); } catch (e) { book = { bids: [], asks: [] }; }
-    return { ctx: ctx, stats: stats,
-      bestBid: (book.bids && book.bids[0]) ? book.bids[0].displayPrice : null,
-      bestAsk: (book.asks && book.asks[0]) ? book.asks[0].displayPrice : null };
-  }
-
-  /* Loaded section: stats line, empty-book note, amount + price + Review. */
-  function paintLoaded(doc, root, myGen, P) {
+  /* Loaded section: stats line, per-side balances, live two-way walk wiring,
+   * walkthrough table + fee previews. All computable locked. */
+  function paintLoadedConvert(doc, root, myGen, P) {
     var wrap = root.firstChild;
     if (!wrap) return;
-    var old = doc.getElementById("it-loaded");
-    if (old) old.parentNode.removeChild(old);
-    var box = el(doc, "div"); box.id = "it-loaded"; wrap.appendChild(box);
     var M = P.M, ctx = M.ctx;
     try {
-      var sLink = wrap.querySelector(".order-tabs a");
-      if (sLink) sLink.setAttribute("href", "#/market/" + ctx.quoteSym + "_" + ctx.baseSym);
-    } catch (e) { /* strip keeps its default desk link */ }
-    box.appendChild(el(doc, "p", "Trade " + ctx.quoteSym + " / " + ctx.baseSym + " — " + (P.side === "buy" ? "Buy " + ctx.quoteSym : "Sell " + ctx.quoteSym), "muted"));
-    /* Principle #6: chain price strings arrive full-precision — normalize via
-     * Format (human visible, verbatim raw in title), never raw on screen. */
+      var heads = wrap.querySelectorAll(".it-panel h2");
+      if (heads && heads[0]) heads[0].textContent = t("trade.col_sell", "Sell") + " " + ctx.sellSym;
+      if (heads && heads[1]) heads[1].textContent = t("trade.col_receive", "Receive") + " " + ctx.receiveSym;
+    } catch (e) { /* headers keep their entry labels */ }
+    try {
+      var deskA = wrap.querySelector("p.muted a");
+      if (deskA) deskA.href = "#/market/" + ctx.sellSym + "_" + ctx.receiveSym;
+    } catch (e) { /* desk link keeps its default pair */ }
+    var walkBox = doc.getElementById("it-walk");
+    if (!walkBox) return;
+    while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
+    /* Stats (receive-per-sell orientation; human visible, verbatim raw in
+     * title — principle #6, same humanPrice path as the old limit view). */
     var latestH = (M.stats && M.stats.latest) ? humanPrice(M.stats.latest) : null;
-    var bidH = M.bestBid ? humanPrice(M.bestBid) : null;
-    var askH = M.bestAsk ? humanPrice(M.bestAsk) : null;
+    var bidH = (M.stats && M.stats.highestBid) ? humanPrice(M.stats.highestBid) : (M.book.bids && M.book.bids[0] ? humanPrice(M.book.bids[0].displayPrice) : null);
+    var askH = (M.stats && M.stats.lowestAsk) ? humanPrice(M.stats.lowestAsk) : (M.book.asks && M.book.asks[0] ? humanPrice(M.book.asks[0].displayPrice) : null);
     var statsP = el(doc, "p", null, "muted");
     statsP.appendChild(doc.createTextNode(t("instant.latest", "Latest: ")));
     var latestSpan = el(doc, "span", latestH ? latestH.human : "—");
@@ -288,58 +553,278 @@ var InstantTradeUI = (function () {
     var askSpan = el(doc, "span", askH ? askH.human : "—");
     if (askH) { try { askSpan.title = askH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(askSpan);
-    box.appendChild(statsP);
-    if (!M.bestBid && !M.bestAsk) box.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
-    if (!P.price) P.price = P.side === "buy" ? (askH ? askH.human : "") : (bidH ? bidH.human : "");
-    var amountF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: ctx.quoteSym }), { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal", unit: ctx.quoteSym });
-    box.appendChild(amountF.row);
-    var priceF = fieldRow(doc, t("instant.price_tpl", "Price (%(base)s per %(quote)s) ", { base: ctx.baseSym, quote: ctx.quoteSym }), { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal", unit: ctx.baseSym + " / " + ctx.quoteSym });
-    box.appendChild(priceF.row);
-    var reviewBtn = touchable(el(doc, "button", t("instant.review_order", "Review order")));
-    reviewBtn.id = "it-review"; reviewBtn.type = "button"; box.appendChild(reviewBtn);
-    reviewBtn.addEventListener("click", function () {
-      setFieldError(amountF, ""); setFieldError(priceF, "");
-      P.amount = amountF.input.value; P.price = priceF.input.value;
-      reviewBtn.disabled = true;
-      var status = showStatus(doc, box, t("instant.checking_balance_and_fee", "Checking balance and fee…"));
-      reviewOrder(P, M).then(function (R) { if (myGen === gen) paintConfirm(doc, root, myGen, P, M, R); })
-        .catch(function (e) {
-          if (myGen !== gen) return;
-          var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_prepare_the_order", "Could not prepare the order."));
-          if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 || msg.indexOf("Amount must be") === 0 || msg.indexOf("Insufficient") === 0) setFieldError(amountF, msg);
-          else if (msg.indexOf("bad price") === 0 || msg.indexOf("Price must be") === 0) setFieldError(priceF, msg);
-          box.removeChild(status); reviewBtn.disabled = false;
-          showError(doc, box, msg, t("instant.could_not_prepare_the_order", "Could not prepare the order."));
+    walkBox.appendChild(statsP);
+    walkBox.appendChild(el(doc, "p", "Trade " + ctx.sellSym + " → " + ctx.receiveSym + " — walkthrough uses bids (selling " + ctx.sellSym + " hits bids paying " + ctx.receiveSym + ").", "muted"));
+    if (!M.book.bids || M.book.bids.length === 0) walkBox.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
+    /* Per-side balances: locked 0 + hint (computable), unlocked real. */
+    refreshBalances(doc, P, M);
+    /* Walkthrough live region: effective price + fee display + orders table. */
+    var effP = el(doc, "p", t("instant.price", "Price") + " (effective): —", "muted");
+    effP.id = "it-effective"; walkBox.appendChild(effP);
+    var feeP = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
+    feeP.id = "it-fee-preview"; walkBox.appendChild(feeP);
+    var mktP = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
+    mktP.id = "it-mkt-fee"; walkBox.appendChild(mktP);
+    var tblWrap = el(doc, "div"); tblWrap.id = "it-walk-table";
+    try { tblWrap.style.overflowX = "auto"; } catch (e) { /* scroll best-effort */ }
+    walkBox.appendChild(tblWrap);
+    wireWalkthrough(doc, P, M, effP, feeP, mktP, tblWrap);
+  }
+
+  /* Empty walkthrough before any book loads: never blank, never a raw int. */
+  function paintWalkEmpty(doc, walkBox, P) {
+    void P;
+    while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
+    walkBox.appendChild(el(doc, "p", t("instant.price", "Price") + " (effective): —", "muted"));
+    walkBox.appendChild(el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
+    walkBox.appendChild(el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
+    walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+  }
+
+  /* Per-side balance lines (locked 0 + hint; unlocked real via one balances
+   * call feeding both sides). Never blank, never throws out. */
+  function refreshBalances(doc, P, M) {
+    var ctx = M.ctx;
+    var sellBal = doc.getElementById("it-sell-bal");
+    var recvBal = doc.getElementById("it-receive-bal");
+    if (!sellBal || !recvBal) return;
+    if (!isUnlockedNow()) {
+      sellBal.textContent = t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + ctx.sellSym;
+      recvBal.textContent = t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + ctx.receiveSym;
+      return;
+    }
+    sellBal.textContent = t("trade.balance", "Balance: ") + "…";
+    recvBal.textContent = t("trade.balance", "Balance: ") + "…";
+    Account.myAccountId().then(function (myId) { return Account.balances(myId); })
+      .then(function (bals) {
+        var sm = null, rm = null;
+        (bals || []).forEach(function (b) {
+          if (b.asset_id === ctx.sellId) sm = b;
+          if (b.asset_id === ctx.receiveId) rm = b;
         });
-    });
+        try {
+          sellBal.textContent = t("trade.balance", "Balance: ") +
+            (sm ? Format.formatAmount(sm.raw, sm.precision) + " " + sm.symbol
+              : Format.formatAmount("0", ctx.sellPrec) + " " + ctx.sellSym);
+          recvBal.textContent = t("trade.balance", "Balance: ") +
+            (rm ? Format.formatAmount(rm.raw, rm.precision) + " " + rm.symbol
+              : Format.formatAmount("0", ctx.receivePrec) + " " + ctx.receiveSym);
+        } catch (e) { /* lines keep their loading text */ }
+      })
+      .catch(function () {
+        sellBal.textContent = t("trade.balance", "Balance: ") + "—";
+        recvBal.textContent = t("trade.balance", "Balance: ") + "—";
+      });
+  }
+
+  /* Live two-way walk wiring + fee previews. Editing SELL recomputes RECEIVE
+   * via the forward walk; editing RECEIVE recomputes SELL via the reverse
+   * walk (QuickTrade onSell/onReceiveAmountChange concept). Guard flag stops
+   * listener loops; invalid input leaves the sibling untouched. Fee previews
+   * debounce (placeholder seller locked) so every keystroke stays cheap. */
+  function wireWalkthrough(doc, P, M, effP, feeP, mktP, tblWrap) {
+    var ctx = M.ctx;
+    var sellIn = doc.getElementById("it-sell-amount");
+    var recvIn = doc.getElementById("it-receive-amount");
+    if (!sellIn || !recvIn) return;
+    var guard = false, feeTimer = null, mktOptsPromise = null;
+    function mktOpts() {
+      if (!mktOptsPromise) mktOptsPromise = fetchMarketFeeOpts(ctx.receiveId);
+      return mktOptsPromise;
+    }
+    function paintTable(rows) {
+      while (tblWrap.firstChild) tblWrap.removeChild(tblWrap.firstChild);
+      if (!rows || rows.length === 0) {
+        tblWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        return;
+      }
+      var table = doc.createElement("table");
+      var head = doc.createElement("tr");
+      [t("market.col_order", "Order"), t("market.col_price", "Price") + " (" + ctx.receiveSym + " per " + ctx.sellSym + ")",
+        t("instant.amount", "Amount") + " (" + ctx.sellSym + ")",
+        t("instant.total", "Total") + " (" + ctx.receiveSym + ")"].forEach(function (h) {
+        var th = doc.createElement("th"); th.textContent = h; head.appendChild(th);
+      });
+      table.appendChild(head);
+      rows.slice(0, WALK_ROWS_MAX).forEach(function (r, i) {
+        var tr = doc.createElement("tr");
+        var c0 = doc.createElement("td"); c0.textContent = String(i + 1); tr.appendChild(c0);
+        var ph = humanPrice(r.price);
+        var c1 = doc.createElement("td"); c1.textContent = ph.human || "—";
+        try { c1.title = ph.raw; } catch (e) { /* title best-effort */ }
+        tr.appendChild(c1);
+        var c2 = doc.createElement("td");
+        try { c2.textContent = Format.formatAmount(r.sellTake, ctx.sellPrec) + " " + ctx.sellSym; }
+        catch (e) { c2.textContent = "—"; }
+        try { c2.title = r.sellTake; } catch (e) { /* title best-effort */ }
+        tr.appendChild(c2);
+        var c3 = doc.createElement("td");
+        try { c3.textContent = Format.formatAmount(r.receiveTake, ctx.receivePrec) + " " + ctx.receiveSym; }
+        catch (e) { c3.textContent = "—"; }
+        try { c3.title = r.receiveTake; } catch (e) { /* title best-effort */ }
+        tr.appendChild(c3);
+        table.appendChild(tr);
+      });
+      tblWrap.appendChild(table);
+      tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + " level" + (rows.length === 1 ? "" : "s") + " walk", "muted"));
+    }
+    function paintMkt(receiveRaw) {
+      mktOpts().then(function (opt) {
+        if (!opt) { try { mktP.style.display = "none"; } catch (e) { /* hidden stands */ } return; }
+        try { mktP.style.display = ""; } catch (e) { /* shown stands */ }
+        var label = t("trade.market_fee_label", "Market fee, %(pct)s", { pct: marketPctLabel(opt.pct) });
+        if (!receiveRaw || !/[1-9]/.test(receiveRaw)) {
+          mktP.textContent = label + ": —";
+          try { mktP.title = ""; } catch (e) { /* title best-effort */ }
+          return;
+        }
+        var feeRaw = marketFeeRaw(receiveRaw, opt.pct, opt.maxRaw);
+        if (feeRaw === null) { mktP.textContent = label + ": —"; return; }
+        try { mktP.textContent = label + ": " + Format.formatAmount(feeRaw, opt.precision) + " " + opt.symbol; }
+        catch (e) { mktP.textContent = label + ": —"; return; }
+        try { mktP.title = feeRaw; } catch (e) { /* title best-effort */ }
+      }).catch(function () { /* preview best-effort */ });
+    }
+    function scheduleFee(sellRaw, receiveRaw) {
+      try { if (feeTimer !== null) clearTimeout(feeTimer); } catch (e) { /* gone */ }
+      try {
+        feeTimer = setTimeout(function () { updateFee(sellRaw, receiveRaw); }, FEE_DEBOUNCE_MS);
+      } catch (e) { /* timers unavailable: preview stands */ }
+    }
+    async function updateFee(sellRaw, receiveRaw) {
+      feeTimer = null;
+      if (!sellRaw || !receiveRaw || !/[1-9]/.test(sellRaw) || !/[1-9]/.test(receiveRaw)) {
+        feeP.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        try { feeP.title = ""; } catch (e) { /* title best-effort */ }
+        paintMkt(null);
+        return;
+      }
+      try {
+        var op = [Tx.OP.limit_order_create, {
+          fee: { amount: 0, asset_id: FEE_ASSET }, seller: VIEWING_AS_ID,
+          amount_to_sell: { amount: String(sellRaw), asset_id: ctx.sellId },
+          min_to_receive: { amount: String(receiveRaw), asset_id: ctx.receiveId },
+          expiration: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, -5),
+          fill_or_kill: true, extensions: [] }];
+        var feeRes = await Tx.feeMulti([op], FEE_ASSET);
+        var meta = await feeAssetMeta(FEE_ASSET);
+        feeP.textContent = t("trade.fee_preview", "Fee (preview): ") + Format.formatAmount(String(feeRes.totalRaw), meta.precision) + " " + meta.symbol;
+        try { feeP.title = String(feeRes.totalRaw); } catch (e) { /* title best-effort */ }
+        paintMkt(receiveRaw);
+      } catch (e) {
+        feeP.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        try { feeP.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
+        paintMkt(null);
+      }
+    }
+    function updateFromSell() {
+      if (guard) return;
+      guard = true;
+      try {
+        var a = sellIn.value.trim();
+        if (!a) {
+          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          paintTable([]); scheduleFee(null, null);
+          guard = false; return;
+        }
+        var sellRaw = Format.parseAmount(a, ctx.sellPrec);
+        if (!/[1-9]/.test(sellRaw)) throw new Error("zero");
+        var w = walkSellToReceive(sellRaw, M.book.bids, ctx.sellPrec, ctx.receivePrec);
+        var recvHuman = Format.formatAmount(w.receiveRaw, ctx.receivePrec);
+        recvIn.value = (/[1-9]/.test(w.receiveRaw)) ? recvHuman : "";
+        P.sellAmount = a; P.receiveAmount = recvIn.value; P.activeInput = "sell";
+        try {
+          var eff = effectiveHuman(sellRaw, w.receiveRaw, ctx.sellPrec, ctx.receivePrec);
+          effP.textContent = t("instant.price", "Price") + " (effective): " + eff + " " + ctx.receiveSym + " per " + ctx.sellSym;
+          try { effP.title = w.receiveRaw + "/" + sellRaw; } catch (e) { /* title best-effort */ }
+        } catch (e) {
+          effP.textContent = t("instant.price", "Price") + " (effective): —";
+        }
+        paintTable(w.rows);
+        scheduleFee(sellRaw, w.receiveRaw);
+      } catch (e) {
+        effP.textContent = t("instant.price", "Price") + " (effective): —";
+        paintTable([]); scheduleFee(null, null);
+      }
+      guard = false;
+    }
+    function updateFromReceive() {
+      if (guard) return;
+      guard = true;
+      try {
+        var b = recvIn.value.trim();
+        if (!b) {
+          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          paintTable([]); scheduleFee(null, null);
+          guard = false; return;
+        }
+        var receiveRaw = Format.parseAmount(b, ctx.receivePrec);
+        if (!/[1-9]/.test(receiveRaw)) throw new Error("zero");
+        var w2 = walkReceiveToSell(receiveRaw, M.book.bids, ctx.sellPrec, ctx.receivePrec);
+        var sellHuman = Format.formatAmount(w2.sellRaw, ctx.sellPrec);
+        sellIn.value = (/[1-9]/.test(w2.sellRaw)) ? sellHuman : "";
+        P.sellAmount = sellIn.value; P.receiveAmount = b; P.activeInput = "receive";
+        try {
+          var eff2 = effectiveHuman(w2.sellRaw, receiveRaw, ctx.sellPrec, ctx.receivePrec);
+          effP.textContent = t("instant.price", "Price") + " (effective): " + eff2 + " " + ctx.receiveSym + " per " + ctx.sellSym;
+          try { effP.title = receiveRaw + "/" + w2.sellRaw; } catch (e) { /* title best-effort */ }
+        } catch (e) {
+          effP.textContent = t("instant.price", "Price") + " (effective): —";
+        }
+        paintTable(w2.rows);
+        scheduleFee(w2.sellRaw, receiveRaw);
+      } catch (e) {
+        effP.textContent = t("instant.price", "Price") + " (effective): —";
+        paintTable([]); scheduleFee(null, null);
+      }
+      guard = false;
+    }
+    sellIn.addEventListener("input", function () { P.activeInput = "sell"; updateFromSell(); });
+    recvIn.addEventListener("input", function () { P.activeInput = "receive"; updateFromReceive(); });
+    /* Seed from entry amounts (deep link keeps amounts empty; swap seeds
+     * swapped values via P). Default direction is SELL (QuickTrade starts
+     * from the sell side). */
+    if ((P.receiveAmount || "") && !(P.sellAmount || "")) updateFromReceive();
+    else if ((P.sellAmount || "")) updateFromSell();
+    else { paintTable([]); scheduleFee(null, null); }
   }
 
   /* Validate, balance-check, build unsigned op-1, live fee (ONE feeMulti).
-   * Amounts stay integer strings. Locked previews act as committee-account
-   * 1.2.0 with balance checks skipped (honest warn on the confirm); the
-   * Sign & Send gate requires unlock + a re-review under the wallet account. */
-  async function reviewOrder(P, M) {
-    var ctx = M.ctx, qp = ctx.quotePrec, bp = ctx.basePrec;
+   * Amounts stay integer strings. Source side follows P.activeInput (last
+   * edited panel, QuickTrade activeInput concept); the other leg comes from
+   * the book walk (never a price-ratio guess). Locked previews act as
+   * committee-account 1.2.0 with balance checks skipped (honest warn on the
+   * confirm); the Sign & Send gate requires unlock + a re-review under the
+   * wallet account. */
+  async function reviewConvert(P) {
+    var M = P.M, ctx = M.ctx;
     var locked = !isUnlockedNow();
     var myId = locked ? VIEWING_AS_ID : await Account.myAccountId();
     var me = await Account.resolve(myId).then(function (a) { return { id: myId, name: a.name }; });
-    var quoteRaw;
-    try { quoteRaw = Format.parseAmount(P.amount, qp); }
-    catch (e) { throw new Error(e && e.message ? e.message : "bad amount"); }
-    if (!/[1-9]/.test(quoteRaw)) throw new Error("Amount must be greater than zero.");
-    var ratio;
-    try { ratio = Format.parsePriceRatio(P.price); }
-    catch (e) { throw new Error(e && e.message ? e.message : "bad price"); }
-    if (ratio.num <= 0n) throw new Error("Price must be greater than zero.");
+    var sellRaw, receiveRaw, walk;
+    if (P.activeInput === "receive" && (P.receiveAmount || "").trim()) {
+      try { receiveRaw = Format.parseAmount(P.receiveAmount.trim(), ctx.receivePrec); }
+      catch (e) { throw new Error(e && e.message ? e.message : "bad amount"); }
+      if (!/[1-9]/.test(receiveRaw)) throw new Error("Amount must be greater than zero.");
+      walk = walkReceiveToSell(receiveRaw, M.book.bids, ctx.sellPrec, ctx.receivePrec);
+      if (!walk.covered) throw new Error("Insufficient liquidity: the book covers only " + Format.formatAmount(walk.rows.reduce(function (acc, r) { return (BigInt(acc) + BigInt(r.receiveTake)).toString(); }, "0"), ctx.receivePrec) + " " + ctx.receiveSym + " of " + P.receiveAmount.trim() + " " + ctx.receiveSym + ".");
+      sellRaw = walk.sellRaw;
+    } else {
+      try { sellRaw = Format.parseAmount((P.sellAmount || "").trim(), ctx.sellPrec); }
+      catch (e) { throw new Error(e && e.message ? e.message : "bad amount"); }
+      if (!/[1-9]/.test(sellRaw)) throw new Error("Amount must be greater than zero.");
+      walk = walkSellToReceive(sellRaw, M.book.bids, ctx.sellPrec, ctx.receivePrec);
+      if (!walk.covered) {
+        var coveredSell = walk.rows.reduce(function (acc, r) { return (BigInt(acc) + BigInt(r.sellTake)).toString(); }, "0");
+        throw new Error("Insufficient liquidity: the book covers only " + Format.formatAmount(coveredSell, ctx.sellPrec) + " " + ctx.sellSym + " of " + P.sellAmount.trim() + " " + ctx.sellSym + ".");
+      }
+      receiveRaw = walk.receiveRaw;
+    }
+    if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(receiveRaw)) throw new Error(t("instant.price_is_too_small_for_this_amount_one_leg_ro", "Price is too small for this amount: one leg rounds to zero."));
     var expWire = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, -5);
-    var sellAssetId = P.side === "buy" ? ctx.base : ctx.quote;
-    var recvAssetId = P.side === "buy" ? ctx.quote : ctx.base;
-    var sellRaw = P.side === "buy" ? quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp) : quoteRaw;
-    var recvRaw = P.side === "buy" ? quoteRaw : quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp);
-    if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(recvRaw)) throw new Error(t("instant.price_is_too_small_for_this_amount_one_leg_ro", "Price is too small for this amount: one leg rounds to zero."));
     var bals = await Account.balances(me.id), sellBal = null, feeHave = 0n;
     bals.forEach(function (b) {
-      if (b.asset_id === sellAssetId) sellBal = b;
+      if (b.asset_id === ctx.sellId) sellBal = b;
       if (b.asset_id === FEE_ASSET) feeHave = BigInt(b.raw);
     });
     var previewWarn = null;
@@ -350,32 +835,33 @@ var InstantTradeUI = (function () {
     }
     var ops = [[Tx.OP.limit_order_create, {
       fee: { amount: 0, asset_id: FEE_ASSET }, seller: me.id,
-      amount_to_sell: { amount: String(sellRaw), asset_id: sellAssetId },
-      min_to_receive: { amount: String(recvRaw), asset_id: recvAssetId },
-      expiration: expWire, fill_or_kill: false, extensions: [] }]];
+      amount_to_sell: { amount: String(sellRaw), asset_id: ctx.sellId },
+      min_to_receive: { amount: String(receiveRaw), asset_id: ctx.receiveId },
+      expiration: expWire, fill_or_kill: true, extensions: [] }]];
     var unsigned = await Tx.buildTx(ops), feeRes = await Tx.feeMulti(unsigned.operations, FEE_ASSET);
-    var dbId = await Chain.db();
-    var feeRows = await Chain.call(dbId, "get_assets", [[unsigned.operations[0][1].fee.asset_id]]);
-    if (!feeRows || !feeRows[0] || typeof feeRows[0].precision !== "number") throw new Error(t("instant.bad_asset_shape_for_fee_asset", "bad-asset-shape for fee asset"));
-    var feeMeta = { symbol: feeRows[0].symbol, precision: feeRows[0].precision };
-    var feeRaw = BigInt(feeRes.totalRaw), sameAsset = unsigned.operations[0][1].fee.asset_id === sellAssetId;
+    var feeMeta = await feeAssetMeta(FEE_ASSET);
+    var feeRaw = BigInt(feeRes.totalRaw), sameAsset = (FEE_ASSET === ctx.sellId);
     var need = sameAsset ? BigInt(sellRaw) + feeRaw : feeRaw;
     if (!locked && (sameAsset ? BigInt(sellBal.raw) : feeHave) < need) {
       throw new Error("Insufficient " + feeMeta.symbol + " for the fee: need " + Format.formatAmount(need.toString(), feeMeta.precision) + " " + feeMeta.symbol + ".");
     }
+    var effHuman;
+    try { effHuman = effectiveHuman(sellRaw, receiveRaw, ctx.sellPrec, ctx.receivePrec); }
+    catch (e) { effHuman = ""; }
     return {
-      me: me, ratio: ratio, sellAssetId: sellAssetId, recvAssetId: recvAssetId,
-      sellRaw: sellRaw, recvRaw: recvRaw, expWire: expWire,
+      me: me, sellRaw: sellRaw, recvRaw: receiveRaw, expWire: expWire,
       unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta,
-      previewWarn: previewWarn
+      previewWarn: previewWarn, walkRows: walk.rows, effHuman: effHuman
     };
   }
 
   /* Confirm screen. Row names follow #3's op-1 table (popup.js:5724-5731),
-   * same set as the desk (trade-form.js:589-622); fee human, raw in title. */
-  function paintConfirm(doc, root, myGen, P, M, R) {
+   * same set as the desk; fee human, raw in title. Effective price replaces
+   * the old limit-price row (receive-per-sell from the walk, raw ratio in
+   * the title). */
+  function paintConfirm(doc, root, myGen, P, R) {
     if (myGen !== gen) return;
-    var ctx = M.ctx;
+    var M = P.M, ctx = M.ctx;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("instant.confirm_order", "Confirm order")));
@@ -383,20 +869,20 @@ var InstantTradeUI = (function () {
     function row(term, text, title) {
       list.appendChild(el(doc, "dt", term));
       var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
-    var sellHuman = Format.formatAmount(R.sellRaw, R.sellAssetId === ctx.base ? ctx.basePrec : ctx.quotePrec);
-    var recvHuman = Format.formatAmount(R.recvRaw, R.recvAssetId === ctx.base ? ctx.basePrec : ctx.quotePrec);
-    var sellS = R.sellAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
-    var recvS = R.recvAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
-    row(t("instant.side_2", "Side"), (P.side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
+    var sellHuman, recvHuman;
+    try { sellHuman = Format.formatAmount(R.sellRaw, ctx.sellPrec); }
+    catch (e) { sellHuman = R.sellRaw; }
+    try { recvHuman = Format.formatAmount(R.recvRaw, ctx.receivePrec); }
+    catch (e) { recvHuman = R.recvRaw; }
+    row(t("instant.side_2", "Side"), t("trade.col_sell", "Sell") + " " + ctx.sellSym + " → " + t("trade.col_receive", "Receive") + " " + ctx.receiveSym);
     row(t("instant.seller", "Seller"), R.me.name + " (" + R.me.id + ")");
-    row(t("instant.price", "Price"), ratioToDec(R.ratio.num, R.ratio.den, PRICE_PLACES) + " " + ctx.baseSym + " per " + ctx.quoteSym, R.ratio.num.toString() + "/" + R.ratio.den.toString());
-    row(t("instant.amount", "Amount"), (P.side === "buy" ? recvHuman : sellHuman) + " " + ctx.quoteSym);
-    row(t("instant.total", "Total"), (P.side === "buy" ? sellHuman : recvHuman) + " " + ctx.baseSym);
-    row(t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + sellS, R.sellRaw);
-    row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), recvHuman + " " + recvS, R.recvRaw);
+    row(t("instant.price", "Price") + " (effective)", (R.effHuman ? R.effHuman + " " + ctx.receiveSym + " per " + ctx.sellSym : "—"), String(R.recvRaw) + "/" + String(R.sellRaw));
+    row(t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + ctx.sellSym, R.sellRaw);
+    row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), recvHuman + " " + ctx.receiveSym, R.recvRaw);
+    row(t("market.col_order", "Order") + "s walk", String((R.walkRows || []).length) + " level" + (((R.walkRows || []).length === 1) ? "" : "s"));
     row(t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw);
     row(t("instant.expiration", "Expiration"), R.expWire + " (1 year)");
-    row(t("instant.fill_or_kill", "Fill or Kill"), t("instant.no", "No"));
+    row(t("instant.fill_or_kill", "Fill or Kill"), t("trade.yes", "Yes"));
     row(t("instant.network", "Network"), networkName());
     wrap.appendChild(list);
     if (R.previewWarn) wrap.appendChild(el(doc, "p", R.previewWarn, "error"));
@@ -405,7 +891,7 @@ var InstantTradeUI = (function () {
     backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", t("instant.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
-    backBtn.addEventListener("click", function () { if (myGen === gen) paintTrade(doc, root, myGen, P); });
+    backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true; sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("instant.signing", "Signing…"));
@@ -426,23 +912,23 @@ var InstantTradeUI = (function () {
         .then(function (s) { before = s; return Tx.sign(R.unsigned, wif); })
         .then(function (signed) {
           status.textContent = t("instant.broadcasting", "Broadcasting…");
-          return sendTx(signed, proveNewOrder(R.me.id, before, R.sellAssetId, R.sellRaw));
+          return sendTx(signed, proveNewOrder(R.me.id, before, ctx.sellId, R.sellRaw));
         })
         .then(function (res) {
           if (myGen !== gen) return;
           clearRoot(root);
           var done = makeWrap(doc, root);
           done.appendChild(el(doc, "h1", t("instant.order_placed", "Order placed")));
-          done.appendChild(el(doc, "p", "Order " + res.found.id + " is on the book (" + ctx.quoteSym + "/" + ctx.baseSym + ")."));
+          done.appendChild(el(doc, "p", "Order " + res.found.id + " is on the book (" + ctx.sellSym + "/" + ctx.receiveSym + ")."));
           done.appendChild(el(doc, "p", "Observed at head block #" + String(res.head) + " via " + res.via + ".", "muted"));
           var again = touchable(el(doc, "button", t("instant.trade_again", "Trade again")));
           again.id = "it-again"; again.type = "button"; done.appendChild(again);
           var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
-          deskA.href = "#/market/" + ctx.quoteSym + "_" + ctx.baseSym;
+          deskA.href = "#/market/" + ctx.sellSym + "_" + ctx.receiveSym;
           deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
           deskP.appendChild(deskA); done.appendChild(deskP);
           again.addEventListener("click", function () {
-            if (myGen === gen) paintTrade(doc, root, myGen, { marketID: "", side: "buy", amount: "", price: "", M: null });
+            if (myGen === gen) paintConvert(doc, root, myGen, { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", M: null, pairErr: "" });
           });
         })
         .catch(function (e) {
