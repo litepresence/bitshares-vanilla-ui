@@ -1,14 +1,19 @@
-/* borrow-ui.js — #/borrow margin positions + op-3 adjust form + op-45
+/* borrow-ui.js — #/borrow margin positions + op-3 open/adjust forms + op-45
  * settlement bids (split OUT of credit-ui.js).
  * Owns: margin positions table for an account (collateral/debt human both legs,
- *   call price, TCR at the proven divisor 1000) + op-3 call_order_update adjust
- *   form (signed delta-collateral / delta-debt, optional TCR, live fee, named-row
- *   confirm) + op-45 bid_collateral section (asset-driven: settlement-fund
- *   gate, existing-bids table, bid form with live fee + named-row confirm +
- *   bid-list re-read proof) + short margin explainer (port the WORDS of #1
- *   Showcases/Borrow.jsx steps, not its stepper chrome). No safe position ->
- *   adjust form client-gated with an honest note (ambiguity H): positions READ
- *   is always offered, the broadcast only against an existing position.
+ *   call price, TCR at the proven divisor 1000) + op-3 OPEN-new-position form
+ *   (borrow-to-create: collateral asset+amount, debt bitasset+amount,
+ *   feed-valued backing-ratio preview with an MCR abort gate, live fee,
+ *   named-row confirm, unlock-at-sign broadcast with positions re-read proof)
+ *   + op-3 call_order_update adjust form (signed delta-collateral / delta-debt,
+ *   optional TCR, live fee, named-row confirm) + op-45 bid_collateral section
+ *   (asset-driven: settlement-fund gate, existing-bids table, bid form with
+ *   live fee + named-row confirm + bid-list re-read proof) + Get-started
+ *   stepper cycling the WORDS of #1 Showcases/Borrow.jsx steps (chrome only —
+ *   same four strings, same keys). Open needs no position and is always
+ *   offered; no safe position -> adjust form client-gated with an honest note
+ *   (ambiguity H): positions READ is always offered, the adjust broadcast only
+ *   against an existing position.
  *   No settlement fund -> bid form client-gated the same way (C27): the READ
  *   (fund + bids) is always offered, the broadcast only against a live fund.
  *   No money math here (Credit builders + Format do it); no serializers
@@ -184,12 +189,16 @@ var BorrowUI = (function () {
     ctx.wrap.appendChild(el(doc, "h2", t("borrow.adjust_position_op_3", "Adjust position (op 3)")));
     if (lockedB) ctx.wrap.appendChild(signNotice(doc));
     var formBox = el(doc, "div"); ctx.wrap.appendChild(formBox);
+    /* Punchlist HIGH: borrow-to-create lives here — always offered, needs no
+     * position (the gap was adjust-only). New-form words are literals until
+     * the next locale batch mints borrow.* keys; dicts untouched, check_i18n
+     * stays green. */
+    ctx.wrap.appendChild(el(doc, "h2", "Open a new position (op 3)"));
+    ctx.wrap.appendChild(el(doc, "p", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above.", "muted"));
+    var openBoxEl = el(doc, "div"); ctx.wrap.appendChild(openBoxEl);
+    openBox(doc, openBoxEl, myGen);
     ctx.wrap.appendChild(el(doc, "h2", t("borrow.how_borrowing_works", "How borrowing works")));
-    [t("borrow.how_1", "1. Lock collateral (e.g. BTS) to open a call order against a bitasset (e.g. bitUSD)."),
-     t("borrow.how_2", "2. The chain must see a live price feed; falling below the maintenance ratio triggers a margin call."),
-     t("borrow.how_3", "3. Top up collateral or repay debt any time with the adjust form — small steps only."),
-     t("borrow.how_4", "4. Negative debt delta means borrowing MORE — it raises your liquidation risk.")
-    ].forEach(function (s) { ctx.wrap.appendChild(el(doc, "p", s, "muted")); });
+    howStepper(doc, ctx.wrap);
     settleSection(doc, ctx.wrap, myGen);
     go.addEventListener("click", function () {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox); clearBox(formBox);
@@ -337,6 +346,206 @@ var BorrowUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(out);
         showError(doc, out, e, t("borrow.could_not_prepare_the_adjust", "Could not prepare the adjust.")); btn.disabled = false;
+      });
+    });
+  }
+
+  /* Get-started stepper: Borrow.jsx STEPS chrome only (introduction/concept/
+   * setup/benefits/risks walk-through concept) over the same four words and
+   * keys — one step visible plus Previous/Next. Button/counter words are
+   * literals until the next locale batch mints borrow.* keys. */
+  function howStepper(doc, wrap) {
+    var steps = [
+      t("borrow.how_1", "1. Lock collateral (e.g. BTS) to open a call order against a bitasset (e.g. bitUSD)."),
+      t("borrow.how_2", "2. The chain must see a live price feed; falling below the maintenance ratio triggers a margin call."),
+      t("borrow.how_3", "3. Top up collateral or repay debt any time with the adjust form — small steps only."),
+      t("borrow.how_4", "4. Negative debt delta means borrowing MORE — it raises your liquidation risk.")
+    ];
+    var idx = 0;
+    var p = el(doc, "p", steps[0], "muted"); wrap.appendChild(p);
+    var nav = el(doc, "div", null, "xfer-field");
+    var prev = touchable(el(doc, "button", "Previous")); prev.type = "button";
+    var count = el(doc, "span", "", "muted");
+    var next = touchable(el(doc, "button", "Next")); next.type = "button";
+    nav.appendChild(prev); nav.appendChild(count); nav.appendChild(next); wrap.appendChild(nav);
+    function draw() {
+      p.textContent = steps[idx];
+      count.textContent = "Step " + (idx + 1) + " of " + steps.length;
+      prev.disabled = idx === 0; next.disabled = idx === steps.length - 1;
+    }
+    prev.addEventListener("click", function () { if (idx > 0) { idx--; draw(); } });
+    next.addEventListener("click", function () { if (idx < steps.length - 1) { idx++; draw(); } });
+    draw();
+  }
+  /* Feed-valued backing-ratio preview (BigInt only, display at the end).
+   * CR = collHuman * feedPrice / debtHuman with feedPrice in debt-per-backing
+   * = baseHuman/quoteHuman; orientation VERIFIED at runtime (quote leg must be
+   * the collateral asset, base leg the debt asset). With matching precisions
+   * the scale factors cancel: CR = collRaw*baseRaw / (quoteRaw*debtRaw).
+   * Anything unverifiable (prediction market, missing/inverted/zero feed leg)
+   * falls back to an honestly-labelled nominal unit ratio — never a guessed
+   * CR. Returns {kind ("feed"|"nominal"), x (display), mcr (raw u16|null),
+   * belowMcr}. MCR compare stays integer: CR < mcr/1000. */
+  function previewRatio(collRaw, collPrec, debtRaw, debtPrec, bit, collId, debtId) {
+    var mcr = null;
+    try {
+      var fd = bit && bit.current_feed;
+      if (fd && Number.isInteger(fd.maintenance_collateral_ratio)) mcr = fd.maintenance_collateral_ratio;
+    } catch (e) { mcr = null; }
+    function units2(num, den) { /* round(num/den, 2dp) -> "1.75"; BigInt, den > 0 */
+      var q = (num * 100n + den / 2n) / den, s = q.toString();
+      while (s.length < 3) s = "0" + s;
+      return s.slice(0, -2) + "." + s.slice(-2);
+    }
+    if (!(bit && bit.is_prediction_market)) {
+      try {
+        var sp = bit.current_feed && bit.current_feed.settlement_price;
+        var base = sp && sp.base, quote = sp && sp.quote;
+        if (base && quote && String(base.asset_id) === String(debtId) && String(quote.asset_id) === String(collId) &&
+            /^\d+$/.test(String(base.amount)) && /^\d+$/.test(String(quote.amount)) &&
+            BigInt(base.amount) > 0n && BigInt(quote.amount) > 0n) {
+          var num = BigInt(collRaw) * BigInt(base.amount), den = BigInt(quote.amount) * BigInt(debtRaw);
+          var below = (mcr !== null) ? (num * 1000n < BigInt(mcr) * den) : false;
+          return { kind: "feed", x: "≈ " + units2(num, den) + "× (" + units2(num * 100n, den) + "%) · feed-valued",
+            mcr: mcr, belowMcr: below };
+        }
+      } catch (e) { /* fall through to nominal */ }
+    }
+    var n = BigInt(collRaw) * (10n ** BigInt(debtPrec)), d = BigInt(debtRaw) * (10n ** BigInt(collPrec));
+    var why = (bit && bit.is_prediction_market) ? "prediction market settles 1:1 — feed ratio not applied"
+      : "no verifiable feed read — not the margin ratio";
+    return { kind: "nominal", x: "≈ " + units2(n, d) + " collateral units per debt unit (nominal — " + why + ")",
+      mcr: mcr, belowMcr: false };
+  }
+  /* Op-3 OPEN: borrow-to-create (the punchlist HIGH gap was adjust-only).
+   * One call_order_update with delta_collateral POSITIVE (locks) + delta_debt
+   * POSITIVE (new debt issued — #4 wallet.hpp borrow_asset "positive borrows,
+   * negative repays"; #1 BorrowModal + #2 Smartcoin agree live, so the
+   * market.hpp field comment's inverted reading loses). Guards: debt leg must
+   * be a bitasset whose short_backing_asset equals the collateral leg; an
+   * already-held pair redirects to Adjust (open would only top it up);
+   * feed-valued CR under maintenance aborts pre-fee (the chain would reject).
+   * Proof = the pair's call order re-read after send (fresh id preferred). */
+  function openBox(doc, box, myGen) {
+    var lockedOpen = !isUnlockedNow();
+    if (lockedOpen) box.appendChild(signNotice(doc));
+    var fAcct = field(doc, t("borrow.account", "Account"), lockedOpen
+      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
+    var fCollA = field(doc, "Collateral asset (symbol or 1.3.x)", { placeholder: "e.g. BTS" });
+    var fDebtA = field(doc, "Debt bitasset (symbol or 1.3.x)", { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
+    var fColl = field(doc, "Collateral amount (collateral units)", { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
+    var fDebt = field(doc, "Amount to borrow (debt units)", { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
+    var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
+    [fAcct, fCollA, fDebtA, fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
+    box.appendChild(el(doc, "p", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it.", "muted"));
+    var btn = touchable(el(doc, "button", "Review borrow")); btn.type = "button"; box.appendChild(btn);
+    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    Account.myAccountId().then(function (id) {
+      if (myGen === gen && !fAcct.input.value) fAcct.input.value = id;
+    }).catch(function () { /* manual account entry remains */ });
+    btn.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      clearBox(out); btn.disabled = true;
+      showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
+      Promise.resolve().then(async function () {
+        if (!fCollA.input.value.trim() || !fDebtA.input.value.trim())
+          throw new Error("Enter a collateral asset and a debt bitasset first.");
+        if (!fColl.input.value.trim() || !fDebt.input.value.trim())
+          throw new Error("Enter both amounts first.");
+        var acct = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
+          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+        var coll = await Asset.describe(fCollA.input.value.trim());
+        var debt = await Asset.describe(fDebtA.input.value.trim());
+        if (!debt.is_smartcoin) throw new Error("not-bitasset (" + debt.symbol + " is not a bitasset — no margin)");
+        var collRaw = Format.parseAmount(fColl.input.value, coll.precision);
+        var debtRaw = Format.parseAmount(fDebt.input.value, debt.precision);
+        if (BigInt(collRaw) <= 0n || BigInt(debtRaw) <= 0n)
+          throw new Error(t("borrow.both_legs_must_be_above_zero_nonzero_debt_nee", "Both legs must be above zero (nonzero debt needs nonzero collateral)."));
+        var tcr = (fTcr.input.value.trim() === "") ? null : Credit.tcrHumanToUnits(fTcr.input.value.trim());
+        var dbId = await Chain.db();
+        var debtRows = await Chain.call(dbId, "get_assets", [[debt.id]]);
+        var debtFull = debtRows && debtRows[0];
+        if (!debtFull || !debtFull.bitasset_data_id) throw new Error("not-bitasset (" + debt.symbol + ")");
+        var objs = await Chain.call(dbId, "get_objects", [[debtFull.bitasset_data_id]]);
+        var bit = (objs && objs[0]) || null;
+        if (!bit) throw new Error(t("borrow.unexpected_asset_data_from_the_node_stopped_i", "Unexpected asset data from the node; stopped instead of guessing."));
+        var backingId = (bit.options && bit.options.short_backing_asset) || "1.3.0";
+        if (coll.id !== backingId)
+          throw new Error("wrong-collateral (" + coll.symbol + " is not the backing asset; " + debt.symbol + " is backed by " + backingId + ")");
+        var prior = [];
+        try { prior = await Credit.positions(acct.id); } catch (e) { prior = []; }
+        var preIds = {}, dup = null;
+        prior.forEach(function (p) { preIds[p.call_id] = true;
+          if (p.coll_id === coll.id && p.debt_id === debt.id) dup = p; });
+        if (dup) throw new Error("have-position (" + dup.call_id + " already covers " + coll.symbol + "/" + debt.symbol + " — use Adjust above)");
+        var ratio = previewRatio(collRaw, coll.precision, debtRaw, debt.precision, bit, coll.id, debt.id);
+        var mcrRow = (ratio.mcr === null) ? "unknown (no feed read)"
+          : Credit.tcrUnitsToHuman(ratio.mcr) + "%";
+        if (ratio.kind === "feed" && ratio.mcr !== null && ratio.belowMcr)
+          throw new Error("below-mcr (backing " + ratio.x + " under maintenance " + mcrRow + " — the chain would reject; raise collateral or lower debt)");
+        var pair = Credit.buildCallUpdate({ accountId: acct.id, collRaw: collRaw, collId: coll.id,
+          debtRaw: debtRaw, debtId: debt.id, tcrUnitsOrNull: tcr });
+        var fee = await Credit.fee(pair, "1.3.0");
+        return { acct: acct, coll: coll, debt: debt, collRaw: collRaw, debtRaw: debtRaw,
+          tcr: tcr, pair: pair, fee: fee, ratio: ratio, mcrRow: mcrRow, preIds: preIds };
+      }).then(function (R) {
+        if (myGen !== gen) return;
+        Asset.describe(R.fee.asset_id).then(function (a) { return a; }).catch(function () { return null; })
+        .then(function (fa) {
+          if (myGen !== gen) return;
+          var feeHuman = fa ? Format.formatAmount(String(R.fee.amount), fa.precision) + " " + fa.symbol : String(R.fee.amount);
+          var tcrRow = (R.tcr === null) ? "unchanged" : Credit.tcrUnitsToHuman(R.tcr) + "%";
+          clearBox(out);
+          out.appendChild(el(doc, "h3", "Confirm new borrow"));
+          out.appendChild(confirmList(doc, [
+            [t("borrow.account", "Account"), R.acct.name + " (" + R.acct.id + ")"],
+            [t("borrow.collateral", "Collateral"), Format.formatAmount(R.collRaw, R.coll.precision) + " " + R.coll.symbol, "raw " + R.collRaw],
+            [t("borrow.hdr_debt", "Debt"), Format.formatAmount(R.debtRaw, R.debt.precision) + " " + R.debt.symbol, "raw " + R.debtRaw],
+            ["Backing ratio", R.ratio.x],
+            ["Maintenance ratio", R.mcrRow + (R.ratio.kind === "nominal" ? " (target only — preview is nominal)" : "")],
+            [t("borrow.target_ratio", "Target ratio"), tcrRow],
+            [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)],
+            [t("borrow.network", "Network"), "testnet"]]));
+          var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
+          var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
+          out.appendChild(back); out.appendChild(send);
+          back.addEventListener("click", function () { clearBox(out); btn.disabled = false; });
+          send.addEventListener("click", function () {
+            if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+            var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
+            var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
+            Tx.buildTx([R.pair]).then(function (unsigned) {
+              return Credit.sendAndProve(unsigned, wif, async function () {
+                try {
+                  var rows = await Credit.positions(R.acct.id);
+                  var fresh = null, any = null;
+                  for (var i = 0; i < rows.length; i++) {
+                    if (rows[i].coll_id === R.coll.id && rows[i].debt_id === R.debt.id) {
+                      any = rows[i];
+                      if (!R.preIds[rows[i].call_id]) { fresh = rows[i]; break; }
+                    }
+                  }
+                  return fresh || any;
+                } catch (e) { return null; } return null;
+              });
+            }).then(async function (res) {
+              if (myGen !== gen) return; clearBox(out);
+              out.appendChild(el(doc, "p", "Borrow broadcast.", "xfer-ok"));
+              out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              btn.disabled = false;
+            }).catch(function (e) {
+              if (myGen !== gen) return; out.removeChild(status);
+              showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+              send.disabled = false; back.disabled = false;
+            });
+          });
+          btn.disabled = false;
+        });
+      }).catch(function (e) {
+        if (myGen !== gen) return; clearBox(out);
+        showError(doc, out, e, "Could not prepare the borrow."); btn.disabled = false;
       });
     });
   }
