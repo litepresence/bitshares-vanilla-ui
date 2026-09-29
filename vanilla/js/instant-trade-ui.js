@@ -43,8 +43,8 @@
  *   its verbatim default (instant.* + trade.* + market.* + swap.title), so
  *   check_i18n stays green with this file alone and no locale edits. New
  *   concepts (SELL/RECEIVE headers, Swap, effective-price suffix) compose
- *   those keys plus untranslatable symbols (asset codes, "->", "(effective)",
- *   em-dash) — full convert copy stays deferred to a later i18n batch.
+ *   those keys plus untranslatable symbols (asset codes, "->", em-dash).
+ *   Batch-4 i18n: the deferred convert copy below is keyed via t().
  * Created by: stub-queue build (matrix row A31); rebuilt to the QuickTrade
  *   convert flow per slice-18 follow-up (single-file constraint).
  */
@@ -410,16 +410,16 @@ var InstantTradeUI = (function () {
     } catch (e) { /* widths best-effort */ }
     sellBox.appendChild(el(doc, "h2", t("trade.col_sell", "Sell") + (P.sellSym ? " " + P.sellSym : "")));
     recvBox.appendChild(el(doc, "h2", t("trade.col_receive", "Receive") + (P.receiveSym ? " " + P.receiveSym : "")));
-    var sellSymF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) ").replace("Market (QUOTE_BASE) ", "Sell asset "), { id: "it-sell-sym", value: P.sellSym, placeholder: "BTS", inputmode: "text" });
-    sellSymF.input.setAttribute("aria-label", "Sell asset symbol");
+    var sellSymF = fieldRow(doc, t("instant.sell_asset_label", "Sell asset "), { id: "it-sell-sym", value: P.sellSym, placeholder: "BTS", inputmode: "text" });
+    sellSymF.input.setAttribute("aria-label", t("instant.sell_asset_symbol_aria", "Sell asset symbol"));
     sellSymF.input.setAttribute("autocapitalize", "characters");
     sellBox.appendChild(sellSymF.row);
     var sellAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.sellSym || "SELL" }), { id: "it-sell-amount", value: P.sellAmount, placeholder: "0.00", inputmode: "decimal", unit: P.sellSym || "SELL" });
     sellBox.appendChild(sellAmtF.row);
     var sellBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.sellSym ? " " + P.sellSym : ""), "muted");
     sellBal.id = "it-sell-bal"; sellBox.appendChild(sellBal);
-    var recvSymF = fieldRow(doc, t("instant.market_quote_base", "Market (QUOTE_BASE) ").replace("Market (QUOTE_BASE) ", "Receive asset "), { id: "it-receive-sym", value: P.receiveSym, placeholder: "CNY", inputmode: "text" });
-    recvSymF.input.setAttribute("aria-label", "Receive asset symbol");
+    var recvSymF = fieldRow(doc, t("instant.receive_asset_label", "Receive asset "), { id: "it-receive-sym", value: P.receiveSym, placeholder: "CNY", inputmode: "text" });
+    recvSymF.input.setAttribute("aria-label", t("instant.receive_asset_symbol_aria", "Receive asset symbol"));
     recvSymF.input.setAttribute("autocapitalize", "characters");
     recvBox.appendChild(recvSymF.row);
     var recvAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.receiveSym || "RECEIVE" }), { id: "it-receive-amount", value: P.receiveAmount, placeholder: "0.00", inputmode: "decimal", unit: P.receiveSym || "RECEIVE" });
@@ -430,7 +430,7 @@ var InstantTradeUI = (function () {
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
     var swapBtn = touchable(el(doc, "button", t("swap.title", "Swap") + " ⇅"));
     swapBtn.id = "it-swap"; swapBtn.type = "button";
-    swapBtn.setAttribute("aria-label", t("swap.title", "Swap") + " sell/receive");
+    swapBtn.setAttribute("aria-label", t("swap.title", "Swap") + t("instant.swap_suffix_sell_receive", " sell/receive"));
     swapCell.appendChild(swapBtn);
     duo.appendChild(sellBox); duo.appendChild(swapCell); duo.appendChild(recvBox);
     wrap.appendChild(duo);
@@ -554,12 +554,12 @@ var InstantTradeUI = (function () {
     if (askH) { try { askSpan.title = askH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(askSpan);
     walkBox.appendChild(statsP);
-    walkBox.appendChild(el(doc, "p", "Trade " + ctx.sellSym + " → " + ctx.receiveSym + " — walkthrough uses bids (selling " + ctx.sellSym + " hits bids paying " + ctx.receiveSym + ").", "muted"));
+    walkBox.appendChild(el(doc, "p", t("instant.walkthrough_trade_prefix", "Trade ") + ctx.sellSym + " → " + ctx.receiveSym + t("instant.walkthrough_bids_mid", " — walkthrough uses bids (selling ") + ctx.sellSym + t("instant.walkthrough_paying_mid", " hits bids paying ") + ctx.receiveSym + ").", "muted"));
     if (!M.book.bids || M.book.bids.length === 0) walkBox.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
     /* Per-side balances: locked 0 + hint (computable), unlocked real. */
     refreshBalances(doc, P, M);
     /* Walkthrough live region: effective price + fee display + orders table. */
-    var effP = el(doc, "p", t("instant.price", "Price") + " (effective): —", "muted");
+    var effP = el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted");
     effP.id = "it-effective"; walkBox.appendChild(effP);
     var feeP = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
     feeP.id = "it-fee-preview"; walkBox.appendChild(feeP);
@@ -575,7 +575,7 @@ var InstantTradeUI = (function () {
   function paintWalkEmpty(doc, walkBox, P) {
     void P;
     while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
-    walkBox.appendChild(el(doc, "p", t("instant.price", "Price") + " (effective): —", "muted"));
+    walkBox.appendChild(el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
@@ -640,7 +640,7 @@ var InstantTradeUI = (function () {
       }
       var table = doc.createElement("table");
       var head = doc.createElement("tr");
-      [t("market.col_order", "Order"), t("market.col_price", "Price") + " (" + ctx.receiveSym + " per " + ctx.sellSym + ")",
+      [t("market.col_order", "Order"), t("market.col_price", "Price") + " (" + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym + ")",
         t("instant.amount", "Amount") + " (" + ctx.sellSym + ")",
         t("instant.total", "Total") + " (" + ctx.receiveSym + ")"].forEach(function (h) {
         var th = doc.createElement("th"); th.textContent = h; head.appendChild(th);
@@ -666,7 +666,7 @@ var InstantTradeUI = (function () {
         table.appendChild(tr);
       });
       tblWrap.appendChild(table);
-      tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + " level" + (rows.length === 1 ? "" : "s") + " walk", "muted"));
+      tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + t("instant.level_suffix", " level") + (rows.length === 1 ? "" : "s") + t("instant.walk_suffix", " walk"), "muted"));
     }
     function paintMkt(receiveRaw) {
       mktOpts().then(function (opt) {
@@ -723,7 +723,7 @@ var InstantTradeUI = (function () {
       try {
         var a = sellIn.value.trim();
         if (!a) {
-          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
           paintTable([]); scheduleFee(null, null);
           guard = false; return;
         }
@@ -735,15 +735,15 @@ var InstantTradeUI = (function () {
         P.sellAmount = a; P.receiveAmount = recvIn.value; P.activeInput = "sell";
         try {
           var eff = effectiveHuman(sellRaw, w.receiveRaw, ctx.sellPrec, ctx.receivePrec);
-          effP.textContent = t("instant.price", "Price") + " (effective): " + eff + " " + ctx.receiveSym + " per " + ctx.sellSym;
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix", " (effective): ") + eff + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym;
           try { effP.title = w.receiveRaw + "/" + sellRaw; } catch (e) { /* title best-effort */ }
         } catch (e) {
-          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
         }
         paintTable(w.rows);
         scheduleFee(sellRaw, w.receiveRaw);
       } catch (e) {
-        effP.textContent = t("instant.price", "Price") + " (effective): —";
+        effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
         paintTable([]); scheduleFee(null, null);
       }
       guard = false;
@@ -754,7 +754,7 @@ var InstantTradeUI = (function () {
       try {
         var b = recvIn.value.trim();
         if (!b) {
-          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
           paintTable([]); scheduleFee(null, null);
           guard = false; return;
         }
@@ -766,15 +766,15 @@ var InstantTradeUI = (function () {
         P.sellAmount = sellIn.value; P.receiveAmount = b; P.activeInput = "receive";
         try {
           var eff2 = effectiveHuman(w2.sellRaw, receiveRaw, ctx.sellPrec, ctx.receivePrec);
-          effP.textContent = t("instant.price", "Price") + " (effective): " + eff2 + " " + ctx.receiveSym + " per " + ctx.sellSym;
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix", " (effective): ") + eff2 + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym;
           try { effP.title = receiveRaw + "/" + w2.sellRaw; } catch (e) { /* title best-effort */ }
         } catch (e) {
-          effP.textContent = t("instant.price", "Price") + " (effective): —";
+          effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
         }
         paintTable(w2.rows);
         scheduleFee(w2.sellRaw, receiveRaw);
       } catch (e) {
-        effP.textContent = t("instant.price", "Price") + " (effective): —";
+        effP.textContent = t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —");
         paintTable([]); scheduleFee(null, null);
       }
       guard = false;
@@ -876,10 +876,10 @@ var InstantTradeUI = (function () {
     catch (e) { recvHuman = R.recvRaw; }
     row(t("instant.side_2", "Side"), t("trade.col_sell", "Sell") + " " + ctx.sellSym + " → " + t("trade.col_receive", "Receive") + " " + ctx.receiveSym);
     row(t("instant.seller", "Seller"), R.me.name + " (" + R.me.id + ")");
-    row(t("instant.price", "Price") + " (effective)", (R.effHuman ? R.effHuman + " " + ctx.receiveSym + " per " + ctx.sellSym : "—"), String(R.recvRaw) + "/" + String(R.sellRaw));
+    row(t("instant.price", "Price") + t("instant.effective_paren", " (effective)"), (R.effHuman ? R.effHuman + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym : "—"), String(R.recvRaw) + "/" + String(R.sellRaw));
     row(t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + ctx.sellSym, R.sellRaw);
     row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), recvHuman + " " + ctx.receiveSym, R.recvRaw);
-    row(t("market.col_order", "Order") + "s walk", String((R.walkRows || []).length) + " level" + (((R.walkRows || []).length === 1) ? "" : "s"));
+    row(t("market.col_order", "Order") + t("instant.orders_walk_suffix", "s walk"), String((R.walkRows || []).length) + t("instant.level_suffix", " level") + (((R.walkRows || []).length === 1) ? "" : "s"));
     row(t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw);
     row(t("instant.expiration", "Expiration"), R.expWire + " (1 year)");
     row(t("instant.fill_or_kill", "Fill or Kill"), t("trade.yes", "Yes"));
@@ -919,8 +919,8 @@ var InstantTradeUI = (function () {
           clearRoot(root);
           var done = makeWrap(doc, root);
           done.appendChild(el(doc, "h1", t("instant.order_placed", "Order placed")));
-          done.appendChild(el(doc, "p", "Order " + res.found.id + " is on the book (" + ctx.sellSym + "/" + ctx.receiveSym + ")."));
-          done.appendChild(el(doc, "p", "Observed at head block #" + String(res.head) + " via " + res.via + ".", "muted"));
+          done.appendChild(el(doc, "p", t("instant.order_prefix", "Order ") + res.found.id + t("instant.on_the_book_mid", " is on the book (") + ctx.sellSym + "/" + ctx.receiveSym + ")."));
+          done.appendChild(el(doc, "p", t("instant.observed_head_prefix", "Observed at head block #") + String(res.head) + t("instant.via_mid", " via ") + res.via + ".", "muted"));
           var again = touchable(el(doc, "button", t("instant.trade_again", "Trade again")));
           again.id = "it-again"; again.type = "button"; done.appendChild(again);
           var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
