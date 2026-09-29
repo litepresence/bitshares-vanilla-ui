@@ -278,6 +278,11 @@ var MarketBook = (function () {
       var tr = doc.createElement("tr");
       tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
       try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+      var texts = [
+        lv.displayPrice !== undefined ? String(lv.displayPrice) : "",
+        lv.quote !== undefined ? String(lv.quote) : "",
+        lv.base !== undefined ? String(lv.base) : ""
+      ];
       /* Click-to-fill: row price → trade-form price input (keyboard: Enter). */
       try {
         tr.setAttribute("tabindex", "0");
@@ -285,11 +290,6 @@ var MarketBook = (function () {
         tr.setAttribute("aria-label", "Fill price " + String(texts[0]));
         tr.title = "Fill price";
       } catch (e) { /* rows render unclickable */ }
-      var texts = [
-        lv.displayPrice !== undefined ? String(lv.displayPrice) : "",
-        lv.quote !== undefined ? String(lv.quote) : "",
-        lv.base !== undefined ? String(lv.base) : ""
-      ];
       texts.forEach(function (text, ci) {
         var td = doc.createElement("td");
         /* Price cell (ci 0) carries the side color hook (book-price-bid green
