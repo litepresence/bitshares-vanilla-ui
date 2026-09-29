@@ -179,7 +179,7 @@ var PoolDetailUI = (function () {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
       over: { sma: [{ p: 10 }], ema: [{ p: 50 }] }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
       /* Toggleable plots (menu "Plots" group): only price is always on. */
-      showVwap: true, showDepth: true,
+      showVwap: false, showDepth: true,
       candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,
       priceHost: priceHost, oscHost: oscHost, oscNote: oscNote,
       depthCanvas: null, basePrec: precOr5(r.prec_b), quotePrec: precOr5(r.prec_a),

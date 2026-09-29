@@ -263,8 +263,8 @@ var MarketDesk = (function () {
        * (no refetch); overlays default to the pre-slice look (SMA10+EMA50). */
       bucket: 3600, tfInit: false, logScale: false,
       /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice.
-       * Only the price pane is always on; both default on (current look). */
-      showVwap: true, showDepth: true,
+       * Only the price pane is always on; depth defaults on, VWAP off. */
+      showVwap: false, showDepth: true,
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
       depthLogX: true, depthLogY: true,
