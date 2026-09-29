@@ -319,8 +319,74 @@ sites — unchanged).
   nothing; (c) deletable subset: chgSign/paintChg + 3 CSS rules revert to
   all-muted by deleting the paint call; the BigInt fund flag reverts to the
   Number test in one line.
-- Deliberately skipped: live-asset settlement estimate (float
+ - Deliberately skipped: live-asset settlement estimate (float
   reciprocal-percent math — recorded above, not guessed); strip 24h Δ
   coloring (picker scope only); live green/red screenshot (chain shows all
   zeros today — logic vectors + token mapping stand in, human pass on a
   moving market).
+
+---
+
+# Error sweep (2026-09-29) — headless console-error pass over every §6 route
+
+Same server + shooter as rounds 1–3
+(`python3 -m http.server 8081 --directory vanilla`,
+`PLAYWRIGHT_BROWSERS_PATH=/workspace/tooling/visual/.browsers node
+tooling/visual/shot.mjs --url <route> --width 1440 --wait 9000`).
+36 routes + 2 tall shots (`--height 2400/2000` for below-fold desk + pool
+detail). Every screenshot below was READ (no blind claims). Zero JS/CSS
+touched — sweep only, so `node --check` is N/A (nothing touched),
+`check_rot` PASS, `check_i18n` OK (2164 keys, 2833 call sites), tree clean.
+
+## Result: 34/36 clean, 2 known-expected errors, 0 regressions, 0 fixes
+
+- **PASS, zero console errors (34):** `#/`, `#/market/BTS_CNY`,
+  `#/market/BTS_USD`, `#/pools`, `#/pools/1.19.2`, `#/swap`,
+  `#/account/committee-account`, `#/transfer`,
+  `#/transfer/lite-test-1`, `#/explorer`, `#/explorer/assets`,
+  `#/voting`, `#/assets`, `#/assets/create`, `#/htlc`, `#/proposals`,
+  `#/tickets`, `#/credit-offer`, `#/samet`, `#/borrow`, `#/barter`,
+  `#/vesting`, `#/alerts`, `#/news`, `#/instant-trade`, `#/prediction`,
+  `#/fees`, `#/referrals`, `#/favourites`, `#/ops`, `#/wallet`,
+  `#/login`, `#/help`, `#/nope-never-here` (honest 404 +
+  "Go to Dashboard").
+- **PASS with known-expected error (2, both pre-existing, not tonight's):**
+  - `#/settings`: `wss://btsws.roelandp.nl/ws ... ERR_NAME_NOT_RESOLVED`.
+    Standing tracked debt (SLICES.md: roelandp DNS-dead from sandbox, kept
+    last, failover covers). Page renders the honest `down` row; 5/6 nodes
+    show chain-id `4018d784` with latencies. No action.
+  - `#/deposit-withdraw`: one `ERR_NAME_NOT_RESOLVED` resource load — the
+    dead GDEX domain (slice-15 scope: GDEX dead DNS → manual-only). Page
+    renders the honest `gateway-down: TypeError` line next to XBTSX/IOB ok.
+    No action.
+- **Tonight's areas re-verified in the tall shots (all render, zero
+  errors):** desk 2x3 buy/sell (Buy BTS / Sell BTS / Trades with
+  RECENT/MY tabs + live rows), quote panels (BTS/USD/BTC/TEST/USDT),
+  depth + synthetic pool curve, pool map + provenance line, INDICATORS
+  plots menu + MACD/volume sub-panes, header forgery + footer REPORT/HELP
+  on every route, unlock previews (`UNLOCK & REVIEW`, viewing-as notices).
+- **Live chain proof (bonus, via /tmp/feed-probe.mjs — repo untouched):**
+  bitUSD `2.4.21` has `settlement_fund 2368199380699` (> 0, globally
+  settled) while bitCNY `2.4.13` has fund `0` — so `#/market/BTS_USD`
+  showing Feed `0.001410` + Global Settlement `0.048100` (both recomputed
+  by hand from the returned legs through `formatPrice` quote-per-base) is
+  exact chain-faithful rendering, and `#/market/BTS_CNY` showing Feed only
+  is the designed honest empty. The frozen-looking USD feed is the stale
+  on-chain `current_feed` of a settled asset, displayed verbatim — not a
+  bug. (The feed looks "10x off market" only because post-GS feeds freeze.)
+
+## Shots (all in /tmp/sweep/, all READ)
+
+- `01-root` … `36-404` (1440×900 each) + `02b-desk-tall` (1440×2400:
+  strip → charts rail → depth → pool map → volume → MACD → full 2x3 +
+  trades) + `05b-pool2-tall` (1440×2000: price history → synthetic book →
+  pool map → volume → curve → pool history rows).
+- Residual non-blockers (recorded, not fixed — not regressions, do not
+  gold-plate): MACD pane × sits tight against its label; `#/assets` +
+  `#/fees` name ops 0–9 / 16 raw (`op_0`) with `—` fees on 4/5/8/10
+  (pre-existing display, honest empties); LWC price-axis scale reads raw
+  units (pre-existing chart behavior).
+- Human browser pass still wanted: tab CLICK-throughs (account tabs,
+  picker Starred — shot.mjs has no click step), live green/red picker
+  CHANGE on a moving market, phone-width re-check of tonight's tall
+  content (1440 only this sweep).
