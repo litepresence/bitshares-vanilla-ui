@@ -23,6 +23,14 @@ var Chain = (function () {
    * Best-effort: nodes that disallow it (some testnets) just don't push;
    * the heartbeat below covers them. */
   var BLOCK_CB_ID = 1;
+  /* Market-notice subscription id (database_api.hpp:602-610:
+   * subscribe_to_market(callback, A, B) — integer echoed back in notice
+   * params, shape-disjoint from call/response ids like BLOCK_CB_ID.
+   * Route-owned: connect() never auto-subscribes; views subscribe per
+   * market and unsubscribe on teardown. Single slot (one market at a
+   * time) — marketCb holds the current route's push handler or null. */
+  var MARKET_CB_ID = 2;
+  var marketCb = null;
 
   function setStatus(patch) {
     lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
@@ -57,8 +65,10 @@ var Chain = (function () {
   }
 
   /* resetApiIds: per-connection api ids die with the socket (login returns
-   *   fresh ones) — a stale cache would address the new connection wrongly. */
-  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; }
+   *   fresh ones) — a stale cache would address the new connection wrongly.
+   *   The market-notice handler dies with it too (server-side subscriptions
+   *   do not survive reconnect — the route resubscribes). */
+  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; marketCb = null; }
 
   /* blockNumberFromId: graphene block ids lead with the 4-byte big-endian
    * block number (astro-ui BlocksLive parity). Returns the number or null. */
@@ -225,11 +235,15 @@ var Chain = (function () {
       ws.onmessage = function (ev) {
         var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
         /* Push notices (no top-level id — shape-disjoint from call pairs):
-         * applied-block feed for the footer (see BLOCK_CB_ID). Unknown
-         * notices are ignored; the heartbeat covers unsubscribed nodes. */
-        if (msg.method === "notice" && Array.isArray(msg.params) && msg.params[0] === BLOCK_CB_ID) {
-          onBlockNotice(msg.params[1]);
-          return;
+         * applied-block feed for the footer (see BLOCK_CB_ID) and the
+         * route-owned market feed (see MARKET_CB_ID). Unknown notices are
+         * ignored; the heartbeat covers unsubscribed nodes. */
+        if (msg.method === "notice" && Array.isArray(msg.params)) {
+          if (msg.params[0] === BLOCK_CB_ID) { onBlockNotice(msg.params[1]); return; }
+          if (msg.params[0] === MARKET_CB_ID) {
+            try { if (marketCb) marketCb(msg.params[1]); } catch (e) { /* route handler fault */ }
+            return;
+          }
         }
         if (msg.id !== undefined && pending[msg.id]) {
           var p = pending[msg.id]; delete pending[msg.id]; clearTimeout(p.timer);
@@ -283,6 +297,34 @@ var Chain = (function () {
     if (_netId !== null) return Promise.resolve(_netId);
     return call(1, "network_broadcast", []).then(function (id) { _netId = id; return id; });
   }
-  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, status: function () { return lastStatus; }};
+  /* subscribeMarket: route-owned market-notice feed (database_api.hpp:602-610
+   *   subscribe_to_market(callback, A, B) — asset ids, not a callback id).
+   *   Params: baseId/quoteId (asset id strings like "1.3.0"), cb (push handler
+   *   receiving the notice payload). Returns a Promise resolving to an unsub
+   *   closure (() => unsubscribeMarket(base, quote)). No auto-subscribe in
+   *   connect() — the route subscribes per market. Fails: rejects when not
+   *   connected or on call timeout (via db()/call()). */
+  function subscribeMarket(baseId, quoteId, cb) {
+    marketCb = (typeof cb === "function") ? cb : null;
+    return db().then(function (dbId) {
+      return call(dbId, "subscribe_to_market", [MARKET_CB_ID, baseId, quoteId]);
+    }).then(function () {
+      return function () { return unsubscribeMarket(baseId, quoteId); };
+    });
+  }
+  /* unsubscribeMarket: drop the local push handler, then best-effort tell the
+   *   node (unsubscribe_from_market(A, B) — asset ids). Params: baseId/quoteId.
+   *   Returns a Promise (always resolves — server errors and dead sockets are
+   *   swallowed; the subscription dies with the socket anyway). */
+  function unsubscribeMarket(baseId, quoteId) {
+    marketCb = null;
+    try {
+      if (_dbId !== null) {
+        return call(_dbId, "unsubscribe_from_market", [baseId, quoteId]).catch(function () {});
+      }
+    } catch (e) { /* best-effort only */ }
+    return Promise.resolve();
+  }
+  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, status: function () { return lastStatus; }};
 })();
 if (typeof module !== "undefined") { module.exports = Chain; }
