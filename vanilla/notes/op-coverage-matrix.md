@@ -31,7 +31,7 @@
 | A12 | `/registration/local` → WalletRegistration (:548) | — | `/registration/local` (:134) → PORTED (`auth-ui.js` → `#/create-wallet-brainkey`) |
 | A13 | `/registration/cloud` → AccountRegistration (:553) | create_account.astro | `/registration/cloud` (:135) → PORTED (`auth-ui.js` → `#/create-account`) |
 | A14 | `/news` → News (:558) | — | `/news` (:136) → PORTED (`news-ui.js`: honest static, no fake feed) |
-| A15 | `/voting` → redirect to `/account/:name/voting` (:559) | vote, governance, witnesses, committee, committee_parameters.astro | `/voting` (:137) → PORTED (slice-08: lists, proxy, slates, op-6 proven blocks 100916767/68; caveat: witness/committee create/update signing not yet — vote slate is) |
+| A15 | `/voting` → redirect to `/account/:name/voting` (:559) | vote, governance, witnesses, committee, committee_parameters.astro | `/voting` (:137) → PORTED (slice-08: lists, proxy, slates, op-6 proven blocks 100916767/68; +ops 20/21/29/30 serializers live, testnet evaluator-reached at head 100989922 — full inclusion needs an LTM payer, vote slate is) |
 | A16 | `/explorer`, `/explorer/:tab` (:566–570) | explorer.astro | `/explorer`, `/explorer/:tab` (:138–139) → PORTED (slice-09) |
 | A17 | `/asset/:symbol` → Asset (:571) | smartcoin, smartcoins, issued_assets.astro | `/asset/:symbol` (:140) → PORTED (slice-09/10) |
 | A18 | `/block/:height` → Block (:575) | blocks.astro | `/block/:height` (:141) → PORTED (slice-09, fixtures 100916767/68) |

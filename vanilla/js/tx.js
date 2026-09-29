@@ -1,16 +1,18 @@
-/* tx.js — graphene serializer registry + dispatch (ops 0-3, 6, 7,
- * 10-15, 19, 22-24, 25-28, 32-34, 37, 49, 50, 52, 54-58, 59-73, 75, 76).
+/* tx.js — graphene serializer registry + dispatch (ops 0-3, 6-8,
+ * 10-15, 19-24, 25-30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75, 76).
  * Envelope/fee/sign/send live in tx-send.js (slice-18 cap split).
  *
-  * What it owns: binary serialization of transfer (op 0), limit_order_create
-  * (op 1), limit_order_cancel (op 2), call_order_update (op 3), account_update
-  * (op 6), account_whitelist (op 7),
+ * What it owns: binary serialization of transfer (op 0), limit_order_create
+ * (op 1), limit_order_cancel (op 2), call_order_update (op 3), account_update
+ * (op 6), account_whitelist (op 7), account_upgrade (op 8),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
- * (op 15), asset_publish_feed (op 19), proposal_create/update/delete (ops
+ * (op 15), asset_publish_feed (op 19), witness_create (op 20),
+ * witness_update (op 21), proposal_create/update/delete (ops
  * 22/23/24), withdraw_permission_create (op 25),
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
- * withdraw_permission_delete (op 28), htlc_create (op 49), htlc_redeem
+ * withdraw_permission_delete (op 28), committee_member_create (op 29),
+ * committee_member_update (op 30), htlc_create (op 49), htlc_redeem
  * (op 50), htlc_extend (op 52), vesting_balance_create/withdraw (ops 32/33),
  * worker_create (op 34), balance_claim (op 37, fee always 0), custom_authority_create/update/delete
  * (ops 54/55/56), ticket_create/update (ops 57/58), liquidity_pool_create (op 59),
@@ -367,6 +369,29 @@
  *   <- .../protocol/withdraw_permission.hpp:185-187
  * - ops 25-28, 49-53 ids <- .../protocol/operations.hpp:81-84, :105-109
  *   (51/53 VIRTUAL — never signed, never dispatched)
+ * - witness_create order (fee)(witness_account)(url)(block_signing_key),
+ *   NO extensions field <- .../protocol/witness.hpp:81 (FC_REFLECT lists
+ *   exactly these four); url < GRAPHENE_MAX_URL_LENGTH (127,
+ *   config.hpp:41) enforced by validate() in witness.cpp:30-34 — vanilla
+ *   throws on missing/non-string/oversize url instead of #3's `|| ''`
+ *   silent default. Byte-identical whenever url is supplied.
+ * - witness_update order (fee)(witness)(witness_account)(new_url?)
+ *   (new_signing_key?), NO extensions field <- witness.hpp:84; both
+ *   optionals encode absent <-> 0x00 via serializeOptional (same convention
+ *   as the transfer-memo path). Both-absent is a chain-valid no-op update
+ *   and encodes as such here (no at-least-one gate — unlike op 75, the
+ *   node does not reject it).
+ * - committee_member_create order (fee)(committee_member_account)(url),
+ *   NO extensions field <- .../protocol/committee_member.hpp:103-104;
+ *   same url rule as witness_create above.
+ * - committee_member_update order (fee)(committee_member)
+ *   (committee_member_account)(new_url?), NO extensions field
+ *   <- committee_member.hpp:105-106 (currently the only updatable field
+ *   is the url, :54-56). No vote-ui form builds op 30 (the reference has
+ *   no committee-update flow) — the serializer ships so the pair is
+ *   complete and proposal-nesting (op 22) can carry it.
+ * - ops 20/21 ids <- .../protocol/operations.hpp:76-77;
+ *   ops 29/30 ids <- :85-86
  * - worker_create order (fee)(owner)(work_begin_date)(work_end_date)
  *   (daily_pay)(name)(url)(initializer)
  *   <- .../protocol/worker.hpp:106-107 (FC_REFLECT); initializer variant
@@ -2233,8 +2258,28 @@ var Tx = (function () {
    * bid_collateral (op 45) serializers. Hand-ported, no import:
    * - serializeAccountUpgradeOp <- #3 bitshares-api.js:2449-2456
    *   + #4 .../protocol/account.hpp:300-301 (FC_REFLECT wire order)
-   * - serializeBidCollateralOp <- #3 bitshares-api.js:3039-3047
-   *   + #4 .../protocol/market.hpp:307-308 (FC_REFLECT wire order)
+ * - serializeBidCollateralOp <- #3 bitshares-api.js:3039-3047
+ *                              + #4 .../protocol/market.hpp:307-308 (FC_REFLECT wire order)
+ * - serializeWitnessCreateOp <- #3 bitshares-api.js:2624-2631
+ *                              + #4 .../protocol/witness.hpp:81 (FC_REFLECT)
+ *                              + BJS lib/serializer/src/operations.js
+ *                              witness_create (field order match, fetched
+ *                              2026-09-29)
+ * - serializeWitnessUpdateOp <- #3 bitshares-api.js:2637-2645
+ *                              + #4 .../protocol/witness.hpp:84 (FC_REFLECT)
+ *                              + BJS witness_update (order match)
+ * - serializeCommitteeMemberCreateOp
+ *                            <- #3 bitshares-api.js:2778-2784
+ *                              + #4 .../protocol/committee_member.hpp:103-104
+ *                              (FC_REFLECT) + BJS committee_member_create
+ *                              (order match)
+ * - serializeCommitteeMemberUpdateOp
+ *                            <- #3 bitshares-api.js:2790-2797
+ *                              + #4 .../protocol/committee_member.hpp:105-106
+ *                              (FC_REFLECT) + BJS committee_member_update
+ *                              (order match)
+ * - ops 20/21/29/30 ids      <- #4 .../protocol/operations.hpp:76-77
+ *                              (20/21), :85-86 (29/30)
    * VARIANT NOTE (task said "op-46 bid_collateral" — off by one): #4
    * operations.hpp:101-102 numbers bid_collateral 45 and execute_bid 46
    * (VIRTUAL, never signed); #3 agrees (op table :3783, dispatch :1587).
@@ -2274,6 +2319,85 @@ var Tx = (function () {
     ]);
   }
 
+  /* Governance-url guard (shared by ops 20/21/29/30): the node's validate()
+   * (witness.cpp:30-41; committee_member.cpp mirrors it) rejects
+   * url.size() >= GRAPHENE_MAX_URL_LENGTH (127, #4 config.hpp:41), so
+   * always-rejected bytes are never built. size() counts BYTES, hence the
+   * TextEncoder length (same rule as serializeWorkerCreateOp name/url).
+   * Empty string is chain-valid (#3's `|| ''` emits the same bytes);
+   * missing/non-string input throws loudly instead of defaulting. */
+  function assertGovUrl(url, opName) {
+    if (typeof url !== "string") {
+      throw new Error(opName + " url must be a string, got: " + JSON.stringify(url));
+    }
+    if (new TextEncoder().encode(url).length >= 127) {
+      throw new Error(opName + " url must be under 127 bytes (GRAPHENE_MAX_URL_LENGTH)");
+    }
+  }
+
+  /* witness_create (op 20) in #4 FC order: fee, witness_account (1.2.x),
+   * url, block_signing_key. NO extensions field exists (witness.hpp:81
+   * lists exactly four fields — no trailing set to write, unlike most
+   * ops; BJS witness_create agrees). Fee payer is the witness account. */
+  function serializeWitnessCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("witness_create op must be an object");
+    assertGovUrl(op.url, "witness_create");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.witness_account),
+      serializeString(op.url),
+      serializePublicKey(op.block_signing_key)
+    ]);
+  }
+
+  /* witness_update (op 21) in #4 FC order: fee, witness (1.6.x),
+   * witness_account (1.2.x), new_url?, new_signing_key?. NO extensions
+   * field (witness.hpp:84). Optionals encode absent <-> 0x00 via
+   * serializeOptional (absent = null/undefined, same convention as the
+   * transfer-memo path); a present empty-string url encodes as present
+   * (chain-valid, mirrors #3). Fee payer is the witness account. */
+  function serializeWitnessUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("witness_update op must be an object");
+    if (op.new_url !== null && op.new_url !== undefined) assertGovUrl(op.new_url, "witness_update");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.witness),
+      serializeObjectId(op.witness_account),
+      serializeOptional(op.new_url === undefined ? null : op.new_url, serializeString),
+      serializeOptional(op.new_signing_key === undefined ? null : op.new_signing_key, serializePublicKey)
+    ]);
+  }
+
+  /* committee_member_create (op 29) in #4 FC order: fee,
+   * committee_member_account (1.2.x), url. NO extensions field
+   * (committee_member.hpp:103-104). Same url rule as witness_create.
+   * Fee payer is the committee member account. */
+  function serializeCommitteeMemberCreateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("committee_member_create op must be an object");
+    assertGovUrl(op.url, "committee_member_create");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.committee_member_account),
+      serializeString(op.url)
+    ]);
+  }
+
+  /* committee_member_update (op 30) in #4 FC order: fee, committee_member
+   * (1.5.x), committee_member_account (1.2.x), new_url?. NO extensions
+   * field (committee_member.hpp:105-106). No vote-ui form builds this op
+   * (the reference has no committee-update flow) — it ships so the pair
+   * is complete and op-22 proposal nesting can carry it. */
+  function serializeCommitteeMemberUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("committee_member_update op must be an object");
+    if (op.new_url !== null && op.new_url !== undefined) assertGovUrl(op.new_url, "committee_member_update");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.committee_member),
+      serializeObjectId(op.committee_member_account),
+      serializeOptional(op.new_url === undefined ? null : op.new_url, serializeString)
+    ]);
+  }
+
   /* Nested-op data dispatch for op-22 recursion: delegates to the SAME
    * per-op functions the outer serializeTransaction path uses, so enclosed
    * bytes can never drift from top-level bytes. Covers every op this file
@@ -2296,6 +2420,8 @@ var Tx = (function () {
     if (opType === 14) return serializeAssetIssueOp(opData);
     if (opType === 15) return serializeAssetReserveOp(opData);
     if (opType === 19) return serializeAssetPublishFeedOp(opData);
+    if (opType === 20) return serializeWitnessCreateOp(opData);
+    if (opType === 21) return serializeWitnessUpdateOp(opData);
     if (opType === 22) return serializeProposalCreateOp(opData);
     if (opType === 23) return serializeProposalUpdateOp(opData);
     if (opType === 24) return serializeProposalDeleteOp(opData);
@@ -2303,6 +2429,8 @@ var Tx = (function () {
     if (opType === 26) return serializeWithdrawPermissionUpdateOp(opData);
     if (opType === 27) return serializeWithdrawPermissionClaimOp(opData);
     if (opType === 28) return serializeWithdrawPermissionDeleteOp(opData);
+    if (opType === 29) return serializeCommitteeMemberCreateOp(opData);
+    if (opType === 30) return serializeCommitteeMemberUpdateOp(opData);
     if (opType === 32) return serializeVestingBalanceCreateOp(opData);
     if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
     if (opType === 34) return serializeWorkerCreateOp(opData);
@@ -2333,7 +2461,7 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19, 22-24, 25-28, 32-34, 37, " +
+    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19-24, 25-28, 29, 30, 32-34, 37, " +
       "45, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
@@ -2366,6 +2494,8 @@ var Tx = (function () {
       else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
       else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
       else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
+      else if (opType === 20) parts.push(serializeWitnessCreateOp(opData));
+      else if (opType === 21) parts.push(serializeWitnessUpdateOp(opData));
       else if (opType === 22) parts.push(serializeProposalCreateOp(opData));
       else if (opType === 23) parts.push(serializeProposalUpdateOp(opData));
       else if (opType === 24) parts.push(serializeProposalDeleteOp(opData));
@@ -2373,6 +2503,8 @@ var Tx = (function () {
       else if (opType === 26) parts.push(serializeWithdrawPermissionUpdateOp(opData));
       else if (opType === 27) parts.push(serializeWithdrawPermissionClaimOp(opData));
       else if (opType === 28) parts.push(serializeWithdrawPermissionDeleteOp(opData));
+      else if (opType === 29) parts.push(serializeCommitteeMemberCreateOp(opData));
+      else if (opType === 30) parts.push(serializeCommitteeMemberUpdateOp(opData));
       else if (opType === 32) parts.push(serializeVestingBalanceCreateOp(opData));
       else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
       else if (opType === 34) parts.push(serializeWorkerCreateOp(opData));
@@ -2421,7 +2553,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19, 22-24, 25-28, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19-24, 25-28, 29, 30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2439,9 +2571,11 @@ var Tx = (function () {
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
       asset_publish_feed: 19,
+      witness_create: 20, witness_update: 21,
       proposal_create: 22, proposal_update: 23, proposal_delete: 24,
       withdraw_permission_create: 25, withdraw_permission_update: 26,
       withdraw_permission_claim: 27, withdraw_permission_delete: 28,
+      committee_member_create: 29, committee_member_update: 30,
       vesting_balance_create: 32, vesting_balance_withdraw: 33,
       worker_create: 34,
       balance_claim: 37,
@@ -2495,6 +2629,11 @@ var Tx = (function () {
       serializeAssetIssueOp: serializeAssetIssueOp,
       serializeAssetReserveOp: serializeAssetReserveOp,
       serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
+      assertGovUrl: assertGovUrl,
+      serializeWitnessCreateOp: serializeWitnessCreateOp,
+      serializeWitnessUpdateOp: serializeWitnessUpdateOp,
+      serializeCommitteeMemberCreateOp: serializeCommitteeMemberCreateOp,
+      serializeCommitteeMemberUpdateOp: serializeCommitteeMemberUpdateOp,
       serializeTimestamp: serializeTimestamp,
       assertUint32: assertUint32,
       serializeAuthority: serializeAuthority,

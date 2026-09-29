@@ -49,17 +49,23 @@
  * - Join-as-witness / Update-witness / Join-committee ENTRY buttons live
  *   below (gov row + inline forms + named-row confirms). The flows are
  *   op-6-flavored: they reuse the vote-publish idioms (Vote.* reads for
- *   prefill, Tx.fee live chain estimate — a pure get_required_fees call
- *   that needs no serializer, Tx.buildTx envelope, fresh-WIF sign gate so
- *   the password is asked ONLY at sign). BROADCAST stays honestly deferred:
- *   witness_create (op 20) / witness_update (op 21) /
- *   committee_member_create (op 29) have NO serializer in tx.js
- *   (serializeOperationData throws "supports ops ..."), and serializers
- *   belong in tx.js — never in a view. Join data (url, block_signing_key)
- *   cannot ride an op-6 new_options either (protocol/account.hpp:39-59 has
- *   no such fields), so the sign step reports the gap inline instead of
- *   sending a malformed op. Field shapes follow #3 bitshares-api.js:2621+
- *   (op 20/21) and :2775+ (op 29), cross-read with #2 WitnessCommittee.jsx.
+ *   prefill, Tx.fee live chain estimate via get_required_fees, Tx.buildTx
+ *   envelope, fresh-WIF sign gate so the password is asked ONLY at sign).
+ *   BROADCAST IS LIVE: witness_create (op 20) / witness_update (op 21) /
+ *   committee_member_create (op 29) / committee_member_update (op 30)
+ *   serialize in tx.js (FC field order per witness.hpp:81/:84 and
+ *   committee_member.hpp:103-106, no extensions field; testnet
+ *   evaluator-reached proof in tooling/prove_witness_update_f1.cjs), so
+ *   the sign step sends for real and proves by re-reading the created
+ *   object (create: object exists; update: url matches). Full inclusion
+ *   needs an LTM payer (witness_evaluator.cpp:35 /
+ *   committee_member_evaluator.cpp:37 assert is_lifetime_member); a basic
+ *   account gets the node's message inline, never a silent failure.
+ *   Join data (url, block_signing_key) rides the gov op itself, never an
+ *   op-6 new_options (protocol/account.hpp:39-59 has no such fields).
+ *   Field shapes follow #3 bitshares-api.js:2621+ (op 20/21) and :2775+
+ *   (op 29), cross-read with #2 WitnessCommittee.jsx and BJS
+ *   operations.js witness_create/witness_update/committee_member_create.
  * - CREATE LOCK is a plain link to #/tickets: amount prefill is NOT trivial
  *   (router currentPath strips query strings and ticket-ui.js parses no
  *   hash params — wiring prefill would touch router/ticket-ui, outside
@@ -914,9 +920,9 @@ var VoteUI = (function () {
           : Promise.resolve({ acct: acct, opData: opData });
         return shaped;
       }).then(function (ctx) {
-        /* Tx.fee is a pure chain get_required_fees call — live even though
-         * tx.js cannot serialize ops 20/21 yet; the node also validates the
-         * account/key shape here, so bad input fails honestly at review. */
+        /* Tx.fee is a pure chain get_required_fees call; the node also
+         * validates the account/key shape here, so bad input fails
+         * honestly at review (before anything is signed). */
         return Tx.fee(opId, ctx.opData, CORE_ASSET).then(function (fee) {
           ctx.opData.fee = { amount: String(fee.amount), asset_id: fee.asset_id || CORE_ASSET };
           return { acct: ctx.acct, opData: ctx.opData, feeRaw: String(fee.amount) };
@@ -1048,11 +1054,6 @@ var VoteUI = (function () {
         showJoinResult(doc, box, spec, null, res);
       }).catch(function (e) {
         if (myGen !== gen) return;
-        if (e && e.joinDeferred) {
-          while (box.firstChild) box.removeChild(box.firstChild);
-          showJoinResult(doc, box, spec, "deferred", null);
-          return;
-        }
         box.removeChild(status);
         showError(doc, box, (e && e.message) ? e.message : String(e || t("vote.join_failed_2", "Join failed")), t("vote.join_failed", "Join failed."));
         backBtn.disabled = false;
@@ -1062,19 +1063,13 @@ var VoteUI = (function () {
 
   /* Join broadcast (vote-publish wiring, other op): envelope via Tx.buildTx,
    * sign with the FRESH wif (never stored), callback/plain fallback, then
-   * prove by re-reading the created object (create: object exists; update:
-   * url matches). The tx.js "supports ops" throw passes through untouched
-   * with joinDeferred=true so the caller renders the honest deferred panel.
+   * prove by re-reading the affected object (create: object exists; update:
+   * url matches). Node rejections (e.g. the LTM-membership assert on ops
+   * 20/29 for basic accounts) surface inline with the node's own message.
    * Returns {blockNum, via, obj} where blockNum is the observed head block. */
   async function sendJoinAndProve(spec, wif, onStep) {
     var unsigned = await Tx.buildTx([[spec.opId, spec.opData]]);
-    var txSigned;
-    try {
-      txSigned = await Tx.sign(unsigned, wif);
-    } catch (e) {
-      e.joinDeferred = /supports ops/.test(String((e && e.message) || e));
-      throw e;
-    }
+    var txSigned = await Tx.sign(unsigned, wif);
     onStep(t("vote.broadcasting", "Broadcasting…"));
     var netId = await Chain.net();
     var callbackId = (Math.random() * 4294967296) >>> 0;
@@ -1105,22 +1100,13 @@ var VoteUI = (function () {
       (PROVE_TIMEOUT_MS / 1000) + "s; check #/voting before retrying (do NOT blindly rebroadcast).");
   }
 
-  /* Join result: observed head block + object id, the node error inline, or
-   * the honest deferred panel (entry/fee/confirm live; serializer pending).
-   * Never blank, never a fabricated txid. Params: doc, box (emptied by the
-   * caller), spec, errText (null | "deferred" | message), res. */
+  /* Join result: observed head block + object id, or the node error inline
+   * (e.g. the LTM-membership message for basic accounts on ops 20/29) —
+   * never blank, never a fabricated txid.
+   * Params: doc, box (emptied by the caller), spec, errText (null |
+   *   message), res. */
   function showJoinResult(doc, box, spec, errText, res) {
-    if (errText === "deferred") {
-      box.appendChild(el(doc, "h2", t("vote.broadcast_deferred", "Broadcast deferred")));
-      var note = el(doc, "p", t("vote.entry_live_fee_and_confirm_above_are_complete", "Entry, live fee, and confirm above are complete, but tx.js has no ") +
-        (spec.kind === "witness"
-          ? (spec.isUpdate ? "witness_update (op 21)" : "witness_create (op 20)")
-          : "committee_member_create (op 29)") +
-        " serializer yet, so this wallet cannot sign it (see the op-coverage matrix A15 caveat). " +
-        "Broadcast lands with the serializer slice — nothing was sent.", "muted");
-      note.setAttribute("aria-live", "polite");
-      box.appendChild(note);
-    } else if (errText) {
+    if (errText) {
       box.appendChild(el(doc, "h2", t("vote.join_failed_2", "Join failed")));
       showError(doc, box, errText, t("vote.join_failed", "Join failed."));
     } else {
