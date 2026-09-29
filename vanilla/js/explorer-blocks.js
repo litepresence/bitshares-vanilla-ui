@@ -254,6 +254,25 @@ var ExplorerBlocks = (function () {
     } catch (e) { return String(stamp || "—"); }
   }
 
+  /* Chain ISO timestamp -> localized full date + time (original Block.jsx
+   * FormattedDate format="full" concept: full date, never the raw ISO on
+   * screen). Returns display text; the caller keeps the raw ISO in the
+   * title. Unparseable stamps fall back to the raw string (never blank).
+   * Plain Intl only — no new i18n keys per punchlist rules. */
+  function fmtFullDate(stamp) {
+    var s = String(stamp || "—");
+    var ms = NaN;
+    try { ms = new Date(s).getTime(); } catch (e) { ms = NaN; }
+    if (!isFinite(ms)) {
+      try { ms = new Date(s + "Z").getTime(); } catch (e2) { ms = NaN; }
+    }
+    if (!isFinite(ms)) return s;
+    try {
+      return new Date(ms).toLocaleString(undefined, { dateStyle: "full", timeStyle: "long" });
+    } catch (e) { /* older ICU without dateStyle/timeStyle: fall through */ }
+    try { return new Date(ms).toLocaleString(); } catch (e2) { return s; }
+  }
+
   /* Re-trigger the live-line bump (CSS keyframe, candy-block pattern):
    * remove → reflow → add, so every new head visibly lands even when heads
    * arrive back-to-back. Never throws (the label still updates without it). */
@@ -464,9 +483,38 @@ var ExplorerBlocks = (function () {
     return sent;
   }
 
+  /* Amount object {amount, asset_id} -> human span (raw meanwhile, raw in
+   * title via amtSpan). Nonconforming shapes yield a muted dash (never
+   * blank, never throws). */
+  function amtObj(doc, o, myGen) {
+    if (o && typeof o === "object" && typeof o.asset_id === "string") {
+      return amtSpan(doc, String(o.amount), o.asset_id, myGen);
+    }
+    return el(doc, "span", "—", "muted");
+  }
+
+  /* Proposed-op index -> name via explorer.js OP_NAMES when present (that
+   * module owns the 78-entry table — this file must not duplicate it).
+   * Falls back to "op N" when OP_NAMES is absent (never blank, never
+   * throws). */
+  function opName(idx) {
+    var i = (typeof idx === "number") ? idx : parseInt(idx, 10);
+    try {
+      if (typeof Explorer !== "undefined" && Explorer && Array.isArray(Explorer.OP_NAMES) &&
+          typeof Explorer.OP_NAMES[i] === "string" && Explorer.OP_NAMES[i]) {
+        return Explorer.OP_NAMES[i];
+      }
+    } catch (e) { /* fallback below */ }
+    return "op " + (isFinite(i) ? i : "?");
+  }
+
   /* One activity sentence (account + action + amounts, original Operation
    * wording: "placed order to buy/sell <amount> at <price> <pair>",
-   * "cancelled order #<n>"). Static glue stays plain English (batch-2b:
+   * "cancelled order #<n>"). Top-10 op types by chain frequency carry full
+   * sentences here (0 transfer, 1/2 limit orders, 3 margin update, 4 fill,
+   * 5 account create, 6 account update, 14 asset issue, 19 feed publish,
+   * 22 proposal create — names via op.type_name / opName, amounts via
+   * amtSpan/Format). Static glue stays plain English (batch-2b:
    * dynamic sentences keep code structure; only the pill labels above carry
    * i18n keys). Accounts resolve to name links via the shared accountLink
    * (raw id meanwhile); amounts resolve human via amtSpan/orderSentence
@@ -494,6 +542,63 @@ var ExplorerBlocks = (function () {
       if (idx === 2) {
         sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
         sent.appendChild(el(doc, "span", " cancelled order #" + orderNum(f.order)));
+        return sent;
+      }
+      if (idx === 3) {
+        sent.appendChild(accountLink(doc, String(f.funding_account || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " updated margin position"));
+        if (f.delta_collateral && typeof f.delta_collateral === "object") {
+          sent.appendChild(el(doc, "span", " (+collateral "));
+          sent.appendChild(amtObj(doc, f.delta_collateral, myGen));
+          sent.appendChild(el(doc, "span", ")"));
+        }
+        if (f.delta_debt && typeof f.delta_debt === "object") {
+          sent.appendChild(el(doc, "span", " (+debt "));
+          sent.appendChild(amtObj(doc, f.delta_debt, myGen));
+          sent.appendChild(el(doc, "span", ")"));
+        }
+        return sent;
+      }
+      if (idx === 4) {
+        sent.appendChild(accountLink(doc, String(f.account_id || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " filled order: "));
+        sent.appendChild(amtObj(doc, f.pays, myGen));
+        sent.appendChild(el(doc, "span", " → "));
+        sent.appendChild(amtObj(doc, f.receives, myGen));
+        return sent;
+      }
+      if (idx === 5) {
+        sent.appendChild(accountLink(doc, String(f.registrar || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " created account " + String(f.name || "—")));
+        return sent;
+      }
+      if (idx === 6) {
+        sent.appendChild(accountLink(doc, String(f.account || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " updated account"));
+        return sent;
+      }
+      if (idx === 14) {
+        sent.appendChild(accountLink(doc, String(f.issuer || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " issued "));
+        sent.appendChild(amtObj(doc, f.asset_to_issue, myGen));
+        sent.appendChild(el(doc, "span", " to "));
+        sent.appendChild(accountLink(doc, String(f.issue_to_account || "—"), myGen));
+        return sent;
+      }
+      if (idx === 19) {
+        sent.appendChild(accountLink(doc, String(f.publisher || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " published feed for " + String(f.asset_id || "—")));
+        return sent;
+      }
+      if (idx === 22) {
+        sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
+        var pops = Array.isArray(f.proposed_ops) ? f.proposed_ops : [];
+        var names = pops.map(function (p) {
+          var pi = Array.isArray(p) ? p[0] : (p && (p.type !== undefined ? p.type : p.op));
+          return opName(pi).replace(/_/g, " ");
+        }).join(", ");
+        sent.appendChild(el(doc, "span", " proposed " + pops.length + " operation" +
+          (pops.length === 1 ? "" : "s") + (names ? " (" + names + ")" : "")));
         return sent;
       }
       var who = opAccount(f);
@@ -946,6 +1051,38 @@ var ExplorerBlocks = (function () {
       return;
     }
     wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+    /* Block-jump input (original Block.jsx toggleInput/_onKeyDown concept):
+     * height -> #/block/N. Plain literals only (no new i18n keys). Invalid
+     * input flags aria-invalid instead of navigating anywhere. Built by a
+     * function because the success/error paths below clear the wrap and must
+     * re-add it (otherwise the pre-load row is wiped on paint). */
+    function buildJump() {
+      var jumpRow = el(doc, "div", null, "xplore-jump");
+      jumpRow.appendChild(el(doc, "span", "Go to block: "));
+      var jumpInput = doc.createElement("input");
+      jumpInput.type = "number";
+      jumpInput.min = "1";
+      jumpInput.step = "1";
+      jumpInput.setAttribute("placeholder", "height");
+      jumpInput.setAttribute("aria-label", "Block height");
+      touchable(jumpInput);
+      var jumpBtn = touchable(el(doc, "button", "Go"));
+      jumpBtn.type = "button";
+      jumpRow.appendChild(jumpInput);
+      jumpRow.appendChild(jumpBtn);
+      jumpBtn.addEventListener("click", function doJump() {
+        var v = parseInt(jumpInput.value, 10);
+        if (v >= 1) {
+          try { location.hash = "#/block/" + v; return; } catch (e) { /* flag below */ }
+        }
+        jumpInput.setAttribute("aria-invalid", "true");
+      });
+      jumpInput.addEventListener("keydown", function (e) {
+        if (e && e.key === "Enter") jumpBtn.click();
+      });
+      return jumpRow;
+    }
+    wrap.appendChild(buildJump());
     showStatus(doc, wrap, t("explorer.loading_block", "Loading block…"));
     Promise.all([Explorer.block(h), Explorer.head().catch(function () { return null; })])
       .then(function (pair) {
@@ -953,6 +1090,29 @@ var ExplorerBlocks = (function () {
         var b = pair[0], head = pair[1];
         while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
         wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + b.height));
+        wrap.appendChild(buildJump());
+        /* Prev/next arrows (original Block.jsx _previousBlock/_nextBlock
+         * concept: prev = height - 1, next = height + 1 clamped at head).
+         * The height-1 link is the prev-minimum the punchlist requires (a
+         * parent-hash row would also satisfy it; the backend strips that
+         * field, so height navigation stands). A next past head renders an
+         * honest muted note instead of a dead link. Plain literals only. */
+        var nav = el(doc, "div", null, "xplore-blocknav");
+        if (b.height > 1) {
+          nav.appendChild(anchor(doc, "← Prev block", "#/block/" + (b.height - 1)));
+        } else {
+          nav.appendChild(el(doc, "span", "← Genesis (first block)", "muted"));
+        }
+        nav.appendChild(el(doc, "span", " "));
+        var headNum = (head && typeof head.head_block_number === "number") ? head.head_block_number : null;
+        if (headNum !== null && b.height >= headNum) {
+          nav.appendChild(el(doc, "span", "Next → (no newer block yet)", "muted"));
+        } else {
+          var nx = anchor(doc, "Next →", "#/block/" + (b.height + 1));
+          if (headNum !== null) nx.title = "Head #" + headNum;
+          nav.appendChild(nx);
+        }
+        wrap.appendChild(nav);
         var dl = el(doc, "dl", null, "xplore-fields");
         function row(t, node) {
           dl.appendChild(el(doc, "dt", t));
@@ -961,15 +1121,35 @@ var ExplorerBlocks = (function () {
           else if (node) dd.appendChild(node);
           dl.appendChild(dd);
         }
-        row(t("explorer.time_row", "Time"), b.timestamp || "—");
+        /* Localized full date (original FormattedDate format="full"
+         * concept): human string on screen, raw ISO kept in the title. */
+        var timeSpan = el(doc, "span", fmtFullDate(b.timestamp || "—"));
+        try { timeSpan.title = String(b.timestamp || ""); } catch (e) { /* text stands */ }
+        row(t("explorer.time_row", "Time"), timeSpan);
         row(t("explorer.witness_row", "Witness"), witnessCell(doc, b.witness_account_id, myGen));
         row(t("explorer.txs_row", "Transactions"), String(b.tx_count));
         if (head && typeof head.last_irreversible_block_num === "number") {
           row(t("explorer.irreversible_row", "Irreversible"), b.height <= head.last_irreversible_block_num ? t("explorer.yes", "yes") : t("explorer.no_recent", "no (recent)"));
         }
         wrap.appendChild(dl);
+        /* Return-to-top link (original Block.jsx scrollToTop concept): plain
+         * button, smooth scroll with instant fallback. Plain literal only. */
+        var topBtn = touchable(el(doc, "button", "Return to top"));
+        topBtn.type = "button";
+        topBtn.addEventListener("click", function () {
+          try {
+            if (typeof window !== "undefined" && window.scrollTo) {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else if (doc.documentElement) {
+              doc.documentElement.scrollTop = 0;
+            }
+          } catch (e) {
+            try { window.scrollTo(0, 0); } catch (e2) { /* stood */ }
+          }
+        });
         if (b.transactions.length === 0) {
           wrap.appendChild(el(doc, "p", t("explorer.no_txs", "No transactions in this block."), "muted"));
+          wrap.appendChild(topBtn);
           return;
         }
         var ctx = { gen: myGen, root: root, tab: "blocks" };
@@ -983,11 +1163,13 @@ var ExplorerBlocks = (function () {
           line.appendChild(el(doc, "span", chips ? " — " + chips : "", "muted"));
           wrap.appendChild(line);
         });
+        wrap.appendChild(topBtn);
         void ctx;
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
         wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+        wrap.appendChild(buildJump());
         showError(doc, wrap, e, t("explorer.unknown_block", "Unknown block."));
       });
   }

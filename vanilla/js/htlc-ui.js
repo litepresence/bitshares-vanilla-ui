@@ -269,32 +269,74 @@ var HtlcUI = (function () {
       box.appendChild(el(doc, "h1", t("htlc.list_title", "Hashed Timelock Contracts")));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       box.appendChild(el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
-      box.appendChild(el(doc, "h2", "Sent (" + found.data.sent.length + ")"));
-      box.appendChild(htlcTable(doc, found.data.sent, "sent"));
-      box.appendChild(el(doc, "h2", "Received (" + found.data.received.length + ")"));
-      box.appendChild(htlcTable(doc, found.data.received, "received"));
+      box.appendChild(el(doc, "h2", "Sent (" + found.data.sent.length + ") · Received (" + found.data.received.length + ")"));
+      box.appendChild(htlcTable(doc, found.data.sent, found.data.received));
       box.appendChild(el(doc, "h2", t("htlc.new_title", "New HTLC")));
       createBox(doc, box, found.me, myGen);
     }).catch(function (e) {
       if (myGen !== gen) return; routeFail(root, "Hashed Timelock Contracts", e, t("htlc.load_failed", "Could not load contracts."), function () { renderHtlc(root); }); });
   }
-  function htlcTable(doc, rows, kind) { /* ALGO NAME + short hex cells; rows link to detail */
-    if (!rows.length) return el(doc, "p", kind === "sent" ? t("htlc.empty_sent", "No HTLCs sent from your accounts.") : t("htlc.empty_received", "No HTLCs addressed to you."), "muted");
+  /* Unified contracts table (MED choice documented): a single table with a
+   * Direction column ("Sent"/"Received") instead of two separate tables — one
+   * filter input covers both sides, and the Sent/Received counts stay in the
+   * h2 above so nothing is lost. FROM/TO columns carry the raw 1.2.x ids
+   * (honest and filterable; names resolve on the detail page). The filter
+   * matches id, from, to, and hash hex case-insensitively; an empty result is
+   * an honest note, never blank. Plain literals only for new strings (no new
+   * i18n keys per punchlist rules); pre-existing t() keys below are reused. */
+  function htlcTable(doc, sent, received) {
+    var box = el(doc, "div", null, "htlc-all");
+    var filter = doc.createElement("input");
+    filter.type = "search";
+    filter.setAttribute("placeholder", "Filter by id, account, or hash…");
+    filter.setAttribute("aria-label", "Filter contracts");
+    touchable(filter);
+    box.appendChild(filter);
     var table = doc.createElement("table"); table.className = "node-table";
-    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"),  t("confirm.amount", "Amount"), t("htlc.hashlock_col", "Hash lock"), t("proposal.expires", "Expires"), ""]));
+    table.appendChild(tableHead(doc, [t("htlc.contract_col", "Contract"), "Direction", "From", "To",
+      t("confirm.amount", "Amount"), t("htlc.hashlock_col", "Hash lock"), t("proposal.expires", "Expires"), ""]));
     var tbody = doc.createElement("tbody");
-    rows.forEach(function (r) {
-      var tr = doc.createElement("tr"), a = amtText(r.amount_raw, r.asset_id, r.precision), exp, link, td, ac, hc;
-      ac = el(doc, "td", a.text); ac.title = "raw " + a.raw;
-      var hc = el(doc, "td", r.algo + " — " + shortHash(r.hash_hex)); hc.title = r.hash_hex;
-      try { exp = Htlc.formatDateTime(r.expiration_iso); } catch (e) { exp = String(r.expiration_iso || "unknown"); }
-      link = el(doc, "a", t("credit.open", "Open")); link.setAttribute("href", "#/htlc/" + r.id);
-      td = doc.createElement("td"); td.appendChild(link);
-      tr.appendChild(el(doc, "td", r.id)); tr.appendChild(ac); tr.appendChild(hc);
-      tr.appendChild(el(doc, "td", r.expired ? exp + " (expired)" : exp)); tr.appendChild(td);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody); return table;
+    table.appendChild(tbody);
+    box.appendChild(table);
+    var note = el(doc, "p", "", "muted");
+    note.setAttribute("aria-live", "polite");
+    box.appendChild(note);
+    var all = (Array.isArray(sent) ? sent : []).map(function (r) { return { r: r, dir: "Sent" }; })
+      .concat((Array.isArray(received) ? received : []).map(function (r) { return { r: r, dir: "Received" }; }));
+    function paint(q) {
+      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      if (!all.length) {
+        note.textContent = "No contracts.";
+        return;
+      }
+      var n = 0;
+      all.forEach(function (item) {
+        var r = item.r;
+        var hay = String(r.id || "") + " " + String(r.from_id || "") + " " +
+          String(r.to_id || "") + " " + String(r.hash_hex || "");
+        if (q && hay.toLowerCase().indexOf(q) === -1) return;
+        n++;
+        var tr = doc.createElement("tr"), a = amtText(r.amount_raw, r.asset_id, r.precision), exp, link, td;
+        var dirTd = el(doc, "td", item.dir);
+        var fromTd = el(doc, "td", String(r.from_id || "—"));
+        fromTd.title = String(r.from_id || "");
+        var toTd = el(doc, "td", String(r.to_id || "—"));
+        toTd.title = String(r.to_id || "");
+        var ac = el(doc, "td", a.text); ac.title = "raw " + a.raw;
+        var hc = el(doc, "td", r.algo + " — " + shortHash(r.hash_hex)); hc.title = r.hash_hex;
+        try { exp = Htlc.formatDateTime(r.expiration_iso); } catch (e) { exp = String(r.expiration_iso || "unknown"); }
+        link = el(doc, "a", t("credit.open", "Open")); link.setAttribute("href", "#/htlc/" + r.id);
+        td = doc.createElement("td"); td.appendChild(link);
+        tr.appendChild(el(doc, "td", r.id)); tr.appendChild(dirTd);
+        tr.appendChild(fromTd); tr.appendChild(toTd); tr.appendChild(ac); tr.appendChild(hc);
+        tr.appendChild(el(doc, "td", r.expired ? exp + " (expired)" : exp)); tr.appendChild(td);
+        tbody.appendChild(tr);
+      });
+      note.textContent = q ? ("Showing " + n + " of " + all.length + " contracts.") : "";
+    }
+    filter.addEventListener("input", function () { paint(filter.value.trim().toLowerCase()); });
+    paint("");
+    return box;
   }
   function createBox(doc, box, me, myGen) { /* create form; fee RE-READ at review; no preimage echo */
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
