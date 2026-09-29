@@ -57,15 +57,49 @@
  * until from+to+amount+asset are present and syntactically valid with
  * from != to (case-insensitive; id-level equality re-checks at review).
  * Every disabled state lists its reasons inline — honest, never silent.
- * DEFERRED (same punchlist page): Send/Propose toggle (SendModal.jsx:551-564
- * concept — propose-as-another-account lands with the proposal slice) and
- * the known-scammer recipient flag (AccountSelector.jsx:592,709 concept —
- * lands with the auth/contacts slice). Recorded here so neither is lost.
- * Pending-i18n plain strings (3 — the next locales batch moves them to
+ * Send/Propose toggle (SendModal.jsx:551-564 concept): Send vs Propose
+ *   buttons above Review; Propose adds proposer + expiration + review-period
+ *   inputs, wraps the op-0 transfer in op-22 via Proposal.buildCreate (the
+ *   barter-ui.js:269-270 nesting path — {op: [0, opData]} — never reinvented),
+ *   quotes the WRAPPER fee live (get_required_fees on op-22, tx-send.js
+ *   nested-shape unwrap), confirms with named rows (proposer + inner op),
+ *   signs at Sign & Send only, broadcasts via Proposal.sendAndProve with a
+ *   proposalsFor + get_objects re-read (proposal id observed). Locked preview
+ *   works (proposer defaults 1.2.0 + notice). Propose-as-another-account is
+ *   INCLUDED: unlocked requires proposer == wallet (fee-payer signs), From
+ *   may differ (inner authorizes later).
+ *   CHAIN TRUTH (#4 wins): op-22 fields <- proposal.hpp:70-82
+ *   (fee_paying_account = proposer, proposed_ops = vector<op_wrapper>,
+ *   review_period_seconds optional); serializer Tx._ser.
+ *   serializeProposalCreateOp (tx.js:1983, dispatch :2425/:2499, recursion
+ *   through serializeOperationData — nested op-0 bytes identical to top-level);
+ *   builder Proposal.buildCreate (proposal.js:104-111); fee Proposal.fee ->
+ *   Tx.fee (tx-send.js:48-59); prove Proposal.proposalsFor (get_proposed_
+ *   transactions) + Proposal.proposal (get_objects).
+ * DEFERRED (same punchlist page): the known-scammer recipient flag
+ * (AccountSelector.jsx:592,709 concept — lands with the auth/contacts
+ * slice). Recorded here so it is not lost.
+ * Pending-i18n plain strings (the next locales batch moves them to
  * transfer.* with matching defaults; check_i18n scans t() calls only, so
- * it stays green meanwhile): "Sender is required.",
+ * it stays green meanwhile — NO new t() calls were added for propose, all
+ * new labels below are literals): "Sender is required.",
  * "Sender and recipient must be different.",
- * "Confirm settles the fee in " + SYM + ".".
+ * "Confirm settles the fee in " + SYM + ".", "Send", "Propose",
+ * "Proposer is required.", "Proposal expiration is required.",
+ * "Proposal expiration is invalid.",
+ * "Review period must be a non-negative integer.",
+ * "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself.",
+ * "Proposal fee is quoted live in the core asset at review.",
+ * "Review proposal", "Proposal backend missing: js/proposal.js failed to load.",
+ * "Proposer must match the unlocked wallet account (fee-payer signs)" (+ ids),
+ * "Proposal preview (locked)", "Proposer", "Expiration", "Review period",
+ * "none", "Enclosed op: transfer (op 0) — executes only after approvals.",
+ * "Fee (live)", "Confirm proposal (op 22)", "Encrypted", "Plain: " + text,
+ * "(none)", "Recipient " + name + " has no memo key; clear the memo to continue.",
+ * "Proposal sent", "Proposal " + id + " observed at head block #…",
+ * amount + symbol + " → " + name + " enclosed; fee …", "View proposals",
+ * "Unlocked — proposal rebuilt with you" (+ name + "as proposer"),
+ * "Could not build the proposal.".
  * Tx.fee supports any fee asset; the node answers the equivalent fee.
  * Tx.broadcast returns {blockNum, trxInBlock, via} — NO txid (history rows
  * carry none, see tx.js pollHistoryForTransfer). The result screen shows
@@ -388,6 +422,56 @@ var TransferUI = (function () {
     feeQuote.setAttribute("aria-live", "polite");
     wrap.appendChild(feeQuote);
 
+    /* Send/Propose toggle (SendModal.jsx:551-564 concept — EqualWidthContainer
+     * with Send vs Propose, primary/ghost by flag). Plain labels (pending-i18n,
+     * see header); active button is bold + aria-pressed, both stay clickable
+     * and keyboard-focusable. Propose reveals proposer + expiration +
+     * review-period below; Review re-labels accordingly. */
+    var mode = (state && state.mode === "propose") ? "propose" : "send";
+    var modeRow = el(doc, "div", null, "xfer-field xfer-mode");
+    var sendModeBtn = touchable(el(doc, "button", "Send"));
+    sendModeBtn.type = "button";
+    sendModeBtn.id = "xfer-mode-send";
+    var proposeModeBtn = touchable(el(doc, "button", "Propose"));
+    proposeModeBtn.type = "button";
+    proposeModeBtn.id = "xfer-mode-propose";
+    modeRow.appendChild(sendModeBtn);
+    modeRow.appendChild(proposeModeBtn);
+    wrap.appendChild(modeRow);
+
+    /* Default proposal expiration: now + 24h as datetime-local. Date only. */
+    function defaultExpirationLocal() {
+      var dt = new Date(Date.now() + 86400000);
+      function p2(n) { return (n < 10 ? "0" : "") + n; }
+      return dt.getFullYear() + "-" + p2(dt.getMonth() + 1) + "-" + p2(dt.getDate()) +
+        "T" + p2(dt.getHours()) + ":" + p2(dt.getMinutes());
+    }
+
+    /* Proposer (fee-payer) defaults to 1.2.0 while locked (public viewing
+     * object) else the wallet sender; expiry defaults +24h; review blank. */
+    var proposerF = fieldRow(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)"), {
+      id: "xfer-proposer",
+      value: (state && state.proposer) || (locked ? "1.2.0" : (state.from || from.name)),
+      placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off"
+    });
+    var expiryF = fieldRow(doc, t("barter.proposal_expiration", "Proposal expiration"), {
+      id: "xfer-expiry", type: "datetime-local",
+      value: (state && state.expiration) || defaultExpirationLocal()
+    });
+    var reviewPeriodF = fieldRow(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)"), {
+      id: "xfer-review-period",
+      value: (state && state.reviewPeriod) || "",
+      placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric", autocomplete: "off"
+    });
+    wrap.appendChild(proposerF.row);
+    wrap.appendChild(expiryF.row);
+    wrap.appendChild(reviewPeriodF.row);
+    var proposeNotice = el(doc, "p",
+      "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself. Proposal fee is quoted live in the core asset at review.", "muted");
+    wrap.appendChild(proposeNotice);
+
+    /* Toggle refresh: button emphasis + propose-field visibility + Review
+     * label. Never throws; gating owns the disabled state. */
     var reviewBtn = touchable(el(doc, "button", t("transfer.review", "Review transfer")));
     reviewBtn.id = "xfer-review";
     reviewBtn.type = "button";
@@ -400,6 +484,49 @@ var TransferUI = (function () {
     wrap.appendChild(gateBox);
     var previewBox = el(doc, "div", null, "xfer-out");
     wrap.appendChild(previewBox);
+
+    /* Toggle refresh: button emphasis (bold + aria-pressed, SendModal
+     * primary/ghost concept) + propose-field visibility + Review label.
+     * Propose hides the op-0 fee row: inner op fees are informational on
+     * op-22 (the WRAPPER fee is quoted live at review in the core asset),
+     * so offering an op-0 fee asset there would promise what signing
+     * cannot settle. Never throws; gating owns the disabled state. */
+    function refreshMode() {
+      var isPropose = (mode === "propose");
+      sendModeBtn.setAttribute("aria-pressed", isPropose ? "false" : "true");
+      proposeModeBtn.setAttribute("aria-pressed", isPropose ? "true" : "false");
+      sendModeBtn.style.fontWeight = isPropose ? "normal" : "bold";
+      proposeModeBtn.style.fontWeight = isPropose ? "bold" : "normal";
+      proposerF.row.style.display = isPropose ? "" : "none";
+      expiryF.row.style.display = isPropose ? "" : "none";
+      reviewPeriodF.row.style.display = isPropose ? "" : "none";
+      proposeNotice.style.display = isPropose ? "" : "none";
+      feeRow.style.display = isPropose ? "none" : "";
+      feeQuote.style.display = isPropose ? "none" : "";
+      if (isPropose) {
+        while (feeQuote.firstChild) feeQuote.removeChild(feeQuote.firstChild);
+      }
+      if (isPropose) reviewBtn.textContent = "Review proposal";
+      else reviewBtn.textContent = t("transfer.review", "Review transfer");
+      updateGate();
+    }
+
+    sendModeBtn.addEventListener("click", function () {
+      if (mode === "send") return;
+      mode = "send";
+      while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      refreshMode();
+    });
+    proposeModeBtn.addEventListener("click", function () {
+      if (mode === "propose") return;
+      mode = "propose";
+      while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      refreshMode();
+    });
+    proposerF.input.addEventListener("input", updateGate);
+    expiryF.input.addEventListener("input", updateGate);
+    expiryF.input.addEventListener("change", updateGate);
+    reviewPeriodF.input.addEventListener("input", updateGate);
 
     /* Sender balances cache (unlocked only) in Account.balances shape,
      * non-zero raw amounts only. bySym maps uppercased symbol to entry.
@@ -582,6 +709,23 @@ var TransferUI = (function () {
       if (fromV && toV && fromV.toLowerCase() === toV.toLowerCase()) {
         reasons.push("Sender and recipient must be different.");
       }
+      /* Propose mode adds proposer + expiry + review-period gating. The
+       * expiry parses as datetime-local (16 chars, needs ":00") or full
+       * ISO; the review period is blank (= none) or a u32 digit string. */
+      if (mode === "propose") {
+        var propV = proposerF.input.value.trim();
+        var expV = expiryF.input.value.trim();
+        var revV = reviewPeriodF.input.value.trim();
+        if (!propV) reasons.push("Proposer is required.");
+        if (!expV) {
+          reasons.push("Proposal expiration is required.");
+        } else if (isNaN(Date.parse(expV.length === 16 ? expV + ":00" : expV))) {
+          reasons.push("Proposal expiration is invalid.");
+        }
+        if (revV !== "" && !/^\d+$/.test(revV)) {
+          reasons.push("Review period must be a non-negative integer.");
+        }
+      }
       while (gateBox.firstChild) gateBox.removeChild(gateBox.firstChild);
       for (var i = 0; i < reasons.length; i++) {
         gateBox.appendChild(el(doc, "div", reasons[i], "xfer-gate-reason"));
@@ -681,7 +825,7 @@ var TransferUI = (function () {
     bindAssetEvents();
     refreshFeeOpts();
     refreshAvail();
-    updateGate();
+    refreshMode();
     if (!locked) loadBalancesForSender();
 
     reviewBtn.addEventListener("click", function () {
@@ -690,6 +834,32 @@ var TransferUI = (function () {
       setFieldError(assetF, "");
       setFieldError(amountF, "");
       while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      /* Propose mode never touches the op-0 confirm file: the transfer
+       * becomes the single enclosed op of an op-22 proposal (From may
+       * differ from the wallet — only the proposer must sign now). */
+      if (mode === "propose") {
+        setFieldError(proposerF, "");
+        setFieldError(expiryF, "");
+        setFieldError(reviewPeriodF, "");
+        var snap = {
+          from: fromF.input.value,
+          to: toF.input.value,
+          asset: assetF.input.value,
+          amount: amountF.input.value,
+          memo: memoF.input.value,
+          encrypted: encBox.checked,
+          feeAsset: String(feeSel.value || feeSym),
+          proposer: proposerF.input.value,
+          expiration: expiryF.input.value,
+          reviewPeriod: reviewPeriodF.input.value
+        };
+        if (typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked()) {
+          proposeReviewUnlocked(doc, wrap, root, from, snap, reviewBtn);
+        } else {
+          lockedProposePreview(doc, previewBox, root, snap, reviewBtn);
+        }
+        return;
+      }
       if (typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked()) {
         reviewBtn.disabled = true;
         var status = showStatus(doc, wrap, t("transfer.checking", "Checking recipient, asset, and fee…"));
@@ -724,6 +894,10 @@ var TransferUI = (function () {
               memo: ctx.memoText,
               encrypted: ctx.memoKind !== "plain",
               feeAsset: feeSym,
+              mode: mode,
+              proposer: proposerF.input.value,
+              expiration: expiryF.input.value,
+              reviewPeriod: reviewPeriodF.input.value,
               error: null
             });
           });
@@ -750,6 +924,10 @@ var TransferUI = (function () {
             memo: memoF.input.value,
             encrypted: encBox.checked,
             feeAsset: String(feeSel.value || feeSym),
+            mode: mode,
+            proposer: proposerF.input.value,
+            expiration: expiryF.input.value,
+            reviewPeriod: reviewPeriodF.input.value,
             error: msg
           });
         });
@@ -762,7 +940,11 @@ var TransferUI = (function () {
           amount: amountF.input.value,
           memo: memoF.input.value,
           encrypted: encBox.checked,
-          feeAsset: feeSym
+          feeAsset: feeSym,
+          mode: mode,
+          proposer: proposerF.input.value,
+          expiration: expiryF.input.value,
+          reviewPeriod: reviewPeriodF.input.value
         }, reviewBtn);
       }
     });
@@ -931,7 +1113,9 @@ var TransferUI = (function () {
                 from: P.fromAcc.name, to: ctx.to.name, asset: ctx.asset.symbol,
                 amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
                 memo: ctx.memoText, encrypted: ctx.memoKind !== "plain",
-                feeAsset: P.feeSym, error: null
+                feeAsset: P.feeSym, mode: (vals.mode || "send"),
+                proposer: vals.proposer, expiration: vals.expiration,
+                reviewPeriod: vals.reviewPeriod, error: null
               });
             });
           })
@@ -944,6 +1128,397 @@ var TransferUI = (function () {
     }).catch(function (e) {
       while (box.firstChild) box.removeChild(box.firstChild);
       showError(doc, box, (e && e.message) ? e.message : String(e || "Could not prepare the transfer."),
+        t("transfer.prepare_failed", "Could not prepare the transfer."));
+      done();
+    });
+  }
+
+  /* datetime-local (16 chars, no seconds) or full ISO -> chain ISO with
+   * seconds. Throws plain "required"/"invalid" (gating shows them first,
+   * so a throw here means a race, never a surprise). */
+  function normaliseExpiration(v) {
+    var s = String(v || "").trim();
+    if (!s) throw new Error("Proposal expiration is required.");
+    var iso = (s.length === 16) ? s + ":00" : s;
+    if (isNaN(Date.parse(iso))) throw new Error("Proposal expiration is invalid.");
+    return iso;
+  }
+
+  /* Blank (= none) or a non-negative integer. Returns null or the number. */
+  function parseReviewPeriod(v) {
+    var s = String(v === undefined || v === null ? "" : v).trim();
+    if (s === "") return null;
+    if (!/^\d+$/.test(s)) throw new Error("Review period must be a non-negative integer.");
+    return parseInt(s, 10);
+  }
+
+  /* Resolve a propose leg (the enclosed op-0) from a form snapshot. Same
+   * node calls + wire shapes as the locked send preview (plain-memo hex
+   * path, encrypted via wallet keys when unlocked, locked-encrypted memos
+   * excluded from the envelope with a hint row). Returns the human fields
+   * plus opData for the {op: [0, opData]} nesting (the barter-ui.js
+   * proposeBarter path — never reinvented). Amounts stay integer strings. */
+  async function resolveProposeLeg(snap, isLocked) {
+    if (!snap.to || !String(snap.to).trim()) {
+      throw new Error(t("transfer.recipient_required", "Recipient is required."));
+    }
+    var fromAcc = await Account.resolve(String(snap.from || "").trim() || "1.2.0");
+    var to = await Account.resolve(String(snap.to).trim());
+    if (fromAcc.id === to.id) throw new Error("Sender and recipient must be different.");
+    var asset = await lookupAssetLocal(snap.asset);
+    var amountInt;
+    try {
+      amountInt = Format.parseAmount(snap.amount, asset.precision);
+    } catch (e) {
+      throw new Error(e && e.message ? e.message : "bad amount");
+    }
+    if (!/[1-9]/.test(amountInt)) {
+      throw new Error(t("transfer.amount_positive", "Amount must be greater than zero."));
+    }
+    var memoText = String(snap.memo || ""), memoObj = null, memoKind = "none", lockedEnc = false;
+    if (memoText) {
+      var toFull = await fullAccountLocal(to.id);
+      var toMemoKey = toFull && toFull.options ? toFull.options.memo_key : null;
+      if (!toMemoKey) throw new Error("Recipient " + to.name + " has no memo key; clear the memo to continue.");
+      if (snap.encrypted) {
+        if (isLocked) {
+          lockedEnc = true;
+          memoKind = "locked-encrypted";
+        } else {
+          if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) throw new Error("wallet-locked");
+          memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, toMemoKey);
+          memoKind = "encrypted";
+        }
+      } else {
+        var fromPub = "";
+        if (!isLocked && Wallet.keys && Wallet.keys.memo && Wallet.keys.memo.pub) {
+          fromPub = Wallet.keys.memo.pub;
+        }
+        memoObj = { from: fromPub, to: toMemoKey, nonce: "0", message: utf8HexLocal(memoText) };
+        memoKind = "plain";
+      }
+    }
+    var unsigned0 = await Tx.buildTransfer({
+      fromId: fromAcc.id, toId: to.id, amountInt: amountInt, assetId: asset.id, memoObj: memoObj
+    });
+    return { fromAcc: fromAcc, to: to, asset: asset, amountInt: amountInt,
+      memoText: memoText, memoKind: memoKind, lockedEnc: lockedEnc,
+      encrypted: !!snap.encrypted, opData: unsigned0.operations[0][1] };
+  }
+
+  /* Wrapper fee -> human text. Prefers Asset.describe (the barter feeText
+   * pattern) with a Chain get_assets fallback; raw + id when both fail —
+   * never a wrong number. Returns {text, sym}. */
+  async function feeHumanFor(fee) {
+    var id = String(fee.asset_id), raw = String(fee.amount);
+    try {
+      if (typeof Asset !== "undefined" && Asset && typeof Asset.describe === "function") {
+        var d = await Asset.describe(id);
+        return { text: Format.formatAmount(raw, d.precision) + " " + d.symbol, sym: d.symbol };
+      }
+    } catch (e) { /* fallback below */ }
+    try {
+      var dbId = await Chain.db();
+      var rows = await Chain.call(dbId, "get_assets", [[id]]);
+      if (rows && rows[0] && typeof rows[0].precision === "number") {
+        return { text: Format.formatAmount(raw, rows[0].precision) + " " + rows[0].symbol, sym: rows[0].symbol };
+      }
+    } catch (e2) { /* raw fallback stands */ }
+    return { text: raw + " (" + id + ")", sym: id };
+  }
+
+  /* Propose confirm: named rows (proposer + enclosed transfer + live
+   * WRAPPER fee), raw op-22 JSON, Back + Sign & Send. Keys must already be
+   * in memory here (the locked path unlocks first in lockedProposePreview,
+   * so the password is asked only at signing, never to view). Broadcasts
+   * via Proposal.sendAndProve with a proposalsFor + get_objects re-read
+   * proof (the new proposal id observed on chain — the barter
+   * confirmPropose pattern). built = {proposer, leg, pair, before, snap}. */
+  function showProposeConfirm(doc, wrap, root, built, fh, onBack) {
+    wrap.appendChild(el(doc, "h1", "Confirm proposal (op 22)"));
+    var list = el(doc, "dl", null, "xfer-confirm");
+    function row(term, text, title) {
+      list.appendChild(el(doc, "dt", term));
+      var dd = el(doc, "dd", text);
+      if (title) dd.title = title;
+      list.appendChild(dd);
+    }
+    var leg = built.leg;
+    row("Proposer", built.proposer.name + " (" + built.proposer.id + ")");
+    row("Expiration", built.pair[1].expiration_time);
+    var rev = built.pair[1].review_period_seconds;
+    row("Review period", (rev === null || rev === undefined) ? "none" : Proposal.durToHuman(rev));
+    row(t("confirm.from", "From"), leg.fromAcc.name + " (" + leg.fromAcc.id + ")");
+    row(t("confirm.to", "To"), leg.to.name + " (" + leg.to.id + ")");
+    row(t("confirm.amount", "Amount"),
+      Format.formatAmount(leg.amountInt, leg.asset.precision) + " " + leg.asset.symbol, leg.amountInt);
+    if (leg.memoKind === "encrypted") row(t("confirm.memo", "Memo"), "Encrypted");
+    else if (leg.memoKind === "plain") row(t("confirm.memo", "Memo"), "Plain: " + leg.memoText);
+    else if (leg.lockedEnc) row(t("confirm.memo", "Memo"),
+      t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain."));
+    else row(t("confirm.memo", "Memo"), "(none)");
+    row("Fee (live)", fh.text, String(built.pair[1].fee.amount));
+    row(t("confirm.network", "Network"), networkNameLocal());
+    wrap.appendChild(list);
+    wrap.appendChild(el(doc, "p", "Enclosed op: transfer (op 0) — executes only after approvals.", "muted"));
+    var detOp = doc.createElement("details");
+    detOp.className = "raw";
+    var sumOp = doc.createElement("summary");
+    sumOp.setAttribute("aria-label", "Show unsigned operation JSON");
+    detOp.appendChild(sumOp);
+    var preOp = doc.createElement("pre");
+    try { preOp.textContent = JSON.stringify(built.pair, null, 2); }
+    catch (e) { preOp.textContent = String(built.pair); }
+    detOp.appendChild(preOp);
+    wrap.appendChild(detOp);
+    var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
+    backBtn.type = "button";
+    wrap.appendChild(backBtn);
+    var sendBtn = touchable(el(doc, "button", t("confirm.sign_send", "Sign & Send")));
+    sendBtn.type = "button";
+    wrap.appendChild(sendBtn);
+    backBtn.addEventListener("click", function () {
+      if (typeof onBack === "function") onBack();
+    });
+    sendBtn.addEventListener("click", function () {
+      backBtn.disabled = true;
+      sendBtn.disabled = true;
+      var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
+      var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+      if (!activeWIF) {
+        wrap.removeChild(status);
+        showError(doc, wrap, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
+        backBtn.disabled = false;
+        sendBtn.disabled = false;
+        return;
+      }
+      Promise.resolve().then(async function () {
+        var wid = await Account.myAccountId();
+        if (built.proposer.id !== wid) {
+          throw new Error("Proposer must match the unlocked wallet account (fee-payer signs) — got " +
+            built.proposer.name + " (" + built.proposer.id + "), wallet is " + wid + ".");
+        }
+        var unsigned = await Tx.buildTx([built.pair]);
+        status.textContent = t("transfer.s1", "Broadcasting…");
+        return Proposal.sendAndProve(unsigned, activeWIF, async function () {
+          var now = await Proposal.proposalsFor(built.proposer.name || built.proposer.id);
+          if (!now || now.length <= built.before) return null;
+          var cand = now[now.length - 1];
+          try {
+            var full = await Proposal.proposal(cand.id);
+            return { slim: cand, full: full };
+          } catch (e) {
+            return { slim: cand, full: null };
+          }
+        });
+      }).then(async function (res) {
+        var head = 0;
+        try {
+          head = (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
+        } catch (e) { /* head stays 0 — never blocks the proof */ }
+        clearRoot(root);
+        showProposeResult(doc, makeWrap(doc, root), root, built, fh, res, head);
+      }).catch(function (e) {
+        var msg = (e && e.message) ? e.message : "Could not build the proposal.";
+        if (wrap.contains(status)) wrap.removeChild(status);
+        showError(doc, wrap, msg, t("transfer.prepare_failed", "Could not prepare the transfer."));
+        backBtn.disabled = false;
+        sendBtn.disabled = false;
+      });
+    });
+  }
+
+  /* Proposal result: the re-read proposal id + head block + channel.
+   * Links to the proposals page. Never blank. */
+  function showProposeResult(doc, wrap, root, built, fh, res, head) {
+    wrap.appendChild(el(doc, "h1", "Proposal sent"));
+    var pid = "?";
+    try {
+      if (res && res.proof) {
+        if (res.proof.slim && res.proof.slim.id) pid = res.proof.slim.id;
+        else if (res.proof.id) pid = res.proof.id;
+      }
+    } catch (e) { /* "?" stands */ }
+    var via = (res && res.via) ? res.via : "?";
+    var ok = el(doc, "p", "Proposal " + pid + " observed at head block #" + String(head) + " (" + via + ").", "xfer-ok");
+    ok.setAttribute("aria-live", "polite");
+    wrap.appendChild(ok);
+    wrap.appendChild(el(doc, "p",
+      Format.formatAmount(built.leg.amountInt, built.leg.asset.precision) + " " +
+      built.leg.asset.symbol + " → " + built.leg.to.name + " enclosed; fee " + fh.text + ".", "muted"));
+    var link = el(doc, "a", "View proposals");
+    link.setAttribute("href", "#/proposals");
+    touchable(link);
+    wrap.appendChild(link);
+  }
+
+  /* Unlocked propose review: resolve the proposer (must EQUAL the wallet —
+   * the fee-payer signs now) + the leg (From may differ: the inner
+   * transfer authorizes later), wrap the [0, opData] pair via
+   * Proposal.buildCreate, quote the WRAPPER fee live, then confirm.
+   * Failures rebuild the form with every input preserved. */
+  function proposeReviewUnlocked(doc, wrap, root, from, snap, reviewBtn) {
+    reviewBtn.disabled = true;
+    var status = showStatus(doc, wrap, t("transfer.checking", "Checking recipient, asset, and fee…"));
+    function fail(msg) {
+      if (wrap.contains(status)) wrap.removeChild(status);
+      clearRoot(root);
+      showForm(doc, makeWrap(doc, root), root, from, {
+        from: snap.from, to: snap.to, asset: snap.asset, amount: snap.amount,
+        memo: snap.memo, encrypted: snap.encrypted, feeAsset: snap.feeAsset,
+        mode: "propose", proposer: snap.proposer, expiration: snap.expiration,
+        reviewPeriod: snap.reviewPeriod, error: msg
+      });
+    }
+    Promise.resolve().then(async function () {
+      if (typeof Proposal === "undefined" || !Proposal || typeof Proposal.buildCreate !== "function") {
+        throw new Error("Proposal backend missing: js/proposal.js failed to load.");
+      }
+      var wid = await Account.myAccountId();
+      var proposer = await Account.resolve(String(snap.proposer || "").trim() || "1.2.0");
+      if (proposer.id !== wid) {
+        throw new Error("Proposer must match the unlocked wallet account (fee-payer signs) — got " +
+          proposer.name + " (" + proposer.id + "), wallet is " + wid + ".");
+      }
+      var leg = await resolveProposeLeg(snap, false);
+      var expIso = normaliseExpiration(snap.expiration);
+      var rev = parseReviewPeriod(snap.reviewPeriod);
+      var pair = Proposal.buildCreate({ feePayerId: proposer.id, expirationIso: expIso,
+        reviewPeriodSecOrNull: rev, innerOps: [{ op: [0, leg.opData] }] });
+      var before = (await Proposal.proposalsFor(proposer.name || proposer.id)).length;
+      await Proposal.fee(pair, "1.3.0");
+      return { proposer: proposer, leg: leg, pair: pair, before: before, snap: snap };
+    }).then(function (built) {
+      feeHumanFor(built.pair[1].fee).then(function (fh) {
+        if (wrap.contains(status)) wrap.removeChild(status);
+        clearRoot(root);
+        var w2 = makeWrap(doc, root);
+        showProposeConfirm(doc, w2, root, built, fh, function () {
+          clearRoot(root);
+          showForm(doc, makeWrap(doc, root), root, from, {
+            from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
+            amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
+            feeAsset: built.snap.feeAsset, mode: "propose",
+            proposer: built.snap.proposer, expiration: built.snap.expiration,
+            reviewPeriod: built.snap.reviewPeriod, error: null
+          });
+        });
+      }).catch(function (e) {
+        fail((e && e.message) ? e.message : "Could not build the proposal.");
+      });
+    }).catch(function (e) {
+      fail((e && e.message) ? e.message : "Could not build the proposal.");
+    });
+  }
+
+  /* Locked propose preview: read-only named rows + LIVE wrapper fee under
+   * the form (proposer input defaults to 1.2.0 with the notice above);
+   * the password is asked only at Unlock & Sign. After unlock the proposal
+   * is REBUILT with the wallet as proposer (the fee-payer must sign) and
+   * quoted again — a switch note names the change, so the preview never
+   * signs something it did not show. */
+  function lockedProposePreview(doc, box, root, vals, reviewBtn) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    reviewBtn.disabled = true;
+    showStatus(doc, box, t("transfer.checking", "Checking recipient, asset, and fee…"));
+    function done() { reviewBtn.disabled = false; }
+    Promise.resolve().then(async function () {
+      if (typeof Proposal === "undefined" || !Proposal || typeof Proposal.buildCreate !== "function") {
+        throw new Error("Proposal backend missing: js/proposal.js failed to load.");
+      }
+      var proposer = await Account.resolve(String(vals.proposer || "").trim() || "1.2.0");
+      var leg = await resolveProposeLeg(vals, true);
+      var expIso = normaliseExpiration(vals.expiration);
+      var rev = parseReviewPeriod(vals.reviewPeriod);
+      var pair = Proposal.buildCreate({ feePayerId: proposer.id, expirationIso: expIso,
+        reviewPeriodSecOrNull: rev, innerOps: [{ op: [0, leg.opData] }] });
+      await Proposal.fee(pair, "1.3.0");
+      var fh = await feeHumanFor(pair[1].fee);
+      return { proposer: proposer, leg: leg, pair: pair, fh: fh };
+    }).then(function (P) {
+      while (box.firstChild) box.removeChild(box.firstChild);
+      box.appendChild(el(doc, "h3", "Proposal preview (locked)"));
+      var list = el(doc, "dl", null, "xfer-confirm");
+      function row(term, text, title) {
+        list.appendChild(el(doc, "dt", term));
+        var dd = el(doc, "dd", text);
+        if (title) dd.title = title;
+        list.appendChild(dd);
+      }
+      row("Proposer", P.proposer.name + " (" + P.proposer.id + ")");
+      row("Expiration", P.pair[1].expiration_time);
+      var rev = P.pair[1].review_period_seconds;
+      row("Review period", (rev === null || rev === undefined) ? "none" : Proposal.durToHuman(rev));
+      row(t("confirm.from", "From"), P.leg.fromAcc.name + " (" + P.leg.fromAcc.id + ")");
+      row(t("confirm.to", "To"), P.leg.to.name + " (" + P.leg.to.id + ")");
+      row(t("confirm.amount", "Amount"),
+        Format.formatAmount(P.leg.amountInt, P.leg.asset.precision) + " " + P.leg.asset.symbol, P.leg.amountInt);
+      row(t("confirm.memo", "Memo"), P.leg.memoKind === "plain" ? "Plain: " + P.leg.memoText :
+        (P.leg.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : "(none)"));
+      row("Fee (live)", P.fh.text, String(P.pair[1].fee.amount));
+      row(t("confirm.network", "Network"), networkNameLocal());
+      box.appendChild(list);
+      box.appendChild(el(doc, "p",
+        t("transfer.locked_sign_hint", "Unlock to sign — the password is asked only here, at signing."), "muted"));
+      var pwRow = el(doc, "div", null, "xfer-field");
+      var pw = doc.createElement("input");
+      pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
+      pw.setAttribute("aria-label", "Password"); touchable(pw); pwRow.appendChild(pw);
+      var ub = touchable(el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
+      ub.type = "button"; pwRow.appendChild(ub);
+      box.appendChild(pwRow);
+      ub.addEventListener("click", function () {
+        ub.disabled = true;
+        showStatus(doc, box, t("transfer.unlocking", "Unlocking…"));
+        Promise.resolve().then(function () { return Wallet.unlock(pw.value); })
+          .then(function () { return Account.myAccountId(); })
+          .then(async function (wid) {
+            var proposer = await Account.resolve(wid);
+            var snap2 = {
+              from: vals.from, to: vals.to, asset: vals.asset, amount: vals.amount,
+              memo: vals.memo, encrypted: vals.encrypted, feeAsset: vals.feeAsset,
+              proposer: wid, expiration: vals.expiration, reviewPeriod: vals.reviewPeriod
+            };
+            var leg = await resolveProposeLeg(snap2, false);
+            var pair = Proposal.buildCreate({ feePayerId: wid,
+              expirationIso: normaliseExpiration(snap2.expiration),
+              reviewPeriodSecOrNull: parseReviewPeriod(snap2.reviewPeriod),
+              innerOps: [{ op: [0, leg.opData] }] });
+            var before = (await Proposal.proposalsFor(proposer.name || wid)).length;
+            await Proposal.fee(pair, "1.3.0");
+            var fh = await feeHumanFor(pair[1].fee);
+            var typed = String(vals.proposer || "").trim();
+            var switched = typed !== "" && typed !== wid && typed !== proposer.name;
+            return { proposer: proposer, leg: leg, pair: pair, before: before,
+              snap: snap2, fh: fh, switched: switched };
+          })
+          .then(function (built) {
+            clearRoot(root);
+            var w2 = makeWrap(doc, root);
+            if (built.switched) {
+              w2.appendChild(el(doc, "p",
+                "Unlocked — proposal rebuilt with you (" + built.proposer.name + ") as proposer.", "muted"));
+            }
+            showProposeConfirm(doc, w2, root, built, built.fh, function () {
+              clearRoot(root);
+              showForm(doc, makeWrap(doc, root), root, built.proposer, {
+                from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
+                amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
+                feeAsset: built.snap.feeAsset, mode: "propose",
+                proposer: built.snap.proposer, expiration: built.snap.expiration,
+                reviewPeriod: built.snap.reviewPeriod, error: null
+              });
+            });
+          })
+          .catch(function (e2) {
+            ub.disabled = false;
+            showError(doc, box, e2, t("transfer.unlock_failed", "Unlock failed"));
+          });
+      });
+      done();
+    }).catch(function (e) {
+      while (box.firstChild) box.removeChild(box.firstChild);
+      showError(doc, box, (e && e.message) ? e.message : "Could not build the proposal.",
         t("transfer.prepare_failed", "Could not prepare the transfer."));
       done();
     });
