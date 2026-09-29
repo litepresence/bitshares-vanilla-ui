@@ -611,6 +611,32 @@ img, canvas, pre { max-width: 100%; }
   .vote-weight { white-space: nowrap; margin-left: auto; flex-shrink: 0; }
 }
 
+/* (g) Desk side-panel bare controls (viewport sweep 2026-09-29, principle #7):
+ * .xfer-field inputs/selects already carry width/max-width guards (section a
+ * above), but pool-desk side controls sit BARE as direct .mkt-side children
+ * (pool-swap-ui.js #pool-swap-dir direction select, pool-detail-ui.js
+ * withdrawal-fee keep/set select). A long option string
+ * ("Withdrawal fee: set 0 (only allowed change)") sized one select to 392px
+ * inside a 343px column at 375px (measured: .mkt-side scrollW=392 >
+ * clientW=343; the page stayed at 375 only via the html overflow-x clip —
+ * the control itself rendered clipped). Cap side-panel controls so they
+ * shrink with the column instead of forcing it. Widths otherwise untouched
+ * (bare selects keep their auto width up to the cap — no restyle). */
+.mkt-side > * { min-width: 0; max-width: 100%; }
+.mkt-side select, .mkt-side input, .mkt-side textarea { max-width: 100%;
+  box-sizing: border-box; }
+
+/* (h) 4K desk width (viewport sweep 2026-09-29, principle #7): the §(b) cap
+ * holds the market/pool desk (.mkt-wrap) to min(96vw,2200px) — at 3840px
+ * that strands ~820px of margin per side (wrap measured 2200/3840 = 57%,
+ * desk centered in a column while explorer/.wide pages go full-bleed).
+ * Desks keep a cap so charts stay readable, but raised to min(98vw,3400px)
+ * at >=2560px so the dense desk earns the pixels. Later rule wins over §(b)
+ * by source order at equal specificity; 1440-2559px unaffected. */
+@media (min-width: 2560px) {
+  .wrap.mkt-wrap { max-width: min(98vw, 3400px); }
+}
+
 /* Retro forgery pass (target: vanilla/notes/original-header-exchange-2026-09-28.png).
  * Token-driven wherever a token exists so all three themes keep working;
  * literal hex appears ONLY for the banner (provenance below), which is a
