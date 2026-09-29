@@ -2,7 +2,13 @@
  * Owns: poolsForAsset (one_asset reads), buildGraph (L0=A,B; L1 cap 8 biggest-first;
  *   L2 up to 6 counters limit 3; nodes cap 25), findCorePath (BFS fewest-hops to 1.3.0,
  *   widest-min-edge tiebreak), layout (deterministic layered rings, no physics/random),
- *   drawGraph (DPR canvas, theme tokens, click hit-test to #/asset + #/pools).
+ *   drawGraph (DPR canvas, theme tokens, small halo labels, staggered rings, click
+ *   hit-test to #/asset + #/pools, direct node dragging over session-only offsets).
+ * NO spring/physics engine anywhere in this file (non-deterministic, untestable — said
+ *   once, enforced by vectors): layout() is the deterministic initial arrangement; a drag
+ *   writes a plain {dx,dy} into a session-only Map (reset on data refresh) and repaints
+ *   through drawGraph. Pointer events cover mouse + touch; touch-action:none applies
+ *   only mid-drag so page scroll is untouched otherwise.
  * Consumes: Chain.db/.call (sole socket owner, _dbCall error contract mirrors pool.js);
  *   lookup_asset_symbols for sym join (misses degrade to bare ids). No DOM except the
  *   caller-provided canvas; no signing, no storage, no ES, no networkx. Global PoolGraph only.
@@ -211,26 +217,55 @@ var PoolGraph = (function () {
     return at === fromId ? { hops: hops, via: via } : null;
   }
 
-  /* Deterministic layered rings: L0 center pair, L1 ring, L2 outer; angle by sorted index.
-   * Returns {assetId:{x,y}} CSS pixels. Pure (tested for determinism). */
-  function layout(graph, assetA, assetB, w, h) {
-    w = w || 300; h = h || 180;
-    var cx = w / 2, cy = h / 2, R = Math.min(w, h);
+  /* Node radius, pixels only: 5 + degree step, capped at 11 (~40% smaller than the
+   * old 9 + 2*deg balls so labels breathe). Pure (tested for bounds). */
+  var NODE_BASE_R = 5, NODE_DEG_STEP = 1.2, NODE_MAX_DEG = 5, NODE_MAX_R = 11;
+  function _nodeRadius(deg) {
+    var d = Number(deg) || 0;
+    if (!(d > 0)) d = 0;
+    if (d > NODE_MAX_DEG) d = NODE_MAX_DEG;
+    return NODE_BASE_R + d * NODE_DEG_STEP;
+  }
+  /* Ring radii from the canvas min-dimension, minus an edge pad (max node radius +
+   * label height + margin) so edge nodes never clip. Pure (tested for containment). */
+  var EDGE_PAD = 30;
+  function _ringRadii(w, h) {
+    var m = Math.min(w || 300, h || 180);
+    if (!(m > 0)) m = 180;
+    var outer = Math.max(m / 2 - EDGE_PAD, m * 0.1);
+    return { min: m, pad: EDGE_PAD, outer: outer, inner: outer * 0.58,
+      center: Math.min(outer * 0.35, 20), maxNodeR: NODE_MAX_R };
+  }
+  /* Ring membership (L0 = center pair, L1 = their neighbours, L2 = rest, all sorted).
+   * Shared by layout (positions) and drawGraph (label stagger). Pure. */
+  function _rings(graph, assetA, assetB) {
     var adj = {};
     (graph.edges || []).forEach(function (e) {
+      if (!e || !e.a || !e.b) return;
       (adj[e.a] = adj[e.a] || {})[e.b] = 1; (adj[e.b] = adj[e.b] || {})[e.a] = 1;
     });
-    /* neigh: adjacent asset ids for one node id (empty when absent). */
     function neigh(id) { return adj[id] ? Object.keys(adj[id]) : []; }
-    var l0 = [assetA, assetB], inL0 = {}; l0.forEach(function (id) { inL0[id] = 1; });
+    var l0 = assetA === assetB ? [assetA] : [assetA, assetB], inL0 = {};
+    l0.forEach(function (id) { inL0[id] = 1; });
     var l1set = {};
     l0.forEach(function (id) { neigh(id).forEach(function (n) { if (!inL0[n]) l1set[n] = 1; }); });
-    var l1 = Object.keys(l1set).sort(), inL1 = {}; l1.forEach(function (id) { inL1[id] = 1; });
+    var l1 = Object.keys(l1set).sort(), inL1 = {};
+    l1.forEach(function (id) { inL1[id] = 1; });
     var l2 = (graph.nodes || []).map(function (n) { return n.assetId; })
       .filter(function (id) { return !inL0[id] && !inL1[id]; }).sort();
+    return { l0: l0, l1: l1, l2: l2 };
+  }
+
+  /* Deterministic layered rings: L0 center pair, L1 ring, L2 outer; angle by sorted index.
+   * Returns {assetId:{x,y}} CSS pixels. Pure (tested for determinism). NO spring/physics
+   * engine here (non-deterministic, untestable) — this is the initial arrangement; user
+   * drag offsets apply on top at draw time and never feed back into layout. */
+  function layout(graph, assetA, assetB, w, h) {
+    w = w || 300; h = h || 180;
+    var cx = w / 2, cy = h / 2;
+    var rings = _rings(graph, assetA, assetB), rr = _ringRadii(w, h);
     var pos = {};
-    var r0 = R * 0.09;
-    pos[assetA] = { x: cx - r0, y: cy }; pos[assetB] = { x: cx + r0, y: cy };
+    pos[assetA] = { x: cx - rr.center, y: cy }; pos[assetB] = { x: cx + rr.center, y: cy };
     if (assetA === assetB) pos[assetA] = { x: cx, y: cy };
     function ring(ids, radius) {
       for (var i = 0; i < ids.length; i++) {
@@ -238,8 +273,8 @@ var PoolGraph = (function () {
         pos[ids[i]] = { x: cx + radius * Math.cos(ang), y: cy + radius * Math.sin(ang) };
       }
     }
-    if (l1.length) ring(l1, R * 0.24);
-    if (l2.length) ring(l2, R * 0.40);
+    if (rings.l1.length) ring(rings.l1, rr.inner);
+    if (rings.l2.length) ring(rings.l2, rr.outer);
     (graph.nodes || []).forEach(function (n) { if (!pos[n.assetId]) pos[n.assetId] = { x: cx, y: cy }; });
     return pos;
   }
@@ -270,8 +305,42 @@ var PoolGraph = (function () {
     return { ctx: ctx, w: w, h: cssH };
   }
 
+  /* Session-only drag offsets, keyed by asset id. The Map lives on the canvas (never
+   * storage) and resets whenever the graph data changes (data refresh), while surviving
+   * theme/resize repaints of the same data. */
+  function _dataKey(graph, assetA, assetB) {
+    var ids = ((graph && graph.nodes) || []).map(function (n) { return n.assetId; }).sort().join(",");
+    var pools = ((graph && graph.edges) || []).map(function (e) { return e.poolId; }).sort().join(",");
+    return String(assetA) + "|" + String(assetB) + "|" + ids + "|" + pools;
+  }
+  function _offsetsFor(canvas, graph, assetA, assetB) {
+    var key = _dataKey(graph, assetA, assetB);
+    try {
+      if (!canvas._graphOffsets || canvas._graphDataKey !== key) {
+        canvas._graphOffsets = new Map(); canvas._graphDataKey = key;
+      }
+      return canvas._graphOffsets;
+    } catch (e) { return new Map(); }
+  }
+  /* Headless-safe rAF (falls back to sync when unavailable — no timers ever). */
+  function _raf(fn) {
+    try {
+      if (typeof requestAnimationFrame !== "undefined") { requestAnimationFrame(fn); return; }
+    } catch (e) { /* sync fallback */ }
+    fn();
+  }
+  /* Drag repaint: re-runs the existing drawGraph path from cached state (no new timers). */
+  function _repaint(canvas) {
+    var st = null;
+    try { st = canvas._graphRepaint; } catch (e) { return; }
+    if (!st) return;
+    drawGraph(st.doc, canvas, st.graph, st.opts);
+  }
+
   /* Canvas slice renderer. opts {assetA, assetB, highlightPools}. Empty -> honest text on canvas.
-   * Click: node -> #/asset/sym, edge midpoint -> #/pools/id. Canvas tabindex + Enter opens core/first. */
+   * Click: node -> #/asset/sym, edge midpoint -> #/pools/id. Canvas tabindex + Enter opens core/first.
+   * Drag offsets (session-only, see _offsetsFor) shift nodes after layout; layout() itself
+   * stays deterministic. */
   function drawGraph(doc, canvas, graph, opts) {
     opts = opts || {};
     if (!canvas) return null;
@@ -290,7 +359,16 @@ var PoolGraph = (function () {
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";
     }
     if (!edges.length) { emptyLine("No pools touch these assets."); _wire(canvas, {}, [], doc); return { empty: true }; }
-    var pos = layout(graph, assetA, assetB, g.w, g.h);
+    var base = layout(graph, assetA, assetB, g.w, g.h);
+    var offs = _offsetsFor(canvas, graph, assetA, assetB);
+    var pos = {};
+    Object.keys(base).forEach(function (id) {
+      var o = null;
+      try { o = offs.get(id); } catch (e) { o = null; }
+      pos[id] = o ? { x: base[id].x + o.dx, y: base[id].y + o.dy } : { x: base[id].x, y: base[id].y };
+    });
+    try { canvas._graphBase = base; } catch (e) {}
+    try { canvas._graphRepaint = { doc: doc, graph: graph, opts: opts }; } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
@@ -303,16 +381,27 @@ var PoolGraph = (function () {
       mids.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, poolId: e.poolId });
     });
     var hits = [];
+    var rings = _rings(graph, assetA, assetB), inL2 = {};
+    rings.l2.forEach(function (id) { inL2[id] = 1; });
     nodes.forEach(function (n) {
       var p = pos[n.assetId];
       if (!p) return;
-      var r = 9 + Math.min(deg[n.assetId] || 0, 5) * 2; /* degree-sized, pixels only */
+      var r = _nodeRadius(deg[n.assetId]); /* degree-sized, pixels only */
       var isCore = n.assetId === CORE_ID, isL0 = n.assetId === assetA || n.assetId === assetB;
       ctx.fillStyle = isCore ? buy : (isL0 ? accent : muted);
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 2 * Math.PI); ctx.fill();
       ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.stroke();
-      ctx.fillStyle = text; ctx.font = "11px system-ui, sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(String(symById[n.assetId]).slice(0, 12), p.x, p.y - r - 3);
+      /* Small label with dark halo (strokeText under fillText) so it reads on any
+       * theme; outer-ring labels sit BELOW the node, inner rings ABOVE (stagger). */
+      var label = String(symById[n.assetId]).slice(0, 12);
+      var ly = inL2[n.assetId] ? p.y + r + 11 : p.y - r - 4;
+      ctx.font = "10px system-ui, sans-serif"; ctx.textAlign = "center";
+      try {
+        ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.85)";
+        ctx.strokeText(label, p.x, ly);
+      } catch (e) { /* halo best-effort */ }
+      ctx.fillStyle = text;
+      ctx.fillText(label, p.x, ly);
       ctx.textAlign = "left";
       hits.push({ x: p.x, y: p.y, r: r, assetId: n.assetId, sym: symById[n.assetId] });
     });
@@ -322,22 +411,45 @@ var PoolGraph = (function () {
     }
     _wire(canvas, pos, hits.concat(mids.map(function (m) { return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId }; })), doc);
     try { canvas.setAttribute("tabindex", "0"); } catch (e) {}
-    try { canvas.style.cursor = "pointer"; } catch (e) {}
+    try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}
     return { empty: false, nodes: hits.length, edges: mids.length };
   }
 
-  /* One-time click + Enter wiring (canvas has no per-node hover — hit-test instead). */
+  /* One-time wiring: click + Enter navigation (kept), node hover cursor, and direct
+   * node dragging. Pointer events cover mouse + touch; touch-action:none applies ONLY
+   * while a drag is active so page scroll is untouched otherwise. NO physics — a drag
+   * writes a plain {dx,dy} offset into the session Map and repaints via drawGraph. */
   function _wire(canvas, pos, hits, doc) {
     void pos; void doc;
+    /* Nearest node within its hit-test radius (edges excluded — same tol as click). */
+    function nodeAt(x, y) {
+      var best = null, bestD = 1e9;
+      (canvas._graphHits || []).forEach(function (h) {
+        if (!h || h.edgeMid) return;
+        var dx = h.x - x, dy = h.y - y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d <= h.r + 5 && d < bestD) { bestD = d; best = h; }
+      });
+      return best;
+    }
+    /* CSS-pixel pointer position (null when unavailable). */
+    function ptr(ev) {
+      try {
+        var box = canvas.getBoundingClientRect();
+        return { x: ev.clientX - box.left, y: ev.clientY - box.top };
+      } catch (e) { return null; }
+    }
     try {
       if (canvas._graphWired) { canvas._graphHits = hits; return; }
       canvas._graphWired = true; canvas._graphHits = hits;
       canvas.addEventListener("click", function (ev) {
-        var box = null, x = 0, y = 0;
-        try { box = canvas.getBoundingClientRect(); x = (ev.clientX - box.left); y = (ev.clientY - box.top); } catch (e) { return; }
+        try {
+          if (canvas._graphSuppressClick) { canvas._graphSuppressClick = false; return; }
+        } catch (e) {}
+        var p = ptr(ev);
+        if (!p) return;
         var best = null, bestD = 1e9;
         (canvas._graphHits || []).forEach(function (h) {
-          var dx = h.x - x, dy = h.y - y, d = Math.sqrt(dx * dx + dy * dy);
+          var dx = h.x - p.x, dy = h.y - p.y, d = Math.sqrt(dx * dx + dy * dy);
           var tol = h.edgeMid ? 12 : (h.r + 5);
           if (d <= tol && d < bestD) { bestD = d; best = h; }
         });
@@ -347,6 +459,62 @@ var PoolGraph = (function () {
           else window.location.hash = "#/asset/" + encodeURIComponent(best.sym);
         } catch (e) { /* navigation best-effort */ }
       });
+      canvas.addEventListener("pointerdown", function (ev) {
+        var p = ptr(ev);
+        if (!p) return;
+        var hit = nodeAt(p.x, p.y);
+        if (!hit) return;
+        try {
+          canvas._graphDrag = { id: hit.assetId, moved: false, sx: p.x, sy: p.y };
+          if (typeof canvas.setPointerCapture === "function") {
+            try { canvas.setPointerCapture(ev.pointerId); } catch (e) {}
+          }
+          canvas.style.touchAction = "none";
+          canvas.style.cursor = "grabbing";
+        } catch (e) { try { canvas._graphDrag = null; } catch (x) {} }
+      });
+      canvas.addEventListener("pointermove", function (ev) {
+        var drag = null;
+        try { drag = canvas._graphDrag; } catch (e) {}
+        if (drag) {
+          var p = ptr(ev);
+          if (!p) return;
+          if (Math.abs(p.x - drag.sx) + Math.abs(p.y - drag.sy) > 4) drag.moved = true;
+          var base = null, offs = null;
+          try { base = canvas._graphBase; offs = canvas._graphOffsets; } catch (e) {}
+          if (base && base[drag.id] && offs && typeof offs.set === "function") {
+            offs.set(drag.id, { dx: p.x - base[drag.id].x, dy: p.y - base[drag.id].y });
+          }
+          try { if (canvas._graphRaf) return; canvas._graphRaf = true; } catch (e) {}
+          _raf(function () {
+            try { canvas._graphRaf = false; } catch (e) {}
+            _repaint(canvas);
+            try { canvas.style.cursor = "grabbing"; } catch (e) {}
+          });
+        } else {
+          /* Hover cursor (grab over nodes), rAF-throttled — pointermove subsumes mousemove. */
+          try { if (canvas._graphHoverRaf) return; canvas._graphHoverRaf = true; } catch (e) {}
+          _raf(function () {
+            var q = ptr(ev);
+            try {
+              canvas._graphHoverRaf = false;
+              if (!canvas._graphDrag) canvas.style.cursor = q && nodeAt(q.x, q.y) ? "grab" : "pointer";
+            } catch (e) {}
+          });
+        }
+      });
+      /* Release the drag; a drag that moved suppresses the click that follows it. */
+      function endDrag() {
+        try {
+          var moved = !!(canvas._graphDrag && canvas._graphDrag.moved);
+          canvas._graphDrag = null;
+          canvas.style.touchAction = "";
+          canvas.style.cursor = "pointer";
+          if (moved) canvas._graphSuppressClick = true;
+        } catch (e) {}
+      }
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
       canvas.addEventListener("keydown", function (ev) {
         if (!ev || (ev.key !== "Enter" && ev.keyCode !== 13)) return;
         try {
@@ -362,7 +530,8 @@ var PoolGraph = (function () {
 
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
-    _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest } };
+    _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
+      nodeRadius: _nodeRadius, ringRadii: _ringRadii } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.PoolGraph === "undefined") { globalThis.PoolGraph = PoolGraph; }

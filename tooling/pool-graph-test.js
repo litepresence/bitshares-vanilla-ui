@@ -81,7 +81,41 @@ function ok(cond, name) {
   ok(typeof a["1.3.1"].x === "number" && typeof a["1.3.0"].x === "number", "layout covers L0+L2");
 })();
 
-// 6. buildGraph node-cap with mocked chain (<=25 nodes, <=9 RPCs).
+// 5b. Node radii small + bounded (readability fix: ~40% down from 9+2*deg).
+(function () {
+  for (let d = 0; d <= 10; d++) {
+    const r = PG._test.nodeRadius(d);
+    ok(r >= 4 && r <= 12, "nodeRadius bounds deg " + d + " (got " + r + ")");
+  }
+  eq(PG._test.nodeRadius(0), 5, "nodeRadius base 5");
+  eq(PG._test.nodeRadius(99), 11, "nodeRadius capped 11");
+})();
+
+// 5c. Ring radii padded: outer ring + biggest node + label clears the canvas edge.
+(function () {
+  const sizes = [[300, 180], [800, 180], [390, 220], [1440, 900]];
+  sizes.forEach(function (wh) {
+    const rr = PG._test.ringRadii(wh[0], wh[1]);
+    ok(rr.outer + rr.maxNodeR + 12 <= rr.min / 2, "rings padded " + wh[0] + "x" + wh[1] + " (outer " + rr.outer + ")");
+    ok(rr.inner < rr.outer && rr.center < rr.inner, "rings ordered " + wh[0] + "x" + wh[1]);
+  });
+  // Layout honors the padding: every node within the outer ring of center.
+  const g = {
+    nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" }, { assetId: "1.3.2", sym: "B" }, { assetId: "1.3.9", sym: "X" }],
+    edges: [
+      { poolId: "1.19.1", a: "1.3.1", b: "1.3.2", sizeRaw: "50" },
+      { poolId: "1.19.2", a: "1.3.1", b: "1.3.9", sizeRaw: "60" }
+    ]
+  };
+  const pos = PG.layout(g, "1.3.1", "1.3.2", 300, 180);
+  const rr = PG._test.ringRadii(300, 180);
+  Object.keys(pos).forEach(function (id) {
+    const dx = pos[id].x - 150, dy = pos[id].y - 90;
+    ok(Math.sqrt(dx * dx + dy * dy) <= rr.outer + 1e-9, "layout inside outer ring " + id);
+  });
+  const c = PG.layout(g, "1.3.1", "1.3.2", 300, 180);
+  eq(c, pos, "re-layout equality (no drift, no physics)");
+})();
 (async function () {
   let calls = 0;
   const poolsByAsset = {};
