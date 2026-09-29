@@ -627,3 +627,150 @@ img, canvas, pre { max-width: 100%; }
   body { padding-bottom: 88px; }
   #appfoot { flex-wrap: wrap; row-gap: 4px; }
 }
+
+/* Hover candy (single revertible block — delete from here to EOF to dial back).
+ * CSS-only micro-interactions, retro-safe: transform / shadow / color /
+ * background only — no padding, margin, width, height, font, or touch-target
+ * changes, no new palette (tokens only: --accent, --panel, --toast-shadow).
+ * Plot panes (.mkt-osc-pane, .mkt-price-host, .mkt-canvas) are deliberately
+ * untouched — charts are instruments, not toys. All :hover candy sits inside
+ * @media (hover:hover) so touch devices never stick in a hover state;
+ * keyboard focus rings live outside the guard. */
+@media (hover:hover) {
+  /* 1. Buttons / primary actions: 120ms lift + press-down. */
+  button, a.btn, .appfoot-actions a, .nav-dir-btn,
+  .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
+  .pools-pager button, .mkt-star, .mkt-bell {
+    transition: transform 120ms ease, box-shadow 120ms ease,
+      background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  }
+  button:hover, a.btn:hover, .appfoot-actions a:hover, .nav-dir-btn:hover,
+  .mkt-quotes button:hover, .mkt-scalerow button:hover,
+  .mkt-indmenu-btn:hover, .pools-pager button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--toast-shadow);
+  }
+  button:active, a.btn:active, .appfoot-actions a:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  /* 2. Table rows: --panel tint + accent left-edge bar reveal. The bar is a
+   * 3px background gradient (not a border, so no layout shift; not a
+   * box-shadow, so border-collapse tables still paint it), layered under the
+   * row — depth-bar children (.depth-bar) ride above it, untouched. */
+  .node-table tbody tr, table.pools-table tbody tr,
+  tr.book-row, .book-row-card {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 0 100%;
+    background-position: left center;
+    background-repeat: no-repeat;
+    transition: background-color 120ms ease, background-size 120ms ease;
+  }
+  .node-table tbody tr:hover, table.pools-table tbody tr:hover,
+  tr.book-row:hover, .book-row-card:hover {
+    background-color: var(--panel);
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 3px 100%;
+  }
+  /* 3. Nav items + underline tabs: accent underline slides in via
+   * background-size (existing hover tints/colors above are untouched — the
+   * later image longhand re-asserts the gradient because earlier `background`
+   * shorthands reset it to none). .mkt-tabs excluded: desk-grid renders those
+   * as bordered pills, where a bottom gradient would hide under the border —
+   * they get an accent border-color shift instead (same no-shift contract). */
+  #nav a, .nav-dir-actions a, .mkt-picker-list a,
+  .trade-tabs button, .order-tabs a {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 0% 2px;
+    background-position: left bottom;
+    background-repeat: no-repeat;
+    transition: background-size 120ms ease, color 120ms ease,
+      background-color 120ms ease;
+  }
+  #nav a:hover, .nav-dir-actions a:hover, .mkt-picker-list a:hover,
+  .trade-tabs button:hover, .order-tabs a:hover {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 100% 2px;
+  }
+  .mkt-tabs button:hover {
+    border-color: var(--accent);
+  }
+  /* 4. Cards / panels: subtle hover raise (toasts excluded — transient
+   * notices should not dance under the cursor). */
+  .node-card, .dashboard-gate, .alert-row,
+  .mkt-statstrip, .mkt-chart-empty {
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .node-card:hover, .dashboard-gate:hover, .alert-row:hover,
+  .mkt-statstrip:hover, .mkt-chart-empty:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--toast-shadow);
+  }
+  /* 5. Links: color-shift only — no underline, no size change. */
+  a {
+    transition: color 120ms ease;
+  }
+  .wrap a:hover, .pools-table a:hover, #appfoot a:hover {
+    color: var(--accent);
+  }
+  /* 7. INDICATORS menu items + timeframe/asset radios: same row-hover
+   * treatment as table rows (tint + left bar). */
+  .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 0 100%;
+    background-position: left center;
+    background-repeat: no-repeat;
+    transition: background-color 120ms ease, background-size 120ms ease;
+  }
+  .mkt-indmenu-item:hover, .mkt-tf:hover, .mkt-ind:hover, .mkt-kind:hover {
+    background-color: var(--panel);
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 3px 100%;
+  }
+}
+
+/* 6. Inputs / selects: accent border glow on focus (default outline replaced
+ * by an equally visible ring — never removed bare). Focus, not hover, so this
+ * lives outside the guard and works for touch keyboards too. */
+input, select, textarea {
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+/* Keyboard users get the candy too: visible accent ring on every focusable
+ * control (inputs already carry the glow above, so they are not repeated). */
+button:focus-visible, a:focus-visible, summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 8. Reduced motion: all candy motion off (transitions snap, lifts cancel).
+ * Hover tints and focus rings still apply instantly — state feedback is not
+ * motion, and keyboard visibility is never sacrificed. */
+@media (prefers-reduced-motion: reduce) {
+  button, a, summary, input, select, textarea,
+  .node-table tbody tr, table.pools-table tbody tr,
+  tr.book-row, .book-row-card,
+  #nav a, .nav-dir-actions a, .mkt-picker-list a,
+  .trade-tabs button, .order-tabs a, .mkt-tabs button,
+  .node-card, .dashboard-gate, .alert-row,
+  .mkt-statstrip, .mkt-chart-empty,
+  .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
+  .pools-pager button, .nav-dir-btn, .mkt-star, .mkt-bell,
+  .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind {
+    transition: none;
+    animation: none;
+  }
+  button:hover, a.btn:hover, .appfoot-actions a:hover,
+  .node-card:hover, .dashboard-gate:hover, .alert-row:hover,
+  .mkt-statstrip:hover, .mkt-chart-empty:hover,
+  .mkt-quotes button:hover, .mkt-scalerow button:hover,
+  .mkt-indmenu-btn:hover, .pools-pager button:hover {
+    transform: none;
+  }
+}
