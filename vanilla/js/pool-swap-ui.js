@@ -6,12 +6,14 @@
  *   broadcast + prove by pool-balance delta + history row. Single pool only —
  *   NO multi-hop routing (recorded boundary). Quote/slippage math lives in
  *   pool.js (Pool.quote/minReceive); this file only wires inputs to it.
- *   HISTORY TOGGLE (mirrors #1 MarketHistory group-1 toggle,
- *   Exchange.jsx:2551-2616 + MarketHistory.jsx:21-139): one exchanges cell
- *   holds Pool history (get_liquidity_pool_history for the selected pool)
- *   and My exchanges (wallet account's op-63 rows for that pool) behind
- *   Pool/My buttons. My needs unlock: locked wallets get the honest
- *   Wallet-link hint (principle #9). Numbers via Format/amtText only (#6).
+  *   HISTORY TOGGLE (mirrors #1 MarketHistory group-1 toggle,
+  *   Exchange.jsx:2551-2616 + MarketHistory.jsx:21-139): one swaps cell
+  *   holds Pool history (get_liquidity_pool_history for the selected pool)
+  *   and My swaps (wallet account's op-63 rows for that pool) behind
+  *   Pool/My buttons. My needs unlock: locked wallets get the honest
+  *   Wallet-link hint (principle #9). Long tapes scroll in place inside
+  *   .pool-hist-scroll (same 15-row metrics as .trades-scroll). Numbers via
+  *   Format/amtText only (#6).
  * Consumes: PoolUI._ui (shared DOM/confirm helpers — pool-ui.js loads first),
  *   Pool (quote/minReceive/buildExchange/fee/sendAndProve/list/get/history),
  *   Format (parseAmount/formatAmount only), Account, Asset.describe, Wallet,
@@ -70,19 +72,19 @@ var PoolSwapUI = (function () {
     var pickBox = u.el(doc, "div"); wrap.appendChild(pickBox);
     var quoteBox = u.el(doc, "div"); wrap.appendChild(quoteBox);
     var actionBox = u.el(doc, "div"); wrap.appendChild(actionBox);
-    /* Exchanges toggle cell: Pool history vs My exchanges for the selected
+    /* Swaps toggle cell: Pool history vs My swaps for the selected
      * pool (mirrors the market desk Recent/My toggle; #1 counterpart is the
      * MarketHistory group-1 tabs, Exchange.jsx:2551-2616). */
     var histSec = u.el(doc, "div", null, "swap-hist");
     wrap.appendChild(histSec);
-    histSec.appendChild(u.el(doc, "h2", t("pool.exchanges_title", "Pool exchanges")));
+    histSec.appendChild(u.el(doc, "h2", t("pool.exchanges_title", "Pool swaps")));
     var histTabs = doc.createElement("div");
     histTabs.className = "mkt-tabs";
     histTabs.setAttribute("role", "tablist");
-    histTabs.setAttribute("aria-label", t("pool.exchanges_toggle_label", "Pool or my exchanges"));
+    histTabs.setAttribute("aria-label", t("pool.exchanges_toggle_label", "Pool or my swaps"));
     var histTabPool = u.touchable(u.el(doc, "button", t("pool.tab_pool", "Pool history")));
     histTabPool.type = "button"; histTabPool.id = "swap-hist-tab-pool"; histTabPool.setAttribute("role", "tab");
-    var histTabMy = u.touchable(u.el(doc, "button", t("pool.tab_my", "My exchanges")));
+    var histTabMy = u.touchable(u.el(doc, "button", t("pool.tab_my", "My swaps")));
     histTabMy.type = "button"; histTabMy.id = "swap-hist-tab-my"; histTabMy.setAttribute("role", "tab");
     histTabs.appendChild(histTabPool); histTabs.appendChild(histTabMy);
     histSec.appendChild(histTabs);
@@ -90,7 +92,7 @@ var PoolSwapUI = (function () {
     var myPoolBody = u.el(doc, "div"); myPoolBody.id = "swap-hist-my"; myPoolBody.setAttribute("role", "tabpanel");
     histSec.appendChild(poolBody); histSec.appendChild(myPoolBody);
     var histTab = "pool", curPoolId = null;
-    /* paintHistTab: pool-history vs my-exchanges tab visibility + ARIA. */
+    /* paintHistTab: pool-history vs my-swaps tab visibility + ARIA. */
     function paintHistTab() {
       var isMy = histTab === "my";
       histTabPool.setAttribute("aria-selected", isMy ? "false" : "true");
@@ -103,8 +105,8 @@ var PoolSwapUI = (function () {
     histTabPool.addEventListener("click", function () { histTab = "pool"; paintHistTab(); });
     histTabMy.addEventListener("click", function () { histTab = "my"; paintHistTab(); if (curPoolId) loadMyPoolHist(doc, u, myGen, uiGen, myPoolBody, curPoolId); });
     paintHistTab();
-    poolBody.appendChild(u.el(doc, "p", t("pool.hist_hint", "Find a pool to see its exchanges."), "muted"));
-    myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your exchanges."), "muted"));
+    poolBody.appendChild(u.el(doc, "p", t("pool.hist_hint", "Find a pool to see its swaps."), "muted"));
+    myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your swaps."), "muted"));
     /* loadPoolHist: fetch + paint the pool event tape (op names, never raw
      * ids); failures paint inline. Also refreshes the My tab when active. */
     function loadPoolHist(poolId) {
@@ -125,13 +127,17 @@ var PoolSwapUI = (function () {
           tr.appendChild(u.el(doc, "td", names[h.op_type] || ("op " + String(h.op_type))));
           tbody.appendChild(tr);
         });
-        table.appendChild(tbody); poolBody.appendChild(table);
+        table.appendChild(tbody);
+        var scroller = doc.createElement("div");
+        scroller.className = "pool-hist-scroll";
+        scroller.appendChild(table);
+        poolBody.appendChild(scroller);
       }).catch(function (e) {
         if (!live(myGen, uiGen)) return;
         u.clearBox(poolBody); u.showError(doc, poolBody, e, t("pool.history_failed", "Could not load pool history."));
       });
       if (histTab === "my") loadMyPoolHist(doc, u, myGen, uiGen, myPoolBody, poolId);
-      else { u.clearBox(myPoolBody); myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your exchanges."), "muted")); }
+      else { u.clearBox(myPoolBody); myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your swaps."), "muted")); }
     }
     find.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; find.disabled = true;
@@ -174,13 +180,14 @@ var PoolSwapUI = (function () {
       }).then(function () { find.disabled = false; });
     });
   }
-  /* My-exchanges pane for the selected pool: wallet account's op-63 rows
+  /* My-swaps pane for the selected pool: wallet account's op-63 rows
    * (liquidity_pool_exchange, protocol/liquidity_pool.hpp:138-152) filtered
    * to this pool id. Anyone can type an account (name or 1.2.N) + Look up to
-   * preview ITS exchanges via public Account.history; blank + locked keeps
+   * preview ITS swaps via public Account.history; blank + locked keeps
    * the honest Wallet-link hint, never a password field here. Unlocked
    * prefills the wallet account; the wallet auto-load is unchanged.
-   * Failures render inline, never blank. */
+   * Failures render inline, never blank. Long lists scroll in place inside
+   * .pool-hist-scroll (same metrics as .trades-scroll). */
   function loadMyPoolHist(doc, u, myGen, uiGen, box, poolId) {
     u.clearBox(box);
     var unlocked = false;
@@ -211,7 +218,7 @@ var PoolSwapUI = (function () {
     function drawMine(mine) {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox);
-      if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
+      if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool."), "muted")); return; }
       var table = doc.createElement("table"); table.className = "node-table";
       table.appendChild(u.tableHead(doc, [t("pool.block_col", "Block"), t("pool.sell_col", "Sell"), t("pool.min_recv_row", "Min to receive")]));
       var tbody = doc.createElement("tbody");
@@ -223,13 +230,17 @@ var PoolSwapUI = (function () {
         tr.appendChild(u.el(doc, "td", d.min_to_receive ? String(d.min_to_receive.amount) + " " + String(d.min_to_receive.asset_id) : "—"));
         tbody.appendChild(tr);
       });
-      table.appendChild(tbody); listBox.appendChild(table);
+      table.appendChild(tbody);
+      var scroller = doc.createElement("div");
+      scroller.className = "pool-hist-scroll";
+      scroller.appendChild(table);
+      listBox.appendChild(scroller);
     }
     /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox);
-      var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
+      var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your swaps in this pool. "), "muted");
       var a = doc.createElement("a");
       a.textContent = t("market.go_wallet", "Go to Wallet");
       a.setAttribute("href", "#/wallet");
@@ -261,7 +272,7 @@ var PoolSwapUI = (function () {
         drawMine(poolMine(rows));
       }).catch(function (e) {
         if (!live(myGen, uiGen)) return;
-        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
       });
     }
     viewBtn.addEventListener("click", loadTyped);
@@ -286,7 +297,7 @@ var PoolSwapUI = (function () {
       drawMine(poolMine(rows));
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return;
-      u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+      u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
     });
   }
   function slipOk(s) { /* slippage gate: 0.1-5% human, string math only */

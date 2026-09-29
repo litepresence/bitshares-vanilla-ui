@@ -292,10 +292,15 @@ var MarketBook = (function () {
       ];
       texts.forEach(function (text, ci) {
         var td = doc.createElement("td");
-        td.className = "book-cell";
+        /* Price cell (ci 0) carries the side color hook (book-price-bid green
+         * / book-price-ask red via desk-grid.css theme tokens) alongside the
+         * row-side class — mirrored column order stays AS-IS, raw/title attrs
+         * on the row (fill-price title + aria-label) are untouched. */
+        td.className = "book-cell" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "");
         /* The row's single .depth-bar anchors in the price-side cell
          * (asks: first cell; bids: last cell) so desk-grid.css can grow it
-         * across the row from the price side. */
+         * across the row from the price side as a full-row cumulative wash
+         * (original language: wash proportional to cumulative depth). */
         if ((isAsk && ci === 0) || (!isAsk && ci === texts.length - 1)) {
           var bar = doc.createElement("span");
           bar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
@@ -316,8 +321,9 @@ var MarketBook = (function () {
       cbar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
       cbar.setAttribute("aria-hidden", "true");
       card.appendChild(cbar);
-      [String(lv.displayPrice || ""), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text) {
-        card.appendChild(el(doc, "div", text, "cell-text"));
+      [String(lv.displayPrice || ""), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text, ci) {
+        /* Phone-card price (first div) mirrors the table price color hook. */
+        card.appendChild(el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "")));
       });
       cards.appendChild(card);
       /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
@@ -355,17 +361,19 @@ var MarketBook = (function () {
 
   /* Book section fill (moved verbatim from the MarketUI fill book handler):
    * clears the section, computes depth via Market, writes the spread header,
-   * renders Asks (reversed) + Bids. ctx carries exactly the moved code's free
-   * variables: { book, basePrec, quotePrec, baseSymbol, quoteSymbol,
-   * spreadLine }. Returns depth so the caller can cache it for charts. */
+   * renders Asks + Bids in chain order (best-first, lowest ask on top — same
+   * as renderSplit since commit 4adad6b; the old .reverse() here is gone so
+   * the pool synth book mimics the exchange book). ctx carries exactly the
+   * moved code's free variables: { book, basePrec, quotePrec, baseSymbol,
+   * quoteSymbol, spreadLine }. Returns depth so the caller can cache it for
+   * charts. */
   function renderBook(doc, parentEl, ctx) {
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
     var depth = Market.depth(ctx.book, ctx.basePrec, ctx.quotePrec);
     var bestBid = ctx.book.bids.length > 0 ? ctx.book.bids[0].displayPrice : null;
-    /* Chain asks arrive best-first (ascending); the render below reverses for
-     * display, so bestAsk is asks[0] — NOT asks[last] (that was the worst).
-     * Levels and depth points reverse TOGETHER, so each row keeps its own
-     * cumulative fraction for the --depth bar. */
+    /* Chain asks arrive best-first (ascending, lowest on top); levels and
+     * depth points stay aligned so each row keeps its own cumulative
+     * fraction for the --depth wash. bestAsk is asks[0]. */
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
@@ -383,7 +391,7 @@ var MarketBook = (function () {
     var grid = doc.createElement("div");
     grid.className = "book-grid";
     parentEl.appendChild(grid);
-    renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse(), !!ctx.logVol);
+    renderBookSide(doc, grid, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol);
     renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol);
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;

@@ -14,8 +14,8 @@
  *   phone-card lists), sticky table headers inside those regions,
  *   .mkt-tabs toggle styling, and .depth-bar geometry + colors. All colors
  *   are theme tokens (var(--buy)/var(--sell)/var(--border)/var(--panel));
- *   the only numeric styling is the depth alpha (0.15, the original rgba
- *   alpha) and row-count heights. No framework, no CDN, no build step.
+ *   the only numeric styling is the depth-wash alpha (0.35, tuned from the
+ *   original 0.15 rgba for full-row wash legibility) and row-count heights. No framework, no CDN, no build step.
  * Consumes: --depth (percent string set inline per row/card by
  *   market-book.js from Market.depth cumulative fractions); theme tokens
  *   from themes.css; row-height estimates documented per variable.
@@ -41,7 +41,14 @@
   --desk-trades-row-h: 34px; /* trades row: 0.9rem type + 6px/8px pad + border */
   --desk-orders-row-h: 48px; /* orders row: base 12px pad + border */
   --desk-picker-row-h: 48px; /* picker row: 44px touch target + 4px gap */
-  --desk-depth-alpha: 0.15;  /* original bar alpha (OrderBook.jsx:177-183) */
+  /* Full-row wash alpha (pool-book retro batch 2026-09-29): raised 0.15 -> 0.35
+   * for wash legibility. 0.15 matched OrderBook.jsx:177-183 literally but read
+   * as thin grey bars in vanilla/notes/pool-book-compare shots; the original
+   * vanilla/notes/original-buy-sell-2x3-2026-09-28.png carries a strong
+   * full-row green/red wash with white text above. 0.35 keeps text contrast
+   * in all three themes (text rides above via .cell-text z-index) while
+   * reading as a wash, not a tint. */
+  --desk-depth-alpha: 0.35;
 }
 
 /* Desk grid placement (grid ONLY — areas; columns mirror app.css so the
@@ -130,7 +137,8 @@
   border: 1px solid var(--border);
   border-radius: 6px;
 }
-.trades-scroll {
+.trades-scroll,
+.pool-hist-scroll {
   max-height: calc(var(--desk-head-h) + 15 * var(--desk-trades-row-h));
   overflow-y: auto;
   border: 1px solid var(--border);
@@ -165,6 +173,7 @@
 /* Tables sit flush in their scrollers (no trailing margin slack). */
 .book-scroll table,
 .trades-scroll table,
+.pool-hist-scroll table,
 .orders-scroll table {
   margin-bottom: 0;
 }
@@ -172,6 +181,7 @@
  * under; z-index above the depth bars below). */
 .book-scroll thead th,
 .trades-scroll thead th,
+.pool-hist-scroll thead th,
 .orders-scroll thead th {
   position: sticky;
   top: 0;
@@ -179,12 +189,15 @@
   z-index: 3;
 }
 
-/* In-row depth bars, table version. The table uses the separate border model
- * (spacing 0 preserves the collapsed look) so td position:relative is a
- * reliable containing block. ONE .depth-bar per row lives in the price-side
- * anchor cell and spans --depth of the ROW: the fixed 3-column layout makes
- * each cell exactly 1/3 of the row, so 3x cell width = full row width
- * (capped at 300% = the whole row). Text rides above in .cell-text. */
+/* Full-row cumulative-depth wash, table version (original language: wash
+ * proportional to cumulative depth, not thin bars). The table uses the
+ * separate border model (spacing 0 preserves the collapsed look) so td
+ * position:relative is a reliable containing block. ONE .depth-bar per row
+ * lives in the price-side anchor cell and spans --depth of the ROW: the fixed
+ * 3-column layout makes each cell exactly 1/3 of the row, so 3x cell width =
+ * full row width (capped at 300% = the whole row). Text rides above in
+ * .cell-text (z-index 1 over the wash at z-index 0). Opacity is
+ * --desk-depth-alpha (0.35, tuned vs the original 2x3 capture). */
 .mkt-book .book-table,
 .mkt-bids .book-table,
 .mkt-asks .book-table {
@@ -197,6 +210,19 @@
 .book-cell .cell-text {
   position: relative;
   z-index: 1;
+}
+/* Colored price cells (original 2x3: bid prices green, ask prices red).
+ * Theme tokens only — never literal hex. Hooks are .book-price-bid/ask on the
+ * price td (market-book.js renderBookSide, ci 0) so mirrored column order
+ * stays AS-IS; raw/title attrs on the row are untouched. Cards mirror via the
+ * same hooks on the first .cell-text div. */
+.book-cell.book-price-bid .cell-text,
+.book-row-card .cell-text.book-price-bid {
+  color: var(--buy);
+}
+.book-cell.book-price-ask .cell-text,
+.book-row-card .cell-text.book-price-ask {
+  color: var(--sell);
 }
 tr.book-row .depth-bar {
   position: absolute;
@@ -219,8 +245,9 @@ tr.book-bid-row .depth-bar {
   background: var(--buy);
 }
 
-/* In-row depth bars, phone-card version (plain divs: bar width is --depth
- * of the card directly; text divs ride above). */
+/* In-row depth wash, phone-card version (plain divs: bar width is --depth
+ * of the card directly; text divs ride above via z-index). Same alpha token
+ * as the table wash so both desks agree. */
 .book-row-card {
   position: relative;
   overflow: hidden;

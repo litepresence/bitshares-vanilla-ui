@@ -558,8 +558,9 @@ var PoolDetailUI = (function () {
       book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
       return;
     }
-    /* Click-fill: DOM rows follow their side array order (asks ship reversed
-     * for display — same array renderBookSide receives). Ask rows are
+    /* Click-fill: DOM rows follow their side array order (chain order,
+     * best-first, lowest ask on top — same as the exchange split renderer
+     * since commit 4adad6b; no reverse anywhere). Ask rows are
      * taker-buys-A (pay leg B); bid rows are taker-sells-A (pay leg A);
      * amounts are the exact human strings on the row. */
     function fillSwap(human, dir) {
@@ -583,7 +584,7 @@ var PoolDetailUI = (function () {
       var sides = host.querySelectorAll(".book-asks, .book-bids");
       Array.prototype.forEach.call(sides, function (side) {
         var isAsk = side.className.indexOf("book-asks") !== -1;
-        var arr = isAsk ? levels.asks.slice().reverse() : levels.bids;
+        var arr = isAsk ? levels.asks : levels.bids;
         var rows = side.querySelectorAll("table tbody tr, .book-row-card");
         Array.prototype.forEach.call(rows, function (row, i) {
           var lv = arr[i];
@@ -649,21 +650,23 @@ var PoolDetailUI = (function () {
     return table;
   }
   function historyPane(doc, hist, r, tape, myGen, uiGen) {
-    /* Swap tape (Time / Price / Paid / Received / Account) + My-exchanges
+    /* Swap tape (Time / Price / Paid / Received / Account) + My-swaps
      * toggle — mirrors the market desk Recent/My tabs (same mkt-tabs
      * contract, same locked-hint). Rows come from the shared tape fetch
-     * (executed paid/received, human strings, raw in title). */
+     * (executed paid/received, human strings, raw in title). Long tapes
+     * scroll in place inside .pool-hist-scroll (same 15-row metrics as
+     * .trades-scroll in desk-grid.css), never running down the page. */
     var u = U();
     /* Toggle mirrors #1 MarketHistory group-1 tabs (Exchange.jsx:2551-2616):
-     * Pool history (all events) vs My exchanges (wallet op-63 for this pool).
+     * Pool history (all events) vs My swaps (wallet op-63 for this pool).
      * My needs unlock: locked wallets get the Wallet-link hint (#9). */
     var tabs = doc.createElement("div");
     tabs.className = "mkt-tabs";
     tabs.setAttribute("role", "tablist");
-    tabs.setAttribute("aria-label", t("pool.exchanges_toggle_label", "Pool or my exchanges"));
+    tabs.setAttribute("aria-label", t("pool.exchanges_toggle_label", "Pool or my swaps"));
     var tabPool = u.touchable(u.el(doc, "button", t("pool.tab_pool", "Pool history")));
     tabPool.type = "button"; tabPool.id = "pool-hist-tab-pool"; tabPool.setAttribute("role", "tab");
-    var tabMy = u.touchable(u.el(doc, "button", t("pool.tab_my", "My exchanges")));
+    var tabMy = u.touchable(u.el(doc, "button", t("pool.tab_my", "My swaps")));
     tabMy.type = "button"; tabMy.id = "pool-hist-tab-my"; tabMy.setAttribute("role", "tab");
     tabs.appendChild(tabPool); tabs.appendChild(tabMy);
     hist.appendChild(tabs);
@@ -671,7 +674,7 @@ var PoolDetailUI = (function () {
     var myBody = u.el(doc, "div"); myBody.id = "pool-hist-my"; myBody.setAttribute("role", "tabpanel");
     hist.appendChild(poolBody); hist.appendChild(myBody);
     var cur = "pool";
-    /* paint: Pool-history vs My-exchanges tab visibility + ARIA. */
+    /* paint: Pool-history vs My-swaps tab visibility + ARIA. */
     function paint() {
       var isMy = cur === "my";
       tabPool.setAttribute("aria-selected", isMy ? "false" : "true");
@@ -692,10 +695,13 @@ var PoolDetailUI = (function () {
     } else if (!swaps.length) {
       poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet."), "muted"));
     } else {
-      poolBody.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
+      var scroller = doc.createElement("div");
+      scroller.className = "pool-hist-scroll";
+      scroller.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
+      poolBody.appendChild(scroller);
     }
-    myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My exchanges to see your fills in this pool."), "muted"));
-    /* loadMy: My-exchanges tab body (typed-account preview + locked hint +
+    myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My swaps to see your fills in this pool."), "muted"));
+    /* loadMy: My-swaps tab body (typed-account preview + locked hint +
      * unlocked wallet tape, filtered to this pool). Params: container els,
      * confirm-row spec, generation pair. Route-gen guarded. */
     function loadMy(poolBodyEl, myBodyEl, row, g1, g2) {
@@ -719,19 +725,23 @@ var PoolDetailUI = (function () {
       myBodyEl.appendChild(viewBtn);
       var listBox = u.el(doc, "div");
       myBodyEl.appendChild(listBox);
-      /* drawMine: paint one account's pool exchanges (empty -> hint).
-       * No-ops when the route generation moved on. */
+      /* drawMine: paint one account's pool swaps (empty -> hint).
+       * No-ops when the route generation moved on. Long lists scroll in
+       * place inside .pool-hist-scroll (same metrics as .trades-scroll). */
       function drawMine(mine) {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
-        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
-        listBox.appendChild(tapeTable(doc, mine.slice(0, 20), row));
+        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool."), "muted")); return; }
+        var scroller = doc.createElement("div");
+        scroller.className = "pool-hist-scroll";
+        scroller.appendChild(tapeTable(doc, mine.slice(0, 20), row));
+        listBox.appendChild(scroller);
       }
       /* lockedHint: locked-wallet empty state with a Wallet link. */
       function lockedHint() {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
-        var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
+        var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your swaps in this pool. "), "muted");
         var a = doc.createElement("a");
         a.textContent = t("market.go_wallet", "Go to Wallet");
         a.setAttribute("href", "#/wallet");
@@ -763,7 +773,7 @@ var PoolDetailUI = (function () {
           drawMine(tape2.filter(function (sw) { return sw && String(sw.account) === String(acct.id); }));
         }).catch(function (e) {
           if (!live(g1, g2)) return;
-          u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+          u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
         });
       }
       viewBtn.addEventListener("click", loadTyped);
@@ -788,7 +798,7 @@ var PoolDetailUI = (function () {
         drawMine(tape2.filter(function (sw) { return sw && String(sw.account) === String(myId); }));
       }).catch(function (e) {
         if (!live(g1, g2)) return;
-        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
       });
     }
   }
