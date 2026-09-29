@@ -1281,8 +1281,17 @@ var MarketDesk = (function () {
         var out = { feed: feed, settle: null };
         try {
           var fund = bit && bit.settlement_fund;
+          /* Round-3 verified: globally-settled flag is exact BigInt (the fund
+           * is a raw chain integer; Number() would still zero-test correctly
+           * but BigInt keeps the integer discipline of this read path). */
+          var fundStr = (fund === null || fund === undefined) ? "0" : String(fund).trim();
+          var isSettled = false;
+          try {
+            if (/^-?\d+$/.test(fundStr)) isSettled = BigInt(fundStr) > 0n;
+            else isSettled = Number(fund) > 0;
+          } catch (e) { isSettled = Number(fund) > 0; }
           var sp = bit && bit.settlement_price;
-          if (Number(fund) > 0 && sp && sp.base && sp.quote) {
+          if (isSettled && sp && sp.base && sp.quote) {
             var sB = null, sQ = null;
             [sp.base, sp.quote].forEach(function (leg) {
               if (leg.asset_id === b.id) sB = String(leg.amount);

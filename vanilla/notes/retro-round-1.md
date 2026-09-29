@@ -220,3 +220,107 @@ stubs). Picker header otherwise reuses `pool.market_col`, `market.th_price`,
   toggle mirrors the proven dashboard tab pattern) — needs the human
   browser pass: click each account tab + picker Starred tab + inspect a
   strip Feed title attr.
+
+---
+
+# Round 3 (2026-09-29) — settlement verification + picker change colors
+
+Closes the two recorded Round-2 gaps: the Settlement half-cell and the
+uncolored picker CHANGE column. Display-only (no new routes, no signing path,
+no settings shape). Same server + shooter as rounds 1–2
+(`python3 -m http.server 8081 --directory vanilla`,
+`PLAYWRIGHT_BROWSERS_PATH=/workspace/tooling/visual/.browsers node
+tooling/visual/shot.mjs`). Every shot below was READ (no blind claims).
+Touched files: `vanilla/js/market-picker.js` + `vanilla/js/market-desk.js` +
+`vanilla/css/app.css` + this note. Untouched per scope: reference/, docs/,
+tooling/, chain.js, tx.js, wallet.js, crypto.js.
+
+## Settlement cell (VERIFIED, one hardening edit)
+
+- **#1 formula** (`ExchangeHeader.jsx:160-198`): globally-settled assets
+  (`bitasset.settlement_fund > 0`) show the on-chain `settlement_price` as
+  "Global Settlement" via `Price.toReal()` (float, `MarketClasses.js:275-285`)
+  with a `1/x` float invert when the market base is BTS (`1.3.0`); live
+  assets show feed ×/÷ `(1 + force_settlement_offset_percent/10000)` in
+  float (`:190-198`).
+- **Vanilla global path was already exact** (`market-desk.js` fetchFeed):
+  legs map by `asset_id` onto the market base/quote and format through
+  `Format.formatPrice` (BigInt, half-up to 8 places) — mathematically the
+  market-oriented `toReal()` with the BTS-leg invert folded into the leg
+  mapping, minus #1's float. MATH ported, not files. Round-3 edit is one
+  line of discipline only: the settled flag went from `Number(fund) > 0` to
+  an exact `BigInt(fundStr) > 0n` integer test (verified against
+  `MarketClasses.js:59-63` `toSats` + `:275-285`: the fund is a raw chain
+  integer, so the zero/nonzero verdict is integer business).
+- **Display** already follows the Feed rule: the settle value renders through
+  the strip's shared `cell()` (`market-ind.js` renderStrip) — trim6 at
+  render, full-precision chain string on `title`. Non-MPA pairs and every
+  failure still fail open (no cells, ticker strip stands).
+- **Live proof is an honest empty:** bitCNY is NOT globally settled, so
+  `#/market/BTS_CNY` shows Feed `0.066686` and no Settlement cell — exactly
+  the designed behavior. The global-settlement branch (same object, zero
+  extra calls) cannot be shot live today: no curated pair touches a
+  globally-settled asset. Deliberately skipped: the live-asset
+  offset-adjusted estimate stays out (needs exact reciprocal-percent string
+  math #1 does in float — recorded in Round 2, still out of display-only
+  scope). No estimate is shown anywhere; no guessing.
+
+## Picker change colors (CLOSED)
+
+- **Single renderer confirmed:** `MarketPicker.renderPicker` is the only
+  picker renderer in the app (used by the exchange rail + the empty-market
+  state, `market-desk.js:210,594`). No pool picker reuses it (pool tables
+  own their columns; `pool-ui.js` has no ticker-change column) — so one
+  paint point covers "both desks' pickers".
+- **Sign test is string-only** (`market-picker.js` chgSign/paintChg):
+  `+1.2`/`1.2` → pos, `-0.5` → neg, `0`/`0.00`/`-0.00` → zero,
+  unparseable (`—`, `%`-suffixed, blank) → null (stays muted). Float never
+  touches the text; percents still render verbatim (no trim6 — D1 rule).
+- **Color is text-only via theme tokens** (`app.css`, (0,2,0) so it beats
+  `.muted` with the JS also dropping `.muted` on pos/neg — either layer
+  alone wins): pos → `var(--buy)`, neg → `var(--sell)`, zero →
+  `var(--muted)`. Grid columns, rows, and targets untouched — no layout
+  shift; the CHANGE span is non-interactive (no 44px rule applies; stars,
+  links, tabs keep theirs).
+- **Live state today is all-zero:** every curated ticker reads `0` change,
+  so all visible CHANGE cells render muted — correct, not a miss. pos/neg
+  proved by logic vectors (`0`→zero, `0.00`→zero, `-0.00`→zero, `+0`→zero,
+  `1.2`→pos, `+1.2`→pos, `-0.5`→neg, `0.000001`→pos, `-12.34%`/`—`/`""`→
+  null) plus the token mapping, which the dexux shot confirms legible.
+  Human pass: re-check on a moving market for live green/red.
+
+## i18n (zero new keys)
+
+No new display strings (sign classes reuse existing cells; settlement keys
+`market.stat_feed` / `market.stat_settle` / `market.stat_global_settle`
+already landed in Round 2). `check_i18n.py`: OK (2164 keys, 2833 call
+sites — unchanged).
+
+## Shots (all in /tmp, all READ, zero console errors each)
+
+- r3-desk.png (1440, ref-ui): strip Latest/Δ/Vol/Bid–Ask + Feed `0.066686`,
+  no Settlement (honest empty); picker table VOL/PRICE/CHANGE with muted
+  zeros; spread/midpoint trimmed.
+- r3-desk-phone.png (390): strip wraps, no sideways overflow, Feed cell
+  intact; picker below fold as before.
+- r3-desk-dexux.png (1440, dex-ux-theme): same strip + picker legible in
+  dark theme (token colors hold).
+
+## Verify
+
+- `node --check` on both touched JS files: OK.
+- `python3 tooling/check_rot.py`: PASS.
+- `python3 tooling/check_i18n.py`: OK (2164 keys, 2833 call sites).
+- 3 shots, zero console errors on every one (shooter exits 2 on errors).
+- 44px: no interactive element added or resized (CHANGE span is
+  non-interactive); stars/links/tabs keep min-height 44px.
+- Anti-rot gates: (a) 10-year test — platform DOM + vendored Format only,
+  2-RPC read path unchanged, CSS is tokens only; (b) newly depended on:
+  nothing; (c) deletable subset: chgSign/paintChg + 3 CSS rules revert to
+  all-muted by deleting the paint call; the BigInt fund flag reverts to the
+  Number test in one line.
+- Deliberately skipped: live-asset settlement estimate (float
+  reciprocal-percent math — recorded above, not guessed); strip 24h Δ
+  coloring (picker scope only); live green/red screenshot (chain shows all
+  zeros today — logic vectors + token mapping stand in, human pass on a
+  moving market).

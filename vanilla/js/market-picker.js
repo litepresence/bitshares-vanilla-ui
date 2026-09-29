@@ -87,7 +87,41 @@ var MarketPicker = (function () {
       done(row);
     }).catch(function () { _tickCache[id] = null; done(null); });
   }
-  /* Network from Store (sole settings owner); mainnet when unreadable. */
+  /* Change-sign class (retro round 3 — the original FIND MARKETS CHANGE
+   * column reads red/green; ours stayed muted grey per the round-2 residual).
+   * String-only sign test on the ticker percent_change text (display text,
+   * never money — and float never touches it either): "+1.2"/"1.2" -> pos,
+   * "-0.5" -> neg, "0"/"0.00"/"-0.00" -> zero, unparseable -> null (stays
+   * muted). Params: s trimmed display string. Returns pos/neg/zero/null. */
+  function chgSign(s) {
+    var m = /^([+-]?)(\d+)(?:\.(\d+))?$/.exec(s);
+    if (!m) return null;
+    var digits = (m[2] + (m[3] || "")).replace(/^0+/, "");
+    if (digits === "") return "zero";
+    return m[1] === "-" ? "neg" : "pos";
+  }
+
+  /* Paint one CHANGE cell: verbatim text (percents pass through untrimmed per
+   * the D1 rule) + sign class for theme-token color (text only, no layout
+   * shift). Non-interactive span — no touch target. Never throws. */
+  function paintChg(cell, raw) {
+    if (raw === null || raw === undefined) return;
+    cell.textContent = String(raw);
+    var k = chgSign(String(raw).trim());
+    if (k === null) return;
+    try {
+      cell.classList.remove("mkt-pk-chg-pos", "mkt-pk-chg-neg", "mkt-pk-chg-zero");
+      if (k === "pos") {
+        cell.classList.remove("muted");
+        cell.classList.add("mkt-pk-chg-pos");
+      } else if (k === "neg") {
+        cell.classList.remove("muted");
+        cell.classList.add("mkt-pk-chg-neg");
+      } else {
+        cell.classList.add("mkt-pk-chg-zero");
+      }
+    } catch (e) { /* text stands uncolored */ }
+  }
   function network() {
     try {
       if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
@@ -428,7 +462,7 @@ var MarketPicker = (function () {
             priceCell.textContent = trim6(r.latest);
             try { priceCell.title = r.latest; } catch (e) { /* text stands */ }
           }
-          if (r.chg !== null) chgCell.textContent = r.chg;
+          if (r.chg !== null) paintChg(chgCell, r.chg);
         });
         ul.appendChild(li);
       });

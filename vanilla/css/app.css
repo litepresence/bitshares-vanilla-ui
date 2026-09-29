@@ -222,6 +222,13 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
 .mkt-picker-row .star-icon { width: 1em; height: 1em; margin-right: 4px; }
 td .cell-icon { width: 1.1em; height: 1.1em; }
 .error { color: var(--danger); } .muted { color: var(--muted); }
+/* Retro round 3 — picker CHANGE colors (text only, no layout shift):
+ * positive green / negative red / zero muted via theme tokens. (0,2,0)
+ * beats .muted (0,1,0) by specificity (round-1 precedent), and the JS also
+ * drops .muted on pos/neg — either layer alone wins. */
+.mkt-picker-list .mkt-pk-chg-pos { color: var(--buy); }
+.mkt-picker-list .mkt-pk-chg-neg { color: var(--sell); }
+.mkt-picker-list .mkt-pk-chg-zero { color: var(--muted); }
 /* Market desk (slice-05): single column stacked chart/book/trades/side on
  * phones; three-column book|charts+trades|side desk at >=1200px. Tables and
  * cards reuse .node-table/.node-cards above; canvases size via CSS (JS only
