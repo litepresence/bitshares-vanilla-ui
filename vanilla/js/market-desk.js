@@ -264,7 +264,7 @@ var MarketDesk = (function () {
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
       depthLogX: true, depthLogY: true,
-      over: { sma: true, ema: true, bb: false, psar: false },
+      over: { sma: [{ p: 10 }], ema: [{ p: 50 }] },
       /* Task 4b stacked panes: one checkbox per key below; MACD stays on by
        * default to preserve the Task-4 look. panes.oscs maps key -> pane
        * handle from drawOscPane; paneEls maps key -> {wrap, body} DOM nodes.

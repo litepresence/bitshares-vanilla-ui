@@ -177,7 +177,7 @@ var PoolDetailUI = (function () {
     charts.appendChild(oscNote);
     var P = {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
-      over: { sma: true, ema: true }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
+      over: { sma: [{ p: 10 }], ema: [{ p: 50 }] }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
       /* Toggleable plots (menu "Plots" group): only price is always on. */
       showVwap: true, showDepth: true,
       candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,

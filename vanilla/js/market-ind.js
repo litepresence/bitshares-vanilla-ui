@@ -347,82 +347,108 @@ var MarketInd = (function () {
     }
   }
 
-  /* Price-pane overlay lines from the picker checkboxes. Each entry is
-   * {name, color, values} aligned to the candle slots (warmup nulls break
-   * the line, never dive to zero). Colors are live theme tokens. Unavailable
-   * indicator functions are skipped (see ind()), never throw. */
+  /* Overlay specs (meshable price plots): exactly ONE adjustable number each
+   * (period, deviation %, or PSAR step) — validated + clamped in the menu,
+   * never trusted raw. kind selects the data legs; run() calls the indicator
+   * fn and returns either one values array or [upper, mid, lower] when
+   * lines: 3 (bands share the muted/accent/muted convention; single lines
+   * rotate the theme palette so a 5/10/50 mesh reads apart). Fixed-param
+   * overlays (vidya/aema/holtwinters — multi-knob fns) keep legacy single
+   * checkbox rows in the menu (OVERLAY_FIXED). Defaults equal today's
+   * hardcoded values, so the default desk (SMA 10 + EMA 50) is unchanged. */
+  var OVERLAY_SPECS = {
+    sma: { label: "SMA", fn: "sma", param: { name: "period", def: 10, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    ema: { label: "EMA", fn: "ema", param: { name: "period", def: 50, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    dema: { label: "DEMA", fn: "dema", param: { name: "period", def: 21, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    tema: { label: "TEMA", fn: "tema", param: { name: "period", def: 21, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    wma: { label: "WMA", fn: "wma", param: { name: "period", def: 9, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    kama: { label: "KAMA", fn: "kama", param: { name: "period", def: 10, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    linreg: { label: "LINREG", fn: "linreg", param: { name: "period", def: 14, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    tsf: { label: "TSF", fn: "tsf", param: { name: "period", def: 14, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, Math.round(p)); } },
+    vwma: { label: "VWMA", fn: "vwma", param: { name: "period", def: 20, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.closes, a.vols, Math.round(p)); } },
+    bb: { label: "BB", fn: "bbands", lines: 3, param: { name: "period", def: 20, min: 2, max: 500 },
+      run: function (f, a, p) { var r = f(a.closes, { period: Math.round(p), stddev: 2 }); return [r.upper, r.middle, r.lower]; } },
+    psar: { label: "PSAR", fn: "psar", param: { name: "step", def: 0.02, min: 0.005, max: 0.5 },
+      run: function (f, a, p) { return f(a.highs, a.lows, { step: p, max: 0.2 }); } },
+    keltner: { label: "Keltner", fn: "keltner", lines: 3, param: { name: "period", def: 20, min: 2, max: 500 },
+      run: function (f, a, p) { var r = f(a.highs, a.lows, a.closes, { atr: Math.round(p), ema: Math.round(p) }); return [r.upper, r.middle, r.lower]; } },
+    donchian: { label: "Donchian", fn: "donchian", lines: 3, param: { name: "period", def: 20, min: 2, max: 500 },
+      run: function (f, a, p) { var r = f(a.highs, a.lows, Math.round(p)); return [r.upper, r.middle, r.lower]; } },
+    supertrend: { label: "Supertrend", fn: "supertrend", param: { name: "period", def: 14, min: 2, max: 500 },
+      run: function (f, a, p) { return f(a.highs, a.lows, a.closes, { period: Math.round(p) }).trend; } },
+    zigzag: { label: "ZigZag", fn: "zigzag", param: { name: "deviation %", def: 5, min: 0.5, max: 20 },
+      run: function (f, a, p) { return f(a.closes, p).line; } },
+    kagi: { label: "KAGI", fn: "kagi", param: { name: "deviation %", def: 2, min: 0.5, max: 20 },
+      run: function (f, a, p) { return f(a.closes, p); } }
+  };
+  /* Fixed-param overlays: legacy single-checkbox rows (no mesh UI). */
+  var OVERLAY_FIXED = ["vidya", "aema", "holtwinters"];
+
+  /* Price-pane overlay lines from instance lists. state.over maps key ->
+   * [{p: number}, ...] (mesh: several periods of one indicator); legacy
+   * booleans (true = one default instance) are normalized, never thrown on.
+   * Each entry is {name, color, values} aligned to the candle slots (warmup
+   * nulls break the line, never dive to zero). Unavailable fns are skipped
+   * (see ind()), never throw. */
   function priceOverlays(state, closes, highs, lows, vols, C) {
     var out = [];
-    var f;
+    var over = (state && state.over) || {};
+    /* Legacy booleans -> instance lists (pool/exchange inits already ship
+     * lists; this only guards foreign states). */
+    Object.keys(over).forEach(function (k) {
+      if (over[k] === true) over[k] = [{}];
+      else if (!Array.isArray(over[k])) over[k] = [];
+    });
+    var palette = [C.buy, C.sell, C.accent, C.warn, C.muted];
+    var ci = 0;
+    var legs = { closes: closes, highs: highs, lows: lows, vols: vols };
+    function nextColor() { var c = palette[ci % palette.length]; ci++; return c; }
+    function clampP(spec, p) {
+      var v = (typeof p === "number" && isFinite(p)) ? p : spec.param.def;
+      if (v < spec.param.min) return spec.param.min;
+      if (v > spec.param.max) return spec.param.max;
+      return v;
+    }
     try {
-      if (state.over.sma && (f = ind("sma"))) {
-        out.push({ name: "SMA 10", color: C.buy, values: f(closes, 10) });
-      }
-      if (state.over.ema && (f = ind("ema"))) {
-        out.push({ name: "EMA 50", color: C.sell, values: f(closes, 50) });
-      }
-      if (state.over.bb && (f = ind("bbands"))) {
-        var bb = f(closes, { period: 20, stddev: 2 });
-        out.push({ name: "BB upper", color: C.muted, values: bb.upper });
-        out.push({ name: "BB mid", color: C.accent, values: bb.middle });
-        out.push({ name: "BB lower", color: C.muted, values: bb.lower });
-      }
-      if (state.over.psar && (f = ind("psar"))) {
-        out.push({ name: "PSAR", color: C.warn, values: f(highs, lows, { step: 0.02, max: 0.2 }) });
-      }
-      /* Parity-round overlays (single line unless noted; defaults match each
-       * fn's own default period — the menu shows symbols, tooltips carry
-       * params where they matter). */
-      if (state.over.dema && (f = ind("dema"))) {
-        out.push({ name: "DEMA 21", color: C.buy, values: f(closes, 21) });
-      }
-      if (state.over.tema && (f = ind("tema"))) {
-        out.push({ name: "TEMA 21", color: C.sell, values: f(closes, 21) });
-      }
-      if (state.over.wma && (f = ind("wma"))) {
-        out.push({ name: "WMA 9", color: C.accent, values: f(closes, 9) });
-      }
-      if (state.over.kama && (f = ind("kama"))) {
-        out.push({ name: "KAMA 10", color: C.warn, values: f(closes, 10) });
-      }
-      if (state.over.vidya && (f = ind("vidya"))) {
+      Object.keys(OVERLAY_SPECS).forEach(function (key) {
+        var spec = OVERLAY_SPECS[key];
+        var list = over[key] || [];
+        if (!list.length) return;
+        var f = ind(spec.fn);
+        if (!f) return;
+        list.forEach(function (inst) {
+          var p = clampP(spec, inst ? inst.p : null);
+          var tag = spec.label + " " + p;
+          try {
+            if (spec.lines === 3) {
+              var r3 = spec.run(f, legs, p);
+              out.push({ name: tag + " upper", color: C.muted, values: r3[0] });
+              out.push({ name: tag + " mid", color: C.accent, values: r3[1] });
+              out.push({ name: tag + " lower", color: C.muted, values: r3[2] });
+            } else {
+              out.push({ name: tag, color: nextColor(), values: spec.run(f, legs, p) });
+            }
+          } catch (e) { /* one bad instance never kills the pane */ }
+        });
+      });
+      var f;
+      if (over.vidya && over.vidya.length && (f = ind("vidya"))) {
         out.push({ name: "VIDYA", color: C.muted, values: f(closes, {}) });
       }
-      if (state.over.vwma && (f = ind("vwma"))) {
-        out.push({ name: "VWMA 20", color: C.accent, values: f(closes, vols, 20) });
-      }
-      if (state.over.linreg && (f = ind("linreg"))) {
-        out.push({ name: "LINREG 14", color: C.buy, values: f(closes, 14) });
-      }
-      if (state.over.tsf && (f = ind("tsf"))) {
-        out.push({ name: "TSF 14", color: C.sell, values: f(closes, 14) });
-      }
-      if (state.over.aema && (f = ind("aema"))) {
+      if (over.aema && over.aema.length && (f = ind("aema"))) {
         out.push({ name: "AEMA 14", color: C.muted, values: f(closes, {}) });
       }
-      if (state.over.holtwinters && (f = ind("holtwinters"))) {
+      if (over.holtwinters && over.holtwinters.length && (f = ind("holtwinters"))) {
         out.push({ name: "HOLT", color: C.accent, values: f(closes, {}).smooth });
-      }
-      if (state.over.supertrend && (f = ind("supertrend"))) {
-        out.push({ name: "SUPERTREND", color: C.warn, values: f(highs, lows, closes, {}).trend });
-      }
-      if (state.over.keltner && (f = ind("keltner"))) {
-        var kc = f(highs, lows, closes, {});
-        out.push({ name: "Kelt upper", color: C.muted, values: kc.upper });
-        out.push({ name: "Kelt mid", color: C.accent, values: kc.middle });
-        out.push({ name: "Kelt lower", color: C.muted, values: kc.lower });
-      }
-      if (state.over.donchian && (f = ind("donchian"))) {
-        var dc = f(highs, lows, 20);
-        out.push({ name: "Don upper", color: C.muted, values: dc.upper });
-        out.push({ name: "Don mid", color: C.accent, values: dc.middle });
-        out.push({ name: "Don lower", color: C.muted, values: dc.lower });
-      }
-      if (state.over.zigzag && (f = ind("zigzag"))) {
-        out.push({ name: "ZIGZAG", color: C.warn, values: f(closes, 5).line });
-      }
-      if (state.over.kagi && (f = ind("kagi"))) {
-        out.push({ name: "KAGI", color: C.accent, values: f(closes, 2) });
       }
     } catch (e) { /* one bad overlay must not kill the pane */ }
     return out;
@@ -875,6 +901,113 @@ var MarketInd = (function () {
     } catch (e) { /* sync is chrome — panes stand unlinked */ }
   }
 
+  /* Overlays menu section: meshable indicators get one row each (label +
+   * Add button) plus per-instance chips ([name] [period input] [x]) so a
+   * 5/10/50 SMA mesh is three Adds and two period edits — live preview on
+   * every change, no modal. Fixed-param overlays keep one legacy checkbox
+   * row. Period inputs validate + clamp to the spec range (invalid reverts,
+   * never reaches the math). All targets 44px. */
+  function overlaysGroup(doc, panel, state) {
+    var sec = doc.createElement("div");
+    sec.className = "mkt-indmenu-group";
+    var head = doc.createElement("div");
+    head.className = "mkt-indmenu-head";
+    head.textContent = t("market.overlays_group", "Overlays");
+    sec.appendChild(head);
+    if (!state.over || typeof state.over !== "object") state.over = {};
+    OVERLAY_DEFS.forEach(function (def) {
+      var key = def[0], label = overlayLabel(key, def[1]);
+      var spec = OVERLAY_SPECS[key];
+      if (!spec) {
+        /* Legacy single-checkbox row (fixed-param overlay). */
+        var lab = doc.createElement("label");
+        lab.className = "mkt-indmenu-item";
+        var box = doc.createElement("input");
+        box.type = "checkbox";
+        box.checked = !!(state.over[key] && state.over[key].length);
+        box.setAttribute("aria-label", label + " overlay");
+        if (!ind(key)) {
+          box.disabled = true;
+          lab.title = label + " unavailable in this build";
+        }
+        touchable(box);
+        box.addEventListener("change", function () {
+          state.over[key] = box.checked ? [{}] : [];
+          drawCharts(state);
+        });
+        lab.appendChild(box);
+        lab.appendChild(el(doc, "span", label));
+        sec.appendChild(lab);
+        return;
+      }
+      if (!ind(spec.fn)) {
+        var off = doc.createElement("div");
+        off.className = "mkt-indmenu-item";
+        off.textContent = label + " unavailable in this build";
+        sec.appendChild(off);
+        return;
+      }
+      if (!Array.isArray(state.over[key])) {
+        state.over[key] = state.over[key] === true ? [{}] : [];
+      }
+      var row = doc.createElement("div");
+      row.className = "mkt-indmenu-item";
+      row.appendChild(el(doc, "span", label));
+      var add = touchable(el(doc, "button", "＋"));
+      add.type = "button";
+      add.setAttribute("aria-label", "Add " + label + " overlay");
+      add.addEventListener("click", function () {
+        state.over[key].push({ p: spec.param.def });
+        paintChips();
+        drawCharts(state);
+      });
+      row.appendChild(add);
+      sec.appendChild(row);
+      var chips = doc.createElement("div");
+      chips.className = "mkt-indmenu-chips";
+      sec.appendChild(chips);
+      var step = (spec.param.min >= 1) ? 1 : (spec.param.def < 1 ? 0.005 : 0.5);
+      function paintChips() {
+        while (chips.firstChild) chips.removeChild(chips.firstChild);
+        state.over[key].forEach(function (inst, i) {
+          var chip = doc.createElement("div");
+          chip.className = "mkt-indmenu-chip";
+          chip.appendChild(el(doc, "span", label));
+          var num = doc.createElement("input");
+          num.type = "number";
+          num.value = String((inst && typeof inst.p === "number") ? inst.p : spec.param.def);
+          num.min = String(spec.param.min);
+          num.max = String(spec.param.max);
+          num.step = String(step);
+          num.setAttribute("aria-label", label + " " + spec.param.name);
+          num.style.minHeight = "44px";
+          num.addEventListener("change", function () {
+            var v = parseFloat(num.value);
+            if (!isFinite(v)) { num.value = String(inst.p !== undefined ? inst.p : spec.param.def); return; }
+            if (v < spec.param.min) v = spec.param.min;
+            if (v > spec.param.max) v = spec.param.max;
+            inst.p = v;
+            num.value = String(v);
+            drawCharts(state);
+          });
+          chip.appendChild(num);
+          var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
+          x.type = "button";
+          x.setAttribute("aria-label", "Remove " + label + " " + num.value);
+          x.addEventListener("click", function () {
+            state.over[key].splice(i, 1);
+            paintChips();
+            drawCharts(state);
+          });
+          chip.appendChild(x);
+          chips.appendChild(chip);
+        });
+      }
+      paintChips();
+    });
+    panel.appendChild(sec);
+  }
+
   /* Indicator dropdown menu (parity round, shared by market + pool desks):
    * one "Indicators" button + grouped checkbox panel (Overlays on the price
    * pane / Oscillator sub-panes), replacing the two sprawling checkbox rows.
@@ -945,10 +1078,7 @@ var MarketInd = (function () {
       });
       panel.appendChild(sec);
     }
-    var overItems = OVERLAY_DEFS.map(function (def) {
-      return [def[0], overlayLabel(def[0], def[1])];
-    });
-    group(t("market.overlays_group", "Overlays"), overItems, state.over, "over");
+    overlaysGroup(doc, panel, state);
     /* Toggleable plots (everything but price): VWAP strip + depth slice.
      * Labels are plain symbols (OSC_ORDER precedent — no dict entries). */
     group(t("market.plots_group", "Plots"),
@@ -992,6 +1122,8 @@ var MarketInd = (function () {
     CANDLE_COUNT: CANDLE_COUNT,
     OSC_ORDER: OSC_ORDER,
     OVERLAY_DEFS: OVERLAY_DEFS,
+    OVERLAY_SPECS: OVERLAY_SPECS,
+    priceOverlays: priceOverlays,
     overlayLabel: overlayLabel,
     ind: ind
   };

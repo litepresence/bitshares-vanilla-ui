@@ -104,6 +104,19 @@ a.btn-ghost { background: transparent; color: var(--accent);
   letter-spacing: 0.05em; margin: 0 0 4px; color: var(--muted); }
 .mkt-indmenu-item { display: flex; align-items: center; gap: 8px;
   min-height: 44px; padding: 0 4px; cursor: pointer; }
+.mkt-indmenu-item input[type="number"] { width: 5em; min-height: 44px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; }
+.mkt-indmenu-item button { min-height: 44px; min-width: 44px;
+  background: transparent; color: var(--accent); border: 1px solid var(--border);
+  border-radius: 6px; cursor: pointer; font-size: 1.1em; }
+.mkt-indmenu-chips { display: flex; flex-direction: column; gap: 4px;
+  margin: 0 0 4px 12px; }
+.mkt-indmenu-chip { display: flex; align-items: center; gap: 8px;
+  min-height: 44px; }
+.mkt-indmenu-chip input[type="number"] { width: 5em; min-height: 44px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; }
 .wrap { margin: 0 auto; padding: 16px; max-width: 720px; }
 .wrap.mkt-wrap { max-width: 1400px; }
 /* Wide screens earn their pixels (principle #7): fluid caps at desk widths
