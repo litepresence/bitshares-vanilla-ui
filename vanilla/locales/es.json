@@ -1240,6 +1240,10 @@
     "backend_missing": "Trade backend missing: js/tx.js, js/account.js, js/wallet.js or js/format.js failed to load.",
     "cancel_backend": "Trade backend missing: js/tx.js failed to load.",
     "cancel_button": "Cancel",
+    "balance": "Balance: ",
+    "balance_fail": "Balance unavailable \u2014 will check at review.",
+    "balance_loading": "Balance: loading\u2026",
+    "balance_locked": "Balance: 0 \u2014 unlock for balances",
     "cancel_warn": "Warning: canceling permanently removes this order from the book.",
     "checking": "Checking balance and fee…",
     "checking_fee": "Checking fee…",
@@ -1261,6 +1265,8 @@
     "fail_prepare": "Could not prepare the order.",
     "fail_scaled": "Scaled orders failed.",
     "fail_scaled_prepare": "Could not prepare scaled orders.",
+    "fee_preview": "Fee (preview): ",
+    "fee_preview_dash": "Fee (preview): \u2014",
     "fok_hint": " (cancel unless the whole order fills at once)",
     "fok_label": "Fill or kill ",
     "heading": "Trade",
@@ -1298,6 +1304,8 @@
     "unlock_button": "Unlock",
     "unlock_failed": "Unlock failed",
     "unlock_hint": "Unlock your wallet to trade on this market.",
+    "unlock_review": "Unlock & review",
+    "unlocking": "Unlocking\u2026",
     "yes": "Yes"
   },
   "transfer": {
