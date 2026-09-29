@@ -1,8 +1,16 @@
 /* Store: tiny pub/sub + localStorage persistence. Sole settings owner.
  * Owns: settings envelope (network/activeNode/customNodes/theme/locale),
  *   DEFAULT_NODES/CHAIN_IDS constants, settings+connection topics.
- * Consumes: localStorage (readStored/saveSettings only, never the socket).
- *   Side effects: localStorage reads/writes under SETTINGS_KEY, listener
+ * Storage backend seam (extension-wrapper): reads/writes go through
+ *   Store.backend {get(k), set(k,v), del(k)} — default wraps localStorage
+ *   (sync, web-identical: same keys, same timing); the extension injects
+ *   its chrome.storage-backed adapter via setBackend() before boot.
+ *   Sync contract preserved: loadSettings/saveSettings stay synchronous
+ *   (20+ call sites); view-state keys elsewhere (favs, last-market,
+ *   dismissal flags, i18n cache, contacts, gateway cache, alerts) stay on
+ *   direct localStorage by design — no secrets, extension-origin isolated.
+ * Consumes: Store.backend only (never raw localStorage, never the socket).
+ *   Side effects: backend reads/writes under SETTINGS_KEY, listener
  *   fan-out on emit. Created by: building-vanilla-slices skill,
  *   slice-01-shell-settings plan. */
 var Store = (function () {
@@ -35,6 +43,57 @@ var Store = (function () {
 
   var listeners = { settings: [], connection: [] };
 
+  /* Default backend: sync localStorage adapter. Sync on purpose — 20+
+   * call sites use loadSettings() synchronously at boot; async-ification
+   * is contained to Wallet (already async create/unlock). Extension pages
+   * keep extension-origin localStorage for settings (isolated from page
+   * origins); only the keystore envelope needs chrome.storage (Wallet).
+   * Params: k string key. get returns string|null (never throws — missing
+   *   storage, empty slot both yield null); set stringifies; del removes.
+   * Fails: never throws (guarded; set/del swallow blocked/full storage). */
+  var _defaultBackend = {
+    get: function (k) {
+      try {
+        if (typeof localStorage === "undefined") return null;
+        var raw = localStorage.getItem(k);
+        return (raw === undefined) ? null : raw;
+      } catch (e) { return null; }
+    },
+    set: function (k, v) {
+      try {
+        if (typeof localStorage === "undefined") return;
+        localStorage.setItem(k, String(v));
+      } catch (e) { /* blocked/full: in-memory value still emits */ }
+    },
+    del: function (k) {
+      try {
+        if (typeof localStorage === "undefined") return;
+        localStorage.removeItem(k);
+      } catch (e) { /* best-effort */ }
+    }
+  };
+
+  var _backend = null;
+
+  /* Active backend (default localStorage adapter until setBackend).
+   * Params: none. Returns the {get,set,del} backend. Fails: never. */
+  function _store() {
+    return _backend || _defaultBackend;
+  }
+
+  /* setBackend: inject a {get(k), set(k,v), del(k)} backend (extension
+   * entry point — call before boot; Store.backend is replaced so the new
+   * object is live for later readers). Params: backend object. Fails: bad
+   * shape throws. Never touches stored data (migration is the wrapper's). */
+  function setBackend(b) {
+    if (!b || typeof b.get !== "function" || typeof b.set !== "function" ||
+      typeof b.del !== "function") {
+      throw new Error("bad storage backend: need get/set/del functions");
+    }
+    _backend = b;
+    api.backend = b;
+  }
+
   /* baseSettings: fresh defaults (mainnet + first node + ref-ui-theme + en).
    *   Params: none. Returns a new settings object. Fails: never (pure). */
   function baseSettings() {
@@ -51,10 +110,14 @@ var Store = (function () {
    *   parsed object or null. Fails: never throws — missing storage, empty
    *   slot, or bad JSON all return null. */
   function readStored() {
+    var raw = null;
     try {
-      if (typeof localStorage === "undefined") return null;
-      var raw = localStorage.getItem(SETTINGS_KEY);
-      if (!raw) return null;
+      raw = _store().get(SETTINGS_KEY);
+    } catch (e) {
+      return null;
+    }
+    if (!raw) return null;
+    try {
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
       return parsed;
@@ -105,9 +168,7 @@ var Store = (function () {
       if (typeof patch.locale === "string") next.locale = patch.locale;
     }
     try {
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
-      }
+      _store().set(SETTINGS_KEY, JSON.stringify(next));
     } catch (e) { /* storage blocked/full: keep in-memory value, still emit */ }
     emit("settings", next);
     return next;
@@ -147,15 +208,19 @@ var Store = (function () {
     return (stored && typeof stored.locale === "string" && stored.locale) ? stored.locale : null;
   }
 
-  return {
+  var api = {
     loadSettings: loadSettings,
     saveSettings: saveSettings,
     storedLocale: storedLocale,
     subscribe: subscribe,
     emitConnection: emitConnection,
+    backend: _defaultBackend,
+    setBackend: setBackend,
     DEFAULT_NODES: DEFAULT_NODES,
     CHAIN_IDS: CHAIN_IDS
   };
+
+  return api;
 })();
 
 /* Expose the single Store global to Node for headless smoke tests (no-op in browsers). */
