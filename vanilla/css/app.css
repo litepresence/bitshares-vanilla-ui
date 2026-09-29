@@ -447,6 +447,32 @@ table.pools-table td.num { text-align: right; }
   .pools-scroll { overflow-x: auto; }
   .pools-scroll table.node-table { display: table; }
 }
+
+/* Alternating-row striping (pools selection + credit open-offers tables):
+ * table ground is --panel — lighter than the app --bg in ref-ui-theme
+ * (#3f3f3f over #2a2a2a) and vanilla-ui-theme (white over cream) — with even
+ * rows in --panel-deep (themes.css provenance per theme). DEVIATION recorded:
+ * dex-ux-theme defines --panel == --bg (#131722), so the table ground cannot
+ * be lighter there; the --panel-deep lift (#1c2030) still gives definition.
+ * Tokens only — all three themes. Sticky first-column cells re-assert the row
+ * tone so horizontally scrolled tables keep the stripe; the header row stays
+ * --panel via the base rule above. */
+.node-table tbody tr:nth-child(even),
+table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
+.node-table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
+/* Clickable offer rows (row click opens the loan modal; the per-row Borrow
+ * button is the touch/keyboard path — no hover-dependent UI). */
+table.offers-table tbody tr[data-offer] { cursor: pointer; }
+
+/* Credit loan modal (open-offers Borrow): fixed overlay + panel. Tokens
+ * only; the overlay scrolls so the form fits 360px phones; 44px targets come
+ * from the base button/input rules. */
+.credit-loan-overlay { position: fixed; inset: 0; z-index: 9500;
+  overflow-y: auto; background: rgba(0, 0, 0, 0.55); padding: 24px 12px; }
+.credit-loan-panel { background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  max-width: 560px; margin: 0 auto; padding: 16px; }
+.credit-loan-panel h2 { margin: 0 0 8px; font-size: 1.2rem; }
  * Choice: KEEP notify-ui.js host positioning inline as the pre-CSS
  * fallback; this stylesheet owns the skin (card, stripes, head/x layout,
  * alert rows, bell). Card has NO inline border/padding/background so these
@@ -571,6 +597,9 @@ img, canvas, pre { max-width: 100%; }
   .wrap.wide table { width: 100%; }
 }
 .pools-scroll { overflow-x: auto; }
+/* Credit open-offers table: 12 columns need a scroll region at every width
+ * (same contract as .pools-scroll above); sticky first column is global. */
+.offers-scroll { overflow-x: auto; }
 
 /* (f) Voting rows ≥720px: rows are wrapping flex cards with inline styles
  * (vote-slate.js rowCard — display:flex, wrap, gap; main flex 1 1 200px).

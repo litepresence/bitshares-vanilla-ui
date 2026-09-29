@@ -1,8 +1,10 @@
-/* credit-ui.js — #/credit-offer desk + op-69 create form + shared CreditUI._ui helpers.
- * Owns: offer list + filters + my-offers + op-69 create form (asset resolve,
- *   human rate/duration/min-deal, collateral/borrower rows, live fee, named-row
- *   confirm). Offer detail (#/credit-offer/:id) lives in credit-detail-ui.js and
- *   the Same-T desk (#/samet) in samet-ui.js (cap splits — pool-detail-ui.js
+/* credit-ui.js — #/credit-offer desk + op-69 create form + open-offers loan modal + shared CreditUI._ui helpers.
+ * Owns: OPEN OFFERS list (all chain offers, reference CreditOfferPage column
+ *   language) + loan modal (op-72 borrow against the row's offer, borrow leg
+ *   from the offer, password only at Sign & Send) + filters + my-offers +
+ *   op-69 create form (asset resolve, human rate/duration/min-deal,
+ *   collateral/borrower rows, live fee, named-row confirm). Offer detail
+ *   (#/credit-offer/:id) lives in credit-detail-ui.js and the Same-T desk (#/samet) in samet-ui.js (cap splits — pool-detail-ui.js
  *   precedent: detail files keep their own gen + check BOTH counters); Borrow
  *   (#/borrow) lives in borrow-ui.js and barter (#/barter) in barter-ui.js
  *   (pre-authorized). All four reuse the _ui helpers below (route gate,
@@ -272,6 +274,162 @@ var CreditUI = (function () {
       "Current " + r.cells[3].text + " / total " + r.cells[4].text,
       "Rate " + r.cells[5].text + " · " + r.cells[6].text + " · " + (o.enabled ? t("credit.enabled_2", "enabled") : t("credit.disabled", "disabled"))];
   }
+  /* Rate display that never kills the list: live chain data carries fee_rate
+   * units above FEE_RATE_DENOM (mainnet 25000000 observed 2026-09-29 — the
+   * u32 denom holds, the chain simply allows >100% offers). Human percent when
+   * in range, honest raw-units fallback otherwise (amt() precedent). */
+  function safeRate(u) {
+    try { return { text: Credit.rateUnitsToHuman(u) + "%", raw: String(u) }; }
+    catch (e) { return { text: String(u) + " (raw units)", raw: String(u) }; }
+  }
+  function safeRateHuman(u) { try { return Credit.rateUnitsToHuman(u); } catch (e) { return ""; } }
+  /* Open-offers table: reference CreditOfferPage._getColumns language (ID /
+   * Asset / Account / Total / Available / Min borrow / Fee rate / Repay period
+   * / Validity / Mortgage + Borrow action). Row click (never on links/buttons)
+   * and the Borrow button both open the loan modal; Enter on a focused row too.
+   * hostBox owns the modal overlay so a list reload clears a stale modal. */
+  function openOffersTable(doc, hostBox, myGen, rows) {
+    var box = el(doc, "div");
+    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
+    var table = doc.createElement("table"); table.className = "node-table offers-table";
+    table.appendChild(tableHead(doc, [t("credit.offer", "Offer"), t("credit.asset", "Asset"), t("credit.owner", "Owner"),
+      t("credit.total", "Total"), t("credit.current", "Current"), t("credit.min_deal_amount", "Min deal amount"),
+      t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"),
+      t("credit.auto_disable", "Auto-disable"), t("credit.collateral", "Collateral"),
+      t("credit.borrow", "Borrow"), ""]));
+    var tbody = doc.createElement("tbody");
+    rows.forEach(function (o) {
+      var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
+      var min = amt(o.min_deal_raw, o.prec, o.sym, o.asset_id), rt = safeRate(o.rate_units);
+      var tr = doc.createElement("tr"); tr.setAttribute("data-offer", o.id); tr.tabIndex = 0;
+      tr.appendChild(el(doc, "td", o.id));
+      tr.appendChild(el(doc, "td", o.sym || o.asset_id));
+      tr.appendChild(el(doc, "td", o.owner));
+      var c1 = el(doc, "td", tot.text); if (tot.raw) c1.title = "raw " + tot.raw; tr.appendChild(c1);
+      var c2 = el(doc, "td", cur.text); if (cur.raw) c2.title = "raw " + cur.raw; tr.appendChild(c2);
+      var c3 = el(doc, "td", min.text); if (min.raw) c3.title = "raw " + min.raw; tr.appendChild(c3);
+      var c4 = el(doc, "td", rt.text); if (rt.raw) c4.title = "raw " + rt.raw; tr.appendChild(c4);
+      tr.appendChild(el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
+      tr.appendChild(el(doc, "td", o.auto_disable_time || "—"));
+      tr.appendChild(el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));
+      var tdB = doc.createElement("td");
+      var bb = touchable(el(doc, "button", t("credit.borrow", "Borrow"))); bb.type = "button";
+      bb.addEventListener("click", function (e) { e.stopPropagation(); openLoanModal(doc, hostBox, myGen, o); });
+      tdB.appendChild(bb); tr.appendChild(tdB);
+      var tdO = doc.createElement("td");
+      var a = el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", "#/credit-offer/" + o.id); tdO.appendChild(a); tr.appendChild(tdO);
+      tr.addEventListener("click", function (e) {
+        var n = e.target;
+        while (n && n !== tr) { if (n.tagName === "A" || n.tagName === "BUTTON") return; n = n.parentElement; }
+        openLoanModal(doc, hostBox, myGen, o);
+      });
+      tr.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && myGen === gen) openLoanModal(doc, hostBox, myGen, o);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    var scroller = el(doc, "div", null, "offers-scroll");
+    scroller.appendChild(table); box.appendChild(scroller);
+    var cards = el(doc, "div", null, "node-cards");
+    rows.forEach(function (o) {
+      var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
+      var c = el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
+      c.appendChild(el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
+      c.appendChild(el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
+      c.appendChild(el(doc, "div", t("credit.current", "Current") + " " + cur.text + " / " + t("credit.total", "Total") + " " + tot.text));
+      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec)));
+      var cb = touchable(el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
+      cb.addEventListener("click", function () { openLoanModal(doc, hostBox, myGen, o); });
+      c.appendChild(cb);
+      var ca = el(doc, "a", t("credit.open", "Open")); ca.setAttribute("href", "#/credit-offer/" + o.id); c.appendChild(ca);
+      cards.appendChild(c);
+    });
+    box.appendChild(cards); return box;
+  }
+  /* Loan modal: borrow against one offer (op-72 accept, detail acceptBox shape).
+   * Borrow-leg asset ALWAYS comes from the offer (never typed). Password is
+   * asked only at Sign & Send (shared sendConfirm gate + inline unlock). */
+  function openLoanModal(doc, hostBox, myGen, o) {
+    if (myGen !== gen) return;
+    var locked = !isUnlockedNow();
+    var overlay = el(doc, "div", null, "credit-loan-overlay");
+    var panel = el(doc, "div", null, "credit-loan-panel");
+    panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-label", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id);
+    overlay.appendChild(panel); hostBox.appendChild(overlay);
+    function close() { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); }
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    function onKey(e) { if (e.key === "Escape") { close(); doc.removeEventListener("keydown", onKey); } }
+    doc.addEventListener("keydown", onKey);
+    panel.appendChild(el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
+    var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
+    var rt = safeRate(o.rate_units);
+    panel.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
+      [t("credit.asset", "Asset"), (o.sym || o.asset_id)],
+      [t("credit.current", "Current"), cur.text, "raw " + cur.raw], [t("credit.total", "Total"), tot.text, "raw " + tot.raw],
+      [t("credit.fee_rate", "Fee rate"), rt.text + " (denom 1,000,000)", "raw " + rt.raw],
+      [t("credit.max_duration", "Max duration"), Credit.durToHuman(o.max_dur_sec)]]));
+    if (locked) panel.appendChild(signNotice(doc));
+    var fBor = field(doc, t("credit.borrower", "Borrower"), locked
+      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
+    var fAmt = field(doc, t("credit.accept_borrow_amt_tpl", "Borrow amount (%(sym)s)", { sym: (o.sym || o.asset_id) }), { placeholder: "0.0", inputmode: "decimal" });
+    var fCollA = field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fColl = field(doc, t("credit.collateral_amount", "Collateral amount"), { placeholder: "0.0", inputmode: "decimal" });
+    var fRate = field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: safeRateHuman(o.rate_units), inputmode: "decimal" });
+    var fDur = field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });
+    [fBor, fAmt, fCollA, fColl, fRate, fDur].forEach(function (f) { panel.appendChild(f.row); });
+    var arRow = el(doc, "div", null, "xfer-field");
+    arRow.appendChild(el(doc, "span", t("credit.auto_repay_2", "Auto-repay: ")));
+    var arNames = [["", t("credit.omit_chain_default", "omit (chain default)")], ["0", t("credit.0_none", "0 — none")], ["1", t("credit.1_full_only", "1 — full only")], ["2", t("credit.2_partial_ok", "2 — partial ok")]];
+    var arInputs = arNames.map(function (n, i) {
+      var lab = el(doc, "label", " " + n[1] + " ");
+      var r = doc.createElement("input"); r.type = "radio"; r.name = "ar-loan-" + o.id; r.value = n[0];
+      if (i === 0) r.checked = true; touchable(r); lab.insertBefore(r, lab.firstChild);
+      arRow.appendChild(lab); return r;
+    });
+    panel.appendChild(arRow);
+    reviewSection(doc, panel, myGen, t("credit.review_accept", "Review accept"), {
+      build: async function () {
+        var bor = fBor.input.value.trim() ? await Account.resolve(fBor.input.value.trim())
+          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+        var a = await Asset.describe(o.asset_id);
+        var borrowRaw = Format.parseAmount(fAmt.input.value.trim(), a.precision);
+        var ca = await Asset.describe(fCollA.input.value.trim());
+        var collRaw = Format.parseAmount(fColl.input.value.trim(), ca.precision);
+        var arVal = null;
+        arInputs.forEach(function (r) { if (r.checked && r.value !== "") arVal = parseInt(r.value, 10); });
+        var pair = Credit.buildAccept({ borrowerId: bor.id, offerId: o.id, borrowRaw: borrowRaw,
+          borrowAssetId: o.asset_id, collRaw: collRaw, collId: ca.id,
+          maxRateHuman: fRate.input.value.trim(), minDurSec: fDur.input.value.trim(), autoRepayOrNull: arVal });
+        var quote = Credit.creditFee(borrowRaw, pair[1].max_fee_rate);
+        return { pair: pair, fee: await Credit.fee(pair, "1.3.0"), bor: bor, ca: ca, a: a, quote: quote,
+          prove: async function () {
+            try {
+              var rows = await Credit.dealsByOffer(o.id, {});
+              return rows.length ? rows[rows.length - 1] : null;
+            } catch (e) { return null; } } };
+      },
+      rows: function (R, fee) {
+        var op = R.pair[1];
+        var arWord = (op.extensions && op.extensions.auto_repay !== undefined)
+          ? Credit.autoRepayWord(op.extensions.auto_repay) : "omitted (chain default)";
+        return [[t("credit.borrower", "Borrower"), who(R.bor)], [t("credit.offer", "Offer"), o.id],
+          [t("credit.borrow", "Borrow"), Format.formatAmount(op.borrow_amount.amount, R.a.precision) + " " + R.a.symbol, "raw " + op.borrow_amount.amount],
+          [t("credit.collateral", "Collateral"), Format.formatAmount(op.collateral.amount, R.ca.precision) + " " + R.ca.symbol, "raw " + op.collateral.amount],
+          [t("credit.max_fee_rate", "Max fee rate"), Credit.rateUnitsToHuman(op.max_fee_rate) + "%", "raw " + op.max_fee_rate],
+          [t("credit.min_duration", "Min duration"), Credit.durToHuman(op.min_duration_seconds)],
+          [t("credit.auto_repay", "Auto-repay"), arWord],
+          [t("credit.quoted_credit_fee", "Quoted credit fee"), Format.formatAmount(R.quote, R.a.precision) + " " + R.a.symbol, "ceil(amount*rate/1M)"],
+          [t("credit.fee", "Fee"), fee.text, "raw " + fee.raw], [t("credit.network", "Network"), "testnet"]];
+      },
+      title: t("credit.confirm_accept", "Confirm accept"), ok: function () { return t("credit.deal_opened_accept_broadcast", "Deal opened (accept broadcast)."); }, fail: t("credit.could_not_prepare_the_accept", "Could not prepare the accept.") });
+    var closeBtn = touchable(el(doc, "button", t("trade.cancel_button", "Cancel"))); closeBtn.type = "button";
+    closeBtn.addEventListener("click", close);
+    panel.appendChild(closeBtn);
+    try { fBor.input.focus(); } catch (e) { /* keyboard path stays via tab order */ }
+  }
   /* Route entry: #/credit-offer — filters + offer table + my-offers + create. */
   function renderOffers(root) {
     if (!root) return;
@@ -293,20 +451,29 @@ var CreditUI = (function () {
     ctx.wrap.appendChild(el(doc, "h2", t("credit.create_offer", "Create offer")));
     if (locked0) ctx.wrap.appendChild(signNotice(doc));
     createBox(doc, ctx.wrap, myGen);
-    go.addEventListener("click", function () {
+    /* Open-offers list: auto-loads ALL chain offers (list_credit_offers);
+     * the Owner/Asset filter row + List button refine the SAME table
+     * (owner-first, then asset, else all). My-offers + create form below stay
+     * as they were. Empty/error states never blank (note / retry sentence). */
+    function showOpenOffers(rowsPromise) {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
       showStatus(doc, listBox, t("credit.loading_offers", "Loading offers…"));
-      var ow = fO.input.value.trim(), av = fA.input.value.trim();
-      Promise.resolve().then(async function () {
-        if (ow) return Credit.offersByOwner(ow, {});
-        if (av) return Credit.offersByAsset(av, {});
-        return Credit.offers({});
-      }).then(function (rows) {
+      Promise.resolve(rowsPromise).then(function (rows) {
         if (myGen !== gen) return; clearBox(listBox);
-        listBox.appendChild(deskTable(doc, [t("credit.offer", "Offer"), t("credit.owner", "Owner"), t("credit.asset", "Asset"), t("credit.current", "Current"), t("credit.total", "Total"), t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"), t("credit.enabled", "Enabled"), ""], offerRows(rows), offerCards));
+        listBox.appendChild(el(doc, "h2", t("credit.all_offers", "← All offers")));
+        listBox.appendChild(openOffersTable(doc, listBox, myGen, rows));
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("credit.could_not_load_offers", "Could not load offers."));
       }).then(function () { go.disabled = false; });
+    }
+    go.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      var ow = fO.input.value.trim(), av = fA.input.value.trim();
+      showOpenOffers(Promise.resolve().then(async function () {
+        if (ow) return Credit.offersByOwner(ow, {});
+        if (av) return Credit.offersByAsset(av, {});
+        return Credit.offers({});
+      }));
     });
     Account.myAccountId().catch(function () { return VIEWING_AS_ID; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return;
@@ -315,8 +482,8 @@ var CreditUI = (function () {
         if (myGen !== gen) return; clearBox(mineBox);
         mineBox.appendChild(deskTable(doc, [t("credit.offer", "Offer"), t("credit.owner", "Owner"), t("credit.asset", "Asset"), t("credit.current", "Current"), t("credit.total", "Total"), t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"), t("credit.enabled", "Enabled"), ""], offerRows(rows), offerCards));
       }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", t("credit.no_owned_offers", "No owned offers."), "muted")); } });
-      go.click();
-    }).catch(function () { if (myGen === gen) go.click(); });
+      showOpenOffers(Credit.offers({}));
+    }).catch(function () { if (myGen === gen) showOpenOffers(Credit.offers({})); });
   }
   /* Collateral price-leg inputs (asset + base amt/asset + quote amt/asset); empty rows skipped. */
   function collRow(doc, box) {

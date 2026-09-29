@@ -53,6 +53,12 @@
   --live: #7bd500;
 --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
   --plot-bg: #1e1e1e;
+  /* --panel-deep: alternating-row stripe (pools + credit open-offers tables).
+   * #373737 = PALETTE.md dark settings-menu-hover-bg ($settings-menu-hover-bg):
+   * an established darker-panel surface, one step below --panel #3f3f3f and
+   * above --bg #2a2a2a. (Row-accent #3c3c3c rejected: 3 grey steps from the
+   * panel read as no stripe at all.) */
+  --panel-deep: #373737;
   /* HELP button: #1's own hover treatment (darken($bs-blue, 10%),
    * _theme-template.scss:2213-2216) as a resting shade. */
   --button-bg-deep: #03739a;
@@ -89,6 +95,10 @@
   --live: #1DA866;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --plot-bg: #ffffff;
+  /* --panel-deep: warm stripe between cream ground --bg #FAF6EA and the
+   * cream-darkened --border #E5DCC8 (both tub-derived) — reads as shadowed
+   * cream on the white --panel, never cold office grey. */
+  --panel-deep: #F1EAD6;
   --button-bg-deep: #1786bb;
   --icon-filter: none;
 }
@@ -118,6 +128,11 @@
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --live: #26de81;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
+  /* --panel-deep: the theme's own sub-nav surface #1c2030 (style.css family;
+   * noted "unmapped by design" above — now mapped for striping only). DEVIATION
+   * recorded: --bg == --panel here, so no darker dex-ux surface exists; even
+   * rows LIFT instead of darken. Contrast preserved in both directions. */
+  --panel-deep: #1c2030;
   --toast-shadow: rgba(0, 0, 0, 0.5);
   /* Dark surfaces need light glyphs: full invert maps the vendored
    * black fills to white. Only monochrome glyphs are wired (nav, alarm,
