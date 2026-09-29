@@ -703,27 +703,84 @@ var PoolDetailUI = (function () {
         unlocked = typeof Wallet !== "undefined" && Wallet &&
           (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
       } catch (e) { unlocked = false; }
-      if (!unlocked) {
+      /* Typed-account preview row (principle #9: reads never gate on
+       * unlock). The pool tape is already fetched; a typed lookup only
+       * resolves the account and filters the same tape rows. Blank +
+       * locked keeps the Wallet-link hint. Unlocked prefills the wallet
+       * account; the wallet tape-filter below is unchanged. */
+      var fAcct = u.field(doc, t("account.card_account", "Account"),
+        { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N") });
+      myBodyEl.appendChild(fAcct.row);
+      var viewBtn = u.touchable(u.el(doc, "button", t("referrals.look_up", "Look up")));
+      viewBtn.type = "button";
+      myBodyEl.appendChild(viewBtn);
+      var listBox = u.el(doc, "div");
+      myBodyEl.appendChild(listBox);
+      function drawMine(mine) {
+        if (!live(g1, g2)) return;
+        u.clearBox(listBox);
+        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
+        listBox.appendChild(tapeTable(doc, mine.slice(0, 20), row));
+      }
+      function lockedHint() {
+        if (!live(g1, g2)) return;
+        u.clearBox(listBox);
         var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
         var a = doc.createElement("a");
         a.textContent = t("market.go_wallet", "Go to Wallet");
         a.setAttribute("href", "#/wallet");
         u.touchable(a);
         hint.appendChild(a);
-        myBodyEl.appendChild(hint);
+        listBox.appendChild(hint);
+      }
+      function loadTyped() {
+        if (!live(g1, g2)) return;
+        var v = fAcct.input.value.trim();
+        if (!v) {
+          if (!live(g1, g2)) return;
+          if (!unlocked) lockedHint();
+          else loadMy(poolBodyEl, myBodyEl, row, g1, g2);
+          return;
+        }
+        u.clearBox(listBox);
+        u.showStatus(doc, listBox, t("account.loading_history", "Loading history…"));
+        Promise.resolve().then(function () {
+          if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+            throw new Error("account backend missing");
+          }
+          return Account.resolve(v);
+        }).then(function (acct) {
+          if (!live(g1, g2)) return;
+          var tape2 = (typeof tape !== "undefined" && tape && tape.swaps) || [];
+          drawMine(tape2.filter(function (sw) { return sw && String(sw.account) === String(acct.id); }));
+        }).catch(function (e) {
+          if (!live(g1, g2)) return;
+          u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+        });
+      }
+      viewBtn.addEventListener("click", loadTyped);
+      if (!unlocked) {
+        lockedHint();
         return;
       }
-      u.showStatus(doc, myBodyEl, t("account.loading_history", "Loading history…"));
+      /* Unlocked: prefill the wallet account id (convenience only). */
+      try {
+        if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+          Account.myAccountId().then(function (id) {
+            if (!live(g1, g2)) return;
+            if (!fAcct.input.value && id) fAcct.input.value = String(id);
+          }).catch(function () { /* tape filter below stands */ });
+        }
+      } catch (e) { /* tape filter below stands */ }
+      u.showStatus(doc, listBox, t("account.loading_history", "Loading history…"));
       Account.myAccountId().then(function (myId) {
         if (!live(g1, g2)) return;
-        u.clearBox(myBodyEl);
+        u.clearBox(listBox);
         var tape2 = (typeof tape !== "undefined" && tape && tape.swaps) || [];
-        var mine = tape2.filter(function (sw) { return sw && String(sw.account) === String(myId); });
-        if (!mine.length) { myBodyEl.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
-        myBodyEl.appendChild(tapeTable(doc, mine.slice(0, 20), row));
+        drawMine(tape2.filter(function (sw) { return sw && String(sw.account) === String(myId); }));
       }).catch(function (e) {
         if (!live(g1, g2)) return;
-        u.clearBox(myBodyEl); u.showError(doc, myBodyEl, e, t("pool.my_history_failed", "Could not load your exchanges."));
+        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
       });
     }
   }

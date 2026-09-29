@@ -1,7 +1,8 @@
 /* MarketOrders: my-open-orders rendering for the DEX desk (display + cancel).
- * Owns: locked hint with Wallet link, loading state, order rows as table +
+ * Owns: typed-account preview row (Account input + Look up, public reads —
+ *   locked + blank keeps the locked hint), loading state, order rows as table +
  *   phone cards with per-row raw JSON, Cancel buttons per row/card plus the
- *   cancel-all box (≥2 orders), and the fill-size tape histogram
+ *   cancel-all box (≥2 orders, unlocked auto-load only), and the fill-size tape histogram
  *   (dex-ux plot proposal 2: order-of-magnitude bins over fill integer
  *   amounts, canvas 2D, collapsible, mounted by MarketBook into the
  *   mkt-trades pane from already-fetched rows — no new chain call).
@@ -28,6 +29,10 @@ var MarketOrders = (function () {
   "use strict";
 
   var PRICE_PLACES = 8;
+
+  /* Render generation: each render() call invalidates stale async
+   * continuations (auto-load, prefill, typed lookups). */
+  var _gen = 0;
 
   /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
    * the pre-conversion literal kept verbatim as enDefault (English-identical
@@ -96,46 +101,70 @@ var MarketOrders = (function () {
   }
 
   /* My open orders, read-only: id, side, amount (for_sale in the sell asset,
-   * market_object.hpp:50), market-oriented price; raw JSON per row. Locked
-   * wallets get a hint with a link — never a password field here. Moved
+   * market_object.hpp:50), market-oriented price; raw JSON per row. Wallets
+   * get the auto-load below; anyone can type an account (name or 1.2.N) +
+   * Look up to preview ITS orders via public get_limit_orders_by_account
+   * (locked previews are display-only: no Cancel buttons). Blank + locked
+   * keeps the Wallet-link hint — never a password field here. Moved
    * verbatim from the MarketUI fillOrders(state) body: state.doc is `doc`,
    * state.ordersBody is `parentEl`, state.assets is `ctx.assets`. */
   function render(doc, parentEl, ctx) {
     var assets = ctx.assets;
+    var myGen = ++_gen;
+    function live() { return myGen === _gen; }
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
     var unlocked = false;
     try {
       unlocked = typeof Wallet !== "undefined" && Wallet &&
         (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
     } catch (e) { unlocked = false; }
-    if (!unlocked) {
+    /* Typed-account preview row (principle #9: reads never gate on unlock). */
+    var acctRow = doc.createElement("div");
+    var lab = el(doc, "span", t("account.card_account", "Account") + " ");
+    var acctInput = doc.createElement("input");
+    acctInput.type = "text";
+    acctInput.setAttribute("placeholder", t("ticket.name_or_1_2_n", "name or 1.2.N"));
+    acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
+    acctInput.style.minHeight = "44px";
+    acctInput.style.width = "12em";
+    var viewBtn = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
+    viewBtn.type = "button";
+    acctRow.appendChild(lab);
+    acctRow.appendChild(acctInput);
+    acctRow.appendChild(doc.createTextNode(" "));
+    acctRow.appendChild(viewBtn);
+    parentEl.appendChild(acctRow);
+    var body = doc.createElement("div");
+    parentEl.appendChild(body);
+    function lockedHint() {
+      while (body.firstChild) body.removeChild(body.firstChild);
       var hint = el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
       var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
       touchable(a);
       hint.appendChild(a);
-      parentEl.appendChild(hint);
-      return;
+      body.appendChild(hint);
     }
-    parentEl.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
-    Market.myOrders().then(function (rows) {
-      while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
-      var mine = (rows || []).filter(function (o) { return isMine(o, assets); });
-      if (mine.length === 0) {
-        parentEl.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
-        return;
-      }
-      var canCancel = typeof TradeUI !== "undefined" && TradeUI &&
+    function canCancelNow() {
+      return unlocked && typeof TradeUI !== "undefined" && TradeUI &&
         typeof TradeUI.orderCancelBox === "function" &&
         typeof TradeUI.cancelAllBox === "function";
+    }
+    function paintOrders(mine, canCancel) {
+      if (!live()) return;
+      while (body.firstChild) body.removeChild(body.firstChild);
+      if (mine.length === 0) {
+        body.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        return;
+      }
       function rerender() { render(doc, parentEl, ctx); }
       /* Shared inline-confirm slot (one, above the list): Cancel buttons
        * paint TradeUI's confirm here so rows/cards stay put until done. */
       var cancelBox = doc.createElement("div");
-      parentEl.appendChild(cancelBox);
+      body.appendChild(cancelBox);
       if (canCancel && mine.length >= 2) {
         var allBox = doc.createElement("div");
-        parentEl.appendChild(allBox);
+        body.appendChild(allBox);
         TradeUI.cancelAllBox(doc, allBox, mine, assets, rerender);
       }
       var table = doc.createElement("table");
@@ -187,8 +216,8 @@ var MarketOrders = (function () {
       var scroller = doc.createElement("div");
       scroller.className = "orders-scroll";
       scroller.appendChild(table);
-      parentEl.appendChild(scroller);
-      parentEl.appendChild(cards);
+      body.appendChild(scroller);
+      body.appendChild(cards);
       var detAll = doc.createElement("details");
       detAll.className = "raw";
       var sumAll = doc.createElement("summary");
@@ -199,10 +228,68 @@ var MarketOrders = (function () {
       try { preAll.textContent = JSON.stringify(mine, null, 2); }
       catch (e) { preAll.textContent = String(mine); }
       detAll.appendChild(preAll);
-      parentEl.appendChild(detAll);
+      body.appendChild(detAll);
+    }
+    /* Typed-account lookup: resolve the input (public read) and paint that
+     * account's orders on this market. Locked previews stay display-only
+     * (no Cancel buttons); unlocked keeps buttons. Blank + locked keeps
+     * the hint; blank + unlocked reloads the wallet auto-load. */
+    function loadTyped() {
+      if (!live()) return;
+      var v = acctInput.value.trim();
+      if (!v) {
+        if (!unlocked) lockedHint();
+        else render(doc, parentEl, ctx);
+        return;
+      }
+      while (body.firstChild) body.removeChild(body.firstChild);
+      body.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
+      Promise.resolve().then(function () {
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+          throw new Error("account backend missing");
+        }
+        return Account.resolve(v);
+      }).then(function (acct) {
+        if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
+          throw new Error("not connected");
+        }
+        return Chain.db().then(function (dbId) {
+          return Chain.call(dbId, "get_limit_orders_by_account", [acct.id, 100]);
+        });
+      }).then(function (rows) {
+        if (!live()) return;
+        var mine = (rows || []).filter(function (o) { return isMine(o, assets); });
+        paintOrders(mine, canCancelNow());
+      }).catch(function (e) {
+        if (!live()) return;
+        while (body.firstChild) body.removeChild(body.firstChild);
+        showError(doc, body, e, t("market.fail_orders", "Could not load your orders."));
+      });
+    }
+    viewBtn.addEventListener("click", loadTyped);
+    if (!unlocked) {
+      lockedHint();
+      return;
+    }
+    /* Unlocked: prefill the wallet account id (convenience only); the
+     * auto-load below is the unchanged wallet path (Market.myOrders). */
+    try {
+      if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+        Account.myAccountId().then(function (id) {
+          if (!live()) return;
+          if (!acctInput.value && id) acctInput.value = String(id);
+        }).catch(function () { /* auto-load below stands */ });
+      }
+    } catch (e) { /* auto-load below stands */ }
+    body.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
+    Market.myOrders().then(function (rows) {
+      if (!live()) return;
+      var mine = (rows || []).filter(function (o) { return isMine(o, assets); });
+      paintOrders(mine, canCancelNow());
     }).catch(function (e) {
-      while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
-      showError(doc, parentEl, e, t("market.fail_orders", "Could not load your orders."));
+      if (!live()) return;
+      while (body.firstChild) body.removeChild(body.firstChild);
+      showError(doc, body, e, t("market.fail_orders", "Could not load your orders."));
     });
   }
 

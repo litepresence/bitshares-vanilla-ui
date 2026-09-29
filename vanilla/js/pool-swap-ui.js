@@ -173,8 +173,11 @@ var PoolSwapUI = (function () {
   }
   /* My-exchanges pane for the selected pool: wallet account's op-63 rows
    * (liquidity_pool_exchange, protocol/liquidity_pool.hpp:138-152) filtered
-   * to this pool id. Locked -> honest Wallet-link hint, never a password
-   * field here. Failures render inline, never blank. */
+   * to this pool id. Anyone can type an account (name or 1.2.N) + Look up to
+   * preview ITS exchanges via public Account.history; blank + locked keeps
+   * the honest Wallet-link hint, never a password field here. Unlocked
+   * prefills the wallet account; the wallet auto-load is unchanged.
+   * Failures render inline, never blank. */
   function loadMyPoolHist(doc, u, myGen, uiGen, box, poolId) {
     u.clearBox(box);
     var unlocked = false;
@@ -182,29 +185,28 @@ var PoolSwapUI = (function () {
       unlocked = typeof Wallet !== "undefined" && Wallet &&
         (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
     } catch (e) { unlocked = false; }
-    if (!unlocked) {
-      var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
-      var a = doc.createElement("a");
-      a.textContent = t("market.go_wallet", "Go to Wallet");
-      a.setAttribute("href", "#/wallet");
-      u.touchable(a);
-      hint.appendChild(a);
-      box.appendChild(hint);
-      return;
-    }
-    u.showStatus(doc, box, t("account.loading_history", "Loading history…"));
-    Account.myAccountId().then(function (myId) {
-      return Account.history(myId, 100);
-    }).then(function (rows) {
-      if (!live(myGen, uiGen)) return;
-      u.clearBox(box);
-      var mine = (rows || []).filter(function (r) {
+    /* Typed-account preview row (principle #9: reads never gate on unlock). */
+    var fAcct = u.field(doc, t("account.card_account", "Account"),
+      { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N") });
+    box.appendChild(fAcct.row);
+    var viewBtn = u.touchable(u.el(doc, "button", t("referrals.look_up", "Look up")));
+    viewBtn.type = "button";
+    box.appendChild(viewBtn);
+    var listBox = u.el(doc, "div");
+    box.appendChild(listBox);
+    /* Same op-63 pool filter as the auto-load below. */
+    function poolMine(rows) {
+      return (rows || []).filter(function (r) {
         var tup = r ? r.op : null;
         if (!Array.isArray(tup) || tup[0] !== 63) return false;
         var d = tup[1] || {};
         return d.pool === poolId;
       });
-      if (!mine.length) { box.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
+    }
+    function drawMine(mine) {
+      if (!live(myGen, uiGen)) return;
+      u.clearBox(listBox);
+      if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
       var table = doc.createElement("table"); table.className = "node-table";
       table.appendChild(u.tableHead(doc, [t("pool.block_col", "Block"), t("pool.sell_col", "Sell"), t("pool.min_recv_row", "Min to receive")]));
       var tbody = doc.createElement("tbody");
@@ -216,10 +218,69 @@ var PoolSwapUI = (function () {
         tr.appendChild(u.el(doc, "td", d.min_to_receive ? String(d.min_to_receive.amount) + " " + String(d.min_to_receive.asset_id) : "—"));
         tbody.appendChild(tr);
       });
-      table.appendChild(tbody); box.appendChild(table);
+      table.appendChild(tbody); listBox.appendChild(table);
+    }
+    function lockedHint() {
+      if (!live(myGen, uiGen)) return;
+      u.clearBox(listBox);
+      var hint = u.el(doc, "p", t("pool.my_locked", "Unlock your wallet to see your exchanges in this pool. "), "muted");
+      var a = doc.createElement("a");
+      a.textContent = t("market.go_wallet", "Go to Wallet");
+      a.setAttribute("href", "#/wallet");
+      u.touchable(a);
+      hint.appendChild(a);
+      listBox.appendChild(hint);
+    }
+    /* Typed-account lookup: resolve the input, then paint that account's
+     * op-63 rows for this pool via public Account.history. */
+    function loadTyped() {
+      if (!live(myGen, uiGen)) return;
+      var v = fAcct.input.value.trim();
+      if (!v) {
+        if (!unlocked) lockedHint();
+        else loadMyPoolHist(doc, u, myGen, uiGen, box, poolId);
+        return;
+      }
+      u.clearBox(listBox);
+      u.showStatus(doc, listBox, t("account.loading_history", "Loading history…"));
+      Promise.resolve().then(function () {
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+          throw new Error("account backend missing");
+        }
+        return Account.resolve(v);
+      }).then(function (acct) {
+        return Account.history(acct.id, 100);
+      }).then(function (rows) {
+        if (!live(myGen, uiGen)) return;
+        drawMine(poolMine(rows));
+      }).catch(function (e) {
+        if (!live(myGen, uiGen)) return;
+        u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
+      });
+    }
+    viewBtn.addEventListener("click", loadTyped);
+    if (!unlocked) {
+      lockedHint();
+      return;
+    }
+    /* Unlocked: prefill the wallet account id (convenience only). */
+    try {
+      if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+        Account.myAccountId().then(function (id) {
+          if (!live(myGen, uiGen)) return;
+          if (!fAcct.input.value && id) fAcct.input.value = String(id);
+        }).catch(function () { /* auto-load below stands */ });
+      }
+    } catch (e) { /* auto-load below stands */ }
+    u.showStatus(doc, listBox, t("account.loading_history", "Loading history…"));
+    Account.myAccountId().then(function (myId) {
+      return Account.history(myId, 100);
+    }).then(function (rows) {
+      if (!live(myGen, uiGen)) return;
+      drawMine(poolMine(rows));
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return;
-      u.clearBox(box); u.showError(doc, box, e, t("pool.my_history_failed", "Could not load your exchanges."));
+      u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your exchanges."));
     });
   }
   function slipOk(s) { /* slippage gate: 0.1-5% human, string math only */

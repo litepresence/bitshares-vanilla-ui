@@ -826,40 +826,65 @@ var MarketDesk = (function () {
   /* My-trades pane (mirrors #1 myMarketHistory, Exchange.jsx:2583-2616 +
    * MarketHistory.jsx:159-204): the wallet account's fill_order ops (op 4,
    * protocol/operations.hpp:60) filtered to this QUOTE_BASE pair
-   * (pays/receives touch both legs, MarketHistory.jsx:176-184). Locked
-   * wallets get the honest Wallet-link hint (principle #9: reads never gate
-   * on unlock, but MY fills need a key). Amounts/prices go through Format
-   * (BigInt, 8 places like Market.trades) — never raw integers (#6). */
+   * (pays/receives touch both legs, MarketHistory.jsx:176-184). Anyone can
+   * type an account (name or 1.2.N) + Look up to preview ITS fills via
+   * public Account.history; blank + locked keeps the Wallet-link hint
+   * (principle #9: reads never gate on unlock, but MY fills need a key).
+   * Unlocked prefills the wallet account; the wallet auto-load is unchanged.
+   * Amounts/prices go through Format (BigInt, 8 places like Market.trades)
+   * — never raw integers (#6). */
   function renderMyTrades(doc, state) {
-    var myBody = state.myBody || state.tradesBody;
+    var host = state.myBody || state.tradesBody;
     var assets = state.assets;
-    if (!myBody || !assets) return;
-    while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+    if (!host || !assets) return;
+    while (host.firstChild) host.removeChild(host.firstChild);
+    var tok = (state._myGen = (state._myGen || 0) + 1);
+    function live() {
+      if (tok !== state._myGen) return false;
+      try {
+        if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return false;
+      } catch (e) { /* headless: hash guard skipped */ }
+      return true;
+    }
     var unlocked = false;
     try {
       unlocked = typeof Wallet !== "undefined" && Wallet &&
         (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
     } catch (e) { unlocked = false; }
-    if (!unlocked) {
+    /* Typed-account preview row (public reads only). */
+    var acctRow = doc.createElement("div");
+    var lab = el(doc, "span", t("account.card_account", "Account") + " ");
+    var acctInput = doc.createElement("input");
+    acctInput.type = "text";
+    acctInput.setAttribute("placeholder", t("ticket.name_or_1_2_n", "name or 1.2.N"));
+    acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
+    acctInput.style.minHeight = "44px";
+    acctInput.style.width = "12em";
+    var viewBtn = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
+    viewBtn.type = "button";
+    acctRow.appendChild(lab);
+    acctRow.appendChild(acctInput);
+    acctRow.appendChild(doc.createTextNode(" "));
+    acctRow.appendChild(viewBtn);
+    host.appendChild(acctRow);
+    var myBody = doc.createElement("div");
+    host.appendChild(myBody);
+    function lockedHint() {
+      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
       var hint = el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
       var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
       touchable(a);
       hint.appendChild(a);
       myBody.appendChild(hint);
-      return;
     }
-    myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
     var q = assets.quote, b = assets.base;
-    Account.myAccountId().then(function (myId) {
-      return Account.history(myId, 100).then(function (rows) {
-        return { myId: myId, rows: rows || [] };
-      });
-    }).then(function (found) {
-      if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
-      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+    /* Same op-4 pair filter as the old auto-load below
+     * (MarketHistory.jsx:176-184): fill ops whose pays/receives legs touch
+     * both market assets. */
+    function pairFills(rows) {
       var fills = [];
-      (found.rows || []).forEach(function (r) {
+      (rows || []).forEach(function (r) {
         var tup = r ? r.op : null;
         var opId = null, op = null;
         if (Array.isArray(tup)) { opId = tup[0]; op = tup[1]; }
@@ -873,6 +898,11 @@ var MarketDesk = (function () {
         if (!hasQ || !hasB) return;
         fills.push({ row: r, op: op });
       });
+      return fills;
+    }
+    function paintFills(fills) {
+      if (!live()) return;
+      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
       if (fills.length === 0) {
         myBody.appendChild(el(doc, "p", t("market.no_my_trades", "No fills for your account on this market."), "muted"));
         return;
@@ -923,7 +953,62 @@ var MarketDesk = (function () {
       myBody.appendChild(scroller);
       myBody.appendChild(cards);
       rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), fills.slice(0, 30).map(function (f) { return f.row; }));
+    }
+    /* Typed-account lookup: resolve the input, then paint that account's
+     * fills for this pair via public Account.history. Blank + locked keeps
+     * the hint; blank + unlocked reloads the wallet auto-load. */
+    function loadTyped() {
+      if (!live()) return;
+      var v = acctInput.value.trim();
+      if (!v) {
+        if (tok !== state._myGen) return;
+        if (!unlocked) lockedHint();
+        else renderMyTrades(doc, state);
+        return;
+      }
+      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+      myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+      Promise.resolve().then(function () {
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+          throw new Error("account backend missing");
+        }
+        return Account.resolve(v);
+      }).then(function (acct) {
+        return Account.history(acct.id, 100);
+      }).then(function (rows) {
+        if (!live()) return;
+        paintFills(pairFills(rows || []));
+      }).catch(function (e) {
+        if (!live()) return;
+        while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+        showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
+      });
+    }
+    viewBtn.addEventListener("click", loadTyped);
+    if (!unlocked) {
+      lockedHint();
+      return;
+    }
+    /* Unlocked: prefill the wallet account id (convenience only); the
+     * auto-load below is the unchanged wallet path. */
+    try {
+      if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+        Account.myAccountId().then(function (id) {
+          if (tok !== state._myGen) return;
+          if (!acctInput.value && id) acctInput.value = String(id);
+        }).catch(function () { /* auto-load below stands */ });
+      }
+    } catch (e) { /* auto-load below stands */ }
+    myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+    Account.myAccountId().then(function (myId) {
+      return Account.history(myId, 100).then(function (rows) {
+        return { myId: myId, rows: rows || [] };
+      });
+    }).then(function (found) {
+      if (!live()) return;
+      paintFills(pairFills(found.rows));
     }).catch(function (e) {
+      if (!live()) return;
       while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
       showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
     });
