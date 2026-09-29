@@ -107,6 +107,21 @@ var InstantTradeUI = (function () {
     var v = (num * pow10(places) / den).toString();
     while (v.length <= places) v = "0" + v;
     return places === 0 ? v : v.slice(0, -places) + "." + v.slice(-places); }
+  /* Chain price string (human base-per-quote, any precision) -> normalized
+   * PRICE_PLACES human decimals via Format.parsePriceRatio + ratioToDec
+   * (BigInt only, never float). Returns {human, raw}: human for display,
+   * raw (verbatim chain string) for the title attribute (principle #6).
+   * WHY: get_ticker/get_order_book price strings arrive full-precision
+   * (audit saw 18-decimal raws on screen); inputs + stats must show the
+   * trimmed human, never the verbatim long string. Never throws. */
+  function humanPrice(str) {
+    var raw = (str === undefined || str === null) ? "" : String(str);
+    if (!raw) return { human: "", raw: raw };
+    try {
+      var r = Format.parsePriceRatio(raw);
+      if (!r || r.den <= 0n || r.num <= 0n) return { human: raw, raw: raw };
+      return { human: ratioToDec(r.num, r.den, PRICE_PLACES), raw: raw };
+    } catch (e) { return { human: raw, raw: raw }; } }
   function sleep(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet, verified live 2026-09-28). Quotes stay
@@ -213,6 +228,8 @@ var InstantTradeUI = (function () {
       var status = showStatus(doc, out, t("instant.loading_market", "Loading market…"));
       loadMarket(P.marketID).then(function (M) {
         if (myGen !== gen) return;
+        try { if (status.parentNode === out) out.removeChild(status); } catch (e) { /* gone */ }
+        loadBtn.disabled = false;
         P.M = M; paintLoaded(doc, root, myGen, P);
       }).catch(function (e) {
         if (myGen !== gen) return;
@@ -253,9 +270,27 @@ var InstantTradeUI = (function () {
       if (sLink) sLink.setAttribute("href", "#/market/" + ctx.quoteSym + "_" + ctx.baseSym);
     } catch (e) { /* strip keeps its default desk link */ }
     box.appendChild(el(doc, "p", "Trade " + ctx.quoteSym + " / " + ctx.baseSym + " — " + (P.side === "buy" ? "Buy " + ctx.quoteSym : "Sell " + ctx.quoteSym), "muted"));
-    box.appendChild(el(doc, "p", "Latest: " + (M.stats && M.stats.latest ? M.stats.latest : "—") + " · Best bid: " + (M.bestBid || "—") + " · Best ask: " + (M.bestAsk || "—"), "muted"));
+    /* Principle #6: chain price strings arrive full-precision — normalize via
+     * Format (human visible, verbatim raw in title), never raw on screen. */
+    var latestH = (M.stats && M.stats.latest) ? humanPrice(M.stats.latest) : null;
+    var bidH = M.bestBid ? humanPrice(M.bestBid) : null;
+    var askH = M.bestAsk ? humanPrice(M.bestAsk) : null;
+    var statsP = el(doc, "p", null, "muted");
+    statsP.appendChild(doc.createTextNode("Latest: "));
+    var latestSpan = el(doc, "span", latestH ? latestH.human : "—");
+    if (latestH) { try { latestSpan.title = latestH.raw; } catch (e) { /* title best-effort */ } }
+    statsP.appendChild(latestSpan);
+    statsP.appendChild(doc.createTextNode(" · Best bid: "));
+    var bidSpan = el(doc, "span", bidH ? bidH.human : "—");
+    if (bidH) { try { bidSpan.title = bidH.raw; } catch (e) { /* title best-effort */ } }
+    statsP.appendChild(bidSpan);
+    statsP.appendChild(doc.createTextNode(" · Best ask: "));
+    var askSpan = el(doc, "span", askH ? askH.human : "—");
+    if (askH) { try { askSpan.title = askH.raw; } catch (e) { /* title best-effort */ } }
+    statsP.appendChild(askSpan);
+    box.appendChild(statsP);
     if (!M.bestBid && !M.bestAsk) box.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
-    if (!P.price) P.price = P.side === "buy" ? (M.bestAsk || "") : (M.bestBid || "");
+    if (!P.price) P.price = P.side === "buy" ? (askH ? askH.human : "") : (bidH ? bidH.human : "");
     var amountF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: ctx.quoteSym }), { id: "it-amount", value: P.amount, placeholder: "0.00", inputmode: "decimal", unit: ctx.quoteSym });
     box.appendChild(amountF.row);
     var priceF = fieldRow(doc, t("instant.price_tpl", "Price (%(base)s per %(quote)s) ", { base: ctx.baseSym, quote: ctx.quoteSym }), { id: "it-price", value: P.price, placeholder: "0.00", inputmode: "decimal", unit: ctx.baseSym + " / " + ctx.quoteSym });
