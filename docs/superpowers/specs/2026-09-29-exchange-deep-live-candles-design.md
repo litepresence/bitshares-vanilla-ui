@@ -1,27 +1,41 @@
-# Exchange deep + live candles — design (2026-09-29)
+# Exchange + pool deep + live candles — design (2026-09-29)
 
-Scope: exchange price plot only (`#/market/:marketID`). Pool desk (`#/pools/:id`,
-`pool-history.js` + `pool-detail-ui.js chartPane`) already ships ES-backfilled swap
-candles; `#/swap` stays quote-only by design. No indicator-math change (slice-07 catalog
+Scope: exchange price plot (`#/market/:marketID`) AND pool price plot (`#/pools/:id`).
+`#/swap` stays quote-only by design. No indicator-math change (slice-07 catalog
 stands); no TradingView; no new runtime dependency.
+
+Local-bucketing rule (binding for both): candles are built client-side from discrete
+order datestamps on a local slot grid (`floor(t/bucket)*bucket`) with local gap
+carry-forward. Node `get_market_history` rows are treated as raw bucket inputs, never
+as a pre-interpolated linear series — missing slots are filled locally, leading
+empties dropped, exactly like `market-candles.js:236-266` and
+`pool-history.js swapsToCandles` already do. Pools have no node market history at
+all: strictly ES discretes + block-op-listener discretes, same local bucketer.
 
 ## 1. Goal
 
-Candles are a three-layer stack, newest-last, one `{buckets, closes}` array out:
+Exchange candles are a three-layer stack, newest-last, one `{buckets, closes}` array
+out (cap 2000):
 
 1. **Baseline (authoritative recent):** public-node `get_market_history_buckets` +
-   `get_market_history(a, b, bucket, start, end)` exactly as today
-   (`market-candles.js:81-101,137-168`), ~200 slots, gap-interpolated.
+   `get_market_history(a, b, bucket, start, end)` (`market-candles.js:81-101,137-168`),
+   ~200 slots, re-gridded + gap-interpolated LOCALLY per the rule above.
 2. **Deep (backfill):** community ES `kibana_fills` (op-4) time-pages behind the chain
-   window until 2000 candles or history exhausted (~1yr `KIBANA_HISTORY`), bucketed on
-   the same bucket grid. Chain wins any time overlap (covers ES `KIBANA_CANDLE_LIFE`
-   lag). Mainnet only (index is mainnet-only, pool-proven 2026-09-28); testnet /
-   ES-down stays chain-only with an honest note.
+   window until 2000 candles or history exhausted (~1yr `KIBANA_HISTORY`), bucketed
+   locally from discrete fill datestamps on the same grid. Chain wins any time
+   overlap (covers ES `KIBANA_CANDLE_LIFE` lag). Mainnet only (index is mainnet-only,
+   pool-proven 2026-09-28); testnet / ES-down stays chain-only with an honest note.
 3. **Forward (live tip):** market-scoped operation push during the exchange view only:
    `subscribe_to_market(base, quote)` → debounced refetch + surgical patch of the
    current bucket OHLCV + last-price strip. Slot-cross rolls a new bucket without a
    full refetch. Unsubscribe on leave. Subscribe-rejected nodes fall back to a light
    fills/ticker poll; the 15s full `fill(state)` stays as floor.
+
+Pool candles are a two-layer stack, same `{buckets}` shape via the shared local
+bucketer (`PoolHistory.swapsToCandles`): **strictly ES discretes** (`kibana_swaps`,
+op-63, already shipped) deep to 2000 **+ block-op-listener discretes** (block-applied
+feed → `get_block` → filter op-63 for this pool id + legs → patch/roll tip). No node
+market-history call exists for pools and none is added.
 
 `MarketInd` / `charts-lwc.js` input shape does not change.
 
@@ -42,19 +56,30 @@ Candles are a three-layer stack, newest-last, one `{buckets, closes}` array out:
   with callback-id registry (astro `ChainWebSocket.ts:166-198` pattern), single
   active market at a time (route-owned). Unknown notices still ignored; heartbeat
   still covers unsubscribed nodes.
-- `market-desk.js` owns the live loop: on `showDesk` with resolved assets →
+- `market-desk.js` owns the exchange live loop: on `showDesk` with resolved assets →
   `Chain.subscribeMarket` → 500ms debounce (astro `DexLiveOrderBook` / #1
   `MarketsActions.js:430-437` parity) → delta `get_fill_order_history(…, 10)` +
   `get_ticker` → patch `state.candles` tip + strip + `MarketInd.maybeDraw`. All
   continuations gen-guarded; teardown via existing `_cleanups` + `cleanup()` on
   hash change. Testnet / subscribe-fail: 3.5s fills/ticker-only poll
   (`DexLiveOrderBook.ts:220-254` precedent), no subscribe retry storm.
+- `pool-detail-ui.js chartPane` owns the pool live loop: reuse the existing shared
+  block-applied feed (footer `BLOCK_CB_ID`) as the tick source → per new head,
+  `get_block(head)` → scan `transactions[].operations[]` for op-63 whose pool id +
+  legs match this desk → `PoolHistory.enrich` + local bucket patch/roll + shared
+  `MarketInd.maybeDraw` + count note. No `subscribe_to_market` for pools (no market
+  pair subscription exists for `1.19.x`); no polling beyond the existing desk (snapshot
+  stays, tip goes live). Block-scan failures are silent (tip simply waits for the
+  next head); leaving the route drops the pool id filter so late arrivals are ignored.
 
 ## 3. Data flow
 
+Exchange:
+
 1. Desk resolves `Market.assets(quote, base)` → ids + precisions (cached).
-2. `Market.candles(base, quote, bucket, 200)` → chain buckets (recent) + ES pages
-   (deep, mainnet) → merged ≤2000 newest-last + `closes[]` Numbers-for-pixels.
+2. `Market.candles(base, quote, bucket, 200)` → chain buckets (recent, locally
+   re-gridded) + ES discrete fills (deep, mainnet, locally bucketed) → merged ≤2000
+   newest-last + `closes[]` Numbers-for-pixels.
 3. `MarketInd.maybeDraw(state)` renders LWC candles + overlays + osc panes + VWAP
    unchanged; count note shows `N candles · deep|chain-only`.
 4. Live: market push → debounce → delta fills: each fill oriented to base/quote legs
@@ -65,6 +90,17 @@ Candles are a three-layer stack, newest-last, one `{buckets, closes}` array out:
    `BigInt` cross-compare (`_isRed`).
 5. Leave: `unsubscribe_from_market` (best-effort) + clear debounce/poll + existing
    LWC `removePane` teardown.
+
+Pool:
+
+1. `detailFill` fetches the pool row + one shared `PoolHistory.swapsForPool` tape
+   (ES → chain `get_liquidity_pool_history` fallback, strict pool-id + leg filter).
+2. `chartPane` buckets the tape LOCALLY via `swapsToCandles` (already the
+   `discrete_to_candles` port — no change to bucket math) up to 2000, newest-last.
+3. Live: block-applied tick → `get_block` → op-63 discretes for this pool →
+   `enrich` → same local patch/roll path as exchange (same slot grid, same
+   carry-forward, same BigInt volumes) + count note `N swaps · ES|chain + live`.
+4. Leave: clear the pool-id filter; tape + panes tear down with the route.
 
 ## 4. Error handling
 
@@ -107,6 +143,6 @@ Candles are a three-layer stack, newest-last, one `{buckets, closes}` array out:
 
 ## 7. Out of scope
 
-Pool candles, `#/swap` charts, indicator additions, orderbook live depth beyond the
-existing 15s book fetch, backfill for account history / pool history, any
+`#/swap` charts, indicator additions, orderbook live depth beyond the
+existing 15s book fetch, backfill for account history, any
 `bitsharesjs` import (reference only), any build step.
