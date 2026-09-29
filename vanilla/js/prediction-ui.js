@@ -1,21 +1,28 @@
 /* prediction-ui.js — #/prediction + #/prediction/:market honest-scope views.
- * Owns: PMA list (bounded list_assets scan + symbol search, open/settled
+ * Owns: PMA LIST (bounded list_assets scan + symbol search, open/settled
  *   filter, hide-unknown-houses + hide-invalid-assets client filters) and
  *   PMA detail (issuer, settlement status/price, feed) with
  *   deep-links into the existing #/market/QUOTE_BASE desk for YES/NO
- *   positioning. List columns: Asset / House / Market confidence /
- *   Predicted likelihood / Resolution date / Action (agree/disagree -> desk
- *   links; ticker reads only, dash otherwise) + Create prediction market
- *   button (-> #/assets/create PMA tab, verified route). Positions ARE limit orders on the pair, so NO new
- *   serializers, no signing, no fee math in this file.
+ *   positioning. LIST columns per row: Asset / Description / Condition /
+ *   Expiry / Validity / House / Market confidence / Predicted likelihood /
+ *   Market (desk link, asset-page fallback) / Details (-> #/prediction/:id).
+ *   Description trio parses the scan row's options.description JSON only
+ *   (dash when unreadable — no new chain reads); validity is invalidReason()
+ *   or dash; Market targets verified routes (router.js /market/:marketID,
+ *   /asset/:symbol); Details targets /prediction/:market. Positions ARE
+ *   limit orders on the pair, so NO new serializers, no signing, no fee
+ *   math in this file. All reads public, no login gate.
  * Consumes: Explorer (assetsPage/asset/feeds joins), Asset.describe,
  *   Format (amount/price display only), Chain (backing-symbol lookup),
  *   Store ("connection" resubscribe). Globals/side effects: exposes global
  *   PredictionUI only; DOM under the given root; Store subscriptions dropped
  *   on every entry (generation counter).
- * Refs: #1 PredictionMarkets.jsx (list + open/past filter + search,
- *   :378-435; opinions ARE orderbook rows :104-160; resolve = global_settle
- *   :341-372 — NOT reimplemented, issuer-only signing lives in AssetManage);
+ * Refs: #1 PredictionMarkets.jsx list concepts only — description/condition/
+ *   expiry + market button per row (:368-419 open/past filter + search,
+ *   :492-618 overview section + OverviewTable columns); opinions ARE
+ *   orderbook rows :104-160 (NOT copied — detail links to the live desk);
+ *   resolve = global_settle :341-372 — NOT reimplemented, issuer-only
+ *   signing lives in AssetManage);
  *   PMAssetsContainer.jsx:121-127 (_isPredictionMarket = bitasset_data
  *   .is_prediction_market; :92-104 whitelist comes from an on-chain config
  *   asset that testnet does not publish, so no whitelist here — bounded
@@ -167,11 +174,16 @@ var PredictionUI = (function () {
     return (b.settlement_fund || 0) > 0;
   }
 
-  /* One table row: Asset / House / Market confidence / Predicted likelihood /
-   * Resolution date / Action. enrich carries clean-read results (house name,
-   * ticker confidence/likelihood, backing symbol); anything unresolvable
-   * shows "—", never a raw integer, never a throw. Agree/Disagree link to
-   * the live #/market desk (positions ARE limit orders there). */
+  /* One LIST row: Asset / Description / Condition / Expiry / Validity /
+   * House / Market confidence / Predicted likelihood / Market / Details.
+   * The description trio comes from the scan row's options.description JSON
+   * only (parsePMADescription, #1 asset_utils.js convention) — dash when
+   * unreadable, never a new chain read. Validity is invalidReason() or
+   * dash. Market targets the live #/market/QUOTE_BASE desk when the backing
+   * symbol resolved, else the #/asset/SYMBOL page (both routes verified in
+   * router.js: /market/:marketID + /asset/:symbol); Details targets
+   * #/prediction/SYMBOL (/prediction/:market). Enrich gaps (house,
+   * confidence, likelihood) show "—", never raw integers, never throw. */
   function appendRow(doc, tbody, row, filter, enrich) {
     var a = row.asset, d = parsePMADescription((a.options || {}).description || "");
     var settled = settledOf(row);
@@ -180,23 +192,35 @@ var PredictionUI = (function () {
     enrich = enrich || {};
     var tr = doc.createElement("tr");
     function cell(text) { var td = doc.createElement("td"); td.textContent = text; return td; }
-    tr.appendChild(cell(a.symbol || a.id));
+    function linkCell(href, label) {
+      var td = doc.createElement("td");
+      var link = doc.createElement("a"); link.href = href; link.textContent = label;
+      touchable(link); td.appendChild(link);
+      return td;
+    }
+    var sym = a.symbol || a.id;
+    tr.appendChild(cell(sym || "—"));
+    tr.appendChild(cell(d.main || "—"));
+    tr.appendChild(cell(d.condition || "—"));
+    tr.appendChild(cell(d.expiry || "—"));
+    tr.appendChild(cell(invalidReason(row) || "—"));
     tr.appendChild(cell(enrich.house || "—"));
     tr.appendChild(cell(enrich.conf || "—"));
     tr.appendChild(cell(enrich.like || "—"));
-    tr.appendChild(cell(d.expiry || "—"));
-    var td = doc.createElement("td");
-    if (enrich.backSym && (a.symbol || a.id)) {
-      var deskHref = "#/market/" + encodeURIComponent(a.symbol || a.id) + "_" + encodeURIComponent(enrich.backSym);
-      var agree = doc.createElement("a"); agree.href = deskHref; agree.textContent = t("prediction.agree", "Agree");
-      touchable(agree); td.appendChild(agree);
-      td.appendChild(doc.createTextNode(" / "));
-      var disagree = doc.createElement("a"); disagree.href = deskHref; disagree.textContent = t("prediction.disagree", "Disagree");
-      touchable(disagree); td.appendChild(disagree);
+    if (sym) {
+      if (enrich.backSym) {
+        tr.appendChild(linkCell("#/market/" + encodeURIComponent(sym) + "_" +
+          encodeURIComponent(enrich.backSym), t("borrow.market", "Market")));
+      } else {
+        tr.appendChild(linkCell("#/asset/" + encodeURIComponent(sym),
+          t("borrow.market", "Market")));
+      }
+      tr.appendChild(linkCell("#/prediction/" + encodeURIComponent(sym),
+        t("prediction.details", "Details")));
     } else {
-      td.textContent = "—";
+      tr.appendChild(cell("—"));
+      tr.appendChild(cell("—"));
     }
-    tr.appendChild(td);
     tbody.appendChild(tr);
     return true;
   }
@@ -333,9 +357,11 @@ var PredictionUI = (function () {
       var hideU = !!(chkU && chkU.checked), hideI = !!(chkI && chkI.checked);
       var table = doc.createElement("table");
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-      /* MED columns: HOUSE / MARKET CONFIDENCE / PREDICTED LIKELIHOOD /
-       * RESOLUTION DATE / ACTION (batch-3 keyed). */
-      [t("prediction.hdr_asset", "Asset"), t("prediction.house", "House"), t("prediction.market_confidence", "Market confidence"), t("prediction.predicted_likelihood", "Predicted likelihood"), t("prediction.resolution_date", "Resolution date"), t("prediction.action", "Action")].forEach(function (h) {
+      /* LIST columns (#1 OverviewTable concepts: description + condition +
+       * expiry + market button per row, plus validity label + Details link;
+       * scan enrichment kept alongside as confidence/likelihood). Headers
+       * reuse existing dict keys only (no locale drift — see check_i18n). */
+      [t("prediction.hdr_asset", "Asset"), t("explorer.description", "Description"), t("prediction.hdr_condition", "Condition"), t("prediction.hdr_expiry", "Expiry"), t("prediction.hdr_validity", "Validity"), t("prediction.house", "House"), t("prediction.market_confidence", "Market confidence"), t("prediction.predicted_likelihood", "Predicted likelihood"), t("borrow.market", "Market"), t("prediction.details", "Details")].forEach(function (h) {
         var th = doc.createElement("th"); th.textContent = h; th.setAttribute("scope", "col"); hr.appendChild(th);
       });
       thead.appendChild(hr); table.appendChild(thead);
@@ -351,7 +377,7 @@ var PredictionUI = (function () {
       });
       if (!shown) {
         var tr = doc.createElement("tr"), td = doc.createElement("td");
-        td.colSpan = 6;
+        td.colSpan = 10;
         td.textContent = cache.rows.length
           ? "No prediction markets match this filter."
           : "No prediction-market assets in the scanned range. Try the lookup box above.";
