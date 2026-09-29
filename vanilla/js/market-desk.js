@@ -5,12 +5,16 @@
  *   (book/stats/trades/my-trades/timeframes/candles — each section fails
  *   inline), last-visited market persistence (saveLast under LAST_KEY),
  *   timer/listener cleanup.
-  *   LAYOUT (mirrors #1 Exchange.jsx below-chart grid + right rail):
-  *   chart stack on top (mkt-charts: price pane + volume pane + depth slice
-  *   + oscillator panes + timeframe), then book | trades-toggle | open
-  *   orders, then trade Buy/Sell/Scaled tabs | 24h stats (wide), market
-  *   picker rail (mkt-side) full-height to the side. Grid areas live in
-  *   desk-grid.css.
+ *   LAYOUT (retro equal 2x3 grid + right rail — reference
+ *   vanilla/notes/original-buy-sell-2x3-2026-09-28.png): chart stack on top
+ *   (mkt-charts: price pane + volume pane + depth slice + oscillator panes
+ *   + timeframe), then row 1 Buy panel | Sell panel | trades toggle, then
+ *   row 2 BUY ORDERS (bids) | SELL ORDERS (asks) | my open orders — six
+ *   equal thirds on desktop (grid-template-columns 1fr 1fr 1fr + 320px
+ *   rail), single-column stack on phones <1200px. The 24h stats strip lives
+ *   in the head (MarketInd.renderStrip); there is no stats grid cell. Grid
+ *   areas live in desk-grid.css (.mkt-exchange scope; the pool desk keeps
+ *   the legacy .mkt areas).
  *   TRADES TOGGLE (mirrors #1 MarketHistory tabs): one trades cell holds
  *   Recent (activeMarketHistory, Exchange.jsx:2551-2581 activeTab "history")
  *   and My (myMarketHistory, Exchange.jsx:2583-2616 activeTab "my_history")
@@ -275,7 +279,7 @@ var MarketDesk = (function () {
       ticker: null, countNote: null, tfBox: null, oscNote: null
     };
 
-    var desk = el(doc, "div", null, "mkt");
+    var desk = el(doc, "div", null, "mkt mkt-exchange");
     wrap.appendChild(desk);
 
     var head = doc.createElement("section");
@@ -303,6 +307,10 @@ var MarketDesk = (function () {
     state.strip = strip;
     var spreadLine = el(doc, "p", "", "muted");
     head.appendChild(spreadLine);
+    /* Raw-ticker proof host (triangle-only details, refilled per stats
+     * fetch — the 24h dl panel is gone with the stats grid cell). */
+    var tickerRaw = doc.createElement("div");
+    head.appendChild(tickerRaw);
 
     var chartsSec = doc.createElement("section");
     chartsSec.className = "mkt-charts";
@@ -379,13 +387,24 @@ var MarketDesk = (function () {
     chartsSec.appendChild(oscNote);
     state.oscNote = oscNote;
 
-    /* ROW 1 col 1: order book (OrderBook Exchange.jsx:2466-2537). */
-    var bookSec = doc.createElement("section");
-    bookSec.className = "mkt-book";
-    desk.appendChild(bookSec);
-    bookSec.appendChild(el(doc, "h2", t("market.order_book", "Order book")));
-    var bookBody = doc.createElement("div");
-    bookSec.appendChild(bookBody);
+    /* ROW 1 col 1+2: Buy + Sell panels (BuySell bid/ask pair,
+     * Exchange.jsx:2089-2210 — two panels side by side, always visible).
+     * TradeUI owns the panels; the desk only hosts the mounts. Headings
+     * name the side + QUOTE symbol (reference 2x3 shot: BUY BTS/SELL BTS);
+     * the Scaled swap lives on the buy panel's own tab row. */
+    var buySec = doc.createElement("section");
+    buySec.className = "mkt-buy";
+    desk.appendChild(buySec);
+    buySec.appendChild(el(doc, "h2", "Buy " + pair.quote));
+    var buyMount = doc.createElement("div");
+    buySec.appendChild(buyMount);
+
+    var sellSec = doc.createElement("section");
+    sellSec.className = "mkt-sell";
+    desk.appendChild(sellSec);
+    sellSec.appendChild(el(doc, "h2", "Sell " + pair.quote));
+    var sellMount = doc.createElement("div");
+    sellSec.appendChild(sellMount);
 
     /* ROW 1 col 2: trades toggle — Recent vs My (ONE cell, two panes).
      * Mirrors #1's tab group 1: marketHistory (Exchange.jsx:2551-2581,
@@ -447,7 +466,25 @@ var MarketDesk = (function () {
     });
     paintTradesTab();
 
-    /* ROW 1 col 3: my open orders (MarketOrders Exchange.jsx:2618-2654,
+    /* ROW 2 col 1+2: split book (OrderBook Exchange.jsx:2466-2537, same
+     * sides): BUY ORDERS (bids) | SELL ORDERS (asks) as two equal cells.
+     * MarketBook.renderSplit fills both through the shared row builder;
+     * each cell owns a fixed-height scroll region like the old book. */
+    var bidsSec = doc.createElement("section");
+    bidsSec.className = "mkt-bids";
+    desk.appendChild(bidsSec);
+    bidsSec.appendChild(el(doc, "h2", "Buy orders"));
+    var bidsBody = doc.createElement("div");
+    bidsSec.appendChild(bidsBody);
+
+    var asksSec = doc.createElement("section");
+    asksSec.className = "mkt-asks";
+    desk.appendChild(asksSec);
+    asksSec.appendChild(el(doc, "h2", "Sell orders"));
+    var asksBody = doc.createElement("div");
+    asksSec.appendChild(asksBody);
+
+    /* ROW 2 col 3: my open orders (MarketOrders Exchange.jsx:2618-2654,
      * activeTab "my_orders"; settlement Exchange.jsx:2656-2693 activeTab
      * "open_settlement" stays a future tab — vanilla shows my_orders only,
      * honest scope, no silent stub). */
@@ -457,15 +494,6 @@ var MarketDesk = (function () {
     ordersSec.appendChild(el(doc, "h2", t("market.my_orders", "My open orders")));
     var ordersBody = doc.createElement("div");
     ordersSec.appendChild(ordersBody);
-
-    /* ROW 2 col 1: trade Buy/Sell/Scaled tabs (BuySell bid Exchange.jsx:2089
-     * + ask counterpart; TradeUI owns the panels, the desk only hosts them). */
-    var tradeSec = doc.createElement("section");
-    tradeSec.className = "trade mkt-trade";
-    desk.appendChild(tradeSec);
-    tradeSec.appendChild(el(doc, "h2", t("trade.heading", "Trade")));
-    var tradeMount = doc.createElement("div");
-    tradeSec.appendChild(tradeMount);
 
     /* Depth slice: the cumulative-depth canvas lives in the charts stack as
      * an osc-sized slice (under Volume, above oscillators — drawCharts pins
@@ -515,17 +543,9 @@ var MarketDesk = (function () {
     oscHost.appendChild(depthWrap);
     state.depthWrap = depthWrap;
 
-    /* 24h market stats (ticker Latest/change/volume/bid-ask — was inside
-     * the side rail; the rail stays picker-only and stats takes the wide
-     * second-row cell next to the trade tabs). */
-    var statsSec = doc.createElement("section");
-    statsSec.className = "mkt-stats-panel";
-    desk.appendChild(statsSec);
-    var statsBox = doc.createElement("div");
-    statsSec.appendChild(statsBox);
-
     /* SIDE RAIL full-height: market picker only (MyMarkets Exchange.jsx:2428
-     * right rail; vanilla MarketPicker renders the curated+search list). */
+     * right rail; vanilla MarketPicker renders the curated+search list).
+     * (No stats cell: the 24h strip lives in the head via renderStrip.) */
     var sideSec = doc.createElement("section");
     sideSec.className = "mkt-side";
     desk.appendChild(sideSec);
@@ -545,14 +565,17 @@ var MarketDesk = (function () {
     state.head = head;
     state.sub = sub;
     state.spreadLine = spreadLine;
+    state.tickerRaw = tickerRaw;
     state.priceHost = priceHost;
     state.oscHost = oscHost;
     state.depthCanvas = depthCanvas;
-    state.bookBody = bookBody;
+    state.bidsBody = bidsBody;
+    state.asksBody = asksBody;
     state.tradesBody = recentBody;
     state.recentBody = recentBody;
     state.myBody = myBody;
-    state.statsBox = statsBox;
+    state.buyMount = buyMount;
+    state.sellMount = sellMount;
     state.ordersBody = ordersBody;
     state.updated = updated;
     state.chartData = null;
@@ -732,12 +755,12 @@ var MarketDesk = (function () {
           }
         } catch (e) { startPoll(); }
       })();
-      /* Slice-06 hook: one renderPanels call with the ctx the desk holds.
-       * TradeUI gates on unlock itself and re-renders after unlock. */
+      /* Slice-06 hook: one renderDual call with the ctx the desk holds
+       * (Buy + Sell panels). TradeUI gates on unlock itself. */
       try {
         if (typeof TradeUI !== "undefined" && TradeUI &&
-            typeof TradeUI.renderPanels === "function") {
-          TradeUI.renderPanels(doc, tradeMount, {
+            typeof TradeUI.renderDual === "function") {
+          TradeUI.renderDual(doc, buyMount, sellMount, {
             base: assets.base.id,
             quote: assets.quote.id,
             basePrec: assets.base.precision,
@@ -877,24 +900,25 @@ var MarketDesk = (function () {
       } catch (e) { state.updated.textContent = ""; }
     };
 
-    /* SLICE-6 FOLLOW-UP (not this slice): bookClick-to-fill — the DEX-UX
-     * pattern where clicking an order-book row fills the trade form — is NOT
-     * implemented here. The book stays read-only until slice 6 owns the
-     * trade-form wiring. */
+    /* Click-to-fill lives in the book rows (market-book.js fillTradePrice):
+     * a row sets BOTH panels' price inputs and focuses the taking side's
+     * amount. The book cells stay display-only otherwise. */
     Market.book(b.id, q.id, 50).then(function (book) {
-      state.bookDepth = MarketBook.renderBook(doc, state.bookBody, {
+      state.bookDepth = MarketBook.renderSplit(doc, state.bidsBody, state.asksBody, {
         book: book, basePrec: b.precision, quotePrec: q.precision,
         baseSymbol: b.symbol, quoteSymbol: q.symbol, spreadLine: state.spreadLine,
         logVol: !!state.depthLogY
       });
       MarketInd.maybeDraw(state);
     }).catch(function (e) {
-      while (state.bookBody.firstChild) state.bookBody.removeChild(state.bookBody.firstChild);
-      showError(doc, state.bookBody, e, t("market.fail_book", "Could not load the order book."));
+      while (state.bidsBody.firstChild) state.bidsBody.removeChild(state.bidsBody.firstChild);
+      while (state.asksBody.firstChild) state.asksBody.removeChild(state.asksBody.firstChild);
+      showError(doc, state.bidsBody, e, t("market.fail_book", "Could not load the order book."));
       var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () { fill(state); });
-      state.bookBody.appendChild(retry);
+      state.bidsBody.appendChild(retry);
+      state.asksBody.appendChild(el(doc, "p", t("market.fail_book", "Could not load the order book."), "muted"));
     });
 
     MarketInd.renderStrip(doc, state);
@@ -915,33 +939,14 @@ var MarketDesk = (function () {
           try { NotifyRules.checkAlerts(state.id, st ? st.latest : null); } catch (e) { /* never break desk */ }
         }
       } catch (e) { /* notify optional here */ }
-      while (state.statsBox.firstChild) state.statsBox.removeChild(state.statsBox.firstChild);
-      state.statsBox.appendChild(el(doc, "h2", t("market.stats_24h", "24h stats")));
-      var dl = el(doc, "dl", null, "mkt-stats");
-      function row(term, text) {
-        if (text === null || text === undefined || text === "") return;
-        dl.appendChild(el(doc, "dt", term));
-        dl.appendChild(el(doc, "dd", String(text)));
-      }
-      row(t("market.stat_latest", "Latest"), st.latest);
-      row(t("market.stat_best_bid", "Best bid"), st.highestBid);
-      row(t("market.stat_best_ask", "Best ask"), st.lowestAsk);
-      if (st.raw) {
-        if (st.raw.percent_change !== undefined && st.raw.percent_change !== null) {
-          row(t("market.stat_chg_pct", "24h change %"), st.raw.percent_change);
-        }
-        if (st.raw.base_volume !== undefined && st.raw.base_volume !== null) {
-          row("24h volume (" + b.symbol + ")", st.raw.base_volume);
-        }
-        if (st.raw.quote_volume !== undefined && st.raw.quote_volume !== null) {
-          row("24h volume (" + q.symbol + ")", st.raw.quote_volume);
-        }
-      }
-      state.statsBox.appendChild(dl);
-      rawDetails(doc, state.statsBox, "Raw ticker", st.raw);
+      /* Raw-ticker proof (triangle-only, refilled per fetch — the 24h dl
+       * panel left with the stats grid cell; the strip above carries the
+       * human fields). */
+      while (state.tickerRaw.firstChild) state.tickerRaw.removeChild(state.tickerRaw.firstChild);
+      rawDetails(doc, state.tickerRaw, "Raw ticker", st.raw);
     }).catch(function (e) {
-      while (state.statsBox.firstChild) state.statsBox.removeChild(state.statsBox.firstChild);
-      showError(doc, state.statsBox, e, t("market.fail_stats", "Could not load market stats."));
+      while (state.tickerRaw.firstChild) state.tickerRaw.removeChild(state.tickerRaw.firstChild);
+      showError(doc, state.tickerRaw, e, t("market.fail_stats", "Could not load market stats."));
     });
 
     Market.trades(b.id, q.id, 30).then(function (rows) {

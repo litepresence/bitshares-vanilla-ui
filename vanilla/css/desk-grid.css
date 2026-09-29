@@ -1,26 +1,30 @@
 /* DeskGrid: trading-desk grid placement, fixed-height scroll regions, and
  * in-row cumulative-depth bars (bids/asks).
- * Owns: .mkt grid areas on all breakpoints — chart on top, then 2 rows x 3
- *   tables below (row1: book | trades-toggle | open orders; row2: trade
- *   Buy/Sell/Scaled tabs | depth | 24h stats), market picker rail (mkt-side)
- *   full-height to the side (mirrors #1 Exchange.jsx below-chart actionCards
- *   + MyMarkets right rail: orderBook :2466, marketHistory :2551,
- *   myMarketHistory :2583, myOpenOrders :2618, settlementOrders :2656,
- *   buyForm :2089/sellForm, myMarkets :2428; toggle group-1 default
- *   panelTabs :362-371) — plus the trade panel the base stylesheet leaves
- *   unplaced, every desk scroll region (.book-scroll/.trades-scroll/
- *   .orders-scroll/.picker-scroll plus the phone-card lists), sticky table
- *   headers inside those regions, .mkt-tabs toggle styling, and .depth-bar
- *   geometry + colors. All colors are theme tokens
- *   (var(--buy)/var(--sell)/var(--border)/var(--panel)); the only numeric
- *   styling is the depth alpha (0.15, the original rgba alpha) and row-count
- *   heights. No framework, no CDN, no build step.
+ * Owns: .mkt grid areas on all breakpoints — the EXCHANGE desk
+ *   (.mkt.mkt-exchange) runs the retro equal 2x3 below the charts (row 1:
+ *   buy | sell | trades-toggle; row 2: bids | asks | open orders — six
+ *   equal thirds on desktop, single-column stack on phones <1200px) with
+ *   the market picker rail (mkt-side) full-height to the side (mirrors #1
+ *   Exchange.jsx below-chart actionCards + MyMarkets right rail: buyForm
+ *   :2089/sellForm, marketHistory :2551, myMarketHistory :2583,
+ *   myOpenOrders :2618, settlementOrders :2656, myMarkets :2428; toggle
+ *   group-1 default panelTabs :362-371) — while the POOL desk (plain .mkt)
+ *   keeps the legacy book|trades areas. Plus every desk scroll region
+ *   (.book-scroll/.trades-scroll/.orders-scroll/.picker-scroll plus the
+ *   phone-card lists), sticky table headers inside those regions,
+ *   .mkt-tabs toggle styling, and .depth-bar geometry + colors. All colors
+ *   are theme tokens (var(--buy)/var(--sell)/var(--border)/var(--panel));
+ *   the only numeric styling is the depth alpha (0.15, the original rgba
+ *   alpha) and row-count heights. No framework, no CDN, no build step.
  * Consumes: --depth (percent string set inline per row/card by
  *   market-book.js from Market.depth cumulative fractions); theme tokens
  *   from themes.css; row-height estimates documented per variable.
  * Globals/side effects: stylesheet only (no JS, no globals). Later in
  *   index.html than app.css, so equal-specificity rules here win.
  * Created by: building-vanilla-slices skill, desk-grid task (AFK round).
+ * Reshaped by: retro equal-2x3 task (exchange cells buy/sell/trades over
+ *   bids/asks/orders in .mkt-exchange scope; legacy .mkt areas kept for
+ *   the pool desk).
  */
 
 /* Row-count model. Heights are estimates from app.css metrics (font +
@@ -43,27 +47,37 @@
 /* Desk grid placement (grid ONLY — areas; columns mirror app.css so the
  * override stays a pure area swap). Charts stack sits on top full-width of
  * the main area (price + volume + depth slice + oscillators inside
- * mkt-charts); below it book|trades-toggle|orders, then trade tabs|stats;
- * the picker rail (side) spans all rows full-height.
+ * mkt-charts). Below it the EXCHANGE desk (.mkt-exchange) runs the retro
+ * equal 2x3: row 1 buy | sell | trades-toggle, row 2 bids | asks | orders;
+ * the picker rail (side) spans all rows full-height. The POOL desk (plain
+ * .mkt) keeps the legacy book | trades areas untouched.
  * Phones (<1200px) stack every cell single-column; the rail drops last. */
 .mkt {
   grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "stats" "side";
 }
+.mkt-exchange {
+  grid-template-areas: "head" "charts" "buy" "sell" "trades" "bids" "asks" "orders" "side";
+}
 .mkt-head { grid-area: head; min-width: 0; }
 .mkt-charts { grid-area: charts; min-width: 0; }
 .mkt-book { grid-area: book; min-width: 0; }
+.mkt-buy { grid-area: buy; min-width: 0; }
+.mkt-sell { grid-area: sell; min-width: 0; }
+.mkt-bids { grid-area: bids; min-width: 0; }
+.mkt-asks { grid-area: asks; min-width: 0; }
 .mkt-trades { grid-area: trades; min-width: 0; }
 .mkt-orders { grid-area: orders; min-width: 0; }
-.mkt-trade {
-  grid-area: trade;
-  min-width: 0;
-}
-.mkt-stats-panel { grid-area: stats; min-width: 0; }
 .mkt-side { grid-area: side; min-width: 0; }
 @media (min-width: 1200px) {
   .mkt {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
     grid-template-areas: "head head head side" "charts charts charts side" "book trades orders side" "trade stats stats side";
+    align-items: start;
+  }
+  /* Retro equal 2x3: six equal thirds + the 320px rail stays. */
+  .mkt-exchange {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
+    grid-template-areas: "head head head side" "charts charts charts side" "buy sell trades side" "bids asks orders side";
     align-items: start;
   }
   .mkt-side {
@@ -171,7 +185,9 @@
  * anchor cell and spans --depth of the ROW: the fixed 3-column layout makes
  * each cell exactly 1/3 of the row, so 3x cell width = full row width
  * (capped at 300% = the whole row). Text rides above in .cell-text. */
-.mkt-book .book-table {
+.mkt-book .book-table,
+.mkt-bids .book-table,
+.mkt-asks .book-table {
   border-collapse: separate;
   border-spacing: 0;
 }

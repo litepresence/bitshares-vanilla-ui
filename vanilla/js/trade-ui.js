@@ -1,11 +1,11 @@
 /* TradeUI: stable entry points for DEX trading (thin shell).
- * Owns: NOTHING but delegation — renderPanels/orderCancelBox/cancelAllBox
+ * Owns: NOTHING but delegation — renderDual/orderCancelBox/cancelAllBox
  *   keep the exact names the desk (market-desk.js) and the orders list
  *   (market-orders.js) use. Bodies live in the slice-18 split files: order
  *   forms + review + send in trade-form.js (TradeForm), cancel boxes +
  *   result screen in trade-cancel.js (TradeCancel). Missing-backend paths
  *   render honest inline errors, never blank.
- * Consumes: TradeForm.renderPanels, TradeCancel.orderCancelBox/
+ * Consumes: TradeForm.renderDual, TradeCancel.orderCancelBox/
  *   cancelAllBox (lazy — honest error when absent).
  * Globals/side effects: DOM error panel only on the missing-backend path;
  *   global TradeUI only (unchanged).
@@ -28,15 +28,16 @@ var TradeUI = (function () {
     return err;
   }
 
-  /* Desk entry: renderPanels(doc, mount, ctx). Delegates to the form side. */
-  function renderPanels(doc, mount, ctx) {
+  /* Desk entry: renderDual(doc, buyMount, sellMount, ctx). Delegates to the
+   * form side (retro 2x3 row-1 Buy + Sell panels). */
+  function renderDual(doc, buyMount, sellMount, ctx) {
     if (typeof TradeForm !== "undefined" && TradeForm &&
-        typeof TradeForm.renderPanels === "function") {
-      TradeForm.renderPanels(doc, mount, ctx);
+        typeof TradeForm.renderDual === "function") {
+      TradeForm.renderDual(doc, buyMount, sellMount, ctx);
       return;
     }
-    if (!mount) return;
-    showError(doc, mount, "Trade backend missing: js/trade-form.js failed to load.");
+    if (!buyMount && !sellMount) return;
+    showError(doc, buyMount || sellMount, "Trade backend missing: js/trade-form.js failed to load.");
   }
 
   /* Inline per-order cancel confirm. Delegates to the cancel side. */
@@ -62,7 +63,7 @@ var TradeUI = (function () {
   }
 
   return {
-    renderPanels: renderPanels,
+    renderDual: renderDual,
     orderCancelBox: orderCancelBox,
     cancelAllBox: cancelAllBox
   };

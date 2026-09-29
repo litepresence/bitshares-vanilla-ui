@@ -227,16 +227,19 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-picker-row a { flex: 1; min-width: 0; }
 .mkt-star { background: transparent; color: var(--warn); border: 0;
   min-width: 44px; min-height: 44px; font-size: 1.2rem; padding: 0 8px; }
-/* Desk tables stay dense on wide screens (scoped .mkt-book only). */
-.mkt-book .node-table th, .mkt-book .node-table td { padding: 6px 8px;
+/* Desk tables stay dense on wide screens (pool .mkt-book cell + exchange
+ * split .mkt-bids/.mkt-asks cells share the book look). */
+.mkt-book .node-table th, .mkt-book .node-table td,
+.mkt-bids .node-table th, .mkt-bids .node-table td,
+.mkt-asks .node-table th, .mkt-asks .node-table td { padding: 6px 8px;
   font-size: 0.9rem; }
 /* Orderbook numerics match the original (.order-table, _exchange.scss:118-140):
  * right-aligned numbers, 14px headers / 12px cells, tight padding. */
-.mkt-book .node-table { table-layout: fixed; }
-.mkt-book .node-table th { font-size: 14px; padding: 5px 5px; text-align: right; }
-.mkt-book .node-table th:first-child { text-align: left; }
-.mkt-book .node-table td { font-size: 12px; padding: 5px 5px; text-align: right; }
-.mkt-book .node-table td:first-child { text-align: left; }
+.mkt-book .node-table, .mkt-bids .node-table, .mkt-asks .node-table { table-layout: fixed; }
+.mkt-book .node-table th, .mkt-bids .node-table th, .mkt-asks .node-table th { font-size: 14px; padding: 5px 5px; text-align: right; }
+.mkt-book .node-table th:first-child, .mkt-bids .node-table th:first-child, .mkt-asks .node-table th:first-child { text-align: left; }
+.mkt-book .node-table td, .mkt-bids .node-table td, .mkt-asks .node-table td { font-size: 12px; padding: 5px 5px; text-align: right; }
+.mkt-book .node-table td:first-child, .mkt-bids .node-table td:first-child, .mkt-asks .node-table td:first-child { text-align: left; }
 /* Book scroll regions: capped height + sticky header (original behavior,
  * native overflow). Phone cards (<560px) keep natural flow — tables hidden. */
 .mkt h1 { font-size: 1.4rem; margin: 8px 0 4px; }

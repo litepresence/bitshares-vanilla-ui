@@ -1,6 +1,10 @@
 /* MarketBook: order-book + recent-trades rendering for the DEX desk.
  * Owns: book side tables/cards with depth shading, spread/midpoint header
- *   text, trades tables/cards with raw-JSON details. The depth CHART lives
+ *   text, trades tables/cards with raw-JSON details. renderBook paints the
+ *   combined Asks+Bids book (pool desk); renderSplit paints the same sides
+ *   into two separate retro-2x3 cells (exchange BUY ORDERS + SELL ORDERS)
+ *   through the ONE shared renderBookSide builder — row math has a single
+ *   code path either way. The depth CHART lives
  *   in exactly one place — the desk's depth cell (MarketCharts.drawDepth
  *   via the shared redraw path); the old second copy here (cumulative
  *   staircase canvas, dex-ux proposal 1) was deleted 2026-09-29 so bids
@@ -49,23 +53,33 @@ var MarketBook = (function () {
     return n;
   }
 
-  /* Click-to-fill (desk parity with #1 order-book click): set the trade-form
-   * price input to the row price, fire input/change so form state syncs,
-   * then focus the amount input. No-op when the form is absent (read-only
-   * desk, locked view). Never throws — money strings pass through verbatim. */
-  function fillTradePrice(doc, priceText) {
+  /* Click-to-fill (desk parity with #1 order-book click): set the price
+   * input of BOTH trade panels (per-side ids trade-price-buy /
+   * trade-price-sell, legacy bare trade-price as fallback) and fire input
+   * so each panel's three-way wiring syncs, then focus the amount input of
+   * the taking side (ask rows -> buy panel, bid rows -> sell panel).
+   * focusSide is "buy", "sell", or omitted (buys). No-op when the panels
+   * are absent (pool desk, confirm screens). Never throws — money strings
+   * pass through verbatim. */
+  function fillTradePrice(doc, priceText, focusSide) {
     try {
-      var price = doc.getElementById("trade-price");
-      if (!price) return;
-      price.value = String(priceText);
-      var ev = null;
-      if (typeof Event === "function") {
-        try { ev = new Event("input", { bubbles: true }); } catch (e) { ev = null; }
-      }
-      if (ev && typeof price.dispatchEvent === "function") {
-        try { price.dispatchEvent(ev); } catch (e) { /* value stands */ }
-      }
-      var amt = doc.getElementById("trade-amount");
+      var filled = false;
+      ["trade-price-buy", "trade-price-sell", "trade-price"].forEach(function (id) {
+        var price = doc.getElementById(id);
+        if (!price) return;
+        price.value = String(priceText);
+        var ev = null;
+        if (typeof Event === "function") {
+          try { ev = new Event("input", { bubbles: true }); } catch (e) { ev = null; }
+        }
+        if (ev && typeof price.dispatchEvent === "function") {
+          try { price.dispatchEvent(ev); } catch (e) { /* value stands */ }
+        }
+        filled = true;
+      });
+      if (!filled) return;
+      var amtId = focusSide === "sell" ? "trade-amount-sell" : "trade-amount-buy";
+      var amt = doc.getElementById(amtId) || doc.getElementById("trade-amount");
       if (amt && typeof amt.focus === "function") amt.focus();
     } catch (e) { /* read-only desk stands */ }
   }
@@ -186,7 +200,9 @@ var MarketBook = (function () {
 
   /* Book side table + phone cards (same .node-table/.node-cards pattern as
    * account-ui renderBalances). Amount = quote leg, Total = base leg, both
-   * verbatim chain-human strings. Depth fraction per row comes from
+   * verbatim chain-human strings. opts.bare (split cells) skips the inner
+   * h3 — the desk cell owns the BUY ORDERS / SELL ORDERS h2 instead.
+   * Depth fraction per row comes from
    * Market.depth cumulative totalBase Numbers (pixels, not money — same as
    * the depth chart); the row stores it as --depth for desk-grid.css, which
    * paints ONE absolutely-positioned .depth-bar behind the row text
@@ -195,15 +211,19 @@ var MarketBook = (function () {
    * volume toggle (log widths share its scale so bars and chart agree);
    * absent/false keeps the legacy linear share. Scroll regions + grid live
    * in desk-grid.css (.book-scroll/.book-cards/.book-grid). */
-  function renderBookSide(doc, section, title, levels, depthPts, logVol) {
+  function renderBookSide(doc, section, title, levels, depthPts, logVol, opts) {
     var isAsk = title === "Asks";
+    var bare = !!(opts && opts.bare);
     /* Title doubles as the caller's side key (Asks/Bids drive the depth-bar
      * color below), so the h3 localizes through a static per-side key while
-     * `title` itself stays the English logic key. */
+     * `title` itself stays the English logic key. Split cells (bare) skip
+     * the h3 — the desk cell's own h2 names the side. */
     var sideWrap = doc.createElement("div");
     sideWrap.className = "book-side " + (isAsk ? "book-asks" : "book-bids");
     section.appendChild(sideWrap);
-    sideWrap.appendChild(el(doc, "h3", isAsk ? t("market.asks", "Asks") : t("market.bids", "Bids")));
+    if (!bare) {
+      sideWrap.appendChild(el(doc, "h3", isAsk ? t("market.asks", "Asks") : t("market.bids", "Bids")));
+    }
     if (!levels || levels.length === 0) {
       sideWrap.appendChild(el(doc, "p", "No " + title.toLowerCase() + ".", "muted"));
       return;
@@ -288,9 +308,10 @@ var MarketBook = (function () {
         card.appendChild(el(doc, "div", text, "cell-text"));
       });
       cards.appendChild(card);
-      /* Click-to-fill wiring (price text is texts[0]); row + card mirror. */
+      /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
+       * Ask rows take into the buy panel, bid rows into the sell panel. */
       (function (row, cardEl, priceText) {
-        function go() { fillTradePrice(doc, priceText); }
+        function go() { fillTradePrice(doc, priceText, isAsk ? "buy" : "sell"); }
         try {
           row.addEventListener("click", go);
           row.addEventListener("keydown", function (ev) {
@@ -349,6 +370,35 @@ var MarketBook = (function () {
     renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse(), !!ctx.logVol);
     renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol);
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
+    return depth;
+  }
+
+  /* Split book fill for the retro 2x3 desk (row 2: BUY ORDERS | SELL ORDERS
+   * as two equal cells): same depth computation, same spread header, same
+   * row math as renderBook — the ONLY difference is destination (bids into
+   * bidsEl, asks into asksEl, both bare since the desk cells own the h2s)
+   * and the raw-JSON proof landing in the asks cell. ctx shape matches
+   * renderBook. Returns depth so the caller can cache it for charts. */
+  function renderSplit(doc, bidsEl, asksEl, ctx) {
+    while (bidsEl.firstChild) bidsEl.removeChild(bidsEl.firstChild);
+    while (asksEl.firstChild) asksEl.removeChild(asksEl.firstChild);
+    var depth = Market.depth(ctx.book, ctx.basePrec, ctx.quotePrec);
+    var bestBid = ctx.book.bids.length > 0 ? ctx.book.bids[0].displayPrice : null;
+    /* Chain asks arrive best-first (ascending); the render below reverses for
+     * display, so bestAsk is asks[0] — NOT asks[last] (that was the worst).
+     * Levels and depth points reverse TOGETHER, so each row keeps its own
+     * cumulative fraction for the --depth bar. */
+    var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
+    var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
+    if (sm) {
+      ctx.spreadLine.textContent = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+        " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
+    } else {
+      ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
+    }
+    renderBookSide(doc, bidsEl, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol, { bare: true });
+    renderBookSide(doc, asksEl, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse(), !!ctx.logVol, { bare: true });
+    rawDetails(doc, asksEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
 
@@ -418,6 +468,7 @@ var MarketBook = (function () {
 
   return {
     renderBook: renderBook,
+    renderSplit: renderSplit,
     renderTrades: renderTrades
   };
 })();
