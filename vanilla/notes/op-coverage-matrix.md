@@ -18,9 +18,9 @@
 | # | #1 route → component (App.jsx) | #2 page / component | Vanilla route (router.js) → status |
 |---|---|---|---|
 | A1 | `/` → DashboardPage (:503) | index.astro + Home.jsx | `/` (:111) → PORTED (slice-05/07; documented deviation: redirects to last/default market desk with link, no blank page) |
-| A2 | `/account/:account_name` → AccountPage (:510) | balances, recent-activity, open-orders, call-orders.astro | `/account/:account_name` (:112) → PORTED (slice-03: balances, open orders, history, 22 live vectors) |
+| A2 | `/account/:account_name` → AccountPage (:510) | balances, recent-activity, open-orders, call-orders.astro | `/account/:account_name` (:112) → PORTED (slice-03: balances, open orders, history, 22 live vectors; +2026-09-29 G6 public-first lookup, any account opens locked — account-ui.js:572) |
 | A3 | `/accounts` → DashboardAccountsOnly (:512) | — (no equiv) | `/accounts` (:113) → PORTED (`accounts-ui.js`: wallet card + lookup + manage links) |
-| A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading) |
+| A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading; +2026-09-29 typed-account My fills/orders preview locked, logged-out quote panels, equal 2x3, overlay mesh, feed/settlement strip reads-only — market-desk.js:702,1230; market-ind.js:352,975; trade-form.js:389; desk-grid.css:51) |
 | A5 | `/credit-offer` → CreditOfferPage (:520) | offers, offer, lend.astro | `/credit-offer` (:116) + `/credit-offer/:id` (:115) → PORTED (slice-13: offer 1.21.43 → deals 1.22.70/71) |
 | A6 | `/settings`, `/settings/:tab` (:524–528) | nodes, theme, visuals, page_themes.astro | `/settings`, `/settings/:tab` (:118–119) → PORTED (slice-01 nodes/latency/testnet; slice-17 switcher; 3 themes) |
 | A7 | `/invoice/:data` → Invoice (:529) | create_invoice, pay_invoice, stored_invoices, invoice_inventory.astro | `/invoice/:data` (:120) + `/invoice` (:121) → PORTED (slice-14 MiscUI) |
@@ -48,14 +48,14 @@
 | A29 | `/htlc` → Htlc showcase (:634) | htlc.astro | `/htlc` (:155) + `/htlc/:id` (:154) → PORTED (slice-11: HTLC 1.16.621–625 lifecycle) |
 | A30 | `/prediction` (+`/:market` per §6) (:635) | — (no astro page; README-level only) | `/prediction` (:156) + `/prediction/:market` (:157) → PORTED (`prediction-ui.js`: PMA scan + detail + desk links) |
 | A31 | `/instant-trade` + `/:marketID` (:639–648) | instant_trade.astro | `/instant-trade` (:158) + `/instant-trade/:marketID` (:159) → PORTED (`instant-trade-ui.js`: simple buy/sell via op-1) |
-| A32 | `/pools` → PoolmartPage (:649) | pools, stake, top-pools, custom_pool_overview, custom_pool_tracker.astro | `/pools` (:161) + `/pools/:id` (:160) + `/swap` (:162) → PORTED (slice-12: ops 59–63/75, lifecycles 1.19.66/67) |
+| A32 | `/pools` → PoolmartPage (:649) | pools, stake, top-pools, custom_pool_overview, custom_pool_tracker.astro | `/pools` (:161) + `/pools/:id` (:160) + `/swap` (:162) → PORTED (slice-12: ops 59–63/75, lifecycles 1.19.66/67; +2026-09-29 pool provenance map reads-only + typed-account swap preview — pool-graph.js:93, pool-detail-ui.js:975) |
 | A33 | `*` → Page404 (:650) | — | `*` (:169) → PORTED (render404 + dashboard link, router.js:54–60) |
 
 ## B. Reference #1 modals/transaction UX (27 Modal files + shell widgets)
 
 | # | #1 modal (components/Modal/ + shell) | #2 equiv | Vanilla → status |
 |---|---|---|---|
-| B1 | SendModal.jsx (transfer confirm) | Transfer.jsx | transfer-confirm.js → PORTED (slice-04: human-readable confirm, memo, fee-fill) |
+| B1 | SendModal.jsx (transfer confirm) | Transfer.jsx | transfer-confirm.js → PORTED (slice-04: human-readable confirm, memo, fee-fill; +2026-09-29 G7 locked memo excluded from confirm — transfer-ui.js:485) |
 | B2 | BorrowModal.jsx | CreditBorrow.jsx | BorrowUI → PORTED (slice-13) |
 | B3 | HtlcModal.jsx | HtlcCreateDialog.jsx | HtlcUI → PORTED (slice-11) |
 | B4 | DirectDebitModal.jsx + DirectDebitClaimModal.jsx | WithdrawPermissions.jsx | DebitUI → PORTED (slice-11) |
@@ -95,11 +95,11 @@
 | C14 | account_lists.astro | allow/block lists | `/lists` (:127) → PORTED (slice-14, incl. blocked-users management in Lists view) |
 | C15 | blocked-users.astro | block accounts from UX | merged in C14 → PORTED (slice-14) |
 | C16 | airdrop_calculate.astro | large-scale airdrops | `/airdrop` (:128) → PORTED view (slice-14; broadcast path via propose flow) |
-| C17 | create_uia, create_smartcoin, smartcoin, smartcoins, issued_assets, publish_feed.astro | UIA/smartcoin/NFT/PMA create/update + feeds | `/assets` (:164), `/assets/create` (:165), `/assets/update/:symbol` (:166), `/assets/issue` (:167), `/assets/feed` (:168), `/asset/:symbol` → PORTED (slice-10: AFKTEST10/M11 lifecycles) |
+| C17 | create_uia, create_smartcoin, smartcoin, smartcoins, issued_assets, publish_feed.astro | UIA/smartcoin/NFT/PMA create/update + feeds | `/assets` (:164), `/assets/create` (:165), `/assets/update/:symbol` (:166), `/assets/issue` (:167), `/assets/feed` (:168), `/asset/:symbol` → PORTED (slice-10: AFKTEST10/M11 lifecycles; +2026-09-29 G1 asset-create previewable locked, explicit issuer input 1.2.0 default, sign still gates at publish — asset-ui.js:183, asset-manage-ui.js:256) |
 | C18 | create_ticket, ticket_leaderboard.astro | vote-lock tickets + leaderboard | `/tickets` (:124) → PORTED view (slice-14; caveat CLOSED: create→update PROVEN on throwaway afk-tkt-75a7 (ticket 1.18.61, blocks 100943508/509)) |
 | C19 | vote, governance, witnesses, committee, committee_parameters.astro | witnesses/committee lists, proxy, voting | merged in A15 → PORTED (slice-08; see A15 caveat) |
 | C20 | explorer, blocks.astro | chain explorer | merged in A16/A18 → PORTED (slice-09) |
-| C21 | transfer.astro | transfer + memo | `/transfer` (:148) + `/transfer/:to` (:147) → PORTED (slice-04: 2 testnet broadcasts) |
+| C21 | transfer.astro | transfer + memo | `/transfer` (:148) + `/transfer/:to` (:147) → PORTED (slice-04: 2 testnet broadcasts; +2026-09-29 locked preview path, G7 memo excluded locked — transfer-ui.js:485) |
 | C22 | create_invoice, pay_invoice, stored_invoices, invoice_inventory.astro | invoices | merged in A7 → PORTED (slice-14) |
 | C23 | blind_transfers.astro | blind transfers | DEFERRED (reason: slice-14 honest downscope — commitments + bulletproofs + stealth ECDH have no auditable vanilla source; tracked, never silently half-ported) |
 | C24 | timed_transfer.astro | delayed transfers | PORTED via `/proposals` generic propose flow (slice-14; note: no dedicated prefill — propose-a-transfer covers the chain path) |
@@ -140,3 +140,66 @@
 - Section C (astro-only pages): 41 rows = 20 PORTED substantive + 11 merge-pointers to §A rows (C1, C19, C20, C22, C25, C28, C32, C33, C38, C39, C41) + 10 DEFERRED (C3 top-ops stats, C23 blind, C27 bid_collateral, C29 LTM op-8, C30 referrer display, C31 fee-schedule table, C34 password change, C35 favourites dashboard, C36 forum, C37 trollbox — all reasoned), MISSING 0.
 - Section D (out-of-scope, decided): 7 items, all with standing-directive reasons.
 - **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. Former STUB routes (A3, A9–A14, A27, A28, A30, A31) all built out in stub batches 1–3 + op-34; no placeholders remain in §A. DEFERRED items each carry a reason + tracking note (C18 tickets PROVEN on-chain, throwaway-funded).
+
+## Nightly delta (2026-09-29) — previews, pool map, mesh (no new ops)
+
+> Append-only note for the 2026-09-28→29 round (`01f0edf..d5d61de`, 30 commits).
+> Convention: this section records behavior deltas only; status cells above are
+> updated in place where a row is affected. No row changes PORTED→STUB/MISSING
+> tonight. Headless-only caveat: per `vanilla/notes/retro-evening-2026-09-29.md`
+> honesty header, no human browser pass ran tonight; builder headless proof is
+> `tooling/visual/shot.mjs` + `node --check` + `pool-graph-test.js` (11/11).
+> Matrix author verified by `rg` in cited files, not by re-running the browser.
+
+- Pool-connection provenance map (A32 detail enrichment, NO new ops): new
+  `vanilla/js/pool-graph.js` reads `get_liquidity_pools_by_one_asset`
+  (`pool-graph.js:93`, chain truth `pool-graph.js:10`) + in-memory BFS
+  `findCorePath` (`pool-graph.js:163`) with L1_CAP 8 / L2 6×3 / NODE_CAP 25
+  (`pool-graph.js:28,119-142`); lazily loaded by `pool-detail-ui.js:948-979`
+  and `market-desk.js:1151-1212`, canvas draw at `pool-detail-ui.js:1005`.
+  Vectors: `tooling/pool-graph-test.js` (11/11 per retro-evening note).
+  Coverage: reads-only enrichment of the PORTED pool/market desks; op set
+  unchanged (59–63/75 per A32).
+- Overlay mesh (A4 enrichment, NO new ops, same fns): meshable price overlays
+  with one adjustable number each (`market-ind.js:352`), legacy single-checkbox
+  rows kept (`market-ind.js:395-399`), per-instance period chips
+  (`market-ind.js:975-977,1041`). Same indicator fns, new multi-instance UI only.
+- Unlock previews — same ops, new logged-out paths (rows A2/A4/A32/B1/C17/C21
+  annotated above): G1 asset-create previewable locked with explicit issuer
+  input 1.2.0 default, sign still gates at publish (`asset-ui.js:183`,
+  `asset-manage-ui.js:256,301-312`); typed-account previews for My
+  orders/fills/exchanges via public `Account.history` (`market-desk.js`
+  `renderMyTrades` typed input + `pairFills` op-4 filter, commits `0835586`,
+  `3d64efd`); G6 public-first account lookup (`account-ui.js:572`); G7 locked
+  memo excluded from confirm (`transfer-ui.js:485`); G8 pointer to public
+  lookup (`accounts-ui.js:122`). Honest boundary: code labels verified are
+  G1/G6/G7/G8 only — G2–G5 labels do not exist in-repo
+  (`retro-evening-2026-09-29.md:287-292`); no G2–G5 coverage claimed.
+- Quote panels + equal 2x3 (A4 layout, SAME op-1 path): locked quote panels
+  with live three-way wiring + fee preview line (`trade-form.js:389-398,424-434,
+  505-509`), i18n keys for locked panel (`b2c7cfb`), retro equal 2x3 grid
+  buy/sell/trades over bids/asks/orders (`desk-grid.css:51-59`, commit `cff7028`).
+  Signing still gates at review (`47a30bb` "unlock only at review").
+- Settlement/feed strip cells (A4 reads-only): strip feed + settlement via one
+  lookup + `get_objects → current_feed.settlement_price` with BOTH precisions
+  (`market-desk.js:702,1230-1323`); globally-settled fund display same object,
+  zero extra calls (`market-desk.js:1239-1240`). No serializer touched.
+- Storage seam (NO coverage change): `Store.backend {get,set,del}` with
+  localStorage default (`store.js:4-5,46,76-94,220`); reads/writes routed
+  through backend, commit `f3d52f8`. No route/op affected.
+- Extension scaffold (OUT-OF-MATRIX, separate track): `extension-wrapper/`
+  Tier-1 scaffold (`adapter/bridge.js`, `adapter/storage.js`,
+  `background/sw.js`, `content/inject.js`, manifests) explicitly UNVERIFIED
+  IN-BROWSER per `extension-wrapper/TEST-PLAN.md:1` and commit `afc65dd`.
+  Not a §D item (D3 remains the deferred wrapper adapter); no matrix row
+  claims it. Track in TEST-PLAN.md, not here.
+- Serializers untouched (verified 2026-09-29): `git diff 01f0edf..d5d61de
+  --name-only` shows no `vanilla/js/tx.js`, no `asset-ops.js`/`tx-send.js`/
+  `ops-ui.js`; last `tx.js` change is `2c2809d` (pre-round). Op builders
+  unchanged, so op-10 (C17) / op-1 (A4/C21) / op-4 (A4 fills) deltas above are
+  preview/read paths only — same ops, same serializers.
+- Counts tonight: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20 substantive
+  PORTED + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged from pre-round.
+  MISSING (unjustified): still 0. Nothing got WORSE; newly uncertain: locked
+  preview UX is headless-only until the human browser pass (not a coverage
+  regression, a verification gap — noted, not hidden).
