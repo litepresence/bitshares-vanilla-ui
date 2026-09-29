@@ -477,7 +477,7 @@ var MarketDesk = (function () {
     var scaleRow = doc.createElement("div");
     scaleRow.className = "mkt-scalerow";
     depthSec.appendChild(scaleRow);
-    function scaleBtn(key, logKey, linKey) {
+    function scaleBtn(key, logKey, linKey, redrawBars) {
       var b = touchable(el(doc, "button", ""));
       b.type = "button";
       function paint() {
@@ -489,14 +489,17 @@ var MarketDesk = (function () {
       b.addEventListener("click", function () {
         state[key] = !state[key];
         paint();
-        MarketInd.drawCharts(state);
+        /* Volume scale also re-shades the book rows (bars share the chart
+         * scale); price scale only redraws the chart. */
+        if (redrawBars) fill(state);
+        else MarketInd.drawCharts(state);
       });
       scaleRow.appendChild(b);
       return { repaint: paint };
     }
     state._scalePainters = [
-      scaleBtn("depthLogX", ["market.px_log", "Price: Log"], ["market.px_lin", "Price: Linear"]),
-      scaleBtn("depthLogY", ["market.vol_log", "Vol: Log"], ["market.vol_lin", "Vol: Linear"])
+      scaleBtn("depthLogX", ["market.px_log", "Price: Log"], ["market.px_lin", "Price: Linear"], false),
+      scaleBtn("depthLogY", ["market.vol_log", "Vol: Log"], ["market.vol_lin", "Vol: Linear"], true)
     ];
     var depthCanvas = doc.createElement("canvas");
     depthCanvas.id = "mkt-depth-canvas";
@@ -544,6 +547,26 @@ var MarketDesk = (function () {
     state.ordersBody = ordersBody;
     state.updated = updated;
     state.chartData = null;
+    /* Deep-candles Task 4: live-tip mode + depth flag for the count note.
+     * paintNote() reuses MarketInd.paintCountNote (no market-ind.js edit)
+     * then appends " · deep|chain-only · live|poll|off". Fill's own
+     * paintCountNote calls stay untouched; live/poll handlers call this. */
+    state.liveMode = "off";
+    state.deep = false;
+    function paintNote() {
+      try {
+        if (typeof MarketInd !== "undefined" && MarketInd &&
+            typeof MarketInd.paintCountNote === "function") {
+          MarketInd.paintCountNote(state);
+        }
+      } catch (e) { /* note best-effort */ }
+      try {
+        if (state.countNote) {
+          state.countNote.textContent += " · " + (state.deep ? "deep" : "chain-only") +
+            " · " + (state.liveMode || "off");
+        }
+      } catch (e) { /* DOM gone */ }
+    }
 
     /* LWC panes hold canvases + listeners outside the canvas 2D path, so
      * route change must removePane them (clearRoot alone leaks listeners).
@@ -596,6 +619,110 @@ var MarketDesk = (function () {
       sub.textContent = assets.quote.symbol + " (" + assets.quote.id + ") / " +
         assets.base.symbol + " (" + assets.base.id + ")";
       fill(state);
+      /* Deep-candles Task 4: live tip with poll fallback (exactness-first:
+       * re-fetch the tip window via Market.candles + Market.stats — no
+       * hand-rolled money math. Push path is Chain.subscribeMarket with a
+       * 500ms debounce; failure or a missing slot falls back to a 3.5s poll.
+       * The 15s fill(state) timer above stays the floor; this only patches
+       * the tip between full fills. Route-gen guarded: every continuation
+       * checks deskAlive() so a dead desk never paints or resubscribes. */
+      (function startLiveTip() {
+        var b = assets.base, q = assets.quote;
+        /* deskAlive: true while this desk's hash is still the live route.
+         * Params: none. Returns boolean. Never throws. */
+        function deskAlive() {
+          try {
+            return String((typeof location !== "undefined" && location.hash) || "")
+              .toUpperCase().indexOf(state.id) !== -1;
+          } catch (e) { return true; }
+        }
+        /* refreshTip: re-fetch tip candles + ticker, repaint chart + strip.
+         * Skips while a full fill is in flight. Failures silent (poll/live
+         * retry covers). */
+        function refreshTip() {
+          if (!deskAlive()) return;
+          if (state.loading) return;
+          var count = 200;
+          try {
+            if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) {
+              count = MarketInd.CANDLE_COUNT;
+            }
+          } catch (e) { /* default stands */ }
+          try {
+            Market.candles(b.id, q.id, state.bucket, count).then(function (c) {
+              if (!deskAlive()) return;
+              state.candles = c;
+              try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
+              try {
+                if (typeof MarketInd !== "undefined" && MarketInd &&
+                    typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
+              } catch (e) { /* chart best-effort */ }
+              paintNote();
+            }).catch(function () { /* tip best-effort; live/poll retries */ });
+          } catch (e) { /* Market missing: live/poll retries */ }
+          try {
+            Market.stats(b.id, q.id).then(function (st) {
+              if (!deskAlive()) return;
+              state.ticker = st;
+              try {
+                if (typeof MarketInd !== "undefined" && MarketInd &&
+                    typeof MarketInd.renderStrip === "function") MarketInd.renderStrip(doc, state);
+              } catch (e) { /* strip best-effort */ }
+            }).catch(function () { /* stats best-effort */ });
+          } catch (e) { /* stats best-effort */ }
+        }
+        var pushTimer = null;
+        _cleanups.push(function () {
+          try { if (pushTimer !== null) clearTimeout(pushTimer); } catch (e) { /* gone */ }
+          pushTimer = null;
+        });
+        /* onPush: market-notice handler — 500ms debounce, then refreshTip.
+         * Payload ignored (exactness-first: re-fetch the window). */
+        function onPush() {
+          if (!deskAlive()) return;
+          try { if (pushTimer !== null) clearTimeout(pushTimer); } catch (e) { /* gone */ }
+          try {
+            pushTimer = setTimeout(function () {
+              pushTimer = null;
+              refreshTip();
+            }, 500);
+          } catch (e) { /* timers unavailable */ }
+        }
+        /* startPoll: 3.5s light-poll fallback (skips when tab hidden).
+         * Registered in _cleanups so route change stops it. */
+        function startPoll() {
+          state.liveMode = "poll";
+          paintNote();
+          try {
+            var pollTimer = setInterval(function () {
+              if (!deskAlive()) return;
+              try {
+                if (typeof document !== "undefined" && document.hidden) return;
+              } catch (e) { /* headless: keep polling */ }
+              refreshTip();
+            }, 3500);
+            _cleanups.push(function () {
+              try { clearInterval(pollTimer); } catch (e) { /* gone */ }
+            });
+          } catch (e) { /* timers unavailable: live tip stays off */ }
+        }
+        try {
+          if (typeof Chain !== "undefined" && Chain &&
+              typeof Chain.subscribeMarket === "function") {
+            Chain.subscribeMarket(b.id, q.id, onPush).then(function (unsub) {
+              if (!deskAlive()) {
+                try { if (typeof unsub === "function") unsub(); } catch (e) { /* gone */ }
+                return;
+              }
+              state.liveMode = "live";
+              paintNote();
+              if (typeof unsub === "function") _cleanups.push(unsub);
+            }).catch(function () { startPoll(); });
+          } else {
+            startPoll();
+          }
+        } catch (e) { startPoll(); }
+      })();
       /* Slice-06 hook: one renderPanels call with the ctx the desk holds.
        * TradeUI gates on unlock itself and re-renders after unlock. */
       try {
@@ -748,7 +875,8 @@ var MarketDesk = (function () {
     Market.book(b.id, q.id, 50).then(function (book) {
       state.bookDepth = MarketBook.renderBook(doc, state.bookBody, {
         book: book, basePrec: b.precision, quotePrec: q.precision,
-        baseSymbol: b.symbol, quoteSymbol: q.symbol, spreadLine: state.spreadLine
+        baseSymbol: b.symbol, quoteSymbol: q.symbol, spreadLine: state.spreadLine,
+        logVol: !!state.depthLogY
       });
       MarketInd.maybeDraw(state);
     }).catch(function (e) {
