@@ -822,6 +822,21 @@ var MarketInd = (function () {
       MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
         { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
     } catch (e) { /* canvas failure must not break the desk */ }
+    /* Depth slice position: the depth canvas lives in the charts stack as an
+     * osc-sized slice (state.depthWrap, owned by the desk) and must sit
+     * second — right after the always-on Volume pane, before any oscillator
+     * panes. The osc loop above re-appends panes in OSC_ORDER, so pin the
+     * wrap at index 1 here (index 0 is Volume; a missing Volume just puts
+     * depth first, never lost). Desks without a depth slice skip this. */
+    try {
+      if (state.depthWrap && state.oscHost) {
+        if (state.depthWrap.parentNode !== state.oscHost) {
+          state.oscHost.appendChild(state.depthWrap);
+        }
+        var at = state.oscHost.children.length > 1 ? state.oscHost.children[1] : null;
+        if (at !== state.depthWrap) state.oscHost.insertBefore(state.depthWrap, at);
+      }
+    } catch (e) { /* slice order is chrome — panes stand as appended */ }
     /* Time-scale sync: scrolling/zooming the price pane moves every
      * oscillator sub-pane with it (and vice versa). Charts are rebuilt on
      * each drawCharts, so the previous link is dropped first; canvas

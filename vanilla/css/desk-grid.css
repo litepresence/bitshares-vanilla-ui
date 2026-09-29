@@ -41,12 +41,13 @@
 }
 
 /* Desk grid placement (grid ONLY — areas; columns mirror app.css so the
- * override stays a pure area swap). Chart sits on top full-width of the main
- * area; below it 2 rows x 3 tables (book|trades-toggle|orders /
- * trade|depth|stats); the picker rail (side) spans all rows full-height.
+ * override stays a pure area swap). Charts stack sits on top full-width of
+ * the main area (price + volume + depth slice + oscillators inside
+ * mkt-charts); below it book|trades-toggle|orders, then trade tabs|stats;
+ * the picker rail (side) spans all rows full-height.
  * Phones (<1200px) stack every cell single-column; the rail drops last. */
 .mkt {
-  grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "depth" "stats" "side";
+  grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "stats" "side";
 }
 .mkt-head { grid-area: head; min-width: 0; }
 .mkt-charts { grid-area: charts; min-width: 0; }
@@ -57,13 +58,12 @@
   grid-area: trade;
   min-width: 0;
 }
-.mkt-depth { grid-area: depth; min-width: 0; }
 .mkt-stats-panel { grid-area: stats; min-width: 0; }
 .mkt-side { grid-area: side; min-width: 0; }
 @media (min-width: 1200px) {
   .mkt {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
-    grid-template-areas: "head head head side" "charts charts charts side" "book trades orders side" "trade depth stats side";
+    grid-template-areas: "head head head side" "charts charts charts side" "book trades orders side" "trade stats stats side";
     align-items: start;
   }
   .mkt-side {

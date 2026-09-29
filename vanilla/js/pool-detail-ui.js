@@ -112,7 +112,20 @@ var PoolDetailUI = (function () {
     }
     var charts = doc.createElement("section"); charts.className = "mkt-charts"; desk.appendChild(charts);
     charts.appendChild(u.el(doc, "h2", t("pool.history_title", "Price history")));
-    chartPane(doc, charts, r, tape, myGen, uiGen);
+    /* Synthetic CPMM levels computed once: the charts-stack depth slice
+     * (chartPane) draws the cumulative staircase, the book section
+     * (depthPane) renders the clickable table — same levels, no recompute. */
+    var synthLevels = null;
+    try {
+      if (typeof PoolHistory !== "undefined" && PoolHistory &&
+          typeof PoolHistory.synthBook === "function") {
+        synthLevels = PoolHistory.synthBook({
+          balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw,
+          precA: precOr5(r.prec_a), precB: precOr5(r.prec_b), taker_units: r.taker_units
+        });
+      }
+    } catch (e) { synthLevels = null; }
+    chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels);
     var acts = doc.createElement("section"); acts.className = "mkt-side"; desk.appendChild(acts);
     acts.appendChild(u.el(doc, "h2", t("pool.stake_title", "Stake / unstake")));
     stakeBoxes(doc, acts, r, uiGen);
@@ -122,7 +135,7 @@ var PoolDetailUI = (function () {
     manageBoxes(doc, acts, r, uiGen);
     var book = doc.createElement("section"); book.className = "mkt-book"; desk.appendChild(book);
     book.appendChild(u.el(doc, "h2", t("pool.book_title", "Order book")));
-    depthPane(doc, book, r);
+    depthPane(doc, book, r, synthLevels);
     var hist = doc.createElement("section"); hist.className = "mkt-trades"; desk.appendChild(hist);
     hist.appendChild(u.el(doc, "h2", t("pool.pool_history_title", "Pool history")));
     historyPane(doc, hist, r, tape, myGen, uiGen);
@@ -131,7 +144,7 @@ var PoolDetailUI = (function () {
    * leg, so bucketing happens here over enriched swaps). */
   var POOL_BUCKETS = [60, 300, 900, 1800, 3600];
 
-  function chartPane(doc, charts, r, tape, myGen, uiGen) {
+  function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels) {
     /* Swap-price candles (ES adapter -> chain fallback) drawn through the
      * SHARED MarketInd stack (timeframes + dropdown menu + LWC price pane +
      * oscillator sub-panes) — the pool desk reads exactly like the exchange
@@ -175,6 +188,31 @@ var PoolDetailUI = (function () {
       swaps: [], precA: precOr5(r.prec_a), precB: precOr5(r.prec_b)
     };
     try { MarketInd.renderIndMenu(doc, menuHost, P); } catch (e) { /* chart works without the menu */ }
+    /* Synthetic depth slice (CPMM levels as a cumulative staircase, same
+     * visual language as the exchange depth slice): canvas in an osc-sized
+     * wrap pinned at stack index 1 by drawCharts via P.depthWrap. Levels
+     * arrive precomputed from detailFill (shared with the book table). */
+    try {
+      if (synthLevels && (synthLevels.asks.length || synthLevels.bids.length) &&
+          typeof Market !== "undefined" && Market && typeof Market.depth === "function") {
+        P.bookDepth = Market.depth({ bids: synthLevels.bids, asks: synthLevels.asks });
+        var depthWrap = doc.createElement("div");
+        depthWrap.className = "mkt-osc-pane";
+        var depthHead = doc.createElement("div");
+        depthHead.className = "mkt-osc-head";
+        var depthTitle = doc.createElement("span");
+        depthTitle.className = "mkt-osc-title";
+        depthTitle.textContent = t("pool.book_title", "Order book") + " (synthetic)";
+        depthHead.appendChild(depthTitle);
+        depthWrap.appendChild(depthHead);
+        var depthCanvas = doc.createElement("canvas");
+        depthCanvas.className = "mkt-canvas";
+        depthWrap.appendChild(depthCanvas);
+        oscHost.appendChild(depthWrap);
+        P.depthWrap = depthWrap;
+        P.depthCanvas = depthCanvas;
+      }
+    } catch (e) { /* desk stands without the depth slice */ }
     function rebucket() {
       P.candles = { buckets: PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB) };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
@@ -427,12 +465,13 @@ var PoolDetailUI = (function () {
     ctx.textAlign = "left";
   }
 
-  function depthPane(doc, book, r) {
+  function depthPane(doc, book, r, synthLevels) {
     /* Synthetic resting-book view: the CPMM curve rendered as bids/asks
      * through the SHARED MarketBook renderer (same tables, depth bars,
      * spread line, staircase as the exchange desk) + the x·y=k canvas above.
-     * Rows are synthetic (no counterparty) — the note says so. Clicking a
-     * row prefills the inline swap form (amount + direction). */
+     * Levels arrive precomputed from detailFill (shared with the charts-stack
+     * depth slice above). Rows are synthetic (no counterparty) — the note
+     * says so. Clicking a row prefills the inline swap form. */
     var u = U();
     drawCurve(doc, book, r); /* x·y=k canvas above the table; silent no-op on empty pools */
     book.appendChild(u.el(doc, "p", t("pool.synth_note", "Synthetic depth from the CPMM curve at current reserves — not resting orders."), "muted"));
@@ -441,13 +480,8 @@ var PoolDetailUI = (function () {
       book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
       return;
     }
-    var precA = precOr5(r.prec_a), precB = precOr5(r.prec_b), levels = null;
-    try {
-      levels = PoolHistory.synthBook({
-        balanceA_raw: r.balance_a_raw, balanceB_raw: r.balance_b_raw,
-        precA: precA, precB: precB, taker_units: r.taker_units
-      });
-    } catch (e) { levels = null; }
+    var precA = precOr5(r.prec_a), precB = precOr5(r.prec_b);
+    var levels = synthLevels || null;
     if (!levels || (!levels.asks.length && !levels.bids.length)) {
       book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
       return;

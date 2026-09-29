@@ -5,11 +5,12 @@
  *   (book/stats/trades/my-trades/timeframes/candles — each section fails
  *   inline), last-visited market persistence (saveLast under LAST_KEY),
  *   timer/listener cleanup.
- *   LAYOUT (mirrors #1 Exchange.jsx below-chart grid + right rail):
- *   chart on top (mkt-charts: price pane + indicators + osc + timeframe),
- *   then 2 rows x 3 tables (row1: book | trades-toggle | open orders;
- *   row2: trade Buy/Sell/Scaled tabs | depth | 24h stats), market picker rail
- *   (mkt-side) full-height to the side. Grid areas live in desk-grid.css.
+  *   LAYOUT (mirrors #1 Exchange.jsx below-chart grid + right rail):
+  *   chart stack on top (mkt-charts: price pane + volume pane + depth slice
+  *   + oscillator panes + timeframe), then book | trades-toggle | open
+  *   orders, then trade Buy/Sell/Scaled tabs | 24h stats (wide), market
+  *   picker rail (mkt-side) full-height to the side. Grid areas live in
+  *   desk-grid.css.
  *   TRADES TOGGLE (mirrors #1 MarketHistory tabs): one trades cell holds
  *   Recent (activeMarketHistory, Exchange.jsx:2551-2581 activeTab "history")
  *   and My (myMarketHistory, Exchange.jsx:2583-2616 activeTab "my_history")
@@ -463,20 +464,23 @@ var MarketDesk = (function () {
     var tradeMount = doc.createElement("div");
     tradeSec.appendChild(tradeMount);
 
-    /* ROW 2 col 2: depth (CPMM-style depth canvas; was inside mkt-charts —
-     * moved here so the chart pane stays price+osc only and the 2x3 grid
-     * has its sixth table. DepthHighChart Exchange.jsx:2716-2751 is the #1
-     * counterpart; vanilla draws from the same book via MarketInd). */
-    var depthSec = doc.createElement("section");
-    depthSec.className = "mkt-depth";
-    desk.appendChild(depthSec);
-    depthSec.appendChild(el(doc, "h2", t("market.depth_title", "Depth")));
+    /* Depth slice: the cumulative-depth canvas lives in the charts stack as
+     * an osc-sized slice (under Volume, above oscillators — drawCharts pins
+     * state.depthWrap at stack index 1), not a grid cell. DepthHighChart
+     * Exchange.jsx:2716-2751 is the #1 counterpart; vanilla draws from the
+     * same book via MarketInd. Same canvas, same log/log toggles. */
+    var depthWrap = doc.createElement("div");
+    depthWrap.className = "mkt-osc-pane";
+    var depthHead = doc.createElement("div");
+    depthHead.className = "mkt-osc-head";
+    depthHead.appendChild(el(doc, "span", t("market.depth_title", "Depth"), "mkt-osc-title"));
+    depthWrap.appendChild(depthHead);
     /* Scale toggles (ship log/log: far-spam prices and dust-to-whale
      * volumes both stay legible; linear stays one tap away). Session-only,
      * same pattern as the price-pane Log toggle. */
     var scaleRow = doc.createElement("div");
     scaleRow.className = "mkt-scalerow";
-    depthSec.appendChild(scaleRow);
+    depthWrap.appendChild(scaleRow);
     function scaleBtn(key, logKey, linKey, redrawBars) {
       var b = touchable(el(doc, "button", ""));
       b.type = "button";
@@ -504,11 +508,13 @@ var MarketDesk = (function () {
     var depthCanvas = doc.createElement("canvas");
     depthCanvas.id = "mkt-depth-canvas";
     depthCanvas.className = "mkt-canvas";
-    depthSec.appendChild(depthCanvas);
+    depthWrap.appendChild(depthCanvas);
+    oscHost.appendChild(depthWrap);
+    state.depthWrap = depthWrap;
 
-    /* ROW 2 col 3: 24h market stats (ticker Latest/change/volume/bid-ask —
-     * was inside the side rail; moved here so the rail is picker-only and
-     * the grid below the chart is a full 2x3). */
+    /* 24h market stats (ticker Latest/change/volume/bid-ask — was inside
+     * the side rail; the rail stays picker-only and stats takes the wide
+     * second-row cell next to the trade tabs). */
     var statsSec = doc.createElement("section");
     statsSec.className = "mkt-stats-panel";
     desk.appendChild(statsSec);
