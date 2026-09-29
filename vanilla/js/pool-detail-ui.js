@@ -179,7 +179,8 @@ var PoolDetailUI = (function () {
       P.candles = { buckets: PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB) };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {
-        P.countNote.textContent = P.swaps.length + " swaps · " + P.bucket + "s candles";
+        var liveSuffix = (typeof poolLive !== "undefined" && poolLive && poolLive.live) ? " · live" : "";
+        P.countNote.textContent = P.swaps.length + " swaps · " + P.bucket + "s candles" + liveSuffix;
       } catch (e) { /* count stands */ }
     }
     var swaps = (tape && tape.swaps) || [];
@@ -193,6 +194,73 @@ var PoolDetailUI = (function () {
       MarketInd.paintTimeframes(doc, P, function () { if (live(myGen, uiGen)) rebucket(); });
     } catch (e) { /* default bucket stands */ }
     rebucket();
+    /* Pool live tip (deep-candles 5/5): head-block poll + get_block op-63
+     * scan. Each new head is fetched once; its transactions are scanned for
+     * [63, body] rows in this pool, built into swap discretes (same shape as
+     * PoolHistory.chainSwaps), leg-filtered, enriched, prepended (cap 500),
+     * then rebucketed. Self-clears on route change via the gen guard; skips
+     * when the tab is hidden; all failures silent. */
+    var poolLive = { id: String(r.id), legA: r.asset_a_id, legB: r.asset_b_id, lastHead: 0, live: false };
+    try { poolLive.lastHead = (Chain.status() || {}).headBlock || 0; } catch (e) { poolLive.lastHead = 0; }
+    function markLive() {
+      if (poolLive.live) return;
+      poolLive.live = true;
+      try {
+        if (P.countNote && P.countNote.textContent.indexOf("live") === -1) {
+          P.countNote.textContent = P.countNote.textContent + " · live";
+        }
+      } catch (e) { /* next rebucket carries it */ }
+    }
+    function scanBlock(n) {
+      try {
+        if (typeof Chain === "undefined" || !Chain) return;
+        Chain.db().then(function (dbId) { return Chain.call(dbId, "get_block", [n]); }).then(function (block) {
+          if (!live(myGen, uiGen)) return;
+          try {
+            var txs = (block && block.transactions) || [], out = [];
+            var stamp = (block && (block.timestamp || block.block_time)) || new Date().toISOString();
+            txs.forEach(function (tx) {
+              var ops = (tx && tx.operations) || [], ress = (tx && tx.operation_results) || [];
+              ops.forEach(function (op, k) {
+                try {
+                  var oid = Array.isArray(op) ? op[0] : op.type;
+                  if (oid !== 63) return;
+                  var bodyb = Array.isArray(op) ? op[1] : op.data;
+                  if (!bodyb || String(bodyb.pool) !== poolLive.id) return;
+                  var res = ress[k];
+                  var resObj = Array.isArray(res) ? res[1] : res;
+                  if (!resObj || !resObj.paid || !resObj.received || !resObj.paid[0] || !resObj.received[0]) return;
+                  var paid = resObj.paid[0], recv = resObj.received[0];
+                  var p = String(paid.asset_id), rc = String(recv.asset_id);
+                  var a = String(poolLive.legA), b = String(poolLive.legB);
+                  if (!((p === a || p === b) && (rc === a || rc === b) && p !== rc)) return;
+                  out.push({ time: stamp, block: n, account: bodyb.account || null,
+                    paid: { amount: String(paid.amount), asset: p },
+                    received: { amount: String(recv.amount), asset: rc } });
+                } catch (e) { /* malformed op skips */ }
+              });
+            });
+            if (!out.length) return;
+            try { PoolHistory.enrich(out, poolLive.legA, P.precA, poolLive.legB, P.precB); } catch (e) { /* tape renders unpriced */ }
+            P.swaps = out.concat(P.swaps).slice(0, 500);
+            rebucket();
+          } catch (e) { /* scan skips */ }
+        }).catch(function () { /* head fetch skips */ });
+      } catch (e) { /* live tip skips */ }
+    }
+    var poolTimer = null;
+    function watchHead() {
+      try {
+        if (!live(myGen, uiGen)) { try { clearInterval(poolTimer); } catch (e) {} return; }
+        if (typeof document !== "undefined" && document.hidden) return;
+        var head = null;
+        try { head = (typeof Chain !== "undefined" && Chain && Chain.status() ? Chain.status().headBlock : null) || null; } catch (e) { head = null; }
+        if (!head) return;
+        markLive();
+        if (head > poolLive.lastHead) { poolLive.lastHead = head; scanBlock(head); }
+      } catch (e) { /* poll skips */ }
+    }
+    try { poolTimer = setInterval(watchHead, 3500); } catch (e) { poolTimer = null; }
   }
   /* Theme token read (plain duplicate of the market-book.js helper —
    * doctrine prefers duplication over a shared chart abstraction). */
