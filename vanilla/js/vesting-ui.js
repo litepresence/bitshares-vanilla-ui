@@ -16,6 +16,22 @@
  *   spaces 1.13/1.15 <- types.hpp:376/:378.
  * MONEY DISCIPLINE (#6): amounts stay RAW digit strings; Format renders.
  *   No Number()/parseFloat on money — ever. Op-37 confirm shows "fee: 0".
+ * PUNCHLIST 2026-09-29 (#/vesting HIGH — progress columns + available hint):
+ *   the table now carries Required / Earned / Remaining (integer days) +
+ *   Available (claimable-now %) per policy, computed read-only by
+ *   progressOf() below (BigInt/integer math only — concepts from #1
+ *   AccountVesting.jsx:71-230, units documented per branch), and the
+ *   per-row claim form defaults to the available amount instead of the
+ *   full balance. The raw policy legs (coin_seconds_earned,
+ *   begin_balance, ...) are re-read here via get_vesting_balances because
+ *   ProposalMisc.vestings drops them to kind+words (duplicated plain read,
+ *   doctrine rule 5); a failed raw read still renders dashed progress,
+ *   never a throw. New column labels are plain literals (no new t() keys —
+ *   locale dicts are outside this punchlist's file scope; check_i18n stays
+ *   green, a later i18n batch should key them).
+ * DEFERRED (punchlist 2026-09-29, low — recorded, not built): list
+ *   search/filter input over the vesting rows (ref AccountVesting.jsx:10
+ *   SearchInput).
  * NOTE: iso16/dateHuman duplicate the tiny copies in misc-ui.js on purpose
  *   (the authorities view still needs them there) — doctrine rule 5 prefers
  *   duplicated plain code over a shared helper with cross-file coupling.
@@ -64,6 +80,102 @@ var VestingUI = (function () {
     var ts = Date.parse(/Z$/.test(iso) ? iso : iso + "Z");
     return isNaN(ts) ? String(iso) : new Date(ts).toLocaleString();
   }
+  var DAY_SEC = 86400n; /* Integer day for progress math (wall-clock only — money stays raw elsewhere). */
+  /* BigInt helpers for read-only progress math (principle #6: no Number()/
+   * parseFloat on chain integers; Date.parse/now feed wall-clock only).
+   * digits: digit-string -> BigInt or null. u32int: chain u32 (number or
+   * digit string) -> BigInt or null. isoSec: ISO datetime -> BigInt epoch
+   * seconds or null (unparseable dates never throw). */
+  function digits(s) { var v = String(s === undefined || s === null ? "" : s); return /^\d+$/.test(v) ? BigInt(v) : null; }
+  function u32int(v) {
+    if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 0xFFFFFFFF) return BigInt(v);
+    if (typeof v === "string" && /^\d+$/.test(v)) { try { var b = BigInt(v); if (b <= 0xFFFFFFFFn) return b; } catch (e) { /* null below */ } }
+    return null;
+  }
+  function isoSec(iso) {
+    if (!iso) return null;
+    var s = String(iso), ms = Date.parse(/Z$/.test(s) ? s : s + "Z");
+    return isNaN(ms) ? null : BigInt(Math.floor(ms / 1000));
+  }
+  function nowSec() { return BigInt(Math.floor(Date.now() / 1000)); }
+  /* BigInt ratio -> basis points 0..10000 (null when the denominator is
+   * missing/zero — the caller dashes). Caps above 100% at 100%. */
+  function ratioBp(num, den) {
+    if (num === null || den === null || den <= 0n) return null;
+    var bp = (num * 10000n) / den;
+    return bp > 10000n ? 10000n : bp;
+  }
+  /* Basis points -> "12.34%" via integer math (null -> "—", never blank). */
+  function fmtBp(bp) {
+    if (bp === null || bp === undefined) return "—";
+    return (bp / 100n).toString() + "." + (bp % 100n).toString().padStart(2, "0") + "%";
+  }
+  function dash(v) { return (v === null || v === undefined) ? "—" : String(v); }
+  /* Raw vesting_balance object -> {req, earn, rem, availBp}. req/earn/rem
+   * are integer-DAY strings (null renders as "—"); availBp is basis points
+   * 0..10000 (null -> "—"). Read-only: malformed chain data yields
+   * all-dash + null avail, never a throw (the row still renders).
+   * Concepts from #1 AccountVesting.jsx:71-230 only — the units below are
+   * deliberate integer-day simplifications, documented per branch:
+   * - instant (type 2): fully vested -> 100%, no day columns.
+   * - linear (type 0): remaining = floor(max(period-earned,0)/86400);
+   *   required/earned stay dash (the reference shows remaining only);
+   *   available = max(vested-claimed,0) in bp, claimed from begin_balance
+   *   when present (missing begin_balance -> claimed 0, never a throw).
+   * - cdd with start_claim (type 1, dated): plain days required/earned and
+   *   remaining = max(required-earned,0) (keeps the displayed invariant
+   *   required = earned + remaining); available is binary (matured? 100:0).
+   * - cdd coin-days (type 1, no start): required/earned/remaining are
+   *   asset-adjusted coin-days (the reference get_asset_amount concept:
+   *   coin-seconds / 86400 / 10^prec) as integer days, same invariant;
+   *   available = earned/required capped at 100% — unitless, so it needs
+   *   no precision and still renders when prec is unknown.
+   * Params: vb raw get_vesting_balances object (policy in [t,d] ARRAY
+   *   form), balRaw digit string, prec number-or-null. */
+  function progressOf(vb, balRaw, prec) {
+    function unknown() { return { req: null, earn: null, rem: null, availBp: null }; }
+    if (!vb || !Array.isArray(vb.policy)) return unknown();
+    var type = vb.policy[0], d = vb.policy[1] || {};
+    if (type === 2) return { req: null, earn: null, rem: null, availBp: 10000n };
+    var now = nowSec();
+    if (type === 0) {
+      var start = isoSec(d.begin_timestamp), period = u32int(d.vesting_duration_seconds), cliff = u32int(d.vesting_cliff_seconds);
+      if (start === null || period === null || cliff === null) return unknown();
+      var earned = now > start ? now - start : 0n;
+      var remDays = (period > earned ? period - earned : 0n) / DAY_SEC;
+      var vested = earned >= period ? 10000n : (earned < cliff || period === 0n ? 0n : (earned * 10000n) / period);
+      var beginBal = digits(d.begin_balance), bal = digits(balRaw);
+      var claimed = (beginBal !== null && beginBal > 0n && bal !== null)
+        ? ((beginBal > bal ? beginBal - bal : 0n) * 10000n) / beginBal : 0n;
+      return { req: null, earn: null, rem: String(remDays), availBp: vested > claimed ? vested - claimed : 0n };
+    }
+    if (type === 1) {
+      var vestSec = u32int(d.vesting_seconds);
+      if (vestSec === null) return unknown();
+      var startClaim = isoSec(d.start_claim);
+      if (startClaim !== null && startClaim > 0n) {
+        var e2 = now > startClaim ? now - startClaim : 0n;
+        var req = vestSec / DAY_SEC, ern = e2 / DAY_SEC;
+        var mature = e2 >= vestSec;
+        return { req: String(req), earn: String(ern),
+          rem: String(mature ? 0n : (req > ern ? req - ern : 0n)), availBp: mature ? 10000n : 0n };
+      }
+      var last = isoSec(d.coin_seconds_earned_last_update), cse = digits(d.coin_seconds_earned), bal2 = digits(balRaw);
+      if (last === null || cse === null || bal2 === null) return unknown();
+      var earnedCS = cse + bal2 * (now > last ? now - last : 0n);
+      var denom = vestSec * bal2;
+      if (denom <= 0n) return { req: "0", earn: "0", rem: "0", availBp: 10000n };
+      var bp = ratioBp(earnedCS, denom);
+      if (typeof prec !== "number" || prec < 0) return { req: null, earn: null, rem: null, availBp: bp };
+      var scale = 1n;
+      for (var i = 0; i < prec; i++) scale *= 10n;
+      var unit = DAY_SEC * scale;
+      var reqD = denom / unit, earnD = earnedCS / unit;
+      return { req: String(reqD), earn: String(earnD),
+        rem: String(reqD > earnD ? reqD - earnD : 0n), availBp: bp };
+    }
+    return unknown();
+  }
   /* Vesting policy -> human WORDS (amounts stay out — caller joins). */
   function policyWords(p) {
     if (p.kind === "linear") return "linear · begin " + p.beginHuman + " · cliff " +
@@ -71,16 +183,22 @@ var VestingUI = (function () {
     if (p.kind === "cdd") return "locked until claimed · start " + p.beginHuman + " · vests over " + Proposal.durToHuman(p.duration_sec);
     return t("vesting.instant_fully_vested", "instant (fully vested)");
   }
-  /* Vesting row -> deskTable shape (human balance + raw, policy words). Params: ui, doc, r (joined row). */
+  /* Vesting row -> deskTable shape (human balance + raw, policy words,
+   * progress columns). Params: ui, doc, r (joined row with .prog from
+   * progressOf — missing prog degrades to dashes, never a throw). */
   function vestRow(ui, doc, r) {
     var a = (typeof r.prec === "number" && /^\d+$/.test(String(r.balance_raw)))
       ? Format.formatAmount(String(r.balance_raw), r.prec) + " " + r.sym
       : String(r.balance_raw) + " (" + r.asset_id + ")";
     var bH = r.policy.begin ? dateHuman(r.policy.begin) : null;
     var w = policyWords({ kind: r.policy.kind, beginHuman: bH, cliff_sec: r.policy.cliff_sec || 0, duration_sec: r.policy.duration_sec || 0 });
+    var p = r.prog || { req: null, earn: null, rem: null, availBp: null };
+    var reqT = dash(p.req), earnT = dash(p.earn), remT = dash(p.rem), avT = fmtBp(p.availBp);
     return { r: r, words: w,
-      cells: [{ text: r.id }, { text: r.owner }, { text: a, raw: r.balance_raw }, { text: w }],
-      cardLines: [r.id + " · " + r.owner, a, w] };
+      cells: [{ text: r.id }, { text: r.owner }, { text: a, raw: r.balance_raw }, { text: w },
+        { text: reqT }, { text: earnT }, { text: remT }, { text: avT }],
+      cardLines: [r.id + " · " + r.owner, a, w,
+        "Required " + reqT + " · Earned " + earnT + " · Remaining " + remT + " · Available " + avT] };
   }
   /* Route entry: #/vesting — table + create + claim + op-37 claim + blind panel. */
   function renderVesting(root) {
@@ -159,9 +277,25 @@ var VestingUI = (function () {
       b.addEventListener("click", function () {
         if (!live(myGen, uiGen)) return;
         ui.clearBox(o2);
-        var fM = ui.field(doc, t("vesting.amount_at_most_the_balance", "Amount (at most the balance)"), { value: vr.r.balance_raw, inputmode: "decimal" });
+        /* Default to the claimable-now hint (was: full raw balance).
+         * availRaw floors via BigInt; the human default round-trips
+         * through parseAmount exactly (raw integer units both ways). */
+        var availRaw = vr.r.balance_raw, availTxt = vr.cells[2].text;
+        try {
+          var bp = vr.r.prog && vr.r.prog.availBp;
+          if (bp !== null && bp !== undefined && /^\d+$/.test(String(vr.r.balance_raw))) {
+            availRaw = String((BigInt(String(vr.r.balance_raw)) * BigInt(bp)) / 10000n);
+            availTxt = (typeof vr.r.prec === "number")
+              ? Format.formatAmount(availRaw, vr.r.prec) + " " + vr.r.sym
+              : availRaw + " (" + vr.r.asset_id + ")";
+          }
+        } catch (e) { availRaw = vr.r.balance_raw; availTxt = vr.cells[2].text; }
+        var defVal = availRaw;
+        try { if (typeof vr.r.prec === "number") defVal = Format.formatAmount(availRaw, vr.r.prec); } catch (e) { defVal = availRaw; }
+        var fM = ui.field(doc, t("vesting.amount_at_most_the_balance", "Amount (at most the balance)"), { value: defVal, inputmode: "decimal" });
         o2.appendChild(fM.row);
-        o2.appendChild(ui.el(doc, "p", "Balance: " + vr.cells[2].text + ". Over-claims fail on chain, so this form blocks them.", "muted"));
+        o2.appendChild(ui.el(doc, "p", "Balance: " + vr.cells[2].text + " · " + availTxt +
+          " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + "). Over-claims fail on chain, so this form blocks them.", "muted"));
         var ibox = ui.el(doc, "div"); o2.appendChild(ibox);
         ui.reviewSection(doc, ibox, uiGen, t("vesting.review_claim", "Review claim"), {
           build: async function () {
@@ -189,16 +323,39 @@ var VestingUI = (function () {
     go.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; go.disabled = true; ui.clearBox(listBox);
       ui.showStatus(doc, listBox, t("vesting.loading_vesting_balances", "Loading vesting balances…"));
-      ProposalMisc.vestings(fA.input.value.trim() || "1.2.0").then(function (rows) {
-        if (!live(myGen, uiGen)) return; ui.clearBox(listBox);
-        if (!rows.length) {
-          listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
-          try { ProposalMisc.requireClaimable(rows); } catch (e) { ui.showError(doc, listBox, e); }
-          go.disabled = false; return;
-        }
-        var mapped = rows.map(function (r) { return vestRow(ui, doc, r); });
-        listBox.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy")], mapped));
-        mapped.forEach(claimBox); go.disabled = false;
+      var acctName = fA.input.value.trim() || "1.2.0";
+      ProposalMisc.vestings(acctName).then(function (rows) {
+        if (!live(myGen, uiGen)) return;
+        /* Raw re-read for the progress legs (coin_seconds_earned,
+         * begin_balance, ...): ProposalMisc.vestings drops them to
+         * kind+words, so the same get_vesting_balances method is read
+         * again here (duplicated plain read, doctrine rule 5).
+         * Best-effort: a failed raw read still renders the table with
+         * dashed progress, never a throw. */
+        var rawP = (async function () {
+          try {
+            var db = await Chain.db();
+            var raw = await Chain.call(db, "get_vesting_balances", [acctName]);
+            var byId = {};
+            (raw || []).forEach(function (v) { if (v && v.id) byId[String(v.id)] = v; });
+            return byId;
+          } catch (e) { return {}; }
+        })();
+        rawP.then(function (byId) {
+          if (!live(myGen, uiGen)) return; ui.clearBox(listBox);
+          if (!rows.length) {
+            listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+            try { ProposalMisc.requireClaimable(rows); } catch (e) { ui.showError(doc, listBox, e); }
+            go.disabled = false; return;
+          }
+          rows.forEach(function (r) {
+            r.prog = progressOf(byId[r.id], r.balance_raw, (typeof r.prec === "number" ? r.prec : null));
+          });
+          var mapped = rows.map(function (r) { return vestRow(ui, doc, r); });
+          listBox.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),
+            "Required (days)", "Earned (days)", "Remaining (days)", "Available"], mapped));
+          mapped.forEach(claimBox); go.disabled = false;
+        });
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(listBox); ui.showError(doc, listBox, e, t("vesting.could_not_load_vesting", "Could not load vesting.")); go.disabled = false; });
     });
     ctx.wrap.appendChild(ui.el(doc, "h2", t("vesting.balance_claim_op_37", "Balance claim (op 37)")));
@@ -256,7 +413,10 @@ var VestingUI = (function () {
     });
   }
 
-  return { renderVesting: renderVesting };
+  return { renderVesting: renderVesting,
+    /* Headless-test seam: read-only progress math (VoteUI._test precedent —
+     * same reason: pure integer functions worth vector-testing). */
+    _test: { progressOf: progressOf, fmtBp: fmtBp, ratioBp: ratioBp } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.VestingUI === "undefined") { globalThis.VestingUI = VestingUI; }

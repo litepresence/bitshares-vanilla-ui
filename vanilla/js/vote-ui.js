@@ -44,6 +44,34 @@
  *   strings until Format.formatAmount(raw, 5) at render; share-% is integer
  *   hundredths math (basis GRAPHENE_100_PERCENT=10000, config.hpp:102-103):
  *   share_bp = total * 10000 / supply via BigInt, formatted without float.
+ *
+ * PUNCHLIST 2026-09-29 (#/voting HIGHs — joins/lock entry, budget line):
+ * - Join-as-witness / Update-witness / Join-committee ENTRY buttons live
+ *   below (gov row + inline forms + named-row confirms). The flows are
+ *   op-6-flavored: they reuse the vote-publish idioms (Vote.* reads for
+ *   prefill, Tx.fee live chain estimate — a pure get_required_fees call
+ *   that needs no serializer, Tx.buildTx envelope, fresh-WIF sign gate so
+ *   the password is asked ONLY at sign). BROADCAST stays honestly deferred:
+ *   witness_create (op 20) / witness_update (op 21) /
+ *   committee_member_create (op 29) have NO serializer in tx.js
+ *   (serializeOperationData throws "supports ops ..."), and serializers
+ *   belong in tx.js — never in a view. Join data (url, block_signing_key)
+ *   cannot ride an op-6 new_options either (protocol/account.hpp:39-59 has
+ *   no such fields), so the sign step reports the gap inline instead of
+ *   sending a malformed op. Field shapes follow #3 bitshares-api.js:2621+
+ *   (op 20/21) and :2775+ (op 29), cross-read with #2 WitnessCommittee.jsx.
+ * - CREATE LOCK is a plain link to #/tickets: amount prefill is NOT trivial
+ *   (router currentPath strips query strings and ticket-ui.js parses no
+ *   hash params — wiring prefill would touch router/ticket-ui, outside
+ *   this punchlist's file scope), so the entry links without prefill.
+ * - WORKER BUDGET: the per-day cap reads cleanly off 2.0.0 parameters
+ *   (same get_objects call Vote.lists already makes); the TOTAL needs the
+ *   budget-record object whose id is not cleanly derivable here, so total
+ *   renders as a dash and stays deferred (recorded here).
+ * - I18N NOTE: new labels below are plain literals (no new t() keys —
+ *   locale dicts are outside this punchlist's file scope, and check_i18n
+ *   requires every t() default to already exist in en.json). A later i18n
+ *   batch should key them; check_i18n stays green meanwhile.
  */
 var VoteUI = (function () {
   "use strict";
@@ -294,6 +322,39 @@ var VoteUI = (function () {
       if (lockedView || (me && me.id === "1.2.0"))
         wrap.appendChild(el(doc, "p", t("vote.viewing_as", "Viewing as committee-account (1.2.0) — unlock to vote as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
+
+    /* Punchlist gov row (see header): join entries + lock link + budget.
+     * Painted once here (refresh() below repaints proxy/tabs/list/actions
+     * only, so an open join form survives slate checkbox toggles). */
+    var govRow = el(doc, "div", null, "vote-gov-row");
+    govRow.style.display = "flex";
+    govRow.style.flexWrap = "wrap";
+    govRow.style.gap = "8px";
+    var joinWBtn = touchable(el(doc, "button", "Join as witness"));
+    joinWBtn.type = "button";
+    var updWBtn = touchable(el(doc, "button", "Update witness"));
+    updWBtn.type = "button";
+    var joinCBtn = touchable(el(doc, "button", "Join committee"));
+    joinCBtn.type = "button";
+    var lockLink = el(doc, "a", "Increase voting power (create lock)");
+    lockLink.setAttribute("href", "#/tickets");
+    lockLink.style.display = "inline-block";
+    lockLink.style.alignSelf = "center";
+    touchable(lockLink);
+    govRow.appendChild(joinWBtn);
+    govRow.appendChild(updWBtn);
+    govRow.appendChild(joinCBtn);
+    govRow.appendChild(lockLink);
+    wrap.appendChild(govRow);
+    var budgetLine = el(doc, "p", "Worker budget: loading…", "muted");
+    budgetLine.setAttribute("aria-live", "polite");
+    wrap.appendChild(budgetLine);
+    var joinBox = el(doc, "div", null, "vote-join");
+    wrap.appendChild(joinBox);
+    fillBudget(doc, budgetLine, myGen);
+    joinWBtn.addEventListener("click", function () { renderJoinWitness(doc, joinBox, root, st, myGen, false); });
+    updWBtn.addEventListener("click", function () { renderJoinWitness(doc, joinBox, root, st, myGen, true); });
+    joinCBtn.addEventListener("click", function () { renderJoinCommittee(doc, joinBox, root, st, myGen); });
 
     var proxyBox = el(doc, "div", null, "vote-proxy");
     wrap.appendChild(proxyBox);
@@ -730,6 +791,336 @@ var VoteUI = (function () {
     var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
     back.setAttribute("href", "#/voting");
     wrap.appendChild(back);
+  }
+
+  /* Worker-budget line (best-effort read-only): the per-day cap off 2.0.0
+   * parameters, formatted at core p5; total stays a dash (budget-record id
+   * not cleanly derivable — deferred, see header). Never fatal: a missing
+   * Chain global or a failed read renders dashes, never a throw.
+   * Params: doc, line (mutated in place), myGen (generation guard). */
+  function fillBudget(doc, line, myGen) {
+    if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
+      line.textContent = "Worker budget: —";
+      return;
+    }
+    Chain.db().then(function (dbId) {
+      return Chain.call(dbId, "get_objects", [["2.0.0"]]);
+    }).then(function (rows) {
+      if (myGen !== gen) return;
+      var params = rows && rows[0] && rows[0].parameters;
+      var raw = params ? params.worker_budget_per_day : null;
+      var human = null;
+      if (raw !== undefined && raw !== null && /^\d+$/.test(String(raw))) {
+        try { human = Format.formatAmount(String(raw), CORE_PRECISION_FALLBACK); } catch (e) { human = null; }
+      }
+      line.textContent = human
+        ? "Worker budget: " + human + " (core)/day · Total: —"
+        : "Worker budget: —";
+    }).catch(function () {
+      if (myGen !== gen) return;
+      line.textContent = "Worker budget: —";
+    });
+  }
+
+  /* Labeled text input row for the join forms (xfer-field convention, same
+   * touch floor as the rest of the page). Returns the input element. */
+  function joinField(doc, box, labelText, value, placeholder) {
+    var row = el(doc, "div", null, "xfer-field");
+    var label = el(doc, "label", labelText + " ");
+    var input = doc.createElement("input");
+    input.type = "text";
+    input.setAttribute("autocomplete", "off");
+    if (value) input.value = value;
+    if (placeholder) input.setAttribute("placeholder", placeholder);
+    touchable(input);
+    label.appendChild(input);
+    row.appendChild(label);
+    box.appendChild(row);
+    return input;
+  }
+
+  /* Join/Update-witness entry form (reference Witnesses.jsx:57-66 +
+   * JoinWitnessesModal field set: account, url, block signing key).
+   * Reads stay public; the fee is a live chain estimate; the password gate
+   * lives ONLY at Sign (showJoinConfirm below). Update mode offers a
+   * "Load current" prefill via Vote.getWitnessByAccount; a missing object
+   * points at Join instead of failing silently.
+   * Params: doc, box (emptied first), root (route root for Back), st
+   *   (needs me), myGen (generation guard), isUpdate bool. */
+  function renderJoinWitness(doc, box, root, st, myGen, isUpdate) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el(doc, "h2", isUpdate ? "Update witness" : "Join as witness"));
+    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, "name or 1.2.N");
+    var urlIn = joinField(doc, box, "URL", "", "https://example.com");
+    var keyIn = joinField(doc, box, "Block signing key", "", "BTS…");
+    var msg = el(doc, "div", "", "error");
+    msg.setAttribute("aria-live", "polite");
+    box.appendChild(msg);
+    if (isUpdate) {
+      var reload = touchable(el(doc, "button", "Load current"));
+      reload.type = "button";
+      box.appendChild(reload);
+      reload.addEventListener("click", function () {
+        msg.textContent = "";
+        reload.disabled = true;
+        Account.resolve(acctIn.value.trim() || st.me.id).then(function (acct) {
+          return Vote.getWitnessByAccount(acct.id);
+        }).then(function (w) {
+          reload.disabled = false;
+          if (myGen !== gen) return;
+          if (!w) { msg.textContent = "No witness object for this account — use Join as witness instead."; return; }
+          urlIn.value = w.url || "";
+          keyIn.value = w.signing_key || "";
+        }).catch(function (e) {
+          reload.disabled = false;
+          msg.textContent = (e && e.message) ? e.message : "Lookup failed.";
+        });
+      });
+    }
+    var review = touchable(el(doc, "button", isUpdate ? "Review update" : "Review join"));
+    review.type = "button";
+    box.appendChild(review);
+    review.addEventListener("click", function () {
+      msg.textContent = "";
+      /* Reference JoinWitnessesModal lowercases + sanitizes the url. */
+      var url = urlIn.value.trim().toLowerCase();
+      var signingKey = keyIn.value.trim();
+      if (!url) { msg.textContent = "Enter a URL."; return; }
+      if (!signingKey || signingKey.length < 20) { msg.textContent = "Enter the block signing public key."; return; }
+      review.disabled = true;
+      var opId = isUpdate ? 21 : 20;
+      Account.resolve(acctIn.value.trim() || st.me.id).then(function (acct) {
+        var opData = isUpdate
+          ? { fee: { amount: "0", asset_id: CORE_ASSET }, witness: "", witness_account: acct.id, new_url: url, new_signing_key: signingKey }
+          : { fee: { amount: "0", asset_id: CORE_ASSET }, witness_account: acct.id, url: url, block_signing_key: signingKey };
+        var shaped = isUpdate
+          ? Vote.getWitnessByAccount(acct.id).then(function (w) {
+              if (!w) throw new Error("No witness object for this account — use Join as witness instead.");
+              opData.witness = w.id;
+              return { acct: acct, opData: opData };
+            })
+          : Promise.resolve({ acct: acct, opData: opData });
+        return shaped;
+      }).then(function (ctx) {
+        /* Tx.fee is a pure chain get_required_fees call — live even though
+         * tx.js cannot serialize ops 20/21 yet; the node also validates the
+         * account/key shape here, so bad input fails honestly at review. */
+        return Tx.fee(opId, ctx.opData, CORE_ASSET).then(function (fee) {
+          ctx.opData.fee = { amount: String(fee.amount), asset_id: fee.asset_id || CORE_ASSET };
+          return { acct: ctx.acct, opData: ctx.opData, feeRaw: String(fee.amount) };
+        });
+      }).then(function (ctx) {
+        review.disabled = false;
+        if (myGen !== gen) return;
+        showJoinConfirm(doc, box, root, st, myGen, {
+          kind: "witness", opId: opId, isUpdate: isUpdate,
+          account: ctx.acct, opData: ctx.opData, feeRaw: ctx.feeRaw
+        });
+      }).catch(function (e) {
+        review.disabled = false;
+        msg.textContent = (e && e.message) ? e.message : "Could not prepare the join.";
+      });
+    });
+  }
+
+  /* Join-committee entry form (reference Committee.jsx:47 +
+   * JoinCommitteeModal field set: account, url). No update mode exists in
+   * the reference, so none is offered here. Same public-reads / live-fee /
+   * sign-gate contract as renderJoinWitness. */
+  function renderJoinCommittee(doc, box, root, st, myGen) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el(doc, "h2", "Join committee"));
+    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, "name or 1.2.N");
+    var urlIn = joinField(doc, box, "URL", "", "https://example.com");
+    var msg = el(doc, "div", "", "error");
+    msg.setAttribute("aria-live", "polite");
+    box.appendChild(msg);
+    var review = touchable(el(doc, "button", "Review join"));
+    review.type = "button";
+    box.appendChild(review);
+    review.addEventListener("click", function () {
+      msg.textContent = "";
+      var url = urlIn.value.trim().toLowerCase();
+      if (!url) { msg.textContent = "Enter a URL."; return; }
+      review.disabled = true;
+      Account.resolve(acctIn.value.trim() || st.me.id).then(function (acct) {
+        var opData = { fee: { amount: "0", asset_id: CORE_ASSET }, committee_member_account: acct.id, url: url };
+        return Tx.fee(29, opData, CORE_ASSET).then(function (fee) {
+          opData.fee = { amount: String(fee.amount), asset_id: fee.asset_id || CORE_ASSET };
+          return { acct: acct, opData: opData, feeRaw: String(fee.amount) };
+        });
+      }).then(function (ctx) {
+        review.disabled = false;
+        if (myGen !== gen) return;
+        showJoinConfirm(doc, box, root, st, myGen, {
+          kind: "committee", opId: 29, isUpdate: false,
+          account: ctx.acct, opData: ctx.opData, feeRaw: ctx.feeRaw
+        });
+      }).catch(function (e) {
+        review.disabled = false;
+        msg.textContent = (e && e.message) ? e.message : "Could not prepare the join.";
+      });
+    });
+  }
+
+  /* Named-row confirm for a join op (same idiom as showConfirm: dl rows,
+   * human fee, locked-sign note; password gate ONLY at Send).
+   * Params: doc, box (emptied first), root, st (form re-render on Back),
+   *   myGen, spec {kind, opId, isUpdate, account {id,name}, opData, feeRaw}. */
+  function showJoinConfirm(doc, box, root, st, myGen, spec) {
+    while (box.firstChild) box.removeChild(box.firstChild);
+    box.appendChild(el(doc, "h2", spec.isUpdate ? "Confirm witness update (op 21)"
+      : (spec.kind === "witness" ? "Confirm witness join (op 20)" : "Confirm committee join (op 29)")));
+    var list = el(doc, "dl", null, "vote-confirm");
+    function row(term, text, title) {
+      var dt = el(doc, "dt", term);
+      var dd = el(doc, "dd", text);
+      if (title) dd.title = title;
+      list.appendChild(dt);
+      list.appendChild(dd);
+    }
+    row(t("vote.account_row", "Account"), spec.account.name + " (" + spec.account.id + ")");
+    row("Role", spec.kind === "witness" ? "Witness" : "Committee member");
+    row("URL", spec.kind === "witness"
+      ? (spec.isUpdate ? spec.opData.new_url : spec.opData.url)
+      : spec.opData.url);
+    if (spec.kind === "witness") {
+      var k = spec.isUpdate ? spec.opData.new_signing_key : spec.opData.block_signing_key;
+      row("Signing key", k.length > 18 ? k.slice(0, 12) + "…" + k.slice(-6) : k, k);
+    }
+    var feeHuman;
+    try {
+      feeHuman = Format.formatAmount(spec.feeRaw, CORE_PRECISION_FALLBACK);
+    } catch (e) { feeHuman = spec.feeRaw; }
+    row(t("vote.fee_row", "Fee"), feeHuman + t("vote.fee_core", " (core)"), spec.feeRaw);
+    var network = "mainnet";
+    try {
+      if (typeof Store !== "undefined" && Store.loadSettings) {
+        network = Store.loadSettings().network || network;
+      }
+    } catch (e) { /* default stands */ }
+    row(t("vote.network_row", "Network"), network);
+    box.appendChild(list);
+    try {
+      if (typeof Wallet === "undefined" || typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked())
+        box.appendChild(el(doc, "p", t("vote.locked_sign_note", "Wallet is locked — browsing is public; unlock to sign."), "muted"));
+    } catch (e) { /* notice is display-only */ }
+
+    var backBtn = touchable(el(doc, "button", t("vote.back", "Back")));
+    backBtn.type = "button";
+    box.appendChild(backBtn);
+    var sendBtn = touchable(el(doc, "button", spec.isUpdate ? "Sign & Update" : "Sign & Join"));
+    sendBtn.type = "button";
+    box.appendChild(sendBtn);
+
+    backBtn.addEventListener("click", function () {
+      if (spec.kind === "witness") renderJoinWitness(doc, box, root, st, myGen, spec.isUpdate);
+      else renderJoinCommittee(doc, box, root, st, myGen);
+    });
+    sendBtn.addEventListener("click", function () {
+      backBtn.disabled = true;
+      sendBtn.disabled = true;
+      var status = showStatus(doc, box, t("vote.signing", "Signing…"));
+      var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+      if (!wif) {
+        box.removeChild(status);
+        showError(doc, box, new Error("wallet-locked"), t("vote.wallet_locked", "Wallet is locked."));
+        backBtn.disabled = false;
+        return;
+      }
+      sendJoinAndProve(spec, wif, function (text) {
+        status.textContent = text;
+      }).then(function (res) {
+        if (myGen !== gen) return;
+        while (box.firstChild) box.removeChild(box.firstChild);
+        showJoinResult(doc, box, spec, null, res);
+      }).catch(function (e) {
+        if (myGen !== gen) return;
+        if (e && e.joinDeferred) {
+          while (box.firstChild) box.removeChild(box.firstChild);
+          showJoinResult(doc, box, spec, "deferred", null);
+          return;
+        }
+        box.removeChild(status);
+        showError(doc, box, (e && e.message) ? e.message : String(e || "Join failed"), "Join failed.");
+        backBtn.disabled = false;
+      });
+    });
+  }
+
+  /* Join broadcast (vote-publish wiring, other op): envelope via Tx.buildTx,
+   * sign with the FRESH wif (never stored), callback/plain fallback, then
+   * prove by re-reading the created object (create: object exists; update:
+   * url matches). The tx.js "supports ops" throw passes through untouched
+   * with joinDeferred=true so the caller renders the honest deferred panel.
+   * Returns {blockNum, via, obj} where blockNum is the observed head block. */
+  async function sendJoinAndProve(spec, wif, onStep) {
+    var unsigned = await Tx.buildTx([[spec.opId, spec.opData]]);
+    var txSigned;
+    try {
+      txSigned = await Tx.sign(unsigned, wif);
+    } catch (e) {
+      e.joinDeferred = /supports ops/.test(String((e && e.message) || e));
+      throw e;
+    }
+    onStep(t("vote.broadcasting", "Broadcasting…"));
+    var netId = await Chain.net();
+    var callbackId = (Math.random() * 4294967296) >>> 0;
+    var via = "broadcast_transaction_with_callback";
+    try {
+      await Chain.call(netId, "broadcast_transaction_with_callback", [callbackId, txSigned]);
+    } catch (e) {
+      via = "broadcast_transaction";
+      await Chain.call(netId, "broadcast_transaction", [txSigned]);
+    }
+    var wantUrl = spec.kind === "witness"
+      ? (spec.isUpdate ? spec.opData.new_url : spec.opData.url)
+      : spec.opData.url;
+    var deadline = Date.now() + PROVE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      var cur = null;
+      try {
+        cur = spec.kind === "witness"
+          ? await Vote.getWitnessByAccount(spec.account.id)
+          : await Vote.getCommitteeMemberByAccount(spec.account.id);
+      } catch (e2) { cur = null; }
+      if (cur && cur.id && (spec.isUpdate !== true || cur.url === wantUrl)) {
+        return { head: await headBlock(), via: via + "+object-read", obj: cur.id };
+      }
+      await sleep(PROVE_INTERVAL_MS);
+    }
+    throw new Error("Sent (" + via + ") but the new object was not observed within " +
+      (PROVE_TIMEOUT_MS / 1000) + "s; check #/voting before retrying (do NOT blindly rebroadcast).");
+  }
+
+  /* Join result: observed head block + object id, the node error inline, or
+   * the honest deferred panel (entry/fee/confirm live; serializer pending).
+   * Never blank, never a fabricated txid. Params: doc, box (emptied by the
+   * caller), spec, errText (null | "deferred" | message), res. */
+  function showJoinResult(doc, box, spec, errText, res) {
+    if (errText === "deferred") {
+      box.appendChild(el(doc, "h2", "Broadcast deferred"));
+      var note = el(doc, "p", "Entry, live fee, and confirm above are complete, but tx.js has no " +
+        (spec.kind === "witness"
+          ? (spec.isUpdate ? "witness_update (op 21)" : "witness_create (op 20)")
+          : "committee_member_create (op 29)") +
+        " serializer yet, so this wallet cannot sign it (see the op-coverage matrix A15 caveat). " +
+        "Broadcast lands with the serializer slice — nothing was sent.", "muted");
+      note.setAttribute("aria-live", "polite");
+      box.appendChild(note);
+    } else if (errText) {
+      box.appendChild(el(doc, "h2", "Join failed"));
+      showError(doc, box, errText, "Join failed.");
+    } else {
+      box.appendChild(el(doc, "h2", spec.isUpdate ? "Witness updated" : "Join published"));
+      var ok = el(doc, "p", t("vote.observed_prefix", "Observed at head block #") + String(res.head) +
+        " (" + res.via + "). Object " + res.obj + ".", "xfer-ok");
+      ok.setAttribute("aria-live", "polite");
+      box.appendChild(ok);
+    }
+    var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
+    back.setAttribute("href", "#/voting");
+    box.appendChild(back);
   }
 
   return {
