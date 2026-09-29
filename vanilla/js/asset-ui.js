@@ -169,6 +169,9 @@ var AssetUI = (function () {
           card.appendChild(el(d, "span", "p" + r.precision + " · supply " + sup + (r.is_smartcoin ? " · smartcoin" : ""), "muted"));
           var o = el(d, "a", t("credit.open", "Open")); o.setAttribute("href", "#/asset/" + r.symbol); touch(o); card.appendChild(o);
           var u = el(d, "a", t("misc.update", "Update")); u.setAttribute("href", "#/assets/update/" + r.symbol); touch(u); card.appendChild(u);
+          /* LOW punchlist: inline Issue action per row (op-14 lives at
+           * #/assets/issue — cross-link, no new route). Plain literal. */
+          var isl = d.createElement("a"); isl.href = "#/assets/issue"; isl.textContent = "Issue"; touch(isl); card.appendChild(isl);
           list.appendChild(card); });
       }).catch(function (e) { if (g === gen) { wipe(list); err(d, list,e,t("asset.issued_failed", "Could not load issued assets.")); } });
     });
@@ -192,6 +195,18 @@ var AssetUI = (function () {
     } catch (e) { /* notice is display-only */ }
     var issuer = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), null, "1.2.0");
     w.appendChild(issuer.row);
+    /* LOW punchlist: account-detached flow honesty — this page defaults to
+     * the viewing-as account; opening it from an account page keeps context.
+     * Plain literals only. */
+    (function issuerNote() {
+      var p = el(d, "p", "Issuer defaults to the viewing-as account (1.2.0 locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here.", "muted");
+      var a = el(d, "a", "Open an account");
+      a.setAttribute("href", "#/accounts");
+      touch(a);
+      p.appendChild(d.createTextNode(" · "));
+      p.appendChild(a);
+      w.appendChild(p);
+    })();
     /* Unlocked prefill: swap the public 1.2.0 default for the wallet account
      * (locked viewers keep 1.2.0). Null-tolerant, gen-guarded — manual stands. */
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
@@ -215,6 +230,10 @@ var AssetUI = (function () {
       var cq = field(d, t("asset.cer_quote_field", "CER quote (human, new asset)"), null, "1", "decimal");
       var desc = field(d, t("asset.description_row", "Description"), null, "", null, true);
       [sym, prec, msup, fpct, mfee, cb, cq, desc].forEach(function (x) { body.appendChild(x.row); });
+      /* LOW punchlist: structured-description guidance — one textarea carries
+       * the whole description object; main/title/short/market go inside as
+       * JSON-ish text. Plain literal only. */
+      body.appendChild(el(d, "p", "Description is one text box: write the full description here (main, short name, market pair and details as plain text).", "muted"));
       body.appendChild(el(d, "h3", t("help.topic_accounts-permissions_title", "Permissions"))); var pg = bits(d, PERMS, 79); body.appendChild(pg.box);
       body.appendChild(el(d, "h3", t("asset.flags_title", "Flags"))); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
       var nt = null, nu = null, lh = null, mf = null, dl = null, op = null, mv = null, ba = null;

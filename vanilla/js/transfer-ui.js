@@ -319,6 +319,9 @@ var TransferUI = (function () {
       id: "xfer-to", value: state.to, placeholder: t("transfer.to_placeholder", "recipient"), autocomplete: "off"
     });
     wrap.appendChild(toF.row);
+    /* LOW punchlist: known-scammer flag (AccountSelector concept). No scam
+     * registry is vendored, so this stays an honest hint, not a verdict. */
+    wrap.appendChild(el(doc, "p", "No scam list is loaded here — double-check the recipient name before reviewing.", "muted"));
     /* Non-blocking blur check: warns early, submit still decides. */
     toF.input.addEventListener("blur", function () {
       var v = toF.input.value.trim();

@@ -172,6 +172,23 @@ var AccountsUI = (function () {
       ["#/create-account", t("account.register_account", "Register a new on-chain account")],
       ["#/wallet", t("account.wallet_manager", "Wallet manager")]
     ]));
+    /* LOW punchlist: restore-your-account / advanced-form links (logged-out).
+     * Both targets exist — plain literals, no new routes. */
+    (function restoreLinks() {
+      var p = el(doc, "p", null, "muted");
+      var a = doc.createElement("a");
+      a.href = "#/existing-account";
+      a.textContent = "Restore your account";
+      touchable(a);
+      p.appendChild(a);
+      p.appendChild(doc.createTextNode(" · "));
+      var b = doc.createElement("a");
+      b.href = "#/create-account";
+      b.textContent = "Advanced form";
+      touchable(b);
+      p.appendChild(b);
+      wrap.appendChild(p);
+    })();
   }
 
   /* Fill the wallet card: active-key account id -> name. Empty states for

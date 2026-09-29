@@ -140,6 +140,45 @@ var GatewayUI = (function () {
     ctx.wrap.appendChild(el(ctx.doc, "p",
       t("gateway.intro_a", "Deposits never broadcast — you send external coins to the shown address. ") +
       t("gateway.intro_b", "Withdraws continue in the standard transfer form with its live fee and confirm."), "muted"));
+    /* LOW punchlist: per-service display toggles (persisted viewSettings) +
+     * terms/agreement disclosure. Plain literals only; toggles hide tab
+     * buttons (direct hashes still load); terms are display-only. */
+    (function gwPrefs() {
+      var KEY = "bts-vanilla-gw-toggles-v1";
+      var prefs = null;
+      try {
+        prefs = JSON.parse(localStorage.getItem(KEY) || "null");
+      } catch (e) { prefs = null; }
+      if (!prefs || typeof prefs !== "object") {
+        prefs = { XBTSX: true, IOB: true, GDEX: true, BIT20: true };
+      }
+      ctx.gwShow = prefs;
+      var det = ctx.doc.createElement("details");
+      det.className = "muted";
+      var sum = ctx.doc.createElement("summary");
+      sum.textContent = "Gateway display + terms";
+      touchable(sum);
+      det.appendChild(sum);
+      ORDER.forEach(function (id) {
+        var lab = ctx.doc.createElement("label");
+        var box = ctx.doc.createElement("input");
+        box.type = "checkbox";
+        box.checked = prefs[id] !== false;
+        touchable(box);
+        box.setAttribute("aria-label", "Show " + id);
+        box.addEventListener("change", function () {
+          prefs[id] = !!box.checked;
+          try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch (e) { /* session-only */ }
+          paintTabs(ctx);
+        });
+        lab.appendChild(box);
+        lab.appendChild(ctx.doc.createTextNode(" Show " + id + " "));
+        det.appendChild(lab);
+      });
+      var terms = el(ctx.doc, "p", "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed.", "muted");
+      det.appendChild(terms);
+      ctx.wrap.appendChild(det);
+    })();
     ctx.tabsBox = el(ctx.doc, "div", null, "gw-tabs"); ctx.wrap.appendChild(ctx.tabsBox);
     ctx.healthBox = el(ctx.doc, "div", null, "muted"); ctx.wrap.appendChild(ctx.healthBox);
     ctx.bodyBox = el(ctx.doc, "div"); ctx.wrap.appendChild(ctx.bodyBox);
@@ -152,6 +191,7 @@ var GatewayUI = (function () {
     clearBox(ctx.tabsBox);
     ctx.dots = {};
     ORDER.forEach(function (id) {
+      if (ctx.gwShow && ctx.gwShow[id] === false) return;
       var b = touchable(el(doc, "button", id)); b.type = "button";
       if (id === ctx.tab) b.disabled = true;
       var dot = el(doc, "span", " ○"); dot.title = t("gateway.health_unknown", "health unknown");

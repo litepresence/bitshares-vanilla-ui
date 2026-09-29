@@ -68,6 +68,18 @@ var PoolSwapUI = (function () {
       unit: String(fSell.input.value || "").trim() || "BTS" });
     var fSlip = u.field(doc, t("pool.slippage_field", "Slippage %"), { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal", unit: "%" });
     [fSell, fBuy, fAmt, fSlip].forEach(function (f) { wrap.appendChild(f.row); });
+    /* LOW punchlist: sell/buy balance display. Balances are account-scoped
+     * (no new chain read here) — the honest pointer is the account page. */
+    (function balanceHint() {
+      var p = u.el(doc, "p", "Balances for the sell and buy assets live on the account page — open it to check before swapping.", "muted");
+      var a = doc.createElement("a");
+      a.setAttribute("href", "#/account/committee-account");
+      a.textContent = "Open account balances";
+      try { u.touchable(a); } catch (e) { /* link stands */ }
+      p.appendChild(doc.createTextNode(" · "));
+      p.appendChild(a);
+      wrap.appendChild(p);
+    })();
     var find = u.touchable(u.el(doc, "button", t("pool.find_pools", "Find pools"))); find.type = "button"; wrap.appendChild(find);
     var pickBox = u.el(doc, "div"); wrap.appendChild(pickBox);
     var quoteBox = u.el(doc, "div"); wrap.appendChild(quoteBox);

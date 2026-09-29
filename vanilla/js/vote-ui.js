@@ -405,6 +405,18 @@ var VoteUI = (function () {
       ? t("vote.proxy_prefix", "Proxy: ") + (st.proxyName || st.draft.proxyId) + t("vote.proxy_follows", " — your stake follows this account; the slate below is read-only.")
       : t("vote.proxy_none", "Proxy: none — voting directly.");
     box.appendChild(line);
+    /* LOW punchlist: proxy help "?" link to /help/voting (AccountVoting
+     * concept). Plain literal, no new route. */
+    (function proxyHelp() {
+      var p = el(doc, "p", null, "muted");
+      var q = doc.createElement("a");
+      q.href = "#/help/voting";
+      q.textContent = "? What is a proxy?";
+      q.title = "Proxies follow another account's slate — read how voting works before setting one.";
+      touchable(q);
+      p.appendChild(q);
+      box.appendChild(p);
+    })();
     if (hasProxy && st.proxySlate) {
       var n = (st.proxySlate.votes || []).length;
       box.appendChild(el(doc, "p", n === 0

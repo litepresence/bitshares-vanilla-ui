@@ -355,12 +355,15 @@ var DashboardUI = (function () {
 
   /* Balances table + phone cards. Cells show Account.balances display
    * strings only (human terms, principle #6); raw integers hide in title.
-   * Same shape as account-ui.js:150-213 (table/cards swap under 560px). */
+   * Same shape as account-ui.js:150-213 (table/cards swap under 560px).
+   * LOW punchlist: reference DashboardPage shows market tabs, not a balances
+   * table — this pulse keeps top-5 plus an honest scope line + account link. */
   function fillBalances(doc, section, found, myGen) {
     Account.balances(found.id).then(function (list) {
       if (myGen !== gen) return;
       clearRoot(section);
       section.appendChild(el(doc, "h2", t("account.s7", "Balances")));
+      section.appendChild(el(doc, "p", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page.", "muted"));
       if (!list || list.length === 0) {
         section.appendChild(el(doc, "p", t("account.s1", "No balances."), "muted"));
         return;
@@ -407,13 +410,11 @@ var DashboardUI = (function () {
         cards.appendChild(card);
       });
       section.appendChild(cards);
-      if (list.length > 5) {
-        section.appendChild(linkPara(doc, [
-          ["#/account/" + encodeURIComponent(found.name),
-            t("account.open_prefix", "Open ") + found.name +
-            " (" + list.length + ")"]
-        ]));
-      }
+      section.appendChild(linkPara(doc, [
+        ["#/account/" + encodeURIComponent(found.name),
+          t("account.open_prefix", "Open ") + found.name +
+          (list.length > 5 ? " (" + list.length + ")" : " — full balances")]
+      ]));
     }).catch(function (e) {
       if (myGen !== gen) return;
       clearRoot(section);

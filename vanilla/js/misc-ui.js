@@ -187,6 +187,19 @@ var MiscUI = (function () {
     var enRow = ui.el(doc, "div", null, "xfer-field"), enL = ui.el(doc, "label", t("misc.enabled_2", "Enabled "));
     enL.appendChild(en); enRow.appendChild(enL); ctx.wrap.appendChild(enRow);
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.restrictions_default_to_zero_the_proven_path", "Restrictions default to zero (the proven path). Adding any restriction is blocked until testnet proves it."), "muted"));
+    /* LOW punchlist: multiple key/account/address auth rows. This form
+     * supports one key-auth plus threshold only — extra rows stay a
+     * disabled, honestly labelled control (no new serializers here). */
+    (function authRowsNote() {
+      var p = ui.el(doc, "p", "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form.", "muted");
+      var b = ui.touchable(ui.el(doc, "button", "Add auth row (unsupported)"));
+      b.type = "button";
+      b.disabled = true;
+      b.title = "Only one key-auth row is supported — extra authority rows need new serializers.";
+      b.setAttribute("aria-disabled", "true");
+      ctx.wrap.appendChild(p);
+      ctx.wrap.appendChild(b);
+    })();
     var crbox = ui.el(doc, "div"); ctx.wrap.appendChild(crbox);
     ui.reviewSection(doc, crbox, uiGen, t("misc.review_authority", "Review authority"), {
       build: async function () {

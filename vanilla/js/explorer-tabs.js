@@ -138,7 +138,9 @@ var ExplorerTabs = (function () {
 
   /* memberTab: shared witness/committee table (name/account/active/link).
    * Vote weights are raw stake ints — intentionally NOT shown here (principle
-   * #6: the voting page owns human weight math; this summary links there). */
+   * #6: the voting page owns human weight math; this summary links there).
+   * LOW punchlist: thin-summary honesty — the scope line below names the
+   * full page for weights and slates. Plain literals only. */
   function memberTab(doc, body, live, kind) {
     var isWit = kind === "witnesses";
     if (typeof Vote === "undefined" || !Vote || typeof Vote.lists !== "function") {
@@ -168,6 +170,7 @@ var ExplorerTabs = (function () {
       var p = el(doc, "p", null, "muted");
       p.appendChild(link(doc, "#/voting", "Open voting for weights and slates →"));
       body.appendChild(p);
+      body.appendChild(el(doc, "p", "Thin summary (top 50, names and activity only) — weights and publishing live on the voting page.", "muted"));
     }).catch(function (e) {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
@@ -221,6 +224,7 @@ var ExplorerTabs = (function () {
           t.tbody.appendChild(tr);
         });
         body.appendChild(t.table);
+        body.appendChild(el(doc, "p", "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page.", "muted"));
       });
     }).catch(function (e) {
       if (!live()) return;

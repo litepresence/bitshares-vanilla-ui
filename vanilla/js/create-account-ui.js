@@ -163,6 +163,23 @@ var CreateAccountUI = (function () {
     if (!testnet) regBtn.disabled = true;
     wrap.appendChild(regBtn);
     var out = el(doc, "div"); wrap.appendChild(out);
+    /* LOW punchlist: restore-your-account / advanced-form links on this page
+     * (original create-account.png). Plain literals, existing routes only. */
+    (function restoreLinks() {
+      var p = el(doc, "p", null, "muted");
+      var a = doc.createElement("a");
+      a.href = "#/existing-account";
+      a.textContent = "Restore your account";
+      touchable(a);
+      p.appendChild(a);
+      p.appendChild(doc.createTextNode(" · "));
+      var b = doc.createElement("a");
+      b.href = "#/registration/cloud";
+      b.textContent = "Advanced form";
+      touchable(b);
+      p.appendChild(b);
+      wrap.appendChild(p);
+    })();
     /* Brainkey source matches the wallet create screen: Crypto.suggestBrainkey. */
     if (!P.brainkey) genBrainkey(doc, myGen, P, out);
     nameF.input.addEventListener("input", function () {

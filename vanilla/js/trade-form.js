@@ -1012,6 +1012,10 @@ var TradeForm = (function () {
     });
     body.appendChild(totalF.row);
     mountBalanceLine(doc, body, P, side);
+    /* LOW punchlist: lowest-ask / highest-bid helper line under each form.
+     * The book owns the live best prices (market-book.js spread lines), so
+     * the forms link there instead of duplicating a second price source. */
+    body.appendChild(el(doc, "p", side === "buy" ? "Lowest ask lives in the order book above — click an ask row to fill the price." : "Highest bid lives in the order book above — click a bid row to fill the price.", "muted"));
     var fokRow = el(doc, "div", null, "xfer-field");
     var fokLabel = el(doc, "label", t("trade.fok_label", "Fill or kill "));
     var fokBox = doc.createElement("input");

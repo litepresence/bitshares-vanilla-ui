@@ -294,6 +294,51 @@ var MarketDesk = (function () {
     head.appendChild(el(doc, "h1", pair.quote + " / " + pair.base));
     var sub = el(doc, "p", t("market.loading", "Loading market…"), "muted");
     head.appendChild(sub);
+    /* LOW punchlist: header star favourite next to the pair (same FAV_KEY the
+     * picker owns) + disabled column-chooser gear (columns are fixed; the
+     * reference Personalize dialog is not rebuilt). Plain literals only. */
+    try {
+      var favKey = "bts-vanilla-fav-markets-v1";
+      var starBtn = doc.createElement("button");
+      starBtn.type = "button";
+      starBtn.id = "mkt-head-star";
+      starBtn.setAttribute("aria-label", "Favourite " + id);
+      touchable(starBtn);
+      function paintStar() {
+        var fav = false;
+        try {
+          var arr = JSON.parse(localStorage.getItem(favKey) || "[]");
+          fav = Array.isArray(arr) && arr.indexOf(id) !== -1;
+        } catch (e) { fav = false; }
+        starBtn.textContent = fav ? "★" : "☆";
+        starBtn.setAttribute("aria-pressed", fav ? "true" : "false");
+        starBtn.title = fav ? "Starred — click to unstar" : "Star this market";
+      }
+      paintStar();
+      starBtn.addEventListener("click", function () {
+        try {
+          var arr2 = [];
+          try { arr2 = JSON.parse(localStorage.getItem(favKey) || "[]"); } catch (e) { arr2 = []; }
+          if (!Array.isArray(arr2)) arr2 = [];
+          var ix = arr2.indexOf(id);
+          if (ix === -1) arr2.push(id);
+          else arr2.splice(ix, 1);
+          try { localStorage.setItem(favKey, JSON.stringify(arr2)); } catch (e) { /* session-only */ }
+        } catch (e) { /* star stays visual */ }
+        paintStar();
+      });
+      head.appendChild(starBtn);
+    } catch (e) { /* header works without the star */ }
+    try {
+      var gearBtn = doc.createElement("button");
+      gearBtn.type = "button";
+      gearBtn.disabled = true;
+      gearBtn.textContent = "⚙ Columns (fixed)";
+      gearBtn.title = "Column chooser is not offered — the book, history and orders tables have fixed columns.";
+      gearBtn.setAttribute("aria-disabled", "true");
+      touchable(gearBtn);
+      head.appendChild(gearBtn);
+    } catch (e) { /* header works without the gear */ }
     /* Slice-16 bell: price-alert entry point (ExchangeHeader.jsx:210-232
      * shape, link flavour — opens #/alerts, never a modal). Optional: the
      * desk works fully when notify-ui.js is absent. */
