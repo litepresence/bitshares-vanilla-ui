@@ -407,10 +407,13 @@ var TransferUI = (function () {
 
   /* Locked read-only preview. transfer-confirm.js is out of scope for this
    * repair, so its lookup/fee steps are replicated here verbatim (same node
-   * calls, same wire shapes — plain-memo path only). Encrypted memos need
-   * wallet keys, so locked + encrypted asks for unlock instead of previewing.
-   * After unlock the flow hands back to TransferConfirm.review/showConfirm,
-   * which re-validates everything against the wallet account. */
+   * calls, same wire shapes — plain-memo path only). Locked + encrypted
+   * memos need wallet keys, so the memo stays OUT of the locked unsigned
+   * envelope while From/To/Asset/Amount/Fee still preview (memo row shows
+   * the locked-encrypted hint). After unlock the flow hands back to
+   * TransferConfirm.review/showConfirm, which re-validates everything
+   * (including the encrypted memo, via the passthrough below) against the
+   * wallet account. */
   function utf8HexLocal(str) {
     var bytes = new TextEncoder().encode(str);
     var out = "";
@@ -471,21 +474,28 @@ var TransferUI = (function () {
         throw new Error(e && e.message ? e.message : "bad amount");
       }
       if (!/[1-9]/.test(amountInt)) throw new Error(t("transfer.amount_positive", "Amount must be greater than zero."));
-      var memoText = String(vals.memo || ""), memoObj = null, memoKind = "none";
+      var memoText = String(vals.memo || ""), memoObj = null, memoKind = "none", lockedEnc = false;
       if (memoText) {
         var toFull = await fullAccountLocal(to.id);
         var toMemoKey = toFull && toFull.options ? toFull.options.memo_key : null;
         if (!toMemoKey) throw new Error("Recipient " + to.name + " has no memo key; clear the memo to continue.");
-        if (vals.encrypted) throw new Error("locked-encrypted");
-        memoObj = { from: "", to: toMemoKey, nonce: "0", message: utf8HexLocal(memoText) };
-        memoKind = "plain";
+        if (vals.encrypted) {
+          /* G7: locked keys cannot encrypt — exclude the memo from the
+           * locked envelope, preview everything else with a placeholder row. */
+          lockedEnc = true;
+          memoKind = "locked-encrypted";
+        } else {
+          memoObj = { from: "", to: toMemoKey, nonce: "0", message: utf8HexLocal(memoText) };
+          memoKind = "plain";
+        }
       }
       var unsigned = await Tx.buildTransfer({
         fromId: fromAcc.id, toId: to.id, amountInt: amountInt, assetId: asset.id, memoObj: memoObj
       });
       var fee = await Tx.fee(0, unsigned.operations[0][1], asset.id);
       return { fromAcc: fromAcc, to: to, asset: asset, amountInt: amountInt,
-        memoText: memoText, memoKind: memoKind, fee: fee };
+        memoText: memoText, memoKind: memoKind, lockedEnc: lockedEnc,
+        encrypted: !!vals.encrypted, fee: fee };
     }).then(function (P) {
       while (box.firstChild) box.removeChild(box.firstChild);
       box.appendChild(el(doc, "h3", t("transfer.preview_title", "Transfer preview (locked)")));
@@ -500,7 +510,8 @@ var TransferUI = (function () {
       row(t("confirm.to", "To"), P.to.name + " (" + P.to.id + ")");
       row(t("confirm.amount", "Amount"),
         Format.formatAmount(P.amountInt, P.asset.precision) + " " + P.asset.symbol, P.amountInt);
-      row(t("confirm.memo", "Memo"), P.memoKind === "plain" ? "Plain: " + P.memoText : "(none)");
+      row(t("confirm.memo", "Memo"), P.memoKind === "plain" ? "Plain: " + P.memoText :
+        (P.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : "(none)"));
       var feeHuman;
       try {
         feeHuman = Format.formatAmount(String(P.fee.amount), P.asset.precision) + " " + P.asset.symbol;
@@ -530,7 +541,7 @@ var TransferUI = (function () {
             return TransferConfirm.review({
               to: P.to.name, asset: P.asset.symbol,
               amount: Format.formatAmount(P.amountInt, P.asset.precision),
-              memo: P.memoText, encrypted: false
+              memo: P.memoText, encrypted: !!(P.encrypted && P.memoText)
             });
           })
           .then(function (ctx) {
@@ -552,14 +563,8 @@ var TransferUI = (function () {
       done();
     }).catch(function (e) {
       while (box.firstChild) box.removeChild(box.firstChild);
-      var msg = (e && e.message) ? e.message : String(e || "Could not prepare the transfer.");
-      if (msg === "locked-encrypted") {
-        showError(doc, box,
-          t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain."),
-          t("transfer.prepare_failed", "Could not prepare the transfer."));
-      } else {
-        showError(doc, box, msg, t("transfer.prepare_failed", "Could not prepare the transfer."));
-      }
+      showError(doc, box, (e && e.message) ? e.message : String(e || "Could not prepare the transfer."),
+        t("transfer.prepare_failed", "Could not prepare the transfer."));
       done();
     });
   }

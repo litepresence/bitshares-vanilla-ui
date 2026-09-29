@@ -82,14 +82,6 @@ var ProposalUI = (function () {
     var b = touchable(el(doc, "button", t("proposal.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }
-  function unlockBox(doc, wrap, retry) {
-    wrap.appendChild(el(doc, "p", t("proposal.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
-    var inp = doc.createElement("input"); inp.type = "password"; touchable(inp); wrap.appendChild(inp);
-    var b = touchable(el(doc, "button", t("proposal.unlock", "Unlock"))); b.type = "button"; wrap.appendChild(b);
-    b.addEventListener("click", function () { b.disabled = true;
-      Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap, e, t("proposal.unlock_failed", "Unlock failed.")); });
-    });
-  }
   function dropSubs() { subs.forEach(function (off) { try { off(); } catch (e) {} }); subs = []; }
   /* Gate a route: backend globals + online (panel+Retry+auto-retry). PUBLIC
    * reads render LOCKED by design (gate-repair: password only at signing) —
@@ -115,7 +107,8 @@ var ProposalUI = (function () {
       return null;
     }
     /* No unlock gate here: public chain data renders locked; signing gates
-     * in sendConfirm (fresh-WIF check). unlockBox stays for sign-time use. */
+     * in sendConfirm (fresh-WIF check) — the single unlock idiom on these
+     * routes, no second unlock box. */
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function confirmList(doc, rows) {

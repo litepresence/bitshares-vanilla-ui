@@ -52,7 +52,7 @@ var AssetFeedUI = (function () {
   function noBackend() { return (typeof Asset === "undefined" || typeof AssetOps === "undefined" || typeof Tx === "undefined" || typeof Account === "undefined" || typeof Wallet === "undefined" || typeof Format === "undefined"); }
   /* cold: offline panel + Retry, plus auto-rerun on reconnect (transfer/
    * vote/explorer Store.subscribe("connection",…) pattern — without it the
-   * stale offline panel survives after connect). lock: password gate. */
+   * stale offline panel survives after connect). */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
     w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
@@ -69,15 +69,6 @@ var AssetFeedUI = (function () {
     b.addEventListener("click", function () {
       if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } } rerun(); });
     return true;
-  }
-  function lock(d, w, rerun) {
-    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed")));
-    w.appendChild(el(d, "p", t("asset.locked_prompt", "Wallet is locked. Enter your password."), "muted"));
-    var pw = d.createElement("input"); pw.type = "password"; touch(pw); w.appendChild(pw);
-    var b = touch(el(d, "button", t("account.s6", "Unlock"))); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
-    b.addEventListener("click", function () { box.textContent = ""; b.disabled = true;
-      Promise.resolve().then(function () { return Wallet.unlock(pw.value); }).then(rerun)
-        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : t("auth.unlock_failed", "Unlock failed"); }); });
   }
   /* field: labeled input row. */
   function field(d, label, id, val, mode, area, ph) {

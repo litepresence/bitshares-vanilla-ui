@@ -78,15 +78,6 @@ var AssetUI = (function () {
       if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } } rerun(); });
     return true;
   }
-  function lock(d, w, rerun) {
-    w.appendChild(el(d, "h1", t("assets.title", "Assets")));
-    w.appendChild(el(d, "p", t("asset.locked_prompt", "Wallet is locked. Enter your password."), "muted"));
-    var pw = d.createElement("input"); pw.type = "password"; touch(pw); w.appendChild(pw);
-    var b = touch(el(d, "button", t("account.s6", "Unlock"))); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
-    b.addEventListener("click", function () { box.textContent = ""; b.disabled = true;
-      Promise.resolve().then(function () { return Wallet.unlock(pw.value); }).then(rerun)
-        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : t("auth.unlock_failed", "Unlock failed"); }); });
-  }
   /* field: labeled input row. bits: checkbox group with read(). */
   function field(d, label, id, val, mode, area, ph) {
     var row = el(d, "div", null, "xfer-field"), lab = el(d, "label", label + " ");
@@ -187,8 +178,22 @@ var AssetUI = (function () {
     wipe(root); var w = wrap(d, root);
     if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderCreate(root); })) return;
-    if (!Wallet.isUnlocked()) { lock(d, w, function () { renderCreate(root); }); return; }
+    /* No entry unlock gate (G1 repair): tabs + builder render locked with an
+     * explicit issuer input (public 1.2.0 default, never myAccountId at
+     * render — asset-manage-ui.js half() pattern); the password stays ONLY
+     * at publish() via the fresh-WIF throw. Fee stays live (AssetOps.fee ->
+     * get_required_fees) at review time in both states. */
     w.appendChild(el(d, "h1", t("asset.create_title", "Create asset")));
+    try {
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+        w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
+    } catch (e) { /* notice is display-only */ }
+    var issuer = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), null, "1.2.0");
+    w.appendChild(issuer.row);
+    /* Unlocked prefill: swap the public 1.2.0 default for the wallet account
+     * (locked viewers keep 1.2.0). Null-tolerant, gen-guarded — manual stands. */
+    Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
+      if (g === gen && issuer.input.value.trim() === "1.2.0") issuer.input.value = me.name; }).catch(function () { /* manual stands */ });
     var tab = "uia", bar = el(d, "div", null, "vote-tabs"); w.appendChild(bar);
     var body = el(d, "div", null, "asset-create"); w.appendChild(body);
     function draw() {
@@ -230,7 +235,7 @@ var AssetUI = (function () {
           var db = await Chain.db();
           var taken = await Chain.call(db, "lookup_asset_symbols", [[symbol]]);
           if (taken && taken[0]) throw new Error("symbol-taken");
-          var me = await Account.resolve(await Account.myAccountId());
+          var me = await Account.resolve(issuer.input.value.trim() || "1.2.0");
           var perms = pg.read(), flags = fg.read();
           if (!smart) { perms &= ~(128 | 256 | 32); flags &= ~(128 | 256); }
           var nftObj = null;

@@ -119,6 +119,18 @@ var AccountsUI = (function () {
     wrap.appendChild(el(doc, "h3", t("account.this_wallet", "This wallet")));
     if (!unlocked) {
       wrap.appendChild(el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
+      /* G8: one-line pointer to the public lookup below (the locked card is
+       * otherwise a dead end for browsing). Button scrolls to + focuses the
+       * lookup input — no hash change, so the router never fires. */
+      var crossBtn = touchable(el(doc, "button", t("account.lookup_title", "Look up an account")));
+      crossBtn.type = "button"; wrap.appendChild(crossBtn);
+      crossBtn.addEventListener("click", function () {
+        var box = doc.getElementById("accts-lookup");
+        if (box) {
+          try { if (box.scrollIntoView) box.scrollIntoView(); } catch (e) { /* focus still helps */ }
+          try { box.focus(); } catch (e) { /* display-only */ }
+        }
+      });
       var f = fieldRow(doc, t("account.password_label", "Password "), { id: "accts-unlock-password", type: "password" });
       wrap.appendChild(f.row);
       var btn = touchable(el(doc, "button", t("account.s6", "Unlock")));

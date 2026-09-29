@@ -204,42 +204,6 @@ var VoteUI = (function () {
     });
   }
 
-  /* Unlock gate with return path: ENTRY no longer calls this (public
-   * lists render locked); kept for the sign-time path — showConfirm's
-   * wallet-locked error directs here via the wallet page. Same pattern as
-   * transfer-ui.js renderUnlockPrompt. */
-  function renderUnlockPrompt(doc, wrap, root, myGen) {
-    wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
-    wrap.appendChild(el(doc, "p",
-      t("vote.unlock_prompt", "Wallet is locked. Enter your password to manage your votes."), "muted"));
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", t("vote.password_label", "Password "));
-    var input = doc.createElement("input");
-    input.type = "password";
-    input.setAttribute("autocomplete", "current-password");
-    touchable(input);
-    label.appendChild(input);
-    row.appendChild(label);
-    wrap.appendChild(row);
-    var btn = touchable(el(doc, "button", t("vote.unlock", "Unlock")));
-    btn.type = "button";
-    wrap.appendChild(btn);
-    var errBox = el(doc, "div", null, "error");
-    errBox.setAttribute("aria-live", "polite");
-    wrap.appendChild(errBox);
-    btn.addEventListener("click", function () {
-      errBox.textContent = "";
-      btn.disabled = true;
-      Promise.resolve()
-        .then(function () { return Wallet.unlock(input.value); })
-        .then(function () { if (myGen === gen) renderVoting(root); })
-        .catch(function (e) {
-          btn.disabled = false;
-          errBox.textContent = (e && e.message) ? e.message : String(e || t("vote.unlock_failed", "Unlock failed"));
-        });
-    });
-  }
-
   /* Fallback account picker (no wallet-bound account, or lookup failed):
    * name/id input + resolve, then load the view as that account. */
   function showAccountPicker(doc, wrap, root, myGen, preset) {

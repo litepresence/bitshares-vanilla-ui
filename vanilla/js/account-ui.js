@@ -567,6 +567,48 @@ var AccountUI = (function () {
           err.textContent = msg;
         });
     });
+    /* Public-first lookup (G6 repair): locked users can still open ANY
+     * account page without unlock (pattern copied from
+     * accounts-ui.js:144-155 — input + button, no resolve, the account page
+     * reports unknown names itself). Plus a wallet-manager link. */
+    var lookH = doc.createElement("h2");
+    lookH.textContent = t("account.lookup_title", "Look up an account");
+    wrap.appendChild(lookH);
+    var lookNote = doc.createElement("p");
+    lookNote.className = "muted";
+    lookNote.textContent = t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history).");
+    wrap.appendChild(lookNote);
+    var lookRow = doc.createElement("div");
+    lookRow.className = "xfer-field";
+    var lookLabel = doc.createElement("label");
+    lookLabel.appendChild(doc.createTextNode(t("account.lookup_label", "Account name ")));
+    var lookInput = doc.createElement("input");
+    lookInput.type = "text";
+    lookInput.setAttribute("autocomplete", "off");
+    lookInput.style.minHeight = "44px";
+    lookLabel.appendChild(lookInput);
+    lookRow.appendChild(lookLabel);
+    wrap.appendChild(lookRow);
+    var lookErr = makeError(doc);
+    wrap.appendChild(lookErr);
+    var lookBtn = doc.createElement("button");
+    lookBtn.type = "button";
+    lookBtn.style.minHeight = "44px";
+    lookBtn.textContent = t("account.open_account", "Open account page");
+    wrap.appendChild(lookBtn);
+    lookBtn.addEventListener("click", function () {
+      var v = lookInput.value.trim().toLowerCase();
+      if (!v) { lookErr.textContent = t("account.enter_name", "Enter an account name."); return; }
+      lookErr.textContent = "";
+      if (typeof location !== "undefined") location.hash = "#/account/" + encodeURIComponent(v);
+    });
+    var walletLine = doc.createElement("p");
+    walletLine.className = "muted";
+    var walletLink = doc.createElement("a");
+    walletLink.setAttribute("href", "#/wallet");
+    walletLink.textContent = t("account.wallet_manager", "Wallet manager");
+    walletLine.appendChild(walletLink);
+    wrap.appendChild(walletLine);
   }
 
   /* Member status from a full get_accounts object (bitsharesjs

@@ -7,7 +7,7 @@
  *   the DOM.
  * Created by: slice-10 audit fix B2 (split from asset-ui.js,
  *   behavior-identical). The small view chrome below (el/touch/wipe/wrap/
- *   err/status/netName/feePrec/head/noBackend/cold/lock/field/confirm/done/
+   *   err/status/netName/feePrec/head/noBackend/cold/field/confirm/done/
  *   publish) intentionally duplicates asset-ui.js verbatim — duplicated
  *   plain code over a shared import, per the anti-rot doctrine (no new
  *   load-bearing cross-file abstraction; each view file stays
@@ -77,15 +77,6 @@ var AssetManageUI = (function () {
     b.addEventListener("click", function () {
       if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } } rerun(); });
     return true;
-  }
-  function lock(d, w, rerun) {
-    w.appendChild(el(d, "h1", t("assets.title", "Assets")));
-    w.appendChild(el(d, "p", t("asset.locked_prompt", "Wallet is locked. Enter your password."), "muted"));
-    var pw = d.createElement("input"); pw.type = "password"; touch(pw); w.appendChild(pw);
-    var b = touch(el(d, "button", t("account.s6", "Unlock"))); b.type = "button"; w.appendChild(b); var box = el(d, "div", null, "error"); w.appendChild(box);
-    b.addEventListener("click", function () { box.textContent = ""; b.disabled = true;
-      Promise.resolve().then(function () { return Wallet.unlock(pw.value); }).then(rerun)
-        .catch(function (e) { b.disabled = false; box.textContent = (e && e.message) ? e.message : t("auth.unlock_failed", "Unlock failed"); }); });
   }
   /* field: labeled input row. */
   function field(d, label, id, val, mode, area, ph) {
