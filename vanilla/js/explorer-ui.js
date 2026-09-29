@@ -46,9 +46,18 @@ var ExplorerUI = (function () {
   var CONNECT_TIMEOUT_MS = 15000; /* slice-1 offline pattern */
   /* Ref tab order (Explorer.jsx:18-64): blocks/assets/pools/accounts/
    * witnesses/committee/markets/fees — plus vanilla's feeds extra (kept as
-   * documented superset, last). Labels render capitalized from the ids. */
+   * documented superset, last). Labels capitalize from ids except "blocks",
+   * which reads "Blockchain" via tabLabel below. */
   var TABS = ["blocks", "assets", "pools", "accounts", "witnesses",
     "committee", "markets", "fees", "feeds"];
+
+  /* Tab label: the "blocks" subtab reads "Blockchain" (ref #1 Blocks tab
+   * parity + user rename) via i18n; every other id capitalizes as before.
+   * Params: id (tab id string). Returns the button label. Fails: never. */
+  function tabLabel(id) {
+    if (id === "blocks") return t("explorer.tab_blocks", "Blockchain");
+    return id.charAt(0).toUpperCase() + id.slice(1);
+  }
 
   /* Generation counter: every route entry bumps it; async continuations
    * capture their generation and bail when it no longer matches. Single
@@ -144,7 +153,7 @@ var ExplorerUI = (function () {
   function waitForOpen(doc, wrap, root, myGen, rerun) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
-    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
+    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
     wrap.appendChild(el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false;
@@ -164,7 +173,7 @@ var ExplorerUI = (function () {
       if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
+      failed.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
       showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
       var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
@@ -223,8 +232,8 @@ var ExplorerUI = (function () {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderExplorer(root, want); })) return;
 
-    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explorer")));
-    if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blocks."), "muted"));
+    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
+    if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
 
     /* Search: single box, 1.x.y / account / symbol, keyboard-submit. */
     var form = doc.createElement("form");
@@ -269,7 +278,7 @@ var ExplorerUI = (function () {
     var bar = el(doc, "div", null, "xplore-tabs");
     bar.setAttribute("role", "tablist");
     TABS.forEach(function (t) {
-      var b = touchable(el(doc, "button", t.charAt(0).toUpperCase() + t.slice(1),
+      var b = touchable(el(doc, "button", tabLabel(t),
         want === t ? "xplore-tab active" : "xplore-tab"));
       b.type = "button";
       b.setAttribute("role", "tab");

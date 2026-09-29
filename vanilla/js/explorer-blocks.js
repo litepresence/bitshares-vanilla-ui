@@ -35,6 +35,18 @@ var ExplorerBlocks = (function () {
 
   var RECENT_N = 20; /* blocks per page */
 
+  /* Live-pulse subscription handle (single active blocks-tab feed): torn
+   * down on route leave (gen guard), on Older paging, and on Retry so only
+   * the tip view holds the Store "connection" listener. Null when idle. */
+  var liveOff = null;
+
+  /* Drop the active live feed, if any. Params: none. Returns nothing.
+   * Fails: never — a missing or throwing unsub is a no-op. */
+  function stopLive() {
+    try { if (liveOff) liveOff(); } catch (e) { /* listener gone */ }
+    liveOff = null;
+  }
+
   /* Account-id shape (data copy of the explorer-ui.js regex — slice-3
    * account route target; logic lives in explorer-assets.js). */
   var ACCT_RE = /^1\.2\.\d+$/;
@@ -164,6 +176,7 @@ var ExplorerBlocks = (function () {
     var scroller = el(doc, "div", null, "xplore-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
+    table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
     headers.forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
@@ -207,8 +220,14 @@ var ExplorerBlocks = (function () {
   }
 
   /* Blocks tab: recent-blocks table + "Older" paging by height decrement
-   * (no infinite-scroll lib). Rows: height link, time, witness link, txs. */
+   * (no infinite-scroll lib). Rows: height link, time, witness link, txs.
+   * Tip view (oldest null) adds the LIVE pulse: the existing Chain block
+   * feed (Store "connection" headBlock, same signal as the footer — zero
+   * extra socket) prepends each new head row with a flash highlight and
+   * refreshes the green live indicator. The one-shot load + Older paging +
+   * Retry below stay as the stall fallback; feed-down never blanks. */
   function blocksTab(doc, body, root, myGen, oldest) {
+    stopLive();
     showStatus(doc, body, t("explorer.loading_blocks", "Loading blocks…"));
     function rowsFor(top) {
       if (top === null || top === undefined) return Explorer.recentBlocks(RECENT_N);
@@ -220,12 +239,121 @@ var ExplorerBlocks = (function () {
         }).catch(function () { return null; });
       })).then(function (rows) { return rows.filter(function (r) { return !!r; }); });
     }
+    /* Current chain head from the shared status (footer signal, no RPC).
+     * Returns {state, head} or null when Chain is absent. */
+    function chainHead() {
+      try {
+        if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
+          var s = Chain.status() || {};
+          return { state: s.state || "unknown", head: s.headBlock || null };
+        }
+      } catch (e) { /* fallback below */ }
+      return null;
+    }
+    /* Paint the live indicator: green "Live • Block #N" when open, muted
+     * "Paused • Block #N" otherwise. Params: liveEl, headNum. Never blank. */
+    function paintLive(liveEl, headNum) {
+      if (!liveEl) return;
+      var ch = chainHead();
+      var open = !!(ch && ch.state === "open");
+      var n = (typeof headNum === "number" && headNum > 0) ? headNum
+        : (ch && typeof ch.head === "number" && ch.head > 0 ? ch.head : null);
+      var label = n !== null
+        ? (open ? t("explorer.live_prefix", "Live • Block #") + n
+          : t("explorer.paused_prefix", "Paused • Block #") + n)
+        : (open ? t("explorer.live_prefix", "Live • Block #").replace(/ ?#$/, "")
+          : t("explorer.paused_prefix", "Paused • Block #").replace(/ ?#$/, ""));
+      while (liveEl.firstChild) liveEl.removeChild(liveEl.firstChild);
+      var dot = el(doc, "span", "●", "xplore-live-dot");
+      dot.setAttribute("aria-hidden", "true");
+      liveEl.appendChild(dot);
+      liveEl.appendChild(el(doc, "span", " " + label));
+      liveEl.setAttribute("data-state", open ? "live" : "paused");
+    }
+    /* One normalized row -> <tr> (same cells as the initial table). */
+    function rowTr(r) {
+      var tr = doc.createElement("tr");
+      var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
+      var cells = [anchor(doc, "#" + r.height, "#/block/" + r.height),
+        r.timestamp || "—", witnessCell(doc, r.witness, myGen),
+        (n === null || n === undefined) ? "—" : String(n)];
+      cells.forEach(function (c) {
+        var td = doc.createElement("td");
+        if (typeof c === "string") td.textContent = c;
+        else if (c) td.appendChild(c);
+        tr.appendChild(td);
+      });
+      return tr;
+    }
+    /* Start the tip live feed: prepends new heads with a flash + refreshes
+     * the indicator. Gen-guarded teardown on route leave. No extra socket. */
+    function startLive(tbody, liveEl, topBox) {
+      if (typeof Store === "undefined" || !Store || typeof Store.subscribe !== "function") return;
+      if (!tbody || !liveEl) return;
+      var off = function () {};
+      off = Store.subscribe("connection", function (st) {
+        if (!isCurrent(myGen)) {
+          try { off(); } catch (e) { /* gone */ }
+          if (liveOff === off) liveOff = null;
+          return;
+        }
+        if (!st) return;
+        if (st.state !== "open") {
+          paintLive(liveEl, topBox.top);
+          return;
+        }
+        var h = st.headBlock;
+        if (typeof h !== "number" || !(h > topBox.top)) {
+          if (typeof h === "number" && h > 0) paintLive(liveEl, Math.max(h, topBox.top));
+          return;
+        }
+        paintLive(liveEl, h);
+        var gap = h - topBox.top;
+        var want = (gap > 1 && gap <= 5)
+          ? (function () { var a = []; for (var k = topBox.top + 1; k <= h; k++) a.push(k); return a; })()
+          : [h];
+        (function next(i) {
+          if (i >= want.length) return;
+          if (!isCurrent(myGen)) return;
+          Explorer.block(want[i]).then(function (b) {
+            if (!isCurrent(myGen)) return;
+            if (!tbody.parentNode) return;
+            var tr = rowTr({
+              height: b.height, timestamp: b.timestamp,
+              witness: b.witness_account_id, txs: b.tx_count
+            });
+            tr.className = "xplore-flash";
+            if (tbody.firstChild) tbody.insertBefore(tr, tbody.firstChild);
+            else tbody.appendChild(tr);
+            if (b.height > topBox.top) {
+              topBox.top = b.height;
+              paintLive(liveEl, topBox.top);
+            }
+            next(i + 1);
+          }).catch(function () {
+            if (!isCurrent(myGen)) return;
+            paintLive(liveEl, topBox.top);
+            next(i + 1);
+          });
+        })(0);
+      });
+      liveOff = off;
+    }
     rowsFor(oldest).then(function (rows) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (rows.length === 0) {
         body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found."), "muted"));
         return;
+      }
+      var isTip = (oldest === null || oldest === undefined);
+      var topBox = { top: rows[0].height };
+      var liveEl = null;
+      if (isTip) {
+        liveEl = el(doc, "p", null, "xplore-live");
+        liveEl.setAttribute("aria-live", "polite");
+        body.appendChild(liveEl);
+        paintLive(liveEl, topBox.top);
       }
       var tableRows = rows.map(function (r) {
         /* Recent path yields tx_count (null -> "—"); Older path yields txs. */
@@ -234,17 +362,22 @@ var ExplorerBlocks = (function () {
           r.timestamp || "—", witnessCell(doc, r.witness, myGen),
           (n === null || n === undefined) ? "—" : String(n)];
       });
-      body.appendChild(scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows));
+      var scroller = scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows);
+      body.appendChild(scroller);
+      var tbody = null;
+      try { tbody = scroller.querySelector("tbody"); } catch (e) { tbody = null; }
       var oldestRow = rows[rows.length - 1];
       if (oldestRow.height > 1) {
         var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
         older.type = "button";
         older.addEventListener("click", function () {
+          stopLive();
           while (body.firstChild) body.removeChild(body.firstChild);
           blocksTab(doc, body, root, myGen, oldestRow.height);
         });
         body.appendChild(older);
       }
+      if (isTip && tbody) startLive(tbody, liveEl, topBox);
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
@@ -252,6 +385,7 @@ var ExplorerBlocks = (function () {
       var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
+        stopLive();
         while (body.firstChild) body.removeChild(body.firstChild);
         blocksTab(doc, body, root, myGen, oldest);
       });

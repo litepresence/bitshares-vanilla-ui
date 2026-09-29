@@ -859,7 +859,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
   .mkt-statstrip, .mkt-chart-empty,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
   .pools-pager button, .nav-dir-btn, .mkt-star, .mkt-bell,
-  .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind {
+  .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind,
+  tr.xplore-flash, .xplore-live-dot {
     transition: none;
     animation: none;
   }
@@ -871,3 +872,25 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
     transform: none;
   }
 }
+
+/* Explore tab (lively like #1 Blocks.jsx:23-48 BlockTimeAgo + TransitionWrapper):
+ * alternating rows on EVERY explorer subtab table (reuse .node-table
+ * striping; .xplore-scroll fallback covers plain tables like the fee
+ * schedule), green live indicator (footer --live token), flashing new-block
+ * row (CSS animation, reduced-motion safe). Tokens only — all three themes. */
+.xplore-scroll table { width: 100%; border-collapse: collapse; background: var(--panel); }
+.xplore-scroll table th, .xplore-scroll table td { padding: 12px;
+  border-bottom: 1px solid var(--border); text-align: left; }
+.xplore-scroll table th { text-transform: uppercase; font-size: 0.78rem;
+  letter-spacing: 0.05em; font-weight: 600; }
+.xplore-scroll table tbody tr:nth-child(even),
+.xplore-scroll table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
+.xplore-live { display: flex; align-items: center; gap: 8px; margin: 8px 0;
+  font-weight: 700; min-height: 44px; }
+.xplore-live[data-state="live"] { color: var(--live); }
+.xplore-live[data-state="paused"] { color: var(--muted); }
+.xplore-live-dot { font-size: 1rem; line-height: 1; }
+.xplore-live[data-state="live"] .xplore-live-dot { color: var(--live); }
+.xplore-live[data-state="paused"] .xplore-live-dot { color: var(--muted); }
+@keyframes xplore-flash { from { background-color: var(--live); } to { background-color: transparent; } }
+tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }

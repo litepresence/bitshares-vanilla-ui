@@ -614,7 +614,7 @@
     "title": "Block"
   },
   "explorer": {
-    "title": "Explorer",
+    "title": "Explore",
     "accumulated_fees": "Accumulated fees",
     "asset_count_suffix": " asset(s)…",
     "asset_prefix": "Asset ",
@@ -717,7 +717,7 @@
     "unknown_asset": "Unknown asset.",
     "unknown_block": "Unknown block.",
     "unknown_tab_prefix": "Unknown tab “",
-    "unknown_tab_suffix": "” — showing Blocks.",
+    "unknown_tab_suffix": "” — showing Blockchain.",
     "unknown_tx": "Unknown transaction.",
     "view_missing_prefix": "Explorer view missing: ",
     "view_missing_suffix": " failed to load.",
@@ -725,7 +725,10 @@
     "votes_unit": " votes",
     "witness_row": "Witness",
     "yes": "yes",
-    "tabs_missing": "Explorer tabs view missing: js/explorer-tabs.js failed to load."
+    "tabs_missing": "Explorer tabs view missing: js/explorer-tabs.js failed to load.",
+    "tab_blocks": "Blockchain",
+    "live_prefix": "Live • Block #",
+    "paused_prefix": "Paused • Block #"
   },
   "gateway": {
     "title": "Deposit / Withdraw",

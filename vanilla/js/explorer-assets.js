@@ -187,6 +187,7 @@ var ExplorerAssets = (function () {
     var scroller = el(doc, "div", null, "xplore-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
+    table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
     headers.forEach(function (h) { hr.appendChild(el(doc, "th", h)); });

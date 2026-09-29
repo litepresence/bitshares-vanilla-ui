@@ -47,7 +47,7 @@ var App = (function () {
     { heading: "Governance", hrefs: ["#/voting", "#/proposals", "#/create-worker",
       "#/credit-offer", "#/direct-debit", "#/spotlight", "#/tickets", "#/airdrop",
       "#/htlc", "#/prediction"] },
-    { heading: "Explorer", hrefs: ["#/explorer", "#/assets", "#/assets/create",
+    { heading: "Explore", hrefs: ["#/explorer", "#/assets", "#/assets/create",
       "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/news"] },
     { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/help"] }
   ];
@@ -118,7 +118,7 @@ var App = (function () {
       case "#/airdrop": return "Airdrop";
       case "#/htlc": return t("htlc.title", "HTLC");
       case "#/prediction": return "Prediction Markets";
-      case "#/explorer": return t("nav.explorer", "Explorer");
+      case "#/explorer": return t("nav.explorer", "Explore");
       case "#/assets": return t("assets.title", "Assets");
       case "#/assets/create": return t("assets_manage.title", "Create Asset");
       case "#/assets/issue": return "Issue Asset";
