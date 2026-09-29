@@ -201,8 +201,8 @@ var FeesUI = (function () {
         var tdId0 = el(doc, "td", String(id)); tdId0.title = title; tr0.appendChild(tdId0);
         var tdOp0 = el(doc, "td", lab.name); tdOp0.title = title; tr0.appendChild(tdOp0);
         tr0.appendChild(el(doc, "td", "—"));
-        var tdM = el(doc, "td", "Not in schedule");
-        tdM.title = "No entry for op " + id + " in the current fee schedule — the chain falls back to a related operation's fee.";
+        var tdM = el(doc, "td", t("fees.not_in_schedule", "Not in schedule"));
+        tdM.title = t("fees.no_entry_for_op", "No entry for op ") + id + t("fees.in_the_current_fee_schedule_the_chain_falls_b", " in the current fee schedule — the chain falls back to a related operation's fee.");
         tdM.style.textAlign = "right"; tr0.appendChild(tdM);
         var tdL0 = el(doc, "td", "—"); tdL0.style.textAlign = "right"; tr0.appendChild(tdL0);
         tb2.appendChild(tr0);
@@ -218,7 +218,7 @@ var FeesUI = (function () {
         var tdId1 = el(doc, "td", String(id)); tdId1.title = title; tr1.appendChild(tdId1);
         var tdOp1 = el(doc, "td", lab.name); tdOp1.title = title; tr1.appendChild(tdOp1);
         tr1.appendChild(el(doc, "td", "—"));
-        var tdF = el(doc, "td", "Free of charge");
+        var tdF = el(doc, "td", t("fees.free_of_charge", "Free of charge"));
         tdF.title = lab.virtual
           ? "Virtual execution event (op " + id + "): produced by the chain, never signed, no fee parameter."
           : "No fee parameters for op " + id + " on chain (balance claims are always free).";
@@ -242,7 +242,7 @@ var FeesUI = (function () {
           /* LTM-required (#1 Fees.jsx:182-199): registrar-paid op — no
            * standard fee exists, dash-starred; the member column carries it. */
           var tdD = el(doc, "td", "— *");
-          tdD.title = "Lifetime membership required — no standard fee for op " + id + ".";
+          tdD.title = t("fees.lifetime_membership_required_no_standard_fee", "Lifetime membership required — no standard fee for op ") + id + ".";
           tdD.style.textAlign = "right"; tr.appendChild(tdD);
         } else {
           tr.appendChild(moneyCell(doc, scaledK, prec, prov + " · " + k));
@@ -251,7 +251,7 @@ var FeesUI = (function () {
         var tdLtm;
         if (ltm === null) {
           tdLtm = el(doc, "td", "—");
-          if (netPct === null || netPct === undefined) tdLtm.title = "network_percent_of_fee unavailable — member cost unknown.";
+          if (netPct === null || netPct === undefined) tdLtm.title = t("fees.network_percent_of_fee_unavailable_member_cos", "network_percent_of_fee unavailable — member cost unknown.");
         } else {
           tdLtm = moneyCell(doc, ltm, prec, "member cost = " + prov + " · net " + netPct + "/10000" + (id === 10 ? " · half registrar/half network" : ""));
         }
@@ -274,7 +274,7 @@ var FeesUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     if (typeof Asset === "undefined" || !Asset || typeof Asset.feeSchedule !== "function") {
-      showError(doc, wrap, "Fee backend missing: js/asset.js failed to load.");
+      showError(doc, wrap, t("fees.fee_backend_missing_js_asset_js_failed_to_loa", "Fee backend missing: js/asset.js failed to load."));
       return;
     }
     wrap.appendChild(el(doc, "h1", t("fees.network_fees", "Network fees")));
@@ -310,7 +310,7 @@ var FeesUI = (function () {
     }
     var box = doc.createElement("div");
     wrap.appendChild(box);
-    box.appendChild(el(doc, "p", "Loading fee schedule…", "muted"));
+    box.appendChild(el(doc, "p", t("fees.loading_fee_schedule", "Loading fee schedule…"), "muted"));
     Asset.feeSchedule().then(function (s) {
       if (myGen !== gen) return;
       clearRoot(box);

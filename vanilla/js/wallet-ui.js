@@ -22,6 +22,17 @@
 var WalletUI = (function () {
   "use strict";
 
+  /* Batch-2 tonight i18n (slice-17 precedent): display strings resolve via I18n.t with the
+   * pre-conversion literal kept verbatim as enDefault (English-identical on any
+   * transport, incl. file:// where dict fetch fails). Falls back to the default
+   * when i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Clear all children of the router root. */
   function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
@@ -365,7 +376,7 @@ var WalletUI = (function () {
     var bkArea = brainkeyField(doc, "create-brainkey", true);
     bkArea.placeholder = "Generating brainkey…";
     bkArea.style.width = "100%";
-    wrap.appendChild(fieldRow(doc, "Brainkey", bkArea));
+    wrap.appendChild(fieldRow(doc, t("wallet.brainkey", "Brainkey"), bkArea));
     var bkHint = doc.createElement("p");
     bkHint.className = "muted";
     bkHint.setAttribute("aria-live", "polite");
@@ -375,10 +386,10 @@ var WalletUI = (function () {
     bkArea.addEventListener("input", refreshBkHint);
 
     var regenRow = doc.createElement("p");
-    var genBtn = touchable(actionButton(doc, "create-regen", "Generate new brainkey"));
+    var genBtn = touchable(actionButton(doc, "create-regen", t("wallet.generate_new_brainkey", "Generate new brainkey")));
     regenRow.appendChild(genBtn);
     regenRow.appendChild(doc.createTextNode(" "));
-    var customBtn = touchable(actionButton(doc, "create-custom", "Use custom brainkey instead"));
+    var customBtn = touchable(actionButton(doc, "create-custom", t("wallet.use_custom_brainkey_instead", "Use custom brainkey instead")));
     regenRow.appendChild(customBtn);
     wrap.appendChild(regenRow);
     var err = makeError(doc);
@@ -409,16 +420,16 @@ var WalletUI = (function () {
         var v = nameInput.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
         if (v !== nameInput.value) nameInput.value = v;
       });
-      wrap.appendChild(fieldRow(doc, "Wallet name", nameInput));
+      wrap.appendChild(fieldRow(doc, t("wallet.wallet_name", "Wallet name"), nameInput));
       var overwrite = doc.createElement("p");
       overwrite.className = "muted";
-      overwrite.textContent = "A wallet already exists on this device — " +
+      overwrite.textContent = t("wallet.a_wallet_already_exists_on_this_device", "A wallet already exists on this device — ") +
         "creating replaces it. The name is only a label; this device keeps a single wallet.";
       wrap.appendChild(overwrite);
     }
 
     var pwInput = passwordField(doc, "create-password");
-    wrap.appendChild(fieldRow(doc, "Password", pwInput));
+    wrap.appendChild(fieldRow(doc, t("wallet.password", "Password"), pwInput));
     var pwMeter = doc.createElement("p");
     pwMeter.className = "muted";
     pwMeter.setAttribute("aria-live", "polite");
@@ -428,13 +439,13 @@ var WalletUI = (function () {
       pwMeter.textContent = passwordHint(pwInput.value);
     });
     var confirmInput = passwordField(doc, "create-confirm");
-    wrap.appendChild(fieldRow(doc, "Confirm password", confirmInput));
+    wrap.appendChild(fieldRow(doc, t("wallet.confirm_password", "Confirm password"), confirmInput));
 
     var actionRow = doc.createElement("p");
-    var createBtn = touchable(actionButton(doc, "create-do", "Create wallet"));
+    var createBtn = touchable(actionButton(doc, "create-do", t("wallet.create_wallet", "Create wallet")));
     actionRow.appendChild(createBtn);
     actionRow.appendChild(doc.createTextNode(" "));
-    var cancelBtn = touchable(actionButton(doc, "create-cancel", "Cancel"));
+    var cancelBtn = touchable(actionButton(doc, "create-cancel", t("wallet.cancel", "Cancel")));
     actionRow.appendChild(cancelBtn);
     wrap.appendChild(actionRow);
 
@@ -457,7 +468,7 @@ var WalletUI = (function () {
       customMode = true;
       bkArea.readOnly = false;
       bkArea.value = "";
-      bkArea.placeholder = "type your own brainkey words…";
+      bkArea.placeholder = t("wallet.type_your_own_brainkey_words", "type your own brainkey words…");
       customBtn.style.display = "none";
       refreshBkHint();
       bkArea.focus();
@@ -481,7 +492,7 @@ var WalletUI = (function () {
         return;
       }
       if (customMode && String(bk || "").length < 50) {
-        err.textContent = "Custom brainkey too short: 50 characters minimum after trimming.";
+        err.textContent = t("wallet.custom_brainkey_too_short_50_characters_minim", "Custom brainkey too short: 50 characters minimum after trimming.");
         return;
       }
       if (!pw) {
@@ -489,7 +500,7 @@ var WalletUI = (function () {
         return;
       }
       if (pw.length < 8) {
-        err.textContent = "Password must be 8 characters or more.";
+        err.textContent = t("wallet.password_must_be_8_characters_or_more", "Password must be 8 characters or more.");
         return;
       }
       if (pw !== confirm) {
@@ -498,7 +509,7 @@ var WalletUI = (function () {
       }
       var walletName = nameInput ? nameInput.value : "default";
       if (nameInput && !walletName) {
-        err.textContent = "Wallet name required: use letters, digits, dash or underscore.";
+        err.textContent = t("wallet.wallet_name_required_use_letters_digits_dash", "Wallet name required: use letters, digits, dash or underscore.");
         return;
       }
       createBtn.disabled = true;

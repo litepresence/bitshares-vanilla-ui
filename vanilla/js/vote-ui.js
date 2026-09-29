@@ -330,13 +330,13 @@ var VoteUI = (function () {
     govRow.style.display = "flex";
     govRow.style.flexWrap = "wrap";
     govRow.style.gap = "8px";
-    var joinWBtn = touchable(el(doc, "button", "Join as witness"));
+    var joinWBtn = touchable(el(doc, "button", t("vote.join_as_witness", "Join as witness")));
     joinWBtn.type = "button";
-    var updWBtn = touchable(el(doc, "button", "Update witness"));
+    var updWBtn = touchable(el(doc, "button", t("vote.update_witness", "Update witness")));
     updWBtn.type = "button";
-    var joinCBtn = touchable(el(doc, "button", "Join committee"));
+    var joinCBtn = touchable(el(doc, "button", t("vote.join_committee", "Join committee")));
     joinCBtn.type = "button";
-    var lockLink = el(doc, "a", "Increase voting power (create lock)");
+    var lockLink = el(doc, "a", t("vote.increase_voting_power_create_lock", "Increase voting power (create lock)"));
     lockLink.setAttribute("href", "#/tickets");
     lockLink.style.display = "inline-block";
     lockLink.style.alignSelf = "center";
@@ -346,7 +346,7 @@ var VoteUI = (function () {
     govRow.appendChild(joinCBtn);
     govRow.appendChild(lockLink);
     wrap.appendChild(govRow);
-    var budgetLine = el(doc, "p", "Worker budget: loading…", "muted");
+    var budgetLine = el(doc, "p", t("vote.worker_budget_loading", "Worker budget: loading…"), "muted");
     budgetLine.setAttribute("aria-live", "polite");
     wrap.appendChild(budgetLine);
     var joinBox = el(doc, "div", null, "vote-join");
@@ -800,7 +800,7 @@ var VoteUI = (function () {
    * Params: doc, line (mutated in place), myGen (generation guard). */
   function fillBudget(doc, line, myGen) {
     if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
-      line.textContent = "Worker budget: —";
+      line.textContent = t("vote.worker_budget", "Worker budget: —");
       return;
     }
     Chain.db().then(function (dbId) {
@@ -818,7 +818,7 @@ var VoteUI = (function () {
         : "Worker budget: —";
     }).catch(function () {
       if (myGen !== gen) return;
-      line.textContent = "Worker budget: —";
+      line.textContent = t("vote.worker_budget", "Worker budget: —");
     });
   }
 
@@ -849,15 +849,15 @@ var VoteUI = (function () {
    *   (needs me), myGen (generation guard), isUpdate bool. */
   function renderJoinWitness(doc, box, root, st, myGen, isUpdate) {
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el(doc, "h2", isUpdate ? "Update witness" : "Join as witness"));
-    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, "name or 1.2.N");
-    var urlIn = joinField(doc, box, "URL", "", "https://example.com");
-    var keyIn = joinField(doc, box, "Block signing key", "", "BTS…");
+    box.appendChild(el(doc, "h2", isUpdate ? t("vote.update_witness", "Update witness") : t("vote.join_as_witness", "Join as witness")));
+    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, t("vote.name_or_1_2_n", "name or 1.2.N"));
+    var urlIn = joinField(doc, box, t("vote.url", "URL"), "", "https://example.com");
+    var keyIn = joinField(doc, box, t("vote.block_signing_key", "Block signing key"), "", "BTS…");
     var msg = el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     box.appendChild(msg);
     if (isUpdate) {
-      var reload = touchable(el(doc, "button", "Load current"));
+      var reload = touchable(el(doc, "button", t("vote.load_current", "Load current")));
       reload.type = "button";
       box.appendChild(reload);
       reload.addEventListener("click", function () {
@@ -868,16 +868,16 @@ var VoteUI = (function () {
         }).then(function (w) {
           reload.disabled = false;
           if (myGen !== gen) return;
-          if (!w) { msg.textContent = "No witness object for this account — use Join as witness instead."; return; }
+          if (!w) { msg.textContent = t("vote.no_witness_object_for_this_account_use_join_a", "No witness object for this account — use Join as witness instead."); return; }
           urlIn.value = w.url || "";
           keyIn.value = w.signing_key || "";
         }).catch(function (e) {
           reload.disabled = false;
-          msg.textContent = (e && e.message) ? e.message : "Lookup failed.";
+          msg.textContent = (e && e.message) ? e.message : t("vote.lookup_failed", "Lookup failed.");
         });
       });
     }
-    var review = touchable(el(doc, "button", isUpdate ? "Review update" : "Review join"));
+    var review = touchable(el(doc, "button", isUpdate ? t("vote.review_update", "Review update") : t("vote.review_join", "Review join")));
     review.type = "button";
     box.appendChild(review);
     review.addEventListener("click", function () {
@@ -885,8 +885,8 @@ var VoteUI = (function () {
       /* Reference JoinWitnessesModal lowercases + sanitizes the url. */
       var url = urlIn.value.trim().toLowerCase();
       var signingKey = keyIn.value.trim();
-      if (!url) { msg.textContent = "Enter a URL."; return; }
-      if (!signingKey || signingKey.length < 20) { msg.textContent = "Enter the block signing public key."; return; }
+      if (!url) { msg.textContent = t("vote.enter_a_url", "Enter a URL."); return; }
+      if (!signingKey || signingKey.length < 20) { msg.textContent = t("vote.enter_the_block_signing_public_key", "Enter the block signing public key."); return; }
       review.disabled = true;
       var opId = isUpdate ? 21 : 20;
       Account.resolve(acctIn.value.trim() || st.me.id).then(function (acct) {
@@ -895,7 +895,7 @@ var VoteUI = (function () {
           : { fee: { amount: "0", asset_id: CORE_ASSET }, witness_account: acct.id, url: url, block_signing_key: signingKey };
         var shaped = isUpdate
           ? Vote.getWitnessByAccount(acct.id).then(function (w) {
-              if (!w) throw new Error("No witness object for this account — use Join as witness instead.");
+              if (!w) throw new Error(t("vote.no_witness_object_for_this_account_use_join_a", "No witness object for this account — use Join as witness instead."));
               opData.witness = w.id;
               return { acct: acct, opData: opData };
             })
@@ -918,7 +918,7 @@ var VoteUI = (function () {
         });
       }).catch(function (e) {
         review.disabled = false;
-        msg.textContent = (e && e.message) ? e.message : "Could not prepare the join.";
+        msg.textContent = (e && e.message) ? e.message : t("vote.could_not_prepare_the_join", "Could not prepare the join.");
       });
     });
   }
@@ -929,19 +929,19 @@ var VoteUI = (function () {
    * sign-gate contract as renderJoinWitness. */
   function renderJoinCommittee(doc, box, root, st, myGen) {
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el(doc, "h2", "Join committee"));
-    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, "name or 1.2.N");
-    var urlIn = joinField(doc, box, "URL", "", "https://example.com");
+    box.appendChild(el(doc, "h2", t("vote.join_committee", "Join committee")));
+    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, t("vote.name_or_1_2_n", "name or 1.2.N"));
+    var urlIn = joinField(doc, box, t("vote.url", "URL"), "", "https://example.com");
     var msg = el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     box.appendChild(msg);
-    var review = touchable(el(doc, "button", "Review join"));
+    var review = touchable(el(doc, "button", t("vote.review_join", "Review join")));
     review.type = "button";
     box.appendChild(review);
     review.addEventListener("click", function () {
       msg.textContent = "";
       var url = urlIn.value.trim().toLowerCase();
-      if (!url) { msg.textContent = "Enter a URL."; return; }
+      if (!url) { msg.textContent = t("vote.enter_a_url", "Enter a URL."); return; }
       review.disabled = true;
       Account.resolve(acctIn.value.trim() || st.me.id).then(function (acct) {
         var opData = { fee: { amount: "0", asset_id: CORE_ASSET }, committee_member_account: acct.id, url: url };
@@ -958,7 +958,7 @@ var VoteUI = (function () {
         });
       }).catch(function (e) {
         review.disabled = false;
-        msg.textContent = (e && e.message) ? e.message : "Could not prepare the join.";
+        msg.textContent = (e && e.message) ? e.message : t("vote.could_not_prepare_the_join", "Could not prepare the join.");
       });
     });
   }
@@ -969,7 +969,7 @@ var VoteUI = (function () {
    *   myGen, spec {kind, opId, isUpdate, account {id,name}, opData, feeRaw}. */
   function showJoinConfirm(doc, box, root, st, myGen, spec) {
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el(doc, "h2", spec.isUpdate ? "Confirm witness update (op 21)"
+    box.appendChild(el(doc, "h2", spec.isUpdate ? t("vote.confirm_witness_update_op_21", "Confirm witness update (op 21)")
       : (spec.kind === "witness" ? "Confirm witness join (op 20)" : "Confirm committee join (op 29)")));
     var list = el(doc, "dl", null, "vote-confirm");
     function row(term, text, title) {
@@ -980,13 +980,13 @@ var VoteUI = (function () {
       list.appendChild(dd);
     }
     row(t("vote.account_row", "Account"), spec.account.name + " (" + spec.account.id + ")");
-    row("Role", spec.kind === "witness" ? "Witness" : "Committee member");
-    row("URL", spec.kind === "witness"
+    row(t("vote.role", "Role"), spec.kind === "witness" ? t("vote.witness", "Witness") : t("vote.committee_member", "Committee member"));
+    row(t("vote.url", "URL"), spec.kind === "witness"
       ? (spec.isUpdate ? spec.opData.new_url : spec.opData.url)
       : spec.opData.url);
     if (spec.kind === "witness") {
       var k = spec.isUpdate ? spec.opData.new_signing_key : spec.opData.block_signing_key;
-      row("Signing key", k.length > 18 ? k.slice(0, 12) + "…" + k.slice(-6) : k, k);
+      row(t("vote.signing_key", "Signing key"), k.length > 18 ? k.slice(0, 12) + "…" + k.slice(-6) : k, k);
     }
     var feeHuman;
     try {
@@ -1009,7 +1009,7 @@ var VoteUI = (function () {
     var backBtn = touchable(el(doc, "button", t("vote.back", "Back")));
     backBtn.type = "button";
     box.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", spec.isUpdate ? "Sign & Update" : "Sign & Join"));
+    var sendBtn = touchable(el(doc, "button", spec.isUpdate ? t("vote.sign_update", "Sign & Update") : t("vote.sign_join", "Sign & Join")));
     sendBtn.type = "button";
     box.appendChild(sendBtn);
 
@@ -1042,7 +1042,7 @@ var VoteUI = (function () {
           return;
         }
         box.removeChild(status);
-        showError(doc, box, (e && e.message) ? e.message : String(e || "Join failed"), "Join failed.");
+        showError(doc, box, (e && e.message) ? e.message : String(e || t("vote.join_failed_2", "Join failed")), t("vote.join_failed", "Join failed."));
         backBtn.disabled = false;
       });
     });
@@ -1089,7 +1089,7 @@ var VoteUI = (function () {
       }
       await sleep(PROVE_INTERVAL_MS);
     }
-    throw new Error("Sent (" + via + ") but the new object was not observed within " +
+    throw new Error(t("vote.sent_prefix", "Sent (") + via + t("vote.but_the_new_object_was_not_observed_within", ") but the new object was not observed within ") +
       (PROVE_TIMEOUT_MS / 1000) + "s; check #/voting before retrying (do NOT blindly rebroadcast).");
   }
 
@@ -1099,8 +1099,8 @@ var VoteUI = (function () {
    * caller), spec, errText (null | "deferred" | message), res. */
   function showJoinResult(doc, box, spec, errText, res) {
     if (errText === "deferred") {
-      box.appendChild(el(doc, "h2", "Broadcast deferred"));
-      var note = el(doc, "p", "Entry, live fee, and confirm above are complete, but tx.js has no " +
+      box.appendChild(el(doc, "h2", t("vote.broadcast_deferred", "Broadcast deferred")));
+      var note = el(doc, "p", t("vote.entry_live_fee_and_confirm_above_are_complete", "Entry, live fee, and confirm above are complete, but tx.js has no ") +
         (spec.kind === "witness"
           ? (spec.isUpdate ? "witness_update (op 21)" : "witness_create (op 20)")
           : "committee_member_create (op 29)") +
@@ -1109,10 +1109,10 @@ var VoteUI = (function () {
       note.setAttribute("aria-live", "polite");
       box.appendChild(note);
     } else if (errText) {
-      box.appendChild(el(doc, "h2", "Join failed"));
-      showError(doc, box, errText, "Join failed.");
+      box.appendChild(el(doc, "h2", t("vote.join_failed_2", "Join failed")));
+      showError(doc, box, errText, t("vote.join_failed", "Join failed."));
     } else {
-      box.appendChild(el(doc, "h2", spec.isUpdate ? "Witness updated" : "Join published"));
+      box.appendChild(el(doc, "h2", spec.isUpdate ? t("vote.witness_updated", "Witness updated") : t("vote.join_published", "Join published")));
       var ok = el(doc, "p", t("vote.observed_prefix", "Observed at head block #") + String(res.head) +
         " (" + res.via + "). Object " + res.obj + ".", "xfer-ok");
       ok.setAttribute("aria-live", "polite");

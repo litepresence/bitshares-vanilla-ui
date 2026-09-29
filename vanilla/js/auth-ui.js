@@ -141,7 +141,7 @@ var AuthUI = (function () {
     }
     /* Card A: local model — password straight into Wallet.unlock (wallet-ui.js
      * owns the same call; this view adds no new crypto path). */
-    var cardA = cardHead(doc, wrap, "Local wallet — unlock on this device",
+    var cardA = cardHead(doc, wrap, t("auth.local_wallet_unlock_on_this_device", "Local wallet — unlock on this device"),
       "Uses the password you set when this wallet was created. Keys never leave this device.");
     var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
     cardA.appendChild(f.row);
@@ -170,18 +170,18 @@ var AuthUI = (function () {
     });
     /* .bin honesty note: wallet.js has no backup-decrypt entry point, so no
      * file picker is offered — the supported import path is the brainkey. */
-    cardA.appendChild(notePara(doc, "Have a .bin backup file instead? This wallet keeps one encrypted " +
+    cardA.appendChild(notePara(doc, t("auth.have_a_bin_backup_file_instead_this_wallet_ke", "Have a .bin backup file instead? This wallet keeps one encrypted ") +
       "brainkey and cannot decrypt .bin files. Import the brainkey itself under Import existing account — " +
       "nothing is uploaded anywhere."));
     /* Card B: cloud/account model — name lookup only. The old UI derived keys
      * from account name + password; this keystore unlocks by password alone,
      * so lookup results point back at the local unlock (or brainkey import). */
-    var cardB = cardHead(doc, wrap, "Cloud / account model — find by name",
+    var cardB = cardHead(doc, wrap, t("auth.cloud_account_model_find_by_name", "Cloud / account model — find by name"),
       "Look an on-chain account up by name, then unlock the local wallet above " +
       "(or import its brainkey). Account-password key derivation from the old UI is not supported here.");
-    var g = fieldRow(doc, "Account name ", { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
+    var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
     cardB.appendChild(g.row);
-    var lookBtn = touchable(el(doc, "button", "Look up account"));
+    var lookBtn = touchable(el(doc, "button", t("auth.look_up_account", "Look up account")));
     lookBtn.id = "login-lookup"; lookBtn.type = "button"; cardB.appendChild(lookBtn);
     var out = el(doc, "div", "");
     out.id = "login-account-out";
@@ -191,30 +191,30 @@ var AuthUI = (function () {
       setFieldError(g, ""); out.textContent = "";
       var name = String(g.input.value || "").trim().toLowerCase();
       g.input.value = name;
-      if (!name) { setFieldError(g, "Enter an account name."); return; }
+      if (!name) { setFieldError(g, t("auth.enter_an_account_name", "Enter an account name.")); return; }
       if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
-        setFieldError(g, "Account lookup unavailable: js/account.js failed to load.");
+        setFieldError(g, t("auth.account_lookup_unavailable_js_account_js_fail", "Account lookup unavailable: js/account.js failed to load."));
         return;
       }
       lookBtn.disabled = true;
-      out.textContent = "Looking up “" + name + "”…";
+      out.textContent = t("auth.looking_up", "Looking up “") + name + "”…";
       Promise.resolve().then(function () { return Account.resolve(name); })
         .then(function (acct) {
           if (myGen !== gen) return;
           lookBtn.disabled = false;
           out.textContent = "";
-          var line = el(doc, "p", "Found " + (acct.name || name) + " (" + (acct.id || "unknown id") + "). " +
+          var line = el(doc, "p", t("auth.found", "Found ") + (acct.name || name) + " (" + (acct.id || "unknown id") + "). " +
             "Unlock the local wallet above if it holds these keys, or import the brainkey.", "muted");
           out.appendChild(line);
           var p = el(doc, "p", null, "muted");
           var a = doc.createElement("a");
           a.href = "#/account/" + encodeURIComponent(acct.name || name);
-          a.textContent = "Open " + (acct.name || name);
+          a.textContent = t("auth.open", "Open ") + (acct.name || name);
           p.appendChild(a);
           p.appendChild(doc.createTextNode(" · "));
           var b = doc.createElement("a");
           b.href = "#/existing-account";
-          b.textContent = "Import existing account";
+          b.textContent = t("auth.import_existing_account", "Import existing account");
           p.appendChild(b);
           out.appendChild(p);
         })
@@ -223,7 +223,7 @@ var AuthUI = (function () {
           lookBtn.disabled = false;
           var msg = (e && e.message) ? e.message : String(e || "Lookup failed");
           if (msg === "unknown-account" || msg.indexOf("unknown-account") !== -1) {
-            setFieldError(g, "No account named “" + name + "” is on-chain.");
+            setFieldError(g, t("auth.no_account_named", "No account named “") + name + t("auth.is_on_chain", "” is on-chain."));
           } else {
             setFieldError(g, msg);
           }
@@ -271,11 +271,11 @@ var AuthUI = (function () {
     wrap.appendChild(el(doc, "h1", t("auth.local_registration", "Local registration")));
     wrap.appendChild(el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
     var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-local-create", "Create a local wallet", "#/create-wallet-brainkey"));
+    row.appendChild(goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey"));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-import", "Import existing account", "#/existing-account"));
+    row.appendChild(goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account"));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-back", "Back to registration", "#/registration"));
+    row.appendChild(goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration"));
     wrap.appendChild(row);
     var hp = el(doc, "p", null, "muted");
     [["#/help/wallets", "How wallets work"], ["#/help/backups", "How backups work"]].forEach(function (pr, i) {
@@ -298,13 +298,13 @@ var AuthUI = (function () {
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("auth.cloud_registration", "Cloud registration")));
     wrap.appendChild(el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
-    wrap.appendChild(notePara(doc, "Registration uses the testnet faucet — switch to testnet in Settings to register. " +
+    wrap.appendChild(notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
       "Name checks work on either network."));
-    var g = fieldRow(doc, "Account name ", { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
+    var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
     wrap.appendChild(g.row);
-    var checkBtn = touchable(el(doc, "button", "Check availability"));
+    var checkBtn = touchable(el(doc, "button", t("auth.check_availability", "Check availability")));
     checkBtn.id = "reg-cloud-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
-    var out = el(doc, "p", "Check whether the name is free before registering.", "muted");
+    var out = el(doc, "p", t("auth.check_whether_the_name_is_free_before_registe", "Check whether the name is free before registering."), "muted");
     out.id = "reg-cloud-out";
     out.setAttribute("aria-live", "polite");
     wrap.appendChild(out);
@@ -312,34 +312,34 @@ var AuthUI = (function () {
       setFieldError(g, "");
       var name = String(g.input.value || "").trim().toLowerCase();
       g.input.value = name;
-      if (!name) { setFieldError(g, "Enter an account name."); return; }
+      if (!name) { setFieldError(g, t("auth.enter_an_account_name", "Enter an account name.")); return; }
       if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
-        setFieldError(g, "Account lookup unavailable: js/account.js failed to load.");
+        setFieldError(g, t("auth.account_lookup_unavailable_js_account_js_fail", "Account lookup unavailable: js/account.js failed to load."));
         return;
       }
       checkBtn.disabled = true;
-      out.textContent = "Checking name…";
+      out.textContent = t("auth.checking_name", "Checking name…");
       Promise.resolve().then(function () { return Account.resolve(name); })
         .then(function (acct) {
           if (myGen !== gen) return;
           checkBtn.disabled = false;
-          out.textContent = "“" + name + "” is taken (" + (acct.id || "on-chain") + "). Pick another name.";
+          out.textContent = "“" + name + t("auth.is_taken", "” is taken (") + (acct.id || "on-chain") + t("auth.pick_another_name", "). Pick another name.");
         })
         .catch(function (e) {
           if (myGen !== gen) return;
           checkBtn.disabled = false;
           var msg = (e && e.message) ? e.message : String(e || "Lookup failed");
           if (msg === "unknown-account" || msg.indexOf("unknown-account") !== -1) {
-            out.textContent = "“" + name + "” looks available — continue to Register via the faucet.";
+            out.textContent = "“" + name + t("auth.looks_available_continue_to_register_via_the", "” looks available — continue to Register via the faucet.");
           } else {
-            out.textContent = "Could not check the name: " + msg;
+            out.textContent = t("auth.could_not_check_the_name", "Could not check the name: ") + msg;
           }
         });
     });
     var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-cloud-go", "Register via the faucet", "#/create-account"));
+    row.appendChild(goButton(doc, "reg-cloud-go", t("auth.register_via_the_faucet", "Register via the faucet"), "#/create-account"));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-cloud-back", "Back to registration", "#/registration"));
+    row.appendChild(goButton(doc, "reg-cloud-back", t("auth.back_to_registration", "Back to registration"), "#/registration"));
     wrap.appendChild(row);
     wrap.appendChild(linkPara(doc, [
       ["#/settings", "Settings — nodes"],

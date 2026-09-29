@@ -413,8 +413,8 @@ var AccountUI = (function () {
      * case-insensitive; re-draws from the cached rows (no refetch). */
     var search = doc.createElement("input");
     search.type = "search";
-    search.placeholder = "Filter by asset symbol…";
-    search.setAttribute("aria-label", "Filter assets by symbol");
+    search.placeholder = t("account.filter_by_asset_symbol", "Filter by asset symbol…");
+    search.setAttribute("aria-label", t("account.filter_assets_by_symbol", "Filter assets by symbol"));
     search.style.minHeight = "44px";
     search.style.width = "100%";
     search.style.maxWidth = "360px";
@@ -435,7 +435,7 @@ var AccountUI = (function () {
     if (enrich.capped) {
       var cap = doc.createElement("p");
       cap.className = "muted";
-      cap.textContent = "Prices cover the first 20 assets — the rest are dashed.";
+      cap.textContent = t("account.prices_cover_the_first_20_assets_the_rest_are", "Prices cover the first 20 assets — the rest are dashed.");
       section.appendChild(cap);
     }
     function symbolLink(sym) {
@@ -453,7 +453,7 @@ var AccountUI = (function () {
       if (!rows.length) {
         var none = doc.createElement("p");
         none.className = "muted";
-        none.textContent = "No assets match this filter.";
+        none.textContent = t("account.no_assets_match_this_filter", "No assets match this filter.");
         box.appendChild(none);
       } else {
         var table = doc.createElement("table");
@@ -520,10 +520,10 @@ var AccountUI = (function () {
         }
       });
       if (bts && any) {
-        total.textContent = "Total ≈ " + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
+        total.textContent = t("account.total", "Total ≈ ") + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
         total.title = "raw " + sum.toString();
       } else {
-        total.textContent = "Total value unavailable (no BTS prices yet).";
+        total.textContent = t("account.total_value_unavailable_no_bts_prices_yet", "Total value unavailable (no BTS prices yet).");
         total.title = "";
       }
     }
@@ -550,13 +550,13 @@ var AccountUI = (function () {
   function renderMargin(doc, section, acct) {
     var loading = doc.createElement("p");
     loading.className = "muted";
-    loading.textContent = "Loading margin positions…";
+    loading.textContent = t("account.loading_margin_positions", "Loading margin positions…");
     section.appendChild(loading);
     if (typeof Credit === "undefined" || !Credit || typeof Credit.positions !== "function") {
       section.removeChild(loading);
       var miss = doc.createElement("p");
       miss.className = "muted";
-      miss.textContent = "Margin backend not loaded (js/credit.js missing) — positions unavailable.";
+      miss.textContent = t("account.margin_backend_not_loaded_js_credit_js_missin", "Margin backend not loaded (js/credit.js missing) — positions unavailable.");
       section.appendChild(miss);
       return;
     }
@@ -565,7 +565,7 @@ var AccountUI = (function () {
       if (!rows || rows.length === 0) {
         var empty = doc.createElement("p");
         empty.className = "muted";
-        empty.textContent = "No margin positions for this account.";
+        empty.textContent = t("account.no_margin_positions_for_this_account", "No margin positions for this account.");
         section.appendChild(empty);
         return;
       }
@@ -605,16 +605,16 @@ var AccountUI = (function () {
       section.appendChild(table);
       var more = doc.createElement("p");
       more.className = "muted";
-      more.appendChild(doc.createTextNode("Adjust or close positions on the "));
+      more.appendChild(doc.createTextNode(t("account.adjust_or_close_positions_on_the", "Adjust or close positions on the ")));
       var a = doc.createElement("a");
       a.setAttribute("href", "#/borrow");
-      a.textContent = "borrow page";
+      a.textContent = t("account.borrow_page", "borrow page");
       more.appendChild(a);
       more.appendChild(doc.createTextNode("."));
       section.appendChild(more);
     }).catch(function (e) {
       section.removeChild(loading);
-      showError(doc, section, e, "Could not load margin positions.");
+      showError(doc, section, e, t("account.could_not_load_margin_positions", "Could not load margin positions."));
     });
   }
 
@@ -631,13 +631,13 @@ var AccountUI = (function () {
   function renderCredit(doc, section, acct) {
     var loading = doc.createElement("p");
     loading.className = "muted";
-    loading.textContent = "Loading credit offers…";
+    loading.textContent = t("account.loading_credit_offers", "Loading credit offers…");
     section.appendChild(loading);
     if (typeof Credit === "undefined" || !Credit || typeof Credit.offersByOwner !== "function") {
       section.removeChild(loading);
       var miss = doc.createElement("p");
       miss.className = "muted";
-      miss.textContent = "Credit backend not loaded (js/credit.js missing) — offers unavailable.";
+      miss.textContent = t("account.credit_backend_not_loaded_js_credit_js_missin", "Credit backend not loaded (js/credit.js missing) — offers unavailable.");
       section.appendChild(miss);
       return;
     }
@@ -646,7 +646,7 @@ var AccountUI = (function () {
       if (!rows || rows.length === 0) {
         var empty = doc.createElement("p");
         empty.className = "muted";
-        empty.textContent = "No credit offers for this account.";
+        empty.textContent = t("account.no_credit_offers_for_this_account", "No credit offers for this account.");
         section.appendChild(empty);
       } else {
         var table = doc.createElement("table");
@@ -701,21 +701,21 @@ var AccountUI = (function () {
       }
       var more = doc.createElement("p");
       more.className = "muted";
-      more.appendChild(doc.createTextNode("Offer and deal flows live on the "));
+      more.appendChild(doc.createTextNode(t("account.offer_and_deal_flows_live_on_the", "Offer and deal flows live on the ")));
       var a = doc.createElement("a");
       a.setAttribute("href", "#/credit-offer");
-      a.textContent = "credit offers page";
+      a.textContent = t("account.credit_offers_page", "credit offers page");
       more.appendChild(a);
-      more.appendChild(doc.createTextNode("; account proposals render on the "));
+      more.appendChild(doc.createTextNode(t("account.account_proposals_render_on_the", "; account proposals render on the ")));
       var b = doc.createElement("a");
       b.setAttribute("href", "#/proposals");
-      b.textContent = "proposals page";
+      b.textContent = t("account.proposals_page", "proposals page");
       more.appendChild(b);
-      more.appendChild(doc.createTextNode(" (no per-account proposals tab here — deferred)."));
+      more.appendChild(doc.createTextNode(t("account.no_per_account_proposals_tab_here_deferred", " (no per-account proposals tab here — deferred).")));
       section.appendChild(more);
     }).catch(function (e) {
       section.removeChild(loading);
-      showError(doc, section, e, "Could not load credit offers.");
+      showError(doc, section, e, t("account.could_not_load_credit_offers", "Could not load credit offers."));
     });
   }
 
@@ -1365,14 +1365,14 @@ var AccountUI = (function () {
 
     var marSection = doc.createElement("section");
     var marH = doc.createElement("h2");
-    marH.textContent = "Margin Positions";
+    marH.textContent = t("account.margin_positions", "Margin Positions");
     marSection.appendChild(marH);
     wrap.appendChild(marSection);
     renderMargin(doc, marSection, acct);
 
     var creSection = doc.createElement("section");
     var creH = doc.createElement("h2");
-    creH.textContent = "Credit Management";
+    creH.textContent = t("account.credit_management", "Credit Management");
     creSection.appendChild(creH);
     wrap.appendChild(creSection);
     renderCredit(doc, creSection, acct);

@@ -594,8 +594,8 @@ var PoolDetailUI = (function () {
           try {
             row.setAttribute("tabindex", "0");
             row.setAttribute("role", "button");
-            row.setAttribute("aria-label", "Fill swap");
-            row.title = "Fill swap";
+            row.setAttribute("aria-label", t("pool.fill_swap", "Fill swap"));
+            row.title = t("pool.fill_swap", "Fill swap");
           } catch (e) { /* rows render unclickable */ }
           function go() { fillSwap(human, dir); }
           try {

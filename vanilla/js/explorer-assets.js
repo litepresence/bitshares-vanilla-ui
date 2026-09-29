@@ -302,15 +302,15 @@ var ExplorerAssets = (function () {
     var search = doc.createElement("input");
     search.type = "search";
     search.value = assetState.q || "";
-    search.setAttribute("placeholder", "Filter by symbol…");
-    search.setAttribute("aria-label", "Filter assets by symbol");
+    search.setAttribute("placeholder", t("explorer.filter_by_symbol", "Filter by symbol…"));
+    search.setAttribute("aria-label", t("explorer.filter_assets_by_symbol", "Filter assets by symbol"));
     touchable(search);
     search.style.minWidth = "180px";
     bar.appendChild(search);
     var modes = [["market", "SmartCoins"], ["user", "User-Issued"], ["prediction", "Prediction"]];
     var radioWrap = el(doc, "span", null, "xplore-radios");
     radioWrap.setAttribute("role", "radiogroup");
-    radioWrap.setAttribute("aria-label", "Asset type filter");
+    radioWrap.setAttribute("aria-label", t("explorer.asset_type_filter", "Asset type filter"));
     modes.forEach(function (m) {
       var lab = el(doc, "label", null, "xplore-radio");
       touchable(lab);
@@ -328,9 +328,9 @@ var ExplorerAssets = (function () {
       radioWrap.appendChild(lab);
     });
     bar.appendChild(radioWrap);
-    var perLab = el(doc, "label", " Rows ");
+    var perLab = el(doc, "label", t("explorer.rows", " Rows "));
     var perSel = doc.createElement("select");
-    perSel.setAttribute("aria-label", "Rows per page");
+    perSel.setAttribute("aria-label", t("explorer.rows_per_page", "Rows per page"));
     touchable(perSel);
     ROW_OPTIONS.forEach(function (n) {
       var opt = doc.createElement("option");
@@ -491,7 +491,7 @@ var ExplorerAssets = (function () {
         hr.appendChild(sortTh("symbol", t("explorer.th_symbol", "Symbol")));
         hr.appendChild(sortTh("issuer", t("explorer.th_issuer", "Issuer")));
         hr.appendChild(sortTh("supply", t("explorer.th_supply", "Supply")));
-        hr.appendChild(el(doc, "th", "Market"));
+        hr.appendChild(el(doc, "th", t("explorer.market_3", "Market")));
         thead.appendChild(hr);
         table.appendChild(thead);
         var tb = doc.createElement("tbody");
@@ -518,7 +518,7 @@ var ExplorerAssets = (function () {
           } else tdP.textContent = "—";
           tr.appendChild(tdP);
           var tdM = doc.createElement("td");
-          var ml = anchor(doc, "Market", "#/market/" + r.marketID);
+          var ml = anchor(doc, t("explorer.market_3", "Market"), "#/market/" + r.marketID);
           ml.title = r.marketID;
           tdM.appendChild(ml);
           tr.appendChild(tdM);
@@ -611,15 +611,15 @@ var ExplorerAssets = (function () {
       var marketID = marketIdFor(a.symbol, a.options && a.options.description);
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
       wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
-      var marketBtn = anchor(doc, "MARKET →", "#/market/" + marketID);
+      var marketBtn = anchor(doc, t("explorer.market_2", "MARKET →"), "#/market/" + marketID);
       marketBtn.title = marketID;
-      marketBtn.setAttribute("aria-label", "Open preferred market " + marketID);
+      marketBtn.setAttribute("aria-label", t("explorer.open_preferred_market", "Open preferred market ") + marketID);
       wrap.appendChild(marketBtn);
       /* Tabs (plain labels per file-scope i18n note; #1 Tabs info/actions). */
       var tabBar = el(doc, "div", null, "xplore-tabs");
-      var infoBtn = touchable(el(doc, "button", "ASSET INFO"));
+      var infoBtn = touchable(el(doc, "button", t("explorer.asset_info", "ASSET INFO")));
       infoBtn.type = "button";
-      var actBtn = touchable(el(doc, "button", "ACTIONS"));
+      var actBtn = touchable(el(doc, "button", t("explorer.actions", "ACTIONS")));
       actBtn.type = "button";
       tabBar.appendChild(infoBtn);
       tabBar.appendChild(actBtn);
@@ -668,14 +668,14 @@ var ExplorerAssets = (function () {
       var pDd = doc.createElement("dd");
       pDd.textContent = String(prec);
       dl.appendChild(pDd);
-      dl.appendChild(el(doc, "dt", "Asset type"));
+      dl.appendChild(el(doc, "dt", t("explorer.asset_type", "Asset type")));
       var tyDd = doc.createElement("dd");
       tyDd.textContent = typeLabel;
       dl.appendChild(tyDd);
       infoBox.appendChild(dl);
       /* Asset-type/flags section (chain truth: protocol/types.hpp permission
        * bits; raw ints in titles, human lists via flagBitNames). */
-      infoBox.appendChild(el(doc, "h3", "Asset type and permissions"));
+      infoBox.appendChild(el(doc, "h3", t("explorer.asset_type_and_permissions", "Asset type and permissions")));
       var dlF = el(doc, "dl", null, "xplore-fields");
       function flagRow(term, raw) {
         dlF.appendChild(el(doc, "dt", term));
@@ -699,12 +699,12 @@ var ExplorerAssets = (function () {
       /* Description box with grouped amounts (main text + short_name +
        * max/current/fees/fee-pool human — #1 AboutBox + Summary grouped). */
       var descBox = el(doc, "div", null, "xplore-descbox");
-      descBox.appendChild(el(doc, "h3", "Description"));
+      descBox.appendChild(el(doc, "h3", t("explorer.description", "Description")));
       var mainText = (descParsed.main && descParsed.main.trim())
         ? descParsed.main : "(no description)";
       descBox.appendChild(el(doc, "p", mainText));
-      if (descParsed.shortName) descBox.appendChild(el(doc, "p", "Short: " + descParsed.shortName));
-      if (descParsed.market) descBox.appendChild(el(doc, "p", "Market: " + descParsed.market));
+      if (descParsed.shortName) descBox.appendChild(el(doc, "p", t("explorer.short", "Short: ") + descParsed.shortName));
+      if (descParsed.market) descBox.appendChild(el(doc, "p", t("explorer.market", "Market: ") + descParsed.market));
       var dl2 = el(doc, "dl", null, "xplore-fields");
       descBox.appendChild(dl2);
       humanRowInto(dl2, t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
@@ -714,13 +714,13 @@ var ExplorerAssets = (function () {
       infoBox.appendChild(descBox);
       /* ACTIONS tab: read-only links only (signing lives in owning slices).
        * DEFERRED: fee-pool funding/claim panel (needs wallet signing). */
-      actBox.appendChild(el(doc, "h3", "Asset actions"));
-      var mLink = anchor(doc, "Open market " + marketID, "#/market/" + marketID);
+      actBox.appendChild(el(doc, "h3", t("explorer.asset_actions", "Asset actions")));
+      var mLink = anchor(doc, t("explorer.open_market", "Open market ") + marketID, "#/market/" + marketID);
       mLink.title = marketID;
       actBox.appendChild(mLink);
-      actBox.appendChild(el(doc, "p", "Trade and transfer this asset from its preferred market.", "muted"));
-      var tLink = anchor(doc, "Transfer " + a.symbol, "#/transfer");
-      tLink.title = "Transfer";
+      actBox.appendChild(el(doc, "p", t("explorer.trade_and_transfer_this_asset_from_its_prefer", "Trade and transfer this asset from its preferred market."), "muted"));
+      var tLink = anchor(doc, t("explorer.transfer", "Transfer ") + a.symbol, "#/transfer");
+      tLink.title = t("explorer.pill_transfer", "Transfer");
       actBox.appendChild(tLink);
       actBox.appendChild(el(doc, "p",
         "Full management view lives in its owning slice — this is a read-only summary.", "muted"));

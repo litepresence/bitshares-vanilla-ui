@@ -294,7 +294,7 @@ var VestingUI = (function () {
         try { if (typeof vr.r.prec === "number") defVal = Format.formatAmount(availRaw, vr.r.prec); } catch (e) { defVal = availRaw; }
         var fM = ui.field(doc, t("vesting.amount_at_most_the_balance", "Amount (at most the balance)"), { value: defVal, inputmode: "decimal" });
         o2.appendChild(fM.row);
-        o2.appendChild(ui.el(doc, "p", "Balance: " + vr.cells[2].text + " · " + availTxt +
+        o2.appendChild(ui.el(doc, "p", t("vesting.balance_2", "Balance: ") + vr.cells[2].text + " · " + availTxt +
           " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + "). Over-claims fail on chain, so this form blocks them.", "muted"));
         var ibox = ui.el(doc, "div"); o2.appendChild(ibox);
         ui.reviewSection(doc, ibox, uiGen, t("vesting.review_claim", "Review claim"), {

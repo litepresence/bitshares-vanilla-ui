@@ -276,15 +276,15 @@ var InstantTradeUI = (function () {
     var bidH = M.bestBid ? humanPrice(M.bestBid) : null;
     var askH = M.bestAsk ? humanPrice(M.bestAsk) : null;
     var statsP = el(doc, "p", null, "muted");
-    statsP.appendChild(doc.createTextNode("Latest: "));
+    statsP.appendChild(doc.createTextNode(t("instant.latest", "Latest: ")));
     var latestSpan = el(doc, "span", latestH ? latestH.human : "—");
     if (latestH) { try { latestSpan.title = latestH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(latestSpan);
-    statsP.appendChild(doc.createTextNode(" · Best bid: "));
+    statsP.appendChild(doc.createTextNode(t("instant.best_bid", " · Best bid: ")));
     var bidSpan = el(doc, "span", bidH ? bidH.human : "—");
     if (bidH) { try { bidSpan.title = bidH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(bidSpan);
-    statsP.appendChild(doc.createTextNode(" · Best ask: "));
+    statsP.appendChild(doc.createTextNode(t("instant.best_ask", " · Best ask: ")));
     var askSpan = el(doc, "span", askH ? askH.human : "—");
     if (askH) { try { askSpan.title = askH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(askSpan);

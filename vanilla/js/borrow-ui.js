@@ -193,8 +193,8 @@ var BorrowUI = (function () {
      * position (the gap was adjust-only). New-form words are literals until
      * the next locale batch mints borrow.* keys; dicts untouched, check_i18n
      * stays green. */
-    ctx.wrap.appendChild(el(doc, "h2", "Open a new position (op 3)"));
-    ctx.wrap.appendChild(el(doc, "p", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above.", "muted"));
+    ctx.wrap.appendChild(el(doc, "h2", t("borrow.open_a_new_position_op_3", "Open a new position (op 3)")));
+    ctx.wrap.appendChild(el(doc, "p", t("borrow.no_position_yet_lock_collateral_to_borrow_a_b", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above."), "muted"));
     var openBoxEl = el(doc, "div"); ctx.wrap.appendChild(openBoxEl);
     openBox(doc, openBoxEl, myGen);
     ctx.wrap.appendChild(el(doc, "h2", t("borrow.how_borrowing_works", "How borrowing works")));
@@ -333,7 +333,7 @@ var BorrowUI = (function () {
             }).then(async function (res) {
               if (myGen !== gen) return; clearBox(out);
               out.appendChild(el(doc, "p", t("borrow.adjust_broadcast", "Adjust broadcast."), "xfer-ok"));
-              out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
@@ -364,13 +364,13 @@ var BorrowUI = (function () {
     var idx = 0;
     var p = el(doc, "p", steps[0], "muted"); wrap.appendChild(p);
     var nav = el(doc, "div", null, "xfer-field");
-    var prev = touchable(el(doc, "button", "Previous")); prev.type = "button";
+    var prev = touchable(el(doc, "button", t("borrow.previous", "Previous"))); prev.type = "button";
     var count = el(doc, "span", "", "muted");
-    var next = touchable(el(doc, "button", "Next")); next.type = "button";
+    var next = touchable(el(doc, "button", t("borrow.next", "Next"))); next.type = "button";
     nav.appendChild(prev); nav.appendChild(count); nav.appendChild(next); wrap.appendChild(nav);
     function draw() {
       p.textContent = steps[idx];
-      count.textContent = "Step " + (idx + 1) + " of " + steps.length;
+      count.textContent = t("borrow.step", "Step ") + (idx + 1) + " of " + steps.length;
       prev.disabled = idx === 0; next.disabled = idx === steps.length - 1;
     }
     prev.addEventListener("click", function () { if (idx > 0) { idx--; draw(); } });
@@ -432,14 +432,14 @@ var BorrowUI = (function () {
     var fAcct = field(doc, t("borrow.account", "Account"), lockedOpen
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
-    var fCollA = field(doc, "Collateral asset (symbol or 1.3.x)", { placeholder: "e.g. BTS" });
-    var fDebtA = field(doc, "Debt bitasset (symbol or 1.3.x)", { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
-    var fColl = field(doc, "Collateral amount (collateral units)", { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
-    var fDebt = field(doc, "Amount to borrow (debt units)", { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
+    var fCollA = field(doc, t("borrow.collateral_asset_symbol_or_1_3_x", "Collateral asset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bts", "e.g. BTS") });
+    var fDebtA = field(doc, t("borrow.debt_bitasset_symbol_or_1_3_x", "Debt bitasset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
+    var fColl = field(doc, t("borrow.collateral_amount_collateral_units", "Collateral amount (collateral units)"), { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
+    var fDebt = field(doc, t("borrow.amount_to_borrow_debt_units", "Amount to borrow (debt units)"), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
     var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
     [fAcct, fCollA, fDebtA, fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
-    box.appendChild(el(doc, "p", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it.", "muted"));
-    var btn = touchable(el(doc, "button", "Review borrow")); btn.type = "button"; box.appendChild(btn);
+    box.appendChild(el(doc, "p", t("borrow.new_debt_is_issued_against_the_locked_collate", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it."), "muted"));
+    var btn = touchable(el(doc, "button", t("borrow.review_borrow", "Review borrow"))); btn.type = "button"; box.appendChild(btn);
     var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
     Account.myAccountId().then(function (id) {
       if (myGen === gen && !fAcct.input.value) fAcct.input.value = id;
@@ -450,14 +450,14 @@ var BorrowUI = (function () {
       showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       Promise.resolve().then(async function () {
         if (!fCollA.input.value.trim() || !fDebtA.input.value.trim())
-          throw new Error("Enter a collateral asset and a debt bitasset first.");
+          throw new Error(t("borrow.enter_a_collateral_asset_and_a_debt_bitasset", "Enter a collateral asset and a debt bitasset first."));
         if (!fColl.input.value.trim() || !fDebt.input.value.trim())
-          throw new Error("Enter both amounts first.");
+          throw new Error(t("borrow.enter_both_amounts_first", "Enter both amounts first."));
         var acct = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
           : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
         var coll = await Asset.describe(fCollA.input.value.trim());
         var debt = await Asset.describe(fDebtA.input.value.trim());
-        if (!debt.is_smartcoin) throw new Error("not-bitasset (" + debt.symbol + " is not a bitasset — no margin)");
+        if (!debt.is_smartcoin) throw new Error("not-bitasset (" + debt.symbol + t("borrow.is_not_a_bitasset_no_margin", " is not a bitasset — no margin)"));
         var collRaw = Format.parseAmount(fColl.input.value, coll.precision);
         var debtRaw = Format.parseAmount(fDebt.input.value, debt.precision);
         if (BigInt(collRaw) <= 0n || BigInt(debtRaw) <= 0n)
@@ -472,18 +472,18 @@ var BorrowUI = (function () {
         if (!bit) throw new Error(t("borrow.unexpected_asset_data_from_the_node_stopped_i", "Unexpected asset data from the node; stopped instead of guessing."));
         var backingId = (bit.options && bit.options.short_backing_asset) || "1.3.0";
         if (coll.id !== backingId)
-          throw new Error("wrong-collateral (" + coll.symbol + " is not the backing asset; " + debt.symbol + " is backed by " + backingId + ")");
+          throw new Error("wrong-collateral (" + coll.symbol + t("borrow.is_not_the_backing_asset", " is not the backing asset; ") + debt.symbol + t("borrow.is_backed_by", " is backed by ") + backingId + ")");
         var prior = [];
         try { prior = await Credit.positions(acct.id); } catch (e) { prior = []; }
         var preIds = {}, dup = null;
         prior.forEach(function (p) { preIds[p.call_id] = true;
           if (p.coll_id === coll.id && p.debt_id === debt.id) dup = p; });
-        if (dup) throw new Error("have-position (" + dup.call_id + " already covers " + coll.symbol + "/" + debt.symbol + " — use Adjust above)");
+        if (dup) throw new Error("have-position (" + dup.call_id + t("borrow.already_covers", " already covers ") + coll.symbol + "/" + debt.symbol + t("borrow.use_adjust_above", " — use Adjust above)"));
         var ratio = previewRatio(collRaw, coll.precision, debtRaw, debt.precision, bit, coll.id, debt.id);
         var mcrRow = (ratio.mcr === null) ? "unknown (no feed read)"
           : Credit.tcrUnitsToHuman(ratio.mcr) + "%";
         if (ratio.kind === "feed" && ratio.mcr !== null && ratio.belowMcr)
-          throw new Error("below-mcr (backing " + ratio.x + " under maintenance " + mcrRow + " — the chain would reject; raise collateral or lower debt)");
+          throw new Error("below-mcr (backing " + ratio.x + t("borrow.under_maintenance", " under maintenance ") + mcrRow + t("borrow.the_chain_would_reject_raise_collateral_or_lo", " — the chain would reject; raise collateral or lower debt)"));
         var pair = Credit.buildCallUpdate({ accountId: acct.id, collRaw: collRaw, collId: coll.id,
           debtRaw: debtRaw, debtId: debt.id, tcrUnitsOrNull: tcr });
         var fee = await Credit.fee(pair, "1.3.0");
@@ -497,7 +497,7 @@ var BorrowUI = (function () {
           var feeHuman = fa ? Format.formatAmount(String(R.fee.amount), fa.precision) + " " + fa.symbol : String(R.fee.amount);
           var tcrRow = (R.tcr === null) ? "unchanged" : Credit.tcrUnitsToHuman(R.tcr) + "%";
           clearBox(out);
-          out.appendChild(el(doc, "h3", "Confirm new borrow"));
+          out.appendChild(el(doc, "h3", t("borrow.confirm_new_borrow", "Confirm new borrow")));
           out.appendChild(confirmList(doc, [
             [t("borrow.account", "Account"), R.acct.name + " (" + R.acct.id + ")"],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(R.collRaw, R.coll.precision) + " " + R.coll.symbol, "raw " + R.collRaw],
@@ -532,8 +532,8 @@ var BorrowUI = (function () {
               });
             }).then(async function (res) {
               if (myGen !== gen) return; clearBox(out);
-              out.appendChild(el(doc, "p", "Borrow broadcast.", "xfer-ok"));
-              out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              out.appendChild(el(doc, "p", t("borrow.borrow_broadcast", "Borrow broadcast."), "xfer-ok"));
+              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
@@ -545,7 +545,7 @@ var BorrowUI = (function () {
         });
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(out);
-        showError(doc, out, e, "Could not prepare the borrow."); btn.disabled = false;
+        showError(doc, out, e, t("borrow.could_not_prepare_the_borrow", "Could not prepare the borrow.")); btn.disabled = false;
       });
     });
   }
@@ -747,7 +747,7 @@ var BorrowUI = (function () {
             }).then(async function (res) {
               if (myGen !== gen) return; clearBox(out);
               out.appendChild(el(doc, "p", t("borrow.bid_broadcast", "Bid broadcast."), "xfer-ok"));
-              out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);

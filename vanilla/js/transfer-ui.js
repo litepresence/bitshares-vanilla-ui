@@ -552,7 +552,7 @@ var TransferUI = (function () {
         if (feeSym !== stampSym || assetVal().toUpperCase() !== stampT) return; /* stale */
         feeQuote.textContent = t("confirm.fee", "Fee") + " (" + b.symbol + "): " +
           Format.formatAmount(String(fee.amount), b.precision);
-        feeQuote.appendChild(doc.createTextNode(" — Confirm settles the fee in " + stampT + "."));
+        feeQuote.appendChild(doc.createTextNode(t("transfer.confirm_settles_the_fee_in", " — Confirm settles the fee in ") + stampT + "."));
       }).catch(function () { /* quote hidden; confirm stays source of truth */ });
     }
 
