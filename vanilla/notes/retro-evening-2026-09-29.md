@@ -112,15 +112,13 @@ indicator math provenance lives separately in `vanilla/js/indicators-qx.js:1-14`
 paths are builder-cited from code comments — **not re-verified by the note
 author** (no QTradeX checkout in `/workspace/reference`).
 
-**Node-bucket probe result (200 requested → 16 rows): UNRESOLVED.**
-No probe artifact, log line, or committed vector for a "200→16" bucket result
-exists anywhere in the repo (grepped `vanilla/`, `tooling/`, `docs/`,
-`extension-wrapper/`). Consistent-with-design hypothesis only: thin markets
-return few populated slots and `market-candles.js:123-136,239` drops leading
-gaps + carries prev close — but that is doctrine, not evidence. Do NOT cite
-"200→16" as observed until a probe is run and committed (e.g. extend
-`tooling/market-fills-test.js` or a `tooling/*probe*` with chain, market,
-bucket, rows-requested, rows-returned, head block).
+**Node-bucket probe result: RESOLVED 2026-09-29 (re-proven live twice).**
+`tooling/market-buckets-probe.mjs` (stdlib WS, committed): BTS/CNY hourly ×200
+(`get_market_history`, base 1.3.113 / quote 1.3.0) returned **15 rows of 200
+slots, 185 missing, 0 dupes** (first run 16/200/184). Sparse, non-linear buckets
+confirmed on `api.bitshares.dev` — empty slots are simply absent, so client-side
+slot-grid + carry-forward (`market-candles.js`, `swapsToCandles`) is load-bearing,
+not cosmetic. Re-run: `node tooling/market-buckets-probe.mjs wss://api.bitshares.dev/ws`.
 
 ---
 
@@ -133,11 +131,14 @@ color); header rename EXCHANGE → SWAP/STAKE (`01f0edf`, +10 locale dicts);
 bold + larger links (`796a0cd`, `vanilla/css/app.css` 1 rule). Qty cells bare
 numbers with raw ints in `title` (`pool-ui.js` inline comment).
 
-**Reference behavior.** Builder comment claims "#1 shows ⇄ here"
-(`pool-ui.js:306`). **Not re-verified: `grep -rn ⇄ reference/bitshares-ui/app/`
-returns zero hits** — the glyph likely comes from the live site/screenshots,
-not source. Treat as styling choice with an unverified provenance comment,
-not as sourced parity.
+**Reference behavior.** #1 `LiquidityPools.jsx:318-340`: an `exchange` column
+(opening `PoolExchangeModal`) plus a `stake_unstake` column (opening the stake
+modal) — same-page destinations, matching our list-stays-a-list doctrine. The ⇄
+glyph itself is a vanilla styling choice: #1 renders a `poolmart` ICON (an
+`<img>`-class glyph that cannot inherit link blue), and ours must be blue, so
+text ⇄ stands in — documented in `pool-ui.js`. Deviation recorded honestly: #1's
+exchange cell is icon-only (not a link) when logged out; ours links always
+(principle #9: reads never gate).
 
 **Test vectors.** None (display-only, no money path touched). Counts: −1
 column, +1 locale key × 10 dicts.
@@ -447,5 +448,6 @@ per their stats (CSS/market-ind/pool copy).
 6. **13-col account table** — per-row SEND/DEPOSIT/TRADE/BORROW/SETTLE +
    price/value columns not ported: needs N tickers + new behavior
    (`retro-round-1.md:182-186`).
-7. **Unresolved evidence** — "200→16" bucket probe (§2) and ⇄-in-#1 provenance
-   (§3) must be proven or retracted before any parity claim cites them.
+7. ~~Unresolved evidence~~ RESOLVED 2026-09-29 — bucket probe committed as
+   `tooling/market-buckets-probe.mjs` (15/200 re-proven, §2); ⇄ provenance
+   corrected to `LiquidityPools.jsx:318-340` with documented glyph deviation (§3).
