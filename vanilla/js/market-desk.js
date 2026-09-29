@@ -265,7 +265,7 @@ var MarketDesk = (function () {
        * default to preserve the Task-4 look. panes.oscs maps key -> pane
        * handle from drawOscPane; paneEls maps key -> {wrap, body} DOM nodes.
        * oscBoxes maps key -> checkbox input (x buttons uncheck through it). */
-      osc: { rsi: false, macd: true, stoch: false, atr: false, fisher: false, volume: false },
+      osc: { volume: true, rsi: false, macd: true, stoch: false, atr: false, fisher: false },
       panes: { price: null, oscs: {} },
       paneEls: {}, oscBoxes: {},
       ticker: null, countNote: null, tfBox: null, oscNote: null

@@ -40,8 +40,9 @@ var MarketInd = (function () {
    * teardown. Labels are indicator SYMBOLS (identifiers, never localized —
    * same class as theme ids; avoids ~40 dict entries per locale). */
   var OSC_ORDER = [
+    ["volume", "Volume"],
     ["rsi", "RSI"], ["macd", "MACD"], ["stoch", "Stoch"],
-    ["atr", "ATR"], ["fisher", "Fisher"], ["volume", "Volume"],
+    ["atr", "ATR"], ["fisher", "Fisher"],
     ["stochrsi", "StochRSI"], ["adxr", "ADXR"], ["cci", "CCI"],
     ["cmo", "CMO"], ["dx", "DX"], ["mom", "MOM"], ["roc", "ROC"],
     ["trix", "TRIX"], ["ultosc", "UltOsc"], ["willr", "WillR"],
@@ -698,16 +699,19 @@ var MarketInd = (function () {
 
   /* Draw price + ALL live stacked sub-panes (Task 4b — the SAME redraw path
    * serves checkbox toggles, x removes, theme switches and resizes: callers
-   * never fork it). Each checked key in OSC_ORDER owns one wrapper
-   * (.mkt-osc-pane: title + x button + chart body) appended in checkbox
-   * order; unchecking removes just that wrapper via removePane. Nothing
-   * checked -> the container stays childless (no blank box, no empty text).
-   * Every sub-pane gets its OWN chart inside drawOscPane, hence an
-   * independent scale — ranges are never shared across panes. */
+   * never fork it). Volume is ALWAYS first: its own histogram sub-pane on an
+   * independent scale, never overlaid on price (one scale per pane). Every
+   * other checked key in OSC_ORDER owns one wrapper (.mkt-osc-pane: title +
+   * x button + chart body); the Volume pane has no x button and its menu box
+   * is locked on. Unchecking everything else leaves just Volume — the
+   * container is never childless while candles exist. */
   function drawCharts(state) {
     if (!state.chartData) return;
     var d = state.chartData;
     var doc = state.doc;
+    /* Volume always has its own pane (never overlaid, never removable). */
+    if (!state.osc) state.osc = {};
+    state.osc.volume = true;
     var C = themeChartColors();
     var frame = { paneBg: C.paneBg, grid: C.grid, text: C.text };
     try {
@@ -775,6 +779,8 @@ var MarketInd = (function () {
           var head = doc.createElement("div");
           head.className = "mkt-osc-head";
           head.appendChild(el(doc, "span", label, "mkt-osc-title"));
+          /* Volume is always on — no x button (unchecking is impossible). */
+          if (key !== "volume") {
           var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
           x.type = "button";
           x.setAttribute("aria-label", "Remove " + label + " pane");
@@ -786,6 +792,7 @@ var MarketInd = (function () {
             drawCharts(state);
           });
           head.appendChild(x);
+          }
           wrap.appendChild(head);
           var body = doc.createElement("div");
           body.className = "mkt-osc-body";
@@ -885,7 +892,12 @@ var MarketInd = (function () {
         box.type = "checkbox";
         box.checked = !!store[key];
         box.setAttribute("aria-label", label + (kind === "over" ? " overlay" : " pane"));
-        if (kind === "osc" && key !== "volume" && !ind(key)) {
+        if (kind === "osc" && key === "volume") {
+          /* Volume always has its own pane — locked on, not a choice. */
+          box.checked = true;
+          box.disabled = true;
+          lab.title = label + " always shows in its own pane";
+        } else if (kind === "osc" && !ind(key)) {
           box.disabled = true;
           lab.title = label + " unavailable in this build";
         }

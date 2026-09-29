@@ -164,7 +164,7 @@ var PoolDetailUI = (function () {
     charts.appendChild(oscNote);
     var P = {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
-      over: { sma: true, ema: true }, osc: {}, oscBoxes: {}, panes: {}, paneEls: {},
+      over: { sma: true, ema: true }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
       candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,
       priceHost: priceHost, oscHost: oscHost, oscNote: oscNote,
       depthCanvas: null, basePrec: precOr5(r.prec_b), quotePrec: precOr5(r.prec_a),

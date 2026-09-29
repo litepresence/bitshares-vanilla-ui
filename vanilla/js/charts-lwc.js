@@ -1,7 +1,7 @@
 /* ChartsLwc: LightweightCharts candle/oscillator panes for the DEX desk.
  * Owns: hasLightweight/lw detection, pane colors/width/hex/scale helpers,
  *   LWC row builders (toLwcCandles/lineData), price pane (drawPricePane:
- *   candles + volume + overlay lines), ONE oscillator sub-pane
+ *   candles + overlay lines; volume is always its own histogram sub-pane),
  *   (drawOscPane: lines, or histogram for the Volume pane), and teardown
  *   (removePane/clearHost) plus time-scale linking across panes
  *   (linkTimeScales: scrolling one pane scrolls them all).
@@ -187,15 +187,6 @@ var ChartsLwc = (function () {
     return 300;
   }
 
-  /* "#rrggbb" + alpha -> "rgba(r,g,b,a)" for volume bars (pixel styling). */
-  function hexA(hex, alpha) {
-    var m = typeof hex === "string" ? /^#([0-9a-fA-F]{6})$/.exec(hex) : null;
-    if (!m) return hex;
-    var n = parseInt(m[1], 16);
-    return "rgba(" + ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," +
-      (n & 255) + "," + alpha + ")";
-  }
-
   /* Price-scale mode: Logarithmic when logScale, else Normal. Uses the v5
    * enum when present, numeric fallback (Normal 0 / Logarithmic 1) otherwise.
    * Params: LW global, logScale bool. Returns the mode value. */
@@ -245,11 +236,7 @@ var ChartsLwc = (function () {
       var l = Number(b.low), c = Number(b.close);
       if (!(t > 0)) continue;
       if (!isFinite(o) || !isFinite(h) || !isFinite(l) || !isFinite(c)) continue;
-      var v = Number(b.baseVolume);
-      out.push({
-        time: t, open: o, high: h, low: l, close: c,
-        red: !!b.red, vol: (isFinite(v) && v > 0) ? v : 0
-      });
+      out.push({ time: t, open: o, high: h, low: l, close: c });
     }
     return out;
   }
@@ -267,7 +254,9 @@ var ChartsLwc = (function () {
     return out;
   }
 
-  /* Price pane: candles + volume + overlay lines.
+  /* Price pane: candles + overlay lines. Volume lives in its OWN sub-pane
+   * (drawOscPane with histogram:true), never overlaid here — one scale per
+   * pane, always.
    * Params: doc; hostEl (emptied first — pass the previous handle in
    *   opts.previous for LWC teardown); opts {candles: market.js buckets,
    *   overlays: [{name, color, values}] aligned to candles, logScale: bool,
@@ -327,15 +316,6 @@ var ChartsLwc = (function () {
     });
     series.setData(bars.map(function (b) {
       return { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close };
-    }));
-    var vols = chart.addSeries(LW.HistogramSeries, {
-      priceScaleId: "", priceFormat: { type: "volume" }
-    });
-    vols.setData(bars.map(function (b) {
-      return {
-        time: b.time, value: b.vol,
-        color: b.red ? hexA(CANDLE_DOWN, 0.5) : hexA(CANDLE_UP, 0.5)
-      };
     }));
     var ovs2 = Array.isArray(opts.overlays) ? opts.overlays : [];
     var i;
