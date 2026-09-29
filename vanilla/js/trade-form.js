@@ -377,35 +377,327 @@ var TradeForm = (function () {
     }];
   }
 
-  /* Unlock gate with return path (same pattern as transfer/account): after a
-   * successful unlock the panels render in place. */
-  function renderUnlock(doc, mount, ctx) {
-    clearBox(mount);
-    mount.appendChild(el(doc, "p", t("trade.unlock_hint", "Unlock your wallet to trade on this market."), "muted"));
-    var f = fieldRow(doc, t("trade.password_label", "Password "), { id: "trade-unlock-password", type: "password" });
-    mount.appendChild(f.row);
-    var btn = touchable(el(doc, "button", t("trade.unlock_button", "Unlock")));
-    btn.id = "trade-unlock-do";
-    btn.type = "button";
-    mount.appendChild(btn);
-    var errBox = el(doc, "div", null, "error");
-    errBox.setAttribute("aria-live", "polite");
-    mount.appendChild(errBox);
-    btn.addEventListener("click", function () {
-      errBox.textContent = "";
-      btn.disabled = true;
-      Promise.resolve()
-        .then(function () { return Wallet.unlock(f.input.value); })
-        .then(function () { renderPanels(doc, mount, ctx); })
-        .catch(function (e) {
-          btn.disabled = false;
-          errBox.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
-        });
-    });
+  /* --- Locked quote panels (try-before-you-buy, principle #9) -----------
+   * Reference: bitshares-ui/app/components/Exchange/BuySell.jsx:518
+   * (`disabled = noBalance || invalidPrice || invalidAmount` — only SUBMIT
+   * gates; inputs/fee/total always live) + Exchange.jsx:2089-2210 (forms
+   * render unconditionally; balance reads 0 logged out).
+   * The helpers below let a LOCKED wallet see the same Buy/Sell/Scaled tabs
+   * with live quotes. The password is asked ONLY at the review button
+   * ("Unlock & review"), never to view the panels.
+   *
+   * QUOTE_PLACEHOLDER_SELLER: fee preview seller for locked quotes.
+   * limit_order_create fees are account-invariant (flat fee schedule per op
+   * type, answered by get_required_fees from the op shape + fee asset — the
+   * seller id never changes the price; any valid 1.2.x id answers the same.
+   * committee-account 1.2.0 always exists, so it is the honest placeholder).
+   * Displayed fees go through Format (human string) with the raw integer in
+   * the title attribute — never a raw integer as the visible text (#6). */
+  var QUOTE_PLACEHOLDER_SELLER = "1.2.0";
+
+  /* True when this tab state has no resolved wallet account (locked view).
+   * Params: P tab state ({me} or null). Returns boolean. Never throws. */
+  function isLockedView(P) {
+    return !P || !P.me || !P.me.id;
   }
 
-  /* Desk entry: renderPanels(doc, mount, ctx). Guards backends, gates on
-   * unlock, resolves the wallet account, then paints the tabbed panels. */
+  /* Expiry wire string for fee previews: the selected expiry when valid,
+   * otherwise the YEAR default. Previews must never throw on an empty
+   * SPECIFIC custom date — the review path still validates strictly. */
+  function previewExpiryWire(st) {
+    try {
+      return expiryWire(st);
+    } catch (e) {
+      return expiryWire({ key: "YEAR", custom: "" });
+    }
+  }
+
+  /* Live three-way quote wiring: amount (QUOTE) <-> price (BASE per QUOTE)
+   * <-> total (BASE), all in pure BigInt via Format.parseAmount /
+   * Format.formatAmount + quoteToBaseRaw/baseToQuoteRaw — never floats.
+   * - amount input (+ valid price) -> total
+   * - price input: amount present -> total; else total present -> amount
+   * - total input (+ valid price) -> amount
+   * onPreview (optional) is called after every edit so the fee line stays
+   * live. Guard flag prevents listener loops. Invalid input leaves the
+   * sibling field untouched (no clobber, no blanking). */
+  function wireThreeWay(doc, ctx, amountF, priceF, totalF, onPreview) {
+    var qp = ctx.quotePrec, bp = ctx.basePrec;
+    var guard = false;
+    function notify() {
+      if (typeof onPreview === "function") {
+        try { onPreview(); } catch (e) { /* preview best-effort */ }
+      }
+    }
+    function amountPriceToTotal() {
+      if (guard) return;
+      guard = true;
+      try {
+        var a = amountF.input.value.trim();
+        var p = priceF.input.value.trim();
+        if (a && p) {
+          var aRaw = Format.parseAmount(a, qp);
+          var r = Format.parsePriceRatio(p);
+          var tRaw = quoteToBaseRaw(aRaw, r.num, r.den, qp, bp);
+          totalF.input.value = Format.formatAmount(tRaw, bp);
+        }
+      } catch (e) { /* sibling stands */ }
+      guard = false;
+      notify();
+    }
+    function priceEdited() {
+      if (guard) return;
+      guard = true;
+      try {
+        var p2 = priceF.input.value.trim();
+        var a2 = amountF.input.value.trim();
+        var t2 = totalF.input.value.trim();
+        if (p2 && a2) {
+          var aRaw2 = Format.parseAmount(a2, qp);
+          var r2 = Format.parsePriceRatio(p2);
+          totalF.input.value = Format.formatAmount(
+            quoteToBaseRaw(aRaw2, r2.num, r2.den, qp, bp), bp);
+        } else if (p2 && t2 && !a2) {
+          var tRaw2 = Format.parseAmount(t2, bp);
+          var r3 = Format.parsePriceRatio(p2);
+          amountF.input.value = Format.formatAmount(
+            baseToQuoteRaw(tRaw2, r3.num, r3.den, qp, bp), qp);
+        }
+      } catch (e) { /* sibling stands */ }
+      guard = false;
+      notify();
+    }
+    function totalEdited() {
+      if (guard) return;
+      guard = true;
+      try {
+        var t3 = totalF.input.value.trim();
+        var p3 = priceF.input.value.trim();
+        if (t3 && p3) {
+          var tRaw3 = Format.parseAmount(t3, bp);
+          var r4 = Format.parsePriceRatio(p3);
+          amountF.input.value = Format.formatAmount(
+            baseToQuoteRaw(tRaw3, r4.num, r4.den, qp, bp), qp);
+        }
+      } catch (e) { /* sibling stands */ }
+      guard = false;
+      notify();
+    }
+    /* Click-to-fill path (market-book.js fillTradePrice sets #trade-price
+     * + fires input): the price listener above recomputes the sibling, so
+     * book clicks fill the LOCKED price field exactly like the unlocked one. */
+    amountF.input.addEventListener("input", amountPriceToTotal);
+    priceF.input.addEventListener("input", priceEdited);
+    totalF.input.addEventListener("input", totalEdited);
+    void doc;
+  }
+
+  /* Fee preview line for locked AND unlocked quotes. Builds the same op the
+   * review path builds (createOp) with the real seller when known, otherwise
+   * QUOTE_PLACEHOLDER_SELLER, then answers ONE get_required_fees via
+   * Tx.feeMulti. Shows "Fee (preview): <human>" with the raw integer in the
+   * title; empty/invalid quotes show an em-dash (never blank, never a raw
+   * integer as visible text). Offline/node errors keep the dash + reason in
+   * the title. Debounced: schedule() callers fire on every keystroke. */
+  function mountFeePreview(doc, wrap, P, side, getVals) {
+    var line = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
+    line.id = "trade-fee-preview";
+    wrap.appendChild(line);
+    var timer = null;
+    function schedule() {
+      try { if (timer !== null) clearTimeout(timer); } catch (e) { /* gone */ }
+      try {
+        timer = setTimeout(update, 400);
+      } catch (e) { /* timers unavailable: preview stands */ }
+    }
+    async function update() {
+      timer = null;
+      var vals;
+      try { vals = getVals(); }
+      catch (e) { return; }
+      var ctx = P.ctx;
+      var a = (vals.amount || "").trim();
+      var p = (vals.price || "").trim();
+      if (!a || !p) {
+        line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        try { line.title = ""; } catch (e) { /* title best-effort */ }
+        return;
+      }
+      try {
+        var qp = ctx.quotePrec, bp = ctx.basePrec;
+        var quoteRaw = Format.parseAmount(a, qp);
+        if (!/[1-9]/.test(quoteRaw)) throw new Error("zero");
+        var ratio = Format.parsePriceRatio(p);
+        if (ratio.num <= 0n) throw new Error("zero price");
+        var sellAssetId, recvAssetId, sellRaw, recvRaw;
+        if (side === "buy") {
+          sellAssetId = ctx.base;
+          recvAssetId = ctx.quote;
+          recvRaw = quoteRaw;
+          sellRaw = quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp);
+        } else {
+          sellAssetId = ctx.quote;
+          recvAssetId = ctx.base;
+          sellRaw = quoteRaw;
+          recvRaw = quoteToBaseRaw(quoteRaw, ratio.num, ratio.den, qp, bp);
+        }
+        if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(recvRaw)) throw new Error("dust");
+        var seller = (P.me && P.me.id) ? P.me.id : QUOTE_PLACEHOLDER_SELLER;
+        var expWire = previewExpiryWire({ key: vals.key, custom: vals.custom });
+        var op = createOp(seller, sellAssetId, sellRaw, recvAssetId, recvRaw, expWire, !!vals.fok);
+        var feeRes = await Tx.feeMulti([op], FEE_ASSET);
+        var feeMeta = await feeAssetMeta(op[1].fee.asset_id);
+        line.textContent = t("trade.fee_preview", "Fee (preview): ") + humanFee(feeRes.totalRaw, feeMeta);
+        try { line.title = String(feeRes.totalRaw); } catch (e) { /* title best-effort */ }
+      } catch (e) {
+        line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        try { line.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
+      }
+    }
+    schedule();
+    return { line: line, schedule: schedule, update: update };
+  }
+
+  /* Spend-asset balance line. Locked: honest "0 <SYM>" + unlock hint (never
+   * blank, never a real balance we cannot know). Unlocked: async spendable
+   * balance via balancesMap, human via Format; failures stay honest inline. */
+  function mountBalanceLine(doc, wrap, P, side) {
+    var ctx = P.ctx;
+    var sym = side === "buy" ? ctx.baseSym : ctx.quoteSym;
+    var assetId = side === "buy" ? ctx.base : ctx.quote;
+    var prec = side === "buy" ? ctx.basePrec : ctx.quotePrec;
+    var line = el(doc, "p", "", "muted");
+    wrap.appendChild(line);
+    if (isLockedView(P)) {
+      line.textContent = t("trade.balance_locked", "Balance: 0 " + sym + " — unlock for balances");
+      return line;
+    }
+    line.textContent = t("trade.balance_loading", "Balance: loading…");
+    balancesMap(P.me.id).then(function (bals) {
+      var b = bals[assetId];
+      var human = b ? Format.formatAmount(b.raw.toString(), b.precision) + " " + b.symbol
+        : Format.formatAmount("0", prec) + " " + sym;
+      line.textContent = t("trade.balance", "Balance: ") + human;
+    }).catch(function (e) {
+      line.textContent = t("trade.balance_fail", "Balance unavailable — will check at review.");
+      try { line.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
+    });
+    return line;
+  }
+
+  /* Password row for the locked "Unlock & review" button (same ids as the
+   * old renderUnlock form so help docs keep reading true). Returns refs. */
+  function lockedPasswordRow(doc, wrap) {
+    var f = fieldRow(doc, t("trade.password_label", "Password "), {
+      id: "trade-unlock-password", type: "password"
+    });
+    wrap.appendChild(f.row);
+    var errBox = el(doc, "div", null, "error");
+    errBox.setAttribute("aria-live", "polite");
+    wrap.appendChild(errBox);
+    return { pwField: f, pwErr: errBox };
+  }
+
+  /* Locked "Unlock & review" click: preserves the quote inputs in st, unlocks
+   * (password ONLY at signing per principle #9), resolves the wallet account,
+   * keeps the panels' input state on P, then proceeds down the EXISTING
+   * review path (reviewSingle -> paintConfirmSingle). Never clears inputs. */
+  function unlockAndReviewSingle(doc, body, mount, P, side, st, refs, btn) {
+    refs.pwErr.textContent = "";
+    btn.disabled = true;
+    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
+    var vals = {
+      amount: st.amount, price: st.price, fok: st.fok,
+      key: st.key, custom: st.custom
+    };
+    var pw = refs.pwField.input.value;
+    Promise.resolve()
+      .then(function () { return Wallet.unlock(pw); })
+      .then(function () { return Account.myAccountId(); })
+      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
+      .then(function (me) {
+        P.me = me;
+        try { body.removeChild(status); } catch (e) { /* gone */ }
+        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
+        return reviewSingle(P, side, vals).then(function (R) {
+          paintConfirmSingle(doc, mount, P, side, R);
+        }).catch(function (e) {
+          try { body.removeChild(status2); } catch (x) { /* gone */ }
+          throw e;
+        });
+      })
+      .catch(function (e) {
+        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        btn.disabled = false;
+        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
+      });
+  }
+
+  /* Locked scaled "Unlock & review": same gate as single orders — unlock,
+   * keep the scaled inputs on P.scaled, then run the existing reviewScaled
+   * -> paintConfirmScaled path. */
+  function unlockAndReviewScaled(doc, body, mount, P, spec, refs, btn) {
+    refs.pwErr.textContent = "";
+    btn.disabled = true;
+    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
+    var pw = refs.pwField.input.value;
+    Promise.resolve()
+      .then(function () { return Wallet.unlock(pw); })
+      .then(function () { return Account.myAccountId(); })
+      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
+      .then(function (me) {
+        P.me = me;
+        try { body.removeChild(status); } catch (e) { /* gone */ }
+        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
+        return reviewScaled(P, spec).then(function (R) {
+          paintConfirmScaled(doc, mount, P, R);
+        }).catch(function (e) {
+          try { body.removeChild(status2); } catch (x) { /* gone */ }
+          throw e;
+        });
+      })
+      .catch(function (e) {
+        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        btn.disabled = false;
+        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
+      });
+  }
+
+  /* Locked scaled "Unlock & review": same gate as single orders — unlock,
+   * keep the scaled inputs on P.scaled, then run the existing reviewScaled
+   * -> paintConfirmScaled path. Never clears inputs. */
+  function unlockAndReviewScaled(doc, body, mount, P, spec, refs, btn) {
+    refs.pwErr.textContent = "";
+    btn.disabled = true;
+    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
+    var pw = refs.pwField.input.value;
+    Promise.resolve()
+      .then(function () { return Wallet.unlock(pw); })
+      .then(function () { return Account.myAccountId(); })
+      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
+      .then(function (me) {
+        P.me = me;
+        try { body.removeChild(status); } catch (e) { /* gone */ }
+        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
+        return reviewScaled(P, spec).then(function (R) {
+          paintConfirmScaled(doc, mount, P, R);
+        }).catch(function (e) {
+          try { body.removeChild(status2); } catch (x) { /* gone */ }
+          throw e;
+        });
+      })
+      .catch(function (e) {
+        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        btn.disabled = false;
+        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
+      });
+  }
+
+  /* Desk entry: renderPanels(doc, mount, ctx). Guards backends, then paints
+   * the tabbed panels for EVERYONE (Exchange.jsx:2089-2210 renders the forms
+   * unconditionally): locked wallets get full quote panels with the unlock
+   * gate moved to the review button; unlocked wallets resolve the account
+   * and paint the same panels with live balances. */
   function renderPanels(doc, mount, ctx) {
     if (!mount) return;
     clearBox(mount);
@@ -426,7 +718,14 @@ var TradeForm = (function () {
       unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys;
     } catch (e) { unlocked = false; }
     if (!unlocked) {
-      renderUnlock(doc, mount, ctx);
+      /* TRY-BEFORE-YOU-BUY: full quote panels while locked (same tabs +
+       * fields as unlocked). The unlock gate lives on the review button. */
+      paintTabs(doc, mount, {
+        ctx: ctx, me: null, tab: "buy",
+        buy: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
+        sell: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
+        scaled: { n: "3", low: "", high: "", total: "", side: "sell", key: "YEAR", custom: "" }
+      });
       return;
     }
     mount.appendChild(el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
@@ -437,8 +736,8 @@ var TradeForm = (function () {
     }).then(function (me) {
       paintTabs(doc, mount, {
         ctx: ctx, me: me, tab: "buy",
-        buy: { amount: "", price: "", fok: false, key: "YEAR", custom: "" },
-        sell: { amount: "", price: "", fok: false, key: "YEAR", custom: "" },
+        buy: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
+        sell: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
         scaled: { n: "3", low: "", high: "", total: "", side: "sell", key: "YEAR", custom: "" }
       });
     }).catch(function (e) {
@@ -472,11 +771,17 @@ var TradeForm = (function () {
     else orderForm(doc, body, mount, P, P.tab);
   }
 
-  /* Buy/Sell single-order form. Amount is in QUOTE units; price is BASE per
-   * QUOTE. Review builds the op + live fee; confirm signs and sends. */
+  /* Buy/Sell single-order form. Amount is in QUOTE units, total in BASE
+   * units; price is BASE per QUOTE (BuySell.jsx amount/price/total trio).
+   * Locked wallets see the SAME fields with live three-way quotes
+   * (wireThreeWay) + fee preview (placeholder seller) + "0" balances; the
+   * unlock gate lives on the button ("Unlock & review", id
+   * unlock-and-review). Review builds the op + live fee; confirm signs. */
   function orderForm(doc, body, mount, P, side) {
     var ctx = P.ctx;
     var st = P[side];
+    if (st.total === undefined || st.total === null) st.total = "";
+    var locked = isLockedView(P);
     body.appendChild(el(doc, "h3", (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym));
     var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", {
       id: "trade-amount", value: st.amount, placeholder: "0.00", inputmode: "decimal",
@@ -488,6 +793,12 @@ var TradeForm = (function () {
       unit: ctx.baseSym + " / " + ctx.quoteSym
     });
     body.appendChild(priceF.row);
+    var totalF = fieldRow(doc, "Total (" + ctx.baseSym + ") ", {
+      id: "trade-total", value: st.total, placeholder: "0.00", inputmode: "decimal",
+      unit: ctx.baseSym
+    });
+    body.appendChild(totalF.row);
+    mountBalanceLine(doc, body, P, side);
     var fokRow = el(doc, "div", null, "xfer-field");
     var fokLabel = el(doc, "label", t("trade.fok_label", "Fill or kill "));
     var fokBox = doc.createElement("input");
@@ -501,6 +812,63 @@ var TradeForm = (function () {
       t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
     body.appendChild(fokRow);
     var exp = renderExpiry(doc, body, st);
+    function liveVals() {
+      return {
+        amount: amountF.input.value, price: priceF.input.value,
+        fok: fokBox.checked, key: exp.select.value, custom: exp.custom.value
+      };
+    }
+    var feePrev = mountFeePreview(doc, body, P, side, liveVals);
+    wireThreeWay(doc, ctx, amountF, priceF, totalF, feePrev.schedule);
+    exp.select.addEventListener("change", feePrev.schedule);
+    exp.custom.addEventListener("input", feePrev.schedule);
+    fokBox.addEventListener("change", feePrev.schedule);
+    /* If the user quoted via total+price (amount empty), derive the amount
+     * with the same BigInt path before validation — never floats. */
+    function resolveAmounts() {
+      var a = amountF.input.value.trim();
+      var tot = totalF.input.value.trim();
+      var pr = priceF.input.value.trim();
+      if (!a && tot && pr) {
+        try {
+          var tRaw = Format.parseAmount(tot, ctx.basePrec);
+          var r = Format.parsePriceRatio(pr);
+          a = Format.formatAmount(
+            baseToQuoteRaw(tRaw, r.num, r.den, ctx.quotePrec, ctx.basePrec),
+            ctx.quotePrec);
+          amountF.input.value = a;
+        } catch (e) { /* validation below reports it */ }
+      }
+      return a;
+    }
+    function saveState() {
+      st.amount = amountF.input.value;
+      st.price = priceF.input.value;
+      st.total = totalF.input.value;
+      st.fok = fokBox.checked;
+      st.key = exp.select.value;
+      st.custom = exp.custom.value;
+    }
+    if (locked) {
+      var refs = lockedPasswordRow(doc, body);
+      var unlockBtn = touchable(el(doc, "button", t("trade.unlock_review", "Unlock & review")));
+      unlockBtn.id = "unlock-and-review";
+      unlockBtn.type = "button";
+      body.appendChild(unlockBtn);
+      unlockBtn.addEventListener("click", function () {
+        setFieldError(amountF, "");
+        setFieldError(priceF, "");
+        setFieldError(totalF, "");
+        exp.err.style.display = "none";
+        resolveAmounts();
+        saveState();
+        unlockAndReviewSingle(doc, body, mount, P, side, {
+          amount: st.amount, price: st.price, fok: st.fok,
+          key: st.key, custom: st.custom
+        }, refs, unlockBtn);
+      });
+      return;
+    }
     var reviewBtn = touchable(el(doc, "button", t("trade.review", "Review order")));
     reviewBtn.id = "trade-review";
     reviewBtn.type = "button";
@@ -508,12 +876,10 @@ var TradeForm = (function () {
     reviewBtn.addEventListener("click", function () {
       setFieldError(amountF, "");
       setFieldError(priceF, "");
+      setFieldError(totalF, "");
       exp.err.style.display = "none";
-      st.amount = amountF.input.value;
-      st.price = priceF.input.value;
-      st.fok = fokBox.checked;
-      st.key = exp.select.value;
-      st.custom = exp.custom.value;
+      resolveAmounts();
+      saveState();
       reviewBtn.disabled = true;
       var status = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
       reviewSingle(P, side, {
@@ -532,7 +898,7 @@ var TradeForm = (function () {
           exp.err.textContent = msg;
           exp.err.style.display = "";
         }
-        body.removeChild(status);
+        try { body.removeChild(status); } catch (x) { /* gone */ }
         reviewBtn.disabled = false;
         showError(doc, body, msg, t("trade.fail_prepare", "Could not prepare the order."));
       });
@@ -714,10 +1080,14 @@ var TradeForm = (function () {
   }
 
   /* Scaled form: N (2-20), priceLow, priceHigh, total in SELL-asset units,
-   * side, expiry. Preview first (exact BigInt math), then ONE multi-op tx. */
+   * side, expiry. Preview first (exact BigInt math), then ONE multi-op tx.
+   * Locked wallets see the SAME fields (try-before-you-buy); the preview
+   * button becomes "Unlock & review" (id unlock-and-review) and unlocks
+   * before running the existing reviewScaled path with inputs preserved. */
   function scaledForm(doc, body, mount, P) {
     var ctx = P.ctx;
     var st = P.scaled;
+    var lockedScaled = isLockedView(P);
     body.appendChild(el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
     var sideRow = el(doc, "div", null, "xfer-field");
     var sideLabel = el(doc, "label", t("trade.side_label", "Side "));
@@ -760,6 +1130,32 @@ var TradeForm = (function () {
       paintTabs(doc, mount, P);
     });
     var exp = renderExpiry(doc, body, st);
+    if (lockedScaled) {
+      var sellSym = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
+      body.appendChild(el(doc, "p",
+        t("trade.balance_locked", "Balance: 0 " + sellSym + " — unlock for balances"), "muted"));
+      var sRefs = lockedPasswordRow(doc, body);
+      var sUnlockBtn = touchable(el(doc, "button", t("trade.unlock_review", "Unlock & review")));
+      sUnlockBtn.id = "unlock-and-review";
+      sUnlockBtn.type = "button";
+      body.appendChild(sUnlockBtn);
+      sUnlockBtn.addEventListener("click", function () {
+        [nF, lowF, highF, totalF].forEach(function (f) { setFieldError(f, ""); });
+        exp.err.style.display = "none";
+        st.n = nF.input.value;
+        st.low = lowF.input.value;
+        st.high = highF.input.value;
+        st.total = totalF.input.value;
+        st.side = sideSel.value;
+        st.key = exp.select.value;
+        st.custom = exp.custom.value;
+        unlockAndReviewScaled(doc, body, mount, P, {
+          n: st.n, low: st.low, high: st.high, total: st.total,
+          side: st.side, key: st.key, custom: st.custom
+        }, sRefs, sUnlockBtn);
+      });
+      return;
+    }
     var prevBtn = touchable(el(doc, "button", t("trade.preview", "Preview scaled orders")));
     prevBtn.id = "trade-preview";
     prevBtn.type = "button";
