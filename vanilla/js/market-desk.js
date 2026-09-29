@@ -317,16 +317,34 @@ var MarketDesk = (function () {
     desk.appendChild(chartsSec);
     chartsSec.appendChild(el(doc, "h2", t("market.charts", "Charts")));
 
+    /* Charts restyle: controls-left rail + zero-gap plots column.
+     * div.mkt-chartgrid > div.mkt-controls + div.mkt-plots (shared with the
+     * pool desk chartPane — one CSS block serves both). Controls hold the
+     * timeframe radios, count note, indicator menu + Log/Invert, and the
+     * depth scale toggles; plots hold priceHost + VWAP wrap (drawVwap
+     * inserts it as priceHost.nextSibling, so it lands in plots) + oscHost
+     * + oscNote. Ids, listeners, and state fields are unchanged — only DOM
+     * parenting moves. */
+    var chartGrid = doc.createElement("div");
+    chartGrid.className = "mkt-chartgrid";
+    chartsSec.appendChild(chartGrid);
+    var controls = doc.createElement("div");
+    controls.className = "mkt-controls";
+    chartGrid.appendChild(controls);
+    var plots = doc.createElement("div");
+    plots.className = "mkt-plots";
+    chartGrid.appendChild(plots);
+
     /* Timeframe radios (from the live bucket list) + candle count note. */
     var tfBox = doc.createElement("div");
     tfBox.className = "mkt-tfrow";
     tfBox.setAttribute("role", "radiogroup");
     tfBox.setAttribute("aria-label", t("market.timeframe_label", "Candle timeframe"));
-    chartsSec.appendChild(tfBox);
+    controls.appendChild(tfBox);
     state.tfBox = tfBox;
     var countNote = el(doc, "p", "", "muted mkt-count-note");
     countNote.setAttribute("aria-live", "polite");
-    chartsSec.appendChild(countNote);
+    controls.appendChild(countNote);
     state.countNote = countNote;
 
     /* Chart options row: shared indicator dropdown menu (overlays +
@@ -335,7 +353,7 @@ var MarketDesk = (function () {
      * rows used — only the control UI changed. */
     var indRow = doc.createElement("div");
     indRow.className = "mkt-indrow";
-    chartsSec.appendChild(indRow);
+    controls.appendChild(indRow);
     if (typeof MarketInd !== "undefined" && MarketInd && typeof MarketInd.renderIndMenu === "function") {
       MarketInd.renderIndMenu(doc, indRow, state);
     }
@@ -373,7 +391,7 @@ var MarketDesk = (function () {
     var priceHost = doc.createElement("div");
     priceHost.id = "mkt-price-host";
     priceHost.className = "mkt-price-host";
-    chartsSec.appendChild(priceHost);
+    plots.appendChild(priceHost);
 
     /* Stacked pane container: drawCharts reconciles one child wrapper per
      * checked key (in OSC_ORDER); nothing checked -> no children at all,
@@ -381,10 +399,10 @@ var MarketDesk = (function () {
     var oscHost = doc.createElement("div");
     oscHost.id = "mkt-osc-host";
     oscHost.className = "mkt-osc-host";
-    chartsSec.appendChild(oscHost);
+    plots.appendChild(oscHost);
     var oscNote = el(doc, "p", "", "muted");
     oscNote.setAttribute("aria-live", "polite");
-    chartsSec.appendChild(oscNote);
+    plots.appendChild(oscNote);
     state.oscNote = oscNote;
 
     /* ROW 1 col 1+2: Buy + Sell panels (BuySell bid/ask pair,
@@ -508,10 +526,13 @@ var MarketDesk = (function () {
     depthWrap.appendChild(depthHead);
     /* Scale toggles (ship log/log: far-spam prices and dust-to-whale
      * volumes both stay legible; linear stays one tap away). Session-only,
-     * same pattern as the price-pane Log toggle. */
+     * same pattern as the price-pane Log toggle. Charts restyle: the toggles
+     * live in the controls rail (same buttons, same state keys, same redraw
+     * path) — the depth pane keeps head + canvas only so the plots column
+     * stays a zero-gap stack. */
     var scaleRow = doc.createElement("div");
     scaleRow.className = "mkt-scalerow";
-    depthWrap.appendChild(scaleRow);
+    controls.appendChild(scaleRow);
     function scaleBtn(key, logKey, linKey, redrawBars) {
       var b = touchable(el(doc, "button", ""));
       b.type = "button";

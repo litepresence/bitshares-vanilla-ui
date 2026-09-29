@@ -221,6 +221,43 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-chart-empty { display: flex; align-items: center; justify-content: center;
   height: 100%; min-height: 120px; background: var(--plot-bg, var(--panel));
   border: 1px solid var(--border); border-radius: 8px; }
+/* Charts restyle: controls-left rail + zero-gap plot stack (exchange + pool
+ * desks share div.mkt-chartgrid > div.mkt-controls + div.mkt-plots — one
+ * block serves both). Desktop: slim 180px controls rail left, plots right;
+ * phones <720px: single column so controls sit above plots. Controls stack
+ * vertically with full-rail targets (>=44px kept from the base rules; widths
+ * only). Plots stack with zero gap: inter-plot margins become 0 and plot
+ * siblings are separated by exactly a 2px rule. Separator uses --border (not
+ * --bg): in dex-ux-theme --bg == --plot-bg (#131722) so a --bg rule would
+ * vanish, while --border stays distinct from --plot-bg in all three themes
+ * and is the established hairline token. LWC internals untouched — selectors
+ * stop at host divs (.mkt-price-host/.mkt-osc-host/.mkt-osc-pane/
+ * #mkt-vwap-wrap), never inside vendored chart nodes. */
+.mkt-chartgrid { display: grid; grid-template-columns: 180px minmax(0, 1fr);
+  gap: 12px; align-items: start; }
+.mkt-controls { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.mkt-controls .mkt-tfrow, .mkt-controls .mkt-indrow, .mkt-controls .mkt-scalerow {
+  display: flex; flex-direction: column; align-items: stretch; gap: 8px; margin: 0; }
+.mkt-controls .mkt-tf, .mkt-controls .mkt-ind { display: flex; width: 100%;
+  min-height: 44px; }
+.mkt-controls .mkt-indmenu { display: block; width: 100%; margin: 0; }
+.mkt-controls .mkt-indmenu-btn, .mkt-controls .mkt-indrow > button,
+.mkt-controls .mkt-scalerow > button { width: 100%; }
+.mkt-controls .mkt-count-note { margin: 0; }
+.mkt-plots { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.mkt-plots .mkt-price-host, .mkt-plots .mkt-osc-host { margin-top: 0; margin-bottom: 0; }
+.mkt-plots #mkt-vwap-wrap { margin: 0; }
+.mkt-plots #mkt-vwap-wrap > details { margin: 0; }
+.mkt-plots .mkt-osc-pane { margin: 0; }
+.mkt-plots .mkt-canvas { margin-top: 0; margin-bottom: 0; }
+.mkt-plots > p { margin: 4px 0 0; }
+.mkt-plots > #mkt-vwap-wrap { border-top: 2px solid var(--border); }
+.mkt-plots > .mkt-osc-host { border-top: 2px solid var(--border); }
+.mkt-osc-host { display: flex; flex-direction: column; gap: 0; }
+.mkt-osc-host > * + * { border-top: 2px solid var(--border); }
+@media (max-width: 719px) {
+  .mkt-chartgrid { grid-template-columns: minmax(0, 1fr); }
+}
 /* Picker: asset-type radios + favorite stars (favorites sort first). */
 .mkt-kinds { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
 .mkt-picker-row { display: flex; align-items: center; gap: 4px; }

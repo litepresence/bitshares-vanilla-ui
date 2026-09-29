@@ -157,24 +157,40 @@ var PoolDetailUI = (function () {
     }
     var note = u.el(doc, "p", t("pool.loading_history", "Loading price history…"), "muted");
     charts.appendChild(note);
+    /* Charts restyle (same contract as market-desk.js showDesk):
+     * div.mkt-chartgrid > div.mkt-controls + div.mkt-plots — one CSS block
+     * serves both desks. Controls hold timeframe radios, count note, and the
+     * indicator menu; plots hold priceHost + VWAP wrap (drawVwap inserts it
+     * as priceHost.nextSibling) + oscHost + oscNote. Ids, listeners, and the
+     * P state fields are unchanged — only DOM parenting moves. */
+    var chartGrid = doc.createElement("div");
+    chartGrid.className = "mkt-chartgrid";
+    charts.appendChild(chartGrid);
+    var controls = doc.createElement("div");
+    controls.className = "mkt-controls";
+    chartGrid.appendChild(controls);
+    var plots = doc.createElement("div");
+    plots.className = "mkt-plots";
+    chartGrid.appendChild(plots);
     var tfBox = doc.createElement("div");
     tfBox.className = "mkt-tfrow";
     tfBox.setAttribute("role", "radiogroup");
-    charts.appendChild(tfBox);
+    controls.appendChild(tfBox);
     var countNote = u.el(doc, "p", "", "muted mkt-count-note");
     countNote.setAttribute("aria-live", "polite");
-    charts.appendChild(countNote);
+    controls.appendChild(countNote);
     var menuHost = doc.createElement("div");
-    charts.appendChild(menuHost);
+    menuHost.className = "mkt-indrow";
+    controls.appendChild(menuHost);
     var priceHost = doc.createElement("div");
     priceHost.className = "mkt-price-host";
-    charts.appendChild(priceHost);
+    plots.appendChild(priceHost);
     var oscHost = doc.createElement("div");
     oscHost.className = "mkt-osc-host";
-    charts.appendChild(oscHost);
+    plots.appendChild(oscHost);
     var oscNote = u.el(doc, "p", "", "muted");
     oscNote.setAttribute("aria-live", "polite");
-    charts.appendChild(oscNote);
+    plots.appendChild(oscNote);
     var P = {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
       over: { sma: [{ p: 10 }], ema: [{ p: 50 }] }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
