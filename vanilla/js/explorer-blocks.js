@@ -242,6 +242,30 @@ var ExplorerBlocks = (function () {
     return String(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 
+  /* Chain ISO timestamp -> "9:58:45 AM" (original Blocks.jsx:247-252
+   * FormattedDate format="time" concept — locale time, never the raw ISO).
+   * Unparseable stamps fall back to the raw string (never blank). */
+  function fmtTime(stamp) {
+    try {
+      var v = new Date(stamp).getTime();
+      if (!isFinite(v)) return String(stamp || "—");
+      return new Date(v).toLocaleTimeString("en-US",
+        { hour: "numeric", minute: "2-digit", second: "2-digit" });
+    } catch (e) { return String(stamp || "—"); }
+  }
+
+  /* Re-trigger the live-line bump (CSS keyframe, candy-block pattern):
+   * remove → reflow → add, so every new head visibly lands even when heads
+   * arrive back-to-back. Never throws (the label still updates without it). */
+  function bumpLive(liveEl) {
+    try {
+      if (!liveEl) return;
+      liveEl.classList.remove("xplore-bump");
+      void liveEl.offsetWidth;
+      liveEl.classList.add("xplore-bump");
+    } catch (e) { /* static label stands */ }
+  }
+
   /* Two-decimal stat string or null (stats are counts/ratios, not money —
    * toFixed here is display rounding, never a money path). */
   function fmt2(n) {
@@ -374,12 +398,81 @@ var ExplorerBlocks = (function () {
     return "";
   }
 
-  /* One activity sentence (account + action + amounts). Static glue stays
-   * plain English (batch-2b: dynamic sentences keep code structure; only
-   * the pill labels above carry i18n keys). Accounts resolve to name links
-   * via the shared accountLink (raw id meanwhile); amounts resolve human
-   * via amtSpan (raw meanwhile, raw in title). Unknown shapes fall back to
-   * "op <id> · block #h" — never blank, never throws. */
+  /* Order instance number ("1.7.574981117" -> "574981117"): original
+   * LimitOrderCancel.jsx:39 shows "#" + order.substring(4). Nonconforming
+   * shapes fall back to the raw string (never blank). */
+  function orderNum(id) {
+    var s = String((id === undefined || id === null) ? "—" : id);
+    if (/^1\.7\.\d+$/.test(s)) return s.substring(4);
+    return s;
+  }
+
+  /* Limit-order sentence in the original shape (LimitOrderCreate.jsx:90-122
+   * concept: "placed order to buy <amount> at <price> <sym/sym>"). Buy/sell
+   * follows the no-prefs default of the original's market-direction test
+   * (isBid = selling the lower-instance asset — getMarketName orders by
+   * instance id, inverted falsy until the viewer picks a market): sellN <
+   * buyN reads "buy", else "sell". Amount + price resolve human via
+   * Explorer.asset + Format (integer-only Format.formatPrice, 8 places
+   * trimmed); raw meanwhile, raw in the title. No block suffix — the
+   * original rows carry no block number either. */
+  function orderSentence(doc, f, myGen) {
+    var sent = el(doc, "span", null, "xplore-act-sent");
+    var sell = (f.amount_to_sell && typeof f.amount_to_sell === "object") ? f.amount_to_sell : {};
+    var buy = (f.min_to_receive && typeof f.min_to_receive === "object") ? f.min_to_receive : {};
+    var sellId = String(sell.asset_id || ""), buyId = String(buy.asset_id || "");
+    var sellN = parseInt(sellId.split(".")[2] || "x", 10);
+    var buyN = parseInt(buyId.split(".")[2] || "x", 10);
+    var isBuy = (isFinite(sellN) && isFinite(buyN)) ? (sellN < buyN) : false;
+    sent.appendChild(accountLink(doc, String(f.seller || opAccount(f) || "—"), myGen));
+    sent.appendChild(el(doc, "span", isBuy ? " placed order to buy " : " placed order to sell "));
+    var amtRaw0 = String((isBuy ? buy.amount : sell.amount) ?? "—");
+    var amtPh = el(doc, "span", amtRaw0 + t("explorer.raw_mark", " (raw)"));
+    amtPh.title = amtRaw0;
+    sent.appendChild(amtPh);
+    sent.appendChild(el(doc, "span", " at "));
+    var pricePh = el(doc, "span", "…");
+    sent.appendChild(pricePh);
+    sent.appendChild(el(doc, "span", " "));
+    sent.appendChild(el(doc, "span", (sellId || "?") + "/" + (buyId || "?")));
+    if (!sellId || !buyId || typeof Explorer === "undefined" || !Explorer ||
+        typeof Explorer.asset !== "function") return sent;
+    var pairPh = sent.lastChild;
+    Promise.all([Explorer.asset(sellId).catch(function () { return null; }),
+      Explorer.asset(buyId).catch(function () { return null; })]).then(function (pair) {
+      if (!isCurrent(myGen)) return;
+      try {
+        var sJ = pair[0], bJ = pair[1];
+        if (!sJ || !bJ || !sJ.asset || !bJ.asset) return;
+        var sP = sJ.asset.precision, bP = bJ.asset.precision;
+        var sS = sJ.asset.symbol, bS = bJ.asset.symbol;
+        if (typeof sP !== "number" || typeof bP !== "number") return;
+        var amtRaw = String(isBuy ? buy.amount : sell.amount);
+        amtPh.textContent = Format.formatAmount(amtRaw, isBuy ? bP : sP) + " " + (isBuy ? bS : sS);
+        amtPh.title = amtRaw;
+        var px = isBuy
+          ? Format.formatPrice(String(sell.amount), sP, String(buy.amount), bP, 8)
+          : Format.formatPrice(String(buy.amount), bP, String(sell.amount), sP, 8);
+        px = px.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        pricePh.textContent = px;
+        pricePh.title = isBuy
+          ? (String(sell.amount) + " " + sellId + " / " + String(buy.amount) + " " + buyId)
+          : (String(buy.amount) + " " + buyId + " / " + String(sell.amount) + " " + sellId);
+        pairPh.textContent = isBuy ? (sS + "/" + bS) : (bS + "/" + sS);
+      } catch (e) { /* raw placeholders stand */ }
+    });
+    return sent;
+  }
+
+  /* One activity sentence (account + action + amounts, original Operation
+   * wording: "placed order to buy/sell <amount> at <price> <pair>",
+   * "cancelled order #<n>"). Static glue stays plain English (batch-2b:
+   * dynamic sentences keep code structure; only the pill labels above carry
+   * i18n keys). Accounts resolve to name links via the shared accountLink
+   * (raw id meanwhile); amounts resolve human via amtSpan/orderSentence
+   * (raw meanwhile, raw in title). Known shapes carry no block suffix, like
+   * the original rows; unknown shapes fall back to "op <id> · block #h" —
+   * never blank, never throws. */
   function sentenceFor(doc, op, myGen) {
     var sent = el(doc, "span", null, "xplore-act-sent");
     try {
@@ -393,29 +486,14 @@ var ExplorerBlocks = (function () {
         sent.appendChild(amtSpan(doc, String(f.amount.amount), f.amount.asset_id, myGen));
         sent.appendChild(el(doc, "span", " to "));
         sent.appendChild(accountLink(doc, String(f.to || "—"), myGen));
-        sent.appendChild(el(doc, "span", " · "));
-        sent.appendChild(blkLink);
         return sent;
       }
       if (idx === 1 && f.amount_to_sell && f.min_to_receive) {
-        sent.appendChild(accountLink(doc, String(f.seller || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " placed order to sell "));
-        if (f.amount_to_sell && typeof f.amount_to_sell.asset_id === "string") {
-          sent.appendChild(amtSpan(doc, String(f.amount_to_sell.amount), f.amount_to_sell.asset_id, myGen));
-        } else sent.appendChild(el(doc, "span", "—"));
-        sent.appendChild(el(doc, "span", " for "));
-        if (f.min_to_receive && typeof f.min_to_receive.asset_id === "string") {
-          sent.appendChild(amtSpan(doc, String(f.min_to_receive.amount), f.min_to_receive.asset_id, myGen));
-        } else sent.appendChild(el(doc, "span", "—"));
-        sent.appendChild(el(doc, "span", " · "));
-        sent.appendChild(blkLink);
-        return sent;
+        return orderSentence(doc, f, myGen);
       }
       if (idx === 2) {
         sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " cancelled order " + String(f.order || "—")));
-        sent.appendChild(el(doc, "span", " · "));
-        sent.appendChild(blkLink);
+        sent.appendChild(el(doc, "span", " cancelled order #" + orderNum(f.order)));
         return sent;
       }
       var who = opAccount(f);
@@ -475,11 +553,13 @@ var ExplorerBlocks = (function () {
       var open = !!(ch && ch.state === "open");
       var n = (typeof headNum === "number" && headNum > 0) ? headNum
         : (ch && typeof ch.head === "number" && ch.head > 0 ? ch.head : null);
+      var shown = (n !== null) ? "#" + commas(n) : "";
       var label = n !== null
-        ? (open ? t("explorer.live_prefix", "Live • Block #") + n
-          : t("explorer.paused_prefix", "Paused • Block #") + n)
+        ? (open ? t("explorer.live_prefix", "Live • Block #") + commas(n)
+          : t("explorer.paused_prefix", "Paused • Block #") + commas(n))
         : (open ? t("explorer.live_prefix", "Live • Block #").replace(/ ?#$/, "")
           : t("explorer.paused_prefix", "Paused • Block #").replace(/ ?#$/, ""));
+      void shown;
       while (liveEl.firstChild) liveEl.removeChild(liveEl.firstChild);
       var dot = el(doc, "span", "●", "xplore-live-dot");
       dot.setAttribute("aria-hidden", "true");
@@ -487,12 +567,13 @@ var ExplorerBlocks = (function () {
       liveEl.appendChild(el(doc, "span", " " + label));
       liveEl.setAttribute("data-state", open ? "live" : "paused");
     }
-    /* One normalized row -> <tr> (same cells as the initial table). */
+    /* One normalized row -> <tr> (same cells as the initial table:
+     * "#1,234,567" height link, locale-time date, witness link, tx count). */
     function rowTr(r) {
       var tr = doc.createElement("tr");
       var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
-      var cells = [anchor(doc, "#" + r.height, "#/block/" + r.height),
-        r.timestamp || "—", witnessCell(doc, r.witness, myGen),
+      var cells = [anchor(doc, "#" + commas(r.height), "#/block/" + r.height),
+        fmtTime(r.timestamp || "—"), witnessCell(doc, r.witness, myGen),
         (n === null || n === undefined) ? "—" : String(n)];
       cells.forEach(function (c) {
         var td = doc.createElement("td");
@@ -528,6 +609,7 @@ var ExplorerBlocks = (function () {
           return;
         }
         paintLive(liveEl, h);
+        bumpLive(liveEl);
         var gap = h - topBox.top;
         var want = (gap > 1 && gap <= 5)
           ? (function () { var a = []; for (var k = topBox.top + 1; k <= h; k++) a.push(k); return a; })()
@@ -614,13 +696,40 @@ var ExplorerBlocks = (function () {
       var cCom = statCell(doc, t("explorer.stat_com", "Active committee members"), "xplore-green");
       var cTpb = statCell(doc, t("explorer.stat_tpb", "Trx/block"));
       var cMiss = statCell(doc, t("explorer.stat_missed", "Recently missed blocks"), "xplore-warn");
-      var cSup = statCell(doc, t("explorer.stat_supply", "Current supply"));
-      var cStl = statCell(doc, t("explorer.stat_stealth", "Stealth supply"));
+      var cSup = statCell(doc, t("explorer.stat_supply", "Current supply"), "xplore-sm");
       var cBt = statCell(doc, t("explorer.stat_blocktimes", "Block times"));
-      [cCur, cLast, cTps, cAvg, cWit, cCom, cTpb, cMiss, cSup, cStl, cBt].forEach(function (c) {
+      var cTxc = statCell(doc, t("explorer.stat_tpb", "Trx/block"));
+      var cStl = statCell(doc, t("explorer.stat_stealth", "Stealth supply"), "xplore-sm");
+      [cCur, cLast, cTps, cAvg, cWit, cCom, cTpb, cMiss, cSup, cBt, cTxc, cStl].forEach(function (c) {
         statsBox.appendChild(c.cell);
       });
       body.appendChild(statsBox);
+
+      /* Stall UI (honest, never frozen-looking): when the head stops
+       * advancing for >15s the live line flips to paused and a Retry button
+       * appears (re-runs the tip load). Cleared by the next head. */
+      var retryBtn = null;
+      function clearStall() {
+        if (retryBtn && retryBtn.parentNode) {
+          try { retryBtn.parentNode.removeChild(retryBtn); } catch (e) { /* gone */ }
+        }
+        retryBtn = null;
+      }
+      function ensureStall(top) {
+        if (retryBtn) return;
+        try {
+          paintLive(liveEl, top);
+          if (liveEl) liveEl.setAttribute("data-state", "paused");
+        } catch (e) { /* label stands */ }
+        retryBtn = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+        retryBtn.type = "button";
+        retryBtn.addEventListener("click", function () {
+          stopLive();
+          while (body.firstChild) body.removeChild(body.firstChild);
+          blocksTab(doc, body, root, myGen, null);
+        });
+        body.insertBefore(retryBtn, statsBox.nextSibling);
+      }
 
       var newestTs = { ts: (typeof data[0].ts === "number" ? data[0].ts : Date.now()) };
       function repaint() {
@@ -650,7 +759,7 @@ var ExplorerBlocks = (function () {
         while (cBt.val.firstChild) cBt.val.removeChild(cBt.val.firstChild);
         if (ivals.length > 0) {
           var cv = doc.createElement("canvas");
-          cv.width = 280; cv.height = 56;
+          cv.width = 300; cv.height = 84;
           cv.className = "xplore-bars";
           cv.setAttribute("role", "img");
           cv.setAttribute("aria-label", t("explorer.stat_blocktimes", "Block times"));
@@ -659,15 +768,43 @@ var ExplorerBlocks = (function () {
         } else {
           cBt.val.textContent = "—";
         }
+        /* TRX/BLOCK bar strip (original TransactionChart.jsx concept: one
+         * column per recent block, newest-first like the interval strip;
+         * repaints with the same gen-guarded repaint so the two strips shift
+         * together on every head). Single accent token — per-count hues from
+         * the original are deliberately omitted (no hex literals in slice
+         * JS; tokens only per the audit). */
+        while (cTxc.val.firstChild) cTxc.val.removeChild(cTxc.val.firstChild);
+        var txVals = data.slice(0, 20).map(function (d) {
+          return (typeof d.txs === "number" && d.txs >= 0) ? d.txs : 0;
+        });
+        var hasTx = txVals.some(function (v) { return v > 0; }) || txVals.length > 0;
+        if (hasTx) {
+          var cv2 = doc.createElement("canvas");
+          cv2.width = 300; cv2.height = 84;
+          cv2.className = "xplore-bars";
+          cv2.setAttribute("role", "img");
+          cv2.setAttribute("aria-label", t("explorer.stat_tpb", "Trx/block"));
+          drawBars(cv2, txVals);
+          cTxc.val.appendChild(cv2);
+        } else {
+          cTxc.val.textContent = "—";
+        }
       }
       repaint();
       /* Freshness ticker (1s): the LAST BLOCK cell counts up until the next
-       * head arrives. Gen-guarded self-clear; stopLive clears on leave. */
+       * head arrives, and trips the stall UI past 15s without a head.
+       * Gen-guarded self-clear; stopLive clears on leave. */
       try {
         clearStatTick();
         statTimer = setInterval(function () {
           if (!isCurrent(myGen)) { clearStatTick(); return; }
           try { cLast.val.textContent = agoText(newestTs.ts); } catch (e) { /* next tick */ }
+          try {
+            var stalled = (Date.now() - newestTs.ts) > 15000;
+            if (stalled) ensureStall(headNum);
+            else clearStall();
+          } catch (e) { /* next tick */ }
         }, 1000);
       } catch (e) { /* static label stands */ }
 
@@ -675,6 +812,7 @@ var ExplorerBlocks = (function () {
       var split = el(doc, "div", null, "xplore-split");
       var actPanel = el(doc, "div", null, "xplore-panel");
       actPanel.appendChild(el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
+      actPanel.appendChild(el(doc, "div", t("explorer.info_h", "INFO"), "xplore-subh"));
       if (!ops || ops.length === 0) {
         actPanel.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity."), "muted"));
       } else {
@@ -691,11 +829,11 @@ var ExplorerBlocks = (function () {
       var shown = rows.slice(0, TABLE_ROWS);
       var tableRows = shown.map(function (r) {
         var n = r.tx_count;
-        return [anchor(doc, "#" + r.height, "#/block/" + r.height),
-          r.timestamp || "—", witnessCell(doc, r.witness, myGen),
+        return [anchor(doc, "#" + commas(r.height), "#/block/" + r.height),
+          fmtTime(r.timestamp || "—"), witnessCell(doc, r.witness, myGen),
           (n === null || n === undefined) ? "—" : String(n)];
       });
-      var scroller = scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows);
+      var scroller = scrollTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")], tableRows);
       blkPanel.appendChild(scroller);
       split.appendChild(blkPanel);
       body.appendChild(split);
@@ -720,6 +858,9 @@ var ExplorerBlocks = (function () {
         data.unshift({ height: b.height, ts: ms, txs: b.tx_count });
         if (data.length > TIP_ROWS) data.length = TIP_ROWS;
         if (ms !== null) newestTs.ts = ms;
+        else newestTs.ts = Date.now();
+        clearStall();
+        bumpLive(liveEl);
         repaint();
       });
     }
@@ -734,11 +875,11 @@ var ExplorerBlocks = (function () {
       if (!isTip) {
         var tableRows = rows.map(function (r) {
           var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
-          return [anchor(doc, "#" + r.height, "#/block/" + r.height),
-            r.timestamp || "—", witnessCell(doc, r.witness, myGen),
+          return [anchor(doc, "#" + commas(r.height), "#/block/" + r.height),
+            fmtTime(r.timestamp || "—"), witnessCell(doc, r.witness, myGen),
             (n === null || n === undefined) ? "—" : String(n)];
         });
-        var scroller = scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows);
+        var scroller = scrollTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")], tableRows);
         body.appendChild(scroller);
         var oldestRow = rows[rows.length - 1];
         if (oldestRow.height > 1) {

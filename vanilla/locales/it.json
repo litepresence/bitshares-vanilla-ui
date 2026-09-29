@@ -629,15 +629,15 @@
     "settlement_row": "Settlement price",
     "signatures_prefix": "Signatures (",
     "th_feed": "Feed",
-    "th_height": "Height",
+    "th_height": "Block ID",
     "th_issuer": "Issuer",
     "th_mssr": "MSSR",
     "th_precision": "Precision",
     "th_settlement": "Settlement",
     "th_supply": "Supply",
     "th_symbol": "Symbol",
-    "th_time": "Time",
-    "th_txs": "Txs",
+    "th_time": "Date",
+    "th_txs": "Transaction count",
     "th_witness": "Witness",
     "time_row": "Time",
     "tx_expired": "Transaction hash lookup covers recent transactions only — this one is expired or unknown.",
@@ -680,7 +680,8 @@
     "pill_cancel": "Cancel order",
     "pill_transfer": "Transfer",
     "ago_one": "1 second ago",
-    "ago_many_suffix": "seconds ago"
+    "ago_many_suffix": "seconds ago",
+    "info_h": "INFO"
   },
   "gateway": {
     "title": "Deposit / Withdraw",

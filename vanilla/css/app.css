@@ -727,20 +727,44 @@ img, canvas, pre { max-width: 100%; }
 
 /* Blockchain tab: stat grid + activity/blocks pair (original Blocks.jsx
  * stat rows + Recent activity/Recent blocks — concepts only, tokens only).
- * Shell h1 folds away visually (single-h1 a11y kept); stats read label-caps
- * over big values; split stacks on phones, pairs ≥1200px; pills carry the
- * op kind in token hues; the bar-strip canvas sizes via CSS. */
+ * Shell h1 folds away visually (single-h1 a11y kept); stats read centered
+ * small-caps labels over huge thin values like the original (h2-scale
+ * numbers, green fresh-time + green counts, orange missed); split stacks on
+ * phones, pairs ≥1200px; pills carry the op kind in token hues; the
+ * bar-strip canvases size via CSS. */
 .xplore-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap; }
+/* Explorer subtab bar: dark underline tabs like the original (grey caps,
+ * active accent underline) — same treatment as .mkt-tabs so all tab rows
+ * agree; wraps on phones so every tab stays visible at 360px. */
+.xplore-tabs { display: flex; flex-wrap: wrap; gap: 0 16px;
+  border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
+.xplore-tab { background: transparent; color: var(--muted); border: 0;
+  border-radius: 0; border-bottom: 2px solid transparent;
+  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; }
+.xplore-tab:hover { color: var(--text); }
+.xplore-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .xplore-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 16px; margin: 12px 0 16px; }
+  gap: 16px 16px; margin: 16px 0 20px; }
 @media (min-width: 700px) {
   .xplore-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
-.xplore-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xplore-stat { display: flex; flex-direction: column; gap: 4px; min-width: 0;
+  text-align: center; }
 .xplore-stat-label { color: var(--muted); font-size: 0.72rem;
   text-transform: uppercase; letter-spacing: 0.05em; }
-.xplore-stat-val { font-size: 1.25rem; font-weight: 600; overflow-wrap: anywhere; }
+.xplore-stat-val { font-size: 1.8rem; font-weight: 400; line-height: 1.2;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* Current/stealth supplies read smaller (original renders them as h3 under
+ * the h2-scale stats, same muted weight as the values). */
+.xplore-stat-val.xplore-sm { font-size: 1.25rem; }
+/* Phones (360–390px): half-columns are ~160px — the h2-scale values would
+ * wrap mid-number, so step them down (supplies already ride .xplore-sm).
+ * This query MUST stay after the base rules (equal specificity, later wins). */
+@media (max-width: 699px) {
+  .xplore-stat-val { font-size: 1.05rem; }
+}
 .xplore-green { color: var(--live); text-transform: uppercase; }
 .xplore-warn { color: var(--warn); }
 .xplore-split { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
@@ -749,11 +773,14 @@ img, canvas, pre { max-width: 100%; }
 }
 .xplore-panel { min-width: 0; }
 .xplore-panel-h { font-size: 1.1rem; font-weight: 600; margin: 4px 0 8px; }
+/* INFO subhead over the activity rows (original Blocks.jsx table header). */
+.xplore-subh { color: var(--muted); font-size: 0.78rem; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase; margin: 0 0 4px; }
 .xplore-act-row { display: flex; gap: 8px; align-items: baseline;
   padding: 8px 0; border-bottom: 1px solid var(--border); }
 .xplore-act-sent { min-width: 0; overflow-wrap: anywhere; }
 .xplore-pill { display: inline-block; flex: 0 0 auto; padding: 2px 8px;
-  border: 1px solid var(--muted); border-radius: 4px; font-size: 0.72rem;
+  border: 1px solid var(--muted); border-radius: 3px; font-size: 0.72rem;
   font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
   white-space: nowrap; color: var(--muted); }
 .xplore-pill-place { color: var(--warn); border-color: var(--warn); }
@@ -761,7 +788,7 @@ img, canvas, pre { max-width: 100%; }
 .xplore-pill-transfer { color: var(--accent); border-color: var(--accent); }
 .xplore-pill-muted { color: var(--muted); border-color: var(--muted); }
 .xplore-pill-raw { text-transform: none; }
-.xplore-bars { width: 100%; max-width: 280px; height: 56px; }
+.xplore-bars { width: 100%; max-width: 300px; height: 84px; }
 /* Footer two-line right stack (original: host caps line 1, latency/block
  * grey caps line 2) with REPORT/HELP spanning both rows: the bar stretches,
  * the side stacks center, the actions stretch full height. */
@@ -907,7 +934,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
   .pools-pager button, .nav-dir-btn, .mkt-star, .mkt-bell,
   .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind,
-  tr.xplore-flash, .xplore-live-dot {
+  tr.xplore-flash, .xplore-live-dot, .xplore-live.xplore-bump {
     transition: none;
     animation: none;
   }
@@ -923,10 +950,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
 /* Explore tab (lively like #1 Blocks.jsx:23-48 BlockTimeAgo + TransitionWrapper):
  * alternating rows on EVERY explorer subtab table (reuse .node-table
  * striping; .xplore-scroll fallback covers plain tables like the fee
- * schedule), green live indicator (footer --live token), flashing new-block
- * row (CSS animation, reduced-motion safe). Tokens only — all three themes. */
+ * schedule), green live indicator with pulsing dot + landing bump on each
+ * head (CSS keyframes only, reduced-motion safe), flashing new-block row
+ * (CSS animation, reduced-motion safe). Tokens only — all three themes. */
 .xplore-scroll table { width: 100%; border-collapse: collapse; background: var(--panel); }
-.xplore-scroll table th, .xplore-scroll table td { padding: 12px;
+.xplore-scroll table th, .xplore-scroll table td { padding: 8px 12px;
   border-bottom: 1px solid var(--border); text-align: left; }
 .xplore-scroll table th { text-transform: uppercase; font-size: 0.78rem;
   letter-spacing: 0.05em; font-weight: 600; }
@@ -937,7 +965,11 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
 .xplore-live[data-state="live"] { color: var(--live); }
 .xplore-live[data-state="paused"] { color: var(--muted); }
 .xplore-live-dot { font-size: 1rem; line-height: 1; }
-.xplore-live[data-state="live"] .xplore-live-dot { color: var(--live); }
+.xplore-live[data-state="live"] .xplore-live-dot { color: var(--live);
+  animation: xplore-pulse 1.6s ease-in-out infinite; }
 .xplore-live[data-state="paused"] .xplore-live-dot { color: var(--muted); }
 @keyframes xplore-flash { from { background-color: var(--live); } to { background-color: transparent; } }
 tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }
+@keyframes xplore-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes xplore-bump { 0% { transform: scale(1); } 30% { transform: scale(1.04); } 100% { transform: scale(1); } }
+.xplore-live.xplore-bump { animation: xplore-bump 0.45s ease-out 1; }
