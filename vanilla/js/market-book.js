@@ -185,15 +185,17 @@ var MarketBook = (function () {
   }
 
   /* Book side table + phone cards (same .node-table/.node-cards pattern as
-  * account-ui renderBalances). Amount = quote leg, Total = base leg, both
-  * verbatim chain-human strings. Depth fraction per row comes from
-  * Market.depth cumulative totalBase Numbers (pixels, not money — same as
-  * the depth chart); the row stores it as --depth for desk-grid.css, which
-  * paints ONE absolutely-positioned .depth-bar behind the row text
-  * (asks red from the left, bids green from the right —
-  * bitshares-ui OrderBook.jsx:176-184). Scroll regions + grid live in
-  * desk-grid.css (.book-scroll/.book-cards/.book-grid). */
-  function renderBookSide(doc, section, title, levels, depthPts) {
+   * account-ui renderBalances). Amount = quote leg, Total = base leg, both
+   * verbatim chain-human strings. Depth fraction per row comes from
+   * Market.depth cumulative totalBase Numbers (pixels, not money — same as
+   * the depth chart); the row stores it as --depth for desk-grid.css, which
+   * paints ONE absolutely-positioned .depth-bar behind the row text
+   * (asks red from the left, bids green from the right —
+   * bitshares-ui OrderBook.jsx:176-184). logVol mirrors the depth chart's
+   * volume toggle (log widths share its scale so bars and chart agree);
+   * absent/false keeps the legacy linear share. Scroll regions + grid live
+   * in desk-grid.css (.book-scroll/.book-cards/.book-grid). */
+  function renderBookSide(doc, section, title, levels, depthPts, logVol) {
     var isAsk = title === "Asks";
     /* Title doubles as the caller's side key (Asks/Bids drive the depth-bar
      * color below), so the h3 localizes through a static per-side key while
@@ -229,7 +231,14 @@ var MarketBook = (function () {
       var lv = levels[i] || {};
       var pct = 0; /* width percent: pixel shading from depth Numbers only */
       if (maxTot > 0 && depthPts[i] && typeof depthPts[i].totalBase === "number") {
-        pct = (100 * depthPts[i].totalBase) / maxTot;
+        var tot = depthPts[i].totalBase;
+        if (logVol) {
+          /* Log share: dust stays visible next to whales (same compression
+           * as the log-volume chart axis). ln(1+x) keeps 0 at 0%. */
+          pct = tot <= 0 ? 0 : (100 * Math.log(1 + tot)) / Math.log(1 + maxTot);
+        } else {
+          pct = (100 * tot) / maxTot;
+        }
         if (!(pct >= 0)) pct = 0;
         if (pct > 100) pct = 100;
       }
@@ -337,8 +346,8 @@ var MarketBook = (function () {
     var grid = doc.createElement("div");
     grid.className = "book-grid";
     parentEl.appendChild(grid);
-    renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse());
-    renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids);
+    renderBookSide(doc, grid, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse(), !!ctx.logVol);
+    renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol);
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
