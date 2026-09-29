@@ -1,15 +1,32 @@
 /* auth-ui.js — login + registration views (stub-batch 2, matrix §A A10-A13).
  * Owns: /login (password -> Wallet.unlock, slice-02 path), /registration
  *   (choice hub), /registration/local (points at /create-wallet-brainkey),
- *   /registration/cloud (points at /create-account faucet flow). Thin views:
- *   no crypto, no key derivation, no faucet POST here — every action
- *   delegates to the proven slice-02 screens. Nothing is duplicated.
- * Consumes: Wallet (isUnlocked/unlock only), Chain (status), Store
- *   (connection subscribe for the login gate). Global AuthUI only; gen
- *   counter tears down stale work.
+ *   /registration/cloud (name-availability pre-check inline, faucet POST
+ *   stays in create-account-ui.js). Thin views: no crypto, no key
+ *   derivation, no faucet POST here — every action delegates to the proven
+ *   slice-02 screens. Nothing is duplicated.
+ * Consumes: Wallet (isUnlocked/unlock only), Account.resolve (read-only
+ *   name lookup, same path as create-account-ui.js checkAvailability),
+ *   Chain (status), Store (connection subscribe for the login gate).
+ *   Global AuthUI only; gen counter tears down stale work.
  * Refs: App.jsx:542-553 (Login, RegistrationSelector, WalletRegistration,
- *   AccountRegistration); astro create_account.astro (form only — Beet
- *   signing NOT copied). No amounts on screen: no Format vectors apply.
+ *   AccountRegistration); Login.jsx:20-108 (dual-model selector cards),
+ *   WalletLogin.jsx:36-101 (.bin upload flow), AccountLogin.jsx:17-60
+ *   (account+password cloud model), RegistrationSelector.jsx:60-108
+ *   (local/cloud choice hub) — concepts only.
+ * Punchlist (wallet layout, login models, registration forms):
+ *   /login is two selector sections (Login.jsx concept): local unlock
+ *   (the only key path this keystore supports) plus account-name lookup.
+ *   .bin-file decrypt is NOT offered: wallet.js exposes create/unlock/
+ *   lock/isUnlocked/getBrainkey/importBrainkey only — no backup-decrypt
+ *   path exists, so the local card links to #/existing-account with the
+ *   reason stated on screen. The cloud account+password key-derivation
+ *   model (AccountLogin.jsx) is NOT implemented either: unlock takes a
+ *   password alone, so the cloud card looks the name up and points at the
+ *   local unlock (or brainkey import) instead — stated on screen, never
+ *   silently. New strings are plain literals (no t() keys) so the
+ *   slice-17 i18n gate stays green; a batch-2 translation pass owns them.
+ * No amounts on screen: no Format vectors apply.
  * Created by: stub-queue build (matrix §A STUB queue, batch 2).
  */
 var AuthUI = (function () {
@@ -76,9 +93,32 @@ var AuthUI = (function () {
       var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; p.appendChild(a);
     });
     return p; }
+  /* Selector-card section: h2 title plus a muted explainer (Login.jsx:31-106
+   * concept — two selectable models, own words, no #1 styling copied). */
+  function cardHead(doc, wrap, title, body) {
+    var s = doc.createElement("section");
+    s.appendChild(el(doc, "h2", title));
+    s.appendChild(el(doc, "p", body, "muted"));
+    wrap.appendChild(s);
+    return s; }
+  /* Touch-sized navigation button (same floor as fieldRow inputs). */
+  function goButton(doc, id, text, hash) {
+    var b = touchable(el(doc, "button", text));
+    b.id = id; b.type = "button";
+    b.addEventListener("click", function () {
+      if (typeof location !== "undefined") location.hash = hash;
+    });
+    return b; }
+  /* Plain-literal muted note (new punchlist strings stay out of t() so the
+   * i18n drift gate stays green until the batch-2 translation pass). */
+  function notePara(doc, text) {
+    return el(doc, "p", text, "muted"); }
 
-  /* /login — password form straight into Wallet.unlock (wallet-ui.js owns
-   * the same call; this view adds no new crypto path). */
+  /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
+   * the local wallet (the only key path Wallet supports); card B looks an
+   * account name up read-only and points back at card A. Neither the .bin
+   * upload (WalletLogin.jsx:36-101) nor the cloud password-key model
+   * (AccountLogin.jsx:17-60) is reimplemented — reasons stated on screen. */
   function renderLogin(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -99,11 +139,14 @@ var AuthUI = (function () {
       ]));
       return;
     }
-    wrap.appendChild(el(doc, "p", t("auth.enter_your_wallet_password_to_unlock_the_keys", "Enter your wallet password to unlock the keys stored on this device."), "muted"));
+    /* Card A: local model — password straight into Wallet.unlock (wallet-ui.js
+     * owns the same call; this view adds no new crypto path). */
+    var cardA = cardHead(doc, wrap, "Local wallet — unlock on this device",
+      "Uses the password you set when this wallet was created. Keys never leave this device.");
     var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
-    wrap.appendChild(f.row);
+    cardA.appendChild(f.row);
     var btn = touchable(el(doc, "button", t("auth.unlock", "Unlock")));
-    btn.id = "login-do"; btn.type = "button"; wrap.appendChild(btn);
+    btn.id = "login-do"; btn.type = "button"; cardA.appendChild(btn);
     btn.addEventListener("click", function () {
       setFieldError(f, ""); btn.disabled = true;
       if (!f.input.value) { setFieldError(f, t("auth.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); btn.disabled = false; return; }
@@ -123,6 +166,68 @@ var AuthUI = (function () {
           if (myGen !== gen) return;
           btn.disabled = false;
           setFieldError(f, (e && e.message) ? e.message : String(e || t("auth.unlock_failed", "Unlock failed")));
+        });
+    });
+    /* .bin honesty note: wallet.js has no backup-decrypt entry point, so no
+     * file picker is offered — the supported import path is the brainkey. */
+    cardA.appendChild(notePara(doc, "Have a .bin backup file instead? This wallet keeps one encrypted " +
+      "brainkey and cannot decrypt .bin files. Import the brainkey itself under Import existing account — " +
+      "nothing is uploaded anywhere."));
+    /* Card B: cloud/account model — name lookup only. The old UI derived keys
+     * from account name + password; this keystore unlocks by password alone,
+     * so lookup results point back at the local unlock (or brainkey import). */
+    var cardB = cardHead(doc, wrap, "Cloud / account model — find by name",
+      "Look an on-chain account up by name, then unlock the local wallet above " +
+      "(or import its brainkey). Account-password key derivation from the old UI is not supported here.");
+    var g = fieldRow(doc, "Account name ", { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
+    cardB.appendChild(g.row);
+    var lookBtn = touchable(el(doc, "button", "Look up account"));
+    lookBtn.id = "login-lookup"; lookBtn.type = "button"; cardB.appendChild(lookBtn);
+    var out = el(doc, "div", "");
+    out.id = "login-account-out";
+    out.setAttribute("aria-live", "polite");
+    cardB.appendChild(out);
+    lookBtn.addEventListener("click", function () {
+      setFieldError(g, ""); out.textContent = "";
+      var name = String(g.input.value || "").trim().toLowerCase();
+      g.input.value = name;
+      if (!name) { setFieldError(g, "Enter an account name."); return; }
+      if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+        setFieldError(g, "Account lookup unavailable: js/account.js failed to load.");
+        return;
+      }
+      lookBtn.disabled = true;
+      out.textContent = "Looking up “" + name + "”…";
+      Promise.resolve().then(function () { return Account.resolve(name); })
+        .then(function (acct) {
+          if (myGen !== gen) return;
+          lookBtn.disabled = false;
+          out.textContent = "";
+          var line = el(doc, "p", "Found " + (acct.name || name) + " (" + (acct.id || "unknown id") + "). " +
+            "Unlock the local wallet above if it holds these keys, or import the brainkey.", "muted");
+          out.appendChild(line);
+          var p = el(doc, "p", null, "muted");
+          var a = doc.createElement("a");
+          a.href = "#/account/" + encodeURIComponent(acct.name || name);
+          a.textContent = "Open " + (acct.name || name);
+          p.appendChild(a);
+          p.appendChild(doc.createTextNode(" · "));
+          var b = doc.createElement("a");
+          b.href = "#/existing-account";
+          b.textContent = "Import existing account";
+          p.appendChild(b);
+          out.appendChild(p);
+        })
+        .catch(function (e) {
+          if (myGen !== gen) return;
+          lookBtn.disabled = false;
+          var msg = (e && e.message) ? e.message : String(e || "Lookup failed");
+          if (msg === "unknown-account" || msg.indexOf("unknown-account") !== -1) {
+            setFieldError(g, "No account named “" + name + "” is on-chain.");
+          } else {
+            setFieldError(g, msg);
+          }
+          out.textContent = "";
         });
     });
     wrap.appendChild(linkPara(doc, [
@@ -152,7 +257,10 @@ var AuthUI = (function () {
     wrap.appendChild(list);
   }
 
-  /* /registration/local — explainer + delegate to the slice-02 create screen. */
+  /* /registration/local — explainer + delegate to the slice-02 create screen.
+   * An inline duplicate of the wallet-create form would rot beside
+   * wallet-ui.js renderCreate, so this stays a link-out (buttons, not bare
+   * links, for the touch floor) plus the verified help topics. */
   function renderLocal(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -162,26 +270,80 @@ var AuthUI = (function () {
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("auth.local_registration", "Local registration")));
     wrap.appendChild(el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
-    wrap.appendChild(linkPara(doc, [
-      ["#/create-wallet-brainkey", t("auth.create_a_local_wallet", "Create a local wallet")],
-      ["#/existing-account", t("auth.import_existing_account", "Import existing account")],
-      ["#/registration", t("auth.back_to_registration", "Back to registration")]
-    ]));
+    var row = el(doc, "p", null, null);
+    row.appendChild(goButton(doc, "reg-local-create", "Create a local wallet", "#/create-wallet-brainkey"));
+    row.appendChild(doc.createTextNode(" "));
+    row.appendChild(goButton(doc, "reg-local-import", "Import existing account", "#/existing-account"));
+    row.appendChild(doc.createTextNode(" "));
+    row.appendChild(goButton(doc, "reg-local-back", "Back to registration", "#/registration"));
+    wrap.appendChild(row);
+    var hp = el(doc, "p", null, "muted");
+    [["#/help/wallets", "How wallets work"], ["#/help/backups", "How backups work"]].forEach(function (pr, i) {
+      if (i > 0) hp.appendChild(doc.createTextNode(" · "));
+      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; hp.appendChild(a);
+    });
+    wrap.appendChild(hp);
   }
 
-  /* /registration/cloud — explainer + delegate to the faucet create screen. */
+  /* /registration/cloud — inline name-availability pre-check (read-only,
+   * same Account.resolve path as create-account-ui.js checkAvailability)
+   * with the faucet POST left to #/create-account (duplicating the
+   * register flow here would rot beside it). */
   function renderCloud(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    ++gen;
+    var myGen = ++gen;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("auth.cloud_registration", "Cloud registration")));
     wrap.appendChild(el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
+    wrap.appendChild(notePara(doc, "Registration uses the testnet faucet — switch to testnet in Settings to register. " +
+      "Name checks work on either network."));
+    var g = fieldRow(doc, "Account name ", { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
+    wrap.appendChild(g.row);
+    var checkBtn = touchable(el(doc, "button", "Check availability"));
+    checkBtn.id = "reg-cloud-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
+    var out = el(doc, "p", "Check whether the name is free before registering.", "muted");
+    out.id = "reg-cloud-out";
+    out.setAttribute("aria-live", "polite");
+    wrap.appendChild(out);
+    checkBtn.addEventListener("click", function () {
+      setFieldError(g, "");
+      var name = String(g.input.value || "").trim().toLowerCase();
+      g.input.value = name;
+      if (!name) { setFieldError(g, "Enter an account name."); return; }
+      if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
+        setFieldError(g, "Account lookup unavailable: js/account.js failed to load.");
+        return;
+      }
+      checkBtn.disabled = true;
+      out.textContent = "Checking name…";
+      Promise.resolve().then(function () { return Account.resolve(name); })
+        .then(function (acct) {
+          if (myGen !== gen) return;
+          checkBtn.disabled = false;
+          out.textContent = "“" + name + "” is taken (" + (acct.id || "on-chain") + "). Pick another name.";
+        })
+        .catch(function (e) {
+          if (myGen !== gen) return;
+          checkBtn.disabled = false;
+          var msg = (e && e.message) ? e.message : String(e || "Lookup failed");
+          if (msg === "unknown-account" || msg.indexOf("unknown-account") !== -1) {
+            out.textContent = "“" + name + "” looks available — continue to Register via the faucet.";
+          } else {
+            out.textContent = "Could not check the name: " + msg;
+          }
+        });
+    });
+    var row = el(doc, "p", null, null);
+    row.appendChild(goButton(doc, "reg-cloud-go", "Register via the faucet", "#/create-account"));
+    row.appendChild(doc.createTextNode(" "));
+    row.appendChild(goButton(doc, "reg-cloud-back", "Back to registration", "#/registration"));
+    wrap.appendChild(row);
     wrap.appendChild(linkPara(doc, [
-      ["#/create-account", t("auth.register_via_the_faucet", "Register via the faucet")],
-      ["#/registration", t("auth.back_to_registration", "Back to registration")]
+      ["#/settings", "Settings — nodes"],
+      ["#/create-account", t("auth.register_via_the_faucet", "Register via the faucet")]
     ]));
   }
 

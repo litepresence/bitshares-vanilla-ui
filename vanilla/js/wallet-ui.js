@@ -6,6 +6,18 @@
  *   WalletUI. No network, no storage, no keys at rest — all key material stays
  *   inside Wallet's memory-only unlock state.
  * Created by: building-vanilla-slices skill, slice-02 Task 6.
+ * Punchlist (wallet layout, login models, registration forms): create screen
+ *   restacked into div.xfer-field rows (app.css section (a) stacks them —
+ *   bare inline appends overlapped); Cancel button (history.back + #/wallet
+ *   fallback); wallet public-name field when a stored wallet exists
+ *   (label-only: single-slot keystore keeps no names — persisted under
+ *   bts-vanilla-wallet-name-v1); custom-brainkey toggle + dictionary hint
+ *   (BRAINKEY_DICT read-only, length-only fallback); password hint meter
+ *   (rough local estimate, NOT a security rating); help links to the
+ *   verified topics #/help/wallets + #/help/backups (help-ui.js TOPICS).
+ *   Refs (concepts only): WalletCreate.jsx:168-270 (name/custom/cancel),
+ *   PasswordConfirm.jsx:42-62 (8-char + match rule), BrainkeyInput.jsx:48-90
+ *   (50-char / 16-word dictionary hint).
  */
 var WalletUI = (function () {
   "use strict";
@@ -68,12 +80,115 @@ var WalletUI = (function () {
     return area;
   }
 
-  /* Labeled row: <label>text <field></label>. */
+  /* Labeled row: <label>text <field></label>. Kept for the single-field
+   * manager/import screens; the create screen uses fieldRow below. */
   function labeledRow(doc, labelText, field) {
     var label = doc.createElement("label");
     label.appendChild(doc.createTextNode(labelText + " "));
     label.appendChild(field);
     return label;
+  }
+
+  /* Stacked form row: div.xfer-field > label(text + field). app.css section
+   * (a) stacks these below ~720px and grids them label|input above — bare
+   * appends share one inline line and overlap, so every create-screen field
+   * goes through here (same DOM contract as transfer-ui.js fieldRow). */
+  function fieldRow(doc, labelText, field) {
+    var row = doc.createElement("div");
+    row.className = "xfer-field";
+    var label = doc.createElement("label");
+    label.appendChild(doc.createTextNode(labelText + " "));
+    label.appendChild(field);
+    row.appendChild(label);
+    return row;
+  }
+
+  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
+  function touchable(node) {
+    node.style.minHeight = "44px";
+    return node;
+  }
+
+  /* Muted paragraph of internal links (href + text pairs). */
+  function helpPara(doc, pairs) {
+    var p = doc.createElement("p");
+    p.className = "muted";
+    pairs.forEach(function (pr, i) {
+      if (i > 0) p.appendChild(doc.createTextNode(" · "));
+      var a = doc.createElement("a");
+      a.href = pr[0];
+      a.textContent = pr[1];
+      p.appendChild(a);
+    });
+    return p;
+  }
+
+  /* True when an encrypted wallet envelope is stored on this device.
+   * Same key the keystore owns (wallet.js LS_KEY); password-ui.js already
+   * probes it this way. try/catch: storage may be missing/blocked. */
+  function hasStoredWallet() {
+    try {
+      if (typeof localStorage === "undefined") return false;
+      return !!localStorage.getItem("bts-vanilla-wallet-v1");
+    } catch (e) { return false; }
+  }
+
+  /* Rough client-side password hint. Length plus character-class breadth maps
+   * to a word label and an approximate bits estimate (len * log2(pool)).
+   * HONEST LABELING: a guessability hint only — NOT a security claim and NOT
+   * a strength proof (no dictionary/pattern checks). Never blocks create. */
+  function passwordHint(pw) {
+    var suffix = " (rough local hint, not a security rating)";
+    if (!pw) return "Enter 8 or more characters." + suffix;
+    if (pw.length < 8) return "Too short — use 8 or more characters." + suffix;
+    var pool = 26;
+    var classes = 0;
+    if (/[a-z]/.test(pw)) classes++;
+    if (/[A-Z]/.test(pw)) { classes++; pool = 52; }
+    if (/[0-9]/.test(pw)) { classes++; pool = pool === 52 ? 62 : 36; }
+    if (/[^A-Za-z0-9]/.test(pw)) { classes++; pool = 94; }
+    var bits = Math.round(pw.length * Math.log(pool) / Math.log(2));
+    var label = bits < 40 ? "weak" : bits < 60 ? "fair" : bits < 80 ? "good" : "strong";
+    if (classes < 2) label = "weak";
+    return "Password hint: " + label + " (~" + bits + " bits)" + suffix;
+  }
+
+  /* Lazily built dictionary set for the brainkey hint. Reads the global word
+   * list crypto.js consumes (js/data/brainkey-dict.js); null when absent
+   * (file:// with missing dict) so the hint degrades to length-only. */
+  var _dictSet = null;
+  var _dictTried = false;
+  function dictSet() {
+    if (_dictTried) return _dictSet;
+    _dictTried = true;
+    try {
+      if (typeof BRAINKEY_DICT === "string" && BRAINKEY_DICT) {
+        _dictSet = {};
+        BRAINKEY_DICT.split(",").forEach(function (w) { _dictSet[w] = true; });
+      }
+    } catch (e) { _dictSet = null; }
+    return _dictSet;
+  }
+
+  /* Brainkey validation hint (BrainkeyInput.jsx:48-90 concept, own words):
+   * 50-char minimum, 16 words recommended, unknown words flagged. Hint only —
+   * Wallet.create enforces the 50-char floor; nothing here blocks or claims. */
+  function brainkeyHintText(bk) {
+    var words = String(bk || "").trim().split(/\s+/).filter(function (w) { return !!w; });
+    if (!words.length) return "Brainkey: waiting to generate… (50 characters minimum, 16 words recommended)";
+    var chars = String(bk).length;
+    var text = "Brainkey: " + chars + " characters (50 minimum) · " +
+      words.length + " words (16 recommended)";
+    var set = dictSet();
+    if (set) {
+      var unknown = 0;
+      words.forEach(function (w) {
+        var m = w.toLowerCase().match(/[a-z]+/);
+        if (!m || !set[m[0]]) unknown++;
+      });
+      if (unknown > 0) text += " · " + unknown + " word(s) outside the dictionary (hint only)";
+    }
+    return text;
   }
 
   /* Submit-style button (click-only activation, never hover-dependent). */
@@ -217,12 +332,19 @@ var WalletUI = (function () {
   }
 
   /* Create screen: generated brainkey plus write-down checkbox gate, then
-   * password plus confirm, then create. Success swaps to a backup view with
-   * the brainkey and derived pubkeys. All failures show inline. */
+   * password plus confirm plus strength hint, then create/cancel. Wallet name
+   * shows only when a stored wallet exists (WalletCreate.jsx:168-186
+   * concept — single-slot keystore, so label-only with an overwrite warning).
+   * Custom-brainkey toggle flips the textarea editable with a dictionary
+   * hint (BrainkeyInput concept). All failures show inline. */
   function renderCreate(root) {
     var doc = root.ownerDocument;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
+    wrap.appendChild(helpPara(doc, [
+      ["#/help/wallets", "How wallets work"],
+      ["#/help/backups", "How backups work"]
+    ]));
     var h1 = doc.createElement("h1");
     h1.textContent = "Create Wallet (Brainkey)";
     wrap.appendChild(h1);
@@ -239,38 +361,116 @@ var WalletUI = (function () {
       "Anyone with it can spend your funds.";
     wrap.appendChild(hint);
 
+    var customMode = false;
     var bkArea = brainkeyField(doc, "create-brainkey", true);
     bkArea.placeholder = "Generating brainkey…";
-    wrap.appendChild(bkArea);
-    var genBtn = actionButton(doc, "create-regen", "Generate new brainkey");
-    wrap.appendChild(genBtn);
+    bkArea.style.width = "100%";
+    wrap.appendChild(fieldRow(doc, "Brainkey", bkArea));
+    var bkHint = doc.createElement("p");
+    bkHint.className = "muted";
+    bkHint.setAttribute("aria-live", "polite");
+    bkHint.textContent = brainkeyHintText("");
+    wrap.appendChild(bkHint);
+    function refreshBkHint() { bkHint.textContent = brainkeyHintText(bkArea.value); }
+    bkArea.addEventListener("input", refreshBkHint);
+
+    var regenRow = doc.createElement("p");
+    var genBtn = touchable(actionButton(doc, "create-regen", "Generate new brainkey"));
+    regenRow.appendChild(genBtn);
+    regenRow.appendChild(doc.createTextNode(" "));
+    var customBtn = touchable(actionButton(doc, "create-custom", "Use custom brainkey instead"));
+    regenRow.appendChild(customBtn);
+    wrap.appendChild(regenRow);
     var err = makeError(doc);
     wrap.appendChild(err);
 
+    var checkRow = doc.createElement("div");
+    checkRow.className = "xfer-field";
     var checkLabel = doc.createElement("label");
     var check = doc.createElement("input");
     check.id = "create-written";
     check.type = "checkbox";
     checkLabel.appendChild(check);
     checkLabel.appendChild(doc.createTextNode(" I wrote it down"));
-    wrap.appendChild(checkLabel);
+    checkRow.appendChild(checkLabel);
+    wrap.appendChild(checkRow);
 
-    wrap.appendChild(labeledRow(doc, "Password", passwordField(doc, "create-password")));
-    wrap.appendChild(labeledRow(doc, "Confirm password", passwordField(doc, "create-confirm")));
-    var createBtn = actionButton(doc, "create-do", "Create wallet");
-    wrap.appendChild(createBtn);
+    /* Public name (WalletCreate.jsx:168-186 concept): only when a wallet
+     * already exists, since a fresh device needs no disambiguation. */
+    var nameInput = null;
+    if (hasStoredWallet()) {
+      nameInput = doc.createElement("input");
+      nameInput.id = "create-wallet-name";
+      nameInput.type = "text";
+      nameInput.value = "default";
+      nameInput.setAttribute("spellcheck", "false");
+      nameInput.setAttribute("autocomplete", "off");
+      nameInput.addEventListener("input", function () {
+        var v = nameInput.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+        if (v !== nameInput.value) nameInput.value = v;
+      });
+      wrap.appendChild(fieldRow(doc, "Wallet name", nameInput));
+      var overwrite = doc.createElement("p");
+      overwrite.className = "muted";
+      overwrite.textContent = "A wallet already exists on this device — " +
+        "creating replaces it. The name is only a label; this device keeps a single wallet.";
+      wrap.appendChild(overwrite);
+    }
+
+    var pwInput = passwordField(doc, "create-password");
+    wrap.appendChild(fieldRow(doc, "Password", pwInput));
+    var pwMeter = doc.createElement("p");
+    pwMeter.className = "muted";
+    pwMeter.setAttribute("aria-live", "polite");
+    pwMeter.textContent = passwordHint("");
+    wrap.appendChild(pwMeter);
+    pwInput.addEventListener("input", function () {
+      pwMeter.textContent = passwordHint(pwInput.value);
+    });
+    var confirmInput = passwordField(doc, "create-confirm");
+    wrap.appendChild(fieldRow(doc, "Confirm password", confirmInput));
+
+    var actionRow = doc.createElement("p");
+    var createBtn = touchable(actionButton(doc, "create-do", "Create wallet"));
+    actionRow.appendChild(createBtn);
+    actionRow.appendChild(doc.createTextNode(" "));
+    var cancelBtn = touchable(actionButton(doc, "create-cancel", "Cancel"));
+    actionRow.appendChild(cancelBtn);
+    wrap.appendChild(actionRow);
 
     function generate() {
       err.textContent = "";
+      customMode = false;
+      bkArea.readOnly = true;
       bkArea.placeholder = "Generating brainkey…";
+      customBtn.style.display = "";
       return Crypto.suggestBrainkey().then(function (bk) {
         bkArea.value = bk;
+        refreshBkHint();
       }).catch(function (e) {
         setError(err, e);
       });
     }
 
     genBtn.addEventListener("click", function () { generate(); });
+    customBtn.addEventListener("click", function () {
+      customMode = true;
+      bkArea.readOnly = false;
+      bkArea.value = "";
+      bkArea.placeholder = "type your own brainkey words…";
+      customBtn.style.display = "none";
+      refreshBkHint();
+      bkArea.focus();
+    });
+    cancelBtn.addEventListener("click", function () {
+      try {
+        if (typeof window !== "undefined" && window.history && window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+      } catch (e) { /* fallback below */ }
+      if (typeof location !== "undefined") location.hash = "#/wallet";
+    });
     createBtn.addEventListener("click", function () {
       err.textContent = "";
       var bk = bkArea.value;
@@ -280,18 +480,36 @@ var WalletUI = (function () {
         err.textContent = "Confirm you wrote the brainkey down first.";
         return;
       }
+      if (customMode && String(bk || "").length < 50) {
+        err.textContent = "Custom brainkey too short: 50 characters minimum after trimming.";
+        return;
+      }
       if (!pw) {
         err.textContent = "Password required: enter a non-empty password.";
+        return;
+      }
+      if (pw.length < 8) {
+        err.textContent = "Password must be 8 characters or more.";
         return;
       }
       if (pw !== confirm) {
         err.textContent = "Passwords do not match.";
         return;
       }
+      var walletName = nameInput ? nameInput.value : "default";
+      if (nameInput && !walletName) {
+        err.textContent = "Wallet name required: use letters, digits, dash or underscore.";
+        return;
+      }
       createBtn.disabled = true;
       Promise.resolve()
         .then(function () { return Wallet.create(pw, bk); })
         .then(function (keys) {
+          try {
+            if (typeof localStorage !== "undefined") {
+              localStorage.setItem("bts-vanilla-wallet-name-v1", walletName);
+            }
+          } catch (e) { /* label is best-effort; the wallet itself is saved */ }
           clearRoot(root);
           var done = makeWrap(doc, root);
           var h2 = doc.createElement("h2");
@@ -299,12 +517,16 @@ var WalletUI = (function () {
           done.appendChild(h2);
           var saved = brainkeyField(doc, "create-backup-text", true);
           saved.value = bk;
+          saved.style.width = "100%";
           done.appendChild(saved);
           done.appendChild(pubkeyList(doc, keys || {}));
           var toWallet = doc.createElement("a");
           toWallet.href = "#/wallet";
           toWallet.textContent = "Go to wallet manager";
           done.appendChild(toWallet);
+          done.appendChild(helpPara(doc, [
+            ["#/help/backups", "How backups work"]
+          ]));
         })
         .catch(function (e) {
           createBtn.disabled = false;
