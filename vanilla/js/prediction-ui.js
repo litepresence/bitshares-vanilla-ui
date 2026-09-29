@@ -282,7 +282,7 @@ var PredictionUI = (function () {
     wrap.appendChild(el(doc, "p", t("prediction.new_markets_are_created_under_assets_", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network."), "muted"));
 
     var status = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
-    var tableWrap = el(doc, "div", null, "table-scroll"); wrap.appendChild(tableWrap);
+    var tableWrap = el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(tableWrap);
     var note = el(doc, "p", "", "muted"); wrap.appendChild(note);
     var createP = el(doc, "p", "", "muted"); wrap.appendChild(createP);
     var ca = doc.createElement("a"); ca.href = "#/assets/create"; ca.textContent = t("prediction.create_one_under_assets_create_pma_tab", "Create one under Assets → Create (PMA tab)");
@@ -355,7 +355,7 @@ var PredictionUI = (function () {
       clearBox(tableWrap);
       var q = (search.value || "").toUpperCase(), f = filterSel.value;
       var hideU = !!(chkU && chkU.checked), hideI = !!(chkI && chkI.checked);
-      var table = doc.createElement("table");
+      var table = doc.createElement("table"); table.className = "node-table";
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
       /* LIST columns (#1 OverviewTable concepts: description + condition +
        * expiry + market button per row, plus validity label + Details link;

@@ -601,6 +601,25 @@ img, canvas, pre { max-width: 100%; }
  * (same contract as .pools-scroll above); sticky first column is global. */
 .offers-scroll { overflow-x: auto; }
 
+/* Prediction list: 10 columns keep ref density at every width (same contract
+ * as .pools-scroll/.offers-scroll above — scroll region, never cards; the
+ * .table-scroll hook stays on the wrapper for compat). Sticky first column
+ * is global via .node-table; cells stay nowrap so the region — not the page
+ * — absorbs the width. Cell links get inline-block padding so the 44px touch
+ * target is real (inline <a> min-height alone does not size). Toolbar wraps
+ * so the search/filter/lookup/buttons fit 360px phones. */
+.prediction-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.prediction-scroll table.node-table th, .prediction-scroll table.node-table td { white-space: nowrap; }
+.prediction-scroll td a { display: inline-block; padding: 10px 12px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar input[type="search"], .toolbar input[type="text"] { flex: 1 1 160px; min-width: 0; }
+.toolbar label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
+@media (max-width: 559px) {
+  /* Phone: opt back into the table inside the scroll region (shared
+   * .node-table contract hides tables <560px) — same opt-in as pools. */
+  .prediction-scroll table.node-table { display: table; }
+}
+
 /* (f) Voting rows ≥720px: rows are wrapping flex cards with inline styles
  * (vote-slate.js rowCard — display:flex, wrap, gap; main flex 1 1 200px).
  * Keep the wrap (worker sub-rows need their own line) but stop the weight
