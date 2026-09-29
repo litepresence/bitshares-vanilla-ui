@@ -18,6 +18,24 @@
  *   Refs (concepts only): WalletCreate.jsx:168-270 (name/custom/cancel),
  *   PasswordConfirm.jsx:42-62 (8-char + match rule), BrainkeyInput.jsx:48-90
  *   (50-char / 16-word dictionary hint).
+ * Punchlist MEDs (wallet/auth selector cards): existing-account options row
+ *   (ExistingAccount.jsx:85-111 concept — BackupRestore subroutes
+ *   import-backup/import-keys/brainkey/balance-claim + dashboard/wallet
+ *   buttons when a wallet exists, own words). ROUTE CHECK vs router.js: only
+ *   #/existing-account, #/wallet, #/wallet/password,
+ *   #/create-wallet-brainkey, #/vesting, #/ exist — the four
+ *   #/existing-account/* subroutes do NOT exist and are OMITTED (never
+ *   linked); wallet.js has no .bin-decrypt or WIF-import entry point so
+ *   those options are stated-unsupported, not linked; the brainkey form
+ *   below IS this page's import path; balance-claim (op 37) lives at
+ *   #/vesting (vesting-ui.js), the honest nearest target.
+ *   ZERO new t() keys: every new string in existingOptions is a plain
+ *   literal for the next i18n batch (locales untouched):
+ *   "Ways in:", "Brainkey import (this page's form below)",
+ *   "Create new wallet instead", "Wallet manager",
+ *   "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.",
+ *   "A wallet already exists on this device.",
+ *   "Claim vesting balances", "Open the dashboard".
  */
 var WalletUI = (function () {
   "use strict";
@@ -549,6 +567,56 @@ var WalletUI = (function () {
     generate();
   }
 
+  /* Existing-account options row (ExistingAccount.jsx:85-111 concept, own
+   * words — NOT #1's subroutes). Targets verified in router.js; missing
+   * subroutes (#/existing-account/import-backup, /import-keys, /brainkey,
+   * /balance-claim) are omitted, never linked. .bin/WIF paths are
+   * stated-unsupported (wallet.js has no such entry point). Params: doc.
+   * Returns the options div. Fails: never — static links only. */
+  function existingOptions(doc) {
+    var box = doc.createElement("div");
+    var ways = doc.createElement("p");
+    ways.className = "muted";
+    ways.appendChild(doc.createTextNode("Ways in: "));
+    var pairs = [
+      ["#/create-wallet-brainkey", "Create new wallet instead"],
+      ["#/wallet", "Wallet manager"]
+    ];
+    pairs.forEach(function (pr, i) {
+      if (i > 0) ways.appendChild(doc.createTextNode(" · "));
+      var a = doc.createElement("a");
+      a.href = pr[0];
+      a.textContent = pr[1];
+      ways.appendChild(a);
+    });
+    var self = doc.createElement("span");
+    self.textContent = " · Brainkey import (this page's form below)";
+    ways.appendChild(self);
+    box.appendChild(ways);
+    var honesty = doc.createElement("p");
+    honesty.className = "muted";
+    honesty.textContent = "Have a .bin backup file or bare private keys " +
+      "instead? This wallet imports brainkeys only — .bin decrypt and WIF " +
+      "import are not supported. Nothing is uploaded anywhere.";
+    box.appendChild(honesty);
+    if (hasStoredWallet()) {
+      var have = doc.createElement("p");
+      have.className = "muted";
+      have.appendChild(doc.createTextNode("A wallet already exists on this device. "));
+      var claim = doc.createElement("a");
+      claim.href = "#/vesting";
+      claim.textContent = "Claim vesting balances";
+      have.appendChild(claim);
+      have.appendChild(doc.createTextNode(" · "));
+      var dash = doc.createElement("a");
+      dash.href = "#/";
+      dash.textContent = "Open the dashboard";
+      have.appendChild(dash);
+      box.appendChild(have);
+    }
+    return box;
+  }
+
   /* Import screen: brainkey textarea plus password, verified against the
    * chain (sequences 0..9) before anything is saved. Inline errors for
    * short brainkeys, chain failures, and unknown (no-chain-keys) brainkeys. */
@@ -571,6 +639,8 @@ var WalletUI = (function () {
     hint.textContent = "Enter your brainkey. It is checked against the chain " +
       "before anything is saved.";
     wrap.appendChild(hint);
+
+    wrap.appendChild(existingOptions(doc));
 
     var bkArea = brainkeyField(doc, "import-brainkey", false);
     bkArea.placeholder = "brainkey words…";

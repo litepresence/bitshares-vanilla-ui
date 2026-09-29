@@ -26,6 +26,42 @@
  *   local unlock (or brainkey import) instead — stated on screen, never
  *   silently. New strings are plain literals (no t() keys) so the
  *   slice-17 i18n gate stays green; a batch-2 translation pass owns them.
+ * Punchlist MEDs (wallet/auth selector cards):
+ *   (2) Login header selections + model-choice tooltips (Login.jsx:20-108
+ *   + WalletHeaderSelection/AccountHeaderSelection concept: two selectable
+ *   models with a recommended badge and per-model tooltip, own words).
+ *   No new routes: each card keeps its form and gains a short inline hint
+ *   (visible muted line + matching title attribute) paraphrasing
+ *   tooltip.registration.walletModel / accountModel.
+ *   (3) Registration dual cards (RegistrationSelector.jsx:60-108 +
+ *   WalletBlockSelection/AccountBlockSelection concept: recommended badge
+ *   + Security/Login-by/Back-up rows + Continue/Select buttons, own
+ *   words). ROUTE CHECK vs router.js: #/registration/local,
+ *   #/registration/cloud, #/create-account, #/existing-account all exist
+ *   — both cards get Continue buttons to their pages, footer keeps the
+ *   faucet/import links. No active-model toggle: both cards show Continue
+ *   (no inactive state to track on a link hub). Values are vanilla-honest
+ *   (local Login-by is password-on-device, NOT .bin-file; cloud Login-by
+ *   is name lookup, NOT password-derived keys).
+ *   (4) create-account-ui.js is FORBIDDEN (untouched): reverse
+ *   restore-account/advanced-form links live here instead — renderCloud
+ *   footer gains the #/existing-account restore link (natural: a visitor
+ *   with an account needs the import path); renderRegistration footer
+ *   already covers #/create-account + #/existing-account both ways.
+ *   ZERO new t() keys (locales untouched so parallel rounds don't
+ *   conflict) — every new string below is a plain literal for the next
+ *   i18n batch:
+ *   "Best security — stays in this browser. Move it with the brainkey backup.",
+ *   "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.",
+ *   "Local wallet — keys on this device", "Recommended",
+ *   "Security: High", "Login by: password on this device",
+ *   "Back up: yes — write down the brainkey", "Continue",
+ *   "Cloud-style account — name via the faucet", "Security: Medium",
+ *   "Login by: account-name lookup (password-derived keys are not supported here)",
+ *   "Back up: no file — the new account's brainkey is shown once at creation",
+ *   "Register a new on-chain account (testnet faucet)",
+ *   "Import an existing account (brainkey)",
+ *   "Already have an account? Import it instead of registering.".
  * No amounts on screen: no Format vectors apply.
  * Created by: stub-queue build (matrix §A STUB queue, batch 2).
  */
@@ -94,11 +130,18 @@ var AuthUI = (function () {
     });
     return p; }
   /* Selector-card section: h2 title plus a muted explainer (Login.jsx:31-106
-   * concept — two selectable models, own words, no #1 styling copied). */
-  function cardHead(doc, wrap, title, body) {
+   * concept — two selectable models, own words, no #1 styling copied).
+   * opts.hint (plain literal, MEDs) renders as a visible muted line plus a
+   * matching title attribute — the model-choice tooltip with no new route.
+   * Params: doc, wrap, title, body, opts. Returns the section. */
+  function cardHead(doc, wrap, title, body, opts) {
     var s = doc.createElement("section");
     s.appendChild(el(doc, "h2", title));
     s.appendChild(el(doc, "p", body, "muted"));
+    if (opts && opts.hint) {
+      s.setAttribute("title", opts.hint);
+      s.appendChild(el(doc, "p", opts.hint, "muted"));
+    }
     wrap.appendChild(s);
     return s; }
   /* Touch-sized navigation button (same floor as fieldRow inputs). */
@@ -142,7 +185,8 @@ var AuthUI = (function () {
     /* Card A: local model — password straight into Wallet.unlock (wallet-ui.js
      * owns the same call; this view adds no new crypto path). */
     var cardA = cardHead(doc, wrap, t("auth.local_wallet_unlock_on_this_device", "Local wallet — unlock on this device"),
-      "Uses the password you set when this wallet was created. Keys never leave this device.");
+      "Uses the password you set when this wallet was created. Keys never leave this device.",
+      { hint: "Best security — stays in this browser. Move it with the brainkey backup." });
     var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
     cardA.appendChild(f.row);
     var btn = touchable(el(doc, "button", t("auth.unlock", "Unlock")));
@@ -178,7 +222,8 @@ var AuthUI = (function () {
      * so lookup results point back at the local unlock (or brainkey import). */
     var cardB = cardHead(doc, wrap, t("auth.cloud_account_model_find_by_name", "Cloud / account model — find by name"),
       "Look an on-chain account up by name, then unlock the local wallet above " +
-      "(or import its brainkey). Account-password key derivation from the old UI is not supported here.");
+      "(or import its brainkey). Account-password key derivation from the old UI is not supported here.",
+      { hint: "No login from anywhere with name + password here — find the name below, then unlock the local wallet above." });
     var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
     cardB.appendChild(g.row);
     var lookBtn = touchable(el(doc, "button", t("auth.look_up_account", "Look up account")));
@@ -236,7 +281,12 @@ var AuthUI = (function () {
     ]));
   }
 
-  /* /registration — choice hub. Every option links at the proven screens. */
+  /* /registration — dual-card choice hub (RegistrationSelector.jsx:60-108 +
+   * WalletBlockSelection/AccountBlockSelection concept: recommended badge +
+   * Security/Login-by/Back-up rows + Continue buttons, own words, no #1
+   * styling copied). Every button target verified in router.js. Both cards
+   * show Continue (a link hub tracks no active model). Row values are
+   * vanilla-honest per the header note. */
   function renderRegistration(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -246,11 +296,37 @@ var AuthUI = (function () {
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("auth.registration", "Registration")));
     wrap.appendChild(el(doc, "p", t("auth.pick_how_to_get_started_registration_itself_h", "Pick how to get started. Registration itself happens on the linked screens — this page only points."), "muted"));
+    /* Local-wallet card: the recommended model (WalletHeaderSelection's
+     * "recommended" badge concept). */
+    var local = doc.createElement("section");
+    local.appendChild(el(doc, "h2", "Local wallet — keys on this device"));
+    var badge = doc.createElement("p");
+    var star = doc.createElement("strong");
+    star.textContent = "Recommended";
+    badge.appendChild(star);
+    local.appendChild(badge);
+    ["Security: High",
+     "Login by: password on this device",
+     "Back up: yes — write down the brainkey"].forEach(function (line) {
+      local.appendChild(el(doc, "p", line, "muted"));
+    });
+    local.appendChild(goButton(doc, "reg-card-local", "Continue", "#/registration/local"));
+    wrap.appendChild(local);
+    /* Cloud-style card: faucet-sponsored names, weaker security
+     * (AccountBlockSelection's Medium concept). */
+    var cloud = doc.createElement("section");
+    cloud.appendChild(el(doc, "h2", "Cloud-style account — name via the faucet"));
+    ["Security: Medium",
+     "Login by: account-name lookup (password-derived keys are not supported here)",
+     "Back up: no file — the new account's brainkey is shown once at creation"].forEach(function (line) {
+      cloud.appendChild(el(doc, "p", line, "muted"));
+    });
+    cloud.appendChild(goButton(doc, "reg-card-cloud", "Continue", "#/registration/cloud"));
+    wrap.appendChild(cloud);
+    /* Direct shortcuts: faucet register + brainkey import (both exist). */
     var list = doc.createElement("ul");
-    [["#/registration/local", t("auth.local_wallet_create_keys_on_this_device", "Local wallet — create keys on this device")],
-     ["#/registration/cloud", t("auth.cloud_style_account_register_a_name_via_the_f", "Cloud-style account — register a name via the faucet")],
-     ["#/create-account", t("auth.register_a_new_on_chain_account_testnet_fauce", "Register a new on-chain account (testnet faucet)")],
-     ["#/existing-account", t("auth.import_an_existing_account_brainkey", "Import an existing account (brainkey)")]].forEach(function (pr) {
+    [["#/create-account", "Register a new on-chain account (testnet faucet)"],
+     ["#/existing-account", "Import an existing account (brainkey)"]].forEach(function (pr) {
       var li = doc.createElement("li"), a = doc.createElement("a");
       a.href = pr[0]; a.textContent = pr[1]; li.appendChild(a); list.appendChild(li);
     });
@@ -344,6 +420,12 @@ var AuthUI = (function () {
     wrap.appendChild(linkPara(doc, [
       ["#/settings", "Settings — nodes"],
       ["#/create-account", t("auth.register_via_the_faucet", "Register via the faucet")]
+    ]));
+    /* MEDs (4): create-account-ui.js is forbidden, so the restore path lives
+     * here — natural fit: a visitor who already has an account needs the
+     * import page, not the faucet. Plain literal for the next i18n batch. */
+    wrap.appendChild(linkPara(doc, [
+      ["#/existing-account", "Already have an account? Import it instead of registering."]
     ]));
   }
 
