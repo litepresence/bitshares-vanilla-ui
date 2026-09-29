@@ -17,6 +17,15 @@
  * CHAIN TRUTH (#4 wins): op-22/23/24 fields <- proposal.hpp:70-82/:119-165;
  *   display WORDS <- ProposedOperation.jsx:185 + Transaction.jsx:1703-1888
  *   (port the WORDS, not the files); unknown inner type -> honest fallback row.
+ * MEDS (punchlist): trust badges on rows (Proposals.jsx:380-429 WORDS only —
+ *   no vendored scam registry exists in vanilla, so untrusted rows carry an
+ *   honest UNKNOWN SOURCE flag, never a fake SCAM verdict; deferred: vendor
+ *   scamAccounts + on-chain blacklist check), per-approver approval status
+ *   (:399-404 NestedApprovalState concept, flat approved/pending per required
+ *   approver from proposal object fields — no threshold tree), raw-JSON
+ *   <details> per proposal (:313-328 JSONModal concept; market-desk.js
+ *   rawDetails is module-private, so the minimal inline <details> lives here).
+ *   ZERO new t() keys: every new word below is a plain literal.
  * MONEY DISCIPLINE (#6): amounts stay RAW digit strings until Format renders
  *   them at THEIR asset precision (joined via lookup_asset_symbols). No
  *   Number()/parseFloat on money — ever. Timestamps use Date only.
@@ -325,6 +334,145 @@ var ProposalUI = (function () {
     var pair = (entries[0] && entries[0].op !== undefined) ? entries[0].op : entries[0];
     return pair ? opName(pair[0]) : t("proposal.empty", "empty");
   }
+  /* Touched accounts for trust badges (Proposals.jsx:140-183 concept port).
+   * Reference collects op-6 active/owner first account_auths, else the op's
+   * `to`, plus the proposer. Vanilla inner ops also use whitelist/ticket/
+   * issue legs, so the else-branch collects every plausible counterparty id
+   * field (to, issue_to_account, account, account_to_list,
+   * authorizing_account). Returns deduped non-empty strings. Pure. */
+  function touchedIds(entries, proposer) {
+    var out = [], seen = {};
+    function push(v) {
+      if (typeof v === "string" && v && !seen[v]) { seen[v] = true; out.push(v); }
+    }
+    (entries || []).forEach(function (e) {
+      var pair = (e && e.op !== undefined) ? e.op : e;
+      if (!pair || !pair[1]) return;
+      if (pair[0] === 6) {
+        try {
+          var aa = pair[1].active && pair[1].active.account_auths;
+          var oa = pair[1].owner && pair[1].owner.account_auths;
+          if (aa && aa[0] && aa[0][0]) push(String(aa[0][0]));
+          if (oa && oa[0] && oa[0][0]) push(String(oa[0][0]));
+        } catch (e2) { /* partial ids still count */ }
+      } else {
+        ["to", "issue_to_account", "account", "account_to_list", "authorizing_account"].forEach(function (k) {
+          if (typeof pair[1][k] === "string" && pair[1][k]) push(pair[1][k]);
+        });
+      }
+    });
+    push(String(proposer || ""));
+    return out.filter(function (v) { return !!v; });
+  }
+  /* Local trust sets (vanilla equivalents of reference starred+contacts).
+   * Contacts are plain names (app.js CONTACTS_KEY); favourite accounts are
+   * {name,id} pairs (favourites-ui.js ACCOUNTS_KEY). No chain calls. Never
+   * throws — broken storage yields empty sets. */
+  function localTrust() {
+    var names = {}, ids = {};
+    try {
+      if (typeof localStorage !== "undefined") {
+        var c = JSON.parse(localStorage.getItem("bts-vanilla-contacts-v1") || "[]");
+        (Array.isArray(c) ? c : []).forEach(function (x) {
+          if (typeof x === "string" && x) {
+            if (/^1\.2\.\d+$/.test(x)) ids[x] = true; else names[x.toLowerCase()] = true;
+          }
+        });
+        var f = JSON.parse(localStorage.getItem("bts-vanilla-fav-accounts-v1") || "[]");
+        (Array.isArray(f) ? f : []).forEach(function (x) {
+          if (x && typeof x === "object") {
+            if (typeof x.id === "string" && x.id) ids[x.id] = true;
+            if (typeof x.name === "string" && x.name) names[x.name.toLowerCase()] = true;
+          }
+        });
+      }
+    } catch (e) { /* untrusted by default */ }
+    return { names: names, ids: ids };
+  }
+  /* Trust badge for a touched-id list. Reference WORDS only (Proposals.jsx:
+   * 406-429): "SCAM ATTEMPT" fires solely on a guarded hook — a future
+   * vendored registry exposing a global isKnownScammer-style helper (none
+   * exists in vanilla today; grep confirms no scammer data source, and
+   * transfer-ui.js defers its own recipient flag). Otherwise any touched id
+   * in local contacts/favourites is "trusted"; an empty touched list is
+   * "unverified"; everything else is "UNKNOWN SOURCE" with a title that says
+   * plainly this is an unverified-source flag, not a scam verdict (deferred:
+   * vendor scamAccounts.js lists + on-chain blacklisted_accounts check).
+   * Plain literals only — no t() keys. Pure (reads localStorage via
+   * localTrust). */
+  function trustBadge(touched) {
+    var DEFERRED = "No scam registry is vendored in vanilla — this is an unverified-source flag, not a scam verdict (deferred: vendor scamAccounts lists + on-chain blacklist check).";
+    try {
+      var g = (typeof globalThis !== "undefined") ? globalThis : null;
+      var hook = null;
+      if (g) {
+        if (g.AccountUtils && typeof g.AccountUtils.isKnownScammer === "function") hook = g.AccountUtils.isKnownScammer;
+        else if (typeof g.isKnownScammer === "function") hook = g.isKnownScammer;
+      }
+      if (hook) {
+        for (var i = 0; i < (touched || []).length; i++) {
+          try { if (hook(touched[i])) return { label: "SCAM ATTEMPT", title: "Flagged by the local scam registry as a known scammer." }; }
+          catch (e2) { /* keep checking */ }
+        }
+      }
+    } catch (e) { /* hook is best-effort only */ }
+    if (!touched || !touched.length) return { label: "unverified", title: "Empty proposal — no touched accounts to check. " + DEFERRED };
+    var trust = localTrust();
+    for (var j = 0; j < touched.length; j++) {
+      var id = touched[j];
+      if (trust.ids[id] || trust.names[String(id).toLowerCase()]) return { label: "trusted", title: "A touched account is in your local contacts or favourite accounts." };
+    }
+    return { label: "UNKNOWN SOURCE", title: "No touched account is in your local contacts or favourite accounts. " + DEFERRED };
+  }
+  /* Per-approver approval status from proposal object fields (Proposals.jsx:
+   * 333-346 available/required split + :399-404 NestedApprovalState concept).
+   * Flat approved/pending per required approver — no threshold/authority tree
+   * (recorded limitation). Key approvals surface as a count line. Pure. */
+  function approvalLines(p) {
+    p = p || {};
+    var reqA = p.required_active_approvals || [], reqO = p.required_owner_approvals || [];
+    var avA = p.available_active_approvals || [], avO = p.available_owner_approvals || [];
+    var avK = p.available_key_approvals || [];
+    var lines = [], ok = 0, req = reqA.length + reqO.length;
+    reqA.forEach(function (id) {
+      var approved = avA.indexOf(id) !== -1;
+      if (approved) ok++;
+      lines.push(String(id) + " (active): " + (approved ? "approved" : "pending"));
+    });
+    reqO.forEach(function (id) {
+      var approved2 = avO.indexOf(id) !== -1;
+      if (approved2) ok++;
+      lines.push(String(id) + " (owner): " + (approved2 ? "approved" : "pending"));
+    });
+    if (!lines.length) lines.push("none required");
+    lines.push("key approvals: " + (avK.length ? avK.join(", ") : "none"));
+    return { req: req, ok: ok, lines: lines };
+  }
+  /* One-line approval summary for table cells. Plain literals only. */
+  function approvalCell(p) {
+    if (!p) return "n/a";
+    var s = approvalLines(p);
+    if (!s.req) return "none required";
+    return s.req + " required · " + s.ok + " approved";
+  }
+  /* Raw-JSON <details> (JSONModal :313-328 concept). market-desk.js:166-183
+   * rawDetails is module-private (not exported), so this minimal inline copy
+   * lives here per the punchlist. textContent only — chain strings never
+   * reach HTML. Plain-literal label, touch-sized summary. */
+  function rawJson(doc, label, value) {
+    var d = doc.createElement("details");
+    d.className = "raw";
+    var s = doc.createElement("summary");
+    s.textContent = label;
+    s.setAttribute("aria-label", label);
+    touchable(s);
+    d.appendChild(s);
+    var pre = doc.createElement("pre");
+    try { pre.textContent = JSON.stringify(value, null, 2); }
+    catch (e) { pre.textContent = String(value); }
+    d.appendChild(pre);
+    return d;
+  }
   /* Inner-op builder field descriptors: [label, placeholder, inputmode]. */
   var INNER_DEFS = {
     transfer: [["From", "name or 1.2.N"], ["To", "name or 1.2.N"], ["Asset", "symbol or 1.3.x"], ["Amount", "1.5", "decimal"], ["Memo (optional)", ""]],
@@ -493,16 +641,41 @@ var ProposalUI = (function () {
       showStatus(doc, listBox, t("proposal.loading_proposals", "Loading proposals…"));
       Proposal.proposalsFor(fA.input.value.trim() || "1.2.0").then(function (rows) {
         if (myGen !== gen) return;
-        clearBox(listBox);
-        listBox.appendChild(deskTable(doc, [t("proposal.id", "ID"), t("proposal.fee_payer", "Fee payer"), t("proposal.expires", "Expires"), t("proposal.review", "Review"), t("proposal.enclosed", "Enclosed")], rows.map(function (r) {
-          return { href: "#/proposals/" + r.id,
-            cells: [{ text: r.id }, { text: r.fee_paying_account }, { text: timeHuman(r.expiration_time) },
-              { text: r.review_period ? Proposal.durToHuman(r.review_period) : t("proposal.none", "none") },
-              { text: r.proposed_ops_count + " × (" + firstWords(r.proposed_ops || []) + ")" }],
-            cardLines: [r.id + " · payer " + r.fee_paying_account, "Expires " + timeHuman(r.expiration_time),
-              (r.proposed_ops_count || 0) + " enclosed op(s), first: " + firstWords(r.proposed_ops || [])] };
-        })));
-        go.disabled = false;
+        /* Enrich slim rows with full objects (approvals + enclosed ops live
+         * only on get_objects; slim rows carry counts). Best-effort per row —
+         * failures keep the slim row with "n/a" approvals. */
+        Promise.all((rows || []).map(function (r) {
+          return Proposal.proposal(r.id).then(function (full) { return { slim: r, full: full }; })
+            .catch(function () { return { slim: r, full: null }; });
+        })).then(function (enriched) {
+          if (myGen !== gen) return;
+          clearBox(listBox);
+          listBox.appendChild(deskTable(doc, [t("proposal.id", "ID"), t("proposal.fee_payer", "Fee payer"), t("proposal.expires", "Expires"), t("proposal.review", "Review"), t("proposal.enclosed", "Enclosed"), "Trust", "Approvals"], enriched.map(function (en) {
+            var r = en.slim, full = en.full;
+            var tx = (full && full.proposed_transaction) || {}, entries = tx.operations || (full && full.proposed_ops) || r.proposed_ops || [];
+            var badge = trustBadge(touchedIds(entries, r.fee_paying_account || r.proposer));
+            var ap = approvalCell(full);
+            var first = firstWords(entries);
+            return { href: "#/proposals/" + r.id,
+              cells: [{ text: r.id }, { text: r.fee_paying_account }, { text: timeHuman(r.expiration_time) },
+                { text: r.review_period ? Proposal.durToHuman(r.review_period) : t("proposal.none", "none") },
+                { text: (entries.length || r.proposed_ops_count) + " × (" + first + ")" },
+                { text: badge.label, raw: badge.title },
+                { text: ap }],
+              cardLines: [r.id + " · payer " + r.fee_paying_account, "Expires " + timeHuman(r.expiration_time),
+                ((entries.length || r.proposed_ops_count) || 0) + " enclosed op(s), first: " + first,
+                "Source: " + badge.label, "Approvals: " + ap] };
+          })));
+          /* Raw JSON per proposal (JSONModal concept, inline <details>). */
+          var rawBox = el(doc, "div");
+          rawBox.appendChild(el(doc, "h3", "Raw JSON"));
+          enriched.forEach(function (en) {
+            rawBox.appendChild(rawJson(doc, "Raw proposal " + en.slim.id,
+              en.full ? (en.full.proposed_transaction || en.full) : en.slim));
+          });
+          listBox.appendChild(rawBox);
+          go.disabled = false;
+        }).catch(function (e) { if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
       }).catch(function (e) { if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
     });
   }
@@ -530,6 +703,16 @@ var ProposalUI = (function () {
         [t("proposal.active_approvals", "Active approvals"), (p.available_active_approvals || []).length ? p.available_active_approvals.join(", ") : t("proposal.none_yet", "none yet")],
         [t("proposal.owner_approvals", "Owner approvals"), (p.available_owner_approvals || []).length ? p.available_owner_approvals.join(", ") : t("proposal.none_yet", "none yet")]]));
       ctx.wrap.appendChild(el(doc, "h2", "Enclosed operations (" + entries.length + ")"));
+      /* MED badges + per-approver status + raw JSON (literals only). */
+      var badge = trustBadge(touchedIds(entries, p.proposer || p.fee_paying_account));
+      var srcLine = el(doc, "p", "Source: " + badge.label + " — " + badge.title, "muted");
+      srcLine.title = badge.title;
+      ctx.wrap.appendChild(srcLine);
+      ctx.wrap.appendChild(el(doc, "h2", "Approver status"));
+      var ap = approvalLines(p);
+      ctx.wrap.appendChild(el(doc, "p", approvalCell(p), "muted"));
+      ap.lines.forEach(function (ln) { ctx.wrap.appendChild(el(doc, "p", ln)); });
+      ctx.wrap.appendChild(rawJson(doc, "Raw proposal JSON", p));
       if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations."), "muted"));
       symJoin(innerAssetIds(entries)).then(function (join) {
         if (myGen !== gen) return;
