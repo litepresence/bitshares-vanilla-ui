@@ -2,7 +2,7 @@
 # Pack the extension wrapper (reproducible, python3+unzip only — no zip binary).
 # Builds extension-wrapper/dist/chromium.zip (MV3) + firefox.zip (MV2):
 #   vanilla/* copied verbatim + adapter injected into index.html +
-#   manifest/background/adapter/icons. The web build never needs this.
+#   manifest/background/adapter/content/icons. The web build never needs this.
 # Usage: bash tooling/pack-extension.sh  (prints sha256 + file list)
 set -euo pipefail
 
@@ -16,8 +16,9 @@ mkdir -p "$DIST/chromium" "$DIST/firefox"
 for target in chromium firefox; do
   D="$DIST/$target"
   cp -r "$VANILLA"/. "$D"/
-  mkdir -p "$D/adapter" "$D/background" "$D/icons"
-  cp "$SRC/adapter/storage.js" "$D/adapter/"
+  mkdir -p "$D/adapter" "$D/background" "$D/content" "$D/icons"
+  cp "$SRC/adapter/storage.js" "$SRC/adapter/bridge.js" "$D/adapter/"
+  cp "$SRC/content/inject.js" "$D/content/"
   cp "$SRC/background/sw.js" "$D/background/"
   cp "$SRC/icons/"*.png "$D/icons/"
   if [ "$target" = "chromium" ]; then

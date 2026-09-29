@@ -2,10 +2,23 @@
  * Owns: chrome.runtime.onInstalled seeding, chrome.alarms auto-lock fan-out
  *   ("vb-lock" broadcast -> open app pages call Wallet.lock()), no key
  *   material ever (pages hold unlock state exactly like the web build —
- *   Tier 2 moves signing behind an approval gate; see proposal §3).
+ *   Tier 2 moves signing behind an approval gate; see below + bridge.js).
+ * Tier 2 gate contract (STUB — validators ship in adapter/bridge.js, wiring
+ *   is follow-up per proposal §3.3): message protocol {type, id, payload}
+ *   <-> {id, ok, payload?, error?}; 60s approval timeout
+ *   (Bridge.APPROVAL_TIMEOUT_MS); HTTPS-only origins
+ *   (Bridge.isHttpsOrigin); wallet-side chain_id check
+ *   (Bridge.checkChainId vs Store.CHAIN_IDS); per-origin allowlist with
+ *   allowedAccountIds binding (Bridge.validateRequest); persisted
+ *   exponential unlock backoff (lives in vanilla/js/wallet.js: in-memory
+ *   count + persisted lockout stamp — the SW never sees passwords); unlocked
+ *   material holder stays chrome.storage.session in Tier 2 (memory-backed,
+ *   dies with the browser — same as #3). signMessage stays UNIMPLEMENTED.
  * Consumes: chrome.alarms, chrome.runtime, chrome.storage (defaults seeding
  *   only). No DOM, no network, no wallet code. MV3 event-driven: no
  *   persistent state here beyond alarms (survives restarts by design).
+ * Patterns (not code) from #3 pi314x approval flow (proposal §2.2); written
+ *   fresh here — nothing copied from reference/wallet-extension/.
  * Created by: extension-wrapper plan (v1 Tier 1). */
 "use strict";
 
