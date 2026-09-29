@@ -44,7 +44,8 @@
   --bg: #2a2a2a; --panel: #3f3f3f; --text: #e0e0e0; --muted: #adadad;
   --accent: #1ec3fa; --accent-text: #ffffff; --button-bg: #049cce;
   --buy: #6ba583; --sell: #e3745b; --warn: #fcab53; --danger: #ff3950;
-  --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
+--border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
+  --plot-bg: #1e1e1e;
   --icon-filter: invert(1);
 }
 /* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
@@ -76,6 +77,7 @@
   --accent: #1E9ED7; --accent-text: #ffffff; --button-bg: #1E9ED7;
   --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
+  --plot-bg: #ffffff;
   --icon-filter: none;
 }
 /* dex-ux-theme (dark): sampled from /workspace/reference/bitshares-dex-ux
@@ -98,6 +100,7 @@
  * Unmapped dex-ux surfaces by design: #1c2030 sub-nav strip, #343a40 hover. */
 :root[data-theme="dex-ux-theme"] {
   --bg: #131722; --panel: #131722; --text: #e0e3eb; --muted: #758696;
+  --plot-bg: #131722;
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;

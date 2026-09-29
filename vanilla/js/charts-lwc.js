@@ -166,11 +166,13 @@ var ChartsLwc = (function () {
 
   /* Chart frame colors. The caller passes colors read from CSS vars (theme-
    * aware); fallbacks are the DEX-UX dark triple, used only headless (no CSS).
+   * paneBg reads --plot-bg: plots sit on the darker content ground (#1's
+   * $main-content-margin-block-bg-color #1e1e1e in ref-ui-theme), not --panel.
    * Params: passed {paneBg, grid, text} (any subset). Returns full triple. */
   function paneColors(passed) {
     passed = passed || {};
     return {
-      paneBg: passed.paneBg || cssVar("--panel", "#131722"),
+      paneBg: passed.paneBg || cssVar("--plot-bg", cssVar("--panel", "#131722")),
       grid: passed.grid || cssVar("--border", "#2a2e39"),
       text: passed.text || cssVar("--text", "#c5cbce")
     };

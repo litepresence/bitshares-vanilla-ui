@@ -193,7 +193,7 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-book { grid-area: book; } .mkt-trades { grid-area: trades; }
 .mkt-side { grid-area: side; } .mkt-orders { grid-area: orders; }
 .mkt section h2 { margin: 6px 0; font-size: 1rem; }
-.mkt-canvas { width: 100%; display: block; background: var(--panel);
+.mkt-canvas { width: 100%; display: block; background: var(--plot-bg, var(--panel));
   border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
 /* Slice-07 Task 4 density pass (desk ONLY — no global body changes):
  * compact book rows, smaller desk headings, tighter section spacing. */
@@ -219,7 +219,7 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-osc-host { min-height: 170px; margin-bottom: 12px; }
 .mkt-price-host:empty, .mkt-osc-host:empty { display: none; }
 .mkt-chart-empty { display: flex; align-items: center; justify-content: center;
-  height: 100%; min-height: 120px; background: var(--panel);
+  height: 100%; min-height: 120px; background: var(--plot-bg, var(--panel));
   border: 1px solid var(--border); border-radius: 8px; }
 /* Picker: asset-type radios + favorite stars (favorites sort first). */
 .mkt-kinds { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0; }
