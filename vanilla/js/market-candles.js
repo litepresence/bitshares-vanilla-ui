@@ -17,6 +17,8 @@
  *   delegates its timeframes/candles to this file, API unchanged).
  * Extended by: dex-ux plots task (AFK round — proposal 3 VWAP math,
  *   chain-history only, ES refused).
+ * Extended by: deep-candles plan Task 2 (ES deep merge to 2000, chain wins;
+ *   MarketFills + Store consumed guarded, ES throw degrades to chain-only).
  */
 var MarketCandles = (function () {
   "use strict";
@@ -140,7 +142,7 @@ var MarketCandles = (function () {
     if (!(count >= 1)) throw new Error("bad-count");
     var nums = await timeframes(); // throws history-unavailable
     if (nums.length === 0) {
-      return { bucket: null, start: null, end: null, buckets: [], closes: [] };
+      return { bucket: null, start: null, end: null, buckets: [], closes: [], deep: false };
     }
     var bucket;
     if (bucketSec === undefined) {
@@ -180,7 +182,7 @@ var MarketCandles = (function () {
       }
     }
     if (Object.keys(bySlot).length === 0) {
-      return { bucket: bucket, start: startISO, end: endISO, buckets: [], closes: [] };
+      return { bucket: bucket, start: startISO, end: endISO, buckets: [], closes: [], deep: false };
     }
     _needPriceMath();
     var precs = await _precisions([baseId, quoteId]);
@@ -264,7 +266,39 @@ var MarketCandles = (function () {
       out.push(entry);
       closes.push(prevNum); // pixels only, not money (prevNum tracks this slot's close)
     }
-    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes };
+    /* Deep backfill (deep-candles plan Task 2): ES op-4 fills bucketed
+     * locally on the same slot grid, merged chain-wins, capped 2000.
+     * Mainnet only (the community index is mainnet-only); any failure
+     * degrades to chain-only with deep=false, never a throw. */
+    var deep = false;
+    try {
+      var net = "mainnet";
+      try {
+        if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+          var st = Store.loadSettings();
+          if (st && (st.network === "testnet" || st.network === "mainnet")) net = st.network;
+        }
+      } catch (e) { /* mainnet default stands */ }
+      if (net === "mainnet" && typeof MarketFills !== "undefined" && MarketFills &&
+        typeof MarketFills.fillsForMarket === "function" &&
+        typeof MarketFills.fillsToCandles === "function" &&
+        typeof MarketFills.mergeDeep === "function") {
+        var fres = await MarketFills.fillsForMarket(baseId, quoteId, 500, { network: net });
+        var fills = fres && fres.fills ? fres.fills : [];
+        if (Array.isArray(fills) && fills.length > 0) {
+          var esBuckets = MarketFills.fillsToCandles(fills, bucket, baseId, precs[baseId], precs[quoteId], quoteId);
+          if (Array.isArray(esBuckets) && esBuckets.length > 0) {
+            out = MarketFills.mergeDeep(out, esBuckets, 2000);
+            closes = out.map(function (e) {
+              var n = Number(e && e.close);
+              return isNaN(n) ? null : n; // pixels only, not money
+            });
+            deep = true;
+          }
+        }
+      }
+    } catch (e) { deep = false; /* ES throw → chain-only */ }
+    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep };
   }
 
   /* Session VWAP + per-bucket spread band (dex-ux proposal 3 — the portable

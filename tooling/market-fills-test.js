@@ -59,5 +59,20 @@ eq(JSON.stringify(q.query).indexOf('"operation_type":"4"') !== -1, true, "esQuer
 eq(JSON.stringify(q.sort).indexOf("block_data.block_time") !== -1 && JSON.stringify(q.sort).indexOf("desc") !== -1, true, "esQuery sorts block_time desc");
 eq(q._source.slice().sort(), ["account_history", "block_data", "operation_history", "operation_type"], "esQuery _source legs");
 
-console.log("market-fills-test: " + pass + " passed, " + fail + " failed");
-process.exit(fail ? 1 : 0);
+/* 12-13: MarketCandles deep orchestration (plan Task 2 Step 1 verbatim,
+ * plus a fast fetch stub so ES degrades to chain without network). */
+(async () => {
+  try {
+    var _fetch = globalThis.fetch;
+    globalThis.fetch = function () { return Promise.reject(new Error("no net in test")); };
+    globalThis.Chain = { history: () => Promise.resolve(2), call: (api, m) => Promise.resolve([]), db: () => Promise.resolve(1) };
+    delete require.cache[require.resolve("/workspace/vanilla/js/market-candles.js")];
+    const MC = require("/workspace/vanilla/js/market-candles.js");
+    const r = await MC.candles("1.3.113", "1.3.0", 3600, 5);
+    eq(Array.isArray(r.buckets), true, "candles returns buckets");
+    eq(r.buckets.length <= 2000, true, "candles capped 2000");
+    if (_fetch !== undefined) { globalThis.fetch = _fetch; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL candles deep path\n " + (e && e.stack || e)); }
+  console.log("market-fills-test: " + pass + " passed, " + fail + " failed");
+  process.exit(fail ? 1 : 0);
+})();
