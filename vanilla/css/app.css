@@ -725,6 +725,53 @@ img, canvas, pre { max-width: 100%; }
   #appfoot { flex-wrap: wrap; row-gap: 4px; }
 }
 
+/* Blockchain tab: stat grid + activity/blocks pair (original Blocks.jsx
+ * stat rows + Recent activity/Recent blocks — concepts only, tokens only).
+ * Shell h1 folds away visually (single-h1 a11y kept); stats read label-caps
+ * over big values; split stacks on phones, pairs ≥1200px; pills carry the
+ * op kind in token hues; the bar-strip canvas sizes via CSS. */
+.xplore-sr { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; }
+.xplore-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px; margin: 12px 0 16px; }
+@media (min-width: 700px) {
+  .xplore-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.xplore-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xplore-stat-label { color: var(--muted); font-size: 0.72rem;
+  text-transform: uppercase; letter-spacing: 0.05em; }
+.xplore-stat-val { font-size: 1.25rem; font-weight: 600; overflow-wrap: anywhere; }
+.xplore-green { color: var(--live); text-transform: uppercase; }
+.xplore-warn { color: var(--warn); }
+.xplore-split { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1200px) {
+  .xplore-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+.xplore-panel { min-width: 0; }
+.xplore-panel-h { font-size: 1.1rem; font-weight: 600; margin: 4px 0 8px; }
+.xplore-act-row { display: flex; gap: 8px; align-items: baseline;
+  padding: 8px 0; border-bottom: 1px solid var(--border); }
+.xplore-act-sent { min-width: 0; overflow-wrap: anywhere; }
+.xplore-pill { display: inline-block; flex: 0 0 auto; padding: 2px 8px;
+  border: 1px solid var(--muted); border-radius: 4px; font-size: 0.72rem;
+  font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+  white-space: nowrap; color: var(--muted); }
+.xplore-pill-place { color: var(--warn); border-color: var(--warn); }
+.xplore-pill-cancel { color: var(--danger); border-color: var(--danger); }
+.xplore-pill-transfer { color: var(--accent); border-color: var(--accent); }
+.xplore-pill-muted { color: var(--muted); border-color: var(--muted); }
+.xplore-pill-raw { text-transform: none; }
+.xplore-bars { width: 100%; max-width: 280px; height: 56px; }
+/* Footer two-line right stack (original: host caps line 1, latency/block
+ * grey caps line 2) with REPORT/HELP spanning both rows: the bar stretches,
+ * the side stacks center, the actions stretch full height. */
+#appfoot { align-items: stretch; }
+.appfoot-left, .appfoot-right { align-self: center; }
+.appfoot-right { display: flex; flex-direction: column; justify-content: center;
+  text-align: right; line-height: 1.35; }
+.appfoot-actions { align-self: stretch; }
+#appfoot .appfoot-actions a { align-self: stretch; }
+
 /* Hover candy (single revertible block — delete from here to EOF to dial back).
  * CSS-only micro-interactions, retro-safe: transform / shadow / color /
  * background only — no padding, margin, width, height, font, or touch-target

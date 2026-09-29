@@ -73,12 +73,17 @@ var Explorer = (function () {
   /* Chain head + irreversibility anchor (heights verbatim plain ints).
    * The chain sends the head time as `time` (dynamic_global_property_object,
    * global_property_object.hpp:68); `head_block_time` is kept as a fallback
-   * for node variance. */
+   * for node variance. recently_missed_count rides the same object
+   * (dynamic_global_property_object) — verbatim when present, null when the
+   * node omits it (the view renders an honest dash, never a guess). */
   async function head() {
     var g = await _dbCall("get_dynamic_global_properties", []);
     var t = (g && g.time !== undefined && g.time !== null) ? g.time : g.head_block_time;
+    var missed = (g && g.recently_missed_count !== undefined && g.recently_missed_count !== null)
+      ? g.recently_missed_count : null;
     return { head_block_number: g.head_block_number, head_block_time: t,
-      last_irreversible_block_num: g.last_irreversible_block_num };
+      last_irreversible_block_num: g.last_irreversible_block_num,
+      recently_missed_count: missed };
   }
 
   /* Normalize one batch element to a header. The node returns
@@ -138,6 +143,77 @@ var Explorer = (function () {
     }));
     for (i = 0; i < rows.length; i++) rows[i].tx_count = counts[i];
     return rows.reverse();
+  }
+
+  /* Active governance sets from the 2.0.0 global property object
+   * (chain/global_property_object.hpp:48-49: active_witnesses is a
+   * flat_set<witness_id_type>, active_committee_members a vector of
+   * committee ids). Read method is get_objects — the same call Vote.lists
+   * and resolveObject already use, no new chain surface. Returns
+   * {witnesses: number|null, committee: number|null} (null when the node
+   * omits either field — the view dashes, never guesses). */
+  async function activeSets() {
+    var rows = await _dbCall("get_objects", [["2.0.0"]]);
+    var g = (rows && rows[0]) || {};
+    return {
+      witnesses: Array.isArray(g.active_witnesses) ? g.active_witnesses.length : null,
+      committee: Array.isArray(g.active_committee_members) ? g.active_committee_members.length : null
+    };
+  }
+
+  /* BTS money supply from the existing asset() join (lookup_asset_symbols +
+   * get_objects + get_assets — no new methods). Returns {symbol, precision,
+   * current_raw, stealth_raw} with raw integer strings (Format at render).
+   * Null raws when the dynamic join is missing — the view dashes. */
+  async function btsSupply() {
+    var j = await asset("BTS"); /* throws unknown-asset when missing */
+    var dyn = j.dynamic || {};
+    return {
+      symbol: (j.asset && j.asset.symbol) || "BTS",
+      precision: (j.asset && typeof j.asset.precision === "number") ? j.asset.precision : null,
+      current_raw: (dyn.current_supply !== undefined && dyn.current_supply !== null)
+        ? String(dyn.current_supply) : null,
+      stealth_raw: (dyn.confidential_supply !== undefined && dyn.confidential_supply !== null)
+        ? String(dyn.confidential_supply) : null
+    };
+  }
+
+  /* Newest-first ops with FIELDS for the activity feed (the block() view
+   * above strips fields to type refs; the feed needs amounts/accounts).
+   * Same two methods recentBlocks/block already use
+   * (get_dynamic_global_properties + get_block) — no new chain surface.
+   * Params: maxOps (default 10), maxBlocks scanned newest-first (default 8).
+   * Returns [{block, tx, op, type_idx, type_name, virtual, fields}]. Gaps
+   * (null blocks) are skipped, never thrown. */
+  async function recentOps(maxOps, maxBlocks) {
+    var mo = parseInt(maxOps, 10);
+    if (!(mo >= 1)) mo = 10;
+    mo = Math.min(mo, 20);
+    var mb = parseInt(maxBlocks, 10);
+    if (!(mb >= 1)) mb = 8;
+    mb = Math.min(mb, 12);
+    var top = (await _dbCall("get_dynamic_global_properties", [])).head_block_number;
+    var out = [];
+    for (var h = top; h >= 1 && h > top - mb && out.length < mo; h--) {
+      var blk;
+      try { blk = await _dbCall("get_block", [h]); } catch (e) {
+        if (e && e.message === "not-connected") throw e;
+        continue;
+      }
+      if (!blk || !Array.isArray(blk.transactions)) continue;
+      for (var ti = 0; ti < blk.transactions.length && out.length < mo; ti++) {
+        var ops = Array.isArray(blk.transactions[ti].operations)
+          ? blk.transactions[ti].operations : [];
+        for (var oi = 0; oi < ops.length && out.length < mo; oi++) {
+          var o = ops[oi];
+          var ref = _opRef(Array.isArray(o) ? o[0] : o.type);
+          out.push({ block: h, tx: ti, op: oi,
+            type_idx: ref.type_idx, type_name: ref.type_name, virtual: ref.virtual,
+            fields: Array.isArray(o) ? o[1] : o });
+        }
+      }
+    }
+    return out;
   }
 
   /* Full block with per-tx op rows (height attached client-side, #1 :39
@@ -314,7 +390,8 @@ var Explorer = (function () {
   }
 
   return { head: head, recentBlocks: recentBlocks, block: block, tx: tx,
-    assetsPage: assetsPage,
+    assetsPage: assetsPage, activeSets: activeSets, btsSupply: btsSupply,
+    recentOps: recentOps,
     asset: asset, feeds: feeds, resolveObject: resolveObject, search: search };
 })();
 

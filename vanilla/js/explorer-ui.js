@@ -108,6 +108,13 @@ var ExplorerUI = (function () {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 
+  /* Shell title (original Blocks.jsx renders NO h1 — tabs sit directly
+   * under the header; vanilla keeps exactly one h1 for a11y but folds it
+   * visually away via .xplore-sr so spacing matches the original). */
+  function shellTitle(doc) {
+    return el(doc, "h1", t("explorer.title", "Explore"), "xplore-sr");
+  }
+
   /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
    * ≥1200px; children span full width via app.css .wide contract. */
   function makeWrap(doc, root) {
@@ -153,7 +160,7 @@ var ExplorerUI = (function () {
   function waitForOpen(doc, wrap, root, myGen, rerun) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
-    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
+    wrap.appendChild(shellTitle(doc));
     wrap.appendChild(el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false;
@@ -173,7 +180,7 @@ var ExplorerUI = (function () {
       if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
+      failed.appendChild(shellTitle(doc));
       showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
       var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
@@ -232,7 +239,7 @@ var ExplorerUI = (function () {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderExplorer(root, want); })) return;
 
-    wrap.appendChild(el(doc, "h1", t("explorer.title", "Explore")));
+    wrap.appendChild(shellTitle(doc));
     if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
 
     /* Search: single box, 1.x.y / account / symbol, keyboard-submit. */

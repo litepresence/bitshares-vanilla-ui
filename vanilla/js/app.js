@@ -573,10 +573,14 @@ var App = (function () {
   /* paintFooter: persistent status bar — the connectivity signal (#1
    *   parity: the node location name carries the state in COLOR, vivid
    *   --live green when connected, red otherwise; no topbar badge).
+   *   Right side is a two-line stack (original footer: host caps on line 1,
+   *   latency/block grey caps on line 2) with REPORT/HELP spanning both rows
+   *   via CSS (.appfoot-actions stretch). Left side carries the version
+   *   string via paintVersion below.
    *   Params: status ({state, node, latencyMs, headBlock}). Returns nothing.
-   *   Fails: never — missing footer is a no-op. Latency + head block are
-   *   heartbeat-live inside span.appfoot-telemetry (grey caps via CSS). */
+   *   Fails: never — missing footer is a no-op. */
   function paintFooter(status) {
+    paintVersion(status);
     var foot = document.getElementById("appfoot-status");
     if (!foot) return;
     var s = status || {};
@@ -590,25 +594,69 @@ var App = (function () {
       n.textContent = text;
       return n;
     }
+    function line(cls) {
+      var d = doc.createElement("div");
+      d.className = cls;
+      return d;
+    }
     if (state === "open") {
       var host = shortHost(s.node);
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
       var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
-      if (host) {
-        foot.appendChild(span(host, "appfoot-host", "open"));
-        foot.appendChild(doc.createTextNode(" · "));
-      }
-      foot.appendChild(span("LATENCY " + lat + blk, "appfoot-telemetry", null));
+      var l1 = line("appfoot-line1");
+      if (host) l1.appendChild(span(host, "appfoot-host", "open"));
+      else l1.appendChild(span("—", "appfoot-host", "open"));
+      foot.appendChild(l1);
+      var l2 = line("appfoot-line2");
+      l2.appendChild(span("LATENCY " + lat + blk, "appfoot-telemetry", null));
+      foot.appendChild(l2);
     } else {
       var host = shortHost(s.node);
-      if (host) {
-        foot.appendChild(span(host, "appfoot-host", "closed"));
-        foot.appendChild(doc.createTextNode(" · "));
-      }
-      var label = (state && state !== "unknown") ? state : "connecting…";
-      if (state && state !== "unknown") foot.appendChild(span(label, "appfoot-host", "closed"));
-      else foot.appendChild(doc.createTextNode(label));
+      var l1 = line("appfoot-line1");
+      if (host) l1.appendChild(span(host, "appfoot-host", "closed"));
+      else if (state && state !== "unknown") l1.appendChild(span(state, "appfoot-host", "closed"));
+      else l1.appendChild(doc.createTextNode("connecting…"));
+      foot.appendChild(l1);
+      var l2 = line("appfoot-line2");
+      if (host && state && state !== "unknown") l2.appendChild(span(state, "appfoot-telemetry", null));
+      else l2.appendChild(doc.createTextNode(" "));
+      foot.appendChild(l2);
     }
+  }
+
+  /* paintVersion: bottom-LEFT version string "BITSHARES <chainid8> •
+   * Disclaimer" (original footer: chain prefix + disclaimer link). The 8
+   * chars come from Chain.status().chainId, uppercased; a missing chain id
+   * omits the hash silently (prefix + disclaimer still paint — never blank,
+   * never throws). Called from paintFooter so every connection event
+   * refreshes it, plus once at boot. */
+  function paintVersion(status) {
+    if (typeof document === "undefined") return;
+    var left = document.getElementById("appfoot-version");
+    if (!left) return;
+    try {
+      var s = status || {};
+      var hash = "";
+      if (s.chainId !== null && s.chainId !== undefined && String(s.chainId)) {
+        hash = " " + String(s.chainId).slice(0, 8).toUpperCase();
+      } else {
+        try {
+          if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
+            var cur = Chain.status() || {};
+            if (cur.chainId !== null && cur.chainId !== undefined && String(cur.chainId)) {
+              hash = " " + String(cur.chainId).slice(0, 8).toUpperCase();
+            }
+          }
+        } catch (e) { /* hash stays omitted */ }
+      }
+      while (left.firstChild) left.removeChild(left.firstChild);
+      var doc = left.ownerDocument || document;
+      left.appendChild(doc.createTextNode("BITSHARES" + hash + " • "));
+      var a = doc.createElement("a");
+      a.setAttribute("href", "#/help");
+      a.textContent = "Disclaimer";
+      left.appendChild(a);
+    } catch (e) { /* static skeleton stands */ }
   }
 
   /* shortHost: wss:// URL -> bare host (footer node label; the ref shows

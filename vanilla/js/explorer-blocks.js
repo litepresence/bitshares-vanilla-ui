@@ -34,17 +34,34 @@ var ExplorerBlocks = (function () {
 
 
   var RECENT_N = 20; /* blocks per page */
+  var TIP_ROWS = 30; /* tip fetch: 20-row table + ~29 intervals for the strip */
+  var TABLE_ROWS = 20; /* rows shown in the Recent blocks table */
+  var STAT_N = 10; /* TRX/S + AVG + TRX/BLOCK window (task: avg over last 10) */
 
   /* Live-pulse subscription handle (single active blocks-tab feed): torn
    * down on route leave (gen guard), on Older paging, and on Retry so only
    * the tip view holds the Store "connection" listener. Null when idle. */
   var liveOff = null;
 
+  /* Stats "N seconds ago" ticker handle (tip page only): cleared by stopLive
+   * and by the tick itself once its generation goes stale. Null when idle. */
+  var statTimer = null;
+
+  /* Clear the ticker without touching the live feed (mismatch-branch use —
+   * stopLive would re-enter the unsub running it). Never throws. */
+  function clearStatTick() {
+    try { if (statTimer !== null) clearInterval(statTimer); } catch (e) { /* gone */ }
+    statTimer = null;
+  }
+
   /* Drop the active live feed, if any. Params: none. Returns nothing.
-   * Fails: never — a missing or throwing unsub is a no-op. */
+   * Fails: never — a missing or throwing unsub is a no-op. Also clears the
+   * stats "seconds ago" ticker (tip page only; paging pages never start it). */
   function stopLive() {
     try { if (liveOff) liveOff(); } catch (e) { /* listener gone */ }
     liveOff = null;
+    try { if (statTimer !== null) clearInterval(statTimer); } catch (e) { /* timer gone */ }
+    statTimer = null;
   }
 
   /* Account-id shape (data copy of the explorer-ui.js regex — slice-3
@@ -219,6 +236,206 @@ var ExplorerBlocks = (function () {
     return s;
   }
 
+  /* Thousands commas on a digit string (display only, string math — never
+   * float; money itself still formats via Format before reaching here). */
+  function commas(digits) {
+    return String(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  /* Two-decimal stat string or null (stats are counts/ratios, not money —
+   * toFixed here is display rounding, never a money path). */
+  function fmt2(n) {
+    return (typeof n === "number" && isFinite(n)) ? n.toFixed(2) : null;
+  }
+
+  /* Raw supply int + precision -> "2,996,875,107 BTS" (commas on the integer
+   * part, fraction trimmed when all zeros). Returns null when unformattable
+   * (caller dashes). Raw stays in the caller's title. */
+  function fmtSupply(raw, prec, sym) {
+    try {
+      if (raw === null || raw === undefined || typeof prec !== "number") return null;
+      var h = Format.formatAmount(String(raw), prec).split(".");
+      var frac = (h[1] || "").replace(/0+$/, "");
+      return commas(h[0]) + (frac ? "." + frac : "") + " " + sym;
+    } catch (e) { return null; }
+  }
+
+  /* One stats-grid cell: label (small caps) + value node (returned for live
+   * repaints). Value starts as an honest dash, never blank. */
+  function statCell(doc, label, valCls) {
+    var cell = el(doc, "div", null, "xplore-stat");
+    cell.appendChild(el(doc, "span", label, "xplore-stat-label"));
+    var val = el(doc, "span", "—", "xplore-stat-val" + (valCls ? " " + valCls : ""));
+    cell.appendChild(val);
+    return { cell: cell, val: val };
+  }
+
+  /* Teal bar-strip for block intervals (canvas, no dependency). Color reads
+   * the theme --accent token live (ref-ui blue reads teal like the
+   * original); the "teal" fallback is a named color so no hex literal ever
+   * lands in slice JS (audit check 5). Empty input leaves the canvas blank
+   * (caller dashes the cell instead). */
+  function drawBars(canvas, intervals) {
+    try {
+      var ctx = canvas.getContext("2d");
+      var W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+      if (!intervals || !intervals.length) return;
+      var max = 0, i;
+      for (i = 0; i < intervals.length; i++) if (intervals[i] > max) max = intervals[i];
+      if (!(max > 0)) max = 1;
+      var color = "teal";
+      try {
+        var css = getComputedStyle(document.documentElement).getPropertyValue("--accent");
+        if (css && css.trim()) color = css.trim();
+      } catch (e) { /* named fallback stands */ }
+      var bw = Math.max(2, Math.floor(W / intervals.length) - 2);
+      for (i = 0; i < intervals.length; i++) {
+        var h = Math.max(2, Math.round(intervals[i] / max * (H - 4)));
+        ctx.fillStyle = color;
+        ctx.fillRect(i * (bw + 2), H - h, bw, h);
+      }
+    } catch (e) { /* blank strip stands — the numeric cells carry the data */ }
+  }
+
+  /* Stats over the newest-first row window [{height, ts(ms|null), txs}].
+   * Consecutive heights only (a gap skips its interval — never guessed).
+   * Returns {tps, avg, tpb} display strings or null each (caller dashes). */
+  function computeStats(rows) {
+    var tx = 0, i, ok = 0;
+    for (i = 0; i < rows.length; i++) tx += (typeof rows[i].txs === "number" ? rows[i].txs : 0);
+    var ivals = [];
+    for (i = 0; i + 1 < rows.length; i++) {
+      var a = rows[i], b = rows[i + 1];
+      if (a.height === b.height + 1 && typeof a.ts === "number" && typeof b.ts === "number") {
+        var s = (a.ts - b.ts) / 1000;
+        if (s >= 0 && s < 3600) { ivals.push(s); ok++; }
+      }
+    }
+    var tps = null, avg = null;
+    if (ok > 0) {
+      var span = 0;
+      for (i = 0; i < ivals.length; i++) span += ivals[i];
+      if (span > 0) tps = fmt2(tx / span);
+      avg = fmt2((span / ivals.length) / 2) + "s";
+      if (tps === null) tps = null;
+    } else if (rows.length > 0) {
+      tps = fmt2(0);
+      avg = null;
+    }
+    return { tps: tps, avg: avg, tpb: rows.length ? fmt2(tx / rows.length) : null, intervals: ivals };
+  }
+
+  /* Amount leaf -> span that fills in human text once the asset precision
+   * resolves (same pattern as explorer-render.js amountSpan, local so this
+   * file needs no new cross-module surface). Raw int + "(raw)" meanwhile,
+   * raw in the title always. */
+  function amtSpan(doc, raw, assetId, myGen) {
+    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
+    s.title = String(raw) + " " + assetId;
+    if (typeof Explorer === "undefined" || !Explorer || typeof Explorer.asset !== "function") return s;
+    Explorer.asset(assetId).then(function (j) {
+      if (!isCurrent(myGen)) return;
+      try {
+        s.textContent = Format.formatAmount(String(raw), j.asset.precision) + " " + j.asset.symbol;
+        s.title = String(raw);
+      } catch (e) { s.textContent = String(raw) + " " + assetId; }
+    }).catch(function () {
+      if (!isCurrent(myGen)) return;
+      s.textContent = String(raw) + " " + assetId;
+    });
+    return s;
+  }
+
+  /* Activity pill for one op: PLACE ORDER (warn orange) / CANCEL (danger
+   * red) / TRANSFER (accent) / known others muted with the spaced type name
+   * / unknown "op <id>" muted (never blank, never throws). Uppercase rides
+   * in CSS for known labels; the unknown id keeps its literal "op N" shape. */
+  function pillFor(doc, op) {
+    var idx = (typeof op.type_idx === "number") ? op.type_idx : parseInt(op.type_idx, 10);
+    var known = (typeof op.type_name === "string" && op.type_name && op.type_name !== "unknown");
+    if (idx === 1) return el(doc, "span", t("explorer.pill_place", "Place order"), "xplore-pill xplore-pill-place");
+    if (idx === 2) return el(doc, "span", t("explorer.pill_cancel", "Cancel order"), "xplore-pill xplore-pill-cancel");
+    if (idx === 0) return el(doc, "span", t("explorer.pill_transfer", "Transfer"), "xplore-pill xplore-pill-transfer");
+    if (known) return el(doc, "span", String(op.type_name).replace(/_/g, " "), "xplore-pill xplore-pill-muted");
+    return el(doc, "span", "op " + (isFinite(idx) ? idx : "?"), "xplore-pill xplore-pill-muted xplore-pill-raw");
+  }
+
+  /* First 1.2.x account id found under the usual op field names (shallow
+   * only — no guessing inside nested objects). Returns "" when none. */
+  function opAccount(f) {
+    if (!f || typeof f !== "object") return "";
+    var keys = ["fee_paying_account", "seller", "from", "to", "account",
+      "issuer", "payer", "owner", "worker_account", "witness_account",
+      "committee_member_account", "registrar", "referrer", "payer_account"];
+    for (var i = 0; i < keys.length; i++) {
+      if (typeof f[keys[i]] === "string" && ACCT_RE.test(f[keys[i]])) return f[keys[i]];
+    }
+    return "";
+  }
+
+  /* One activity sentence (account + action + amounts). Static glue stays
+   * plain English (batch-2b: dynamic sentences keep code structure; only
+   * the pill labels above carry i18n keys). Accounts resolve to name links
+   * via the shared accountLink (raw id meanwhile); amounts resolve human
+   * via amtSpan (raw meanwhile, raw in title). Unknown shapes fall back to
+   * "op <id> · block #h" — never blank, never throws. */
+  function sentenceFor(doc, op, myGen) {
+    var sent = el(doc, "span", null, "xplore-act-sent");
+    try {
+      var f = (op.fields && typeof op.fields === "object") ? op.fields : {};
+      var idx = (typeof op.type_idx === "number") ? op.type_idx : parseInt(op.type_idx, 10);
+      var blkLink = anchor(doc, "#" + op.block, "#/block/" + op.block);
+      blkLink.title = t("explorer.block_prefix", "Block #") + op.block;
+      if (idx === 0 && f.amount && typeof f.amount.asset_id === "string") {
+        sent.appendChild(accountLink(doc, String(f.from || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " transferred "));
+        sent.appendChild(amtSpan(doc, String(f.amount.amount), f.amount.asset_id, myGen));
+        sent.appendChild(el(doc, "span", " to "));
+        sent.appendChild(accountLink(doc, String(f.to || "—"), myGen));
+        sent.appendChild(el(doc, "span", " · "));
+        sent.appendChild(blkLink);
+        return sent;
+      }
+      if (idx === 1 && f.amount_to_sell && f.min_to_receive) {
+        sent.appendChild(accountLink(doc, String(f.seller || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " placed order to sell "));
+        if (f.amount_to_sell && typeof f.amount_to_sell.asset_id === "string") {
+          sent.appendChild(amtSpan(doc, String(f.amount_to_sell.amount), f.amount_to_sell.asset_id, myGen));
+        } else sent.appendChild(el(doc, "span", "—"));
+        sent.appendChild(el(doc, "span", " for "));
+        if (f.min_to_receive && typeof f.min_to_receive.asset_id === "string") {
+          sent.appendChild(amtSpan(doc, String(f.min_to_receive.amount), f.min_to_receive.asset_id, myGen));
+        } else sent.appendChild(el(doc, "span", "—"));
+        sent.appendChild(el(doc, "span", " · "));
+        sent.appendChild(blkLink);
+        return sent;
+      }
+      if (idx === 2) {
+        sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
+        sent.appendChild(el(doc, "span", " cancelled order " + String(f.order || "—")));
+        sent.appendChild(el(doc, "span", " · "));
+        sent.appendChild(blkLink);
+        return sent;
+      }
+      var who = opAccount(f);
+      if (who) sent.appendChild(accountLink(doc, who, myGen));
+      else sent.appendChild(el(doc, "span", (typeof op.type_name === "string" && op.type_name !== "unknown")
+        ? op.type_name.replace(/_/g, " ") : "op " + (isFinite(idx) ? idx : "?")));
+      if (who) {
+        sent.appendChild(el(doc, "span", " " + ((typeof op.type_name === "string" && op.type_name !== "unknown")
+          ? op.type_name.replace(/_/g, " ") : "op " + (isFinite(idx) ? idx : "?"))));
+      }
+      sent.appendChild(el(doc, "span", " · "));
+      sent.appendChild(blkLink);
+      return sent;
+    } catch (e) {
+      while (sent.firstChild) sent.removeChild(sent.firstChild);
+      sent.appendChild(el(doc, "span", "op ? · #" + (op.block || "?")));
+      return sent;
+    }
+  }
+
   /* Blocks tab: recent-blocks table + "Older" paging by height decrement
    * (no infinite-scroll lib). Rows: height link, time, witness link, txs.
    * Tip view (oldest null) adds the LIVE pulse: the existing Chain block
@@ -230,7 +447,7 @@ var ExplorerBlocks = (function () {
     stopLive();
     showStatus(doc, body, t("explorer.loading_blocks", "Loading blocks…"));
     function rowsFor(top) {
-      if (top === null || top === undefined) return Explorer.recentBlocks(RECENT_N);
+      if (top === null || top === undefined) return Explorer.recentBlocks(TIP_ROWS);
       var heights = [];
       for (var h = top - 1; h > top - 1 - RECENT_N && h >= 1; h--) heights.push(h);
       return Promise.all(heights.map(function (hh) {
@@ -286,8 +503,10 @@ var ExplorerBlocks = (function () {
       return tr;
     }
     /* Start the tip live feed: prepends new heads with a flash + refreshes
-     * the indicator. Gen-guarded teardown on route leave. No extra socket. */
-    function startLive(tbody, liveEl, topBox) {
+     * the indicator. Gen-guarded teardown on route leave. No extra socket.
+     * onNew (optional) fires with each full new block AFTER the row
+     * prepend, so the tip stats strip repaints under the same gen guard. */
+    function startLive(tbody, liveEl, topBox, onNew) {
       if (typeof Store === "undefined" || !Store || typeof Store.subscribe !== "function") return;
       if (!tbody || !liveEl) return;
       var off = function () {};
@@ -295,6 +514,7 @@ var ExplorerBlocks = (function () {
         if (!isCurrent(myGen)) {
           try { off(); } catch (e) { /* gone */ }
           if (liveOff === off) liveOff = null;
+          clearStatTick();
           return;
         }
         if (!st) return;
@@ -329,6 +549,9 @@ var ExplorerBlocks = (function () {
               topBox.top = b.height;
               paintLive(liveEl, topBox.top);
             }
+            if (typeof onNew === "function") {
+              try { onNew(b); } catch (e) { /* stats keep prior values */ }
+            }
             next(i + 1);
           }).catch(function () {
             if (!isCurrent(myGen)) return;
@@ -339,35 +562,148 @@ var ExplorerBlocks = (function () {
       });
       liveOff = off;
     }
-    rowsFor(oldest).then(function (rows) {
-      if (!isCurrent(myGen)) return;
+    /* "N seconds ago" label for a head timestamp (original BlockTimeAgo
+     * concept, Blocks.jsx:23-48: green-when-fresh rides in CSS). */
+    function agoText(newestTs) {
+      var sec = 0;
+      try { sec = Math.max(0, Math.round((Date.now() - newestTs) / 1000)); } catch (e) { sec = 0; }
+      if (sec <= 1) return t("explorer.ago_one", "1 second ago");
+      return sec + " " + t("explorer.ago_many_suffix", "seconds ago");
+    }
+    /* Tip stats strip + two-column activity/blocks layout (original
+     * Blocks.jsx:305-504 stat rows + 507-602 activity/blocks pair — concepts
+     * only: no React, no perfect-scrollbar). Every cell starts as an honest
+     * dash; unreadable reads stay dashes, never guesses. Panel headers are
+     * plain divs like the original's block-content-header, so the page keeps
+     * exactly one h1 (the shell title, visually folded away in explorer-ui). */
+    function paintTip(rows, hd, sets, sup, ops) {
       while (body.firstChild) body.removeChild(body.firstChild);
-      if (rows.length === 0) {
-        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found."), "muted"));
-        return;
-      }
-      var isTip = (oldest === null || oldest === undefined);
       var topBox = { top: rows[0].height };
-      var liveEl = null;
-      if (isTip) {
-        liveEl = el(doc, "p", null, "xplore-live");
-        liveEl.setAttribute("aria-live", "polite");
-        body.appendChild(liveEl);
-        paintLive(liveEl, topBox.top);
+      var liveEl = el(doc, "p", null, "xplore-live");
+      liveEl.setAttribute("aria-live", "polite");
+      body.appendChild(liveEl);
+      paintLive(liveEl, topBox.top);
+
+      /* Newest-first stat rows (timestamps parsed once; unparseable stamps
+       * yield null and simply contribute no interval — never guessed). */
+      var data = rows.map(function (r) {
+        var ms = null;
+        try { var v = new Date(r.timestamp).getTime(); if (isFinite(v)) ms = v; } catch (e) { ms = null; }
+        return { height: r.height, ts: ms, txs: (typeof r.tx_count === "number" ? r.tx_count : null) };
+      });
+      function stripIntervals() {
+        var out = [];
+        for (var i = 0; i + 1 < data.length; i++) {
+          var a = data[i], b = data[i + 1];
+          if (a.height === b.height + 1 && typeof a.ts === "number" && typeof b.ts === "number") {
+            var s = (a.ts - b.ts) / 1000;
+            if (s >= 0 && s < 3600) out.push(s);
+          }
+        }
+        return out;
       }
-      var tableRows = rows.map(function (r) {
-        /* Recent path yields tx_count (null -> "—"); Older path yields txs. */
-        var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
+
+      var headNum = (hd && typeof hd.head_block_number === "number") ? hd.head_block_number : rows[0].height;
+      var statsBox = el(doc, "div", null, "xplore-stats");
+      statsBox.setAttribute("aria-live", "off");
+      var cCur = statCell(doc, t("explorer.stat_current", "Current block"));
+      var cLast = statCell(doc, t("explorer.stat_last", "Last block"), "xplore-green");
+      var cTps = statCell(doc, t("explorer.stat_tps", "Trx/s"));
+      var cAvg = statCell(doc, t("explorer.stat_avg", "Average confirmation time"));
+      var cWit = statCell(doc, t("explorer.stat_wit", "Active witnesses"), "xplore-green");
+      var cCom = statCell(doc, t("explorer.stat_com", "Active committee members"), "xplore-green");
+      var cTpb = statCell(doc, t("explorer.stat_tpb", "Trx/block"));
+      var cMiss = statCell(doc, t("explorer.stat_missed", "Recently missed blocks"), "xplore-warn");
+      var cSup = statCell(doc, t("explorer.stat_supply", "Current supply"));
+      var cStl = statCell(doc, t("explorer.stat_stealth", "Stealth supply"));
+      var cBt = statCell(doc, t("explorer.stat_blocktimes", "Block times"));
+      [cCur, cLast, cTps, cAvg, cWit, cCom, cTpb, cMiss, cSup, cStl, cBt].forEach(function (c) {
+        statsBox.appendChild(c.cell);
+      });
+      body.appendChild(statsBox);
+
+      var newestTs = { ts: (typeof data[0].ts === "number" ? data[0].ts : Date.now()) };
+      function repaint() {
+        if (!isCurrent(myGen)) return;
+        cCur.val.textContent = "#" + commas(headNum);
+        cCur.val.title = String(headNum);
+        cLast.val.textContent = agoText(newestTs.ts);
+        var st = computeStats(data.slice(0, STAT_N));
+        cTps.val.textContent = st.tps !== null ? st.tps : "—";
+        cAvg.val.textContent = st.avg !== null ? st.avg : "—";
+        cTpb.val.textContent = st.tpb !== null ? st.tpb : "—";
+        if (sets && typeof sets.witnesses === "number") cWit.val.textContent = String(sets.witnesses);
+        if (sets && typeof sets.committee === "number") cCom.val.textContent = String(sets.committee);
+        if (hd && typeof hd.recently_missed_count === "number") {
+          cMiss.val.textContent = String(hd.recently_missed_count);
+          cMiss.val.title = String(hd.recently_missed_count);
+        }
+        if (sup && sup.current_raw !== null && sup.current_raw !== undefined) {
+          var s1 = fmtSupply(sup.current_raw, sup.precision, sup.symbol || "BTS");
+          if (s1 !== null) { cSup.val.textContent = s1; cSup.val.title = String(sup.current_raw); }
+        }
+        if (sup && sup.stealth_raw !== null && sup.stealth_raw !== undefined) {
+          var s2 = fmtSupply(sup.stealth_raw, sup.precision, sup.symbol || "BTS");
+          if (s2 !== null) { cStl.val.textContent = s2; cStl.val.title = String(sup.stealth_raw); }
+        }
+        var ivals = stripIntervals();
+        while (cBt.val.firstChild) cBt.val.removeChild(cBt.val.firstChild);
+        if (ivals.length > 0) {
+          var cv = doc.createElement("canvas");
+          cv.width = 280; cv.height = 56;
+          cv.className = "xplore-bars";
+          cv.setAttribute("role", "img");
+          cv.setAttribute("aria-label", t("explorer.stat_blocktimes", "Block times"));
+          drawBars(cv, ivals);
+          cBt.val.appendChild(cv);
+        } else {
+          cBt.val.textContent = "—";
+        }
+      }
+      repaint();
+      /* Freshness ticker (1s): the LAST BLOCK cell counts up until the next
+       * head arrives. Gen-guarded self-clear; stopLive clears on leave. */
+      try {
+        clearStatTick();
+        statTimer = setInterval(function () {
+          if (!isCurrent(myGen)) { clearStatTick(); return; }
+          try { cLast.val.textContent = agoText(newestTs.ts); } catch (e) { /* next tick */ }
+        }, 1000);
+      } catch (e) { /* static label stands */ }
+
+      /* Two-column activity + blocks (side by side ≥1200px, stacked below). */
+      var split = el(doc, "div", null, "xplore-split");
+      var actPanel = el(doc, "div", null, "xplore-panel");
+      actPanel.appendChild(el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
+      if (!ops || ops.length === 0) {
+        actPanel.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity."), "muted"));
+      } else {
+        (ops || []).slice(0, 12).forEach(function (op) {
+          var row = el(doc, "div", null, "xplore-act-row");
+          row.appendChild(pillFor(doc, op));
+          row.appendChild(sentenceFor(doc, op, myGen));
+          actPanel.appendChild(row);
+        });
+      }
+      split.appendChild(actPanel);
+      var blkPanel = el(doc, "div", null, "xplore-panel");
+      blkPanel.appendChild(el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
+      var shown = rows.slice(0, TABLE_ROWS);
+      var tableRows = shown.map(function (r) {
+        var n = r.tx_count;
         return [anchor(doc, "#" + r.height, "#/block/" + r.height),
           r.timestamp || "—", witnessCell(doc, r.witness, myGen),
           (n === null || n === undefined) ? "—" : String(n)];
       });
       var scroller = scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows);
-      body.appendChild(scroller);
+      blkPanel.appendChild(scroller);
+      split.appendChild(blkPanel);
+      body.appendChild(split);
+
       var tbody = null;
       try { tbody = scroller.querySelector("tbody"); } catch (e) { tbody = null; }
-      var oldestRow = rows[rows.length - 1];
-      if (oldestRow.height > 1) {
+      var oldestRow = shown[shown.length - 1];
+      if (oldestRow && oldestRow.height > 1) {
         var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
         older.type = "button";
         older.addEventListener("click", function () {
@@ -377,7 +713,61 @@ var ExplorerBlocks = (function () {
         });
         body.appendChild(older);
       }
-      if (isTip && tbody) startLive(tbody, liveEl, topBox);
+      if (tbody) startLive(tbody, liveEl, topBox, function (b) {
+        var ms = null;
+        try { var v = new Date(b.timestamp).getTime(); if (isFinite(v)) ms = v; } catch (e) { ms = null; }
+        headNum = b.height;
+        data.unshift({ height: b.height, ts: ms, txs: b.tx_count });
+        if (data.length > TIP_ROWS) data.length = TIP_ROWS;
+        if (ms !== null) newestTs.ts = ms;
+        repaint();
+      });
+    }
+    rowsFor(oldest).then(function (rows) {
+      if (!isCurrent(myGen)) return;
+      while (body.firstChild) body.removeChild(body.firstChild);
+      if (rows.length === 0) {
+        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found."), "muted"));
+        return;
+      }
+      var isTip = (oldest === null || oldest === undefined);
+      if (!isTip) {
+        var tableRows = rows.map(function (r) {
+          var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
+          return [anchor(doc, "#" + r.height, "#/block/" + r.height),
+            r.timestamp || "—", witnessCell(doc, r.witness, myGen),
+            (n === null || n === undefined) ? "—" : String(n)];
+        });
+        var scroller = scrollTable(doc, [t("explorer.th_height", "Height"), t("explorer.th_time", "Time"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Txs")], tableRows);
+        body.appendChild(scroller);
+        var oldestRow = rows[rows.length - 1];
+        if (oldestRow.height > 1) {
+          var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
+          older.type = "button";
+          older.addEventListener("click", function () {
+            stopLive();
+            while (body.firstChild) body.removeChild(body.firstChild);
+            blocksTab(doc, body, root, myGen, oldestRow.height);
+          });
+          body.appendChild(older);
+        }
+        return;
+      }
+      /* Tip: secondary fail-open reads (head / active sets / BTS supply /
+       * recent ops) join the block rows; any single failure dashes its cells
+       * or empties the feed — the table below still paints. */
+      function failOpen(p, fb) {
+        try { return p.catch(function () { return fb; }); }
+        catch (e) { return Promise.resolve(fb); }
+      }
+      var pHd = (typeof Explorer.head === "function") ? failOpen(Explorer.head(), null) : Promise.resolve(null);
+      var pSets = (typeof Explorer.activeSets === "function") ? failOpen(Explorer.activeSets(), null) : Promise.resolve(null);
+      var pSup = (typeof Explorer.btsSupply === "function") ? failOpen(Explorer.btsSupply(), null) : Promise.resolve(null);
+      var pOps = (typeof Explorer.recentOps === "function") ? failOpen(Explorer.recentOps(12, 8), []) : Promise.resolve([]);
+      Promise.all([pHd, pSets, pSup, pOps]).then(function (res) {
+        if (!isCurrent(myGen)) return;
+        paintTip(rows, res[0], res[1], res[2], res[3]);
+      });
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
