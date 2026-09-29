@@ -389,6 +389,8 @@ var AccountUI = (function () {
     var range = mx - mn;
     var padL = 8, padR = 8, padT = 8, padB = 12;
     var plotW = g.w - padL - padR, plotH = g.h - padT - padB;
+    /* frac: BigInt value -> 0..1 plot fraction (pixel math only, never
+     * display: display strings come from Format). Returns 0.5 on flat data. */
     function frac(v) {
       if (range === 0n) return 0.5;
       /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */

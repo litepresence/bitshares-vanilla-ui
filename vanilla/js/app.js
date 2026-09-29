@@ -663,6 +663,10 @@ var App = (function () {
     return settings;
   }
 
+  /* finishBoot: wire footer + settings subscriptions and first paint.
+   * Params: settings (Store envelope, already loaded). Returns nothing.
+   * Fails: never — every DOM/storage touch is guarded; errors surface in
+   *   the footer/banner inline. */
   function finishBoot(settings) {
     Store.subscribe("connection", paintFooter);
     try { paintFooter(typeof Chain !== "undefined" && Chain ? Chain.status() : null); } catch (e) { /* footer carries errors */ }

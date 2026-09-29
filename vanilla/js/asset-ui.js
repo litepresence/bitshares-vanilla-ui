@@ -87,6 +87,8 @@ var AssetUI = (function () {
     if (ph) inp.setAttribute("placeholder", ph); inp.setAttribute("autocomplete", "off");
     touch(inp); lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
   }
+  /* bits: permission-bit checkbox group. Params: doc, [bit,label] list,
+   * current mask. Returns {box, read()} where read() ORs checked bits. */
   function bits(d, list, cur) {
     var box = el(d, "div", null, "asset-bits");
     box.style.display = "flex"; box.style.flexWrap = "wrap"; box.style.gap = "8px";

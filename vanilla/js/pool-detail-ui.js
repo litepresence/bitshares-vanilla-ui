@@ -654,7 +654,6 @@ var PoolDetailUI = (function () {
      * contract, same locked-hint). Rows come from the shared tape fetch
      * (executed paid/received, human strings, raw in title). */
     var u = U();
-    var u = U();
     /* Toggle mirrors #1 MarketHistory group-1 tabs (Exchange.jsx:2551-2616):
      * Pool history (all events) vs My exchanges (wallet op-63 for this pool).
      * My needs unlock: locked wallets get the Wallet-link hint (#9). */
@@ -672,6 +671,7 @@ var PoolDetailUI = (function () {
     var myBody = u.el(doc, "div"); myBody.id = "pool-hist-my"; myBody.setAttribute("role", "tabpanel");
     hist.appendChild(poolBody); hist.appendChild(myBody);
     var cur = "pool";
+    /* paint: Pool-history vs My-exchanges tab visibility + ARIA. */
     function paint() {
       var isMy = cur === "my";
       tabPool.setAttribute("aria-selected", isMy ? "false" : "true");
@@ -695,6 +695,9 @@ var PoolDetailUI = (function () {
       poolBody.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
     }
     myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My exchanges to see your fills in this pool."), "muted"));
+    /* loadMy: My-exchanges tab body (typed-account preview + locked hint +
+     * unlocked wallet tape, filtered to this pool). Params: container els,
+     * confirm-row spec, generation pair. Route-gen guarded. */
     function loadMy(poolBodyEl, myBodyEl, row, g1, g2) {
       void poolBodyEl;
       u.clearBox(myBodyEl);
@@ -716,12 +719,15 @@ var PoolDetailUI = (function () {
       myBodyEl.appendChild(viewBtn);
       var listBox = u.el(doc, "div");
       myBodyEl.appendChild(listBox);
+      /* drawMine: paint one account's pool exchanges (empty -> hint).
+       * No-ops when the route generation moved on. */
       function drawMine(mine) {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
         if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No exchanges for your account in this pool."), "muted")); return; }
         listBox.appendChild(tapeTable(doc, mine.slice(0, 20), row));
       }
+      /* lockedHint: locked-wallet empty state with a Wallet link. */
       function lockedHint() {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
@@ -733,6 +739,8 @@ var PoolDetailUI = (function () {
         hint.appendChild(a);
         listBox.appendChild(hint);
       }
+      /* loadTyped: resolve the typed account and filter the fetched tape
+       * to its rows (public reads only); blank input keeps the hint. */
       function loadTyped() {
         if (!live(g1, g2)) return;
         var v = fAcct.input.value.trim();

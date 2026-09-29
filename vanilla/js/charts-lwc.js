@@ -500,6 +500,8 @@ var ChartsLwc = (function () {
       if (live.length < 2) return noop;
       var syncing = false;
       var subs = live.map(function (src) {
+        /* handler: fan one pane's visible range to the other linked panes
+         * (re-entrancy guarded by syncing; one stuck pane never blocks). */
         var handler = function (range) {
           if (syncing || !range) return;
           syncing = true;

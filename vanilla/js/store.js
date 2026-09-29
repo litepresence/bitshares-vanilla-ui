@@ -174,6 +174,9 @@ var Store = (function () {
     return next;
   }
 
+  /* subscribe: register a listener on a topic ("settings"/"connection").
+   * Params: topic (string), fn (callback). Returns an unsubscribe closure.
+   * Fails: never throws (unknown topics start empty; see emit for fan-out). */
   function subscribe(topic, fn) {
     if (!listeners[topic]) listeners[topic] = [];
     listeners[topic].push(fn);

@@ -1,3 +1,8 @@
+/* App.css: base layout + components for all three themes (ref-ui default).
+ * Owns: reset, shell (topbar/nav/footer), cards/tables/forms/buttons/pickers,
+ *   responsive breakpoints (single-column stack under ~1200px, touch targets
+ *   >=44px). Consumes: tokens from themes.css only (no literal palette here).
+ *   No build step: plain CSS served statically. */
 * { box-sizing: border-box; }
 /* Original-pages style pass (buttons + fonts only; layout untouched):
  * #1 body stack is Roboto-Regular/Helvetica/Arial (base/_fonts.scss:27-32 +

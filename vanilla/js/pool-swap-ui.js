@@ -90,6 +90,7 @@ var PoolSwapUI = (function () {
     var myPoolBody = u.el(doc, "div"); myPoolBody.id = "swap-hist-my"; myPoolBody.setAttribute("role", "tabpanel");
     histSec.appendChild(poolBody); histSec.appendChild(myPoolBody);
     var histTab = "pool", curPoolId = null;
+    /* paintHistTab: pool-history vs my-exchanges tab visibility + ARIA. */
     function paintHistTab() {
       var isMy = histTab === "my";
       histTabPool.setAttribute("aria-selected", isMy ? "false" : "true");
@@ -104,6 +105,8 @@ var PoolSwapUI = (function () {
     paintHistTab();
     poolBody.appendChild(u.el(doc, "p", t("pool.hist_hint", "Find a pool to see its exchanges."), "muted"));
     myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your exchanges."), "muted"));
+    /* loadPoolHist: fetch + paint the pool event tape (op names, never raw
+     * ids); failures paint inline. Also refreshes the My tab when active. */
     function loadPoolHist(poolId) {
       curPoolId = poolId;
       u.clearBox(poolBody);
@@ -203,6 +206,8 @@ var PoolSwapUI = (function () {
         return d.pool === poolId;
       });
     }
+    /* drawMine: paint this pool's op-63 rows for the account (empty ->
+     * hint). No-ops when the route generation moved on. */
     function drawMine(mine) {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox);
@@ -220,6 +225,7 @@ var PoolSwapUI = (function () {
       });
       table.appendChild(tbody); listBox.appendChild(table);
     }
+    /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox);
@@ -292,6 +298,9 @@ var PoolSwapUI = (function () {
     if (whole === 0 && frac.length && parseInt((frac + "00").slice(0, 2), 10) < 10) return false;
     return frac.length <= 2;
   }
+  /* quoteFor: CPMM quote + min-to-receive + confirm wiring for one pool.
+   * Params: doc, ui helpers, generations, output boxes, resolved assets,
+   * pool id, human sell amount + slippage %. Chain failures paint inline. */
   function quoteFor(doc, u, myGen, uiGen, quoteBox, actionBox, found, poolId, amtHuman, slipHuman) {
     u.clearBox(quoteBox); u.clearBox(actionBox);
     u.showStatus(doc, quoteBox, "Quoting…");

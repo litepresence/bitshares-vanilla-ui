@@ -27,6 +27,8 @@ var PoolGraph = (function () {
   var ASSET_RE = /^1\.3\.\d+$/;
   var L1_CAP = 8, L2_ASSETS = 6, L2_LIMIT = 3, NODE_CAP = 25;
 
+  /* _assertAsset: reject non-asset ids up front (throws). _isSocketError:
+   * true for transport-level failures (caller maps to offline state). */
   function _assertAsset(id) { if (typeof id !== "string" || !ASSET_RE.test(id)) throw new Error("bad asset id: " + JSON.stringify(id)); }
   function _isSocketError(e) { return /not connected|socket closed|connect timeout|call timeout/i.test(String((e && e.message) || e || "")); }
   /* Missing-method shape: node lacks one_asset (older binary) or rejects params. -> [] fallback, never throws. */
@@ -218,6 +220,7 @@ var PoolGraph = (function () {
     (graph.edges || []).forEach(function (e) {
       (adj[e.a] = adj[e.a] || {})[e.b] = 1; (adj[e.b] = adj[e.b] || {})[e.a] = 1;
     });
+    /* neigh: adjacent asset ids for one node id (empty when absent). */
     function neigh(id) { return adj[id] ? Object.keys(adj[id]) : []; }
     var l0 = [assetA, assetB], inL0 = {}; l0.forEach(function (id) { inL0[id] = 1; });
     var l1set = {};
@@ -241,6 +244,7 @@ var PoolGraph = (function () {
     return pos;
   }
 
+  /* _cssTok: theme token value or the fallback (headless-safe). */
   function _cssTok(name, fallback) {
     try {
       if (typeof getComputedStyle !== "undefined" && typeof document !== "undefined") {
@@ -280,6 +284,7 @@ var PoolGraph = (function () {
     var assetA = opts.assetA, assetB = opts.assetB;
     var hi = {};
     (opts.highlightPools || []).forEach(function (id) { hi[String(id)] = 1; });
+    /* emptyLine: centered canvas message (no-data states). */
     function emptyLine(s) {
       ctx.fillStyle = muted; ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";

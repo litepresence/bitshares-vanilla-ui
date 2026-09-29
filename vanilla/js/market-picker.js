@@ -174,6 +174,8 @@ var MarketPicker = (function () {
     }
   }
 
+  /* saveFavs: persist starred QUOTE_BASE ids (session-only when storage
+   * is blocked). Never throws. */
   function saveFavs(list) {
     try {
       if (typeof localStorage !== "undefined") {
@@ -186,6 +188,7 @@ var MarketPicker = (function () {
     return list.indexOf(id) !== -1;
   }
 
+  /* toggleFav: star/unstar a market id in place, persist, return list. */
   function toggleFav(list, id) {
     var i = list.indexOf(id);
     if (i === -1) list.push(id);
@@ -359,6 +362,8 @@ var MarketPicker = (function () {
       return out;
     }
 
+    /* rowKind: cached asset-kind for one market id (fails OPEN -> null
+     * shows the row unfiltered). Never throws. */
     function rowKind(id) {
       var rec = null, sym = null;
       try {
@@ -374,6 +379,8 @@ var MarketPicker = (function () {
       return kindOf(sym, rec);
     }
 
+    /* paint: render the filtered picker rows (search + kind + fav-only).
+     * Params: filter (raw search string, matched case-insensitively). */
     function paint(filter) {
       while (ul.firstChild) ul.removeChild(ul.firstChild);
       var f = String(filter || "").trim().toUpperCase();
@@ -467,6 +474,7 @@ var MarketPicker = (function () {
         ul.appendChild(li);
       });
     }
+    /* paintTabs: All/Starred ARIA selection follows favOnly. */
     function paintTabs() {
       tabAll.setAttribute("aria-selected", favOnly ? "false" : "true");
       tabStar.setAttribute("aria-selected", favOnly ? "true" : "false");

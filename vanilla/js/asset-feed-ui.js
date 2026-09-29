@@ -205,6 +205,8 @@ var AssetFeedUI = (function () {
     var cq = field(d, t("asset.cer_quote_backing_field", "CER quote (human, backing)"), null, "1", "decimal");
     [pub, sb, sq, mcr, mssr, cb, cq].forEach(function (x) { body.appendChild(x.row); });
     var prev = el(d, "p", "", "muted"); body.appendChild(prev);
+    /* paintPrev: live MCR/MSSR % preview from the raw inputs. Never throws
+     * (bad input shows a hint, never a blank). */
     function paintPrev() {
       var txt;
       try { txt = "MCR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mcr.input.value)) + "% · MSSR " + AssetOps.ratioToPct(AssetOps.pctHumanToRatio(mssr.input.value)) + "%"; }

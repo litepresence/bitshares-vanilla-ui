@@ -136,6 +136,7 @@ var MarketOrders = (function () {
     parentEl.appendChild(acctRow);
     var body = doc.createElement("div");
     parentEl.appendChild(body);
+    /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       while (body.firstChild) body.removeChild(body.firstChild);
       var hint = el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
@@ -145,11 +146,16 @@ var MarketOrders = (function () {
       hint.appendChild(a);
       body.appendChild(hint);
     }
+    /* canCancelNow: cancel UI is available (unlocked AND the TradeUI
+     * cancel backend is loaded). Returns boolean, never throws. */
     function canCancelNow() {
       return unlocked && typeof TradeUI !== "undefined" && TradeUI &&
         typeof TradeUI.orderCancelBox === "function" &&
         typeof TradeUI.cancelAllBox === "function";
     }
+    /* paintOrders: my open orders as table + phone cards with per-row
+     * cancel (TradeUI confirm renders into the shared slot above the list).
+     * No-ops when live() is false. */
     function paintOrders(mine, canCancel) {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
@@ -157,6 +163,7 @@ var MarketOrders = (function () {
         body.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
         return;
       }
+      /* rerender: full re-render after a cancel flow completes. */
       function rerender() { render(doc, parentEl, ctx); }
       /* Shared inline-confirm slot (one, above the list): Cancel buttons
        * paint TradeUI's confirm here so rows/cards stay put until done. */

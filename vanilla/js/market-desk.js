@@ -466,6 +466,8 @@ var MarketDesk = (function () {
     state.tabMy = tabMy;
     state.recentBody = recentBody;
     state.myBody = myBody;
+    /* paintTradesTab: show the recent-fills or my-fills pane per
+     * state.tradesTab (ARIA pressed/selected follow). Pure DOM, never throws. */
     function paintTradesTab() {
       var isMy = state.tradesTab === "my";
       tabRecent.setAttribute("aria-selected", isMy ? "false" : "true");
@@ -538,6 +540,7 @@ var MarketDesk = (function () {
     function scaleBtn(key, logKey, linKey, redrawBars) {
       var b = touchable(el(doc, "button", ""));
       b.type = "button";
+      /* paint: relabel this scale toggle from state (log/lin pair). */
       function paint() {
         var on = !!state[key];
         b.textContent = on ? t(logKey[0], logKey[1]) : t(linKey[0], linKey[1]);
@@ -842,6 +845,9 @@ var MarketDesk = (function () {
     if (!host || !assets) return;
     while (host.firstChild) host.removeChild(host.firstChild);
     var tok = (state._myGen = (state._myGen || 0) + 1);
+    /* live: this my-trades render is still current (generation token
+     * matches and the desk hash is still on this market). Stale async
+     * fills must not paint. */
     function live() {
       if (tok !== state._myGen) return false;
       try {
@@ -872,6 +878,7 @@ var MarketDesk = (function () {
     host.appendChild(acctRow);
     var myBody = doc.createElement("div");
     host.appendChild(myBody);
+    /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
       var hint = el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
@@ -903,6 +910,8 @@ var MarketDesk = (function () {
       });
       return fills;
     }
+    /* paintFills: op-4 pair fills for the typed/unlocked account as a
+     * table (empty -> honest hint). No-ops when live() is false. */
     function paintFills(fills) {
       if (!live()) return;
       while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
@@ -1240,6 +1249,8 @@ var MarketDesk = (function () {
     function alive() {
       try { return deskAlive(state) && state.id === myId; } catch (e) { return false; }
     }
+    /* novalue: feed fetch failed/absent — clear state.feed and repaint
+     * the strip (which shows the missing-feed hint). Never throws. */
     function novalue() {
       if (!alive()) return;
       state.feed = null;

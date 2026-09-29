@@ -514,6 +514,8 @@ var TradeForm = (function () {
     line.id = "trade-fee-preview-" + side;
     wrap.appendChild(line);
     var timer = null;
+    /* schedule: debounce the fee preview 400ms (resets on each keystroke;
+     * timers-unavailable keeps the last preview). Never throws. */
     function schedule() {
       try { if (timer !== null) clearTimeout(timer); } catch (e) { /* gone */ }
       try {
@@ -903,6 +905,8 @@ var TradeForm = (function () {
       t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
     body.appendChild(fokRow);
     var exp = renderExpiry(doc, body, st, side);
+    /* liveVals: scrape current form inputs (amount/price/fill-or-kill/
+     * expiry) for the fee preview and review screen. */
     function liveVals() {
       return {
         amount: amountF.input.value, price: priceF.input.value,

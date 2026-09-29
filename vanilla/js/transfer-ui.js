@@ -445,6 +445,8 @@ var TransferUI = (function () {
     return rows[0];
   }
 
+  /* networkNameLocal: settings network for the core-asset default
+   * ("mainnet" when settings are unreadable). Never throws. */
   function networkNameLocal() {
     try {
       if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {

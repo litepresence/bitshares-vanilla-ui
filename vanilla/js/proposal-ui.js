@@ -64,11 +64,14 @@ var ProposalUI = (function () {
   }
   function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+  /* showError: human error line (ERRMAP maps chain codes to dict strings,
+   * aria-live). Returns the node. Never throws. */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("proposal.unexpected_error", "Unexpected error"));
     ERRMAP.forEach(function (p) { if (m.indexOf(p[0]) !== -1) m = t("proposal.err_" + p[0].replace(/-/g, "_"), p[1]); });
     var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
   }
+  /* showStatus: muted aria-live status line. Returns the node. */
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
@@ -119,6 +122,7 @@ var ProposalUI = (function () {
     });
     return list;
   }
+  /* field: labeled touch-sized input row. Returns {row, input}. */
   function field(doc, labelText, opts) {
     opts = opts || {};
     var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");

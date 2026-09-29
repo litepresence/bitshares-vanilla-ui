@@ -67,6 +67,8 @@ var MarketInd = (function () {
     ["supertrend", "SUPERTREND"], ["keltner", "KELTNER"],
     ["donchian", "DONCHIAN"], ["zigzag", "ZIGZAG"], ["kagi", "KAGI"]
   ];
+  /* overlayLabel: i18n display label for a price-overlay key (SMA/EMA/BB/
+   * PSAR have dict entries; anything else keeps its table fallback). */
   function overlayLabel(key, fallback) {
     if (key === "sma") return t("market.ov_sma", "SMA");
     if (key === "ema") return t("market.ov_ema", "EMA");
@@ -411,7 +413,10 @@ var MarketInd = (function () {
     var palette = [C.buy, C.sell, C.accent, C.warn, C.muted];
     var ci = 0;
     var legs = { closes: closes, highs: highs, lows: lows, vols: vols };
+    /* nextColor: round-robin overlay leg color from the theme palette. */
     function nextColor() { var c = palette[ci % palette.length]; ci++; return c; }
+    /* clampP: user period into the spec's [min,max] (non-numbers take the
+     * spec default). Returns a finite number, never throws. */
     function clampP(spec, p) {
       var v = (typeof p === "number" && isFinite(p)) ? p : spec.param.def;
       if (v < spec.param.min) return spec.param.min;
@@ -1033,6 +1038,8 @@ var MarketInd = (function () {
       chips.className = "mkt-indmenu-chips";
       sec.appendChild(chips);
       var step = (spec.param.min >= 1) ? 1 : (spec.param.def < 1 ? 0.005 : 0.5);
+      /* paintChips: per-instance period chips (editable number + remove)
+       * for this indicator; edits clamp into range and redraw the charts. */
       function paintChips() {
         while (chips.firstChild) chips.removeChild(chips.firstChild);
         state.over[key].forEach(function (inst, i) {
@@ -1096,6 +1103,8 @@ var MarketInd = (function () {
     var panel = doc.createElement("div");
     panel.className = "mkt-indmenu-panel";
     panel.style.display = "none";
+    /* setOpen: show/hide the indicator menu panel (ARIA expanded follows;
+     * opening moves focus to the first input, falling back to the button). */
     function setOpen(open) {
       panel.style.display = open ? "" : "none";
       btn.setAttribute("aria-expanded", open ? "true" : "false");
@@ -1108,6 +1117,9 @@ var MarketInd = (function () {
     }
     function isOpen() { return panel.style.display !== "none"; }
     btn.addEventListener("click", function () { setOpen(!isOpen()); });
+    /* group: one menu section (title + checkbox items bound to the
+     * overlay/oscillator state store). Params: title, [key,label] items,
+     * state store object, "over"|"osc" kind. */
     function group(title, items, store, kind) {
       var sec = doc.createElement("div");
       sec.className = "mkt-indmenu-group";
