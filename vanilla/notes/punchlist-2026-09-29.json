@@ -1,1 +1,907 @@
-{"auditors":["dash-wallet","exchange-pools","account-transfer","explorer","governance","assets-misc"],"date":"2026-09-29","pages":[{"missing":[{"element":"LoginSelector gate (reference shows LoginSelector cards when accountCount==0 per DashboardPage.jsx:26-32; vanilla shows simplified welcome card instead)","ref":"reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:26-32","severity":"med"},{"element":"StarredMarkets + FeaturedMarkets tab set per preferredBases quote with asset-icon imgs and gateway prefixes; vanilla above-fold shows welcome/unlock/committee-account/Balances, market tabs not visible without scrolling","ref":"reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:43-87, Markets.jsx","severity":"med"},{"element":"No Balances table on reference dashboard (balances live on account page); vanilla renders committee-account Balances block on dashboard","ref":"reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:34-92","severity":"low"}],"notes":"Vanilla renders (welcome card CREATE ACCOUNT/LOGIN, Language select, Import existing account, unlock notice, committee-account 1.2.0 viewing-as, Balances header). Structure differs from reference tab layout but all content renders; markets directory exists in code (vanilla/js/dashboard-ui.js:454) below fold.","page":"#/","route_status":"ok"},{"missing":[{"element":"Wallet console cards: active-wallet card + change-wallet link, import-keys card, balance-claims card (WalletOptions)","ref":"reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:147-213","severity":"high"},{"element":"Sub-routes absent: /wallet/create, /wallet/change, /wallet/change-password (as subview), /wallet/import-keys, /wallet/delete, /wallet/backup/create, /wallet/backup/restore, /wallet/backup/brainkey, /wallet/balance-claims, /wallet/brainkey","ref":"reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:81-137","severity":"high"},{"element":"Locked state: reference console shows RESTORE BACKUP + NEW LOCAL WALLET buttons and wallet cards, not a password-unlock form","ref":"vanilla/notes/original-pages/wallet.png","severity":"med"},{"element":"Unlocked state extras missing from shot verification: create-backup (.bin download), restore-backup, delete-wallet, wallet-name display","ref":"reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:215-260","severity":"med"}],"notes":"Vanilla locked screen (Password + UNLOCK + Change-password/Create-new/Import links) works but is a different model from the reference console. Change-password exists only as separate #/wallet/password route.","page":"#/wallet","route_status":"ok"},{"missing":[{"element":"Form layout broken: brainkey textarea, GENERATE NEW BRAINKEY button, wrote-it-down checkbox, Password/Confirm fields all run on one overlapping inline row instead of stacked labeled rows","ref":"headless shot (visual)","severity":"high"},{"element":"Missing Cancel button (reference has CREATE NEW LOCAL WALLET + CANCEL)","ref":"reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:211-222","severity":"med"},{"element":"Missing wallet public-name field shown when a wallet already exists","ref":"reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:168-186","severity":"med"},{"element":"Missing custom-brainkey toggle (enter own brainkey) and BrainkeyInput dictionary-validation UI","ref":"reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:188-232","severity":"med"},{"element":"Missing help links to wallet types / backup types (/help/introduction/wallets, /help/introduction/backups)","ref":"reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:260-270","severity":"low"},{"element":"Missing PasswordConfirm strength/validation meter (reference PasswordConfirm component vs two bare password inputs)","ref":"reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:167","severity":"low"}],"notes":"Reference route renders CreateWalletFromBrainkey restore form. Vanilla instead generates a new brainkey with a wrote-it-down gate — behaviorally a create flow, closer to WalletCreate default than to the brainkey-restore variant.","page":"#/create-wallet-brainkey","route_status":"ok"},{"missing":[{"element":"Default view is BackupRestore (.bin Choose File + RESET + BACK) but vanilla shows brainkey-only import form","ref":"reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:48-53, vanilla/notes/original-pages/existing-account.png","severity":"high"},{"element":"Missing sub-routes: /existing-account/import-backup, /existing-account/import-keys (WIF/private-key ImportKeys), /existing-account/brainkey, /existing-account/balance-claim","ref":"reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:54-74","severity":"high"},{"element":"Missing ExistingAccountOptions links (import_backup, import_bts1, create_wallet) and wallet-types/backup-types help links","ref":"reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:85-111","severity":"med"},{"element":"Missing DecryptBackup password step after .bin selection","ref":"reference/bitshares-ui/app/components/Login/DecryptBackup.jsx","severity":"med"}],"notes":"Vanilla verifies brainkey against chain (sequences 0..9) before saving — good — but covers only one of the four reference import paths.","page":"#/existing-account","route_status":"ok"},{"missing":[{"element":"Missing dual-model selector cards (By .bin-file Local Wallet vs By Account Name and Password Cloud Wallet) with active/inactive switching","ref":"reference/bitshares-ui/app/components/Login/Login.jsx:20-108, vanilla/notes/original-pages/login.png","severity":"high"},{"element":"Missing .bin-file drag-drop zone + browse-files upload + LOGIN + tooltip link (WalletLogin)","ref":"reference/bitshares-ui/app/components/Login/WalletLogin.jsx:36-101","severity":"high"},{"element":"Missing cloud login: account-name input + password + show-password toggle + passwordAccount flow (AccountLogin)","ref":"reference/bitshares-ui/app/components/Login/AccountLogin.jsx:17-60","severity":"high"},{"element":"Missing header selections and login tooltips guiding model choice","ref":"reference/bitshares-ui/app/components/Registration/WalletHeaderSelection.jsx, AccountHeaderSelection.jsx","severity":"low"}],"notes":"Vanilla /login is local-password-unlock only (same call as #/wallet locked form). No cloud-wallet and no .bin-file login paths exist.","page":"#/login","route_status":"ok"},{"missing":[{"element":"Missing dual selection cards with recommended badge, Security High/Medium rows, Login-by rows, Back-up rows, CONTINUE/SELECT buttons","ref":"reference/bitshares-ui/app/components/Registration/RegistrationSelector.jsx:60-108, vanilla/notes/original-pages/registration.png","severity":"high"},{"element":"#/registration/local has no WalletRegistration faucet form (account name, registrar, password confirm); vanilla is an explainer linking out","ref":"reference/bitshares-ui/app/components/Registration/WalletRegistration.jsx","severity":"high"},{"element":"#/registration/cloud has no AccountRegistration faucet form; vanilla is an explainer linking out","ref":"reference/bitshares-ui/app/components/Registration/AccountRegistration.jsx","severity":"high"}],"notes":"Vanilla hub is a 4-bullet link list (vanilla/js/auth-ui.js:135-153); faucet form itself lives only at #/create-account.","page":"#/registration","route_status":"ok"},{"missing":[{"element":"Missing news feed table (LINE/DATE/SUBJECT/AUTHOR columns, steemit links) fetched from Hive/steemit tag feed","ref":"reference/bitshares-ui/app/components/News.jsx:43-127","severity":"med"},{"element":"Missing fetch-error state and loading indicator","ref":"reference/bitshares-ui/app/components/News.jsx:25-29,129-200","severity":"low"}],"notes":"Intentional documented deviation (vanilla/js/news-ui.js:7-12 cites News.jsx:27-33 as NOT copied: external hosted feed is a rot risk).","page":"#/news","route_status":"ok"},{"missing":[{"element":"BORROW button on buy form (margin-short entry)","ref":"reference/bitshares-ui/app/components/Exchange/BuySell.jsx:1476-1489","severity":"high"},{"element":"Book-row prices render full-precision verbatim (14+ decimals in Buy/Sell orders tables)","ref":"vanilla/js/market-book.js:282,458 (trim6 only on spread lines)","severity":"med"},{"element":"Fee-asset selector dropdown (fee hardcoded to BTS 1.3.0)","ref":"reference/bitshares-ui/app/components/Exchange/BuySell.jsx:553-566,700-814","severity":"med"},{"element":"Settlement Price cell for live (non-globally-settled) MPA in stats strip","ref":"reference/bitshares-ui/app/components/Exchange/ExchangeHeader.jsx","severity":"med"},{"element":"Open-settlement-orders tab next to My open orders","ref":"reference/bitshares-ui/app/components/Exchange/Exchange.jsx:2656-2693","severity":"med"},{"element":"Collateral display (ExchangeHeaderCollateral) for bitasset market","ref":"reference/bitshares-ui/app/components/Exchange/ExchangeHeader.jsx:417","severity":"med"},{"element":"Invert-pair (flip) control and header star favourite next to trading pair (only alarm bell present)","ref":"vanilla/notes/original-header-exchange-2026-09-28.png","severity":"low"},{"element":"Personalize column chooser (gear)","ref":"reference/bitshares-ui/app/components/Exchange/Exchange.jsx:3418 + Personalize.jsx","severity":"low"},{"element":"Lowest-ask / Highest-bid helper line under each order form","ref":"vanilla/notes/original-buy-sell-2x3-2026-09-28.png","severity":"low"}],"notes":"Full desk renders with live data, zero console errors. Order confirm is inline UNLOCK & REVIEW rather than ConfirmOrderModal (behavior present, different chrome).","page":"#/market/BTS_CNY","route_status":"ok"},{"missing":[{"element":"Raw 18-decimal Latest/Best-bid/Best-ask strings and price-input prefill — chain integers not converted to human terms","ref":"vanilla/js/instant-trade-ui.js:256,258; principle #6","severity":"high"},{"element":"QuickTrade dual SELL/RECEIVE flow: receive-side amount/quote, swap-direction button, per-side asset pickers with balances","ref":"reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:37-83 + SellReceive.jsx","severity":"high"},{"element":"Order-walkthrough table (effective price, price/fee/orders columns) and fee display before sell","ref":"reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:837-944,1102-1137","severity":"med"},{"element":"Stale Loading market status line persists above the loaded quote section","ref":"vanilla/js/instant-trade-ui.js:213,244","severity":"low"}],"notes":"#/instant-trade/BTS_CNY auto-loads and reaches REVIEW ORDER state; functional as limit-order loader but a different product from #1 QuickTrade, not a visual twin.","page":"#/instant-trade","route_status":"ok"},{"missing":[{"element":"Separate EXCHANGE and STAKE/UNSTAKE action columns with inline modals; vanilla merges into one SWAP/STAKE link requiring navigation to the detail desk","ref":"reference/bitshares-ui/app/components/Poolmart/LiquidityPools.jsx:315-343","severity":"med"}],"notes":"Documented adaptation (pool-ui.js:241-242). Reference numbered pagination vs Prev/Next accepted (no chain pool count).","page":"#/pools","route_status":"ok"},{"missing":[],"notes":"No #1 counterpart (PoolmartPage is list-only); vanilla detail desk is an extension. Verified: stats strip, swap-count history + indicators, synth book + depth, pool map, volume, x*y=k curve, spread/midpoint, POOL HISTORY / MY SWAPS tabs, STAKE/UNSTAKE/SWAP/UPDATE/DELETE panels.","page":"#/pools/1.19.2","route_status":"ok"},{"missing":[{"element":"Balance display for sell/buy assets on the swap form","ref":"reference/astro-ui/src/components/SimpleSwap.jsx vs vanilla/js/pool-swap-ui.js","severity":"low"}],"notes":"Parity target is astro SimpleSwap (no #1 route). Single-pool only stated in UI.","page":"#/swap","route_status":"ok"},{"missing":[{"element":"Balance table columns QTY / IN ORDERS / IN VESTING BALANCES / IN COLLATERAL / PRICE(BTS) / 24HR / VALUE(BTS) — vanilla renders 2-col Asset|Balance only","ref":"reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx + vanilla/notes/original-pages/account.png","severity":"high"},{"element":"Per-asset action columns SEND / DEPOSIT / TRADE / BORROW / SETTLE","ref":"reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx:431-1343","severity":"high"},{"element":"Tabs Margin Positions (collaterals) and Credit Management absent; vanilla HISTORY/MEMBERSHIP/EQUITY are not reference tabs","ref":"reference/bitshares-ui/app/components/Account/AccountOverview.jsx:338-520","severity":"high"},{"element":"Asset filter SearchInput + Active/Visual toggle","ref":"reference/bitshares-ui/app/components/Account/AccountOverview.jsx:374-420","severity":"med"},{"element":"Portfolio total-value subtext in BTS under tab","ref":"reference/bitshares-ui/app/components/Account/AccountOverview.jsx:221-258","severity":"med"},{"element":"Asset symbols link to /asset/:symbol; trade icons deep-link markets","ref":"reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx:930-941","severity":"med"},{"element":"Proposals tab when account holds proposals","ref":"reference/bitshares-ui/app/components/Account/AccountOverview.jsx:505-560","severity":"low"}],"notes":"Renders live chain data, zero console errors; phone-card fallback present.","page":"#/account/committee-account","route_status":"ok"},{"missing":[{"element":"Logged-out LoginSelector: CREATE ACCOUNT / LOGIN buttons, language selector","ref":"reference/bitshares-ui/app/components/Dashboard/DashboardAccountsOnly.jsx:128-133","severity":"med"},{"element":"restore-your-account / advanced-form links (logged-out)","ref":"vanilla/notes/original-pages/accounts.png","severity":"low"},{"element":"Logged-in wallet-accounts list + Contacts + Recent tabs with DashboardList","ref":"reference/bitshares-ui/app/components/Dashboard/DashboardAccountsOnly.jsx:133-200","severity":"med"}],"notes":"Reference route App.jsx:512-515 → DashboardAccountsOnly. Logged-in list state not verifiable headless without a wallet.","page":"#/accounts","route_status":"ok"},{"missing":[{"element":"Asset dropdown restricted to sender non-zero balances; vanilla free-text asset input","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx:288-304","severity":"high"},{"element":"Send/Propose toggle (propose-as-another-account flow)","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx:551-564","severity":"med"},{"element":"Fee-asset selector; vanilla fee fixed in transfer asset","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx:677-689","severity":"med"},{"element":"Available-balance display with click-to-fill max amount","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx:458-484","severity":"med"},{"element":"Known-scammer flag on recipient selector","ref":"reference/bitshares-ui/app/components/Account/AccountSelector.jsx:592,709","severity":"low"},{"element":"Submit disabled until from+to+amount+asset valid and from!=to; vanilla Review always active","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx:496-509","severity":"low"}],"notes":"No /transfer route in reference (SendModal). Encrypted-memo checkbox is a vanilla extra.","page":"#/transfer","route_status":"ok"},{"missing":[{"element":"Same SendModal gaps as #/transfer","ref":"reference/bitshares-ui/app/components/Modal/SendModal.jsx","severity":"med"}],"notes":":to prefill verified working.","page":"#/transfer/lite-test-1","route_status":"ok"},{"missing":[{"element":"Gateway coverage: reference binds 8 services; vanilla lists 4 (GDEX+BIT20 disabled)","ref":"reference/bitshares-ui/app/components/Account/AccountDepositWithdraw.jsx:1-30","severity":"med"},{"element":"Per-service gateway/bridge toggles persisted in viewSettings","ref":"reference/bitshares-ui/app/components/Account/AccountDepositWithdraw.jsx:43-60","severity":"low"},{"element":"Deposit QR code (qrcode.react; vanilla self-documents NO QR)","ref":"reference/bitshares-ui/app/components/Modal/DepositModal.jsx","severity":"low"},{"element":"Gateway transaction-history panels (GdexHistory, OpenLedgerFiatTransactionHistory)","ref":"reference/bitshares-ui/app/components/DepositWithdraw/gdex/GdexHistory.jsx","severity":"med"},{"element":"Terms/agreement modal before gateway use","ref":"reference/bitshares-ui/app/components/DepositWithdraw/gdex/GdexAgreementModal.jsx","severity":"low"},{"element":"Full WithdrawModalNew flow with fee handling; vanilla withdraw deep-links prefilled transfer","ref":"reference/bitshares-ui/app/components/Modal/WithdrawModalNew.jsx","severity":"med"}],"notes":"Vanilla renders a working desk where the original logged-out page is BLANK — strictly better there. Dead gateways not desirable without unavailable-states.","page":"#/deposit-withdraw","route_status":"ok"},{"missing":[{"element":"Full per-op activity sentences: only transfer/limit_order_create/limit_order_cancel have original-shaped sentences","ref":"reference/bitshares-ui/app/components/Blockchain/Operation.jsx:224-234 vs vanilla/js/explorer-blocks.js:476-515","severity":"med"},{"element":"Activity rows lack pending (blocks-to-irreversible), fee and date that reference rows carry","ref":"reference/bitshares-ui/app/components/Blockchain/Operation.jsx:69-87,139-146","severity":"med"},{"element":"Witnesses/committee/markets tab bodies are thin summaries","ref":"reference/bitshares-ui/app/components/Explorer/Explorer.jsx:18-67","severity":"low"}],"notes":"Renders live at head with stats, pulse, strips, tables; zero console errors. Extra search box, head strip and FEEDS tab are documented supersets.","page":"#/explorer","route_status":"ok"},{"missing":[{"element":"SUPPLY column is dashes for every row: dynamic lookups always fail (OBJECT_RE only matches space 1; dynamic ids are 2.3.x)","ref":"vanilla/js/explorer-assets.js:275-288 vs vanilla/js/explorer.js:20,339-358","severity":"high"},{"element":"No SmartCoins / User-Issued / Prediction filter radio, no text filter, no rows-per-page selector","ref":"reference/bitshares-ui/app/components/Explorer/Assets.jsx:432-490","severity":"high"},{"element":"No per-row Exchange/market link column and no sortable Symbol/Issuer/Supply headers","ref":"reference/bitshares-ui/app/components/Explorer/Assets.jsx:213-226,321-334","severity":"high"},{"element":"No prediction-market list view (description/condition/expiry + market button)","ref":"reference/bitshares-ui/app/components/Explorer/Assets.jsx:368-419,492-618","severity":"med"},{"element":"Default list is first 25 list_assets from '' not the reference default SmartCoins set","ref":"reference/bitshares-ui/app/components/Explorer/Assets.jsx:43-45,259","severity":"med"}],"notes":"Tab renders, zero console errors; Symbol/Issuer/Precision populate and symbols link to #/asset.","page":"#/explorer/assets","route_status":"ok"},{"missing":[{"element":"No MARKET button to preferred market (BTS_USD)","ref":"reference/bitshares-ui/app/components/Blockchain/Asset.jsx:430-435","severity":"high"},{"element":"No ASSET INFO / ASSET ACTIONS tabs","ref":"reference/bitshares-ui/app/components/Blockchain/Asset.jsx:77-87","severity":"high"},{"element":"No asset-type / flags / permissions section","ref":"reference/bitshares-ui/app/components/Blockchain/Asset.jsx:252-258,286-316,582-636","severity":"high"},{"element":"No FEE POOL panel (core exchange rate, pool balance, unclaimed issuer income)","ref":"reference/bitshares-ui/app/components/Blockchain/Asset.jsx:1210-1306","severity":"med"},{"element":"No description/about box; amounts ungrouped without asset suffix","ref":"reference/bitshares-ui/app/components/Blockchain/Asset.jsx:346-438","severity":"med"}],"notes":"Core fields correct: ID 1.3.0, issuer null-account, precision 5, human-scaled supplies/fees, market fee 0%, 'Not a smartcoin' correct for BTS.","page":"#/asset/BTS","route_status":"ok"},{"missing":[{"element":"No Previous (parent hash) row","ref":"reference/bitshares-ui/app/components/Blockchain/Block.jsx:231-237","severity":"high"},{"element":"No prev/next block arrow navigation","ref":"reference/bitshares-ui/app/components/Blockchain/Block.jsx:118-131,246-262","severity":"high"},{"element":"Date shown as raw ISO instead of full localized date","ref":"reference/bitshares-ui/app/components/Blockchain/Block.jsx:206-218","severity":"med"},{"element":"No block-jump input, no Return-to-top link","ref":"reference/bitshares-ui/app/components/Blockchain/Block.jsx:133-143,174-197,264-270","severity":"low"},{"element":"Per-op detail richness untestable on empty block; tx view lacks Show-raw-json toggle","ref":"reference/bitshares-ui/app/components/Blockchain/Transaction.jsx:42-73","severity":"med"}],"notes":"Empty-block state honest. Use non-empty block to verify op detail.","page":"#/block/114778000","route_status":"ok"},{"missing":[],"notes":"No reference counterpart (App.jsx:565-584) — vanilla-only extra, honest sample labeling, astro-style columns. Deliberate omissions (no ES ranking, no pie) are anti-rot correct.","page":"#/ops","route_status":"ok"},{"missing":[{"element":"OP column shows generic labels instead of operation names for all non-asset ops","ref":"vanilla/js/asset.js:31-33 (OP_NAMES covers only ops 10-15,19) vs reference/bitshares-ui/app/components/Blockchain/Fees.jsx:76-94","severity":"high"},{"element":"Flat 2-column Op/Fee table instead of 5 fee groups (general/asset/market/account/business)","ref":"reference/bitshares-ui/app/components/Blockchain/Fees.jsx:18-42,233-249","severity":"med"},{"element":"No per-fee-type rows (basic_fee/price_per_kbyte/premium_fee) — only flat .fee shown","ref":"reference/bitshares-ui/app/components/Blockchain/Fees.jsx:105-201","severity":"med"},{"element":"No Lifetime-member fee column and no LTM-required dash treatment","ref":"reference/bitshares-ui/app/components/Blockchain/Fees.jsx:45,95-99,167-200","severity":"med"},{"element":"Fee scale not applied (fee*scale/1e4)","ref":"reference/bitshares-ui/app/components/Blockchain/Fees.jsx:71,106","severity":"med"},{"element":"Duplicated 'Network fees' heading and null-fee rows render as em-dash with no explanation","ref":"vanilla/js/fees-ui.js:68","severity":"low"}],"notes":"Empty/error/loading states honest, raw ints in titles, zero console errors.","page":"#/fees","route_status":"ok"},{"missing":[{"element":"Join Witness / Update Witness buttons + JoinWitnessesModal","ref":"reference/bitshares-ui/app/components/Account/Voting/Witnesses.jsx:57-66,92-97","severity":"high"},{"element":"Join Committee button + JoinCommitteeModal","ref":"reference/bitshares-ui/app/components/Account/Voting/Committee.jsx:47,76","severity":"med"},{"element":"Increase voting power / CREATE LOCK button + CreateLockModal (ticket-create entry on voting page)","ref":"reference/bitshares-ui/app/components/Account/AccountVoting.jsx:612-629,717-725","severity":"high"},{"element":"Worker budget / total budget line + hide-legacy-proposals toggle on workers tab","ref":"reference/bitshares-ui/app/components/Account/Voting/Workers.jsx:129,153","severity":"med"},{"element":"Proxy help '?' link to /help/voting","ref":"reference/bitshares-ui/app/components/Account/AccountVoting.jsx:800-807","severity":"low"}],"notes":"Proxy/slates/publish/reset present (vote-ui.js, vote-slate.js). No join/create-lock entry points.","page":"#/voting","route_status":"ok"},{"missing":[{"element":"SCAM ATTEMPT / UNKNOWN SOURCE badges","ref":"reference/bitshares-ui/app/components/Account/Proposals.jsx:380-429","severity":"med"},{"element":"NestedApprovalState per-approver status column","ref":"reference/bitshares-ui/app/components/Account/Proposals.jsx:399-404","severity":"med"},{"element":"Raw JSON view modal for proposal operations","ref":"reference/bitshares-ui/app/components/Account/Proposals.jsx:313-328","severity":"low"}],"notes":"List + create + detail + approve/reject/delete present. #1 has no top-level /proposals route (account-embedded); vanilla page is a superset desk.","page":"#/proposals","route_status":"ok"},{"missing":[],"notes":"No #1 source page (only ApplicationApi.createTicket). Leaderboard, my-tickets, create, per-row update, honest no-delete note present.","page":"#/tickets","route_status":"ok"},{"missing":[{"element":"Vesting progress columns: required/earned/remaining days, available % (claimable-now math)","ref":"reference/bitshares-ui/app/components/Account/AccountVesting.jsx:147-217","severity":"high"},{"element":"Search/filter input over the vesting list","ref":"reference/bitshares-ui/app/components/Account/AccountVesting.jsx:10,24,153-166","severity":"low"}],"notes":"List + create + per-row claim + op-37 claim present. Table shows ID/owner/balance/policy only; no available-% hint.","page":"#/vesting","route_status":"ok"},{"missing":[{"element":"Multiple key/account/address auth rows (vanilla create supports one key-auth + threshold)","ref":"vanilla/js/misc-ui.js:127,183-195","severity":"low"}],"notes":"Lookup/detail/update/delete/create present. No #1 counterpart (different feature). Restrictions path intentionally blocked as unproven.","page":"#/authorities","route_status":"ok"},{"missing":[{"element":"Lifetime-member requirement note / current-account binding","ref":"reference/bitshares-ui/app/components/Account/CreateWorker.jsx:190-202","severity":"low"},{"element":"Per-field helper texts (name/date/pay/url/vesting guidance)","ref":"reference/bitshares-ui/app/components/Account/CreateWorker.jsx:83-86,125-128,139-142,153-156,170-173","severity":"low"}],"notes":"Strict superset of #1's Publish-direct form except doc gaps. Op-34 broadcast with re-read proof.","page":"#/create-worker","route_status":"ok"},{"missing":[{"element":"Network-fees table uses placeholder labels '0 · op_0' … (feeSection)","ref":"vanilla/js/asset-ui.js:143-155","severity":"med"},{"element":"No explorer-style all-assets table by default; issued-assets list only renders after manual issuer LOAD","ref":"reference/bitshares-ui/app/components/Account/AccountAssets.jsx:215-245","severity":"med"},{"element":"Issued rows expose Open + Update links only; no inline Issue (op-14) action per row","ref":"reference/bitshares-ui/app/components/Account/AccountAssets.jsx:130-138","severity":"low"}],"notes":"Renders ok (issuer lookup + fee schedule).","page":"#/assets","route_status":"ok"},{"missing":[{"element":"Description is a single textarea; reference carries structured description fields","ref":"reference/bitshares-ui/app/components/Account/AccountAssetCreate.jsx:312-385","severity":"low"},{"element":"Flow is account-detached (manual issuer input default 1.2.0) vs reference account-contextual push","ref":"reference/bitshares-ui/app/components/Account/AccountAssets.jsx:146-147","severity":"low"}],"notes":"PERMS/FLAGS groups, smartcoin opts, NFT/PMA tabs all present.","page":"#/assets/create","route_status":"ok"},{"missing":[{"element":"No Filter/search input above the table","ref":"reference/bitshares-ui/app/components/Showcases/Htlc.jsx:107,298","severity":"med"},{"element":"List omits FROM/TO per-row columns and unified sortable table","ref":"reference/bitshares-ui/app/components/Showcases/Htlc.jsx:179-230","severity":"med"}],"notes":"Renders ok (Sent/Received counts + New HTLC form). Inline form is an accepted deviation.","page":"#/htlc","route_status":"ok"},{"missing":[{"element":"No EXPIRATION column","ref":"vanilla/notes/original-pages/credit-offer.png TOTAL+AVAILABLE","severity":"med"},{"element":"No AVAILABLE (vs TOTAL) column split; vanilla shows TOTAL + CURRENT + MIN DEAL AMOUNT only","ref":"vanilla/notes/original-pages/credit-offer.png","severity":"med"},{"element":"No per-row LOAN/borrow ($) action visible in list above fold","ref":"vanilla/notes/original-pages/credit-offer.png LOAN column","severity":"low"}],"notes":"Renders ok with live rows. Owner/Asset filter + LIST + Create-offer form; collateral in code below fold.","page":"#/credit-offer","route_status":"ok"},{"missing":[],"notes":"No /samet route in reference (ops/enum only). Fund table + My-funds + Create/Borrow/Repay/Update/Delete present.","page":"#/samet","route_status":"ok"},{"missing":[{"element":"No open-new-position (borrow-to-create call order) form; adjust gated to existing positions","ref":"reference/bitshares-ui/app/components/Showcases/Borrow.jsx","severity":"high"},{"element":"No GET STARTED guided stepper chrome","ref":"reference/bitshares-ui/app/components/Showcases/Borrow.jsx:336","severity":"med"}],"notes":"Renders ok (positions loader + op-3 adjust + explainer + op-45 bids below fold).","page":"#/borrow","route_status":"ok"},{"missing":[{"element":"No ADD/REMOVE ESCROW control","ref":"reference/bitshares-ui/app/components/Showcases/Barter.jsx:1159-1177","severity":"med"},{"element":"No per-side fee-asset selectors, fee-when-executes toggle, proposal-fee input, or TOTAL FEES line","ref":"reference/bitshares-ui/app/components/Showcases/Barter.jsx:1216-1226","severity":"med"}],"notes":"Renders ok (Peer A/B + ADD ASSET ROW + PREVIEW/PROPOSE op-22). Propose path present.","page":"#/barter","route_status":"ok"},{"missing":[{"element":"No Hide-unknown-houses / Hide-invalid-assets toggles","ref":"reference/bitshares-ui/app/components/PredictionMarkets/PredictionMarkets.jsx","severity":"med"},{"element":"No CREATE PREDICTION MARKET button/modal","ref":"reference/bitshares-ui/app/components/PredictionMarkets/PredictionMarkets.jsx:266-268,564","severity":"med"},{"element":"List lacks HOUSE, MARKET CONFIDENCE, PREDICTED LIKELIHOOD, RESOLUTION DATE, ACTION columns","ref":"vanilla/notes/original-pages/prediction.png","severity":"med"}],"notes":"Renders ok with live scan (5 markets, validity labels, Details links, PMA-create link).","page":"#/prediction","route_status":"ok"},{"missing":[],"notes":"No /alerts route in reference (Exchange modal + toasts). Vanilla page is a superset desk.","page":"#/alerts","route_status":"ok"},{"missing":[{"element":"No CREATE ACCOUNT vs LOGIN selector card","ref":"vanilla/notes/original-pages/create-account.png","severity":"med"},{"element":"No 'restore your account / advanced form' links on this page","ref":"vanilla/notes/original-pages/create-account.png","severity":"low"}],"notes":"Renders ok (name check + brainkey + REGISTER TESTNET-ONLY).","page":"#/create-account","route_status":"ok"},{"missing":[{"element":"Topic bodies are one-paragraph summaries, not full help articles","ref":"vanilla/notes/original-pages/help.png","severity":"high"},{"element":"Sub-topics Witnesses / Workers / Committee Members absent from index","ref":"vanilla/notes/original-pages/help.png","severity":"med"}],"notes":"Renders ok (22-topic index). XBTS/IOXBank gateway topics present.","page":"#/help","route_status":"ok"}],"round":"director-round-1","totals":{"empty":0,"high":21,"low":22,"med":45,"ok_pages":44,"pages":44}}
+{
+ "auditors": [
+  "dash-wallet",
+  "exchange-pools",
+  "account-transfer",
+  "explorer",
+  "governance",
+  "assets-misc"
+ ],
+ "date": "2026-09-29",
+ "pages": [
+  {
+   "missing": [
+    {
+     "element": "LoginSelector gate (reference shows LoginSelector cards when accountCount==0 per DashboardPage.jsx:26-32; vanilla shows simplified welcome card instead)",
+     "ref": "reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:26-32",
+     "severity": "med"
+    },
+    {
+     "element": "StarredMarkets + FeaturedMarkets tab set per preferredBases quote with asset-icon imgs and gateway prefixes; vanilla above-fold shows welcome/unlock/committee-account/Balances, market tabs not visible without scrolling",
+     "ref": "reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:43-87, Markets.jsx",
+     "severity": "med"
+    },
+    {
+     "element": "No Balances table on reference dashboard (balances live on account page); vanilla renders committee-account Balances block on dashboard",
+     "ref": "reference/bitshares-ui/app/components/Dashboard/DashboardPage.jsx:34-92",
+     "severity": "low"
+    }
+   ],
+   "notes": "Vanilla renders (welcome card CREATE ACCOUNT/LOGIN, Language select, Import existing account, unlock notice, committee-account 1.2.0 viewing-as, Balances header). Structure differs from reference tab layout but all content renders; markets directory exists in code (vanilla/js/dashboard-ui.js:454) below fold.",
+   "page": "#/",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Wallet console cards: active-wallet card + change-wallet link, import-keys card, balance-claims card (WalletOptions)",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:147-213",
+     "severity": "high"
+    },
+    {
+     "element": "Sub-routes absent: /wallet/create, /wallet/change, /wallet/change-password (as subview), /wallet/import-keys, /wallet/delete, /wallet/backup/create, /wallet/backup/restore, /wallet/backup/brainkey, /wallet/balance-claims, /wallet/brainkey",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:81-137",
+     "severity": "high"
+    },
+    {
+     "element": "Locked state: reference console shows RESTORE BACKUP + NEW LOCAL WALLET buttons and wallet cards, not a password-unlock form",
+     "ref": "vanilla/notes/original-pages/wallet.png",
+     "severity": "med"
+    },
+    {
+     "element": "Unlocked state extras missing from shot verification: create-backup (.bin download), restore-backup, delete-wallet, wallet-name display",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletManager.jsx:215-260",
+     "severity": "med"
+    }
+   ],
+   "notes": "Vanilla locked screen (Password + UNLOCK + Change-password/Create-new/Import links) works but is a different model from the reference console. Change-password exists only as separate #/wallet/password route.",
+   "page": "#/wallet",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Form layout broken: brainkey textarea, GENERATE NEW BRAINKEY button, wrote-it-down checkbox, Password/Confirm fields all run on one overlapping inline row instead of stacked labeled rows",
+     "ref": "headless shot (visual)",
+     "severity": "high"
+    },
+    {
+     "element": "Missing Cancel button (reference has CREATE NEW LOCAL WALLET + CANCEL)",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:211-222",
+     "severity": "med"
+    },
+    {
+     "element": "Missing wallet public-name field shown when a wallet already exists",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:168-186",
+     "severity": "med"
+    },
+    {
+     "element": "Missing custom-brainkey toggle (enter own brainkey) and BrainkeyInput dictionary-validation UI",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:188-232",
+     "severity": "med"
+    },
+    {
+     "element": "Missing help links to wallet types / backup types (/help/introduction/wallets, /help/introduction/backups)",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:260-270",
+     "severity": "low"
+    },
+    {
+     "element": "Missing PasswordConfirm strength/validation meter (reference PasswordConfirm component vs two bare password inputs)",
+     "ref": "reference/bitshares-ui/app/components/Wallet/WalletCreate.jsx:167",
+     "severity": "low"
+    }
+   ],
+   "notes": "Reference route renders CreateWalletFromBrainkey restore form. Vanilla instead generates a new brainkey with a wrote-it-down gate \u2014 behaviorally a create flow, closer to WalletCreate default than to the brainkey-restore variant.",
+   "page": "#/create-wallet-brainkey",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Default view is BackupRestore (.bin Choose File + RESET + BACK) but vanilla shows brainkey-only import form",
+     "ref": "reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:48-53, vanilla/notes/original-pages/existing-account.png",
+     "severity": "high"
+    },
+    {
+     "element": "Missing sub-routes: /existing-account/import-backup, /existing-account/import-keys (WIF/private-key ImportKeys), /existing-account/brainkey, /existing-account/balance-claim",
+     "ref": "reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:54-74",
+     "severity": "high"
+    },
+    {
+     "element": "Missing ExistingAccountOptions links (import_backup, import_bts1, create_wallet) and wallet-types/backup-types help links",
+     "ref": "reference/bitshares-ui/app/components/Wallet/ExistingAccount.jsx:85-111",
+     "severity": "med"
+    },
+    {
+     "element": "Missing DecryptBackup password step after .bin selection",
+     "ref": "reference/bitshares-ui/app/components/Login/DecryptBackup.jsx",
+     "severity": "med"
+    }
+   ],
+   "notes": "Vanilla verifies brainkey against chain (sequences 0..9) before saving \u2014 good \u2014 but covers only one of the four reference import paths.",
+   "page": "#/existing-account",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Missing dual-model selector cards (By .bin-file Local Wallet vs By Account Name and Password Cloud Wallet) with active/inactive switching",
+     "ref": "reference/bitshares-ui/app/components/Login/Login.jsx:20-108, vanilla/notes/original-pages/login.png",
+     "severity": "high"
+    },
+    {
+     "element": "Missing .bin-file drag-drop zone + browse-files upload + LOGIN + tooltip link (WalletLogin)",
+     "ref": "reference/bitshares-ui/app/components/Login/WalletLogin.jsx:36-101",
+     "severity": "high"
+    },
+    {
+     "element": "Missing cloud login: account-name input + password + show-password toggle + passwordAccount flow (AccountLogin)",
+     "ref": "reference/bitshares-ui/app/components/Login/AccountLogin.jsx:17-60",
+     "severity": "high"
+    },
+    {
+     "element": "Missing header selections and login tooltips guiding model choice",
+     "ref": "reference/bitshares-ui/app/components/Registration/WalletHeaderSelection.jsx, AccountHeaderSelection.jsx",
+     "severity": "low"
+    }
+   ],
+   "notes": "Vanilla /login is local-password-unlock only (same call as #/wallet locked form). No cloud-wallet and no .bin-file login paths exist.",
+   "page": "#/login",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Missing dual selection cards with recommended badge, Security High/Medium rows, Login-by rows, Back-up rows, CONTINUE/SELECT buttons",
+     "ref": "reference/bitshares-ui/app/components/Registration/RegistrationSelector.jsx:60-108, vanilla/notes/original-pages/registration.png",
+     "severity": "high"
+    },
+    {
+     "element": "#/registration/local has no WalletRegistration faucet form (account name, registrar, password confirm); vanilla is an explainer linking out",
+     "ref": "reference/bitshares-ui/app/components/Registration/WalletRegistration.jsx",
+     "severity": "high"
+    },
+    {
+     "element": "#/registration/cloud has no AccountRegistration faucet form; vanilla is an explainer linking out",
+     "ref": "reference/bitshares-ui/app/components/Registration/AccountRegistration.jsx",
+     "severity": "high"
+    }
+   ],
+   "notes": "Vanilla hub is a 4-bullet link list (vanilla/js/auth-ui.js:135-153); faucet form itself lives only at #/create-account.",
+   "page": "#/registration",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Missing news feed table (LINE/DATE/SUBJECT/AUTHOR columns, steemit links) fetched from Hive/steemit tag feed",
+     "ref": "reference/bitshares-ui/app/components/News.jsx:43-127",
+     "severity": "med"
+    },
+    {
+     "element": "Missing fetch-error state and loading indicator",
+     "ref": "reference/bitshares-ui/app/components/News.jsx:25-29,129-200",
+     "severity": "low"
+    }
+   ],
+   "notes": "Intentional documented deviation (vanilla/js/news-ui.js:7-12 cites News.jsx:27-33 as NOT copied: external hosted feed is a rot risk).",
+   "page": "#/news",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "BORROW button on buy form (margin-short entry)",
+     "ref": "reference/bitshares-ui/app/components/Exchange/BuySell.jsx:1476-1489",
+     "severity": "high"
+    },
+    {
+     "element": "Book-row prices render full-precision verbatim (14+ decimals in Buy/Sell orders tables)",
+     "ref": "vanilla/js/market-book.js:282,458 (trim6 only on spread lines)",
+     "severity": "med"
+    },
+    {
+     "element": "Fee-asset selector dropdown (fee hardcoded to BTS 1.3.0)",
+     "ref": "reference/bitshares-ui/app/components/Exchange/BuySell.jsx:553-566,700-814",
+     "severity": "med"
+    },
+    {
+     "element": "Settlement Price cell for live (non-globally-settled) MPA in stats strip",
+     "ref": "reference/bitshares-ui/app/components/Exchange/ExchangeHeader.jsx",
+     "severity": "med"
+    },
+    {
+     "element": "Open-settlement-orders tab next to My open orders",
+     "ref": "reference/bitshares-ui/app/components/Exchange/Exchange.jsx:2656-2693",
+     "severity": "med"
+    },
+    {
+     "element": "Collateral display (ExchangeHeaderCollateral) for bitasset market",
+     "ref": "reference/bitshares-ui/app/components/Exchange/ExchangeHeader.jsx:417",
+     "severity": "med"
+    },
+    {
+     "element": "Invert-pair (flip) control and header star favourite next to trading pair (only alarm bell present)",
+     "ref": "vanilla/notes/original-header-exchange-2026-09-28.png",
+     "severity": "low"
+    },
+    {
+     "element": "Personalize column chooser (gear)",
+     "ref": "reference/bitshares-ui/app/components/Exchange/Exchange.jsx:3418 + Personalize.jsx",
+     "severity": "low"
+    },
+    {
+     "element": "Lowest-ask / Highest-bid helper line under each order form",
+     "ref": "vanilla/notes/original-buy-sell-2x3-2026-09-28.png",
+     "severity": "low"
+    }
+   ],
+   "notes": "Full desk renders with live data, zero console errors. Order confirm is inline UNLOCK & REVIEW rather than ConfirmOrderModal (behavior present, different chrome).",
+   "page": "#/market/BTS_CNY",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Raw 18-decimal Latest/Best-bid/Best-ask strings and price-input prefill \u2014 chain integers not converted to human terms",
+     "ref": "vanilla/js/instant-trade-ui.js:256,258; principle #6",
+     "severity": "high"
+    },
+    {
+     "element": "QuickTrade dual SELL/RECEIVE flow: receive-side amount/quote, swap-direction button, per-side asset pickers with balances",
+     "ref": "reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:37-83 + SellReceive.jsx",
+     "severity": "high"
+    },
+    {
+     "element": "Order-walkthrough table (effective price, price/fee/orders columns) and fee display before sell",
+     "ref": "reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:837-944,1102-1137",
+     "severity": "med"
+    },
+    {
+     "element": "Stale Loading market status line persists above the loaded quote section",
+     "ref": "vanilla/js/instant-trade-ui.js:213,244",
+     "severity": "low"
+    }
+   ],
+   "notes": "#/instant-trade/BTS_CNY auto-loads and reaches REVIEW ORDER state; functional as limit-order loader but a different product from #1 QuickTrade, not a visual twin.",
+   "page": "#/instant-trade",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Separate EXCHANGE and STAKE/UNSTAKE action columns with inline modals; vanilla merges into one SWAP/STAKE link requiring navigation to the detail desk",
+     "ref": "reference/bitshares-ui/app/components/Poolmart/LiquidityPools.jsx:315-343",
+     "severity": "med"
+    }
+   ],
+   "notes": "Documented adaptation (pool-ui.js:241-242). Reference numbered pagination vs Prev/Next accepted (no chain pool count).",
+   "page": "#/pools",
+   "route_status": "ok"
+  },
+  {
+   "missing": [],
+   "notes": "No #1 counterpart (PoolmartPage is list-only); vanilla detail desk is an extension. Verified: stats strip, swap-count history + indicators, synth book + depth, pool map, volume, x*y=k curve, spread/midpoint, POOL HISTORY / MY SWAPS tabs, STAKE/UNSTAKE/SWAP/UPDATE/DELETE panels.",
+   "page": "#/pools/1.19.2",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Balance display for sell/buy assets on the swap form",
+     "ref": "reference/astro-ui/src/components/SimpleSwap.jsx vs vanilla/js/pool-swap-ui.js",
+     "severity": "low"
+    }
+   ],
+   "notes": "Parity target is astro SimpleSwap (no #1 route). Single-pool only stated in UI.",
+   "page": "#/swap",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Balance table columns QTY / IN ORDERS / IN VESTING BALANCES / IN COLLATERAL / PRICE(BTS) / 24HR / VALUE(BTS) \u2014 vanilla renders 2-col Asset|Balance only",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx + vanilla/notes/original-pages/account.png",
+     "severity": "high"
+    },
+    {
+     "element": "Per-asset action columns SEND / DEPOSIT / TRADE / BORROW / SETTLE",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx:431-1343",
+     "severity": "high"
+    },
+    {
+     "element": "Tabs Margin Positions (collaterals) and Credit Management absent; vanilla HISTORY/MEMBERSHIP/EQUITY are not reference tabs",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountOverview.jsx:338-520",
+     "severity": "high"
+    },
+    {
+     "element": "Asset filter SearchInput + Active/Visual toggle",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountOverview.jsx:374-420",
+     "severity": "med"
+    },
+    {
+     "element": "Portfolio total-value subtext in BTS under tab",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountOverview.jsx:221-258",
+     "severity": "med"
+    },
+    {
+     "element": "Asset symbols link to /asset/:symbol; trade icons deep-link markets",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx:930-941",
+     "severity": "med"
+    },
+    {
+     "element": "Proposals tab when account holds proposals",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountOverview.jsx:505-560",
+     "severity": "low"
+    }
+   ],
+   "notes": "Renders live chain data, zero console errors; phone-card fallback present.",
+   "page": "#/account/committee-account",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Logged-out LoginSelector: CREATE ACCOUNT / LOGIN buttons, language selector",
+     "ref": "reference/bitshares-ui/app/components/Dashboard/DashboardAccountsOnly.jsx:128-133",
+     "severity": "med"
+    },
+    {
+     "element": "restore-your-account / advanced-form links (logged-out)",
+     "ref": "vanilla/notes/original-pages/accounts.png",
+     "severity": "low"
+    },
+    {
+     "element": "Logged-in wallet-accounts list + Contacts + Recent tabs with DashboardList",
+     "ref": "reference/bitshares-ui/app/components/Dashboard/DashboardAccountsOnly.jsx:133-200",
+     "severity": "med"
+    }
+   ],
+   "notes": "Reference route App.jsx:512-515 \u2192 DashboardAccountsOnly. Logged-in list state not verifiable headless without a wallet.",
+   "page": "#/accounts",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Asset dropdown restricted to sender non-zero balances; vanilla free-text asset input",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:288-304",
+     "severity": "high"
+    },
+    {
+     "element": "Send/Propose toggle (propose-as-another-account flow)",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:551-564",
+     "severity": "med"
+    },
+    {
+     "element": "Fee-asset selector; vanilla fee fixed in transfer asset",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:677-689",
+     "severity": "med"
+    },
+    {
+     "element": "Available-balance display with click-to-fill max amount",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:458-484",
+     "severity": "med"
+    },
+    {
+     "element": "Known-scammer flag on recipient selector",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountSelector.jsx:592,709",
+     "severity": "low"
+    },
+    {
+     "element": "Submit disabled until from+to+amount+asset valid and from!=to; vanilla Review always active",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:496-509",
+     "severity": "low"
+    }
+   ],
+   "notes": "No /transfer route in reference (SendModal). Encrypted-memo checkbox is a vanilla extra.",
+   "page": "#/transfer",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Same SendModal gaps as #/transfer",
+     "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx",
+     "severity": "med"
+    }
+   ],
+   "notes": ":to prefill verified working.",
+   "page": "#/transfer/lite-test-1",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Gateway coverage: reference binds 8 services; vanilla lists 4 (GDEX+BIT20 disabled)",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountDepositWithdraw.jsx:1-30",
+     "severity": "med"
+    },
+    {
+     "element": "Per-service gateway/bridge toggles persisted in viewSettings",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountDepositWithdraw.jsx:43-60",
+     "severity": "low"
+    },
+    {
+     "element": "Deposit QR code (qrcode.react; vanilla self-documents NO QR)",
+     "ref": "reference/bitshares-ui/app/components/Modal/DepositModal.jsx",
+     "severity": "low"
+    },
+    {
+     "element": "Gateway transaction-history panels (GdexHistory, OpenLedgerFiatTransactionHistory)",
+     "ref": "reference/bitshares-ui/app/components/DepositWithdraw/gdex/GdexHistory.jsx",
+     "severity": "med"
+    },
+    {
+     "element": "Terms/agreement modal before gateway use",
+     "ref": "reference/bitshares-ui/app/components/DepositWithdraw/gdex/GdexAgreementModal.jsx",
+     "severity": "low"
+    },
+    {
+     "element": "Full WithdrawModalNew flow with fee handling; vanilla withdraw deep-links prefilled transfer",
+     "ref": "reference/bitshares-ui/app/components/Modal/WithdrawModalNew.jsx",
+     "severity": "med"
+    }
+   ],
+   "notes": "Vanilla renders a working desk where the original logged-out page is BLANK \u2014 strictly better there. Dead gateways not desirable without unavailable-states.",
+   "page": "#/deposit-withdraw",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Full per-op activity sentences: only transfer/limit_order_create/limit_order_cancel have original-shaped sentences",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Operation.jsx:224-234 vs vanilla/js/explorer-blocks.js:476-515",
+     "severity": "med"
+    },
+    {
+     "element": "Activity rows lack pending (blocks-to-irreversible), fee and date that reference rows carry",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Operation.jsx:69-87,139-146",
+     "severity": "med"
+    },
+    {
+     "element": "Witnesses/committee/markets tab bodies are thin summaries",
+     "ref": "reference/bitshares-ui/app/components/Explorer/Explorer.jsx:18-67",
+     "severity": "low"
+    }
+   ],
+   "notes": "Renders live at head with stats, pulse, strips, tables; zero console errors. Extra search box, head strip and FEEDS tab are documented supersets.",
+   "page": "#/explorer",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "SUPPLY column is dashes for every row: dynamic lookups always fail (OBJECT_RE only matches space 1; dynamic ids are 2.3.x)",
+     "ref": "vanilla/js/explorer-assets.js:275-288 vs vanilla/js/explorer.js:20,339-358",
+     "severity": "high"
+    },
+    {
+     "element": "No SmartCoins / User-Issued / Prediction filter radio, no text filter, no rows-per-page selector",
+     "ref": "reference/bitshares-ui/app/components/Explorer/Assets.jsx:432-490",
+     "severity": "high"
+    },
+    {
+     "element": "No per-row Exchange/market link column and no sortable Symbol/Issuer/Supply headers",
+     "ref": "reference/bitshares-ui/app/components/Explorer/Assets.jsx:213-226,321-334",
+     "severity": "high"
+    },
+    {
+     "element": "No prediction-market list view (description/condition/expiry + market button)",
+     "ref": "reference/bitshares-ui/app/components/Explorer/Assets.jsx:368-419,492-618",
+     "severity": "med"
+    },
+    {
+     "element": "Default list is first 25 list_assets from '' not the reference default SmartCoins set",
+     "ref": "reference/bitshares-ui/app/components/Explorer/Assets.jsx:43-45,259",
+     "severity": "med"
+    }
+   ],
+   "notes": "Tab renders, zero console errors; Symbol/Issuer/Precision populate and symbols link to #/asset.",
+   "page": "#/explorer/assets",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No MARKET button to preferred market (BTS_USD)",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:430-435",
+     "severity": "high"
+    },
+    {
+     "element": "No ASSET INFO / ASSET ACTIONS tabs",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:77-87",
+     "severity": "high"
+    },
+    {
+     "element": "No asset-type / flags / permissions section",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:252-258,286-316,582-636",
+     "severity": "high"
+    },
+    {
+     "element": "No FEE POOL panel (core exchange rate, pool balance, unclaimed issuer income)",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:1210-1306",
+     "severity": "med"
+    },
+    {
+     "element": "No description/about box; amounts ungrouped without asset suffix",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:346-438",
+     "severity": "med"
+    }
+   ],
+   "notes": "Core fields correct: ID 1.3.0, issuer null-account, precision 5, human-scaled supplies/fees, market fee 0%, 'Not a smartcoin' correct for BTS.",
+   "page": "#/asset/BTS",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No Previous (parent hash) row",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Block.jsx:231-237",
+     "severity": "high"
+    },
+    {
+     "element": "No prev/next block arrow navigation",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Block.jsx:118-131,246-262",
+     "severity": "high"
+    },
+    {
+     "element": "Date shown as raw ISO instead of full localized date",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Block.jsx:206-218",
+     "severity": "med"
+    },
+    {
+     "element": "No block-jump input, no Return-to-top link",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Block.jsx:133-143,174-197,264-270",
+     "severity": "low"
+    },
+    {
+     "element": "Per-op detail richness untestable on empty block; tx view lacks Show-raw-json toggle",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Transaction.jsx:42-73",
+     "severity": "med"
+    }
+   ],
+   "notes": "Empty-block state honest. Use non-empty block to verify op detail.",
+   "page": "#/block/114778000",
+   "route_status": "ok"
+  },
+  {
+   "missing": [],
+   "notes": "No reference counterpart (App.jsx:565-584) \u2014 vanilla-only extra, honest sample labeling, astro-style columns. Deliberate omissions (no ES ranking, no pie) are anti-rot correct.",
+   "page": "#/ops",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "OP column shows generic labels instead of operation names for all non-asset ops",
+     "ref": "vanilla/js/asset.js:31-33 (OP_NAMES covers only ops 10-15,19) vs reference/bitshares-ui/app/components/Blockchain/Fees.jsx:76-94",
+     "severity": "high"
+    },
+    {
+     "element": "Flat 2-column Op/Fee table instead of 5 fee groups (general/asset/market/account/business)",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Fees.jsx:18-42,233-249",
+     "severity": "med"
+    },
+    {
+     "element": "No per-fee-type rows (basic_fee/price_per_kbyte/premium_fee) \u2014 only flat .fee shown",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Fees.jsx:105-201",
+     "severity": "med"
+    },
+    {
+     "element": "No Lifetime-member fee column and no LTM-required dash treatment",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Fees.jsx:45,95-99,167-200",
+     "severity": "med"
+    },
+    {
+     "element": "Fee scale not applied (fee*scale/1e4)",
+     "ref": "reference/bitshares-ui/app/components/Blockchain/Fees.jsx:71,106",
+     "severity": "med"
+    },
+    {
+     "element": "Duplicated 'Network fees' heading and null-fee rows render as em-dash with no explanation",
+     "ref": "vanilla/js/fees-ui.js:68",
+     "severity": "low"
+    }
+   ],
+   "notes": "Empty/error/loading states honest, raw ints in titles, zero console errors.",
+   "page": "#/fees",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Join Witness / Update Witness buttons + JoinWitnessesModal",
+     "ref": "reference/bitshares-ui/app/components/Account/Voting/Witnesses.jsx:57-66,92-97",
+     "severity": "high"
+    },
+    {
+     "element": "Join Committee button + JoinCommitteeModal",
+     "ref": "reference/bitshares-ui/app/components/Account/Voting/Committee.jsx:47,76",
+     "severity": "med"
+    },
+    {
+     "element": "Increase voting power / CREATE LOCK button + CreateLockModal (ticket-create entry on voting page)",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountVoting.jsx:612-629,717-725",
+     "severity": "high"
+    },
+    {
+     "element": "Worker budget / total budget line + hide-legacy-proposals toggle on workers tab",
+     "ref": "reference/bitshares-ui/app/components/Account/Voting/Workers.jsx:129,153",
+     "severity": "med"
+    },
+    {
+     "element": "Proxy help '?' link to /help/voting",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountVoting.jsx:800-807",
+     "severity": "low"
+    }
+   ],
+   "notes": "Proxy/slates/publish/reset present (vote-ui.js, vote-slate.js). No join/create-lock entry points.",
+   "page": "#/voting",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "SCAM ATTEMPT / UNKNOWN SOURCE badges",
+     "ref": "reference/bitshares-ui/app/components/Account/Proposals.jsx:380-429",
+     "severity": "med"
+    },
+    {
+     "element": "NestedApprovalState per-approver status column",
+     "ref": "reference/bitshares-ui/app/components/Account/Proposals.jsx:399-404",
+     "severity": "med"
+    },
+    {
+     "element": "Raw JSON view modal for proposal operations",
+     "ref": "reference/bitshares-ui/app/components/Account/Proposals.jsx:313-328",
+     "severity": "low"
+    }
+   ],
+   "notes": "List + create + detail + approve/reject/delete present. #1 has no top-level /proposals route (account-embedded); vanilla page is a superset desk.",
+   "page": "#/proposals",
+   "route_status": "ok"
+  },
+  {
+   "missing": [],
+   "notes": "No #1 source page (only ApplicationApi.createTicket). Leaderboard, my-tickets, create, per-row update, honest no-delete note present.",
+   "page": "#/tickets",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Vesting progress columns: required/earned/remaining days, available % (claimable-now math)",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountVesting.jsx:147-217",
+     "severity": "high"
+    },
+    {
+     "element": "Search/filter input over the vesting list",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountVesting.jsx:10,24,153-166",
+     "severity": "low"
+    }
+   ],
+   "notes": "List + create + per-row claim + op-37 claim present. Table shows ID/owner/balance/policy only; no available-% hint.",
+   "page": "#/vesting",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Multiple key/account/address auth rows (vanilla create supports one key-auth + threshold)",
+     "ref": "vanilla/js/misc-ui.js:127,183-195",
+     "severity": "low"
+    }
+   ],
+   "notes": "Lookup/detail/update/delete/create present. No #1 counterpart (different feature). Restrictions path intentionally blocked as unproven.",
+   "page": "#/authorities",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Lifetime-member requirement note / current-account binding",
+     "ref": "reference/bitshares-ui/app/components/Account/CreateWorker.jsx:190-202",
+     "severity": "low"
+    },
+    {
+     "element": "Per-field helper texts (name/date/pay/url/vesting guidance)",
+     "ref": "reference/bitshares-ui/app/components/Account/CreateWorker.jsx:83-86,125-128,139-142,153-156,170-173",
+     "severity": "low"
+    }
+   ],
+   "notes": "Strict superset of #1's Publish-direct form except doc gaps. Op-34 broadcast with re-read proof.",
+   "page": "#/create-worker",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Network-fees table uses placeholder labels '0 \u00b7 op_0' \u2026 (feeSection)",
+     "ref": "vanilla/js/asset-ui.js:143-155",
+     "severity": "med"
+    },
+    {
+     "element": "No explorer-style all-assets table by default; issued-assets list only renders after manual issuer LOAD",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountAssets.jsx:215-245",
+     "severity": "med"
+    },
+    {
+     "element": "Issued rows expose Open + Update links only; no inline Issue (op-14) action per row",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountAssets.jsx:130-138",
+     "severity": "low"
+    }
+   ],
+   "notes": "Renders ok (issuer lookup + fee schedule).",
+   "page": "#/assets",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Description is a single textarea; reference carries structured description fields",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountAssetCreate.jsx:312-385",
+     "severity": "low"
+    },
+    {
+     "element": "Flow is account-detached (manual issuer input default 1.2.0) vs reference account-contextual push",
+     "ref": "reference/bitshares-ui/app/components/Account/AccountAssets.jsx:146-147",
+     "severity": "low"
+    }
+   ],
+   "notes": "PERMS/FLAGS groups, smartcoin opts, NFT/PMA tabs all present.",
+   "page": "#/assets/create",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No Filter/search input above the table",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Htlc.jsx:107,298",
+     "severity": "med"
+    },
+    {
+     "element": "List omits FROM/TO per-row columns and unified sortable table",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Htlc.jsx:179-230",
+     "severity": "med"
+    }
+   ],
+   "notes": "Renders ok (Sent/Received counts + New HTLC form). Inline form is an accepted deviation.",
+   "page": "#/htlc",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No EXPIRATION column",
+     "ref": "vanilla/notes/original-pages/credit-offer.png TOTAL+AVAILABLE",
+     "severity": "med"
+    },
+    {
+     "element": "No AVAILABLE (vs TOTAL) column split; vanilla shows TOTAL + CURRENT + MIN DEAL AMOUNT only",
+     "ref": "vanilla/notes/original-pages/credit-offer.png",
+     "severity": "med"
+    },
+    {
+     "element": "No per-row LOAN/borrow ($) action visible in list above fold",
+     "ref": "vanilla/notes/original-pages/credit-offer.png LOAN column",
+     "severity": "low"
+    }
+   ],
+   "notes": "Renders ok with live rows. Owner/Asset filter + LIST + Create-offer form; collateral in code below fold.",
+   "page": "#/credit-offer",
+   "route_status": "ok"
+  },
+  {
+   "missing": [],
+   "notes": "No /samet route in reference (ops/enum only). Fund table + My-funds + Create/Borrow/Repay/Update/Delete present.",
+   "page": "#/samet",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No open-new-position (borrow-to-create call order) form; adjust gated to existing positions",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Borrow.jsx",
+     "severity": "high"
+    },
+    {
+     "element": "No GET STARTED guided stepper chrome",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Borrow.jsx:336",
+     "severity": "med"
+    }
+   ],
+   "notes": "Renders ok (positions loader + op-3 adjust + explainer + op-45 bids below fold).",
+   "page": "#/borrow",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No ADD/REMOVE ESCROW control",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Barter.jsx:1159-1177",
+     "severity": "med"
+    },
+    {
+     "element": "No per-side fee-asset selectors, fee-when-executes toggle, proposal-fee input, or TOTAL FEES line",
+     "ref": "reference/bitshares-ui/app/components/Showcases/Barter.jsx:1216-1226",
+     "severity": "med"
+    }
+   ],
+   "notes": "Renders ok (Peer A/B + ADD ASSET ROW + PREVIEW/PROPOSE op-22). Propose path present.",
+   "page": "#/barter",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No Hide-unknown-houses / Hide-invalid-assets toggles",
+     "ref": "reference/bitshares-ui/app/components/PredictionMarkets/PredictionMarkets.jsx",
+     "severity": "med"
+    },
+    {
+     "element": "No CREATE PREDICTION MARKET button/modal",
+     "ref": "reference/bitshares-ui/app/components/PredictionMarkets/PredictionMarkets.jsx:266-268,564",
+     "severity": "med"
+    },
+    {
+     "element": "List lacks HOUSE, MARKET CONFIDENCE, PREDICTED LIKELIHOOD, RESOLUTION DATE, ACTION columns",
+     "ref": "vanilla/notes/original-pages/prediction.png",
+     "severity": "med"
+    }
+   ],
+   "notes": "Renders ok with live scan (5 markets, validity labels, Details links, PMA-create link).",
+   "page": "#/prediction",
+   "route_status": "ok"
+  },
+  {
+   "missing": [],
+   "notes": "No /alerts route in reference (Exchange modal + toasts). Vanilla page is a superset desk.",
+   "page": "#/alerts",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "No CREATE ACCOUNT vs LOGIN selector card",
+     "ref": "vanilla/notes/original-pages/create-account.png",
+     "severity": "med"
+    },
+    {
+     "element": "No 'restore your account / advanced form' links on this page",
+     "ref": "vanilla/notes/original-pages/create-account.png",
+     "severity": "low"
+    }
+   ],
+   "notes": "Renders ok (name check + brainkey + REGISTER TESTNET-ONLY).",
+   "page": "#/create-account",
+   "route_status": "ok"
+  },
+  {
+   "missing": [
+    {
+     "element": "Topic bodies are one-paragraph summaries, not full help articles",
+     "ref": "vanilla/notes/original-pages/help.png",
+     "severity": "high"
+    },
+    {
+     "element": "Sub-topics Witnesses / Workers / Committee Members absent from index",
+     "ref": "vanilla/notes/original-pages/help.png",
+     "severity": "med"
+    }
+   ],
+   "notes": "Renders ok (22-topic index). XBTS/IOXBank gateway topics present.",
+   "page": "#/help",
+   "route_status": "ok"
+  }
+ ],
+ "round": "director-round-1",
+ "totals": {
+  "pages": 40,
+  "ok_pages": 40,
+  "empty": 0,
+  "high": 32,
+  "med": 59,
+  "low": 31
+ }
+}
