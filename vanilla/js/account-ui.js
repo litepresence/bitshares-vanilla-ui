@@ -1,10 +1,16 @@
-/* AccountUI: public account pages (balances in human terms + op history +
- *   membership + lifetime-member upgrade + equity sparkline).
+/* AccountUI: public account pages (portfolio in human terms + op history +
+ *   membership + lifetime-member upgrade + equity sparkline + margin/credit tabs).
  * Owns: DOM for the /account/:account_name route only (loading, header,
- *   membership section with the op-8 LTM upgrade flow, balances table/cards,
+ *   membership section with the op-8 LTM upgrade flow, portfolio table/cards
+ *   (qty / in-orders / in-vesting / in-collateral / price(BTS) / 24hr /
+ *   value(BTS) + per-asset route links + symbol filter + summed BTS total),
+ *   margin-positions and credit-management tabs (read-only; adjust/accept/
+ *   repay live on #/borrow and #/credit-offer — linked, never rebuilt),
  *   equity sparkline (paged get_account_history integer replay as canvas
  *   small multiples — dex-ux plot proposal 4, chain-history ONLY),
- *   history list, /account/me unlock prompt, errors).
+ *   history list, /account/me unlock prompt, errors). The per-account
+ *   proposals tab is DEFERRED by punchlist scope (recorded in renderCredit):
+ *   proposals render on #/proposals, linked from the credit tab instead.
  * Consumes: Account.resolve/balances/history/myAccountId (js/account.js),
  *   Wallet.isUnlocked/unlock/keys (js/wallet.js); Format via Account display
  *   strings (no money math here); the upgrade path additionally consumes
@@ -149,59 +155,380 @@ var AccountUI = (function () {
     return t("settings.dash", "—");
   }
 
-  /* Balances section: Asset | Balance table plus a card list that the
-   * existing .node-table/.node-cards CSS swaps under 560px. Balance cells
-   * show the preformatted display string; the raw integer lives in title. */
-  function renderBalances(doc, section, list) {
-    if (!list || list.length === 0) {
+  /* Punchlist i18n note: NEW display strings in this portfolio block are
+   * plain literals on purpose — tooling/check_i18n.py requires every t()
+   * key to exist in all 10 locale dicts, and this single-file punchlist
+   * cannot touch vanilla/locales/*.json (commit scope: this file only).
+   * The next i18n batch converts these literals; until then the English
+   * source stays visible instead of failing the gate. Reused t() calls
+   * below cite pre-existing keys with byte-identical defaults only. */
+
+  /* Decimal string -> {num, den} BigInts ("12.5" -> 125n/10n), or null on
+   * any other shape. Integer-only; feeds exact BTS-value multiplication
+   * (binary float for money is a bug, not a shortcut). */
+  function decFrac(s) {
+    if (typeof s !== "string") s = String(s === null || s === undefined ? "" : s);
+    var m = /^(\d+)(?:\.(\d+))?$/.exec(s.trim());
+    if (!m) return null;
+    var frac = m[2] || "";
+    var num;
+    try { num = BigInt(m[1] + frac); } catch (e) { return null; }
+    var den = 1n, i;
+    for (i = 0; i < frac.length; i++) den *= 10n;
+    return { num: num, den: den };
+  }
+
+  /* Exact floor of qtyHuman * priceHuman scaled to a raw integer at prec
+   * decimals (value in BTS smallest units). Returns the digit string, or
+   * null when either side is not a plain non-negative decimal (caller
+   * dashes the cell — never throws on chain data). */
+  function valueRawOf(qtyHuman, priceHuman, prec) {
+    var q = decFrac(qtyHuman), p = decFrac(priceHuman);
+    if (!q || !p) return null;
+    var scale = 1n, i;
+    for (i = 0; i < prec; i++) scale *= 10n;
+    try {
+      return ((q.num * p.num * scale) / (q.den * p.den)).toString();
+    } catch (e) { return null; }
+  }
+
+  /* Add a raw integer string into map[assetId] (BigInt sum; malformed legs
+   * are ignored so one bad row never blanks the column). */
+  function sumRawInto(map, assetId, raw) {
+    if (typeof assetId !== "string" || !assetId) return;
+    var s = String(raw === null || raw === undefined ? "" : raw);
+    if (!/^\d+$/.test(s)) return;
+    try {
+      var cur = map[assetId];
+      map[assetId] = ((cur === undefined ? 0n : BigInt(cur)) + BigInt(s)).toString();
+    } catch (e) { /* malformed leg ignored */ }
+  }
+
+  /* Raw integer -> display string at prec decimals; falls back to the raw
+   * digits when Format is absent (never throws on chain data). */
+  function fmtRaw(raw, prec) {
+    if (typeof prec !== "number") return String(raw);
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.formatAmount === "function") {
+        return Format.formatAmount(String(raw), prec);
+      }
+    } catch (e) { /* raw fallback below */ }
+    return String(raw);
+  }
+
+  /* Dash text for honestly-missing cells (reuses the shared dash key). */
+  function dashText() { return t("settings.dash", "—"); }
+
+  /* Per-asset route links (punchlist 2): SEND -> #/transfer, DEPOSIT ->
+   * #/deposit-withdraw, TRADE -> #/market/<SYM>_BTS (BTS itself uses the
+   * app-default BTS_CNY market — router.js renderHomeFallback precedent),
+   * BORROW + SETTLE -> #/borrow (the margin/settle family page hosts both
+   * flows; nothing rebuilt here). Plain anchors: tap-friendly, no hover
+   * dependence. Params: doc, symbol, btsSymbol. Returns a span element. */
+  function actionLinks(doc, symbol, btsSymbol) {
+    var sym = String(symbol || "");
+    var base = String(btsSymbol || "BTS");
+    var pair = (sym === base) ? base + "_CNY" : sym + "_" + base;
+    var defs = [
+      ["SEND", "#/transfer", "Send " + sym + " (transfer page)"],
+      ["DEPOSIT", "#/deposit-withdraw", "Deposit or withdraw " + sym + " (gateway page)"],
+      ["TRADE", "#/market/" + encodeURIComponent(pair), "Trade " + pair + " (market page)"],
+      ["BORROW", "#/borrow", "Borrow against " + sym + " (borrow page)"],
+      ["SETTLE", "#/borrow", "Settle " + sym + " (borrow page)"]
+    ];
+    var span = doc.createElement("span");
+    defs.forEach(function (d, i) {
+      if (i > 0) span.appendChild(doc.createTextNode(" | "));
+      var a = doc.createElement("a");
+      a.setAttribute("href", d[1]);
+      a.textContent = d[0];
+      a.title = d[2];
+      span.appendChild(a);
+    });
+    return span;
+  }
+
+  /* Portfolio enrichment (punchlist 1): per-asset IN ORDERS / IN VESTING /
+   * IN COLLATERAL / PRICE(BTS) / 24HR reads behind the balances tab.
+   * Reference concepts only: #1 AccountPortfolioList.getHeader (qty /
+   * inOrders / inVesting / inCollateral / price / hour24 / value) plus its
+   * _renderBalances vesting/collateral joins; #1 AccountOverview adds the
+   * TotalBalanceValue line with MarginPositionsTable + CreditOfferAccountPage
+   * sections below it. Sources: Account.openOrders
+   * (get_limit_orders_by_account — sell legs summed per asset),
+   * get_vesting_balances (balance legs summed per asset),
+   * Credit.positions (proven margin-first / by-account-fallback read —
+   * collateral summed per asset), and one get_ticker batch quoted in BTS
+   * (latest = BTS-per-asset human, percent_change shown verbatim).
+   * Ticker batch is capped at 20 assets (N+1 ban holds: one bounded batch,
+   * never per-row refetch on filter). Every leg is best-effort: failures
+   * resolve to null and render as dashes with a muted note — a missing
+   * read never blanks the tab.
+   * Params: acctId "1.2.N", balances (Account.balances rows).
+   * Returns a Promise of {inOrders, vesting, collateral (assetId->raw, or
+   * null when that read failed), prices (assetId->{latest, change}), bts
+   * ({id, prec, symbol} or null), capped, notes}. Never rejects. */
+  function enrichPortfolio(acctId, balances) {
+    var out = { inOrders: {}, vesting: null, collateral: null, prices: {},
+      bts: null, capped: false, notes: [] };
+    if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
+      out.notes.push("Chain backend missing — portfolio extras dashed.");
+      return Promise.resolve(out);
+    }
+    var list = Array.isArray(balances) ? balances : [];
+    function dbCall(method, params) {
+      return Chain.db().then(function (dbId) { return Chain.call(dbId, method, params); });
+    }
+    var jobs = [];
+    /* IN ORDERS: sum open-order sell legs per asset (the same WS method the
+     * Orders tab reads — one extra call, never per-row). */
+    jobs.push(Promise.resolve().then(function () {
+      return Account.openOrders(acctId);
+    }).then(function (orders) {
+      (orders || []).forEach(function (o) {
+        if (o && o.sell) sumRawInto(out.inOrders, o.sell.asset_id, o.sell.raw);
+      });
+    }).catch(function () {
+      out.notes.push("Open orders unavailable — in-orders dashed.");
+    }));
+    /* IN VESTING: get_vesting_balances summed per asset (same method and
+     * [id] param shape as referrals-ui.js / vesting-ui.js). */
+    jobs.push(dbCall("get_vesting_balances", [acctId]).then(function (rows) {
+      var map = {};
+      (rows || []).forEach(function (vb) {
+        var bal = vb && vb.balance;
+        if (bal) sumRawInto(map, bal.asset_id, bal.amount);
+      });
+      out.vesting = map;
+    }).catch(function () {
+      out.vesting = null;
+      out.notes.push("Vesting balances unavailable on this node — column dashed.");
+    }));
+    /* IN COLLATERAL: Credit.positions when that backend loaded (its proven
+     * read already handles the margin/by-account fallback); an absent
+     * backend dashes the column instead of breaking the tab. */
+    if (typeof Credit !== "undefined" && Credit && typeof Credit.positions === "function") {
+      jobs.push(Promise.resolve().then(function () {
+        return Credit.positions(acctId);
+      }).then(function (rows) {
+        var map = {};
+        (rows || []).forEach(function (r) {
+          if (r) sumRawInto(map, r.coll_id, r.coll_raw);
+        });
+        out.collateral = map;
+      }).catch(function () {
+        out.collateral = null;
+        out.notes.push("Collateral positions unavailable — column dashed.");
+      }));
+    } else {
+      out.notes.push("Credit backend not loaded — collateral column dashed.");
+    }
+    /* PRICE(BTS) + 24HR: BTS id first, then ONE bounded ticker batch (base
+     * BTS, quote asset). BTS itself prices at 1 with no call. */
+    jobs.push(dbCall("lookup_asset_symbols", [["BTS"]]).then(function (rows) {
+      var bts = rows && rows[0];
+      if (!bts || typeof bts.precision !== "number") throw new Error("no-bts");
+      out.bts = { id: bts.id, prec: bts.precision, symbol: bts.symbol || "BTS" };
+      var need = [];
+      list.forEach(function (b) {
+        if (b && b.asset_id !== bts.id) need.push(b.asset_id);
+      });
+      if (need.length > 20) { out.capped = true; need = need.slice(0, 20); }
+      var ticks = need.map(function (aid) {
+        return dbCall("get_ticker", [bts.id, aid]).then(function (tk) {
+          out.prices[aid] = {
+            latest: (tk && tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null,
+            change: (tk && tk.percent_change !== undefined && tk.percent_change !== null)
+              ? String(tk.percent_change) : null
+          };
+        }).catch(function () { out.prices[aid] = { latest: null, change: null }; });
+      });
+      return Promise.all(ticks).then(function () { /* batch settled */ });
+    }).catch(function () {
+      out.bts = null;
+      out.notes.push("BTS price batch unavailable — price/value columns dashed.");
+    }));
+    return Promise.all(jobs).then(function () { return out; });
+  }
+
+  /* Portfolio table + phone cards (punchlist 1-5): Asset (linked to
+   * #/asset/:symbol) | QTY | IN ORDERS | IN VESTING | IN COLLATERAL |
+   * PRICE(BTS) | 24HR | VALUE(BTS) | actions. A search input filters rows
+   * client-side (no refetch); a muted subtext line carries the summed BTS
+   * total (floor of qty*price per asset, BTS row at face value, visible
+   * rows only). Missing legs render as dashes (see enrichPortfolio notes).
+   * Params: doc, section, acct ({id, name}), balances, enrich. */
+  function renderPortfolio(doc, section, acct, balances, enrich) {
+    var list = Array.isArray(balances) ? balances : [];
+    var bts = enrich.bts;
+    var btsSym = bts ? bts.symbol : "BTS";
+    if (!list.length) {
       var empty = doc.createElement("p");
       empty.className = "muted";
       empty.textContent = t("account.s1", "No balances.");
       section.appendChild(empty);
+      (enrich.notes || []).forEach(function (n) {
+        var nn = doc.createElement("p");
+        nn.className = "muted";
+        nn.textContent = n;
+        section.appendChild(nn);
+      });
       return;
     }
-    var table = doc.createElement("table");
-    table.className = "node-table";
-    var thead = doc.createElement("thead");
-    var headRow = doc.createElement("tr");
-    var balHeaders = [t("account.asset_th", "Asset"), t("account.balance_th", "Balance")];
-    balHeaders.forEach(function (label) {
-      var th = doc.createElement("th");
-      th.textContent = label;
-      headRow.appendChild(th);
+    function isBts(b) { return !!(bts && b && b.asset_id === bts.id); }
+    /* One enriched row per balance (humans via fmtRaw; value floored via
+     * valueRawOf; anything missing dashes — never throws). */
+    function rowFor(b) {
+      var inORaw = enrich.inOrders[b.asset_id];
+      var vMap = enrich.vesting, cMap = enrich.collateral;
+      var price = null, change = null, valueRaw = null;
+      if (isBts(b)) {
+        price = "1";
+        valueRaw = /^\d+$/.test(String(b.raw)) ? String(b.raw) : null;
+      } else if (enrich.prices[b.asset_id]) {
+        price = enrich.prices[b.asset_id].latest;
+        change = enrich.prices[b.asset_id].change;
+      }
+      if (bts && valueRaw === null && price) {
+        valueRaw = valueRawOf(b.display, price, bts.prec);
+      }
+      var valueH = null;
+      if (bts && valueRaw !== null) {
+        try { valueH = fmtRaw(valueRaw, bts.prec); } catch (e) { valueH = null; }
+      }
+      return {
+        b: b,
+        inOH: (inORaw !== undefined ? fmtRaw(inORaw, b.precision) : dashText()),
+        vestH: (!vMap ? dashText()
+          : (vMap[b.asset_id] !== undefined ? fmtRaw(vMap[b.asset_id], b.precision) : dashText())),
+        collH: (!cMap ? dashText()
+          : (cMap[b.asset_id] !== undefined ? fmtRaw(cMap[b.asset_id], b.precision) : dashText())),
+        priceH: (price !== null && price !== undefined && price !== "" ? price : dashText()),
+        changeH: (change !== null && change !== undefined && change !== "" ? change : dashText()),
+        valueH: (valueH !== null ? valueH : dashText()),
+        valueRaw: valueRaw
+      };
+    }
+    /* Asset search filter (punchlist 5): plain substring on the symbol,
+     * case-insensitive; re-draws from the cached rows (no refetch). */
+    var search = doc.createElement("input");
+    search.type = "search";
+    search.placeholder = "Filter by asset symbol…";
+    search.setAttribute("aria-label", "Filter assets by symbol");
+    search.style.minHeight = "44px";
+    search.style.width = "100%";
+    search.style.maxWidth = "360px";
+    section.appendChild(search);
+    /* Total-value BTS subtext (punchlist 4): filled per draw so a filter
+     * totals the visible rows; honest when no price leg exists. */
+    var total = doc.createElement("p");
+    total.className = "muted";
+    section.appendChild(total);
+    var box = doc.createElement("div");
+    section.appendChild(box);
+    (enrich.notes || []).forEach(function (n) {
+      var nn = doc.createElement("p");
+      nn.className = "muted";
+      nn.textContent = n;
+      section.appendChild(nn);
     });
-    thead.appendChild(headRow);
-    table.appendChild(thead);
-    var tbody = doc.createElement("tbody");
-    list.forEach(function (b) {
-      var tr = doc.createElement("tr");
-      var assetCell = doc.createElement("td");
-      assetCell.textContent = b.symbol;
-      tr.appendChild(assetCell);
-      var balCell = doc.createElement("td");
-      balCell.textContent = b.display;
-      balCell.title = b.raw;
-      tr.appendChild(balCell);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
-    section.appendChild(table);
+    if (enrich.capped) {
+      var cap = doc.createElement("p");
+      cap.className = "muted";
+      cap.textContent = "Prices cover the first 20 assets — the rest are dashed.";
+      section.appendChild(cap);
+    }
+    function symbolLink(sym) {
+      var a = doc.createElement("a");
+      a.setAttribute("href", "#/asset/" + encodeURIComponent(sym));
+      a.textContent = sym;
+      return a;
+    }
+    function draw() {
+      var q = search.value.trim().toLowerCase();
+      while (box.firstChild) box.removeChild(box.firstChild);
+      var rows = list.map(rowFor).filter(function (r) {
+        return !q || String(r.b.symbol).toLowerCase().indexOf(q) !== -1;
+      });
+      if (!rows.length) {
+        var none = doc.createElement("p");
+        none.className = "muted";
+        none.textContent = "No assets match this filter.";
+        box.appendChild(none);
+      } else {
+        var table = doc.createElement("table");
+        table.className = "node-table";
+        var thead = doc.createElement("thead");
+        var headRow = doc.createElement("tr");
+        [t("account.asset_th", "Asset"), "QTY", "IN ORDERS", "IN VESTING",
+          "IN COLLATERAL", "PRICE(BTS)", "24HR", "VALUE(BTS)",
+          t("account.manage", "Manage")].forEach(function (label) {
+          var th = doc.createElement("th");
+          th.textContent = label;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        var tbody = doc.createElement("tbody");
+        rows.forEach(function (r) {
+          var tr = doc.createElement("tr");
+          var symCell = doc.createElement("td");
+          symCell.appendChild(symbolLink(r.b.symbol));
+          tr.appendChild(symCell);
+          var qtyCell = doc.createElement("td");
+          qtyCell.textContent = r.b.display;
+          qtyCell.title = r.b.raw;
+          tr.appendChild(qtyCell);
+          [r.inOH, r.vestH, r.collH, r.priceH, r.changeH, r.valueH].forEach(function (txt) {
+            var td = doc.createElement("td");
+            td.textContent = txt;
+            tr.appendChild(td);
+          });
+          var actCell = doc.createElement("td");
+          actCell.appendChild(actionLinks(doc, r.b.symbol, btsSym));
+          tr.appendChild(actCell);
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        box.appendChild(table);
 
-    var cards = doc.createElement("div");
-    cards.className = "node-cards";
-    list.forEach(function (b) {
-      var card = doc.createElement("div");
-      card.className = "node-card";
-      var name = doc.createElement("div");
-      name.textContent = b.symbol;
-      card.appendChild(name);
-      var bal = doc.createElement("div");
-      bal.textContent = b.display;
-      bal.title = b.raw;
-      card.appendChild(bal);
-      cards.appendChild(card);
-    });
-    section.appendChild(cards);
+        var cards = doc.createElement("div");
+        cards.className = "node-cards";
+        rows.forEach(function (r) {
+          var card = doc.createElement("div");
+          card.className = "node-card";
+          var top = doc.createElement("div");
+          top.appendChild(symbolLink(r.b.symbol));
+          top.appendChild(doc.createTextNode(" " + r.b.display));
+          top.title = r.b.raw;
+          card.appendChild(top);
+          var mid = doc.createElement("div");
+          mid.className = "muted";
+          mid.textContent = r.priceH + " BTS · " + r.valueH + " BTS";
+          card.appendChild(mid);
+          var acts = doc.createElement("div");
+          acts.appendChild(actionLinks(doc, r.b.symbol, btsSym));
+          card.appendChild(acts);
+          cards.appendChild(card);
+        });
+        box.appendChild(cards);
+      }
+      var sum = 0n, any = false;
+      rows.forEach(function (r) {
+        if (r.valueRaw !== null) {
+          try { sum += BigInt(r.valueRaw); any = true; } catch (e) { /* leg ignored */ }
+        }
+      });
+      if (bts && any) {
+        total.textContent = "Total ≈ " + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
+        total.title = "raw " + sum.toString();
+      } else {
+        total.textContent = "Total value unavailable (no BTS prices yet).";
+        total.title = "";
+      }
+    }
+    search.addEventListener("input", draw);
+    draw();
     var detBal = doc.createElement("details");
     detBal.className = "raw";
     var sumBal = doc.createElement("summary");
@@ -212,6 +539,184 @@ var AccountUI = (function () {
     catch (e) { preBal.textContent = String(list); }
     detBal.appendChild(preBal);
     section.appendChild(detBal);
+  }
+
+  /* Margin Positions tab (punchlist ADD): Credit.positions for the viewed
+   * account (public read, no unlock — same posture as open orders).
+   * Reference concept only: #1 AccountOverview MarginPositionsTable.
+   * Read-only table (Position / Collateral / Debt / Borrower); adjust or
+   * close flows live on #/borrow — linked, not rebuilt. A missing Credit
+   * backend or a failed read renders an honest line, never a blank tab. */
+  function renderMargin(doc, section, acct) {
+    var loading = doc.createElement("p");
+    loading.className = "muted";
+    loading.textContent = "Loading margin positions…";
+    section.appendChild(loading);
+    if (typeof Credit === "undefined" || !Credit || typeof Credit.positions !== "function") {
+      section.removeChild(loading);
+      var miss = doc.createElement("p");
+      miss.className = "muted";
+      miss.textContent = "Margin backend not loaded (js/credit.js missing) — positions unavailable.";
+      section.appendChild(miss);
+      return;
+    }
+    Promise.resolve().then(function () { return Credit.positions(acct.id); }).then(function (rows) {
+      section.removeChild(loading);
+      if (!rows || rows.length === 0) {
+        var empty = doc.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "No margin positions for this account.";
+        section.appendChild(empty);
+        return;
+      }
+      var table = doc.createElement("table");
+      table.className = "node-table";
+      var thead = doc.createElement("thead");
+      var headRow = doc.createElement("tr");
+      ["Position", "Collateral", "Debt", "Borrower"].forEach(function (label) {
+        var th = doc.createElement("th");
+        th.textContent = label;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      var tbody = doc.createElement("tbody");
+      rows.forEach(function (r) {
+        var tr = doc.createElement("tr");
+        var idCell = doc.createElement("td");
+        idCell.textContent = r.call_id;
+        tr.appendChild(idCell);
+        var collCell = doc.createElement("td");
+        collCell.textContent = (r.coll_prec !== null && r.coll_prec !== undefined)
+          ? fmtRaw(r.coll_raw, r.coll_prec) + " " + r.coll_sym : String(r.coll_raw) + " (" + r.coll_id + ")";
+        collCell.title = "raw " + String(r.coll_raw);
+        tr.appendChild(collCell);
+        var debtCell = doc.createElement("td");
+        debtCell.textContent = (r.debt_prec !== null && r.debt_prec !== undefined)
+          ? fmtRaw(r.debt_raw, r.debt_prec) + " " + r.debt_sym : String(r.debt_raw) + " (" + r.debt_id + ")";
+        debtCell.title = "raw " + String(r.debt_raw);
+        tr.appendChild(debtCell);
+        var borCell = doc.createElement("td");
+        borCell.textContent = r.borrower;
+        tr.appendChild(borCell);
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      section.appendChild(table);
+      var more = doc.createElement("p");
+      more.className = "muted";
+      more.appendChild(doc.createTextNode("Adjust or close positions on the "));
+      var a = doc.createElement("a");
+      a.setAttribute("href", "#/borrow");
+      a.textContent = "borrow page";
+      more.appendChild(a);
+      more.appendChild(doc.createTextNode("."));
+      section.appendChild(more);
+    }).catch(function (e) {
+      section.removeChild(loading);
+      showError(doc, section, e, "Could not load margin positions.");
+    });
+  }
+
+  /* Credit Management tab (punchlist ADD): offers owned by the viewed
+   * account via Credit.offersByOwner (id or name — the chain resolves it).
+   * Reference concept only: #1 AccountOverview CreditOfferAccountPage.
+   * Table (Offer / Asset / Current / Total / Rate / Enabled) plus a link to
+   * the full #/credit-offer desk, where accept/repay live (not rebuilt
+   * here). Offer ids link to #/credit-offer/:id detail pages.
+   * Proposals tab: DEFERRED by punchlist scope and recorded here so the gap
+   * stays visible — per-account proposals already render on #/proposals
+   * (router route, global list), linked below, instead of a third new tab
+   * in this file. */
+  function renderCredit(doc, section, acct) {
+    var loading = doc.createElement("p");
+    loading.className = "muted";
+    loading.textContent = "Loading credit offers…";
+    section.appendChild(loading);
+    if (typeof Credit === "undefined" || !Credit || typeof Credit.offersByOwner !== "function") {
+      section.removeChild(loading);
+      var miss = doc.createElement("p");
+      miss.className = "muted";
+      miss.textContent = "Credit backend not loaded (js/credit.js missing) — offers unavailable.";
+      section.appendChild(miss);
+      return;
+    }
+    Promise.resolve().then(function () { return Credit.offersByOwner(acct.id); }).then(function (rows) {
+      section.removeChild(loading);
+      if (!rows || rows.length === 0) {
+        var empty = doc.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "No credit offers for this account.";
+        section.appendChild(empty);
+      } else {
+        var table = doc.createElement("table");
+        table.className = "node-table";
+        var thead = doc.createElement("thead");
+        var headRow = doc.createElement("tr");
+        ["Offer", "Asset", "Current", "Total", "Rate", "Enabled"].forEach(function (label) {
+          var th = doc.createElement("th");
+          th.textContent = label;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        var tbody = doc.createElement("tbody");
+        rows.forEach(function (r) {
+          var tr = doc.createElement("tr");
+          var idCell = doc.createElement("td");
+          var link = doc.createElement("a");
+          link.setAttribute("href", "#/credit-offer/" + encodeURIComponent(r.id));
+          link.textContent = r.id;
+          idCell.appendChild(link);
+          tr.appendChild(idCell);
+          var symCell = doc.createElement("td");
+          symCell.textContent = r.sym || r.asset_id;
+          tr.appendChild(symCell);
+          var curCell = doc.createElement("td");
+          curCell.textContent = (r.prec !== null && r.prec !== undefined)
+            ? fmtRaw(r.current_raw, r.prec) : String(r.current_raw);
+          curCell.title = "raw " + String(r.current_raw);
+          tr.appendChild(curCell);
+          var totCell = doc.createElement("td");
+          totCell.textContent = (r.prec !== null && r.prec !== undefined)
+            ? fmtRaw(r.total_raw, r.prec) : String(r.total_raw);
+          totCell.title = "raw " + String(r.total_raw);
+          tr.appendChild(totCell);
+          var rateCell = doc.createElement("td");
+          var rateH = null;
+          try {
+            if (typeof Credit.rateUnitsToHuman === "function" && typeof r.rate_units === "number") {
+              rateH = Credit.rateUnitsToHuman(r.rate_units) + "%";
+            }
+          } catch (e) { rateH = null; }
+          rateCell.textContent = (rateH !== null ? rateH : dashText());
+          tr.appendChild(rateCell);
+          var enCell = doc.createElement("td");
+          enCell.textContent = r.enabled ? "yes" : "no";
+          tr.appendChild(enCell);
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        section.appendChild(table);
+      }
+      var more = doc.createElement("p");
+      more.className = "muted";
+      more.appendChild(doc.createTextNode("Offer and deal flows live on the "));
+      var a = doc.createElement("a");
+      a.setAttribute("href", "#/credit-offer");
+      a.textContent = "credit offers page";
+      more.appendChild(a);
+      more.appendChild(doc.createTextNode("; account proposals render on the "));
+      var b = doc.createElement("a");
+      b.setAttribute("href", "#/proposals");
+      b.textContent = "proposals page";
+      more.appendChild(b);
+      more.appendChild(doc.createTextNode(" (no per-account proposals tab here — deferred)."));
+      section.appendChild(more);
+    }).catch(function (e) {
+      section.removeChild(loading);
+      showError(doc, section, e, "Could not load credit offers.");
+    });
   }
 
   /* Open-orders section: table + phone cards, same patterns as balances.
@@ -793,8 +1298,9 @@ var AccountUI = (function () {
   }
 
   /* Fill an account page: header (name + id), then Balances / Open orders /
-   * History / Membership / Equity sections behind a tab row (retro round 2
-   * D3 — the original's 5-tab language; our sections, not its 13-column
+   * History / Membership / Equity / Margin Positions / Credit Management
+   * sections behind a tab row (retro round 2 D3 — the original's 5-tab
+   * language, extended by the punchlist; our sections, not its 13-column
    * table). Balances is the default tab like #1. Sections fill
    * independently and fail inline (never blank, never wiping each other);
    * hidden tabs keep filling so switching never shows a stale loader. */
@@ -857,15 +1363,34 @@ var AccountUI = (function () {
     eqSection.appendChild(eqLoading);
     wrap.appendChild(eqSection);
 
+    var marSection = doc.createElement("section");
+    var marH = doc.createElement("h2");
+    marH.textContent = "Margin Positions";
+    marSection.appendChild(marH);
+    wrap.appendChild(marSection);
+    renderMargin(doc, marSection, acct);
+
+    var creSection = doc.createElement("section");
+    var creH = doc.createElement("h2");
+    creH.textContent = "Credit Management";
+    creSection.appendChild(creH);
+    wrap.appendChild(creSection);
+    renderCredit(doc, creSection, acct);
+
     /* Tab row (original Balances-first language; hidden sections keep their
      * h2s for screen readers via tabpanel roles). Buttons ride the shared
-     * .mkt-tabs style (dashboard/pool/desk precedent) — 44px from CSS. */
+     * .mkt-tabs style (dashboard/pool/desk precedent) — 44px from CSS.
+     * Proposals tab deferred by punchlist scope (see renderCredit): the
+     * row keeps the round-2 tabs plus Margin Positions + Credit Management;
+     * #/proposals stays reachable from the credit tab's link line. */
     var tabDefs = [
       { label: t("account.s7", "Balances"), sec: balSection },
       { label: t("account.orders_title", "Open orders"), sec: ordSection },
       { label: t("account.history_title", "History"), sec: histSection },
       { label: t("account.membership", "Membership"), sec: memSection },
-      { label: t("account.equity_tab", "Equity"), sec: eqSection }
+      { label: t("account.equity_tab", "Equity"), sec: eqSection },
+      { label: "Margin Positions", sec: marSection },
+      { label: "Credit Management", sec: creSection }
     ];
     var tabBar = doc.createElement("div");
     tabBar.className = "mkt-tabs acct-tabs";
@@ -893,7 +1418,9 @@ var AccountUI = (function () {
 
     Account.balances(acct.id).then(function (list) {
       balSection.removeChild(balLoading);
-      renderBalances(doc, balSection, list);
+      enrichPortfolio(acct.id, list).then(function (enrich) {
+        renderPortfolio(doc, balSection, acct, list, enrich);
+      });
     }).catch(function (e) {
       balSection.removeChild(balLoading);
       showError(doc, balSection, e, t("account.load_balances_failed", "Could not load balances."));
