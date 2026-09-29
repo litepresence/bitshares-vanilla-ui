@@ -1,8 +1,12 @@
 /* prediction-ui.js — #/prediction + #/prediction/:market honest-scope views.
  * Owns: PMA list (bounded list_assets scan + symbol search, open/settled
- *   filter) and PMA detail (issuer, settlement status/price, feed) with
+ *   filter, hide-unknown-houses + hide-invalid-assets client filters) and
+ *   PMA detail (issuer, settlement status/price, feed) with
  *   deep-links into the existing #/market/QUOTE_BASE desk for YES/NO
- *   positioning. Positions ARE limit orders on the pair, so NO new
+ *   positioning. List columns: Asset / House / Market confidence /
+ *   Predicted likelihood / Resolution date / Action (agree/disagree -> desk
+ *   links; ticker reads only, dash otherwise) + Create prediction market
+ *   button (-> #/assets/create PMA tab, verified route). Positions ARE limit orders on the pair, so NO new
  *   serializers, no signing, no fee math in this file.
  * Consumes: Explorer (assetsPage/asset/feeds joins), Asset.describe,
  *   Format (amount/price display only), Chain (backing-symbol lookup),
@@ -163,25 +167,38 @@ var PredictionUI = (function () {
     return (b.settlement_fund || 0) > 0;
   }
 
-  /* One table row (textContent-only). Params: doc, tbody, row, filter. */
-  function appendRow(doc, tbody, row, filter) {
+  /* One table row: Asset / House / Market confidence / Predicted likelihood /
+   * Resolution date / Action. enrich carries clean-read results (house name,
+   * ticker confidence/likelihood, backing symbol); anything unresolvable
+   * shows "—", never a raw integer, never a throw. Agree/Disagree link to
+   * the live #/market desk (positions ARE limit orders there). */
+  function appendRow(doc, tbody, row, filter, enrich) {
     var a = row.asset, d = parsePMADescription((a.options || {}).description || "");
     var settled = settledOf(row);
-    if (filter === "open" && settled) return;
-    if (filter === "settled" && !settled) return;
+    if (filter === "open" && settled) return false;
+    if (filter === "settled" && !settled) return false;
+    enrich = enrich || {};
     var tr = doc.createElement("tr");
     function cell(text) { var td = doc.createElement("td"); td.textContent = text; return td; }
     tr.appendChild(cell(a.symbol || a.id));
-    tr.appendChild(cell(d.condition || "—"));
+    tr.appendChild(cell(enrich.house || "—"));
+    tr.appendChild(cell(enrich.conf || "—"));
+    tr.appendChild(cell(enrich.like || "—"));
     tr.appendChild(cell(d.expiry || "—"));
-    tr.appendChild(cell(settled ? t("prediction.settled", "Settled") : t("prediction.open", "Open")));
-    var bad = invalidReason(row);
-    tr.appendChild(cell(bad ? ("Invalid: " + bad) : "—"));
-    var td = doc.createElement("td"), link = doc.createElement("a");
-    link.href = "#/prediction/" + encodeURIComponent(a.symbol || a.id);
-    link.textContent = t("prediction.details", "Details"); touchable(link); td.appendChild(link);
+    var td = doc.createElement("td");
+    if (enrich.backSym && (a.symbol || a.id)) {
+      var deskHref = "#/market/" + encodeURIComponent(a.symbol || a.id) + "_" + encodeURIComponent(enrich.backSym);
+      var agree = doc.createElement("a"); agree.href = deskHref; agree.textContent = "Agree";
+      touchable(agree); td.appendChild(agree);
+      td.appendChild(doc.createTextNode(" / "));
+      var disagree = doc.createElement("a"); disagree.href = deskHref; disagree.textContent = "Disagree";
+      touchable(disagree); td.appendChild(disagree);
+    } else {
+      td.textContent = "—";
+    }
     tr.appendChild(td);
     tbody.appendChild(tr);
+    return true;
   }
 
   /* #/prediction — list. Search filters scanned rows; the symbol box resolves
@@ -217,6 +234,29 @@ var PredictionUI = (function () {
       var v = (sym.value || "").trim();
       if (v) location.hash = "#/prediction/" + encodeURIComponent(v);
     });
+    /* MED create button (#1 PredictionMarkets.jsx create_market modal entry):
+     * vanilla creates under the existing #/assets/create PMA tab (verified:
+     * router.js maps /assets/create -> AssetUI.renderCreate, which draws a
+     * PMA tab locking is_prediction_market ON). Plain literal, zero new
+     * t() keys. */
+    var mk = touchable(el(doc, "button", "Create prediction market")); mk.type = "button";
+    toolbar.appendChild(mk);
+    mk.addEventListener("click", function () { location.hash = "#/assets/create"; });
+    /* MED client-side toggles (#1 PredictionMarkets.jsx:37-38 defaults ON,
+     * :378-400 _filterMarkets): unknown house = issuer name unresolvable on
+     * this network; invalid = invalidReason() non-empty. Plain literals. */
+    var toggleRow = el(doc, "div", null, "toolbar"); wrap.appendChild(toggleRow);
+    function checkBox(labelText, checked) {
+      var lab = doc.createElement("label");
+      var box = doc.createElement("input"); box.type = "checkbox"; box.checked = !!checked;
+      touchable(box); lab.appendChild(box);
+      lab.appendChild(doc.createTextNode(" " + labelText));
+      toggleRow.appendChild(lab);
+      return box;
+    }
+    var chkU = checkBox("Hide unknown houses", true);
+    var chkI = checkBox("Hide invalid assets", true);
+    wrap.appendChild(el(doc, "p", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network.", "muted"));
 
     var status = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
     var tableWrap = el(doc, "div", null, "table-scroll"); wrap.appendChild(tableWrap);
@@ -228,12 +268,75 @@ var PredictionUI = (function () {
     createP.appendChild(ca); createP.appendChild(doc.createTextNode("."));
 
     var cache = { rows: [], scanned: 0, truncated: false };
+    /* Per-asset enrichment from clean reads only (dash otherwise): house =
+     * issuer name via Account.resolve, confidence/likelihood = get_ticker
+     * (backing, asset), desk backing symbol via backingSymbol. Entries:
+     * {done, house, conf, like, backSym}. Filled once per asset; paint
+     * re-runs when a fill lands (gen-guarded). */
+    var enrichCache = {};
+    function enrichKey(row) {
+      var a = row && row.asset;
+      return (a && (a.id || a.symbol)) || "";
+    }
+    function cleanNum(s) {
+      return typeof s === "string" && /^\d+(\.\d+)?$/.test(s) && s !== "0" && s !== "1" &&
+        s !== "NaN" && s !== "-NaN";
+    }
+    async function enrichRow(row) {
+      var out = { done: true, house: null, conf: null, like: null, backSym: null };
+      var a = row.asset || {}, b = row.bitasset || {};
+      try {
+        if (a.issuer) {
+          var acc = await Account.resolve(a.issuer);
+          if (acc && acc.name) out.house = acc.name;
+        }
+      } catch (e) { /* unknown house stands */ }
+      var backId = b.short_backing_asset ||
+        (a.options && a.options.core_exchange_rate && a.options.core_exchange_rate.base &&
+          a.options.core_exchange_rate.base.asset_id) || null;
+      if (backId) {
+        try { out.backSym = await backingSymbol(backId); } catch (e) { /* dash stands */ }
+      }
+      if (backId && a.id && out.backSym) {
+        try {
+          var dbId = await Chain.db();
+          var tk = await Chain.call(dbId, "get_ticker", [backId, a.id]);
+          if (tk && typeof tk === "object") {
+            if (cleanNum(tk.quote_volume)) out.conf = String(tk.quote_volume) + " " + out.backSym;
+            if (cleanNum(tk.latest)) {
+              var pct = Number(tk.latest) * 100;
+              if (isFinite(pct)) out.like = pct.toPrecision(3) + "%";
+            }
+          }
+        } catch (e) { /* dashes stand */ }
+      }
+      return out;
+    }
+    function fillEnrich() {
+      (cache.rows || []).forEach(function (row) {
+        var k = enrichKey(row);
+        if (!k || enrichCache[k]) return;
+        enrichCache[k] = { done: false, house: null, conf: null, like: null, backSym: null };
+        enrichRow(row).then(function (e) {
+          if (myGen !== gen) return;
+          enrichCache[k] = e;
+          paint();
+        }).catch(function () {
+          if (myGen !== gen) return;
+          enrichCache[k] = { done: true, house: null, conf: null, like: null, backSym: null };
+          paint();
+        });
+      });
+    }
     function paint() {
       clearBox(tableWrap);
       var q = (search.value || "").toUpperCase(), f = filterSel.value;
+      var hideU = !!(chkU && chkU.checked), hideI = !!(chkI && chkI.checked);
       var table = doc.createElement("table");
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-      [t("prediction.hdr_asset", "Asset"), t("prediction.hdr_condition", "Condition"), t("prediction.hdr_expiry", "Expiry"), t("prediction.hdr_status", "Status"), t("prediction.hdr_validity", "Validity"), ""].forEach(function (h) {
+      /* MED columns: HOUSE / MARKET CONFIDENCE / PREDICTED LIKELIHOOD /
+       * RESOLUTION DATE / ACTION (plain literals, zero new t() keys). */
+      ["Asset", "House", "Market confidence", "Predicted likelihood", "Resolution date", "Action"].forEach(function (h) {
         var th = doc.createElement("th"); th.textContent = h; th.setAttribute("scope", "col"); hr.appendChild(th);
       });
       thead.appendChild(hr); table.appendChild(thead);
@@ -242,9 +345,10 @@ var PredictionUI = (function () {
       cache.rows.forEach(function (row) {
         var a = row.asset, d = parsePMADescription((a.options || {}).description || "");
         if (q && ((a.symbol || "") + " " + d.condition + " " + d.main).toUpperCase().indexOf(q) === -1) return;
-        var before = tbody.childNodes.length;
-        appendRow(doc, tbody, row, f);
-        if (tbody.childNodes.length > before) shown++;
+        if (hideI && invalidReason(row)) return;
+        var k = enrichKey(row), en = enrichCache[k] || { done: false };
+        if (hideU && en.done && !en.house) return;
+        if (appendRow(doc, tbody, row, f, en.done ? en : {})) shown++;
       });
       if (!shown) {
         var tr = doc.createElement("tr"), td = doc.createElement("td");
@@ -258,9 +362,12 @@ var PredictionUI = (function () {
       note.textContent = "Scanned " + cache.scanned + " assets, found " + cache.rows.length +
         " prediction market" + (cache.rows.length === 1 ? "" : "s") +
         (cache.truncated ? " (scan bound reached — lookup finds the rest)." : ".");
+      fillEnrich();
     }
     search.addEventListener("input", paint);
     filterSel.addEventListener("change", paint);
+    chkU.addEventListener("change", paint);
+    chkI.addEventListener("change", paint);
 
     scanPMAs().then(function (r) {
       if (myGen !== gen) return;
