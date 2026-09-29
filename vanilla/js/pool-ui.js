@@ -236,10 +236,10 @@ var PoolUI = (function () {
     a.setAttribute("href", "#/asset/" + sym);
     return a;
   }
-  function poolTable(doc, rows) { /* dexux-ref density: POOL ID / SHARE / A /
-    *   A QTY / B / B QTY / TAKER / WITHDRAWAL / EXCHANGE (swap) / STAKE.
-    *   EXCHANGE + STAKE both open the detail desk (#/pools/:id), which owns
-    *   the inline swap and stake panels — the list stays a list.
+  function poolTable(doc, rows) { /* dexux-ref density: POOL ID / EXCHANGE /
+    *   SHARE / A / A QTY / B / B QTY / TAKER / WITHDRAWAL. EXCHANGE opens the
+    *   detail desk (#/pools/:id), which owns the inline swap and stake panels
+    *   — the list stays a list (no separate STAKE column: same destination).
     *   Sort: Pool ID / Taker / Withdrawal headers toggle page-sort. */
     if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found."), "muted");
     var view = rows.slice();
@@ -258,15 +258,14 @@ var PoolUI = (function () {
     var hr = doc.createElement("tr");
     var cols = [
       { key: "id", label: t("pool.id_col", "Pool ID"), sortable: true },
+      { key: null, label: t("market.title", "Exchange") },
       { key: null, label: t("pool.share_asset_field", "Share asset") },
       { key: null, label: t("pool.asset_a_field", "Asset A") },
       { key: null, label: t("pool.asset_a_qty_col", "Asset A qty") },
       { key: null, label: t("pool.asset_b_field", "Asset B") },
       { key: null, label: t("pool.asset_b_qty_col", "Asset B qty") },
       { key: "taker", label: t("pool.taker_row", "Taker fee"), sortable: true },
-      { key: "withdrawal", label: t("pool.withdrawal_row", "Withdrawal fee"), sortable: true },
-      { key: null, label: t("market.title", "Exchange") },
-      { key: null, label: t("pool.stake_unstake_col", "Stake/Unstake") }
+      { key: "withdrawal", label: t("pool.withdrawal_row", "Withdrawal fee"), sortable: true }
     ];
     cols.forEach(function (c) {
       var th = doc.createElement("th");
@@ -304,6 +303,16 @@ var PoolUI = (function () {
       var aA = amtText(r.balance_a_raw, r.asset_a_id, r.prec_a, null);
       var aB = amtText(r.balance_b_raw, r.asset_b_id, r.prec_b, null);
       tr.appendChild(el(doc, "td", r.id));
+      /* EXCHANGE second: ⇄ text link in link blue (#1 shows ⇄ here; the
+       * vendored swap.svg <img> cannot inherit link color, so text keeps
+       * the column blue like every other link). href, aria-label, title
+       * unchanged — skin only. */
+      var tdX = doc.createElement("td");
+      var xl = el(doc, "a", "⇄", "pools-xlink");
+      xl.setAttribute("href", "#/pools/" + r.id);
+      xl.setAttribute("aria-label", "Swap in pool " + r.id);
+      xl.title = t("pool.swap_title_attr", "Swap in this pool");
+      tdX.appendChild(xl); tr.appendChild(tdX);
       var tdS = doc.createElement("td"); tdS.appendChild(assetLink(doc, r.sym_share)); tr.appendChild(tdS);
       var tdA = doc.createElement("td"); tdA.appendChild(assetLink(doc, r.sym_a)); tr.appendChild(tdA);
       var cA = el(doc, "td", aA.text, "num"); cA.title = "raw " + aA.raw; tr.appendChild(cA);
@@ -311,28 +320,6 @@ var PoolUI = (function () {
       var cB = el(doc, "td", aB.text, "num"); cB.title = "raw " + aB.raw; tr.appendChild(cB);
       tr.appendChild(el(doc, "td", pctText(r.taker_units), "num"));
       tr.appendChild(el(doc, "td", pctText(r.withdrawal_units), "num"));
-      var tdX = doc.createElement("td");
-      /* Icon wiring (swap.svg; #1 pools table shows ⇄ in EXCHANGE). href,
-       * aria-label, and title unchanged — skin only; without Icon the ⇄
-       * text renders so the link is never blank. */
-      var xl = doc.createElement("a");
-      try {
-        if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
-          xl.appendChild(Icon.img("swap", "cell-icon", ""));
-        } else {
-          xl.textContent = "⇄";
-        }
-      } catch (e) {
-        xl.textContent = "⇄";
-      }
-      xl.setAttribute("href", "#/pools/" + r.id);
-      xl.setAttribute("aria-label", "Swap in pool " + r.id);
-      xl.title = t("pool.swap_title_attr", "Swap in this pool");
-      tdX.appendChild(xl); tr.appendChild(tdX);
-      var tdSt = doc.createElement("td");
-      var sl = el(doc, "a", t("pool.stake_link", "Stake")); sl.setAttribute("href", "#/pools/" + r.id);
-      sl.setAttribute("aria-label", "Stake or unstake in pool " + r.id);
-      tdSt.appendChild(sl); tr.appendChild(tdSt);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); return table;

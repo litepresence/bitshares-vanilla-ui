@@ -323,6 +323,10 @@ table.pools-table th, table.pools-table td { padding: 6px 8px; font-size: 0.9rem
   white-space: nowrap; }
 table.pools-table td.num { text-align: right; }
 .pools-table a { color: var(--accent); }
+/* EXCHANGE ⇄ link: text glyph (an <img> icon cannot inherit link blue),
+ * sized up with touch padding so the tap target stays generous. */
+.pools-table a.pools-xlink { font-size: 1.5em; line-height: 1;
+  display: inline-block; padding: 6px 10px; text-decoration: none; }
 .pools-pager { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
 .pools-pager button { background: transparent; color: var(--text);
   border: 1px solid var(--border); min-width: 44px; }
