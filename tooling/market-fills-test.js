@@ -1,0 +1,63 @@
+#!/usr/bin/env node
+/* market-fills-test: unit vectors for MarketFills (deep-candles plan Task 1).
+ * Stdlib only. Exit 0 = all pass, 1 = any failure. */
+"use strict";
+globalThis.Format = require("/workspace/vanilla/js/format.js");
+globalThis.Chain = { call: function () { return Promise.reject(new Error("no chain in vectors")); } };
+var MF = require("/workspace/vanilla/js/market-fills-history.js");
+var pass = 0, fail = 0;
+function eq(got, want, name) {
+  var ok = JSON.stringify(got) === JSON.stringify(want);
+  if (ok) { pass++; }
+  else { fail++; console.log("FAIL " + name + "\n got " + JSON.stringify(got) + "\n want " + JSON.stringify(want)); }
+}
+
+/* 1-2: merge chain-wins vector (plan Task 1 Step 1 verbatim). */
+var chain = [
+  { timeMs: 1000 * 3600 * 10, open: "2.0", high: "2.0", low: "2.0", close: "2.0", baseVolume: "1.0", volumeBaseRaw: "100000", volumeQuoteRaw: "50000", highBase: "1", highQuote: "1", lowBase: "1", lowQuote: "1" }
+];
+var es = [
+  { timeMs: 1000 * 3600 * 7, open: "1.0", high: "1.0", low: "1.0", close: "1.0", baseVolume: "1.0", volumeBaseRaw: "100000", volumeQuoteRaw: "100000", highBase: "1", highQuote: "1", lowBase: "1", lowQuote: "1" },
+  { timeMs: 1000 * 3600 * 10, open: "9.0", high: "9.0", low: "9.0", close: "9.0", baseVolume: "9.0", volumeBaseRaw: "9", volumeQuoteRaw: "9", highBase: "9", highQuote: "9", lowBase: "9", lowQuote: "9" }
+];
+var merged = MF.mergeDeep(chain, es, 2000);
+eq(merged.length, 2, "merge keeps both slots");
+eq(merged[1].close, "2.0", "chain wins overlap");
+
+/* 3: merge cap slices the oldest off. */
+var many = [1, 2, 3, 4, 5].map(function (h) {
+  return { timeMs: 1000 * 3600 * h, close: String(h) };
+});
+eq(MF.mergeDeep(many, [], 3).map(function (b) { return b.close; }), ["3", "4", "5"], "mergeDeep slices last cap");
+
+/* 4-6: bucket orientation vector — opposite-direction fills, same slot,
+ * same oriented price, base-leg volume summed. Base 1.3.0 prec 5,
+ * quote 1.3.113 prec 4: 1.0/0.5 and 2.0/1.0 both price 2.0. */
+var fills = [
+  { time: "2026-09-01T10:15:00Z", paid: { amount: "100000", asset: "1.3.0" }, received: { amount: "5000", asset: "1.3.113" } },
+  { time: "2026-09-01T10:45:00Z", paid: { amount: "10000", asset: "1.3.113" }, received: { amount: "200000", asset: "1.3.0" } }
+];
+var buckets = MF.fillsToCandles(fills, 3600, "1.3.0", 5, 4, "1.3.113");
+var slot = Math.floor(Date.parse("2026-09-01T10:00:00Z") / 1000) * 1000;
+eq(buckets.length, 1, "orientation fills share one bucket");
+eq(buckets.length ? buckets[0].timeMs : null, slot, "bucket slotted by floor(unix/bucket)");
+eq(buckets.length ? buckets[0].close : null, globalThis.Format.formatPrice("100000", 5, "5000", 4, 8), "oriented price base-per-quote");
+eq(buckets.length ? buckets[0].baseVolume : null, globalThis.Format.formatAmount("300000", 5), "base-leg volume summed");
+
+/* 7-9: leg-guard vector — esFill accepts the pair, rejects strangers. */
+function hit(opType, pays, recv) {
+  return { _source: { operation_type: opType, operation_history: { op_object: { pays: pays, receives: recv, is_maker: false } }, block_data: { block_time: "2026-09-01T10:15:00Z" } } };
+}
+eq(MF.esFill(hit("4", { amount: "100", asset_id: "1.3.0" }, { amount: "200", asset_id: "1.3.113" }), "1.3.0", "1.3.113") !== null, true, "leg-guard accepts market pair");
+eq(MF.esFill(hit("4", { amount: "100", asset_id: "1.3.0" }, { amount: "200", asset_id: "1.3.999" }), "1.3.0", "1.3.113"), null, "leg-guard rejects foreign leg");
+eq(MF.esFill(hit("63", { amount: "100", asset_id: "1.3.0" }, { amount: "200", asset_id: "1.3.113" }), "1.3.0", "1.3.113"), null, "leg-guard rejects non-op-4");
+
+/* 10-11: esQuery shape — op-4 kibana_fills contract. */
+var q = MF.esQuery("BTS", "USD");
+eq(q.size, 500, "esQuery size 500");
+eq(JSON.stringify(q.query).indexOf('"operation_type":"4"') !== -1, true, "esQuery filters operation_type 4");
+eq(JSON.stringify(q.sort).indexOf("block_data.block_time") !== -1 && JSON.stringify(q.sort).indexOf("desc") !== -1, true, "esQuery sorts block_time desc");
+eq(q._source.slice().sort(), ["account_history", "block_data", "operation_history", "operation_type"], "esQuery _source legs");
+
+console.log("market-fills-test: " + pass + " passed, " + fail + " failed");
+process.exit(fail ? 1 : 0);
