@@ -31,7 +31,10 @@
  *   green, a later i18n batch should key them).
  * DEFERRED (punchlist 2026-09-29, low — recorded, not built): list
  *   search/filter input over the vesting rows (ref AccountVesting.jsx:10
- *   SearchInput).
+ *   SearchInput). BUILT 2026-09-29 (MED punchlist): client-side Filter input
+ *   over the rendered rows (id/owner/asset/policy words, plain literals —
+ *   no new t() keys); table + per-row Claim buttons re-paint from the cached
+ *   mapped array, no re-fetch.
  * NOTE: iso16/dateHuman duplicate the tiny copies in misc-ui.js on purpose
  *   (the authorities view still needs them there) — doctrine rule 5 prefers
  *   duplicated plain code over a shared helper with cross-file coupling.
@@ -270,10 +273,11 @@ var VestingUI = (function () {
       },
       ok: function () { return t("vesting.vesting_created_and_re_read_on_chain", "Vesting created and re-read on chain."); },
       fail: t("vesting.could_not_build_vesting_check_accounts_asset", "Could not build vesting (check accounts, asset, amount and dates).") });
-    /* Per-row Claim button + amount/review box (over-claims blocked client-side; chain re-enforces). Params: t (vestRow shape). */
-    function claimBox(vr) {
-      var b = ui.touchable(ui.el(doc, "button", "Claim " + vr.r.id)); b.type = "button"; listBox.appendChild(b);
-      var o2 = ui.el(doc, "div", null, "xfer-out"); listBox.appendChild(o2);
+    /* Per-row Claim button + amount/review box (over-claims blocked client-side; chain re-enforces). Params: vr (vestRow shape), box (results container — the filter re-paint passes its own box). */
+    function claimBox(vr, box) {
+      var host = box || listBox;
+      var b = ui.touchable(ui.el(doc, "button", "Claim " + vr.r.id)); b.type = "button"; host.appendChild(b);
+      var o2 = ui.el(doc, "div", null, "xfer-out"); host.appendChild(o2);
       b.addEventListener("click", function () {
         if (!live(myGen, uiGen)) return;
         ui.clearBox(o2);
@@ -352,9 +356,32 @@ var VestingUI = (function () {
             r.prog = progressOf(byId[r.id], r.balance_raw, (typeof r.prec === "number" ? r.prec : null));
           });
           var mapped = rows.map(function (r) { return vestRow(ui, doc, r); });
-          listBox.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),
-            "Required (days)", "Earned (days)", "Remaining (days)", "Available"], mapped));
-          mapped.forEach(claimBox); go.disabled = false;
+          /* Client-side filter over the rendered rows (ref AccountVesting
+           * SearchInput): id/owner/asset/policy words, case-insensitive.
+           * Re-paints table + Claim buttons from the cached mapped array —
+           * no re-fetch. All words are plain literals (no new t() keys). */
+          var fQ2 = ui.field(doc, "Filter", { placeholder: "Search id, owner, asset…" });
+          try { fQ2.input.setAttribute("type", "search"); fQ2.input.setAttribute("aria-label", "Filter vesting rows"); } catch (e) { /* label wraps input already */ }
+          listBox.appendChild(fQ2.row);
+          var results = ui.el(doc, "div"); listBox.appendChild(results);
+          function paintVest(q) {
+            if (!live(myGen, uiGen)) return;
+            ui.clearBox(results);
+            var needle = String(q || "").trim().toLowerCase();
+            var shown = !needle ? mapped : mapped.filter(function (vr) {
+              var hay = (vr.r.id + " " + vr.r.owner + " " + (vr.r.sym || "") + " " + vr.r.asset_id + " " + vr.words).toLowerCase();
+              return hay.indexOf(needle) !== -1;
+            });
+            if (!shown.length) {
+              results.appendChild(ui.el(doc, "p", needle ? "No matching vesting rows." : t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+              return;
+            }
+            results.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),
+              "Required (days)", "Earned (days)", "Remaining (days)", "Available"], shown));
+            shown.forEach(function (vr) { claimBox(vr, results); });
+          }
+          fQ2.input.addEventListener("input", function () { paintVest(fQ2.input.value); });
+          paintVest(""); go.disabled = false;
         });
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(listBox); ui.showError(doc, listBox, e, t("vesting.could_not_load_vesting", "Could not load vesting.")); go.disabled = false; });
     });

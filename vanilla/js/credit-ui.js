@@ -285,32 +285,43 @@ var CreditUI = (function () {
   function safeRateHuman(u) { try { return Credit.rateUnitsToHuman(u); } catch (e) { return ""; } }
   /* Open-offers table: reference CreditOfferPage._getColumns language (ID /
    * Asset / Account / Total / Available / Min borrow / Fee rate / Repay period
-   * / Validity / Mortgage + Borrow action). Row click (never on links/buttons)
-   * and the Borrow button both open the loan modal; Enter on a focused row too.
-   * hostBox owns the modal overlay so a list reload clears a stale modal. */
+   * / Validity / Mortgage + Borrow action). TOTAL = total_balance;
+   * AVAILABLE = current_balance (the chain-maintained total-minus-active-deals;
+   * a per-row deal-sum recompute from dealsByOffer rows is recorded here as
+   * deferred — N+1 reads for a list, chain value is ground truth).
+   * EXPIRATION = auto_disable_time (validity_period in #1; the offer object
+   * carries no other expiry field per credit_offer.hpp:36-64 — blank shows
+   * a dash, never blank). LOAN = Borrow button per row. Row click (never on
+   * links/buttons) and the Borrow button both open the loan modal
+   * (openLoanModal — name verified from commit 123f034); Enter on a focused
+   * row too. hostBox owns the modal overlay so a list reload clears a stale
+   * modal. Header words Available/Expiration/Loan are plain literals (no new
+   * t() keys — locales untouched). */
   function openOffersTable(doc, hostBox, myGen, rows) {
     var box = el(doc, "div");
     if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table offers-table";
     table.appendChild(tableHead(doc, [t("credit.offer", "Offer"), t("credit.asset", "Asset"), t("credit.owner", "Owner"),
-      t("credit.total", "Total"), t("credit.current", "Current"), t("credit.min_deal_amount", "Min deal amount"),
+      t("credit.total", "Total"), "Available", t("credit.min_deal_amount", "Min deal amount"),
       t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"),
-      t("credit.auto_disable", "Auto-disable"), t("credit.collateral", "Collateral"),
-      t("credit.borrow", "Borrow"), ""]));
+      "Expiration", t("credit.collateral", "Collateral"),
+      "Loan", ""]));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (o) {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
+      var avail = (o.current_raw === null || o.current_raw === undefined || String(o.current_raw) === "") ? { text: "—", raw: "" } : cur;
+      var exp = (o.auto_disable_time && String(o.auto_disable_time).trim()) ? String(o.auto_disable_time).trim() : "—";
       var min = amt(o.min_deal_raw, o.prec, o.sym, o.asset_id), rt = safeRate(o.rate_units);
       var tr = doc.createElement("tr"); tr.setAttribute("data-offer", o.id); tr.tabIndex = 0;
       tr.appendChild(el(doc, "td", o.id));
       tr.appendChild(el(doc, "td", o.sym || o.asset_id));
       tr.appendChild(el(doc, "td", o.owner));
       var c1 = el(doc, "td", tot.text); if (tot.raw) c1.title = "raw " + tot.raw; tr.appendChild(c1);
-      var c2 = el(doc, "td", cur.text); if (cur.raw) c2.title = "raw " + cur.raw; tr.appendChild(c2);
+      var c2 = el(doc, "td", avail.text); if (avail.raw) c2.title = "raw " + avail.raw; tr.appendChild(c2);
       var c3 = el(doc, "td", min.text); if (min.raw) c3.title = "raw " + min.raw; tr.appendChild(c3);
       var c4 = el(doc, "td", rt.text); if (rt.raw) c4.title = "raw " + rt.raw; tr.appendChild(c4);
       tr.appendChild(el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
-      tr.appendChild(el(doc, "td", o.auto_disable_time || "—"));
+      tr.appendChild(el(doc, "td", exp));
       tr.appendChild(el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));
       var tdB = doc.createElement("td");
       var bb = touchable(el(doc, "button", t("credit.borrow", "Borrow"))); bb.type = "button";
@@ -334,11 +345,13 @@ var CreditUI = (function () {
     var cards = el(doc, "div", null, "node-cards");
     rows.forEach(function (o) {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
+      var availC = (o.current_raw === null || o.current_raw === undefined || String(o.current_raw) === "") ? "—" : cur.text;
+      var expC = (o.auto_disable_time && String(o.auto_disable_time).trim()) ? String(o.auto_disable_time).trim() : "—";
       var c = el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
       c.appendChild(el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
       c.appendChild(el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
-      c.appendChild(el(doc, "div", t("credit.current", "Current") + " " + cur.text + " / " + t("credit.total", "Total") + " " + tot.text));
-      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec)));
+      c.appendChild(el(doc, "div", "Total " + tot.text + " / Available " + availC));
+      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + " · Expiration " + expC));
       var cb = touchable(el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
       cb.addEventListener("click", function () { openLoanModal(doc, hostBox, myGen, o); });
       c.appendChild(cb);
