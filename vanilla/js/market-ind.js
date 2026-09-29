@@ -864,6 +864,12 @@ var MarketInd = (function () {
         MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
           { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
       }
+      /* Pool map off detaches the wrap (same pattern as depth; the desk owns drawing). */
+      if (state.showPoolMap === false) {
+        if (state.graphWrap && state.graphWrap.parentNode) {
+          state.graphWrap.parentNode.removeChild(state.graphWrap);
+        }
+      }
     } catch (e) { /* canvas failure must not break the desk */ }
     /* Depth slice position: the depth canvas lives in the charts stack as an
      * osc-sized slice (state.depthWrap, owned by the desk) and must sit
@@ -878,6 +884,29 @@ var MarketInd = (function () {
         }
         var at = state.oscHost.children.length > 1 ? state.oscHost.children[1] : null;
         if (at !== state.depthWrap) state.oscHost.insertBefore(state.depthWrap, at);
+      }
+      /* Pool-map slice position: pinned right after depthWrap (index 2-ish).
+       * Depth present -> insert before depth-next; depth absent -> index 1
+       * (after Volume). Desks without a pool slice skip this. */
+      if (state.graphWrap && state.showPoolMap !== false && state.oscHost) {
+        if (state.graphWrap.parentNode !== state.oscHost) {
+          state.oscHost.appendChild(state.graphWrap);
+        }
+        var gref = null, gidx = -1, gi;
+        try {
+          var gkids = state.oscHost.children;
+          for (gi = 0; gi < gkids.length; gi++) {
+            if (gkids[gi] === state.depthWrap && state.showDepth !== false) { gidx = gi; break; }
+          }
+          if (gidx !== -1) gref = gkids[gidx + 1] || null;
+          else gref = gkids.length > 1 ? gkids[1] : null;
+        } catch (e) { gref = null; }
+        if (gref !== state.graphWrap) {
+          try {
+            if (gref) state.oscHost.insertBefore(state.graphWrap, gref);
+            else state.oscHost.appendChild(state.graphWrap);
+          } catch (e) { /* slice order is chrome */ }
+        }
       }
     } catch (e) { /* slice order is chrome — panes stand as appended */ }
     /* Time-scale sync: scrolling/zooming the price pane moves every
@@ -1079,10 +1108,10 @@ var MarketInd = (function () {
       panel.appendChild(sec);
     }
     overlaysGroup(doc, panel, state);
-    /* Toggleable plots (everything but price): VWAP strip + depth slice.
+    /* Toggleable plots (everything but price): VWAP strip + depth slice + pool map.
      * Labels are plain symbols (OSC_ORDER precedent — no dict entries). */
     group(t("market.plots_group", "Plots"),
-      [["showVwap", "Session VWAP"], ["showDepth", "Depth"]], state, "plot");
+      [["showVwap", "Session VWAP"], ["showDepth", "Depth"], ["showPoolMap", "Pool map"]], state, "plot");
     group(t("market.oscillators_group", "Oscillators"), OSC_ORDER, state.osc, "osc");
     wrap.appendChild(btn);
     wrap.appendChild(panel);

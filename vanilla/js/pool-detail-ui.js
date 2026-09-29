@@ -195,10 +195,11 @@ var PoolDetailUI = (function () {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
       over: { sma: [{ p: 10 }], ema: [{ p: 50 }] }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
       /* Toggleable plots (menu "Plots" group): only price is always on. */
-      showVwap: false, showDepth: true,
+      showVwap: false, showDepth: true, showPoolMap: true,
       candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,
       priceHost: priceHost, oscHost: oscHost, oscNote: oscNote,
-      depthCanvas: null, basePrec: precOr5(r.prec_b), quotePrec: precOr5(r.prec_a),
+      depthCanvas: null, graphWrap: null, graphCanvas: null, graphNote: null, graphData: null,
+      basePrec: precOr5(r.prec_b), quotePrec: precOr5(r.prec_a),
       assets: {
         base: { precision: precOr5(r.prec_b), symbol: r.sym_b || r.asset_b_id },
         quote: { precision: precOr5(r.prec_a), symbol: r.sym_a || r.asset_a_id }
@@ -231,6 +232,45 @@ var PoolDetailUI = (function () {
         P.depthCanvas = depthCanvas;
       }
     } catch (e) { /* desk stands without the depth slice */ }
+    /* Pool-map provenance slice: .mkt-osc-pane titled "Pool map" in oscHost.
+     * drawCharts pins graphWrap right after depthWrap (index 2-ish). Lazy
+     * async fetch for this pool's legs; never blocks the desk. */
+    try {
+      var graphWrap = doc.createElement("div");
+      graphWrap.className = "mkt-osc-pane";
+      var graphHead = doc.createElement("div");
+      graphHead.className = "mkt-osc-head";
+      var graphTitle = doc.createElement("span");
+      graphTitle.className = "mkt-osc-title";
+      graphTitle.textContent = "Pool map";
+      graphHead.appendChild(graphTitle);
+      graphWrap.appendChild(graphHead);
+      var graphCanvas = doc.createElement("canvas");
+      graphCanvas.className = "mkt-canvas";
+      graphWrap.appendChild(graphCanvas);
+      var graphNote = u.el(doc, "p", "Loading pool map…", "muted");
+      graphNote.setAttribute("aria-live", "polite");
+      graphWrap.appendChild(graphNote);
+      oscHost.appendChild(graphWrap);
+      P.graphWrap = graphWrap; P.graphCanvas = graphCanvas; P.graphNote = graphNote;
+      /* Existing redraw path hook: price/osc redraws also repaint the map
+       * (theme/resize via P.redraw below + window resize). */
+      P.redraw = function () {
+        try { MarketInd.drawCharts(P); } catch (e) { /* panes stand */ }
+        try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* map best-effort */ }
+      };
+      if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+        var onRs = function () { if (live(myGen, uiGen)) P.redraw(); else { try { window.removeEventListener("resize", onRs); } catch (e) {} } };
+        window.addEventListener("resize", onRs);
+      }
+      try {
+        if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
+          var offTh = Store.subscribe("settings", function () { if (live(myGen, uiGen)) P.redraw(); });
+          void offTh;
+        }
+      } catch (e) { /* theme redraw best-effort */ }
+      fetchPoolMap(doc, P, r, myGen, uiGen);
+    } catch (e) { /* desk stands without the pool map */ }
     function rebucket() {
       P.candles = { buckets: PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB) };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
@@ -828,6 +868,87 @@ var PoolDetailUI = (function () {
           [t("borrow.fee", "Fee"),  fee.text + " (expected 0)", "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
       },
       title: t("pool.confirm_delete", "Confirm pool delete"), ok: function () { return t("pool.deleted", "Pool deleted."); }, fail: t("credit.could_not_prepare_the_delete", "Could not prepare the delete.") });
+  }
+  /* Pool-map lazy loader (index.html frozen — dynamic script like router.js
+   * dashboard precedent; relative URL only, never CDN). Never throws. */
+  var _pgLoading = false, _pgWaiters = [];
+  function _pgSrc() {
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL("js/pool-graph.js", document.baseURI).toString();
+      }
+    } catch (e) { /* relative fallback below */ }
+    return "js/pool-graph.js";
+  }
+  function _ensurePoolGraph(cb) {
+    try { if (typeof PoolGraph !== "undefined" && PoolGraph) { cb(true); return; } } catch (e) {}
+    if (typeof document === "undefined") { try { cb(false); } catch (e) {} return; }
+    _pgWaiters.push(cb);
+    if (_pgLoading) return;
+    _pgLoading = true;
+    try {
+      var s = document.createElement("script");
+      s.src = _pgSrc(); s.async = true;
+      s.onload = function () { _pgLoading = false; var w = _pgWaiters; _pgWaiters = []; w.forEach(function (f) { try { f(true); } catch (e) {} }); };
+      s.onerror = function () { _pgLoading = false; var w = _pgWaiters; _pgWaiters = []; w.forEach(function (f) { try { f(false); } catch (e) {} }); };
+      (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
+    } catch (e) {
+      _pgLoading = false;
+      var w = _pgWaiters; _pgWaiters = [];
+      w.forEach(function (f) { try { f(false); } catch (x) {} });
+    }
+  }
+  /* Fetch 2-layer pool graph for this pool's legs (lazy async, <=9 RPCs).
+   * Stale-route guarded by live(). Failures -> honest empty note. */
+  function fetchPoolMap(doc, P, r, myGen, uiGen) {
+    if (!P.graphWrap || !P.graphCanvas || !P.graphNote) return;
+    _ensurePoolGraph(function (ok) {
+      if (!live(myGen, uiGen)) return;
+      if (!ok) { try { P.graphNote.textContent = "Pool map unavailable (script load failed)."; } catch (e) {} return; }
+      var pA = r.asset_a_id, pB = r.asset_b_id;
+      try {
+        PoolGraph.buildGraph(pA, pB, { depth: 2, cap: 25 }).then(function (g) {
+          if (!live(myGen, uiGen)) return;
+          var pa = null, pb = null;
+          try { pa = PoolGraph.findCorePath(g, pA); } catch (e) { pa = null; }
+          try { pb = PoolGraph.findCorePath(g, pB); } catch (e) { pb = null; }
+          P.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
+          redrawPoolMap(doc, P, myGen, uiGen);
+          try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
+        }).catch(function (e) {
+          if (!live(myGen, uiGen)) return;
+          var m = String((e && e.message) || e || "");
+          try {
+            if (m.indexOf("not-connected") !== -1) P.graphNote.textContent = "Pool map unavailable (offline).";
+            else P.graphNote.textContent = "No pools touch these assets.";
+          } catch (x) {}
+        });
+      } catch (e) { /* map best-effort */ }
+    });
+  }
+  /* Repaint the pool-map canvas from cached graphData (theme/resize path). Never throws outward. */
+  function redrawPoolMap(doc, P, myGen, uiGen) {
+    if (!P.graphData || !P.graphCanvas) return;
+    if (P.showPoolMap === false) return;
+    if (!live(myGen, uiGen)) return;
+    try {
+      if (typeof PoolGraph === "undefined" || !PoolGraph) return;
+      var gd = P.graphData, hi = [], seen = {};
+      [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
+        (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
+      });
+      PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
+        { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      var n = (gd.graph.edges || []).length;
+      if (!n) P.graphNote.textContent = "No pools touch these assets.";
+      else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = "No BTS path — treat pair as unverified.";
+      else {
+        var bits = [];
+        if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
+        if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
+        P.graphNote.textContent = "BTS provenance: " + bits.join(" · ") + ".";
+      }
+    } catch (e) { /* canvas best-effort */ }
   }
   return { renderPoolDetail: renderPoolDetail };
 })();

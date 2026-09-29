@@ -262,9 +262,9 @@ var MarketDesk = (function () {
        * live list on first fill; logScale is a pure priceScale mode switch
        * (no refetch); overlays default to the pre-slice look (SMA10+EMA50). */
       bucket: 3600, tfInit: false, logScale: false,
-      /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice.
-       * Only the price pane is always on; depth defaults on, VWAP off. */
-      showVwap: false, showDepth: true,
+      /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice + pool map.
+       * Only the price pane is always on; depth + pool map default on, VWAP off. */
+      showVwap: false, showDepth: true, showPoolMap: true,
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
       depthLogX: true, depthLogY: true,
@@ -276,7 +276,9 @@ var MarketDesk = (function () {
       osc: { volume: true, rsi: false, macd: true, stoch: false, atr: false, fisher: false },
       panes: { price: null, oscs: {} },
       paneEls: {}, oscBoxes: {},
-      ticker: null, countNote: null, tfBox: null, oscNote: null
+      ticker: null, countNote: null, tfBox: null, oscNote: null,
+      /* Pool-map provenance slice (2-layer BTS-core map, own canvas — never blocks desk). */
+      graphWrap: null, graphCanvas: null, graphNote: null, graphData: null
     };
 
     var desk = el(doc, "div", null, "mkt mkt-exchange");
@@ -563,6 +565,25 @@ var MarketDesk = (function () {
     depthWrap.appendChild(depthCanvas);
     oscHost.appendChild(depthWrap);
     state.depthWrap = depthWrap;
+    /* Pool-map provenance slice: .mkt-osc-pane titled "Pool map" in oscHost.
+     * Own canvas + loading note; drawCharts pins graphWrap right after
+     * depthWrap (index 2-ish). Lazy async fetch never blocks the desk. */
+    var graphWrap = doc.createElement("div");
+    graphWrap.className = "mkt-osc-pane";
+    var graphHead = doc.createElement("div");
+    graphHead.className = "mkt-osc-head";
+    graphHead.appendChild(el(doc, "span", "Pool map", "mkt-osc-title"));
+    graphWrap.appendChild(graphHead);
+    var graphCanvas = doc.createElement("canvas");
+    graphCanvas.className = "mkt-canvas";
+    graphWrap.appendChild(graphCanvas);
+    var graphNote = el(doc, "p", "Loading pool map…", "muted");
+    graphNote.setAttribute("aria-live", "polite");
+    graphWrap.appendChild(graphNote);
+    oscHost.appendChild(graphWrap);
+    state.graphWrap = graphWrap;
+    state.graphCanvas = graphCanvas;
+    state.graphNote = graphNote;
 
     /* SIDE RAIL full-height: market picker only (MyMarkets Exchange.jsx:2428
      * right rail; vanilla MarketPicker renders the curated+search list).
@@ -641,6 +662,7 @@ var MarketDesk = (function () {
 
     state.redraw = function () {
       MarketInd.drawCharts(state);
+      try { redrawPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
     };
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       var onResize = function () { state.redraw(); };
@@ -672,6 +694,8 @@ var MarketDesk = (function () {
       sub.textContent = assets.quote.symbol + " (" + assets.quote.id + ") / " +
         assets.base.symbol + " (" + assets.base.id + ")";
       fill(state);
+      /* Pool-map provenance (lazy, never blocks desk; stale-route guarded). */
+      try { fetchPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
       /* Deep-candles Task 4: live tip with poll fallback (exactness-first:
        * re-fetch the tip window via Market.candles + Market.stats — no
        * hand-rolled money math. Push path is Chain.subscribeMarket with a
@@ -1013,6 +1037,121 @@ var MarketDesk = (function () {
       state.candles = { buckets: [], closes: [] };
       MarketInd.maybeDraw(state);
     });
+  }
+
+  /* Pool-map lazy loader (index.html frozen — dynamic script like router.js
+   * dashboard precedent; relative URL only, never CDN). Params: cb(bool).
+   * Returns nothing. Never throws. */
+  var _graphLoading = false, _graphWaiters = [];
+  function graphSrc() {
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL("js/pool-graph.js", document.baseURI).toString();
+      }
+    } catch (e) { /* relative fallback below */ }
+    return "js/pool-graph.js";
+  }
+  function ensurePoolGraph(cb) {
+    try {
+      if (typeof PoolGraph !== "undefined" && PoolGraph) { cb(true); return; }
+    } catch (e) { /* load below */ }
+    if (typeof document === "undefined") { try { cb(false); } catch (e) {} return; }
+    _graphWaiters.push(cb);
+    if (_graphLoading) return;
+    _graphLoading = true;
+    try {
+      var s = document.createElement("script");
+      s.src = graphSrc(); s.async = true;
+      s.onload = function () {
+        _graphLoading = false;
+        var w = _graphWaiters; _graphWaiters = [];
+        w.forEach(function (f) { try { f(true); } catch (e) {} });
+      };
+      s.onerror = function () {
+        _graphLoading = false;
+        var w = _graphWaiters; _graphWaiters = [];
+        w.forEach(function (f) { try { f(false); } catch (e) {} });
+      };
+      (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
+    } catch (e) {
+      _graphLoading = false;
+      var w = _graphWaiters; _graphWaiters = [];
+      w.forEach(function (f) { try { f(false); } catch (e2) {} });
+    }
+  }
+
+  /* Desk alive guard (stale-route: dead desk never paints). Params: state.
+   * Returns boolean. Never throws. */
+  function deskAlive(state) {
+    try {
+      return String((typeof location !== "undefined" && location.hash) || "")
+        .toUpperCase().indexOf(state.id) !== -1;
+    } catch (e) { return true; }
+  }
+
+  /* Fetch 2-layer pool graph for quote/base ids (lazy async, <=9 RPCs).
+   * Loading note -> render. Failures -> honest partial/empty note. */
+  function fetchPoolMap(doc, state) {
+    if (!state.graphWrap || !state.graphCanvas || !state.graphNote) return;
+    if (!state.assets) return;
+    var q = state.assets.quote, b = state.assets.base, myId = state.id;
+    try { state.graphNote.textContent = "Loading pool map…"; } catch (e) {}
+    ensurePoolGraph(function (ok) {
+      if (!deskAlive(state) || state.id !== myId) return;
+      if (!ok) {
+        try { state.graphNote.textContent = "Pool map unavailable (script load failed)."; } catch (e) {}
+        return;
+      }
+      var pA, pB;
+      try {
+        if (typeof PoolGraph === "undefined" || !PoolGraph) throw new Error("missing");
+        pA = q.id; pB = b.id;
+      } catch (e) { return; }
+      try {
+        PoolGraph.buildGraph(pA, pB, { depth: 2, cap: 25 }).then(function (g) {
+          if (!deskAlive(state) || state.id !== myId) return;
+          var pa = null, pb = null;
+          try { pa = PoolGraph.findCorePath(g, pA); } catch (e) { pa = null; }
+          try { pb = PoolGraph.findCorePath(g, pB); } catch (e) { pb = null; }
+          state.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
+          redrawPoolMap(doc, state);
+          try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+        }).catch(function (e) {
+          if (!deskAlive(state) || state.id !== myId) return;
+          var m = String((e && e.message) || e || "");
+          try {
+            if (m.indexOf("not-connected") !== -1) state.graphNote.textContent = "Pool map unavailable (offline).";
+            else state.graphNote.textContent = "No pools touch these assets.";
+          } catch (x) {}
+        });
+      } catch (e) { /* graph best-effort */ }
+    });
+  }
+
+  /* Repaint the pool-map canvas from cached graphData (theme/resize path).
+   * Skips when toggled off or stale. Never throws outward. */
+  function redrawPoolMap(doc, state) {
+    if (!state.graphData || !state.graphCanvas) return;
+    if (state.showPoolMap === false) return;
+    if (!deskAlive(state)) return;
+    try {
+      if (typeof PoolGraph === "undefined" || !PoolGraph) return;
+      var gd = state.graphData, hi = [], seen = {};
+      [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
+        (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
+      });
+      PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
+        { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      var n = (gd.graph.edges || []).length;
+      if (!n) state.graphNote.textContent = "No pools touch these assets.";
+      else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = "No BTS path — treat pair as unverified.";
+      else {
+        var bits = [];
+        if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
+        if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
+        state.graphNote.textContent = "BTS provenance: " + bits.join(" · ") + ".";
+      }
+    } catch (e) { /* canvas best-effort */ }
   }
 
   return {
