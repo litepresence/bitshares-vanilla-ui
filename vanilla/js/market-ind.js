@@ -205,6 +205,14 @@ var MarketInd = (function () {
     if (!doc || !host || !host.parentNode) return;
     var parent = host.parentNode;
     var wrap = state.vwapWrap || null;
+    /* Toggleable like every non-price plot: off removes the strip. */
+    if (state.showVwap === false) {
+      try {
+        if (wrap && wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      } catch (e) { /* gone */ }
+      state.vwapWrap = null;
+      return;
+    }
     if (!wrap || wrap.parentNode !== parent ||
         (typeof wrap.isConnected === "boolean" && !wrap.isConnected)) {
       wrap = doc.createElement("div");
@@ -818,9 +826,18 @@ var MarketInd = (function () {
           : "";
       }
     } catch (e) { /* pane failure must not break the desk */ }
+    /* Depth slice: toggleable like every non-price plot. Off detaches the
+     * wrap (draw skipped); on draws + pins at stack index 1 (right after
+     * the always-on Volume pane). Desks without a depth slice skip this. */
     try {
-      MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
-        { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
+      if (state.showDepth === false) {
+        if (state.depthWrap && state.depthWrap.parentNode) {
+          state.depthWrap.parentNode.removeChild(state.depthWrap);
+        }
+      } else {
+        MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
+          { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
+      }
     } catch (e) { /* canvas failure must not break the desk */ }
     /* Depth slice position: the depth canvas lives in the charts stack as an
      * osc-sized slice (state.depthWrap, owned by the desk) and must sit
@@ -829,7 +846,7 @@ var MarketInd = (function () {
      * wrap at index 1 here (index 0 is Volume; a missing Volume just puts
      * depth first, never lost). Desks without a depth slice skip this. */
     try {
-      if (state.depthWrap && state.oscHost) {
+      if (state.depthWrap && state.showDepth !== false && state.oscHost) {
         if (state.depthWrap.parentNode !== state.oscHost) {
           state.oscHost.appendChild(state.depthWrap);
         }
@@ -932,6 +949,10 @@ var MarketInd = (function () {
       return [def[0], overlayLabel(def[0], def[1])];
     });
     group(t("market.overlays_group", "Overlays"), overItems, state.over, "over");
+    /* Toggleable plots (everything but price): VWAP strip + depth slice.
+     * Labels are plain symbols (OSC_ORDER precedent — no dict entries). */
+    group(t("market.plots_group", "Plots"),
+      [["showVwap", "Session VWAP"], ["showDepth", "Depth"]], state, "plot");
     group(t("market.oscillators_group", "Oscillators"), OSC_ORDER, state.osc, "osc");
     wrap.appendChild(btn);
     wrap.appendChild(panel);

@@ -258,6 +258,9 @@ var MarketDesk = (function () {
        * live list on first fill; logScale is a pure priceScale mode switch
        * (no refetch); overlays default to the pre-slice look (SMA10+EMA50). */
       bucket: 3600, tfInit: false, logScale: false,
+      /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice.
+       * Only the price pane is always on; both default on (current look). */
+      showVwap: true, showDepth: true,
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
       depthLogX: true, depthLogY: true,
