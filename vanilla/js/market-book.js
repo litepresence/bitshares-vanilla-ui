@@ -391,19 +391,20 @@ var MarketBook = (function () {
 
   /* Split book fill for the retro 2x3 desk (row 2: BUY ORDERS | SELL ORDERS
    * as two equal cells): same depth computation, same spread header, same
-   * row math as renderBook — the ONLY difference is destination (bids into
-   * bidsEl, asks into asksEl, both bare since the desk cells own the h2s)
-   * and the raw-JSON proof landing in the asks cell. ctx shape matches
-   * renderBook. Returns depth so the caller can cache it for charts. */
+   * row math as renderBook — the ONLY differences are destination (bids into
+   * bidsEl, asks into asksEl, both bare since the desk cells own the h2s),
+   * the raw-JSON proof landing in the asks cell, and ask ORDER: lowest ask
+   * on top (chain order, best-first — no reverse). bestAsk stays asks[0].
+   * ctx shape matches renderBook. Returns depth so the caller can cache it
+   * for charts. */
   function renderSplit(doc, bidsEl, asksEl, ctx) {
     while (bidsEl.firstChild) bidsEl.removeChild(bidsEl.firstChild);
     while (asksEl.firstChild) asksEl.removeChild(asksEl.firstChild);
     var depth = Market.depth(ctx.book, ctx.basePrec, ctx.quotePrec);
     var bestBid = ctx.book.bids.length > 0 ? ctx.book.bids[0].displayPrice : null;
-    /* Chain asks arrive best-first (ascending); the render below reverses for
-     * display, so bestAsk is asks[0] — NOT asks[last] (that was the worst).
-     * Levels and depth points reverse TOGETHER, so each row keeps its own
-     * cumulative fraction for the --depth bar. */
+    /* Asks render in chain order (best-first, lowest on top) — levels and
+     * depth points stay aligned so each row keeps its own cumulative
+     * fraction for the --depth bar. */
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
@@ -417,7 +418,7 @@ var MarketBook = (function () {
       ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }
     renderBookSide(doc, bidsEl, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol, { bare: true });
-    renderBookSide(doc, asksEl, "Asks", ctx.book.asks.slice().reverse(), depth.asks.slice().reverse(), !!ctx.logVol, { bare: true });
+    renderBookSide(doc, asksEl, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol, { bare: true });
     rawDetails(doc, asksEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }

@@ -46,6 +46,9 @@
   --buy: #6ba583; --sell: #e3745b; --warn: #fcab53; --danger: #ff3950;
 --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
   --plot-bg: #1e1e1e;
+  /* HELP button: #1's own hover treatment (darken($bs-blue, 10%),
+   * _theme-template.scss:2213-2216) as a resting shade. */
+  --button-bg-deep: #03739a;
   --icon-filter: invert(1);
 }
 /* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
@@ -78,6 +81,7 @@
   --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --plot-bg: #ffffff;
+  --button-bg-deep: #1786bb;
   --icon-filter: none;
 }
 /* dex-ux-theme (dark): sampled from /workspace/reference/bitshares-dex-ux
@@ -101,6 +105,7 @@
 :root[data-theme="dex-ux-theme"] {
   --bg: #131722; --panel: #131722; --text: #e0e3eb; --muted: #758696;
   --plot-bg: #131722;
+  --button-bg-deep: #0062cc;
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
   --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;

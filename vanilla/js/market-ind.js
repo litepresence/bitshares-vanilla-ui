@@ -126,7 +126,7 @@ var MarketInd = (function () {
   /* Frame colors for both chart panes, read live from CSS vars. */
   function themeChartColors() {
     return {
-      paneBg: readVar("--panel", "#131722"),
+      paneBg: readVar("--plot-bg", readVar("--panel", "#131722")),
       grid: readVar("--border", "#2a2e39"),
       text: readVar("--text", "#c5cbce"),
       accent: readVar("--accent", "#007bff"),
