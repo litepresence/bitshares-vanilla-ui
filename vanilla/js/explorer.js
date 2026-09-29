@@ -8,7 +8,9 @@
  * Chain truth (#4 wins; see slice-09 plan References): database_api.hpp
  *   (get_objects, block/tx getters, global props, asset reads); feeds via
  *   asset.bitasset_data_id + get_objects (wallet.hpp:280); op enum 0-77
- *   (operations.hpp:56-133); space 1.x.y (types.hpp:361-386).
+ *   (operations.hpp:56-133); space 1.x.y protocol + 2.x.y implementation
+ *   (protocol/types.hpp:297-299,361-386; chain/types.hpp implementation list:
+ *   2.3.x asset_dynamic_data, 2.4.x asset_bitasset_data).
  * Money discipline (#6): amount/price/percent leaves stay RAW strings until
  *   the view formats them via Format — no Number(), no float math, ever.
  */
@@ -16,8 +18,9 @@ var Explorer = (function () {
   "use strict";
 
   var RECENT_MAX = 50; /* recentBlocks cap (plan) */
-  var ASSETS_PAGE = 25; /* asset page size (#1 Assets.jsx 25/page) */
-  var OBJECT_RE = /^1\.(\d+)\.(\d+)$/;
+  var ASSETS_PAGE = 25; /* asset page default (#1 Assets.jsx 25/page) */
+  var ASSETS_PAGE_MAX = 100; /* rows-per-page ceiling (10/25/50/100 punchlist) */
+  var OBJECT_RE = /^([12])\.(\d+)\.(\d+)$/;
   var ASSET_ID_RE = /^1\.3\.\d+$/;
 
   /* Op index -> short name, FC_REFLECT order <- operations.hpp:56-133. */
@@ -49,7 +52,14 @@ var Explorer = (function () {
     "1.11": "operation_history", "1.12": "withdraw_permission", "1.13": "vesting_balance",
     "1.14": "worker", "1.15": "balance", "1.16": "htlc", "1.17": "custom_authority",
     "1.18": "ticket", "1.19": "liquidity_pool", "1.20": "samet_fund",
-    "1.21": "credit_offer", "1.22": "credit_deal"};
+    "1.21": "credit_offer", "1.22": "credit_deal",
+    "2.0": "global_property", "2.1": "dynamic_global_property", "2.2": "reserved",
+    "2.3": "asset_dynamic_data", "2.4": "asset_bitasset_data", "2.5": "account_balance",
+    "2.6": "account_statistics", "2.7": "transaction_history", "2.8": "block_summary",
+    "2.9": "account_history", "2.10": "blinded_balance", "2.11": "chain_property",
+    "2.12": "witness_schedule", "2.13": "budget_record", "2.14": "special_authority",
+    "2.15": "buyback", "2.16": "fba_accumulator", "2.17": "collateral_bid",
+    "2.18": "credit_deal_summary"};
 
   /* One database-API round trip; "not-connected" when no socket is open. */
   async function _dbCall(method, params) {
@@ -259,11 +269,11 @@ var Explorer = (function () {
   }
 
   /* One asset-list page (raw extended_asset_objects). lower: bound symbol
-   * ("" from top); limit 1..25. */
+   * ("" from top); limit 1..100 (default 25). */
   function assetsPage(lower, limit) {
     var lim = parseInt(limit, 10);
     if (!(lim >= 1)) lim = ASSETS_PAGE;
-    return _dbCall("list_assets", [typeof lower === "string" ? lower : "", Math.min(lim, ASSETS_PAGE)]);
+    return _dbCall("list_assets", [typeof lower === "string" ? lower : "", Math.min(lim, ASSETS_PAGE_MAX)]);
   }
 
   /* One asset + bitasset/dynamic joins. Absent bitasset_data_id yields
@@ -336,17 +346,23 @@ var Explorer = (function () {
     });
   }
 
-  /* Any 1.x.y id -> {id, space, type, typeName, object}; 1.11.x rows also
-   * carry op {type_idx, type_name, virtual, fields}. Fails "unknown-object". */
+  /* Any 1.x.y or 2.x.y id -> {id, space, type, typeName, object};
+   * 1.11.x rows also carry op {type_idx, type_name, virtual, fields}.
+   * Space 1 is protocol objects, space 2 is implementation objects
+   * (chain/types.hpp: global_property 2.0.x … asset_dynamic_data 2.3.x,
+   * asset_bitasset_data 2.4.x …). Supply joins resolve 2.3.x dynamics and
+   * 2.4.x bitassets through this same get_objects flow. Fails
+   * "unknown-object" on bad ids/null rows; "not-connected" passes through. */
   async function resolveObject(id) {
     var m = (typeof id === "string") ? id.match(OBJECT_RE) : null;
     if (!m) throw new Error("unknown-object");
     var rows = await _dbCall("get_objects", [[id]]);
     var obj = rows && rows[0];
     if (!obj) throw new Error("unknown-object");
-    /* OBJECT_RE hardcodes the leading space: m[1] is the TYPE, m[2] the
-     * instance (space is literal 1, types.hpp:361-386). */
-    var space = 1, type = parseInt(m[1], 10);
+    /* OBJECT_RE captures the space: m[1] is space (1|2), m[2] is the TYPE,
+     * m[3] the instance (protocol_ids=1, implementation_ids=2,
+     * types.hpp:297-299 + chain/types.hpp implementation list). */
+    var space = parseInt(m[1], 10), type = parseInt(m[2], 10);
     var entry = { id: id, space: space, type: type,
       typeName: SPACE[space + "." + type] || "unknown", object: obj };
     if (space === 1 && type === 11 && Array.isArray(obj.op)) {

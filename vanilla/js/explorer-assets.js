@@ -49,11 +49,77 @@ var ExplorerAssets = (function () {
   }
 
 
-  var ASSETS_PAGE = 25; /* #1 Assets.jsx 25/page */
+  var ASSETS_PAGE = 25; /* #1 Assets.jsx 25/page default (rows-per-page overrides) */
   var FEED_SCAN_PAGES = 4; /* asset pages scanned for smartcoins */
   var FEED_MAX = 10; /* smartcoins shown on the Feeds tab */
   var PRICE_PLACES = 8; /* market.js/market-orders.js convention (mirrors ExplorerRender.PRICE_PLACES) */
   var ACCT_RE = /^1\.2\.\d+$/; /* issuer-id check for account links (mirrors ExplorerRender's copy) */
+
+  /* Assets-tab UI state (punchlist HIGHs, #1 Assets.jsx:432-490 concepts):
+   * mode market|user|prediction (default market = SmartCoins), q text filter,
+   * perPage 10/25/50/100, sortKey symbol|issuer|supply + dir 1|-1. Module-level
+   * so Next/Prev page turns keep the user's filter/sort (shell re-invokes
+   * assetsTab with new lower/stack but same state). Plain literals for new
+   * labels (no new t() keys) so check_i18n stays green without touching
+   * vanilla/locales/* — file-scope punchlist constraint. */
+  var assetState = { mode: "market", q: "", perPage: 25, sortKey: "symbol", sortDir: 1 };
+  var ROW_OPTIONS = [10, 25, 50, 100];
+
+  /* Permission/flag bit labels (chain truth: protocol/types.hpp
+   * asset_issuer_permission_flags). Duplicated plain list per doctrine rule 5
+   * (no shared-DOM-util module may grow) — same source as asset-ui.js
+   * PERMS/FLAGS, extended with the disable-bits for the detail page. */
+  var PERM_LABELS = [[1, "charge fee"], [2, "whitelist"], [4, "override"],
+    [8, "restricted"], [16, "no force settle"], [32, "global settle"],
+    [64, "no confidential"], [128, "witness-fed"], [256, "committee-fed"],
+    [512, "lock max supply"], [1024, "disable new supply"],
+    [2048, "disable mcr update"], [4096, "disable icr update"],
+    [8192, "disable mssr update"], [16384, "disable bsrm update"],
+    [32768, "disable collateral bidding"]];
+
+  /* Bit int -> "a, b" label list, "(none)" when empty; "" on garbage. */
+  function flagBitNames(v) {
+    var n = parseInt(String(v), 10);
+    if (!(n >= 0)) return "";
+    var out = [];
+    PERM_LABELS.forEach(function (p) { if (n & p[0]) out.push(p[1]); });
+    return out.length ? out.join(", ") : "(none)";
+  }
+
+  /* Preferred market id SYMBOL_QUOTE (#1 Assets.jsx:240-247 + Asset.jsx:366-379
+   * simplified): description.market when the issuer set JSON {market}, else
+   * BTS; self-markets fall back to USD (BTS_BTS would be invalid — #1 uses
+   * USD for the core asset). Short-backing-asset lookup for MPAs needs an
+   * extra get_assets round trip per row — deferred to keep the tab read-only
+   * with no new chain surface; description.market covers the UIA case that
+   * matters here. */
+  function marketIdFor(symbol, descStr) {
+    var quote = "BTS";
+    try {
+      if (typeof descStr === "string" && descStr.indexOf("{") !== -1) {
+        var p = JSON.parse(descStr);
+        if (p && typeof p.market === "string" && p.market) quote = p.market;
+      }
+    } catch (e) { /* fallback stands */ }
+    if (typeof symbol === "string" && symbol === quote) quote = "USD";
+    return symbol + "_" + quote;
+  }
+
+  /* Description JSON -> {main, market, shortName}: {main: raw} when plain
+   * text or bad JSON (#1 asset_utils.parseDescription concept, without the
+   * sanitizer dep — textContent at render is the XSS boundary). */
+  function parseDesc(descStr) {
+    if (typeof descStr !== "string" || !descStr) return { main: "", market: "", shortName: "" };
+    try {
+      var p = JSON.parse(descStr);
+      if (p && typeof p === "object" && !Array.isArray(p)) {
+        return { main: typeof p.main === "string" ? p.main : descStr,
+          market: typeof p.market === "string" ? p.market : "",
+          shortName: typeof p.short_name === "string" ? p.short_name : "" };
+      }
+    } catch (e) { /* plain text below */ }
+    return { main: descStr, market: "", shortName: "" };
+  }
 
 
   /* Local fallback counter, used ONLY when explorer-ui.js failed to load
@@ -210,99 +276,309 @@ var ExplorerAssets = (function () {
   }
 
 
-  /* Assets tab: 25/page table (symbol, issuer, precision, supply human)
-   * with lower-bound paging (Next/Prev stack, Reference #18 pattern). */
+  /* Assets tab: filterable/sortable table (Symbol, Issuer, Supply human +
+   *   Market link) with lower-bound paging (Next/Prev stack, Reference #18
+   *   pattern). Concepts from #1 Assets.jsx:432-490: text filter + radio
+   *   SmartCoins(User=market)/User-Issued/Prediction + rows-per-page
+   *   10/25/50/100; columns from Assets.jsx:151-334 (symbol/issuer/supply
+   *   sortable + marketId link). DEFERRED: prediction LIST view (antd List
+   *   with condition/expiry — table covers filtering; list polish deferred).
+   *   Supply fix: dynamics are 2.3.x implementation objects — explorer.js
+   *   resolveObject now accepts space 2 (was space-1 only, hence dashes).
+   *   Bitasset 2.4.x joins ride the same flow for the prediction filter. */
   function assetsTab(doc, body, root, myGen, lower, stack) {
-    showStatus(doc, body, t("explorer.loading_assets", "Loading assets…"));
-    Explorer.assetsPage(lower, ASSETS_PAGE).then(function (rows) {
-      if (!isCurrent(myGen)) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
-      rows = rows || [];
-      if (rows.length === 0) {
-        body.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
-        return;
-      }
-      var precById = {};
-      var dynById = {};
-      rows.forEach(function (a) {
-        if (a) { precById[a.id] = a.precision; dynById[a.id] = a.dynamic_asset_data_id || null; }
+    while (body.firstChild) body.removeChild(body.firstChild);
+    /* Filter bar (rebuilt per page turn with state values preserved; table
+     * repaints below it so typing never loses focus). New labels are plain
+     * literals (no new t() keys) per the file-scope i18n note above. */
+    var bar = el(doc, "div", null, "xplore-filters");
+    /* Inline flex (no new CSS): wraps on 360px phones, one row on desktop.
+     * Principle #7 — no hover-dependent UI, everything tap-sized. */
+    try {
+      bar.style.display = "flex"; bar.style.flexWrap = "wrap";
+      bar.style.gap = "8px 16px"; bar.style.alignItems = "center";
+      bar.style.marginBottom = "8px";
+    } catch (e) { /* styling only */ }
+    var search = doc.createElement("input");
+    search.type = "search";
+    search.value = assetState.q || "";
+    search.setAttribute("placeholder", "Filter by symbol…");
+    search.setAttribute("aria-label", "Filter assets by symbol");
+    touchable(search);
+    search.style.minWidth = "180px";
+    bar.appendChild(search);
+    var modes = [["market", "SmartCoins"], ["user", "User-Issued"], ["prediction", "Prediction"]];
+    var radioWrap = el(doc, "span", null, "xplore-radios");
+    radioWrap.setAttribute("role", "radiogroup");
+    radioWrap.setAttribute("aria-label", "Asset type filter");
+    modes.forEach(function (m) {
+      var lab = el(doc, "label", null, "xplore-radio");
+      touchable(lab);
+      var inp = doc.createElement("input");
+      inp.type = "radio";
+      inp.name = "xplore-asset-filter";
+      inp.value = m[0];
+      if (assetState.mode === m[0]) inp.checked = true;
+      inp.addEventListener("change", function () {
+        assetState.mode = m[0];
+        paintCached();
       });
-      var dynIds = Object.keys(dynById).map(function (k) { return dynById[k]; })
-        .filter(function (id) { return typeof id === "string"; });
+      lab.appendChild(inp);
+      lab.appendChild(el(doc, "span", " " + m[1]));
+      radioWrap.appendChild(lab);
+    });
+    bar.appendChild(radioWrap);
+    var perLab = el(doc, "label", " Rows ");
+    var perSel = doc.createElement("select");
+    perSel.setAttribute("aria-label", "Rows per page");
+    touchable(perSel);
+    ROW_OPTIONS.forEach(function (n) {
+      var opt = doc.createElement("option");
+      opt.value = String(n);
+      opt.textContent = String(n) + " rows";
+      if (assetState.perPage === n) opt.selected = true;
+      perSel.appendChild(opt);
+    });
+    perSel.addEventListener("change", function () {
+      var n = parseInt(perSel.value, 10);
+      if (ROW_OPTIONS.indexOf(n) === -1) n = 25;
+      if (n === assetState.perPage) return;
+      assetState.perPage = n;
+      assetsTab(doc, body, root, myGen, "", []);
+    });
+    perLab.appendChild(perSel);
+    bar.appendChild(perLab);
+    body.appendChild(bar);
+    var tableWrap = el(doc, "div", null, "xplore-tablewrap");
+    body.appendChild(tableWrap);
+    var navWrap = el(doc, "div", null, "xplore-nav");
+    body.appendChild(navWrap);
+    var allRows = null; /* enriched rows for client-side filter/sort */
+    var lastRows = []; /* raw page rows for Next paging */
+    showStatus(doc, tableWrap, t("explorer.loading_assets", "Loading assets…"));
+    search.addEventListener("input", function () {
+      assetState.q = search.value || "";
+      paintCached();
+    });
+    function enrichAndStore(rows) {
+      lastRows = rows || [];
       var supplyOf = {};
-      function paint(tableRows) {
-        while (body.firstChild) body.removeChild(body.firstChild);
-        body.appendChild(scrollTable(doc, [t("explorer.th_symbol", "Symbol"), t("explorer.th_issuer", "Issuer"), t("explorer.th_precision", "Precision"), t("explorer.th_supply", "Supply")], tableRows));
-        var nav = el(doc, "div", null, "xplore-nav");
-        if (stack.length > 0) {
-          var prev = touchable(el(doc, "button", t("explorer.prev", "← Prev")));
-          prev.type = "button";
-          prev.addEventListener("click", function () {
-            var back = stack.slice(0, -1);
-            var to = stack[stack.length - 1];
-            while (body.firstChild) body.removeChild(body.firstChild);
-            assetsTab(doc, body, root, myGen, to === undefined ? "" : to, back);
-          });
-          nav.appendChild(prev);
-        }
-        if (rows.length >= ASSETS_PAGE) {
-          var next = touchable(el(doc, "button", t("explorer.next", "Next →")));
-          next.type = "button";
-          next.addEventListener("click", function () {
-            while (body.firstChild) body.removeChild(body.firstChild);
-            assetsTab(doc, body, root, myGen, rows[rows.length - 1].symbol, stack.concat([lower]));
-          });
-          nav.appendChild(next);
-        }
-        body.appendChild(nav);
-      }
-      function tableRows() {
-        return rows.map(function (a) {
-          var sym = anchor(doc, a.symbol, "#/asset/" + a.symbol);
-          sym.title = a.id;
-          var issuer = (typeof a.issuer === "string" && ACCT_RE.test(a.issuer))
-            ? ExplorerRender.accountLink(doc, a.issuer, myGen) : String(a.issuer);
-          var supplyRaw = supplyOf[a.id];
-          var supply = supplyRaw !== undefined && supplyRaw !== null
-            ? (function () {
-              try { return Format.formatAmount(String(supplyRaw), a.precision); }
-              catch (e) { return String(supplyRaw); }
-            })() : "—";
-          return [sym, issuer, String(a.precision), supply];
+      var predById = {};
+      var dynIds = [], bitIds = [];
+      (rows || []).forEach(function (a) {
+        if (!a) return;
+        if (typeof a.dynamic_asset_data_id === "string") dynIds.push(a.dynamic_asset_data_id);
+        if (typeof a.bitasset_data_id === "string") bitIds.push(a.bitasset_data_id);
+      });
+      function finish() {
+        allRows = (rows || []).map(function (a) {
+          var isSmart = !!(a && a.bitasset_data_id);
+          return { a: a, supplyRaw: supplyOf[a.id] !== undefined ? supplyOf[a.id] : null,
+            isSmart: isSmart, isPrediction: predById[a.id] === true,
+            marketID: marketIdFor(a.symbol, a.options && a.options.description) };
         });
+        paintCached();
       }
-      if (dynIds.length === 0) { paint(tableRows()); return; }
-      Explorer.resolveObject(dynIds[0]).then(function () {
-        return Promise.all(dynIds.map(function (id) {
+      var jobs = [];
+      if (dynIds.length > 0) {
+        jobs.push(Promise.all(dynIds.map(function (id) {
           return Explorer.resolveObject(id).then(function (e) { return e.object; }).catch(function () { return null; });
+        })).then(function (objs) {
+          var byId = {};
+          dynIds.forEach(function (id, i) { byId[id] = objs[i]; });
+          (rows || []).forEach(function (a) {
+            var o = a && byId[a.dynamic_asset_data_id];
+            if (o && o.current_supply !== undefined && o.current_supply !== null) supplyOf[a.id] = String(o.current_supply);
+          });
         }));
-      }).then(function (objs) {
+      }
+      if (bitIds.length > 0) {
+        jobs.push(Promise.all(bitIds.map(function (id) {
+          return Explorer.resolveObject(id).then(function (e) { return e.object; }).catch(function () { return null; });
+        })).then(function (objs) {
+          var byId = {};
+          bitIds.forEach(function (id, i) { byId[id] = objs[i]; });
+          (rows || []).forEach(function (a) {
+            var o = a && a.bitasset_data_id && byId[a.bitasset_data_id];
+            if (o && o.is_prediction_market === true) predById[a.id] = true;
+          });
+        }));
+      }
+      if (jobs.length === 0) { finish(); return; }
+      Promise.all(jobs).then(function () {
         if (!isCurrent(myGen)) return;
-        rows.forEach(function (a, i) {
-          if (objs[i] && objs[i].current_supply !== undefined) supplyOf[a.id] = String(objs[i].current_supply);
-        });
-        paint(tableRows());
+        finish();
       }).catch(function () {
         if (!isCurrent(myGen)) return;
-        paint(tableRows());
+        finish();
       });
+    }
+    function filteredSorted() {
+      var q = (assetState.q || "").toUpperCase();
+      var out = (allRows || []).filter(function (r) {
+        if (!r || !r.a) return false;
+        if (assetState.mode === "market" && !(r.isSmart && !r.isPrediction)) return false;
+        if (assetState.mode === "user" && r.isSmart) return false;
+        if (assetState.mode === "prediction" && !(r.isSmart && r.isPrediction)) return false;
+        if (q && String(r.a.symbol || "").toUpperCase().indexOf(q) === -1) return false;
+        return true;
+      });
+      var k = assetState.sortKey, d = assetState.sortDir >= 0 ? 1 : -1;
+      out.sort(function (x, y) {
+        var c = 0;
+        if (k === "issuer") {
+          var xi = String((x.a && x.a.issuer) || ""), yi = String((y.a && y.a.issuer) || "");
+          c = xi < yi ? -1 : xi > yi ? 1 : 0;
+        } else if (k === "supply") {
+          var xs = x.supplyRaw, ys = y.supplyRaw;
+          if (xs === null && ys === null) c = 0;
+          else if (xs === null) c = 1;
+          else if (ys === null) c = -1;
+          else {
+            try {
+              var xb = BigInt(String(xs)), yb = BigInt(String(ys));
+              c = xb < yb ? -1 : xb > yb ? 1 : 0;
+            } catch (e) { c = String(xs) < String(ys) ? -1 : String(xs) > String(ys) ? 1 : 0; }
+          }
+        } else {
+          var xa = String((x.a && x.a.symbol) || ""), ya = String((y.a && y.a.symbol) || "");
+          c = xa < ya ? -1 : xa > ya ? 1 : 0;
+        }
+        return c * d;
+      });
+      return out;
+    }
+    function sortMark(key) {
+      if (assetState.sortKey !== key) return "";
+      return assetState.sortDir >= 0 ? " ▲" : " ▼";
+    }
+    function paintCached() {
+      if (!isCurrent(myGen)) return;
+      if (!allRows) return;
+      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+      while (navWrap.firstChild) navWrap.removeChild(navWrap.firstChild);
+      var view = filteredSorted();
+      if (view.length === 0) {
+        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
+      } else {
+        var scroller = el(doc, "div", null, "xplore-scroll");
+        scroller.style.overflowX = "auto";
+        var table = doc.createElement("table");
+        table.className = "node-table";
+        /* Inline opt-out of the global phone hide (app.css hides .node-table
+         * <560px expecting card fallbacks; pools-scroll precedent restores
+         * with CSS — file-scoped punchlist restores inline so the scouted
+         * horizontal scroller above keeps the table legible on 360px phones
+         * with no CSS touch). Principle #7: scroll, never vanish. */
+        try { table.style.display = "table"; } catch (e) { /* stylesheet stands */ }
+        var thead = doc.createElement("thead");
+        var hr = doc.createElement("tr");
+        function sortTh(key, label) {
+          var th = doc.createElement("th");
+          th.setAttribute("scope", "col");
+          if (isCurrent(myGen)) th.setAttribute("aria-sort",
+            assetState.sortKey === key ? (assetState.sortDir >= 0 ? "ascending" : "descending") : "none");
+          var b = touchable(el(doc, "button", label + sortMark(key)));
+          b.type = "button";
+          b.addEventListener("click", function () {
+            if (assetState.sortKey === key) assetState.sortDir = -assetState.sortDir;
+            else { assetState.sortKey = key; assetState.sortDir = 1; }
+            paintCached();
+          });
+          th.appendChild(b);
+          return th;
+        }
+        hr.appendChild(sortTh("symbol", t("explorer.th_symbol", "Symbol")));
+        hr.appendChild(sortTh("issuer", t("explorer.th_issuer", "Issuer")));
+        hr.appendChild(sortTh("supply", t("explorer.th_supply", "Supply")));
+        hr.appendChild(el(doc, "th", "Market"));
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        var tb = doc.createElement("tbody");
+        view.forEach(function (r) {
+          var a = r.a;
+          var tr = doc.createElement("tr");
+          var tdS = doc.createElement("td");
+          var sym = anchor(doc, a.symbol, "#/asset/" + a.symbol);
+          sym.title = a.id;
+          tdS.appendChild(sym);
+          tr.appendChild(tdS);
+          var tdI = doc.createElement("td");
+          var issuer = (typeof a.issuer === "string" && ACCT_RE.test(a.issuer))
+            ? ExplorerRender.accountLink(doc, a.issuer, myGen) : el(doc, "span", String(a.issuer));
+          if (typeof issuer === "string") tdI.textContent = issuer;
+          else tdI.appendChild(issuer);
+          tr.appendChild(tdI);
+          var tdP = doc.createElement("td");
+          if (r.supplyRaw !== undefined && r.supplyRaw !== null) {
+            try {
+              tdP.textContent = Format.formatAmount(String(r.supplyRaw), a.precision);
+              tdP.title = String(r.supplyRaw);
+            } catch (e) { tdP.textContent = String(r.supplyRaw); }
+          } else tdP.textContent = "—";
+          tr.appendChild(tdP);
+          var tdM = doc.createElement("td");
+          var ml = anchor(doc, "Market", "#/market/" + r.marketID);
+          ml.title = r.marketID;
+          tdM.appendChild(ml);
+          tr.appendChild(tdM);
+          tb.appendChild(tr);
+        });
+        table.appendChild(tb);
+        scroller.appendChild(table);
+        tableWrap.appendChild(scroller);
+      }
+      if ((stack || []).length > 0) {
+        var prev = touchable(el(doc, "button", t("explorer.prev", "← Prev")));
+        prev.type = "button";
+        prev.addEventListener("click", function () {
+          var back = (stack || []).slice(0, -1);
+          var to = (stack || [])[(stack || []).length - 1];
+          assetsTab(doc, body, root, myGen, to === undefined ? "" : to, back);
+        });
+        navWrap.appendChild(prev);
+      }
+      if (lastRows.length >= assetState.perPage && lastRows.length > 0) {
+        var next = touchable(el(doc, "button", t("explorer.next", "Next →")));
+        next.type = "button";
+        next.addEventListener("click", function () {
+          assetsTab(doc, body, root, myGen, lastRows[lastRows.length - 1].symbol, (stack || []).concat([lower]));
+        });
+        navWrap.appendChild(next);
+      }
+    }
+    Explorer.assetsPage(lower, assetState.perPage).then(function (rows) {
+      if (!isCurrent(myGen)) return;
+      rows = rows || [];
+      if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
+        while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
+        return;
+      }
+      enrichAndStore(rows);
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
-      showError(doc, body, e, t("explorer.assets_failed", "Could not load assets."));
+      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+      showError(doc, tableWrap, e, t("explorer.assets_failed", "Could not load assets."));
       var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
-        while (body.firstChild) body.removeChild(body.firstChild);
         assetsTab(doc, body, root, myGen, lower, stack);
       });
-      body.appendChild(retry);
+      tableWrap.appendChild(retry);
     });
   }
 
-  /* #/asset/:symbol: header + supply/max/fees human rows + permission note
-   * + feed section when is_smartcoin (both-precisions math) else the
-   * "not a smartcoin" empty state. */
+  /* #/asset/:symbol: header + MARKET button (preferred market) +
+   * ASSET INFO/ACTIONS tabs + asset-type/flags section + description box with
+   * grouped amounts + feed section when is_smartcoin (both-precisions math)
+   * else the "not a smartcoin" empty state. Concepts from #1 Asset.jsx:
+   * AboutBox preferredMarket (description.market else core, self->USD),
+   * Tabs info/actions (Asset.jsx:2337-2403), type/flags (asset_utils +
+   * permission bits), description main/market (parseDescription). DEFERRED:
+   * FEE POOL funding/claim panel (Asset.jsx renderFeePool* needs signing —
+   * read-only explorer shows the fee-pool balance only) + prediction LIST
+   * view (Assets.jsx:492- List with condition/expiry — table covers it). */
   function renderAsset(root, symbol) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -326,11 +602,50 @@ var ExplorerAssets = (function () {
       if (!isCurrent(myGen)) return;
       var a = j.asset, dyn = j.dynamic || {};
       var prec = a.precision;
+      var bitObj = j.bitasset || null;
+      var isSmart = !!j.is_smartcoin;
+      var isPrediction = !!(bitObj && bitObj.is_prediction_market === true);
+      var typeLabel = isPrediction ? "Prediction Market"
+        : isSmart ? "SmartCoin (MPA)" : "User-Issued (UIA)";
+      var descParsed = parseDesc(a.options && a.options.description);
+      var marketID = marketIdFor(a.symbol, a.options && a.options.description);
       while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
       wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
+      var marketBtn = anchor(doc, "MARKET →", "#/market/" + marketID);
+      marketBtn.title = marketID;
+      marketBtn.setAttribute("aria-label", "Open preferred market " + marketID);
+      wrap.appendChild(marketBtn);
+      /* Tabs (plain labels per file-scope i18n note; #1 Tabs info/actions). */
+      var tabBar = el(doc, "div", null, "xplore-tabs");
+      var infoBtn = touchable(el(doc, "button", "ASSET INFO"));
+      infoBtn.type = "button";
+      var actBtn = touchable(el(doc, "button", "ACTIONS"));
+      actBtn.type = "button";
+      tabBar.appendChild(infoBtn);
+      tabBar.appendChild(actBtn);
+      wrap.appendChild(tabBar);
+      var infoBox = el(doc, "div", null, "xplore-tabinfo");
+      var actBox = el(doc, "div", null, "xplore-tabact");
+      actBox.style.display = "none";
+      wrap.appendChild(infoBox);
+      wrap.appendChild(actBox);
+      function selectTab(which) {
+        var info = which !== "actions";
+        infoBox.style.display = info ? "" : "none";
+        actBox.style.display = info ? "none" : "";
+        try {
+          infoBtn.setAttribute("aria-selected", info ? "true" : "false");
+          actBtn.setAttribute("aria-selected", info ? "false" : "true");
+          infoBtn.style.fontWeight = info ? "bold" : "";
+          actBtn.style.fontWeight = info ? "" : "bold";
+        } catch (e) { /* styling only */ }
+      }
+      infoBtn.addEventListener("click", function () { selectTab("info"); });
+      actBtn.addEventListener("click", function () { selectTab("actions"); });
+      selectTab("info");
       var dl = el(doc, "dl", null, "xplore-fields");
-      function humanRow(term, raw) {
-        dl.appendChild(el(doc, "dt", term));
+      function humanRowInto(target, term, raw) {
+        target.appendChild(el(doc, "dt", term));
         var dd = doc.createElement("dd");
         if (raw === undefined || raw === null) dd.textContent = "—";
         else {
@@ -338,7 +653,7 @@ var ExplorerAssets = (function () {
           catch (e) { dd.textContent = String(raw); }
           dd.title = String(raw);
         }
-        dl.appendChild(dd);
+        target.appendChild(dd);
       }
       dl.appendChild(el(doc, "dt", t("explorer.id_row", "ID")));
       var idDd = doc.createElement("dd");
@@ -353,28 +668,71 @@ var ExplorerAssets = (function () {
       var pDd = doc.createElement("dd");
       pDd.textContent = String(prec);
       dl.appendChild(pDd);
-      wrap.appendChild(dl);
-      var dl2 = el(doc, "dl", null, "xplore-fields");
-      wrap.appendChild(dl2);
-      humanRow(t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
-      humanRow(t("explorer.current_supply", "Current supply"), dyn.current_supply);
-      humanRow(t("explorer.accumulated_fees", "Accumulated fees"), dyn.accumulated_fees);
-      humanRow(t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
+      dl.appendChild(el(doc, "dt", "Asset type"));
+      var tyDd = doc.createElement("dd");
+      tyDd.textContent = typeLabel;
+      dl.appendChild(tyDd);
+      infoBox.appendChild(dl);
+      /* Asset-type/flags section (chain truth: protocol/types.hpp permission
+       * bits; raw ints in titles, human lists via flagBitNames). */
+      infoBox.appendChild(el(doc, "h3", "Asset type and permissions"));
+      var dlF = el(doc, "dl", null, "xplore-fields");
+      function flagRow(term, raw) {
+        dlF.appendChild(el(doc, "dt", term));
+        var dd = doc.createElement("dd");
+        var names = flagBitNames(raw);
+        dd.textContent = names || "—";
+        dd.title = String(raw);
+        dlF.appendChild(dd);
+      }
+      flagRow("Permissions", a.options && a.options.issuer_permissions);
+      flagRow("Flags", a.options && a.options.flags);
       var feeDd = doc.createElement("dd");
       var feeKey = a.options && a.options.market_fee_percent;
       if (feeKey !== undefined && /^\d+$/.test(String(feeKey))) {
         feeDd.textContent = pctHundredths(String(feeKey));
         feeDd.title = String(feeKey);
       } else feeDd.textContent = "—";
-      dl2.appendChild(el(doc, "dt", t("explorer.market_fee", "Market fee")));
-      dl2.appendChild(feeDd);
+      dlF.appendChild(el(doc, "dt", t("explorer.market_fee", "Market fee")));
+      dlF.appendChild(feeDd);
+      infoBox.appendChild(dlF);
+      /* Description box with grouped amounts (main text + short_name +
+       * max/current/fees/fee-pool human — #1 AboutBox + Summary grouped). */
+      var descBox = el(doc, "div", null, "xplore-descbox");
+      descBox.appendChild(el(doc, "h3", "Description"));
+      var mainText = (descParsed.main && descParsed.main.trim())
+        ? descParsed.main : "(no description)";
+      descBox.appendChild(el(doc, "p", mainText));
+      if (descParsed.shortName) descBox.appendChild(el(doc, "p", "Short: " + descParsed.shortName));
+      if (descParsed.market) descBox.appendChild(el(doc, "p", "Market: " + descParsed.market));
+      var dl2 = el(doc, "dl", null, "xplore-fields");
+      descBox.appendChild(dl2);
+      humanRowInto(dl2, t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
+      humanRowInto(dl2, t("explorer.current_supply", "Current supply"), dyn.current_supply);
+      humanRowInto(dl2, t("explorer.accumulated_fees", "Accumulated fees"), dyn.accumulated_fees);
+      humanRowInto(dl2, t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
+      infoBox.appendChild(descBox);
+      /* ACTIONS tab: read-only links only (signing lives in owning slices).
+       * DEFERRED: fee-pool funding/claim panel (needs wallet signing). */
+      actBox.appendChild(el(doc, "h3", "Asset actions"));
+      var mLink = anchor(doc, "Open market " + marketID, "#/market/" + marketID);
+      mLink.title = marketID;
+      actBox.appendChild(mLink);
+      actBox.appendChild(el(doc, "p", "Trade and transfer this asset from its preferred market.", "muted"));
+      var tLink = anchor(doc, "Transfer " + a.symbol, "#/transfer");
+      tLink.title = "Transfer";
+      actBox.appendChild(tLink);
+      actBox.appendChild(el(doc, "p",
+        "Full management view lives in its owning slice — this is a read-only summary.", "muted"));
+      actBox.appendChild(el(doc, "p",
+        "Fee pool funding and claiming live in the asset management view (deferred here).", "muted"));
       if (!j.is_smartcoin) {
-        wrap.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
+        infoBox.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;
       }
-      wrap.appendChild(el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
+      infoBox.appendChild(el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
       var feedBox = el(doc, "div", null, "xplore-feed");
-      wrap.appendChild(feedBox);
+      infoBox.appendChild(feedBox);
       showStatus(doc, feedBox, t("explorer.loading_feeds", "Loading feeds…"));
       Explorer.feeds([a.symbol]).then(function (rows) {
         if (!isCurrent(myGen)) return;
