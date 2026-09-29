@@ -813,7 +813,7 @@ var MarketInd = (function () {
     } catch (e) { /* pane failure must not break the desk */ }
     try {
       MarketCharts.drawDepth(state.depthCanvas, d.depth.bids, d.depth.asks,
-        { low: null, high: null }, "No depth data.");
+        { low: null, high: null, logX: !!state.depthLogX, logY: !!state.depthLogY }, "No depth data.");
     } catch (e) { /* canvas failure must not break the desk */ }
   }
 

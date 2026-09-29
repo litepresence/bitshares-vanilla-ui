@@ -68,6 +68,11 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   letter-spacing: 0.05em; }
 a.btn-ghost { background: transparent; color: var(--accent);
   border: 1px solid var(--accent); }
+/* Depth scale toggles (price/vol log-lin, session-only). */
+.mkt-scalerow { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 8px; }
+.mkt-scalerow button { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
+  border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+.mkt-scalerow button[aria-pressed="true"] { border-color: var(--accent); font-weight: 700; }
 /* Clickable book rows (click-to-fill): pointer + keyboard focus ring. */
 .book-row[tabindex], .book-row-card[tabindex] { cursor: pointer; }
 .book-row[tabindex]:focus, .book-row-card[tabindex]:focus { outline: 2px solid var(--accent); outline-offset: -2px; }

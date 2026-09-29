@@ -2146,7 +2146,11 @@
       "pool.hist_source_es",
       "pool.hist_source_chain",
       "pool.book_title",
-      "explorer.tabs_missing"
+      "explorer.tabs_missing",
+      "market.px_log",
+      "market.px_lin",
+      "market.vol_log",
+      "market.vol_lin"
     ]
   },
   "nav": {
@@ -3069,7 +3073,11 @@
     "chg_label": "24h Δ",
     "indicators_menu": "Indicators",
     "overlays_group": "Overlays",
-    "oscillators_group": "Oscillators"
+    "oscillators_group": "Oscillators",
+    "px_log": "Price: Log",
+    "px_lin": "Price: Linear",
+    "vol_log": "Vol: Log",
+    "vol_lin": "Vol: Linear"
   },
   "misc": {
     "title": "Invoice",

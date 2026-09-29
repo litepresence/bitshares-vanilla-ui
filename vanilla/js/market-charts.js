@@ -187,6 +187,10 @@ var MarketCharts = (function () {
     if (!g) return;
     labels = labels || {};
     var muted = cssVar("--muted", "#777777");
+    /* Log scales (desk toggles, default log/log): compress far-spam prices
+     * and dust-to-whale volumes into readable room. Pure coordinate mapping
+     * (Number domain, never money); linear path below is untouched. */
+    var useLogX = !!labels.logX, useLogY = !!labels.logY;
     bids = Array.isArray(bids) ? bids : [];
     asks = Array.isArray(asks) ? asks : [];
     var all = bids.concat(asks);
@@ -198,6 +202,8 @@ var MarketCharts = (function () {
       var t = all[i] ? all[i].totalBase : NaN;
       if (typeof p !== "number" || !isFinite(p)) continue;
       if (typeof t !== "number" || !isFinite(t)) continue;
+      if (useLogX && p <= 0) continue;
+      if (useLogY && t < 0) continue;
       px.push(all[i]);
       if (p < pmin) pmin = p;
       if (p > pmax) pmax = p;
@@ -211,19 +217,28 @@ var MarketCharts = (function () {
       g.ctx.textAlign = "left";
       return;
     }
-    if (!(pmax > pmin)) {
-      pmax = pmin + 1;
-      pmin = pmin - 1;
+    /* Log floors: x needs pmin>0 (guarded above); y floors at the smallest
+     * positive total so zero-dust rows clamp instead of vanishing. */
+    var yFloor = Infinity, j;
+    for (j = 0; j < px.length; j++) {
+      var tv = px[j].totalBase;
+      if (tv > 0 && tv < yFloor) yFloor = tv;
     }
-    if (!(tmax > 0)) tmax = 1;
+    if (!isFinite(yFloor)) yFloor = 1;
+    function tx(v) { return useLogX ? Math.log(v) : v; }
+    function ty(v) { return useLogY ? Math.log(Math.max(v, yFloor)) : v; }
+    var dmin = tx(pmin), dmax = tx(pmax);
+    if (!(dmax > dmin)) { dmax = dmin + 1; dmin = dmin - 1; }
+    var tTop = ty(tmax), tBot = ty(useLogY ? yFloor : 0);
+    if (!(tTop > tBot)) tTop = tBot + 1;
     var padL = 8, padR = 8, padT = 24, padB = 18;
     var plotW = g.w - padL - padR;
     var plotH = g.h - padT - padB;
     function x(val) {
-      return padL + ((val - pmin) / (pmax - pmin)) * plotW;
+      return padL + ((tx(val) - dmin) / (dmax - dmin)) * plotW;
     }
     function y(val) {
-      return padT + (1 - val / tmax) * plotH;
+      return padT + (1 - (ty(val) - tBot) / (tTop - tBot)) * plotH;
     }
     var buy = cssVar("--buy", "#22d173");
     var sell = cssVar("--sell", "#e3745b");

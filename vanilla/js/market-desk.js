@@ -257,6 +257,9 @@ var MarketDesk = (function () {
        * live list on first fill; logScale is a pure priceScale mode switch
        * (no refetch); overlays default to the pre-slice look (SMA10+EMA50). */
       bucket: 3600, tfInit: false, logScale: false,
+      /* Depth scales ship log/log (far-spam prices + dust volumes stay
+       * legible); toggles in the depth cell flip either axis. */
+      depthLogX: true, depthLogY: true,
       over: { sma: true, ema: true, bb: false, psar: false },
       /* Task 4b stacked panes: one checkbox per key below; MACD stays on by
        * default to preserve the Task-4 look. panes.oscs maps key -> pane
@@ -468,6 +471,33 @@ var MarketDesk = (function () {
     depthSec.className = "mkt-depth";
     desk.appendChild(depthSec);
     depthSec.appendChild(el(doc, "h2", t("market.depth_title", "Depth")));
+    /* Scale toggles (ship log/log: far-spam prices and dust-to-whale
+     * volumes both stay legible; linear stays one tap away). Session-only,
+     * same pattern as the price-pane Log toggle. */
+    var scaleRow = doc.createElement("div");
+    scaleRow.className = "mkt-scalerow";
+    depthSec.appendChild(scaleRow);
+    function scaleBtn(key, logKey, linKey) {
+      var b = touchable(el(doc, "button", ""));
+      b.type = "button";
+      function paint() {
+        var on = !!state[key];
+        b.textContent = on ? t(logKey[0], logKey[1]) : t(linKey[0], linKey[1]);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+      paint();
+      b.addEventListener("click", function () {
+        state[key] = !state[key];
+        paint();
+        MarketInd.drawCharts(state);
+      });
+      scaleRow.appendChild(b);
+      return { repaint: paint };
+    }
+    state._scalePainters = [
+      scaleBtn("depthLogX", ["market.px_log", "Price: Log"], ["market.px_lin", "Price: Linear"]),
+      scaleBtn("depthLogY", ["market.vol_log", "Vol: Log"], ["market.vol_lin", "Vol: Linear"])
+    ];
     var depthCanvas = doc.createElement("canvas");
     depthCanvas.id = "mkt-depth-canvas";
     depthCanvas.className = "mkt-canvas";
