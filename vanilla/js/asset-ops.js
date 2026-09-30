@@ -1,7 +1,7 @@
 /* AssetOps: asset-op builders + percent/ratio helpers + sendAndProve.
  * Owns: pure op-data builders returning [opId, opData] with a
  *   zero-placeholder fee for live fee-fill at confirm time (ops 10/11/12/13/
- *   14/15/16/19), the hundredths-vs-ratio helper pairs (integer/string math
+ *   14/15/16/17/19/43/47/48), the hundredths-vs-ratio helper pairs (integer/string math
  *   only), live fee via Tx.fee, and sign+send+prove via Tx.sign (vote-pattern
  *   shape). No DOM, no broadcast strings — publishing lives in the views.
  * Consumes: Asset.describe (buildFeed backing-leg lookup — asset.js loads FIRST;
@@ -14,7 +14,13 @@
  *   price_per_kbyte <- asset_ops.hpp:192-226; op-11 + BSIP48 ext <- :351-382;
  *   op-12 (target MUST be market-issued) <- :398-411; op-13 <- :430-439;
  *   op-14 (payer = issuer, price_per_kbyte) <- :485-505; op-15 (never on
- *   MPAs) <- :513-524; op-19 + price_feed = (settlement)(MCR u16)(MSSR u16)
+ *   MPAs) <- :513-524; op-16 (bare int64 CORE amount, NOT an asset pair)
+ *   <- :322-334 + FC :728; op-17 (fee)(account)(amount)(extensions) <- :267-288
+ *   + FC :719; op-43 (fee)(issuer)(amount_to_claim)(extensions + optional
+ *   claim_from_asset_id) <- :529-553 + FC :619/:621; op-47
+ *   (fee)(issuer)(asset_id)(amount_to_claim CORE)(extensions) <- :601-615 +
+ *   FC :623; op-48 (fee)(issuer)(asset_to_update)(new_issuer)(extensions,
+ *   OWNER auth) <- :565-586 + FC :700-706; op-19 + price_feed = (settlement)(MCR u16)(MSSR u16)
  *   (CER) <- :462-480 + asset.hpp:160-189; hundredths (10000 = 100%) vs
  *   ratio over 1000 (1750 = 175%) <- config.hpp:102-117. Op-data keys mirror
  *   #3 bitshares-api.js :2145-2204 + :2475-2618; CER create placeholder
@@ -22,8 +28,11 @@
  * MONEY DISCIPLINE (#6): amounts stay RAW digit strings (parseAmount in, no float);
  *   hundredths + ratios stay RAW ints via the helpers below (views never divide ad-hoc).
  *   FEE RULES: create tier = symbol length, descriptions add price_per_kbyte — both
- *   OBSERVED live via AssetOps.fee, never estimated here. SCOPE: ops 17/18 OUT
- *   (settle/global-settle deferred); op 16 funded here; no memo encryption in v1 (views pass memoOrNull:null).
+ *   OBSERVED live via AssetOps.fee, never estimated here. SCOPE: op 18 OUT
+ *   (global-settle: issuer-only, no vanilla form — honest deferral); ops
+ *   17/43/47/48 built here (settle needs an MPA position; claim-fees needs
+ *   accumulated fees; claim-pool needs pool balance; update-issuer signs with
+ *   the OWNER key); no memo encryption in v1 (views pass memoOrNull:null).
  * NAMED-ERROR HOMES: not-issuer (update gate, views enforce via describe);
  *   not-market-issued (buildFeed + reserve/feed gates); symbol-taken
  *   (create gate via the lookup pre-check in views).
@@ -309,6 +318,93 @@ var AssetOps = (function () {
       asset_id: args.assetId, amount: raw, extensions: [] }];
   }
 
+  /* Op-17 asset_settle (force-settle a bitasset position).
+   * Field order <- #4 asset_ops.hpp:267-288 + FC :719
+   * (fee)(account)(amount)(extensions). amountHuman parses at the BITASSET
+   * precision (the amount IS an asset pair, unlike op-16). READ-SIDE GATES
+   * (callers enforce before building): the asset is market-issued and the
+   * account holds at least the settle amount — the chain rejects otherwise.
+   * Returns [17, opData] with zero-placeholder fee. */
+  function buildSettle(args) {
+    args = args || {};
+    _assertAccountId(args.accountId, "accountId");
+    _assertAssetId(args.assetId, "assetId");
+    _assertPrecision(args.precision, "precision");
+    _needFormat();
+    var raw = Format.parseAmount(args.amountHuman, args.precision);
+    if (!/[1-9]/.test(raw)) throw new Error("settle amount must be greater than zero");
+    return [17, { fee: { amount: "0", asset_id: CORE_ASSET }, account: args.accountId,
+      amount: { amount: raw, asset_id: args.assetId }, extensions: [] }];
+  }
+
+  /* Op-43 asset_claim_fees (issuer reclaims accumulated market/transfer fees).
+   * Field order <- #4 asset_ops.hpp:529-553 + FC :619/:621
+   * (fee)(issuer)(amount_to_claim)(extensions). amountHuman parses at the
+   * CLAIMED-asset precision. claimFromAssetIdOrNull selects the
+   * collateral-fee path: when set it must be a DIFFERENT asset than assetId
+   * (#4 :539-542 — the chain rejects same-asset, so the builder throws
+   * loudly instead of producing always-rejected bytes); when null the
+   * extensions stay [] (empty count, the common market-fee path).
+   * READ-SIDE GATE: accumulated_fees must cover the claim — the chain
+   * rejects dust claims on empty pools. Returns [43, opData] with
+   * zero-placeholder fee. */
+  function buildClaimFees(args) {
+    args = args || {};
+    _assertAccountId(args.issuerId, "issuerId");
+    _assertAssetId(args.assetId, "assetId");
+    _assertPrecision(args.precision, "precision");
+    _needFormat();
+    var raw = Format.parseAmount(args.amountHuman, args.precision);
+    if (!/[1-9]/.test(raw)) throw new Error("claim amount must be greater than zero");
+    var ext = [];
+    var claimFrom = (args.claimFromAssetIdOrNull === undefined) ? null : args.claimFromAssetIdOrNull;
+    if (claimFrom !== null) {
+      _assertAssetId(claimFrom, "claimFromAssetIdOrNull");
+      if (claimFrom === args.assetId) throw new Error("claim_from_asset_id must differ from the claimed asset");
+      ext = { claim_from_asset_id: claimFrom };
+    }
+    return [43, { fee: { amount: "0", asset_id: CORE_ASSET }, issuer: args.issuerId,
+      amount_to_claim: { amount: raw, asset_id: args.assetId }, extensions: ext }];
+  }
+
+  /* Op-47 asset_claim_pool (issuer drains CORE from the asset's fee pool).
+   * Field order <- #4 asset_ops.hpp:601-615 + FC :623
+   * (fee)(issuer)(asset_id)(amount_to_claim)(extensions). amountHuman parses
+   * at corePrecision (the claim IS core units). FEE RULE (chain-enforced):
+   * the fee must be paid in an asset OTHER than assetId — callers pass a
+   * non-pool fee asset to AssetOps.fee (core works when the pool asset is a
+   * UIA). READ-SIDE GATE: fee_pool must cover the claim. Returns [47,
+   * opData] with zero-placeholder fee. */
+  function buildClaimPool(args) {
+    args = args || {};
+    _assertAccountId(args.issuerId, "issuerId");
+    _assertAssetId(args.assetId, "assetId");
+    _assertPrecision(args.corePrecision, "corePrecision");
+    _needFormat();
+    var raw = Format.parseAmount(args.amountHuman, args.corePrecision);
+    if (!/[1-9]/.test(raw)) throw new Error("claim amount must be greater than zero");
+    return [47, { fee: { amount: "0", asset_id: CORE_ASSET }, issuer: args.issuerId,
+      asset_id: args.assetId,
+      amount_to_claim: { amount: raw, asset_id: CORE_ASSET }, extensions: [] }];
+  }
+
+  /* Op-48 asset_update_issuer (hand an asset to a new issuer).
+   * Field order <- #4 asset_ops.hpp:565-586 + FC :700-706
+   * (fee)(issuer)(asset_to_update)(new_issuer)(extensions). OWNER AUTHORITY:
+   * get_required_owner_authorities inserts issuer and the active set is
+   * empty (#4 :580-584) — the caller MUST sign with the OWNER wif (passing
+   * the active wif builds valid bytes the chain rejects with an authority
+   * error). No amounts here, so no Format gate. Returns [48, opData] with
+   * zero-placeholder fee. */
+  function buildUpdateIssuer(args) {
+    args = args || {};
+    _assertAccountId(args.issuerId, "issuerId");
+    _assertAssetId(args.assetId, "assetId");
+    _assertAccountId(args.newIssuerId, "newIssuerId");
+    return [48, { fee: { amount: "0", asset_id: CORE_ASSET }, issuer: args.issuerId,
+      asset_to_update: args.assetId, new_issuer: args.newIssuerId, extensions: [] }];
+  }
+
   /* Op-19 asset_publish_feed. ASYNC by necessity: the settlement-quote and
    * CER legs need the backing id from Asset.describe().bitasset (no safe
    * placeholder exists). mcr/mssr are explicit ratio ints — NO silent
@@ -394,7 +490,9 @@ var AssetOps = (function () {
   }
 
   return { buildCreate: buildCreate, buildUpdate: buildUpdate, buildUpdateBitasset: buildUpdateBitasset,
-    buildUpdateProducers: buildUpdateProducers, buildIssue: buildIssue, buildReserve: buildReserve, buildFundFeePool: buildFundFeePool, buildFeed: buildFeed,
+    buildUpdateProducers: buildUpdateProducers, buildIssue: buildIssue, buildReserve: buildReserve, buildFundFeePool: buildFundFeePool,
+    buildSettle: buildSettle, buildClaimFees: buildClaimFees, buildClaimPool: buildClaimPool, buildUpdateIssuer: buildUpdateIssuer,
+    buildFeed: buildFeed,
     fee: fee, sendAndProve: sendAndProve, pctHumanToHundredths: pctHumanToHundredths, hundredthsToPct: hundredthsToPct,
     pctHumanToRatio: pctHumanToRatio, ratioToPct: ratioToPct };
 })();

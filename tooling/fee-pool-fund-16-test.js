@@ -102,8 +102,12 @@ function throws(fn) { try { fn(); return false; } catch (e) { return true; } }
   ]);
   ok(eq(gotTx, wantTx), "op16 tx framing (varint id + data, ext 0)");
 
-  // 8. Neighbour ids untouched: 17/18 still undispatched (settle deferred).
-  ok(throws(() => S.serializeOperationData(17, {})), "op17 still undispatched");
+  // 8. Neighbour ids: 17 now dispatched (settle serializer task); 18 still
+  // undispatched (global-settle stays deferred — issuer-only, no form).
+  ok(eq(S.serializeOperationData(17, { fee: FEE, account: FROM,
+    amount: { amount: "1", asset_id: ASSET }, extensions: [] }),
+    S.serializeAssetSettleOp({ fee: FEE, account: FROM,
+      amount: { amount: "1", asset_id: ASSET }, extensions: [] })), "op17 now dispatched");
   ok(throws(() => S.serializeOperationData(18, {})), "op18 still undispatched");
 
   console.log(pass + " passed, " + fail + " failed");

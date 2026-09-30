@@ -1,5 +1,5 @@
 /* tx.js — graphene serializer registry + dispatch (ops 0-3, 6-8,
- * 10-16, 19-24, 25-30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75, 76).
+ * 10-17, 19-24, 25-30, 32-34, 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75, 76).
  * Envelope/fee/sign/send live in tx-send.js (slice-18 cap split).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
@@ -7,7 +7,9 @@
  * (op 6), account_whitelist (op 7), account_upgrade (op 8),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
- * (op 15), asset_fund_fee_pool (op 16), asset_publish_feed (op 19), witness_create (op 20),
+ * (op 15), asset_fund_fee_pool (op 16), asset_settle (op 17),
+ * asset_claim_fees (op 43), asset_claim_pool (op 47),
+ * asset_update_issuer (op 48), asset_publish_feed (op 19), witness_create (op 20),
  * witness_update (op 21), proposal_create/update/delete (ops
  * 22/23/24), withdraw_permission_create (op 25),
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
@@ -112,11 +114,38 @@
  *                              + FC :728 (fee)(from_account)(asset_id)(amount)(extensions)
  *                              + BJS operations.js asset_fund_fee_pool (order match,
  *                              fetched 2026-09-30; amount is int64 core, NOT an asset)
+ * - serializeAssetSettleOp   <- #3 bitshares-api.js:2580-2590
+ *                              + #4 .../protocol/asset_ops.hpp:267-288 (struct)
+ *                              + FC :719 (fee)(account)(amount)(extensions)
+ *                              + BJS operations.js asset_settle (order match,
+ *                              fetched 2026-09-30)
+ * - serializeAssetClaimFeesOp <- #3 bitshares-api.js:3002-3023
+ *                              + #4 .../protocol/asset_ops.hpp:529-553 (struct)
+ *                              + FC :619 (fee)(issuer)(amount_to_claim)(extensions)
+ *                              + ext :621 (claim_from_asset_id, index 0)
+ *                              + BJS operations.js asset_claim_fees (extension
+ *                              order match, fetched 2026-09-30)
+ * - serializeAssetClaimPoolOp <- #3 bitshares-api.js:3063-3075
+ *                              + #4 .../protocol/asset_ops.hpp:601-615 (struct)
+ *                              + FC :623 (fee)(issuer)(asset_id)
+ *                              (amount_to_claim)(extensions)
+ *                              + BJS operations.js asset_claim_pool (order
+ *                              match, fetched 2026-09-30)
+ * - serializeAssetUpdateIssuerOp
+ *                            <- #3 bitshares-api.js:3077-3089
+ *                              + #4 .../protocol/asset_ops.hpp:565-586 (struct)
+ *                              + FC :700-706 (fee)(issuer)(asset_to_update)
+ *                              (new_issuer)(extensions)
+ *                              + BJS operations.js asset_update_issuer (order
+ *                              match, fetched 2026-09-30)
  * - serializeAssetPublishFeedOp
  *                           <- #3 bitshares-api.js:2610-2618
  *                              + #4 .../protocol/asset_ops.hpp:462-480 (struct)
- * - ops 10-16, 19 ids      <- #4 .../protocol/operations.hpp:66-72, :75
- *                              (/* 10 *\/ … /* 16 *\/, /* 19 *\/; 17/18 deferred)
+ * - ops 10-17, 19 ids      <- #4 .../protocol/operations.hpp:66-73, :75
+ *                              (/* 10 *\/ … /* 17 *\/, /* 19 *\/; 18 deferred:
+ *                              global-settle is issuer-only, no vanilla form)
+ * - ops 43/47/48 ids         <- #4 .../protocol/operations.hpp:99 (43),
+ *                              :103 (47), :104 (48)
  * - serializeTimestamp       <- #3 bitshares-api.js:1959-1973 (ISO-with-Z /
  *                              unix-seconds -> u32 LE; vanilla throws on
  *                              missing/unparseable input instead of defaulting
@@ -201,10 +230,22 @@
   * - op 74 (credit_deal_expired) VIRTUAL — deliberately NOT serialized
   *   (#4 operations.hpp:130 + credit_offer.hpp "virtual operation" assert;
   *   #3's :3580-3594 serializer exists only for history display, never tx)
-  * - op-72 ext<ext{optional u8 auto_repay}> packing <- #4 ext.hpp (count of
-  *   set optionals + index + value) + credit_offer.hpp:118-129 (0/1/2 enum),
-  *   :137-141 (ext decl); #3 always writes EMPTY (:3542) — the SET form is
-  *   vanilla's ambiguity-C addition, same count+index+value shape as op 3
+ * - op-72 ext<ext{optional u8 auto_repay}> packing <- #4 ext.hpp (count of
+ *   set optionals + index + value) + credit_offer.hpp:118-129 (0/1/2 enum),
+ *   :137-141 (ext decl); #3 always writes EMPTY (:3542) — the SET form is
+ *   vanilla's ambiguity-C addition, same count+index+value shape as op 3
+ * - op-43 ext<additional_options{optional claim_from_asset_id}> packing <-
+ *   #4 ext.hpp (same count+index+value rule) + asset_ops.hpp:535-543 (the
+ *   single optional, index 0) + :621 (FC); #3 :3012-3021 agrees (count 1 +
+ *   index 0 + asset id when set, count 0 otherwise). Vanilla accepts the
+ *   object form {claim_from_asset_id}, the empty array [] (what builders
+ *   emit when unset), and the [0, asset_id] pair; anything else throws
+ *   loudly — never a silent empty for a caller-supplied id, never a silent
+ *   id for a caller that forgot the field.
+ * - op-48 carries NO authority flag in its bytes: the owner-auth requirement
+ *   (#4 :580-584) is enforced by the CHAIN at broadcast, so the serializer
+ *   writes what it is given and the builder + prove script document the
+ *   owner-WIF signing rule (no silent active-WIF default anywhere).
   * - op-69/71 flat_map ordering: #4 stores flat_map (ordered); vanilla sorts
   *   entries by id before writing (same numeric rule as serializeIdSet) —
   *   #3 emits caller order, so bytes are identical for sorted input
@@ -281,13 +322,30 @@
   *                          <- #4 .../protocol/operations.hpp:63 (7), :78-80
   *                             (22-24), :88-90 (32/33), :93 (37), :110-114
   *                             (54-58)
-  * - NOT serialized (WHY comments at the dispatch site, slice-14 scope
-  *   decision): 38 override_transfer (issuer-only — no vanilla UI path),
-  *   39/40/41 blind trio (needs Pedersen commitments + bulletproof
-  *   range_proofs + blinding-factor ECDH mint: #3 serializes the bytes but
-  *   can not CREATE them, #2 mints them only behind Electron-host IPC —
-  *   vendoring that crypto is its own audited slice, never smuggled in),
-  *   46 execute_bid (VIRTUAL per #4 operations.hpp:102, never signed)
+ * - NOT serialized (WHY comments at the dispatch site, slice-14 scope
+ *   decision): 38 override_transfer (issuer-only — no vanilla UI path),
+ *   39/40/41 blind trio (needs Pedersen commitments + bulletproof
+ *   range_proofs + blinding-factor ECDH mint: #3 serializes the bytes but
+ *   can not CREATE them, #2 mints them only behind Electron-host IPC —
+ *   vendoring that crypto is its own audited slice, never smuggled in),
+ *   46 execute_bid (VIRTUAL per #4 operations.hpp:102, never signed)
+ * - ASSESSED, NOT serialized (verdicts recorded at the dispatch site, this
+ *   task — ground truth #4 headers only, no new BJS fetch needed beyond the
+ *   four ops above): 5 account_create (faucet flow covers registration —
+ *   create-account-ui.js registerViaFaucet; local signing would need an LTM
+ *   registrar + referrer split + full authority/options + premium-fee tiers,
+ *   no UI path needs it), 9 account_transfer (ownership move + whitelist
+ *   clear, owner-auth, rare/dangerous, no UI path builds it), 18
+ *   asset_global_settle (issuer-only: must equal the asset issuer, so
+ *   committee-owned bitassets need committee multisig/proposal; no vanilla
+ *   form — proposal-nesting is the future path, honest deferral until then),
+ *   31 committee_member_update_global_parameters (chain_parameters is dozens
+ *   of nested structs; #3 punts with a JSON blob that is NOT the wire bytes
+ *   — no auditable vanilla source; committee-only + proposal-only, honest
+ *   deferral), 35 custom_operation (generic payer/auths/id/data payload, no
+ *   vanilla UI builds it — stays deferred), 36 assert_operation (predicates
+ *   are NOT the multisig approve path: approvals sign op 23 via
+ *   Proposal.buildApprove — no UI builds predicates, stays deferred)
   * - op dispatch 25-28, 49/50/52
  *                            <- #3 bitshares-api.js:1547-1554, :1595-1604
  *                              (51/53 VIRTUAL — never dispatched, see the
@@ -335,6 +393,24 @@
  * - asset_fund_fee_pool order (fee)(from_account)(asset_id)(amount)(extensions)
  *   <- struct .../protocol/asset_ops.hpp:322-334 + FC :728; amount is a
  *   bare int64 in CORE units (not an asset pair — unlike op 15)
+ * - asset_settle order (fee)(account)(amount)(extensions)
+ *   <- struct .../protocol/asset_ops.hpp:267-288 + FC :719; amount is the
+ *   bitasset to force-settle (MPA only — chain-enforced, not checked here)
+ * - asset_claim_fees order (fee)(issuer)(amount_to_claim)(extensions)
+ *   <- struct .../protocol/asset_ops.hpp:529-553 + FC :619; the extensions
+ *   slot is extension<additional_options_type> (:621) holding ONE optional
+ *   claim_from_asset_id (index 0): empty encodes a single 0x00 (count 0),
+ *   set encodes count 1 + index 0 + asset id (same count+index+value shape
+ *   as op-72 auto_repay above; #3 :3012-3021 agrees)
+ * - asset_claim_pool order (fee)(issuer)(asset_id)(amount_to_claim)
+ *   (extensions) <- struct .../protocol/asset_ops.hpp:601-615 + FC :623;
+ *   amount_to_claim is denominated in CORE (fee.asset_id must differ from
+ *   asset_id — chain-enforced, not checked here)
+ * - asset_update_issuer order (fee)(issuer)(asset_to_update)(new_issuer)
+ *   (extensions) <- struct .../protocol/asset_ops.hpp:565-586 + FC :700-706;
+ *   requires the OWNER authority (get_required_owner_authorities inserts
+ *   issuer, active set is empty — :580-584): sign with the owner WIF, not
+ *   the active one (signing-time concern, never a serializer branch)
  * - asset_publish_feed order (fee)(publisher)(asset_id)(feed)(extensions)
  *   <- struct .../protocol/asset_ops.hpp:462-480
  * - asset_options order (max_supply)(market_fee_percent)(max_market_fee)
@@ -352,8 +428,10 @@
  *   governs the bytes — matches #3's serializer)
  * - price order (base)(quote), asset order (amount)(asset_id)
  *   <- .../protocol/asset.hpp:309-310
- * - ops 10-16, 19 ids <- .../protocol/operations.hpp:66-72 (10-16), :75 (19);
- *   17/18 (settle/global-settle) stay deferred — no serializer here
+ * - ops 10-17, 19 ids <- .../protocol/operations.hpp:66-73 (10-17), :75 (19);
+ *   18 (global-settle) stays deferred — issuer-only, no vanilla form
+ * - ops 43/47/48 ids <- .../protocol/operations.hpp:99 (43), :103 (47),
+ *   :104 (48)
  * - htlc_create order (fee)(from)(to)(amount)(preimage_hash)
  *   (preimage_size)(claim_period_seconds)(extensions)
  *   <- .../protocol/htlc.hpp:226-227
@@ -1050,6 +1128,103 @@ var Tx = (function () {
       serializeObjectId(op.from_account),
       serializeObjectId(op.asset_id),
       writeInt64LE(op.amount),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_settle (op 17) in #4 FC order: fee, account, amount (the bitasset
+   * to force-settle), extensions (empty). Fee payer is the settler. The
+   * amount MUST be a market-issued asset and the account must hold it —
+   * chain-enforced at broadcast (validate() in asset_evaluator), never
+   * checked here: bytes carry no position lookup. */
+  function serializeAssetSettleOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_settle op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.account),
+      serializeAsset(op.amount),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_claim_fees (op 43) in #4 FC order: fee, issuer, amount_to_claim,
+   * extensions=extension<additional_options_type>. The ext packs per ext.hpp:
+   * varint count of SET optionals + (index + value) each — so an unset
+   * claim_from_asset_id is a single 0x00 (the #3 always-empty path when no
+   * object is passed), while a set one encodes 0x01 0x00 <asset id> (index 0
+   * per additional_options_type field order, #4 :535-543; #3 :3012-3021
+   * agrees). Accepts the object form {claim_from_asset_id} and the empty
+   * array [] (builders emit [] when unset); any other non-empty shape throws
+   * loudly instead of producing always-rejected bytes. Fee payer is the
+   * issuer, which must match the claimed asset's issuer. */
+  function serializeAssetClaimFeesOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_claim_fees op must be an object");
+    var claimFrom = null;
+    var ext = op.extensions;
+    if (ext === null || ext === undefined) {
+      claimFrom = null;
+    } else if (Array.isArray(ext)) {
+      if (ext.length === 0) {
+        claimFrom = null;
+      } else if (ext.length === 1 && ext[0] && typeof ext[0] === "object" &&
+          !Array.isArray(ext[0]) && ext[0].claim_from_asset_id !== undefined &&
+          ext[0].claim_from_asset_id !== null) {
+        claimFrom = ext[0].claim_from_asset_id;
+      } else if (ext.length === 2 && ext[0] === 0) {
+        claimFrom = ext[1];
+      } else {
+        throw new Error("asset_claim_fees extensions must be [] or {claim_from_asset_id} " +
+          "(or [0, asset_id]), got: " + JSON.stringify(ext));
+      }
+    } else if (typeof ext === "object") {
+      if (ext.claim_from_asset_id === undefined || ext.claim_from_asset_id === null) {
+        claimFrom = null;
+      } else {
+        claimFrom = ext.claim_from_asset_id;
+      }
+    } else {
+      throw new Error("asset_claim_fees extensions must be [] or {claim_from_asset_id}, got: " +
+        JSON.stringify(ext));
+    }
+    var extBytes = (claimFrom === null || claimFrom === undefined)
+      ? varintUint32(0)
+      : concatBytes([varintUint32(1), varintUint32(0), serializeObjectId(claimFrom)]);
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeAsset(op.amount_to_claim),
+      extBytes
+    ]);
+  }
+
+  /* asset_claim_pool (op 47) in #4 FC order: fee, issuer, asset_id (the
+   * asset whose CORE fee pool is drained), amount_to_claim (CORE asset),
+   * extensions (empty). Fee payer is the issuer; fee.asset_id must differ
+   * from asset_id (chain-enforced, not checked here). */
+  function serializeAssetClaimPoolOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_claim_pool op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeObjectId(op.asset_id),
+      serializeAsset(op.amount_to_claim),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_update_issuer (op 48) in #4 FC order: fee, issuer (current),
+   * asset_to_update, new_issuer, extensions (empty). OWNER authority is
+   * required (get_required_owner_authorities inserts issuer, active set is
+   * empty — #4 :580-584): the caller signs with the owner WIF (see the
+   * Task-2 builder comment); the bytes themselves carry no authority flag,
+   * so this function writes what it is given. */
+  function serializeAssetUpdateIssuerOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_update_issuer op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.issuer),
+      serializeObjectId(op.asset_to_update),
+      serializeObjectId(op.new_issuer),
       varintUint32(0)
     ]);
   }
@@ -2446,6 +2621,7 @@ var Tx = (function () {
     if (opType === 14) return serializeAssetIssueOp(opData);
     if (opType === 15) return serializeAssetReserveOp(opData);
     if (opType === 16) return serializeAssetFundFeePoolOp(opData);
+    if (opType === 17) return serializeAssetSettleOp(opData);
     if (opType === 19) return serializeAssetPublishFeedOp(opData);
     if (opType === 20) return serializeWitnessCreateOp(opData);
     if (opType === 21) return serializeWitnessUpdateOp(opData);
@@ -2462,7 +2638,10 @@ var Tx = (function () {
     if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
     if (opType === 34) return serializeWorkerCreateOp(opData);
     if (opType === 37) return serializeBalanceClaimOp(opData);
+    if (opType === 43) return serializeAssetClaimFeesOp(opData);
     if (opType === 45) return serializeBidCollateralOp(opData);
+    if (opType === 47) return serializeAssetClaimPoolOp(opData);
+    if (opType === 48) return serializeAssetUpdateIssuerOp(opData);
     if (opType === 49) return serializeHtlcCreateOp(opData);
     if (opType === 50) return serializeHtlcRedeemOp(opData);
     if (opType === 52) return serializeHtlcExtendOp(opData);
@@ -2488,8 +2667,8 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-16, 19-24, 25-28, 29, 30, 32-34, 37, " +
-      "45, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
+    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-34, 37, " +
+      "43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
@@ -2521,6 +2700,7 @@ var Tx = (function () {
       else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
       else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
       else if (opType === 16) parts.push(serializeAssetFundFeePoolOp(opData));
+      else if (opType === 17) parts.push(serializeAssetSettleOp(opData));
       else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
       else if (opType === 20) parts.push(serializeWitnessCreateOp(opData));
       else if (opType === 21) parts.push(serializeWitnessUpdateOp(opData));
@@ -2537,7 +2717,10 @@ var Tx = (function () {
       else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
       else if (opType === 34) parts.push(serializeWorkerCreateOp(opData));
       else if (opType === 37) parts.push(serializeBalanceClaimOp(opData));
+      else if (opType === 43) parts.push(serializeAssetClaimFeesOp(opData));
       else if (opType === 45) parts.push(serializeBidCollateralOp(opData));
+      else if (opType === 47) parts.push(serializeAssetClaimPoolOp(opData));
+      else if (opType === 48) parts.push(serializeAssetUpdateIssuerOp(opData));
       // Op 38 (override_transfer) is ISSUER-ONLY (#4 balance/asset issuer
       // path; no vanilla wallet UI signs it) — deliberately NOT serialized.
       // Do not "complete" this list with it.
@@ -2550,6 +2733,18 @@ var Tx = (function () {
       // its own audited slice. Do not "complete" this list with them.
       // Op 46 (execute_bid) is VIRTUAL (#4 operations.hpp:102, same rule as
       // ops 51/53/74) — never signed, never dispatched.
+      // ASSESSED, NOT dispatched (verdicts this task — see the header block):
+      // 5 account_create (faucet covers registration; local signing needs an
+      // LTM registrar + tiers no UI path needs), 9 account_transfer (rare /
+      // dangerous ownership move, no UI path builds it), 18
+      // asset_global_settle (issuer-only — committee multisig/proposal for
+      // committee bitassets; no vanilla form, proposal-nesting is the future
+      // path), 31 committee_member_update_global_parameters (chain_parameters
+      // needs its own audited slice; #3's JSON blob is not the wire bytes),
+      // 35 custom_operation (generic payload no UI builds — stays deferred),
+      // 36 assert_operation (predicates are not approvals — multisig approve
+      // flows sign op 23 via Proposal.buildApprove; no UI builds predicates).
+      // Do not "complete" this list with them.
       else if (opType === 49) parts.push(serializeHtlcCreateOp(opData));
       else if (opType === 50) parts.push(serializeHtlcRedeemOp(opData));
       else if (opType === 52) parts.push(serializeHtlcExtendOp(opData));
@@ -2581,7 +2776,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-16, 19-24, 25-28, 29, 30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-34, 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 42/44/46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2598,7 +2793,7 @@ var Tx = (function () {
       account_upgrade: 8,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
-      asset_fund_fee_pool: 16,
+      asset_fund_fee_pool: 16, asset_settle: 17,
       asset_publish_feed: 19,
       witness_create: 20, witness_update: 21,
       proposal_create: 22, proposal_update: 23, proposal_delete: 24,
@@ -2608,7 +2803,9 @@ var Tx = (function () {
       vesting_balance_create: 32, vesting_balance_withdraw: 33,
       worker_create: 34,
       balance_claim: 37,
+      asset_claim_fees: 43,
       bid_collateral: 45,
+      asset_claim_pool: 47, asset_update_issuer: 48,
       htlc_create: 49, htlc_redeem: 50, htlc_extend: 52,
       custom_authority_create: 54, custom_authority_update: 55,
       custom_authority_delete: 56, ticket_create: 57, ticket_update: 58,
@@ -2658,6 +2855,10 @@ var Tx = (function () {
       serializeAssetIssueOp: serializeAssetIssueOp,
       serializeAssetReserveOp: serializeAssetReserveOp,
       serializeAssetFundFeePoolOp: serializeAssetFundFeePoolOp,
+      serializeAssetSettleOp: serializeAssetSettleOp,
+      serializeAssetClaimFeesOp: serializeAssetClaimFeesOp,
+      serializeAssetClaimPoolOp: serializeAssetClaimPoolOp,
+      serializeAssetUpdateIssuerOp: serializeAssetUpdateIssuerOp,
       serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
       assertGovUrl: assertGovUrl,
       serializeWitnessCreateOp: serializeWitnessCreateOp,
