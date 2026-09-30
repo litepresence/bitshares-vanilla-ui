@@ -349,22 +349,24 @@
       "verified": "headless"
     },
     {
-     "element": "QuickTrade dual SELL/RECEIVE flow: receive-side amount/quote, swap-direction button, per-side asset pickers with balances",
+      "element": "QuickTrade dual SELL/RECEIVE flow: receive-side amount/quote, swap-direction button, per-side asset pickers with balances",
       "ref": "reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:37-83 + SellReceive.jsx",
       "severity": "high",
       "status": "fixed",
       "fixed_in": "5ed6499",
       "verified": "headless",
-      "needs_human": true
+      "needs_human": true,
+      "reason": "Follow-ups: 962fed6 bare-glyph swap (transparent accent arrow, 44px target + aria-label kept, same id/handler) closing retro R5-D1, plus Last-price + Order-book liquidity rows; 2edd6e0 PRICE_PLACES 8->6 to match the desk strip trim6."
     },
     {
-     "element": "Order-walkthrough table (effective price, price/fee/orders columns) and fee display before sell",
+      "element": "Order-walkthrough table (effective price, price/fee/orders columns) and fee display before sell",
       "ref": "reference/bitshares-ui/app/components/QuickTrade/QuickTrade.jsx:837-944,1102-1137",
       "severity": "med",
       "status": "fixed",
       "fixed_in": "5ed6499",
       "verified": "headless",
-      "needs_human": true
+      "needs_human": true,
+      "reason": "962fed6 added a Last-price row (ticker latest, receive-per-sell) + liquidity note (depth levels + best bid via the same humanPrice path); feed-price row honestly omitted (bitasset-only, no clean feed read in-file)."
     },
     {
      "element": "Stale Loading market status line persists above the loaded quote section",
@@ -422,10 +424,11 @@
       "severity": "high",
       "status": "fixed",
       "fixed_in": "53eea4b",
-      "verified": "headless"
-    },
-    {
-     "element": "Per-asset action columns SEND / DEPOSIT / TRADE / BORROW / SETTLE",
+      "verified": "headless",
+      "reason": "Round-4 follow-up f1a370d: PRICE(BTS) trim6 at render (16-decimal ticker strings e.g. SILVER 1547.9876...->1547.987616, full string kept on title; VALUE math untouched), matching original account.png density."
+     },
+     {
+      "element": "Per-asset action columns SEND / DEPOSIT / TRADE / BORROW / SETTLE",
       "ref": "reference/bitshares-ui/app/components/Account/AccountPortfolioList.jsx:431-1343",
       "severity": "high",
       "status": "fixed",
@@ -519,13 +522,14 @@
       "needs_human": true
     },
     {
-     "element": "Send/Propose toggle (propose-as-another-account flow)",
+      "element": "Send/Propose toggle (propose-as-another-account flow)",
       "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx:551-564",
       "severity": "med",
       "status": "fixed",
       "fixed_in": "8432b52",
-      "verified": "headless",
-      "needs_human": true
+      "verified": "testnet",
+      "needs_human": true,
+      "reason": "Wire path proved on testnet (5320596 + matrix f7e5536): op-22 wrapper built/fee-filled/signed/broadcast via the unmodified vanilla path, inclusion 1.10.1493 at head #100989922 (inner op-0 lite-test-1 1.2.26833->committee-account 1.2.0 amount 1, wrapper fee 4787 raw TEST, get_objects re-read; artifacts tooling/prove_transfer_propose_f2.cjs + propose-proof-2026-09-29.md F2). Prior 1.10.1492 unverified/uncounted. Round-5 CSS (2edd6e0) renders the toggle primary/ghost per the SendModal EqualWidthContainer."
     },
     {
      "element": "Fee-asset selector; vanilla fee fixed in transfer asset",
@@ -567,12 +571,13 @@
   {
    "missing": [
     {
-     "element": "Same SendModal gaps as #/transfer",
+      "element": "Same SendModal gaps as #/transfer",
       "ref": "reference/bitshares-ui/app/components/Modal/SendModal.jsx",
       "severity": "med",
       "status": "fixed",
       "fixed_in": "8432b52",
-      "verified": "headless"
+      "verified": "testnet",
+      "reason": "Propose path re-proved with this account as proposer: inner op-0 lite-test-1 (1.2.26833)->committee-account, inclusion 1.10.1493 (propose-proof-2026-09-29.md F2, matrix f7e5536)."
     }
    ],
    "notes": ":to prefill verified working.",
@@ -732,11 +737,13 @@
       "verified": "headless"
     },
     {
-     "element": "No FEE POOL panel (core exchange rate, pool balance, unclaimed issuer income)",
+      "element": "No FEE POOL panel (core exchange rate, pool balance, unclaimed issuer income)",
       "ref": "reference/bitshares-ui/app/components/Blockchain/Asset.jsx:1210-1306",
       "severity": "med",
-      "status": "deferred",
-      "reason": "Funding/claim needs signing; read-only shows fee-pool balance only (explorer-assets.js header)."
+      "status": "fixed",
+      "fixed_in": "444eb18",
+      "verified": "testnet",
+      "reason": "Funding form landed in 444eb18 (ACTIONS tab: amount + from-account + Review, named-row confirm, unlock-at-sign, pool-delta re-read proof) and proved on testnet: AFKTEST10 1.3.1849 dust 0.1 TEST = 10000 raw, pool 10004248->10014248 exact, fee 100 raw, head #100989922 (tooling/prove-feepool-fund-16.cjs, unit vectors 20/20, matrix nightly-delta-2 90102f4). Also fixed a 10x display bug (pool now core p5, was asset precision). Claiming (ops 43/47) stays deferred."
     },
     {
      "element": "No description/about box; amounts ungrouped without asset suffix",
