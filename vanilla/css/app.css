@@ -621,6 +621,38 @@ img, canvas, pre { max-width: 100%; }
   .prediction-scroll table.node-table { display: table; }
 }
 
+/* Vision sweep 2026-09-30 (rarely-shot pages): three cheap-exact deltas.
+ * (1) Ops table on phones: renderTable builds .node-table in a scroller,
+ *   but the shared contract above hides .node-table <560px — the table
+ *   vanished at 390px. Opt back into a scroll region like pools
+ *   (.pools-scroll) and prediction (.prediction-scroll): same contract,
+ *   nowrap cells, sticky first column stays global.
+ * (2) Existing-account import rows: renderImport appends a bare textarea +
+ *   a bare label (wallet-ui.js labeledRow), so brainkey / password / button
+ *   shared one inline line at 1440px. Grid the rows like .xfer-field
+ *   section (a) above — the stylesheet owns the layout, no wallet JS
+ *   touched. The adjacent-sibling selector holds because the password
+ *   label is appended immediately after #import-brainkey.
+ * (3) Create-account buttons: regen + register are adjacent bare buttons
+ *   with no gap. One margin separates them at every width (and when they
+ *   wrap on phones). */
+.ops-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ops-scroll table.node-table th, .ops-scroll table.node-table td { white-space: nowrap; }
+#import-brainkey { display: block; width: 100%; min-width: 0; max-width: 100%;
+  box-sizing: border-box; margin: 8px 0; }
+#import-brainkey + label { display: grid; gap: 4px 12px;
+  grid-template-columns: minmax(0, 1fr); align-items: center; min-width: 0;
+  margin: 8px 0; }
+#import-brainkey + label #import-password { width: 100%; min-width: 0;
+  max-width: 100%; box-sizing: border-box; }
+#ca-regen { margin: 0 8px 8px 0; }
+@media (min-width: 720px) {
+  #import-brainkey + label { grid-template-columns: minmax(140px, 220px) minmax(0, 1fr); }
+}
+@media (max-width: 559px) {
+  .ops-scroll table.node-table { display: table; }
+}
+
 /* (f) Voting rows ≥720px: rows are wrapping flex cards with inline styles
  * (vote-slate.js rowCard — display:flex, wrap, gap; main flex 1 1 200px).
  * Keep the wrap (worker sub-rows need their own line) but stop the weight

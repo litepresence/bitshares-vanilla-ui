@@ -198,7 +198,7 @@ var OpsUI = (function () {
       wrap.appendChild(el(doc, "p", "No operations in the sampled blocks.", "muted"));
       return;
     }
-    var scroller = el(doc, "div", null, null);
+    var scroller = el(doc, "div", null, "ops-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
