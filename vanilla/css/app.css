@@ -1043,3 +1043,89 @@ tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }
   .help-index { column-count: 2; column-gap: 48px; }
   .help-index li { break-inside: avoid; }
 }
+
+/* Candy 2: busy-box shimmer, glow, physics, watermarks (2026-09-30).
+ * Extends the "Hover candy" block above under the same contract: transform /
+ * shadow / color / background / opacity only — no padding, margin, width,
+ * height, font, or touch-target changes, no new palette (tokens only).
+ * Ambient motion (shimmer, glow, tick, view fade) lives outside the hover
+ * guard so touch users see live states too; press physics stays inside
+ * @media (hover:hover) like the existing block. Reduced-motion override
+ * closes this block. Single revertible block — delete from here to EOF. */
+
+/* 1. Skeleton shimmer on loading lines (zero JS): every view's showStatus
+ * helper paints p.muted[aria-live="polite"] (barter/asset/pool/explorer/
+ * vote…), so that selector IS the loading convention — empty states never
+ * carry aria-live. The statstrip loading span has no aria-live, but it is
+ * the strip's :only-child while loading, so it is covered explicitly.
+ * Sweep rests as a static pill when motion is off. */
+p.muted[aria-live="polite"],
+.mkt-statstrip > span.muted:only-child {
+  border-radius: 4px;
+  background-image: linear-gradient(100deg, var(--panel) 30%, var(--panel-deep) 50%, var(--panel) 70%);
+  background-size: 200% 100%;
+  animation: candy-shimmer 1.4s linear infinite;
+}
+@keyframes candy-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* 2. Live-dot glow + footer block-advance pulse. The explorer dot keeps its
+ * existing xplore-pulse (opacity) and gains a static --live halo; the footer
+ * host gets the same halo plus candy-glow — a softer sibling of xplore-pulse
+ * (floor 0.72, not 0.35: footer text must stay legible; xplore-pulse verbatim
+ * would flicker body copy). paintFooter rebuilds these spans per head block,
+ * so the glow visibly advances with the chain. No new keyframes duplicated —
+ * candy-glow differs in range; xplore-pulse is untouched. */
+.xplore-live[data-state="live"] .xplore-live-dot { text-shadow: 0 0 8px var(--live); }
+.appfoot-host[data-state="open"] {
+  text-shadow: 0 0 8px var(--live);
+  animation: candy-glow 2.4s ease-in-out infinite;
+}
+@keyframes candy-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
+
+/* 3. Number-tick flourish (zero JS): market-ind renderStrip rebuilds every
+ * .mkt-stat chip per ticker (removeChild/appendChild), so a run-once
+ * background flash replays exactly when values update — no hook needed.
+ * In-place textContent updates elsewhere don't replay it (out of scope). */
+.mkt-stat { animation: candy-tick 0.6s ease-out 1; }
+@keyframes candy-tick { from { background-color: var(--panel-deep); } to { background-color: transparent; } }
+
+/* 4. Button press physics (same guard as the existing block): springy
+ * cubic-bezier press-in, transform-only — 44px targets untouched. */
+@media (hover:hover) {
+  button:active, a.btn:active, .appfoot-actions a:active {
+    transition: transform 90ms cubic-bezier(0.2, 1.4, 0.4, 1);
+    transform: translateY(1px) scale(0.99);
+    box-shadow: none;
+  }
+}
+
+/* 5. Empty-state watermark (CSS only): the chart empty pane
+ * (.mkt-chart-empty, charts-lwc emptyPane) carries an oversized translucent
+ * ⇄ behind its "No data" line — token muted at low opacity, pointer-events
+ * off, absolutely positioned so layout never shifts. Generic p.muted empties
+ * stay untouched: without a JS hook they are indistinguishable from legacy
+ * loading lines that lack aria-live. */
+.mkt-chart-empty { position: relative; overflow: hidden; }
+.mkt-chart-empty::before {
+  content: "⇄";
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 4rem; line-height: 1;
+  color: var(--muted); opacity: 0.18;
+  pointer-events: none;
+}
+
+/* 6. Tab-switch micro-fade: router.js render() restarts .view-enter on #view
+ * per route (≤10-line hook); opacity-only, 160ms, never shifts layout. */
+#view.view-enter { animation: candy-view 160ms ease-out 1; }
+@keyframes candy-view { from { opacity: 0; } to { opacity: 1; } }
+
+/* Candy 2 reduced motion: all new motion off (shimmer rests as a static
+ * pill, glows stay as static halos, ticks/views paint instantly). */
+@media (prefers-reduced-motion: reduce) {
+  p.muted[aria-live="polite"], .mkt-statstrip > span.muted:only-child,
+  .appfoot-host[data-state="open"], .mkt-stat, #view.view-enter {
+    animation: none;
+  }
+  button:active, a.btn:active, .appfoot-actions a:active { transform: none; }
+}

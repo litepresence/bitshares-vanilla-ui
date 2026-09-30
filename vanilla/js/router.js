@@ -324,6 +324,14 @@ var Router = (function () {
     }
     if (typeof document !== "undefined") document.title = title;
     fn(view, params);
+    /* Candy-2 view-enter restart (tab-switch micro-fade; CSS owns motion). */
+    try {
+      if (view && view.classList) {
+        view.classList.remove("view-enter");
+        void view.offsetWidth;
+        view.classList.add("view-enter");
+      }
+    } catch (e) { /* paint stands */ }
   }
 
   /* start: binds hashchange and renders once. Params: viewEl (element).
