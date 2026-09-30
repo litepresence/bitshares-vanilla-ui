@@ -197,6 +197,184 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return { ops: list(), signatures: _signatures.slice(), requiredAuths: _requiredAuths };
   }
 
+  /* Per-op required-level table (spec section 5.2, initial coverage = serialized ops).
+   * Each entry: function reading the payer/account field(s) from opData plus the
+   * level ("active" default, "owner" for op-48 and op-24-with-owner-flag). */
+  var AUTH_LEVELS = {
+    0: { fields: ["from"], level: "active" },
+    1: { fields: ["seller"], level: "active" },
+    2: { fields: ["fee_paying_account"], level: "active" },
+    3: { fields: ["funding_account"], level: "active" },
+    6: { fields: ["account"], level: "active" },
+    7: { fields: ["authorizing_account"], level: "active" },
+    8: { fields: ["account_to_upgrade"], level: "active" },
+    22: { fields: ["fee_paying_account"], level: "active" },
+    23: { fields: ["fee_paying_account"], level: "active" },
+    24: { fields: ["fee_paying_account"], level: "active" },
+    48: { fields: ["issuer"], level: "owner" }
+  };
+
+  /* Collect involved 1.2.N ids: per-op table fields + fallback scan of all
+   * string values + recursion into op-22 proposed_ops (both shapes). */
+  function _collectAccountIds() {
+    var out = [];
+    function push(id) { if (typeof id === "string" && /^1\.2\.\d+$/.test(id) && out.indexOf(id) < 0) out.push(id); }
+    function scanObj(o) {
+      if (!o || typeof o !== "object") return;
+      Object.keys(o).forEach(function (k) {
+        var v = o[k];
+        if (typeof v === "string") push(v);
+        else if (v && typeof v === "object") scanObj(v);
+      });
+    }
+    function scanOp(opId, opData) {
+      var spec = AUTH_LEVELS[opId];
+      (spec ? spec.fields : []).forEach(function (f) { push(opData[f]); });
+      if (opId === 22 && Array.isArray(opData.proposed_ops)) {
+        opData.proposed_ops.forEach(function (w) {
+          var inner = (w && w.op) ? w.op : w;
+          if (Array.isArray(inner) && Number.isInteger(inner[0]) && inner[1]) scanOp(inner[0], inner[1]);
+        });
+      }
+      scanObj(opData);
+    }
+    _ops.forEach(function (e) { scanOp(e.opId, e.opData); });
+    return out;
+  }
+
+  /* Threshold math for one authority level against available pubs (one level
+   * of account_auths recursion; deeper nesting reports honestly via note). */
+  function _levelMet(auth, avail) {
+    var sum = 0;
+    var nested = [];
+    (auth.key_auths || []).forEach(function (ka) { if (avail.indexOf(ka[0]) >= 0) sum += ka[1]; });
+    (auth.account_auths || []).forEach(function (aa) {
+      if (avail.indexOf("ACCOUNT:" + aa[0]) >= 0) sum += aa[1];
+      else nested.push(aa[0]);
+    });
+    return { met: sum >= (auth.weight_threshold || 1), weight: sum, threshold: (auth.weight_threshold || 1), nested: nested };
+  }
+
+  /* Resolve required authorities client-side via one batched get_objects read.
+   * Returns rows; empty wallet yields all-missing rows (honest, never throws). */
+  async function resolveAuths() {
+    if (!_ops.length) throw new Error("tb-empty: nothing queued");
+    var C = globalThis.Chain;
+    if (!C || typeof C.db !== "function") throw new Error("tb-not-connected: Chain is not loaded");
+    var ids = _collectAccountIds();
+    var rows = [];
+    var byId = {};
+    if (ids.length) {
+      var dbId = await C.db();
+      var objs = await C.call(dbId, "get_objects", [ids]);
+      ids.forEach(function (id, i) { byId[id] = (objs && objs[i]) || null; });
+    }
+    var W = globalThis.Wallet || {};
+    var avail = [];
+    if (W.keys && W.keys.owner && W.keys.owner.pub) avail.push(W.keys.owner.pub);
+    if (W.keys && W.keys.active && W.keys.active.pub) avail.push(W.keys.active.pub);
+    _signatures.forEach(function (s) { if (avail.indexOf(s.pub) < 0) avail.push(s.pub); });
+    _availablePubs = avail.slice();
+    // Mark accounts satisfied by an already-imported signature so nested math sees them.
+    Object.keys(byId).forEach(function (id) {
+      var o = byId[id];
+      if (!o) return;
+      ["owner", "active"].forEach(function (lvl) {
+        var a = o[lvl];
+        if (!a) return;
+        var r = _levelMet(a, avail);
+        if (r.met && avail.indexOf("ACCOUNT:" + id) < 0) avail.push("ACCOUNT:" + id);
+      });
+    });
+    var seen = {};
+    _ops.forEach(function (e) {
+      var spec = AUTH_LEVELS[e.opId] || { fields: [], level: "active" };
+      var level = spec.level;
+      if (e.opId === 6 && e.opData.owner) level = "owner";
+      if (e.opId === 24 && e.opData.using_owner_authority) level = "owner";
+      var candIds = [];
+      spec.fields.forEach(function (f) { if (/^1\.2\.\d+$/.test(e.opData[f] || "")) candIds.push(e.opData[f]); });
+      if (!candIds.length) candIds = ids.slice();
+      candIds.forEach(function (id) {
+        if (seen[id + ":" + level]) return;
+        seen[id + ":" + level] = true;
+        var o = byId[id];
+        if (!o) { rows.push({ accountId: id, accountName: "unknown-account(" + id + ")", level: level, threshold: 1, availablePubs: [], missing: true, note: "account object not found" }); return; }
+        var auth = o[level] || o.active;
+        var r = _levelMet(auth, avail);
+        var pubs = (auth.key_auths || []).map(function (ka) { return ka[0]; });
+        rows.push({ accountId: id, accountName: o.name || id, level: level, threshold: r.threshold,
+          availablePubs: avail.filter(function (p) { return pubs.indexOf(p) >= 0; }),
+          missing: !r.met,
+          note: (!r.met && r.nested.length ? "nested-auth (needs " + r.nested.join(", ") + ")" : "") +
+            ((auth.address_auths && auth.address_auths.length) ? " address_auths: ignored (legacy)" : "") });
+      });
+    });
+    // Best-effort node cross-check (never required, never blocking).
+    try {
+      if (_built && C && typeof C.call === "function") {
+        var dbId2 = await C.db();
+        await C.call(dbId2, "get_potential_signatures", [_built]).catch(function () { return null; });
+      }
+    } catch (e) { /* cross-check failure degrades silently to the client answer */ }
+    _requiredAuths = rows;
+    notify();
+    return rows.map(function (r) { return Object.assign({}, r); });
+  }
+
+  /* Sign with every distinct matching local WIF (append-only; same-pub re-sign
+   * replaces its entry). Locked wallet throws tb-wallet-locked. */
+  async function signLocal() {
+    if (!_ops.length) throw new Error("tb-empty: nothing queued");
+    var W = globalThis.Wallet || {};
+    if (!W.keys || !W.keys.active) throw new Error("tb-wallet-locked: unlock the wallet before signing");
+    if (!_built) await buildUnsigned();
+    if (!_requiredAuths) await resolveAuths();
+    var T = globalThis.Tx;
+    var C = globalThis.Chain;
+    var st = C.status();
+    var packed = T._ser.serializeTransaction(_built);
+    var chainBytes = T._ser.hexToBytes(st.chainId);
+    var msg = new Uint8Array(chainBytes.length + packed.length);
+    msg.set(chainBytes); msg.set(packed, chainBytes.length);
+    var digest = new Uint8Array(await crypto.subtle.digest("SHA-256", msg));
+    var wifs = [];
+    function consider(pub, wif) {
+      if (!pub || !wif) return;
+      if (_signatures.some(function (s) { return s.pub === pub; })) return;
+      if (wifs.some(function (w) { return w.pub === pub; })) return;
+      wifs.push({ pub: pub, wif: wif });
+    }
+    var needOwner = _requiredAuths.some(function (r) { return r.level === "owner"; });
+    var activeSatisfied = _requiredAuths.some(function (r) { return r.level === "active" && !r.missing; });
+    if (needOwner && W.keys.owner) consider(W.keys.owner.pub, W.keys.owner.wif);
+    if (!needOwner || !activeSatisfied) consider(W.keys.active.pub, W.keys.active.wif);
+    if (needOwner && W.keys.owner) consider(W.keys.owner.pub, W.keys.owner.wif);
+    var signed = [];
+    for (var i = 0; i < wifs.length; i++) {
+      var sig = await globalThis.Crypto.signHash(digest, wifs[i].wif);
+      if (!(sig instanceof Uint8Array) || sig.length !== 65) throw new Error("tb-bad-envelope: Crypto.signHash must return 65 bytes");
+      var hex = T._ser.bytesToHex ? T._ser.bytesToHex(sig) : Array.prototype.map.call(sig, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+      var at = -1;
+      for (var j = 0; j < _signatures.length; j++) if (_signatures[j].pub === wifs[i].pub) at = j;
+      var entry = { pub: wifs[i].pub, hex: hex };
+      if (at >= 0) _signatures[at] = entry; else _signatures.push(entry);
+      signed.push(wifs[i].pub);
+    }
+    var stillMissing = _requiredAuths.filter(function (r) {
+      return r.missing && signed.indexOf(r.availablePubs[0]) < 0 &&
+        !_signatures.some(function (s) { return r.availablePubs.indexOf(s.pub) >= 0; });
+    }).map(function (r) { return r.accountId; });
+    // Recompute missing honestly: rows whose threshold still unmet after new sigs.
+    stillMissing = _requiredAuths.filter(function (r) { return r.missing; }).map(function (r) { return r.accountId; });
+    var availNow = _availablePubs.concat(signed);
+    stillMissing = _requiredAuths.filter(function (r) {
+      return r.availablePubs.every(function (p) { return availNow.indexOf(p) < 0; }) && r.missing;
+    }).map(function (r) { return r.accountId; });
+    notify();
+    return { signed: signed, stillMissing: stillMissing };
+  }
+
   TxBuilder.addOp = addOp;
   TxBuilder.removeOp = removeOp;
   TxBuilder.clear = clear;
@@ -209,6 +387,8 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
   TxBuilder.buildUnsigned = buildUnsigned;
   TxBuilder.exportJSON = exportJSON;
   TxBuilder.importJSON = importJSON;
+  TxBuilder.resolveAuths = resolveAuths;
+  TxBuilder.signLocal = signLocal;
   // feeAll / resolveAuths / buildUnsigned / signLocal / describe / wrapProposal /
   // exportJSON / importJSON / broadcastSigned land in Tasks 2-4+6 on this same global.
   if (typeof globalThis !== "undefined") { globalThis.TxBuilder = TxBuilder; }
