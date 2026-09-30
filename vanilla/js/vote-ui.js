@@ -680,6 +680,29 @@ var VoteUI = (function () {
     wrap.appendChild(sendBtn);
 
     backBtn.addEventListener("click", function () { renderVoting(root); });
+    /* TxBuilder outlet (additive): queue the [6, opData] without
+     * broadcasting. One-shot Sign & Publish above is untouched — the opData
+     * shape mirrors buildSigned (raw fee string, CORE_ASSET, new_options)
+     * and passes as JS values only. Plain literal label (no new i18n key —
+     * recorded for the next i18n batch). */
+    try {
+      if (typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function") {
+        var tbVote = touchable(el(doc, "button", "Add vote to TxBuilder"));
+        tbVote.type = "button";
+        tbVote.addEventListener("click", function () {
+          var tbWho = ((st && st.me && (st.me.name || st.me.id)) || "?");
+          var tbSrc = "vote:" + tbWho + " slate";
+          TxBuilder.addOp(6, { fee: { amount: feeRaw, asset_id: CORE_ASSET }, account: st.me.id, new_options: newOptions }, tbSrc);
+          try {
+            if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
+              Notify.push("info", "Added to TxBuilder", tbSrc + " (op 6) — " + TxBuilder.count() + " in queue", {});
+            }
+          } catch (e2) { /* toast optional; the desk badge is the record */ }
+          location.hash = "#/txbuilder";
+        });
+        wrap.appendChild(tbVote);
+      }
+    } catch (e) { /* outlet never breaks the one-shot path */ }
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;

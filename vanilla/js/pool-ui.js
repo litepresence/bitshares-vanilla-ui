@@ -174,6 +174,29 @@ var PoolUI = (function () {
     var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button";
     var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
+    /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
+     * deposit without broadcasting. Create/unstake/swap confirms render no
+     * outlet. The pair passes as JS values only (never into the DOM); the
+     * one-shot Sign & Send below is untouched. Plain literal label, no new
+     * i18n key (recorded for the next i18n batch). */
+    try {
+      if (cfg && cfg.pair && cfg.pair[0] === 61 && cfg.pair[1] &&
+          typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function") {
+        var tbDep = touchable(el(doc, "button", "Add deposit to TxBuilder"));
+        tbDep.type = "button";
+        tbDep.addEventListener("click", function () {
+          var tbSrc = "pool:deposit " + String(cfg.pair[1].pool || "");
+          TxBuilder.addOp(cfg.pair[0], cfg.pair[1], tbSrc);
+          try {
+            if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
+              Notify.push("info", "Added to TxBuilder", tbSrc + " (op 61) — " + TxBuilder.count() + " in queue", {});
+            }
+          } catch (e2) { /* toast optional; the desk badge is the record */ }
+          location.hash = "#/txbuilder";
+        });
+        out.appendChild(tbDep);
+      }
+    } catch (e) { /* outlet never breaks the one-shot path */ }
     back.addEventListener("click", function () { clearBox(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
@@ -202,7 +225,7 @@ var PoolUI = (function () {
       if (myGen !== gen) return done();
       feeText(built.fee).then(function (f) {
         if (myGen !== gen) return done();
-        sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f),
+        sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f), pair: built.pair,
           makeUnsigned: function () { return Tx.buildTx([built.pair]); },
           prove: built.prove, okText: cfg.ok(built) }, myGen);
         done();
