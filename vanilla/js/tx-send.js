@@ -37,6 +37,67 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     }
   }
 
+  /* H4: head-block validation — a malformed or hostile node reply must fail
+   * loudly (bad-head-block) instead of building a tx on garbage refs. */
+  function assertHeadProps(props) {
+    if (!props || typeof props !== "object") throw new Error("bad-head-block: dynamic props missing");
+    if (!Number.isSafeInteger(props.head_block_number) || props.head_block_number <= 0) {
+      throw new Error("bad-head-block: head_block_number must be a positive safe integer");
+    }
+    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{64}$/.test(props.head_block_id)) {
+      throw new Error("bad-head-block: head_block_id must be 64 hex chars");
+    }
+    if (typeof props.time !== "string" || !Number.isFinite(Date.parse(props.time + "Z"))) {
+      throw new Error("bad-head-block: props.time does not parse");
+    }
+  }
+
+  /* Exact 10^n as BigInt (fee math never touches float). */
+  function pow10(n) {
+    var s = "1";
+    for (var i = 0; i < n; i++) s += "0";
+    return BigInt(s);
+  }
+
+  /* Fee-asset precision via one get_assets read. Throws bad-asset-shape. */
+  async function feeAssetPrecision(dbId, assetId) {
+    var rows = await Chain.call(dbId, "get_assets", [[assetId]]);
+    if (!rows || !rows[0] || typeof rows[0].precision !== "number") {
+      throw new Error("bad-asset-shape for fee asset " + assetId);
+    }
+    return rows[0].precision;
+  }
+
+  /* H3 fee rail: refuse to auto-proceed on a suspicious fee. Throws an
+   * Error starting "fee-suspicious" (with the answered fee on .detail so
+   * the transfer confirm screen can show it behind an explicit ack gate).
+   * Rules: fee above 5 units of the fee asset (the sketch's 5-BTS-equiv
+   * proxy — exact for BTS-quoted fees, conservative otherwise), or an op-0
+   * fee above 50% of the transferred amount in the same asset. */
+  async function assertFeeSane(opId, opData, fee, dbId) {
+    var raw = String(fee.amount);
+    if (!/^\d+$/.test(raw)) throw new Error("get_required_fees fee is not a digit string: " + raw);
+    var feeAsset = fee.asset_id;
+    var prec = await feeAssetPrecision(dbId, feeAsset);
+    var ceiling = BigInt(5) * pow10(prec);
+    if (BigInt(raw) > ceiling) {
+      var err = new Error("fee-suspicious: fee " + raw + " " + feeAsset +
+        " exceeds the 5-unit ceiling (" + ceiling.toString() + " raw). Refusing to auto-proceed — verify the fee asset and amount.");
+      err.detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, ceilingRaw: ceiling.toString() };
+      throw err;
+    }
+    if (opId === 0 && opData && opData.amount && typeof opData.amount === "object") {
+      var amtRaw = String(opData.amount.amount);
+      var amtAsset = opData.amount.asset_id;
+      if (/^\d+$/.test(amtRaw) && amtAsset === feeAsset && BigInt(raw) * 2n > BigInt(amtRaw)) {
+        var err2 = new Error("fee-suspicious: fee " + raw + " exceeds 50% of the transfer amount " +
+          amtRaw + " (" + feeAsset + "). Refusing to auto-proceed — lower the fee asset cost or the amount.");
+        err2.detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, amountRaw: amtRaw };
+        throw err2;
+      }
+    }
+  }
+
   /* Fee lookup: pre-fills opData.fee with a zero placeholder (the node
    * requires the fee field present), then returns the chain's answered
    * {amount, asset_id}. Amount stays raw (caller formats via Format).
@@ -55,7 +116,9 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (!fees || !fees[0]) throw new Error("get_required_fees returned no fee");
     var flat = Array.isArray(fees[0]) ? fees[0][0] : fees[0];
     if (!flat || typeof flat !== "object") throw new Error("get_required_fees returned no fee");
-    return { amount: flat.amount, asset_id: flat.asset_id };
+    var answered = { amount: flat.amount, asset_id: flat.asset_id };
+    await assertFeeSane(opId, opData, answered, dbId);
+    return answered;
   }
 
   /* Multi-op fee lookup: ONE get_required_fees call with the FULL op list
@@ -104,6 +167,26 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (!rows || !rows[0] || typeof rows[0].precision !== "number") {
       throw new Error("bad-asset-shape for fee asset " + displayFeeId);
     }
+    /* H3 fee rail on the multi-op total (same 5-unit rule as fee(); the
+     * single-op-0 50% rule applies when the batch is one transfer). */
+    var railPrec = rows[0].precision;
+    var railCeiling = BigInt(5) * pow10(railPrec);
+    if (total > railCeiling) {
+      var rerr = new Error("fee-suspicious: total fee " + total.toString() + " " + displayFeeId +
+        " exceeds the 5-unit ceiling (" + railCeiling.toString() + " raw). Refusing to auto-proceed.");
+      rerr.detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId };
+      throw rerr;
+    }
+    if (opsArray.length === 1 && opsArray[0][0] === 0) {
+      var a0 = opsArray[0][1] && opsArray[0][1].amount;
+      var aRaw = a0 ? String(a0.amount) : "";
+      if (/^\d+$/.test(aRaw) && (a0.asset_id || feeAssetId) === displayFeeId && total * 2n > BigInt(aRaw)) {
+        var rerr2 = new Error("fee-suspicious: total fee " + total.toString() + " exceeds 50% of the transfer amount " +
+          aRaw + " (" + displayFeeId + "). Refusing to auto-proceed.");
+        rerr2.detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId, amountRaw: aRaw };
+        throw rerr2;
+      }
+    }
     var F = (typeof globalThis !== "undefined" && globalThis.Format) ? globalThis.Format : null;
     if (!F || typeof F.formatAmount !== "function") {
       throw new Error("Format.formatAmount is not loaded (format.js)");
@@ -135,6 +218,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     }
     var dbId = await Chain.db();
     var props = await Chain.call(dbId, "get_dynamic_global_properties", []);
+    assertHeadProps(props);
     var refBlockNum = props.head_block_number & 0xFFFF;
     var hexBytes = props.head_block_id.substring(8, 16);
     var b0 = parseInt(hexBytes.substring(0, 2), 16);

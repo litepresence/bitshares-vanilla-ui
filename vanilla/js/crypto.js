@@ -646,28 +646,34 @@ var Crypto = (function () {
       throw new Error("nobleGetPublicKey is not loaded");
     }
     var hash = hashU8 instanceof Uint8Array ? hashU8 : toBytes(hashU8);
+    /* M5: secret bytes are zeroed in the finally below. A Uint8Array CAN be
+     * wiped (unlike the WIF string, which only drops out of reach). */
     var privateKeyBytes = await wifToPrivateKey(wif);
-    var expectedPubKey = nobleGetPublicKey(privateKeyBytes, true);
-    var expectedHex = bytesToHex(expectedPubKey);
-    for (var attempt = 0; attempt < 128; attempt++) {
-      var opts = attempt === 0
-        ? { lowS: true }
-        : { lowS: true, extraEntropy: crypto.getRandomValues(new Uint8Array(32)) };
-      var sig = await nobleSignAsync(hash, privateKeyBytes, opts);
-      var rBytes = bigIntToBytes(sig.r, 32);
-      var sBytes = bigIntToBytes(sig.s, 32);
-      if (!isCanonicalSignature(rBytes, sBytes)) continue;
-      var signature = new Uint8Array(65);
-      signature[0] = 27 + 4 + (sig.recovery & 3);
-      signature.set(rBytes, 1);
-      signature.set(sBytes, 33);
-      try {
-        if (bytesToHex(recoverPublicKey(hash, signature)) === expectedHex) {
-          return signature;
-        }
-      } catch (_) { /* fall through and retry */ }
+    try {
+      var expectedPubKey = nobleGetPublicKey(privateKeyBytes, true);
+      var expectedHex = bytesToHex(expectedPubKey);
+      for (var attempt = 0; attempt < 128; attempt++) {
+        var opts = attempt === 0
+          ? { lowS: true }
+          : { lowS: true, extraEntropy: crypto.getRandomValues(new Uint8Array(32)) };
+        var sig = await nobleSignAsync(hash, privateKeyBytes, opts);
+        var rBytes = bigIntToBytes(sig.r, 32);
+        var sBytes = bigIntToBytes(sig.s, 32);
+        if (!isCanonicalSignature(rBytes, sBytes)) continue;
+        var signature = new Uint8Array(65);
+        signature[0] = 27 + 4 + (sig.recovery & 3);
+        signature.set(rBytes, 1);
+        signature.set(sBytes, 33);
+        try {
+          if (bytesToHex(recoverPublicKey(hash, signature)) === expectedHex) {
+            return signature;
+          }
+        } catch (_) { /* fall through and retry */ }
+      }
+      throw new Error("Unable to find a canonical signature after 128 attempts");
+    } finally {
+      try { privateKeyBytes.fill(0); } catch (wipeErr) { /* bytes dropped regardless */ }
     }
-    throw new Error("Unable to find a canonical signature after 128 attempts");
   }
 
   /* Encrypt a memo (BitShares ECIES); ported from #3
@@ -686,41 +692,46 @@ var Crypto = (function () {
       throw new Error("nobleGetPublicKey is not loaded");
     }
     var fromPrivateKeyBytes = await wifToPrivateKey(fromWIF);
-    var memoPrefix = "BTS";
-    var prefixes = ["BTS", "TEST", "GPH"];
-    for (var p = 0; p < prefixes.length; p++) {
-      if (toPub.indexOf(prefixes[p]) === 0) { memoPrefix = prefixes[p]; break; }
+    try {
+      var memoPrefix = "BTS";
+      var prefixes = ["BTS", "TEST", "GPH"];
+      for (var p = 0; p < prefixes.length; p++) {
+        if (toPub.indexOf(prefixes[p]) === 0) { memoPrefix = prefixes[p]; break; }
+      }
+      var fromPublicKeyBytes = nobleGetPublicKey(fromPrivateKeyBytes, true);
+      var fromPublicKeyBTS = publicBytesToPrefixed(fromPublicKeyBytes, memoPrefix);
+      var toPublicKeyBytes = btsToPublicKeyBytes(toPub);
+      if (nonce === null) {
+        var randBytes = crypto.getRandomValues(new Uint8Array(8));
+        nonce = randBytes.reduce(function (acc, b) { return (acc << 8n) | BigInt(b); }, 0n);
+      }
+      var sharedXBytes = nobleGetSharedSecret(
+        fromPrivateKeyBytes, toPublicKeyBytes, true
+      ).slice(1, 33);
+      var nonceBytes = bigIntToBytes(nonce, 8);
+      var preKey = new Uint8Array(8 + 32);
+      preKey.set(nonceBytes, 0);
+      preKey.set(sharedXBytes, 8);
+      var keyHash = await sha512Bytes(preKey);
+      var encryptionKey = keyHash.slice(0, 32);
+      var iv = keyHash.slice(32, 48);
+      var messageBytes = new TextEncoder().encode(message);
+      var encryptedBytes = await aes256CbcEncrypt(messageBytes, encryptionKey, iv);
+      var messageChecksum = await sha256Bytes(messageBytes);
+      var checksum = messageChecksum.slice(0, 4);
+      var finalMessage = new Uint8Array(4 + encryptedBytes.length);
+      finalMessage.set(checksum, 0);
+      finalMessage.set(encryptedBytes, 4);
+      return {
+        from: fromPublicKeyBTS,
+        to: toPub,
+        nonce: nonce.toString(),
+        message: bytesToHex(finalMessage)
+      };
+    } finally {
+      /* M5: secret bytes zeroed even on throw (see signHash). */
+      try { fromPrivateKeyBytes.fill(0); } catch (wipeErr) { /* bytes dropped regardless */ }
     }
-    var fromPublicKeyBytes = nobleGetPublicKey(fromPrivateKeyBytes, true);
-    var fromPublicKeyBTS = publicBytesToPrefixed(fromPublicKeyBytes, memoPrefix);
-    var toPublicKeyBytes = btsToPublicKeyBytes(toPub);
-    if (nonce === null) {
-      var randBytes = crypto.getRandomValues(new Uint8Array(8));
-      nonce = randBytes.reduce(function (acc, b) { return (acc << 8n) | BigInt(b); }, 0n);
-    }
-    var sharedXBytes = nobleGetSharedSecret(
-      fromPrivateKeyBytes, toPublicKeyBytes, true
-    ).slice(1, 33);
-    var nonceBytes = bigIntToBytes(nonce, 8);
-    var preKey = new Uint8Array(8 + 32);
-    preKey.set(nonceBytes, 0);
-    preKey.set(sharedXBytes, 8);
-    var keyHash = await sha512Bytes(preKey);
-    var encryptionKey = keyHash.slice(0, 32);
-    var iv = keyHash.slice(32, 48);
-    var messageBytes = new TextEncoder().encode(message);
-    var encryptedBytes = await aes256CbcEncrypt(messageBytes, encryptionKey, iv);
-    var messageChecksum = await sha256Bytes(messageBytes);
-    var checksum = messageChecksum.slice(0, 4);
-    var finalMessage = new Uint8Array(4 + encryptedBytes.length);
-    finalMessage.set(checksum, 0);
-    finalMessage.set(encryptedBytes, 4);
-    return {
-      from: fromPublicKeyBTS,
-      to: toPub,
-      nonce: nonce.toString(),
-      message: bytesToHex(finalMessage)
-    };
   }
 
   return {

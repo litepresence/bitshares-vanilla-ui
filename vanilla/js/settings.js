@@ -123,6 +123,11 @@ var SettingsPage = (function () {
         customError.textContent = t("settings.err_wss", "Only wss:// URLs are allowed.");
         return;
       }
+      /* M2: cap custom URL length (overlong URLs break row storage/lookup). */
+      if (v.length > 256) {
+        customError.textContent = "URL too long: 256 characters maximum.";
+        return;
+      }
       customError.textContent = "";
       var cur = Store.loadSettings();
       var customs = Array.isArray(cur.customNodes) ? cur.customNodes.slice() : [];

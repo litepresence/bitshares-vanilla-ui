@@ -743,9 +743,11 @@ var TradeForm = (function () {
       amount: st.amount, price: st.price, fok: st.fok,
       key: st.key, custom: st.custom
     };
+    /* H2: password wiped from input + local once consumed (both outcomes). */
     var pw = refs.pwField.input.value;
     Promise.resolve()
       .then(function () { return Wallet.unlock(pw); })
+      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
       .then(function () { return Account.myAccountId(); })
       .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
       .then(function (me) {
@@ -761,6 +763,8 @@ var TradeForm = (function () {
       })
       .catch(function (e) {
         try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
+        pw = null;
         btn.disabled = false;
         refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
       });
@@ -773,9 +777,11 @@ var TradeForm = (function () {
     refs.pwErr.textContent = "";
     btn.disabled = true;
     var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
+    /* H2: password wiped from input + local once consumed (both outcomes). */
     var pw = refs.pwField.input.value;
     Promise.resolve()
       .then(function () { return Wallet.unlock(pw); })
+      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
       .then(function () { return Account.myAccountId(); })
       .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
       .then(function (me) {
@@ -791,6 +797,8 @@ var TradeForm = (function () {
       })
       .catch(function (e) {
         try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
+        pw = null;
         btn.disabled = false;
         refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
       });
@@ -803,9 +811,11 @@ var TradeForm = (function () {
     refs.pwErr.textContent = "";
     btn.disabled = true;
     var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
+    /* H2: password wiped from input + local once consumed (both outcomes). */
     var pw = refs.pwField.input.value;
     Promise.resolve()
       .then(function () { return Wallet.unlock(pw); })
+      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
       .then(function () { return Account.myAccountId(); })
       .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
       .then(function (me) {
@@ -821,6 +831,8 @@ var TradeForm = (function () {
       })
       .catch(function (e) {
         try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
+        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
+        pw = null;
         btn.disabled = false;
         refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
       });

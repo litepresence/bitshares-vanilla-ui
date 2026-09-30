@@ -195,7 +195,19 @@ var TransferConfirm = (function () {
       memoObj: memoObj
     });
     var opData = unsigned.operations[0][1];
-    var fee = await Tx.fee(0, opData, asset.id);
+    /* H3: a suspicious fee never auto-proceeds — it rides to the confirm
+     * screen as a blocking warning behind an explicit ack gate (see
+     * showConfirm). Anything else still throws here. */
+    var fee = null, feeWarning = null;
+    try {
+      fee = await Tx.fee(0, opData, asset.id);
+    } catch (feeErr) {
+      if (feeErr && feeErr.message && feeErr.message.indexOf("fee-suspicious") === 0 &&
+          feeErr.detail && feeErr.detail.fee) {
+        fee = feeErr.detail.fee;
+        feeWarning = feeErr.message;
+      } else throw feeErr;
+    }
     opData.fee = { amount: fee.amount, asset_id: fee.asset_id };
 
     var network = "mainnet";
@@ -205,6 +217,15 @@ var TransferConfirm = (function () {
       }
     } catch (e) { /* default stands */ }
 
+    /* H1: chain-id prefix pinned at review time (re-checked at sign). */
+    var chainPrefix = "";
+    try {
+      if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
+        var cst = Chain.status() || {};
+        if (cst.chainId) chainPrefix = String(cst.chainId).slice(0, 8).toUpperCase();
+      }
+    } catch (chainErr) { /* row shows unknown */ }
+
     return {
       to: to,
       asset: asset,
@@ -213,6 +234,8 @@ var TransferConfirm = (function () {
       memoKind: memoKind,
       unsigned: unsigned,
       fee: fee,
+      feeWarning: feeWarning,
+      chainPrefix: chainPrefix,
       network: network
     };
   }
@@ -244,8 +267,30 @@ var TransferConfirm = (function () {
     var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
     row(t("confirm.fee", "Fee"), feeHuman, String(ctx.fee.amount));
     row(t("confirm.network", "Network"), ctx.network);
+    /* H1: the chain under review — check this prefix against the footer
+     * before signing (plain literal label: display-only, no new i18n key). */
+    row("Chain ID", ctx.chainPrefix || "unknown");
 
     wrap.appendChild(list);
+
+    /* H3: blocking suspicious-fee warning + explicit ack checkbox. The
+     * Sign & Send handler below refuses to sign until the box is ticked —
+     * a second, deliberate click — and nothing here ever auto-proceeds. */
+    var feeAckBox = null;
+    if (ctx.feeWarning) {
+      var feeWarn = el(doc, "div", null, "error");
+      feeWarn.setAttribute("aria-live", "assertive");
+      feeWarn.textContent = ctx.feeWarning + " Check the fee before signing — tick the box and click Sign & Send again to proceed.";
+      wrap.appendChild(feeWarn);
+      var ackRow = el(doc, "label", null, "xfer-field");
+      feeAckBox = doc.createElement("input");
+      feeAckBox.type = "checkbox";
+      feeAckBox.id = "xfer-fee-ack";
+      touchable(feeAckBox);
+      ackRow.appendChild(feeAckBox);
+      ackRow.appendChild(doc.createTextNode(" I understand this fee is unusually high."));
+      wrap.appendChild(ackRow);
+    }
 
     /* The exact operation about to be signed (no secrets: unsigned, fee
      * filled). Review bytes before Sign & Send. */
@@ -274,6 +319,27 @@ var TransferConfirm = (function () {
     });
 
     sendBtn.addEventListener("click", function () {
+      /* H3: suspicious-fee transfers need the explicit acked second click. */
+      if (ctx.feeWarning && !(feeAckBox && feeAckBox.checked)) {
+        showError(doc, wrap,
+          new Error("This fee looks unusually high — tick the acknowledgement above, then click Sign & Send again. Nothing was signed."),
+          t("confirm.transfer_failed", "Transfer failed."));
+        return;
+      }
+      /* H1: re-pin the chain at sign time — refuse if the node changed
+       * under the confirm screen. */
+      try {
+        if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
+          var nowChain = Chain.status() || {};
+          var nowPrefix = nowChain.chainId ? String(nowChain.chainId).slice(0, 8).toUpperCase() : "";
+          if (ctx.chainPrefix && nowPrefix && nowPrefix !== ctx.chainPrefix) {
+            showError(doc, wrap,
+              new Error("Chain changed while reviewing (was " + ctx.chainPrefix + ", now " + nowPrefix + "). Go back and review again."),
+              t("confirm.transfer_failed", "Transfer failed."));
+            return;
+          }
+        }
+      } catch (pinErr) { /* pin best-effort; signing continues */ }
       backBtn.disabled = true;
       sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));

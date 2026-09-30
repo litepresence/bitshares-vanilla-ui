@@ -186,8 +186,10 @@ var InstantTradeUI = (function () {
     var b = touchable(el(doc, "button", t("instant.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
     parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
-      Wallet.unlock(inp.value).then(function () { inp.value = ""; if (onUnlock) onUnlock(); })
-        .catch(function (e) { b.disabled = false; showError(doc, parent, e, t("instant.unlock_failed", "Unlock failed")); });
+      /* H2: wipe the password local + input on either outcome. */
+      var pw = inp.value;
+      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
+        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("instant.unlock_failed", "Unlock failed")); });
     });
   }
 

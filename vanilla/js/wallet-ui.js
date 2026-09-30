@@ -397,11 +397,20 @@ var WalletUI = (function () {
       unlockBtn.addEventListener("click", function () {
         err.textContent = "";
         unlockBtn.disabled = true;
-        var pw = doc.getElementById("wallet-password").value;
+        /* H2: the password lives in a local + the input; both are wiped on
+         * either outcome so nothing lingers in DOM or closure. */
+        var pwInput = doc.getElementById("wallet-password");
+        var pw = pwInput ? pwInput.value : "";
         Promise.resolve()
           .then(function () { return Wallet.unlock(pw); })
-          .then(function () { renderWallet(root); })
+          .then(function () {
+            if (pwInput) pwInput.value = "";
+            pw = null;
+            renderWallet(root);
+          })
           .catch(function (e) {
+            if (pwInput) pwInput.value = "";
+            pw = null;
             unlockBtn.disabled = false;
             setError(err, e);
           });
@@ -553,8 +562,13 @@ var WalletUI = (function () {
     createBtn.addEventListener("click", function () {
       err.textContent = "";
       var bk = bkArea.value;
-      var pw = doc.getElementById("create-password").value;
-      var confirm = doc.getElementById("create-confirm").value;
+      /* H2: password locals + inputs are wiped on either outcome. The
+       * brainkey textarea keeps its value by design (the user is writing
+       * it down on this screen). */
+      var pwInput = doc.getElementById("create-password");
+      var confirmInput = doc.getElementById("create-confirm");
+      var pw = pwInput ? pwInput.value : "";
+      var confirm = confirmInput ? confirmInput.value : "";
       if (!check.checked) {
         err.textContent = "Confirm you wrote the brainkey down first.";
         return;
@@ -584,6 +598,9 @@ var WalletUI = (function () {
       Promise.resolve()
         .then(function () { return Wallet.create(pw, bk); })
         .then(function (keys) {
+          if (pwInput) pwInput.value = "";
+          if (confirmInput) confirmInput.value = "";
+          pw = null; confirm = null; bk = null;
           try {
             if (typeof localStorage !== "undefined") {
               localStorage.setItem("bts-vanilla-wallet-name-v1", walletName);
@@ -608,6 +625,9 @@ var WalletUI = (function () {
           ]));
         })
         .catch(function (e) {
+          if (pwInput) pwInput.value = "";
+          if (confirmInput) confirmInput.value = "";
+          pw = null; confirm = null;
           createBtn.disabled = false;
           setError(err, e);
         });
@@ -714,7 +734,9 @@ var WalletUI = (function () {
     importBtn.addEventListener("click", function () {
       err.textContent = "";
       var bk = bkArea.value;
-      var pw = doc.getElementById("import-password").value;
+      /* H2: same password wipe as unlock/create above. */
+      var pwInput = doc.getElementById("import-password");
+      var pw = pwInput ? pwInput.value : "";
       if (!pw) {
         err.textContent = "Password required: enter a non-empty password.";
         return;
@@ -724,6 +746,8 @@ var WalletUI = (function () {
       Promise.resolve()
         .then(function () { return Wallet.importBrainkey(bk, pw); })
         .then(function (keys) {
+          if (pwInput) pwInput.value = "";
+          pw = null; bk = null;
           clearRoot(root);
           var done = makeWrap(doc, root);
           var h2 = doc.createElement("h2");
@@ -736,6 +760,8 @@ var WalletUI = (function () {
           done.appendChild(toWallet);
         })
         .catch(function (e) {
+          if (pwInput) pwInput.value = "";
+          pw = null;
           importBtn.disabled = false;
           importBtn.textContent = "Verify and import";
           setError(err, e);

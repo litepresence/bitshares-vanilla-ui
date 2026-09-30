@@ -36,7 +36,10 @@ class StubWS {
     else if (method === "set_block_applied_callback") respond(null);
     else if (method === "get_chain_id") respond("роп12345");
     else if (method === "get_dynamic_global_properties") {
-      respond({ head_block_number: blockNum, time: "2026-01-01T00:00:00" });
+      /* Audit-fix contract (H4/M1): real nodes always return the full
+       * dynamic_global_property_object — the fake node must too, or the
+       * shape gate under test correctly rejects it. */
+      respond({ head_block_number: blockNum, head_block_id: "00" + "ab".repeat(31), time: "2026-01-01T00:00:00" });
     }
   }
   close() {

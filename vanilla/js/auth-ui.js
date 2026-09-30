@@ -193,8 +193,12 @@ var AuthUI = (function () {
     btn.addEventListener("click", function () {
       setFieldError(f, ""); btn.disabled = true;
       if (!f.input.value) { setFieldError(f, t("auth.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); btn.disabled = false; return; }
-      Promise.resolve().then(function () { return Wallet.unlock(f.input.value); })
+      /* H2: wipe the password local + input on either outcome. */
+      var pw = f.input.value;
+      Promise.resolve().then(function () { return Wallet.unlock(pw); })
         .then(function () {
+          f.input.value = "";
+          pw = null;
           if (myGen !== gen) return;
           clearRoot(root);
           var done = makeWrap(doc, root);
@@ -206,6 +210,8 @@ var AuthUI = (function () {
           ]));
         })
         .catch(function (e) {
+          f.input.value = "";
+          pw = null;
           if (myGen !== gen) return;
           btn.disabled = false;
           setFieldError(f, (e && e.message) ? e.message : String(e || t("auth.unlock_failed", "Unlock failed")));

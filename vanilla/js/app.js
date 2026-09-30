@@ -599,6 +599,21 @@ var App = (function () {
       d.className = cls;
       return d;
     }
+    /* H1: a chain-id mismatch is a blocking message, not a quiet state —
+     * host on line 1 (closed color), the expected-vs-got text on line 2. */
+    if (s.mismatch) {
+      var mhost = shortHost(s.node);
+      var ml1 = line("appfoot-line1");
+      if (mhost) ml1.appendChild(span(mhost, "appfoot-host", "closed"));
+      else ml1.appendChild(span("error", "appfoot-host", "closed"));
+      foot.appendChild(ml1);
+      var ml2 = line("appfoot-line2");
+      var mspan = span(String(s.mismatch), "appfoot-telemetry", null);
+      mspan.title = String(s.mismatch);
+      ml2.appendChild(mspan);
+      foot.appendChild(ml2);
+      return;
+    }
     if (state === "open") {
       var host = shortHost(s.node);
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
@@ -672,10 +687,31 @@ var App = (function () {
   }
 
   /* connect: opens the chain socket (failures via connection events).
-   *   Params: node (wss:// URL string). Returns nothing. Fails: never throws —
+   * H1 chain-id pin: after connect resolves, the answered chain id must
+   *   equal Store.CHAIN_IDS for the active network. A mismatch (wrong-chain
+   *   or aliased node) disconnects immediately and the footer carries a
+   *   blocking mismatch message (expected vs got, first 8 chars each) —
+   *   reads never silently follow the wrong chain.
+   * Params: node (wss:// URL string). Returns nothing. Fails: never throws —
    *   Chain.connect rejections are swallowed; the footer carries the error. */
   function connect(node) {
-    if (node) Chain.connect(node).catch(function () { /* failures surface via connection events */ });
+    if (!node) return;
+    Chain.connect(node).then(function (r) {
+      try {
+        var st = Store.loadSettings();
+        var exp = Store.CHAIN_IDS && Store.CHAIN_IDS[st.network];
+        var got = r && r.chainId;
+        if (exp && got && String(got).toLowerCase() !== String(exp).toLowerCase()) {
+          try { Chain.disconnect(); } catch (discErr) { /* state below */ }
+          var msg = "CHAIN-ID MISMATCH on " + shortHost(node) + ": expected " +
+            String(exp).slice(0, 8).toUpperCase() + ", got " +
+            String(got).slice(0, 8).toUpperCase() + ". Disconnected — check Settings → Nodes.";
+          try {
+            Store.emitConnection({state: "error", node: node, chainId: got, mismatch: msg});
+          } catch (emitErr) { /* footer keeps prior state */ }
+        }
+      } catch (pinErr) { /* pin best-effort; the socket stays connected */ }
+    }).catch(function () { /* failures surface via connection events */ });
   }
 
   function onSettings(next) {
@@ -749,6 +785,25 @@ var App = (function () {
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
     bindLockOnce();
+    /* M4a: extension-wrapper Tier 1 — the SW's vb-lock broadcast locks the
+     * in-page keystore (auto-lock fan-out across open app pages). Unlock/
+     * lock notices ride the other way from wallet.js _notifySw. Web build
+     * has no chrome/browser namespace: guarded, best-effort, never throws. */
+    try {
+      var extNs = (typeof chrome !== "undefined" && chrome) ||
+        (typeof browser !== "undefined" && browser);
+      if (extNs && extNs.runtime && extNs.runtime.onMessage &&
+          typeof extNs.runtime.onMessage.addListener === "function") {
+        extNs.runtime.onMessage.addListener(function (msg) {
+          try {
+            if (msg && msg.type === "vb-lock" &&
+                typeof Wallet !== "undefined" && Wallet && typeof Wallet.lock === "function") {
+              Wallet.lock();
+            }
+          } catch (e) { /* lock best-effort */ }
+        });
+      }
+    } catch (e) { /* web build: no extension messaging */ }
     if (toggle && nav) {
       toggle.addEventListener("click", function () {
         var open = nav.classList.toggle("open");

@@ -91,6 +91,24 @@ var Chain = (function () {
       if (typeof cur !== "number" || num > cur) setStatus({headBlock: num});
     } catch (e) { /* heartbeat covers */ }
   }
+  /* H4/M1: dynamic-props shape gate — head_block_number must be a
+   *   positive safe integer, head_block_id 64 hex chars, time a parseable
+   *   string. Throws bad-head-shape naming the field. connect() rejects
+   *   with it (error state, no tx built on garbage); beat() drops bad
+   *   replies silently (the next beat retries). */
+  function assertPropsShape(props) {
+    if (!props || typeof props !== "object") throw new Error("bad-head-shape: dynamic props missing");
+    if (!Number.isSafeInteger(props.head_block_number) || props.head_block_number <= 0) {
+      throw new Error("bad-head-shape: head_block_number must be a positive safe integer");
+    }
+    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{64}$/.test(props.head_block_id)) {
+      throw new Error("bad-head-shape: head_block_id must be 64 hex chars");
+    }
+    if (typeof props.time !== "string" || !Number.isFinite(Date.parse(props.time + "Z"))) {
+      throw new Error("bad-head-shape: time does not parse");
+    }
+  }
+
   /* Heartbeat: one get_dynamic_global_properties per interval on the open
    * socket (traffic both directions defeats idle timeouts) + the reply
    * refreshes the footer head block AND latency (round-trip time — the
@@ -105,6 +123,7 @@ var Chain = (function () {
       if (!ws || ws.readyState !== 1) return;
       return call(dbId, "get_dynamic_global_properties", [], 10000);
     }).then(function (props) {
+      try { assertPropsShape(props); } catch (shapeErr) { return; /* next beat retries */ }
       if (props && props.head_block_number && ws && ws.readyState === 1) {
         var cur = lastStatus.headBlock;
         if (typeof cur !== "number" || props.head_block_number > cur) {
@@ -183,6 +202,13 @@ var Chain = (function () {
         }).catch(fail);
       };
       sock.onmessage = function (ev) {
+        /* M1: 4MB inbound cap on the throwaway probe socket too. */
+        try {
+          if (ev && typeof ev.data === "string" && ev.data.length > 4 * 1024 * 1024) {
+            fail(new Error("oversize frame rejected"));
+            return;
+          }
+        } catch (capErr) { /* parse below still guards */ }
         var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (msg.id !== undefined && waiting[msg.id]) {
           var p = waiting[msg.id]; delete waiting[msg.id]; clearTimeout(p.timer);
@@ -211,6 +237,16 @@ var Chain = (function () {
           return Promise.all([call(dbId, "get_chain_id", []), call(dbId, "get_dynamic_global_properties", [])]);
         }).then(function (res) {
           if (done) return; done = true; clearTimeout(guard);
+          /* H4: reject the connection on malformed head props (bad-head-shape
+           * carries the field) — no tx envelope is ever built on garbage. */
+          try {
+            assertPropsShape(res[1]);
+          } catch (shapeErr) {
+            try { ws.close(); } catch (closeErr) { /* closing */ }
+            setStatus({state: "error", node: url});
+            reject(shapeErr);
+            return;
+          }
           var latencyMs = Date.now() - t0;
           /* Head block stashed from the ALREADY-fetched dynamic props (footer
            * paint reads it; no extra RPC — same Promise.all as before). */
@@ -233,6 +269,18 @@ var Chain = (function () {
         });
       };
       ws.onmessage = function (ev) {
+        /* M1: 4MB inbound cap — a hostile or broken node must not grow the
+         * page's memory unboundedly. Oversize frames are dropped, the socket
+         * is disconnected, and the footer carries an error (no reconnect —
+         * a node sending 4MB+ frames is not one to redial blindly). */
+        try {
+          if (ev && typeof ev.data === "string" && ev.data.length > 4 * 1024 * 1024) {
+            try { ws.close(); } catch (closeErr) { /* closing */ }
+            try { disconnect(); } catch (discErr) { /* state below */ }
+            setStatus({state: "error", node: url});
+            return;
+          }
+        } catch (capErr) { /* cap best-effort; the parse below still guards */ }
         var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
         /* Push notices (no top-level id — shape-disjoint from call pairs):
          * applied-block feed for the footer (see BLOCK_CB_ID) and the
@@ -241,7 +289,12 @@ var Chain = (function () {
         if (msg.method === "notice" && Array.isArray(msg.params)) {
           if (msg.params[0] === BLOCK_CB_ID) { onBlockNotice(msg.params[1]); return; }
           if (msg.params[0] === MARKET_CB_ID) {
-            try { if (marketCb) marketCb(msg.params[1]); } catch (e) { /* route handler fault */ }
+            /* M1: shape-check the market payload before route chart code —
+             * a malformed notice never throws outward (heartbeat covers). */
+            var pl = msg.params[1];
+            if (pl && (Array.isArray(pl) || typeof pl === "object")) {
+              try { if (marketCb) marketCb(pl); } catch (e) { /* route handler fault */ }
+            }
             return;
           }
         }

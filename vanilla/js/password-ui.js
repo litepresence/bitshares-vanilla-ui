@@ -117,6 +117,8 @@ var PasswordUI = (function () {
     ok.setAttribute("aria-live", "polite"); wrap.appendChild(ok);
     btn.addEventListener("click", function () {
       err.textContent = ""; ok.textContent = "";
+      /* H2: password locals + inputs are wiped on either outcome (the wipe
+       * in catch runs before the stale-view bail — wiping never skipped). */
       var curPw = cur.input.value, newPw = nw.input.value, cfmPw = cf.input.value;
       if (!curPw) { err.textContent = t("password.enter_your_current_password", "Enter your current password."); return; }
       if (!newPw) { err.textContent = t("password.enter_a_new_password", "Enter a new password."); return; }
@@ -145,9 +147,12 @@ var PasswordUI = (function () {
           Wallet.lock(); /* leave locked: no keys linger past the proof */
           btn.disabled = false; btn.textContent = t("password.change_password", "Change password");
           cur.input.value = ""; nw.input.value = ""; cf.input.value = "";
+          curPw = null; newPw = null; cfmPw = null;
           ok.textContent = t("password.password_changed_and_verified_the_wallet_is_l", "Password changed and verified — the wallet is locked. Unlock with the new password to continue.");
         })
         .catch(function (e) {
+          cur.input.value = ""; nw.input.value = ""; cf.input.value = "";
+          curPw = null; newPw = null; cfmPw = null;
           if (myGen !== gen) return;
           btn.disabled = false; btn.textContent = t("password.change_password", "Change password");
           var msg = (e && e.message) ? e.message : String(e || t("password.password_change_failed", "Password change failed"));

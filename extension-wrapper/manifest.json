@@ -13,7 +13,7 @@
     "128": "icons/icon128.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; connect-src *;"
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src wss: https:;"
   },
   "background": {
     "service_worker": "background/sw.js"

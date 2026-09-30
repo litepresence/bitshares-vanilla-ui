@@ -155,9 +155,17 @@ var AccountsUI = (function () {
       })();
       btn.addEventListener("click", function () {
         errBox.textContent = ""; btn.disabled = true;
-        Promise.resolve().then(function () { return Wallet.unlock(f.input.value); })
-          .then(function () { if (myGen === gen) renderAccounts(root); })
+        /* H2: wipe the password local + input on either outcome. */
+        var pw = f.input.value;
+        Promise.resolve().then(function () { return Wallet.unlock(pw); })
+          .then(function () {
+            f.input.value = "";
+            pw = null;
+            if (myGen === gen) renderAccounts(root);
+          })
           .catch(function (e) {
+            f.input.value = "";
+            pw = null;
             if (myGen !== gen) return;
             btn.disabled = false;
             errBox.textContent = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");

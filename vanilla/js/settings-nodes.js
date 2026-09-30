@@ -40,6 +40,20 @@ var SettingsNodes = (function () {
     return Array.isArray(settings.customNodes) && settings.customNodes.indexOf(url) !== -1;
   }
 
+  /* M2: row lookup by getAttribute compare — URLs are never interpolated
+   * into a selector (a quote in a custom URL broke querySelector). Params:
+   * tbody, url string. Returns the tr or null. Fails: never throws. */
+  function findRow(tbody, url) {
+    if (!tbody || typeof tbody.querySelectorAll !== "function") return null;
+    var rows = tbody.querySelectorAll("tr");
+    for (var k = 0; k < rows.length; k++) {
+      try {
+        if (rows[k].getAttribute("data-url") === url) return rows[k];
+      } catch (e) { /* next row */ }
+    }
+    return null;
+  }
+
   /* Paint one table row AND its mirrored phone card with the same
    * latency/status text. Status is tracked as a canonical id on data-status
    * (up|connecting|down); the visible text may be translated (settings.
@@ -56,10 +70,15 @@ var SettingsNodes = (function () {
       if (st) st.textContent = statusText;
       if (statusId) row.setAttribute("data-status", statusId);
     }
-    var url = row ? row.getAttribute("data-url") : null;
+    var url = null;
+    try { url = row ? row.getAttribute("data-url") : null; } catch (attrErr) { url = null; }
     if (url && row && row.ownerDocument) {
-      var card = row.ownerDocument.querySelector('.node-card[data-url="' + url + '"]');
-      if (card) {
+      /* M2: card lookup by getAttribute compare, same rule as findRow. */
+      var cards = row.ownerDocument.querySelectorAll(".node-card");
+      for (var c = 0; c < cards.length; c++) {
+        var card = cards[c], cu = null;
+        try { cu = card.getAttribute("data-url"); } catch (ce) { cu = null; }
+        if (cu !== url) continue;
         var cLat = card.querySelector(".latency");
         var cSt = card.querySelector(".node-status");
         if (cLat) cLat.textContent = latencyText;
@@ -252,10 +271,25 @@ var SettingsNodes = (function () {
      * Ends by repainting the offline panel (paintOfflineIfAllDown). */
     function next() {
       if (i >= nodes.length) { paintOfflineIfAllDown(tbody, offline); return; }
-      var url = nodes[i], row = tbody.querySelector('tr[data-url="' + url + '"]');
+      var url = nodes[i], row = findRow(tbody, url);
       setRow(row, t("settings.pending", "…"), t("settings.connecting", "connecting"), "connecting");
       Chain.probe(url, 6000).then(function (r) {
-        setRow(row, r.latencyMs + "ms", r.chainId.slice(0, 8), "up");
+        /* H1: a probe hit on the wrong chain paints as a mismatch (down),
+         * never as a healthy row — selecting it would sign wrong-chain. */
+        var mismatch = false;
+        try {
+          var st = Store.loadSettings();
+          var exp = Store.CHAIN_IDS && Store.CHAIN_IDS[st.network];
+          if (exp && r && r.chainId &&
+              String(r.chainId).toLowerCase() !== String(exp).toLowerCase()) mismatch = true;
+        } catch (pinErr) { mismatch = false; }
+        var prefix = "";
+        try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
+        if (mismatch) {
+          setRow(row, r.latencyMs + "ms", "mismatch " + prefix, "down");
+        } else {
+          setRow(row, r.latencyMs + "ms", prefix, "up");
+        }
       }).catch(function () {
         setRow(row, t("settings.dash", "—"), t("settings.down", "down"), "down");
       }).then(function () { i++; next(); });
@@ -276,6 +310,7 @@ var SettingsNodes = (function () {
   return {
     allNodes: allNodes,
     isCustom: isCustom,
+    findRow: findRow,
     setRow: setRow,
     buildNodeTable: buildNodeTable,
     buildNodeCards: buildNodeCards,

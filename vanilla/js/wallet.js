@@ -27,10 +27,12 @@ var Wallet = (function () {
   var _data = null; // {brainkey:string, keys:{owner,active,memo:{wif,pub}}, created:string} | null
   var _lockTimer = null;
   var _onLock = null;
-  /* Rate-limit state: consecutive failures this session + persisted lockout
-   * stamp (survives restarts where the backend persists). Delays: 0,1,2,4,8
-   * … seconds, capped at 30s. Storage failures never weaken the in-memory
-   * count — they only lose cross-restart memory. */
+  /* Rate-limit state: consecutive failures (in-memory) plus a persisted
+   * lockout envelope {failCount, until} under LOCKOUT_KEY (survives
+   * restarts where the backend persists; legacy bare-numeric stamps migrate
+   * as count 1). Delays: 1,2,4,8 … seconds, capped at 30s
+   * (min(30000, 1000*2^(count-1))). Storage failures never weaken the
+   * in-memory count — they only lose cross-restart memory. */
   var _failCount = 0;
   var LOCKOUT_KEY = "bts-vanilla-lockout-v1";
   var _backend = null;
@@ -237,6 +239,7 @@ var Wallet = (function () {
   function _setUnlocked(plain) {
     _data = plain;
     api.keys = plain.keys;
+    _notifySw("vb-unlocked");
     _armLock();
   }
 
@@ -270,46 +273,92 @@ var Wallet = (function () {
     return api.keys;
   }
 
+  /* M3: read the persisted lockout envelope {failCount, until}. Tolerates
+   * the legacy bare-numeric stamp (a ms epoch — a future-dated one migrates
+   * as count 1, anything else resets) and "0". Returns the envelope.
+   * Fails: never throws — unreadable storage yields a zeroed envelope (the
+   * in-memory count still applies). */
+  async function _readLockout() {
+    var blank = { failCount: 0, until: 0 };
+    var raw = null;
+    try {
+      raw = await _store().getItem(LOCKOUT_KEY);
+    } catch (e) {
+      return blank;
+    }
+    if (!raw || raw === "0") return blank;
+    try {
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        var fc = parseInt(parsed.failCount, 10);
+        var un = parseInt(parsed.until, 10);
+        return {
+          failCount: (isFinite(fc) && fc > 0) ? fc : 0,
+          until: (isFinite(un) && un > 0) ? un : 0
+        };
+      }
+    } catch (e) { /* fall through to the legacy numeric stamp */ }
+    var legacy = parseInt(raw, 10);
+    if (isFinite(legacy) && legacy > Date.now()) return { failCount: 1, until: legacy };
+    return blank;
+  }
+
+  /* M3: persist the lockout envelope (best-effort — a storage failure only
+   * loses cross-restart memory, never weakens the in-memory count). */
+  async function _writeLockout(failCount, until) {
+    try {
+      await _store().setItem(LOCKOUT_KEY, JSON.stringify({ failCount: failCount, until: until }));
+    } catch (e) { /* stamp best-effort */ }
+  }
+
+  /* M3: backoff for a failure count — 1s, 2s, 4s … capped at 30s. */
+  function _backoffMs(count) {
+    if (!(count > 0)) return 0;
+    return Math.min(30000, 1000 * Math.pow(2, count - 1));
+  }
+
   /* Decrypt the stored wallet into memory only. Resolves to Wallet.keys.
    * Params: password string. Rate-limited: each consecutive failure waits
-   *   0,1,2,4,8…s (cap 30s) before deriving, and persists a lockout stamp;
+   *   1,2,4,8…s (cap 30s) before deriving, and persists a lockout envelope;
    *   success resets both. Fails: locked-out, no wallet, corrupt envelope,
    *   wrong password. */
   async function unlock(password) {
     if (typeof password !== "string" || password.length === 0) {
       throw new Error("password required: expected a non-empty string");
     }
-    try {
-      var stamp = await _store().getItem(LOCKOUT_KEY);
-      var until = parseInt(stamp, 10);
-      if (isFinite(until) && until > Date.now()) {
-        throw new Error("locked out: try again in " + Math.ceil((until - Date.now()) / 1000) + "s");
-      }
-    } catch (e) {
-      if (e && e.message && e.message.indexOf("locked out") === 0) throw e;
-      /* unreadable stamp: in-memory count still enforced below */
+    var persisted = await _readLockout();
+    if (persisted.until > Date.now()) {
+      throw new Error("locked out: try again in " + Math.ceil((persisted.until - Date.now()) / 1000) + "s");
     }
-    if (_failCount > 0) {
-      var waitMs = Math.min(30000, 1000 * Math.pow(2, _failCount - 1));
-      await new Promise(function (res) { setTimeout(res, waitMs); });
+    /* Effective count is the max of memory and disk — a restart must not
+     * forgive failures the disk remembers. */
+    var effCount = Math.max(_failCount, persisted.failCount);
+    if (effCount > 0) {
+      await new Promise(function (res) { setTimeout(res, _backoffMs(effCount)); });
     }
     var env = await _readEnvelope();
     try {
       var plain = await _decryptPlain(password, env);
       _failCount = 0;
-      try { await _store().setItem(LOCKOUT_KEY, "0"); } catch (e) { /* stamp best-effort */ }
+      await _writeLockout(0, 0);
       _setUnlocked(plain);
       return api.keys;
     } catch (e) {
-      _failCount++;
-      var waitMs2 = Math.min(30000, 1000 * Math.pow(2, _failCount - 1));
-      try { await _store().setItem(LOCKOUT_KEY, String(Date.now() + waitMs2)); } catch (x) { /* stamp best-effort */ }
+      var next = effCount + 1;
+      _failCount = next;
+      await _writeLockout(next, Date.now() + _backoffMs(next));
       throw e;
     }
   }
 
-  /* Best-effort zero of key material (strings immutable in JS: overwrite refs
-   * with zeros before nulling), clear timer, notify the onLock callback once. */
+  /* Drop key material from memory, clear the timer, notify the onLock
+   * callback once. JS-STRING TRUTH: WIFs and the brainkey are immutable JS
+   * strings — they can NOT be wiped. Overwriting the reference only drops
+   * our handle so GC can collect; the original bytes linger until collected
+   * (and may survive in copies the engine made). True zeroing applies only
+   * to Uint8Arrays (Crypto wipes privateKeyBytes in a finally). So lock()
+   * minimizes secret lifetime (5-min auto-lock, hidden-tab lock,
+   * lock-after-proof) instead of pretending strings can be scrubbed. */
   function lock() {
     var wasUnlocked = !!_data;
     if (_lockTimer) { try { clearTimeout(_lockTimer); } catch (e) {} _lockTimer = null; }
@@ -329,9 +378,26 @@ var Wallet = (function () {
     }
     _data = null;
     api.keys = null;
+    if (wasUnlocked) _notifySw("vb-locked");
     if (wasUnlocked && typeof _onLock === "function") {
       try { _onLock(); } catch (e) {}
     }
+  }
+
+  /* M4a: extension-wrapper Tier 1 lock broadcast. Best-effort
+   * chrome/browser.runtime.sendMessage — absent on the web build (namespace
+   * check), failures swallowed (the SW may be unreachable). Never throws. */
+  function _notifySw(type) {
+    try {
+      var c = (typeof chrome !== "undefined" && chrome) ||
+        (typeof browser !== "undefined" && browser);
+      if (c && c.runtime && typeof c.runtime.sendMessage === "function") {
+        try {
+          var r = c.runtime.sendMessage({ type: type });
+          if (r && typeof r.catch === "function") r.catch(function () { /* SW unreachable */ });
+        } catch (e) { /* messaging best-effort */ }
+      }
+    } catch (e) { /* web build: no extension namespace */ }
   }
 
   /* True when decrypted key material is present in memory. */

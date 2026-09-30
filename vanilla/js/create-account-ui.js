@@ -354,13 +354,19 @@ var CreateAccountUI = (function () {
       if (!pwF.input.value) { setFieldError(pwF, t("createaccount.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); return; }
       saveBtn.disabled = true;
       var status = showStatus(doc, out, t("createaccount.saving_wallet", "Saving wallet…"));
-      Promise.resolve().then(function () { return Wallet.create(pwF.input.value, P.brainkey); })
+      /* H2: wipe the password local + input on either outcome. */
+      var pw = pwF.input.value;
+      Promise.resolve().then(function () { return Wallet.create(pw, P.brainkey); })
         .then(function () {
+          pwF.input.value = "";
+          pw = null;
           if (myGen !== gen) return;
           out.removeChild(status);
           out.appendChild(el(doc, "p", t("createaccount.wallet_saved_the_account_keys_are_now_unlocke", "Wallet saved. The account keys are now unlocked on this device."), "muted"));
         })
         .catch(function (e) {
+          pwF.input.value = "";
+          pw = null;
           if (myGen !== gen) return;
           out.removeChild(status); saveBtn.disabled = false;
           showError(doc, out, e, t("createaccount.could_not_save_the_wallet", "Could not save the wallet."));

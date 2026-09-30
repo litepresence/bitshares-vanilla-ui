@@ -1096,10 +1096,18 @@ var AccountUI = (function () {
     btn.addEventListener("click", function () {
       err.textContent = "";
       btn.disabled = true;
+      /* H2: wipe the password local + input on either outcome. */
+      var pw = input.value;
       Promise.resolve()
-        .then(function () { return Wallet.unlock(input.value); })
-        .then(function () { renderAccount(root, "me"); })
+        .then(function () { return Wallet.unlock(pw); })
+        .then(function () {
+          input.value = "";
+          pw = null;
+          renderAccount(root, "me");
+        })
         .catch(function (e) {
+          input.value = "";
+          pw = null;
           btn.disabled = false;
           var msg = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");
           err.textContent = msg;

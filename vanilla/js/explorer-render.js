@@ -184,7 +184,8 @@ var ExplorerRender = (function () {
     if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return s;
     Account.resolve(id).then(function (a) {
       if (!isCurrent(myGen)) return;
-      var link = anchor(doc, a.name + " (" + a.id + ")", "#/account/" + a.name);
+      /* L1: chain names ride in a URL — encode them. */
+      var link = anchor(doc, a.name + " (" + a.id + ")", "#/account/" + encodeURIComponent(a.name));
       s.parentNode.replaceChild(link, s);
     }).catch(function () { /* plain id stands — honest, never blank */ });
     return s;
@@ -195,7 +196,8 @@ var ExplorerRender = (function () {
     var s = el(doc, "span", id);
     Explorer.asset(id).then(function (j) {
       if (!isCurrent(myGen)) return;
-      var link = anchor(doc, j.asset.symbol, "#/asset/" + j.asset.symbol);
+      /* L1: chain symbols ride in a URL — encode them. */
+      var link = anchor(doc, j.asset.symbol, "#/asset/" + encodeURIComponent(j.asset.symbol));
       s.parentNode.replaceChild(link, s);
     }).catch(function () { /* plain id stands */ });
     return s;

@@ -70,7 +70,9 @@ var PoolUI = (function () {
     var inp = doc.createElement("input"); inp.type = "password"; touchable(inp); wrap.appendChild(inp);
     var b = touchable(el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; wrap.appendChild(b);
     b.addEventListener("click", function () { b.disabled = true;
-      Wallet.unlock(inp.value).then(retry).catch(function (e) { b.disabled = false; showError(doc, wrap,e,t("barter.unlock_failed", "Unlock failed.")); });
+      /* H2: wipe the password local + input on either outcome. */
+      var pw = inp.value;
+      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; retry(); }).catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, wrap,e,t("barter.unlock_failed", "Unlock failed.")); });
     });
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public

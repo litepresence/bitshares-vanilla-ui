@@ -608,10 +608,12 @@ var Tx = (function () {
     return buf;
   }
 
-  /* uint32 little-endian (ref_block_prefix, timestamps). Unsigned via >>>. */
+  /* uint32 little-endian (ref_block_prefix, timestamps). H4: loud
+   * integer + range check — the old >>>0 fold silently wrapped floats,
+   * strings, and negatives into a different transaction than intended. */
   function writeUint32LE(value) {
-    var v = Number(value) >>> 0;
-    if (!Number.isFinite(v)) throw new Error("uint32 out of range: " + value);
+    if (!Number.isInteger(value) || value < 0 || value > 0xFFFFFFFF) throw new Error("uint32 out of range: " + value);
+    var v = value >>> 0;
     var buf = new Uint8Array(4);
     buf[0] = v & 0xFF;
     buf[1] = (v >>> 8) & 0xFF;

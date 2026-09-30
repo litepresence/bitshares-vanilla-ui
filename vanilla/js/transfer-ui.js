@@ -1094,7 +1094,10 @@ var TransferUI = (function () {
       ub.addEventListener("click", function () {
         ub.disabled = true;
         showStatus(doc, box, t("transfer.unlocking", "Unlocking…"));
-        Promise.resolve().then(function () { return Wallet.unlock(pw.value); })
+        /* H2: wipe the password local + input on either outcome. */
+        var pwStr = pw.value;
+        Promise.resolve().then(function () { return Wallet.unlock(pwStr); })
+          .then(function (r) { try { pw.value = ""; } catch (wipeErr) { /* input gone */ } pwStr = null; return r; })
           .then(function () { return Account.myAccountId(); })
           .then(function (wid) {
             if (wid !== P.fromAcc.id) {
@@ -1123,6 +1126,8 @@ var TransferUI = (function () {
             });
           })
           .catch(function (e2) {
+            try { pw.value = ""; } catch (wipeErr2) { /* input gone */ }
+            pwStr = null;
             ub.disabled = false;
             showError(doc, box, e2, t("transfer.unlock_failed", "Unlock failed"));
           });
@@ -1473,7 +1478,10 @@ var TransferUI = (function () {
       ub.addEventListener("click", function () {
         ub.disabled = true;
         showStatus(doc, box, t("transfer.unlocking", "Unlocking…"));
-        Promise.resolve().then(function () { return Wallet.unlock(pw.value); })
+        /* H2: wipe the password local + input on either outcome. */
+        var pwStr = pw.value;
+        Promise.resolve().then(function () { return Wallet.unlock(pwStr); })
+          .then(function (r) { try { pw.value = ""; } catch (wipeErr) { /* input gone */ } pwStr = null; return r; })
           .then(function () { return Account.myAccountId(); })
           .then(async function (wid) {
             var proposer = await Account.resolve(wid);
@@ -1514,6 +1522,8 @@ var TransferUI = (function () {
             });
           })
           .catch(function (e2) {
+            try { pw.value = ""; } catch (wipeErr2) { /* input gone */ }
+            pwStr = null;
             ub.disabled = false;
             showError(doc, box, e2, t("transfer.unlock_failed", "Unlock failed"));
           });
