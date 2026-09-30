@@ -597,7 +597,7 @@ var TransferUI = (function () {
       var btn = el(doc, "button", t("credit.current_balance", "Current balance") + ": " + b.display + " " + b.symbol);
       btn.type = "button";
       btn.id = "xfer-max";
-      btn.style.borderBottom = "#A09F9F 1px dotted"; /* SendModal affordance */
+      btn.style.borderBottom = "var(--border, #A09F9F) 1px dotted"; /* SendModal affordance (themed token + classic fallback) */
       btn.style.cursor = "pointer";
       touchable(btn);
       btn.addEventListener("click", function () { fillMax(b); });
