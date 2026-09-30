@@ -375,6 +375,119 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return { signed: signed, stillMissing: stillMissing };
   }
 
+  /* Per-op coverage table (visible gaps: pilot ops full, long tail title+fee+accounts).
+   * Titles follow #3 OPERATION_NAMES order/labels; amounts render via Format. */
+  var OP_TITLES = { 0: "Transfer", 1: "Limit order create", 2: "Limit order cancel",
+    3: "Call order update", 6: "Account update", 7: "Account whitelist", 8: "Account upgrade",
+    10: "Asset create", 14: "Asset issue", 19: "Feed publish", 22: "Proposal create",
+    23: "Proposal update", 24: "Proposal delete", 32: "Vesting create", 33: "Vesting withdraw",
+    37: "Balance claim", 48: "Asset update issuer", 49: "HTLC create", 50: "HTLC redeem",
+    54: "Custom authority create", 55: "Custom authority update", 56: "Custom authority delete",
+    57: "Ticket create", 58: "Ticket update", 59: "Pool create", 60: "Pool update",
+    61: "Pool deposit", 62: "Pool withdraw", 63: "Pool exchange", 75: "Pool claim" };
+
+  /* Batch precision read for distinct asset ids (one get_assets call). */
+  async function _assetPrecisions(ids) {
+    var out = {};
+    var uniq = ids.filter(function (id, i) { return ids.indexOf(id) === i; });
+    if (!uniq.length) return out;
+    try {
+      var C = globalThis.Chain;
+      var dbId = await C.db();
+      var rows = await C.call(dbId, "get_assets", [uniq]);
+      uniq.forEach(function (id, i) {
+        var r = rows && rows[i];
+        out[id] = (r && typeof r.precision === "number") ? { precision: r.precision, symbol: r.symbol || id } : null;
+      });
+    } catch (e) { uniq.forEach(function (id) { out[id] = null; }); }
+    return out;
+  }
+
+  /* Best-effort account name lookup; falls back to bare id plus a marker. */
+  async function _nameOf(id) {
+    try {
+      var A = globalThis.Account;
+      if (A && typeof A.resolve === "function") {
+        var r = await A.resolve(id);
+        if (r && r.name) return r.name + " (" + id + ")";
+      }
+    } catch (e) { /* fall through to bare id */ }
+    return id + " (unknown account)";
+  }
+
+  /* Format one raw amount slot; degrades to a labelled raw string, never blank. */
+  function _fmtAmt(raw, prec, sym) {
+    try { return globalThis.Format.formatAmount(String(raw), prec) + (sym ? " " + sym : ""); }
+    catch (e) { return String(raw) + " (raw)"; }
+  }
+
+  /* Human rows per op. Amounts via Format at the right precision (raw in title);
+   * accounts as name (id); fee row always present; raw JSON stays in the view's
+   * <details>, never here. Unknown opId returns the honest fallback. */
+  async function describe(opId, opData) {
+    var d = opData || {};
+    var title = OP_TITLES[opId] || ("op " + opId + " (not yet described)");
+    if (!OP_TITLES[opId]) {
+      return [{ label: "Operation", value: title }, { label: "Data", value: JSON.stringify(d) }];
+    }
+    var rows = [{ label: "Operation", value: title + " (op " + opId + ")" }];
+    var assetIds = [];
+    JSON.stringify(d);
+    (function collect(o) {
+      if (!o || typeof o !== "object") return;
+      if (typeof o.asset_id === "string" && /^\d+\.\d+\.\d+$/.test(o.asset_id) && typeof o.amount !== "undefined") assetIds.push(o.asset_id);
+      Object.keys(o).forEach(function (k) { if (o[k] && typeof o[k] === "object") collect(o[k]); });
+    })(d);
+    var precs = await _assetPrecisions(assetIds);
+    async function amtStr(slot) {
+      if (!slot || typeof slot.amount === "undefined") return "—";
+      var p = precs[slot.asset_id];
+      if (!p) return String(slot.asset_id) + " unresolved — showing raw " + String(slot.amount);
+      return _fmtAmt(slot.amount, p.precision, p.symbol);
+    }
+    if (opId === 0) {
+      rows.push({ label: "From", value: await _nameOf(d.from) });
+      rows.push({ label: "To", value: await _nameOf(d.to) });
+      var av = await amtStr(d.amount);
+      rows.push({ label: "Amount", value: av, title: String((d.amount || {}).amount) });
+      if (d.memo && d.memo.message) rows.push({ label: "Memo", value: String(d.memo.message).slice(0, 120) });
+    } else if (opId === 6) {
+      rows.push({ label: "Account", value: await _nameOf(d.account) });
+      var no = d.new_options || {};
+      rows.push({ label: "Voting account", value: String(no.voting_account || "—") });
+      rows.push({ label: "Votes", value: String(((no.votes || []).length) + " selected") });
+      rows.push({ label: "Witnesses / committee", value: String(no.num_witness || "—") + " / " + String(no.num_committee || "—") });
+    } else if (opId === 61) {
+      rows.push({ label: "Account", value: await _nameOf(d.account) });
+      rows.push({ label: "Pool", value: String(d.pool || "—") });
+      var a0 = await amtStr(d.amount_a), a1 = await amtStr(d.amount_b);
+      rows.push({ label: "Amount A", value: a0, title: String((d.amount_a || {}).amount) });
+      rows.push({ label: "Amount B", value: a1, title: String((d.amount_b || {}).amount) });
+    } else {
+      var ids = [];
+      (function idsOf(o) {
+        if (!o || typeof o !== "object") return;
+        Object.keys(o).forEach(function (k) {
+          if (typeof o[k] === "string" && /^1\.2\.\d+$/.test(o[k])) ids.push(o[k]);
+          else if (o[k] && typeof o[k] === "object") idsOf(o[k]);
+        });
+      })(d);
+      for (var i = 0; i < ids.length; i++) rows.push({ label: "Account", value: await _nameOf(ids[i]) });
+      Object.keys(d).forEach(function (k) {
+        if (k === "fee" || k === "extensions") return;
+        var v = d[k];
+        if (v && typeof v === "object" && typeof v.amount !== "undefined" && v.asset_id) return;
+        if (typeof v === "string" && /^1\.2\.\d+$/.test(v)) return;
+        rows.push({ label: k, value: typeof v === "object" ? JSON.stringify(v) : String(v) });
+      });
+    }
+    if (d.fee) {
+      var fp = precs[d.fee.asset_id];
+      rows.push({ label: "Fee", value: fp ? _fmtAmt(d.fee.amount, fp.precision, fp.symbol) : ("raw " + String(d.fee.amount) + " " + String(d.fee.asset_id)), title: String(d.fee.amount) });
+    }
+    return rows;
+  }
+
   TxBuilder.addOp = addOp;
   TxBuilder.removeOp = removeOp;
   TxBuilder.clear = clear;
@@ -389,6 +502,7 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
   TxBuilder.importJSON = importJSON;
   TxBuilder.resolveAuths = resolveAuths;
   TxBuilder.signLocal = signLocal;
+  TxBuilder.describe = describe;
   // feeAll / resolveAuths / buildUnsigned / signLocal / describe / wrapProposal /
   // exportJSON / importJSON / broadcastSigned land in Tasks 2-4+6 on this same global.
   if (typeof globalThis !== "undefined") { globalThis.TxBuilder = TxBuilder; }
