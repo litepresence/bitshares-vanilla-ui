@@ -38,8 +38,9 @@ class StubWS {
     else if (method === "get_dynamic_global_properties") {
       /* Audit-fix contract (H4/M1): real nodes always return the full
        * dynamic_global_property_object — the fake node must too, or the
-       * shape gate under test correctly rejects it. */
-      respond({ head_block_number: blockNum, head_block_id: "00" + "ab".repeat(31), time: "2026-01-01T00:00:00" });
+       * shape gate under test correctly rejects it. block_id_type is
+       * fc::ripemd160 (types.hpp:304) = 40 hex chars, NOT 64. */
+      respond({ head_block_number: blockNum, head_block_id: "060560c4c0d58ccb50f17443302bdc8096e7f34a", time: "2026-01-01T00:00:00" });
     }
   }
   close() {
