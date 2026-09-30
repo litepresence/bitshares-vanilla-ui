@@ -203,3 +203,78 @@
   MISSING (unjustified): still 0. Nothing got WORSE; newly uncertain: locked
   preview UX is headless-only until the human browser pass (not a coverage
   regression, a verification gap — noted, not hidden).
+
+## Punchlist delta (director round 1 `81f7b60` → verify-close `eca9ae1`)
+
+> Append-only note for the punchlist round (`81f7b60..eca9ae1`, ~30 commits).
+> Convention: same as above — behavior deltas only; status cells above are
+> NOT flipped by this round (all rows stay PORTED/DEFERRED as listed).
+> Every claim below was verified by `rg` in the cited file:line (never
+> invented). Headless-only caveat: no human browser pass ran in this round;
+> builder proof is `tooling/visual/shot.mjs` + `node --check` + headless
+> DOM text per `vanilla/notes/punchlist-2026-09-29.json` (`verified:
+> headless`). No `vanilla/js/tx.js` dispatch line was removed; the dispatch
+> set only grew (ops 20/21/29/30).
+
+- Ops 20/21/29/30 serializers ADDED (commit `872f25d`, no full inclusion —
+  fixture not LTM): builders `serializeWitnessCreateOp` (`tx.js:2342`),
+  `serializeWitnessUpdateOp` (`tx.js:2359`),
+  `serializeCommitteeMemberCreateOp` (`tx.js:2375`),
+  `serializeCommitteeMemberUpdateOp` (`tx.js:2390`) + dispatch
+  `tx.js:2423-2424,2432-2433`. Proof is evaluator-reached, not included:
+  `tooling/prove_witness_update_f1.cjs:1,20,25` (basic fixture hits the
+  `is_lifetime_member` assert in `witness_evaluator.cpp:35` /
+  `committee_member_evaluator.cpp:37`) + header honesty
+  `vote-ui.js:58-62` (needs an LTM payer; vote slate is the proven path).
+  Rows A15/B9 already carry this caveat — no status change.
+- Op-22 transfer-propose path LIVE (commit `8432b52`, code-live, chain-proof
+  as coded): Send/Propose toggle (`transfer-ui.js:435,497-503`), proposer +
+  expiration + review inputs (`transfer-ui.js:452-466,712-723`), op-0 wrapped
+  in op-22 via `Proposal.buildCreate` (`transfer-ui.js:62-66`,
+  `proposal.js:104-111`), wrapper serializer
+  `serializeProposalCreateOp` (`tx.js:1983`) + dispatch `tx.js:2425`,
+  confirm/broadcast `transfer-ui.js:1230-1407`. Task-claimed testnet proposal
+  `1.10.1492`: `rg -n 1492` finds NO in-repo hit (only slice-14
+  `1.10.1488/89/91` + barter `1.10.1491` in §A21/B7) — so `1492` is NOT
+  independently verified here and is NOT counted as proof. Code path is live;
+  chain inclusion for this id is unproven in-repo. Row C21 stays PORTED
+  (same op-0 + op-22 wrapper, new UI path only).
+- QuickTrade dual flow, SAME ops (commit `5ed6499`): dual SELL/RECEIVE +
+  swap + per-side balances + walkthrough (`instant-trade-ui.js:1-23,383,
+  521-622`), single op-1 `limit_order_create`
+  (`instant-trade-ui.js:703,836-840`, `fill_or_kill: true`), confirm rows
+  per #3 op-1 table (`instant-trade-ui.js:858-885`). `git show --stat
+  5ed6499` touches `instant-trade-ui.js` only — no `tx.js` change, no new
+  op. Row A31 stays PORTED.
+- Fee groups / LTM, READS only (commit `7958649`): grouped table
+  (`fees-ui.js:2-8,173-184`, `TYPE_ORDER` `fees-ui.js:84`),
+  `fee*scale/1e4` + LTM column + dash treatment
+  (`fees-ui.js:180,242,276-327`), sole reader `Asset.feeSchedule`
+  (`asset.js:209-232`). No serializer touched. Row C31 stays PORTED.
+- Account portfolio tabs, READS only (commit `53eea4b`): portfolio
+  columns/actions/tabs incl. Margin Positions + Credit Management reads
+  (`account-ui.js:544,621,1162,1301-1393`), membership op-8 section
+  (`account-ui.js:1154-1162`, dispatch `tx.js:2415`). No new op dispatch.
+  Row A2 stays PORTED.
+- Borrow open-position, OP-3 path as coded (commit `887a520`): open form
+  (`borrow-ui.js:196-197,421`), adjust form (`borrow-ui.js:189`),
+  broadcasts as coded (adjust `borrow-ui.js:323-340`, open
+  `borrow-ui.js:516-540`, bids `borrow-ui.js:737-754`), serializer
+  `serializeCallOrderUpdateOp` (`tx.js:1334`) + dispatch `tx.js:2412`.
+  No inclusion proof claimed beyond the code path. Row A20 stays PORTED.
+- Vote joins, BROADCAST per serializer status (commit `a7e9fc5` on top of
+  `872f25d`): `renderJoinWitness` (`vote-ui.js:885`),
+  `renderJoinCommittee` (`vote-ui.js:965`), join broadcast
+  (`vote-ui.js:1081-1098` via `Tx.buildTx` + `broadcast_transaction…`).
+  Broadcast is live per code; inclusion is subject to the same LTM-payer
+  caveat as ops 20/21/29/30 above. Rows A15/B9 stay PORTED with caveat.
+- Rest of the round is NO-OP-CHANGE (reads/UI/i18n/help): transfer gating
+  (`42f5b26`), explorer assets (`039eb60`), wallet console
+  (`f28d5e3`/`15b3e81`), vote budget/toggle (`15b3e81`), meds/lows
+  (`9e2c6be`-`f9ea49e`), prediction columns (`3fc3ee5`/`7868caf`),
+  help articles (`2b19d5e`), i18n batches (`c472d59`-`eca9ae1`). None touch
+  `tx.js` dispatch (verified: `git diff 5d4681b..eca9ae1 --stat` shows
+  `tx.js` changed ONLY in `872f25d`).
+- Counts this round: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20
+  substantive PORTED + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged.
+  MISSING (unjustified): still 0.
