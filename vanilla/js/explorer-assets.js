@@ -749,21 +749,20 @@ var ExplorerAssets = (function () {
       actBox.appendChild(tLink);
       /* Fund-fee-pool form (op 16) — anyone may fund any asset's pool with
        * CORE. Reads are public; the password is asked ONLY at signing
-       * (publish gates on the fresh WIF, same as asset-manage-ui). New
-       * labels are plain literals (no new t() keys) so check_i18n stays
-       * green without touching vanilla/locales/*. */
+       * (publish gates on the fresh WIF, same as asset-manage-ui). Batch-7
+       * i18n: labels keyed via t() under explorer dot fund, confirm, plus suffixes. */
       (function fundSection() {
-        actBox.appendChild(el(doc, "h3", "Fund fee pool (op 16)"));
+        actBox.appendChild(el(doc, "h3", t("explorer.fund_fee_pool_h", "Fund fee pool (op 16)")));
         var poolHuman = "—", poolRaw = (dyn && dyn.fee_pool !== undefined && dyn.fee_pool !== null)
           ? String(dyn.fee_pool) : null;
-        try { poolHuman = poolRaw === null ? "—" : Format.formatAmount(poolRaw, CORE_PRECISION) + " (core)"; }
-        catch (e) { poolHuman = String(poolRaw); }
-        var pPool = el(doc, "p", "Current pool: " + poolHuman, "muted");
+        try { poolHuman = poolRaw === null ? "—" : Format.formatAmount(poolRaw, CORE_PRECISION) + t("explorer.core_suffix", " (core)"); }
+          catch (e) { poolHuman = String(poolRaw); }
+        var pPool = el(doc, "p", t("explorer.current_pool_prefix", "Current pool: ") + poolHuman, "muted");
         if (poolRaw !== null) pPool.title = poolRaw;
         actBox.appendChild(pPool);
         try {
           if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-            actBox.appendChild(el(doc, "p", "Viewing as committee-account (1.2.0) — unlock to act as yourself.", "muted"));
+            actBox.appendChild(el(doc, "p", t("explorer.viewing_as_committee", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
         } catch (e) { /* notice is display-only */ }
         function fundField(label, val, mode, ph) {
           var row = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", label + " ");
@@ -773,10 +772,10 @@ var ExplorerAssets = (function () {
           inp.setAttribute("autocomplete", "off"); touchable(inp);
           lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
         }
-        var amtF = fundField("Amount (core, human — e.g. 0.1)", "0.1", "decimal", "0.1");
-        var whoF = fundField("From account (name or 1.2.N)", "1.2.0", null, "1.2.0");
+        var amtF = fundField(t("explorer.fund_amount_label", "Amount (core, human — e.g. 0.1)"), "0.1", "decimal", "0.1");
+        var whoF = fundField(t("explorer.fund_from_label", "From account (name or 1.2.N)"), "1.2.0", null, "1.2.0");
         actBox.appendChild(amtF.row); actBox.appendChild(whoF.row);
-        var review = touchable(el(doc, "button", "Review funding"));
+        var review = touchable(el(doc, "button", t("explorer.review_funding", "Review funding")));
         review.type = "button"; actBox.appendChild(review);
         var msgBox = el(doc, "div", null, "xplore-fundmsg");
         actBox.appendChild(msgBox);
@@ -791,11 +790,11 @@ var ExplorerAssets = (function () {
             if (typeof AssetOps === "undefined" || typeof Tx === "undefined" ||
                 typeof Account === "undefined" || typeof Wallet === "undefined" ||
                 typeof Format === "undefined" || typeof Chain === "undefined") {
-              throw new Error("Asset backend missing.");
+              throw new Error(t("explorer.fund_backend_missing", "Asset backend missing."));
             }
             var amountHuman = (amtF.input.value || "").trim();
             var raw = Format.parseAmount(amountHuman, CORE_PRECISION);
-            if (!/[1-9]/.test(raw)) throw new Error("Amount must be greater than zero.");
+            if (!/[1-9]/.test(raw)) throw new Error(t("explorer.fund_amount_zero", "Amount must be greater than zero."));
             var from = await Account.resolve((whoF.input.value || "").trim() || "1.2.0");
             var before = poolRaw;
             var pair = AssetOps.buildFundFeePool({
@@ -806,7 +805,7 @@ var ExplorerAssets = (function () {
             pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
             if (!isCurrent(myGen)) return;
             while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
-            actBox.appendChild(el(doc, "h3", "Confirm fee-pool funding"));
+            actBox.appendChild(el(doc, "h3", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
             var dl = el(doc, "dl", null, "xfer-confirm");
             function confRow(term, human, rawTitle) {
               dl.appendChild(el(doc, "dt", term));
@@ -814,33 +813,33 @@ var ExplorerAssets = (function () {
               dl.appendChild(dd);
             }
             var amtHuman;
-            try { amtHuman = Format.formatAmount(raw, CORE_PRECISION) + " (core)"; }
+            try { amtHuman = Format.formatAmount(raw, CORE_PRECISION) + t("explorer.core_suffix", " (core)"); }
             catch (e) { amtHuman = String(raw); }
-            confRow("Asset", a.symbol + " (" + a.id + ")");
-            confRow("Amount", amtHuman, raw);
-            confRow("From", (from.name || from.id) + " (" + from.id + ")");
+            confRow(t("explorer.confirm_asset", "Asset"), a.symbol + " (" + a.id + ")");
+            confRow(t("explorer.confirm_amount", "Amount"), amtHuman, raw);
+            confRow(t("explorer.confirm_from", "From"), (from.name || from.id) + " (" + from.id + ")");
             var feeHuman;
-            try { feeHuman = Format.formatAmount(String(f.amount), CORE_PRECISION) + " (core)"; }
+            try { feeHuman = Format.formatAmount(String(f.amount), CORE_PRECISION) + t("explorer.core_suffix", " (core)"); }
             catch (e) { feeHuman = String(f.amount); }
-            confRow("Fee", feeHuman, String(f.amount));
+            confRow(t("explorer.confirm_fee", "Fee"), feeHuman, String(f.amount));
             var netName = "testnet";
             try { netName = (typeof Store !== "undefined" && Store.loadSettings().network) || "testnet"; }
             catch (e) { /* display-only */ }
-            confRow("Network", netName);
+            confRow(t("explorer.confirm_network", "Network"), netName);
             actBox.appendChild(dl);
-            var back = touchable(el(doc, "button", "Back")); back.type = "button";
-            var send = touchable(el(doc, "button", "Sign & Send")); send.type = "button";
+            var back = touchable(el(doc, "button", t("explorer.fund_back", "Back"))); back.type = "button";
+            var send = touchable(el(doc, "button", t("explorer.fund_sign_send", "Sign & Send"))); send.type = "button";
             actBox.appendChild(back); actBox.appendChild(send);
             back.addEventListener("click", function () { renderAsset(root, symbol); });
             send.addEventListener("click", function () {
               back.disabled = true; send.disabled = true;
-              var st = el(doc, "p", "Signing…", "muted");
+              var st = el(doc, "p", t("explorer.fund_signing", "Signing…"), "muted");
               st.setAttribute("aria-live", "polite"); actBox.appendChild(st);
               (async function () {
                 var unsigned = await Tx.buildTx([pair]);
                 var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
                 if (!wif) throw new Error("wallet-locked");
-                st.textContent = "Broadcasting…";
+                st.textContent = t("explorer.fund_broadcasting", "Broadcasting…");
                 var r = await AssetOps.sendAndProve(unsigned, wif, async function () {
                   try {
                     var n = await Explorer.asset(a.symbol);
@@ -858,33 +857,33 @@ var ExplorerAssets = (function () {
                 } catch (e) { /* head is display-only */ }
                 if (!isCurrent(myGen)) return;
                 while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
-                actBox.appendChild(el(doc, "h1", "Fee pool funded"));
+                actBox.appendChild(el(doc, "h1", t("explorer.funded_h", "Fee pool funded")));
                 var okP = el(doc, "p",
-                  "Observed at head block #" + headN + " (" + r.via + ").", "xfer-ok");
+                  t("explorer.observed_prefix", "Observed at head block #") + headN + " (" + r.via + ").", "xfer-ok");
                 okP.setAttribute("aria-live", "polite"); actBox.appendChild(okP);
                 actBox.appendChild(el(doc, "p",
-                  amtHuman + " → " + a.symbol + " pool (re-read delta matches).", "muted"));
-                var backLink = anchor(doc, "Open " + a.symbol, "#/asset/" + a.symbol);
+                  amtHuman + " → " + a.symbol + t("explorer.pool_delta_suffix", " pool (re-read delta matches)."), "muted"));
+                var backLink = anchor(doc, t("explorer.open_prefix", "Open ") + a.symbol, "#/asset/" + a.symbol);
                 actBox.appendChild(backLink);
               })().catch(function (e) {
                 try { actBox.removeChild(st); } catch (x) { /* gone */ }
-                var m = (e && e.message) ? e.message : String(e || "Send failed.");
-                if (m.indexOf("wallet-locked") !== -1) m = "Wallet is locked.";
+                var m = (e && e.message) ? e.message : String(e || t("explorer.send_failed", "Send failed."));
+                if (m.indexOf("wallet-locked") !== -1) m = t("explorer.wallet_locked_msg", "Wallet is locked.");
                 else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) {
-                  m = "Network unavailable. Check Settings → Nodes and retry.";
+                  m = t("explorer.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
                 }
                 fundMsg(m, true); back.disabled = false;
               });
             });
           })().catch(function (e) {
             review.disabled = false;
-            var m = (e && e.message) ? e.message : String(e || "Could not prepare the funding.");
+            var m = (e && e.message) ? e.message : String(e || t("explorer.prepare_failed", "Could not prepare the funding."));
             fundMsg(m, true);
           });
         });
       })();
       actBox.appendChild(el(doc, "p",
-        "Fee-pool claiming (issuer) stays deferred here — no claim serializer in this view.", "muted"));
+        t("explorer.claim_deferred", "Fee-pool claiming (issuer) stays deferred here — no claim serializer in this view."), "muted"));
       if (!j.is_smartcoin) {
         infoBox.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;

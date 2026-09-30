@@ -522,7 +522,7 @@ var AccountUI = (function () {
           var mid = doc.createElement("div");
           mid.className = "muted";
           mid.textContent = r.priceH + " BTS · " + r.valueH + " BTS";
-          if (r.priceFull) mid.title = r.priceFull + " BTS (full chain precision)";
+          if (r.priceFull) mid.title = r.priceFull + t("account.price_full_suffix", " BTS (full chain precision)");
           card.appendChild(mid);
           var acts = doc.createElement("div");
           acts.appendChild(actionLinks(doc, r.b.symbol, btsSym));
