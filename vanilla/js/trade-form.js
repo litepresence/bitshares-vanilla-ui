@@ -804,40 +804,6 @@ var TradeForm = (function () {
       });
   }
 
-  /* Locked scaled "Unlock & review": same gate as single orders — unlock,
-   * keep the scaled inputs on P.scaled, then run the existing reviewScaled
-   * -> paintConfirmScaled path. Never clears inputs. */
-  function unlockAndReviewScaled(doc, body, mount, P, spec, refs, btn) {
-    refs.pwErr.textContent = "";
-    btn.disabled = true;
-    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
-    /* H2: password wiped from input + local once consumed (both outcomes). */
-    var pw = refs.pwField.input.value;
-    Promise.resolve()
-      .then(function () { return Wallet.unlock(pw); })
-      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
-      .then(function () { return Account.myAccountId(); })
-      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
-      .then(function (me) {
-        P.me = me;
-        try { body.removeChild(status); } catch (e) { /* gone */ }
-        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
-        return reviewScaled(P, spec).then(function (R) {
-          paintConfirmScaled(doc, mount, P, R);
-        }).catch(function (e) {
-          try { body.removeChild(status2); } catch (x) { /* gone */ }
-          throw e;
-        });
-      })
-      .catch(function (e) {
-        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
-        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
-        pw = null;
-        btn.disabled = false;
-        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
-      });
-  }
-
   /* Desk entry: renderDual(doc, buyMount, sellMount, ctx). Guards backends,
    * then paints TWO always-visible panels (retro 2x3 row 1: Buy QUOTE |
    * Sell QUOTE — reference vanilla/notes/original-buy-sell-2x3 shot): the
