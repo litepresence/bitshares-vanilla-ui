@@ -45,7 +45,8 @@ var SettingsPrefs = (function () {
   /* Theme selector (ref-ui-theme/vanilla-ui-theme/dex-ux-theme, current
    * selected; option labels are the same human names the header switcher
    * shows (app.js THEME_NAMES) so both copies agree — values stay the ids.
-   * English literals, no dict churn, matching the header pattern).
+   * Batch-8 i18n: labels keyed via t() under settings dot theme, header
+   * copy in app.js stays plain until its own batch owns it).
    * The change handler (settings.js) persists + flips data-theme on <html>.
    * Params: doc, settings, t. Returns: {label, select}. */
   function buildTheme(doc, settings, t) {
@@ -54,15 +55,15 @@ var SettingsPrefs = (function () {
     var themeSelect = doc.createElement("select");
     themeSelect.id = "theme-select";
     var themeNames = {
-      "ref-ui-theme": "Classic",
-      "vanilla-ui-theme": "Vanilla light",
-      "dex-ux-theme": "DEX dark"
+      "ref-ui-theme": t("settings.theme_classic", "Classic"),
+      "vanilla-ui-theme": t("settings.theme_vanilla_light", "Vanilla light"),
+      "dex-ux-theme": t("settings.theme_dex_dark", "DEX dark")
     };
-    ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"].forEach(function (t) {
+    ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"].forEach(function (id) {
       var opt = doc.createElement("option");
-      opt.value = t;
-      opt.textContent = themeNames[t] || t;
-      if (settings.theme === t) opt.selected = true;
+      opt.value = id;
+      opt.textContent = themeNames[id] || id;
+      if (settings.theme === id) opt.selected = true;
       themeSelect.appendChild(opt);
     });
     themeLabel.appendChild(themeSelect);

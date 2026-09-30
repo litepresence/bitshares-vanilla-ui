@@ -2618,7 +2618,10 @@
       "explorer.review_funding",
       "explorer.send_failed",
       "explorer.viewing_as_committee",
-      "explorer.wallet_locked_msg"
+      "explorer.wallet_locked_msg",
+      "settings.theme_classic",
+      "settings.theme_vanilla_light",
+      "settings.theme_dex_dark"
     ]
   },
   "nav": {
@@ -2654,7 +2657,10 @@
     "pending": "…",
     "dash": "—",
     "connecting": "connecting",
-    "down": "down"
+    "down": "down",
+    "theme_classic": "Classic",
+    "theme_vanilla_light": "Vanilla light",
+    "theme_dex_dark": "DEX dark"
   },
   "shell": {
     "brand": "BitShares",

@@ -104,7 +104,10 @@
     "pending": "…",
     "dash": "—",
     "connecting": "conectando",
-    "down": "caído"
+    "down": "caído",
+    "theme_classic": "Classic",
+    "theme_vanilla_light": "Vanilla light",
+    "theme_dex_dark": "DEX dark"
   },
   "shell": {
     "brand": "BitShares",
