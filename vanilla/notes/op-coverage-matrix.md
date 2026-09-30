@@ -233,12 +233,14 @@
   in op-22 via `Proposal.buildCreate` (`transfer-ui.js:62-66`,
   `proposal.js:104-111`), wrapper serializer
   `serializeProposalCreateOp` (`tx.js:1983`) + dispatch `tx.js:2425`,
-  confirm/broadcast `transfer-ui.js:1230-1407`. Task-claimed testnet proposal
-  `1.10.1492`: `rg -n 1492` finds NO in-repo hit (only slice-14
-  `1.10.1488/89/91` + barter `1.10.1491` in §A21/B7) — so `1492` is NOT
-  independently verified here and is NOT counted as proof. Code path is live;
-  chain inclusion for this id is unproven in-repo. Row C21 stays PORTED
-  (same op-0 + op-22 wrapper, new UI path only).
+  confirm/broadcast `transfer-ui.js:1230-1407`. Testnet inclusion PROVEN
+  (commits `13a15a0` byte-proof + `5320596` inclusion): proposal **`1.10.1493`**
+  at head **`100989922`**, inner op-0 lite-test-1→committee-account amount 1,
+  fee 4787 raw TEST, re-read via `get_objects` (proposer/expiry/review/enclosed
+  op confirmed; artifacts `tooling/prove_transfer_propose_f2.cjs` +
+  `vanilla/notes/propose-proof-2026-09-29.md`). Prior claimed `1.10.1492`
+  remains unverified/uncounted (self-transfer shape is consensus-illegal).
+  Row C21 stays PORTED (same op-0 + op-22 wrapper, new UI path only).
 - QuickTrade dual flow, SAME ops (commit `5ed6499`): dual SELL/RECEIVE +
   swap + per-side balances + walkthrough (`instant-trade-ui.js:1-23,383,
   521-622`), single op-1 `limit_order_create`
