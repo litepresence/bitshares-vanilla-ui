@@ -368,8 +368,8 @@ var VoteUI = (function () {
       box.setAttribute("aria-disabled", "true");
       touchable(box);
       lab.appendChild(box);
-      lab.appendChild(doc.createTextNode(" Hide legacy proposals (always on — expired workers are excluded at fetch)"));
-      lab.title = "Worker lists come from get_all_workers(false); expired rows never arrive.";
+      lab.appendChild(doc.createTextNode(t("vote.hide_legacy_label", " Hide legacy proposals (always on — expired workers are excluded at fetch)")));
+      lab.title = t("vote.hide_legacy_title", "Worker lists come from get_all_workers(false); expired rows never arrive.");
       wrap.appendChild(lab);
     })();
     var joinBox = el(doc, "div", null, "vote-join");

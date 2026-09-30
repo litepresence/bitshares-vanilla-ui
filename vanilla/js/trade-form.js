@@ -982,8 +982,8 @@ var TradeForm = (function () {
         var brow = el(doc, "p", null, "muted");
         var blink = doc.createElement("a");
         blink.href = "#/borrow";
-        blink.textContent = "Borrow (margin)";
-        blink.title = "Open a margin position on the borrow desk";
+        blink.textContent = t("trade.borrow_margin_link", "Borrow (margin)");
+        blink.title = t("trade.borrow_margin_title", "Open a margin position on the borrow desk");
         brow.appendChild(blink);
         mountEl.appendChild(brow);
       })();

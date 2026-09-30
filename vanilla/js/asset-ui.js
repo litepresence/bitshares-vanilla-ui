@@ -155,7 +155,7 @@ var AssetUI = (function () {
      * list auto-loads once the prefill below resolves. Plain literals only. */
     (function browseAll() {
       var p = el(d, "p", null, "muted");
-      var a = d.createElement("a"); a.setAttribute("href", "#/explorer/assets"); a.textContent = "Browse all assets"; touch(a);
+      var a = d.createElement("a"); a.setAttribute("href", "#/explorer/assets"); a.textContent = t("asset.browse_all", "Browse all assets"); touch(a);
       p.appendChild(a); w.appendChild(p);
     })();
     var list = el(d, "div", null, "asset-list"); w.appendChild(list);

@@ -338,8 +338,8 @@ var MarketDesk = (function () {
       flipBtn.type = "button";
       flipBtn.id = "mkt-head-flip";
       flipBtn.textContent = "⇄";
-      flipBtn.title = "Invert market pair";
-      flipBtn.setAttribute("aria-label", "Invert market pair");
+      flipBtn.title = t("market.invert_label", "Invert market pair");
+      flipBtn.setAttribute("aria-label", t("market.invert_label", "Invert market pair"));
       touchable(flipBtn);
       flipBtn.addEventListener("click", function () {
         try {

@@ -147,11 +147,11 @@ var CreateAccountUI = (function () {
      * unlocks an existing wallet. Plain literals only. */
     (function selectorCard() {
       var card = el(doc, "div", null, "ca-selector");
-      card.appendChild(el(doc, "strong", "Create account (this form)"));
+      card.appendChild(el(doc, "strong", t("createaccount.selector_this_form", "Create account (this form)")));
       card.appendChild(doc.createTextNode(" · "));
       var a = doc.createElement("a");
       a.href = "#/login";
-      a.textContent = "Login instead";
+      a.textContent = t("createaccount.login_instead", "Login instead");
       touchable(a);
       card.appendChild(a);
       wrap.appendChild(card);

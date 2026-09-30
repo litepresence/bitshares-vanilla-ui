@@ -175,7 +175,9 @@
     "borrow_page": "borrow page",
     "total": "Total ≈ ",
     "advanced_form": "Advanced form",
-    "restore_your_account": "Restore your account"
+    "restore_your_account": "Restore your account",
+    "gate_create_account": "Create account",
+    "gate_login": "Login"
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -804,7 +806,9 @@
     "thin_summary_top_50_names_and_activity": "Thin summary (top 50, names and activity only) — weights and publishing live on the voting page.",
     "to_mid": " to ",
     "updated_account": " updated account",
-    "updated_margin_position": " updated margin position"
+    "updated_margin_position": " updated margin position",
+    "raw_json": "Raw JSON",
+    "raw_op_aria": "Show raw operation JSON"
   },
   "gateway": {
     "title": "Deposit / Withdraw",
@@ -1421,7 +1425,9 @@
     "unlocking": "Unlocking…",
     "yes": "Yes",
     "highest_bid_lives_in_the_order_book_above": "Highest bid lives in the order book above — click a bid row to fill the price.",
-    "lowest_ask_lives_in_the_order_book_above": "Lowest ask lives in the order book above — click an ask row to fill the price."
+    "lowest_ask_lives_in_the_order_book_above": "Lowest ask lives in the order book above — click an ask row to fill the price.",
+    "borrow_margin_link": "Borrow (margin)",
+    "borrow_margin_title": "Open a margin position on the borrow desk"
   },
   "transfer": {
     "title": "Transfer",
@@ -1617,7 +1623,20 @@
     "have_a_bin_backup_file_or_bare_private_k": "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.",
     "open_the_dashboard": "Open the dashboard",
     "wallet_manager": "Wallet manager",
-    "ways_in": "Ways in: "
+    "ways_in": "Ways in: ",
+    "console_active_prefix": "Active wallet: ",
+    "console_change_password": "Change password",
+    "console_claims": "Balance claims",
+    "console_empty": "No wallet on this device yet.",
+    "console_import_keys": "Import keys",
+    "console_locked_suffix": " (locked)",
+    "console_new_wallet": "New wallet",
+    "console_single_key_note": "Single-key wallet: .bin backup files and bare private keys (WIF) are not supported — brainkey import only.",
+    "console_title": "Wallet console",
+    "console_unlocked_suffix": " (unlocked)",
+    "console_unnamed": "unnamed",
+    "option_backup_types": "Backup types",
+    "option_wallet_types": "Wallet types"
   },
   "auth": {
     "a_local_wallet_creates_a_brainkey_on_this_dev": "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password.",
@@ -1749,7 +1768,9 @@
     "unexpected_error": "Unexpected error",
     "wallet_saved_the_account_keys_are_now_unlocke": "Wallet saved. The account keys are now unlocked on this device.",
     "advanced_form": "Advanced form",
-    "restore_your_account": "Restore your account"
+    "restore_your_account": "Restore your account",
+    "login_instead": "Login instead",
+    "selector_this_form": "Create account (this form)"
   },
   "createworker": {
     "back": "Back",
@@ -2442,7 +2463,9 @@
     "role": "Role",
     "url": "URL",
     "proxies_follow_another_account_s_slate_re": "Proxies follow another account's slate — read how voting works before setting one.",
-    "what_is_a_proxy": "? What is a proxy?"
+    "what_is_a_proxy": "? What is a proxy?",
+    "hide_legacy_label": " Hide legacy proposals (always on — expired workers are excluded at fetch)",
+    "hide_legacy_title": "Worker lists come from get_all_workers(false); expired rows never arrive."
   },
   "asset": {
     "acting_field": "Acting account (name or 1.2.N)",
@@ -2550,7 +2573,8 @@
     "description_is_one_text_box_write_the_fu": "Description is one text box: write the full description here (main, short name, market pair and details as plain text).",
     "issue": "Issue",
     "issuer_defaults_to_the_viewing_as_accoun": "Issuer defaults to the viewing-as account (1.2.0 locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here.",
-    "open_an_account": "Open an account"
+    "open_an_account": "Open an account",
+    "browse_all": "Browse all assets"
   },
   "pool": {
     "a_to_b_col": "A→B out (raw)",

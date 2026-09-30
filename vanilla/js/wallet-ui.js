@@ -278,7 +278,7 @@ var WalletUI = (function () {
     var box = doc.createElement("section");
     box.className = "wallet-console";
     var h = doc.createElement("h2");
-    h.textContent = "Wallet console";
+    h.textContent = t("wallet.console_title", "Wallet console");
     box.appendChild(h);
     var name = null;
     try { name = localStorage.getItem("bts-vanilla-wallet-name-v1"); } catch (e) { name = null; }
@@ -286,8 +286,8 @@ var WalletUI = (function () {
     try { unlocked = Wallet.isUnlocked(); } catch (e) { unlocked = false; }
     var line = doc.createElement("p");
     line.textContent = stored
-      ? "Active wallet: " + (name || "unnamed") + (unlocked ? " (unlocked)" : " (locked)")
-      : "No wallet on this device yet.";
+      ? t("wallet.console_active_prefix", "Active wallet: ") + (name || t("wallet.console_unnamed", "unnamed")) + (unlocked ? t("wallet.console_unlocked_suffix", " (unlocked)") : t("wallet.console_locked_suffix", " (locked)"))
+      : t("wallet.console_empty", "No wallet on this device yet.");
     box.appendChild(line);
     var links = doc.createElement("p");
     function link(href, text) {
@@ -297,18 +297,18 @@ var WalletUI = (function () {
       return a;
     }
     if (stored) {
-      links.appendChild(link("#/vesting", "Balance claims"));
+      links.appendChild(link("#/vesting", t("wallet.console_claims", "Balance claims")));
       links.appendChild(doc.createTextNode(" · "));
-      links.appendChild(link("#/wallet/password", "Change password"));
+      links.appendChild(link("#/wallet/password", t("wallet.console_change_password", "Change password")));
       links.appendChild(doc.createTextNode(" · "));
     }
-    links.appendChild(link("#/existing-account", "Import keys"));
+    links.appendChild(link("#/existing-account", t("wallet.console_import_keys", "Import keys")));
     links.appendChild(doc.createTextNode(" · "));
-    links.appendChild(link("#/create-wallet-brainkey", "New wallet"));
+    links.appendChild(link("#/create-wallet-brainkey", t("wallet.console_new_wallet", "New wallet")));
     box.appendChild(links);
     var note = doc.createElement("p");
     note.className = "muted";
-    note.textContent = "Single-key wallet: .bin backup files and bare private keys (WIF) are not supported — brainkey import only.";
+    note.textContent = t("wallet.console_single_key_note", "Single-key wallet: .bin backup files and bare private keys (WIF) are not supported — brainkey import only.");
     box.appendChild(note);
     return box;
   }
@@ -652,10 +652,10 @@ var WalletUI = (function () {
     (function optionHelp() {
       var hp = doc.createElement("p");
       hp.className = "muted";
-      var hw = doc.createElement("a"); hw.href = "#/help/wallets"; hw.textContent = "Wallet types";
+      var hw = doc.createElement("a"); hw.href = "#/help/wallets"; hw.textContent = t("wallet.option_wallet_types", "Wallet types");
       hp.appendChild(hw);
       hp.appendChild(doc.createTextNode(" · "));
-      var hb = doc.createElement("a"); hb.href = "#/help/backups"; hb.textContent = "Backup types";
+      var hb = doc.createElement("a"); hb.href = "#/help/backups"; hb.textContent = t("wallet.option_backup_types", "Backup types");
       hp.appendChild(hb);
       box.appendChild(hp);
     })();

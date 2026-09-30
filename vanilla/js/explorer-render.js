@@ -413,8 +413,8 @@ var ExplorerRender = (function () {
       var det = doc.createElement("details");
       det.className = "raw";
       var sum = doc.createElement("summary");
-      sum.setAttribute("aria-label", "Show raw operation JSON");
-      sum.textContent = "Raw JSON";
+      sum.setAttribute("aria-label", t("explorer.raw_op_aria", "Show raw operation JSON"));
+      sum.textContent = t("explorer.raw_json", "Raw JSON");
       det.appendChild(sum);
       var pre = doc.createElement("pre");
       pre.textContent = JSON.stringify(op, null, 2);

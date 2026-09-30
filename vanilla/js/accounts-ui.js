@@ -144,12 +144,12 @@ var AccountsUI = (function () {
         var p = el(doc, "p", null, "muted");
         var c = doc.createElement("a");
         c.href = "#/create-account";
-        c.textContent = "Create account";
+        c.textContent = t("account.gate_create_account", "Create account");
         p.appendChild(c);
         p.appendChild(doc.createTextNode(" · "));
         var l = doc.createElement("a");
         l.href = "#/login";
-        l.textContent = "Login";
+        l.textContent = t("account.gate_login", "Login");
         p.appendChild(l);
         wrap.appendChild(p);
       })();
