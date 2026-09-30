@@ -1,5 +1,5 @@
 /* tx.js — graphene serializer registry + dispatch (ops 0-3, 6-8,
- * 10-15, 19-24, 25-30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75, 76).
+ * 10-16, 19-24, 25-30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75, 76).
  * Envelope/fee/sign/send live in tx-send.js (slice-18 cap split).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
@@ -7,7 +7,7 @@
  * (op 6), account_whitelist (op 7), account_upgrade (op 8),
  * asset_create (op 10), asset_update (op 11), asset_update_bitasset (op 12),
  * asset_update_feed_producers (op 13), asset_issue (op 14), asset_reserve
- * (op 15), asset_publish_feed (op 19), witness_create (op 20),
+ * (op 15), asset_fund_fee_pool (op 16), asset_publish_feed (op 19), witness_create (op 20),
  * witness_update (op 21), proposal_create/update/delete (ops
  * 22/23/24), withdraw_permission_create (op 25),
  * withdraw_permission_update (op 26), withdraw_permission_claim (op 27),
@@ -107,11 +107,16 @@
  *                              + #4 .../protocol/asset_ops.hpp:485-505 (struct)
  * - serializeAssetReserveOp <- #3 bitshares-api.js:2556-2563
  *                              + #4 .../protocol/asset_ops.hpp:513-524 (struct)
+ * - serializeAssetFundFeePoolOp <- #3 bitshares-api.js:2566-2576
+ *                              + #4 .../protocol/asset_ops.hpp:322-334 (struct)
+ *                              + FC :728 (fee)(from_account)(asset_id)(amount)(extensions)
+ *                              + BJS operations.js asset_fund_fee_pool (order match,
+ *                              fetched 2026-09-30; amount is int64 core, NOT an asset)
  * - serializeAssetPublishFeedOp
  *                           <- #3 bitshares-api.js:2610-2618
  *                              + #4 .../protocol/asset_ops.hpp:462-480 (struct)
- * - ops 10-15, 19 ids       <- #4 .../protocol/operations.hpp:66-75
- *                              (/* 10 *\/ … /* 19 *\/)
+ * - ops 10-16, 19 ids      <- #4 .../protocol/operations.hpp:66-72, :75
+ *                              (/* 10 *\/ … /* 16 *\/, /* 19 *\/; 17/18 deferred)
  * - serializeTimestamp       <- #3 bitshares-api.js:1959-1973 (ISO-with-Z /
  *                              unix-seconds -> u32 LE; vanilla throws on
  *                              missing/unparseable input instead of defaulting
@@ -327,6 +332,9 @@
  *   (extensions) <- struct .../protocol/asset_ops.hpp:485-505
  * - asset_reserve order (fee)(payer)(amount_to_reserve)(extensions)
  *   <- struct .../protocol/asset_ops.hpp:513-524
+ * - asset_fund_fee_pool order (fee)(from_account)(asset_id)(amount)(extensions)
+ *   <- struct .../protocol/asset_ops.hpp:322-334 + FC :728; amount is a
+ *   bare int64 in CORE units (not an asset pair — unlike op 15)
  * - asset_publish_feed order (fee)(publisher)(asset_id)(feed)(extensions)
  *   <- struct .../protocol/asset_ops.hpp:462-480
  * - asset_options order (max_supply)(market_fee_percent)(max_market_fee)
@@ -344,7 +352,8 @@
  *   governs the bytes — matches #3's serializer)
  * - price order (base)(quote), asset order (amount)(asset_id)
  *   <- .../protocol/asset.hpp:309-310
- * - ops 10-19 ids <- .../protocol/operations.hpp:66-75
+ * - ops 10-16, 19 ids <- .../protocol/operations.hpp:66-72 (10-16), :75 (19);
+ *   17/18 (settle/global-settle) stay deferred — no serializer here
  * - htlc_create order (fee)(from)(to)(amount)(preimage_hash)
  *   (preimage_size)(claim_period_seconds)(extensions)
  *   <- .../protocol/htlc.hpp:226-227
@@ -1024,6 +1033,23 @@ var Tx = (function () {
       serializeAsset(op.fee),
       serializeObjectId(op.payer),
       serializeAsset(op.amount_to_reserve),
+      varintUint32(0)
+    ]);
+  }
+
+  /* asset_fund_fee_pool (op 16) in #4 FC order: fee, from_account, asset_id,
+   * amount (bare int64 in CORE units), extensions. The amount is NOT an
+   * asset pair (unlike op 15) — #4 asset_ops.hpp:329 marks it `share_type`
+   * (core asset), BJS asset_fund_fee_pool + #3 :2572-2573 agree (int64).
+   * writeInt64LE throws loudly on missing/non-digit input — no `|| 0`
+   * fallback (a forgotten amount must fail, not fund zero). */
+  function serializeAssetFundFeePoolOp(op) {
+    if (!op || typeof op !== "object") throw new Error("asset_fund_fee_pool op must be an object");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.from_account),
+      serializeObjectId(op.asset_id),
+      writeInt64LE(op.amount),
       varintUint32(0)
     ]);
   }
@@ -2419,6 +2445,7 @@ var Tx = (function () {
     if (opType === 13) return serializeAssetUpdateFeedProducersOp(opData);
     if (opType === 14) return serializeAssetIssueOp(opData);
     if (opType === 15) return serializeAssetReserveOp(opData);
+    if (opType === 16) return serializeAssetFundFeePoolOp(opData);
     if (opType === 19) return serializeAssetPublishFeedOp(opData);
     if (opType === 20) return serializeWitnessCreateOp(opData);
     if (opType === 21) return serializeWitnessUpdateOp(opData);
@@ -2461,7 +2488,7 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19-24, 25-28, 29, 30, 32-34, 37, " +
+    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-16, 19-24, 25-28, 29, 30, 32-34, 37, " +
       "45, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
@@ -2493,6 +2520,7 @@ var Tx = (function () {
       else if (opType === 13) parts.push(serializeAssetUpdateFeedProducersOp(opData));
       else if (opType === 14) parts.push(serializeAssetIssueOp(opData));
       else if (opType === 15) parts.push(serializeAssetReserveOp(opData));
+      else if (opType === 16) parts.push(serializeAssetFundFeePoolOp(opData));
       else if (opType === 19) parts.push(serializeAssetPublishFeedOp(opData));
       else if (opType === 20) parts.push(serializeWitnessCreateOp(opData));
       else if (opType === 21) parts.push(serializeWitnessUpdateOp(opData));
@@ -2553,7 +2581,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-15, 19-24, 25-28, 29, 30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-16, 19-24, 25-28, 29, 30, 32-34, 37, 45, 49, 50, 52, 54-58, 59-73, 75 and 76 (38 issuer-only; 39/40/41 blind-downscoped; 46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2570,6 +2598,7 @@ var Tx = (function () {
       account_upgrade: 8,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,
       asset_update_feed_producers: 13, asset_issue: 14, asset_reserve: 15,
+      asset_fund_fee_pool: 16,
       asset_publish_feed: 19,
       witness_create: 20, witness_update: 21,
       proposal_create: 22, proposal_update: 23, proposal_delete: 24,
@@ -2628,6 +2657,7 @@ var Tx = (function () {
       serializeAssetUpdateFeedProducersOp: serializeAssetUpdateFeedProducersOp,
       serializeAssetIssueOp: serializeAssetIssueOp,
       serializeAssetReserveOp: serializeAssetReserveOp,
+      serializeAssetFundFeePoolOp: serializeAssetFundFeePoolOp,
       serializeAssetPublishFeedOp: serializeAssetPublishFeedOp,
       assertGovUrl: assertGovUrl,
       serializeWitnessCreateOp: serializeWitnessCreateOp,

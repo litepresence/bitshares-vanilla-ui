@@ -1,7 +1,8 @@
 /* ExplorerAssets: asset views for the explorer (tables + #/asset/:symbol).
  * Owns: the Assets tab table (25/page lower-bound paging), the Feeds tab
- *   (smartcoin scan), #/asset/:symbol (human supply/fees + feed section),
- *   plus the pctHundredths/ratio1000/lifetimeText helpers. The generic
+ *   (smartcoin scan), #/asset/:symbol (human supply/fees + feed section +
+ *   fee-pool FUND form op 16 with review + unlock-at-sign + pool-delta
+ *   re-read proof), plus the pctHundredths/ratio1000/lifetimeText helpers. The generic
  *   value-rendering layer (fieldRow/fillValue/opSection/renderObjectPanel,
  *   amount/price spans, account/asset/object links) moved to
  *   js/explorer-render.js (ExplorerRender, slice-18 split) — this file
@@ -53,6 +54,9 @@ var ExplorerAssets = (function () {
   var FEED_SCAN_PAGES = 4; /* asset pages scanned for smartcoins */
   var FEED_MAX = 10; /* smartcoins shown on the Feeds tab */
   var PRICE_PLACES = 8; /* market.js/market-orders.js convention (mirrors ExplorerRender.PRICE_PLACES) */
+  var CORE_PRECISION = 5; /* fee_pool lives in core asset (asset_object.hpp:65;
+   * GRAPHENE_BLOCKCHAIN_PRECISION = 10^5, config.hpp:29-30; same const as
+   * ExplorerRender.CORE_PRECISION — never the funded asset's precision) */
   var ACCT_RE = /^1\.2\.\d+$/; /* issuer-id check for account links (mirrors ExplorerRender's copy) */
 
   /* Assets-tab UI state (punchlist HIGHs, #1 Assets.jsx:432-490 concepts):
@@ -655,6 +659,21 @@ var ExplorerAssets = (function () {
         }
         target.appendChild(dd);
       }
+      /* Fee-pool row in CORE precision (not the asset precision above):
+       * dyn.fee_pool funds fee payments in core asset (#1 FeePoolOperation
+       * uses core precision; #2 shows feePoolBalance in CORE_PRECISION).
+       * Using prec here would misplace the decimal on any p!=5 asset. */
+      function coreRowInto(target, term, raw) {
+        target.appendChild(el(doc, "dt", term));
+        var dd = doc.createElement("dd");
+        if (raw === undefined || raw === null) dd.textContent = "—";
+        else {
+          try { dd.textContent = Format.formatAmount(String(raw), CORE_PRECISION); }
+          catch (e) { dd.textContent = String(raw); }
+          dd.title = String(raw);
+        }
+        target.appendChild(dd);
+      }
       dl.appendChild(el(doc, "dt", t("explorer.id_row", "ID")));
       var idDd = doc.createElement("dd");
       idDd.textContent = a.id;
@@ -710,10 +729,16 @@ var ExplorerAssets = (function () {
       humanRowInto(dl2, t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
       humanRowInto(dl2, t("explorer.current_supply", "Current supply"), dyn.current_supply);
       humanRowInto(dl2, t("explorer.accumulated_fees", "Accumulated fees"), dyn.accumulated_fees);
-      humanRowInto(dl2, t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
+      coreRowInto(dl2, t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
       infoBox.appendChild(descBox);
-      /* ACTIONS tab: read-only links only (signing lives in owning slices).
-       * DEFERRED: fee-pool funding/claim panel (needs wallet signing). */
+      /* ACTIONS tab: market/transfer links + live fee-pool FUND form (op 16).
+       * RESOLVED (was deferred): funding now signs locally via AssetOps +
+       * Tx like the asset-manage flows (review + unlock-at-sign + pool-delta
+       * re-read proof). Claiming (ops 43/47) stays deferred honestly — no
+       * serializer or form for it here. Concepts from #1 Asset.jsx
+       * renderFeePoolFunding + FeePoolOperation fund path and #2
+       * AssetIssuerActions fund-fee-pool dialog (current pool + amount +
+       * confirm); vanilla uses named confirm rows, never raw JSON. */
       actBox.appendChild(el(doc, "h3", t("explorer.asset_actions", "Asset actions")));
       var mLink = anchor(doc, t("explorer.open_market", "Open market ") + marketID, "#/market/" + marketID);
       mLink.title = marketID;
@@ -722,10 +747,144 @@ var ExplorerAssets = (function () {
       var tLink = anchor(doc, t("explorer.transfer", "Transfer ") + a.symbol, "#/transfer");
       tLink.title = t("explorer.pill_transfer", "Transfer");
       actBox.appendChild(tLink);
+      /* Fund-fee-pool form (op 16) — anyone may fund any asset's pool with
+       * CORE. Reads are public; the password is asked ONLY at signing
+       * (publish gates on the fresh WIF, same as asset-manage-ui). New
+       * labels are plain literals (no new t() keys) so check_i18n stays
+       * green without touching vanilla/locales/*. */
+      (function fundSection() {
+        actBox.appendChild(el(doc, "h3", "Fund fee pool (op 16)"));
+        var poolHuman = "—", poolRaw = (dyn && dyn.fee_pool !== undefined && dyn.fee_pool !== null)
+          ? String(dyn.fee_pool) : null;
+        try { poolHuman = poolRaw === null ? "—" : Format.formatAmount(poolRaw, CORE_PRECISION) + " (core)"; }
+        catch (e) { poolHuman = String(poolRaw); }
+        var pPool = el(doc, "p", "Current pool: " + poolHuman, "muted");
+        if (poolRaw !== null) pPool.title = poolRaw;
+        actBox.appendChild(pPool);
+        try {
+          if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
+            actBox.appendChild(el(doc, "p", "Viewing as committee-account (1.2.0) — unlock to act as yourself.", "muted"));
+        } catch (e) { /* notice is display-only */ }
+        function fundField(label, val, mode, ph) {
+          var row = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", label + " ");
+          var inp = doc.createElement("input");
+          inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode);
+          inp.value = val || ""; if (ph) inp.setAttribute("placeholder", ph);
+          inp.setAttribute("autocomplete", "off"); touchable(inp);
+          lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
+        }
+        var amtF = fundField("Amount (core, human — e.g. 0.1)", "0.1", "decimal", "0.1");
+        var whoF = fundField("From account (name or 1.2.N)", "1.2.0", null, "1.2.0");
+        actBox.appendChild(amtF.row); actBox.appendChild(whoF.row);
+        var review = touchable(el(doc, "button", "Review funding"));
+        review.type = "button"; actBox.appendChild(review);
+        var msgBox = el(doc, "div", null, "xplore-fundmsg");
+        actBox.appendChild(msgBox);
+        function fundMsg(text, isErr) {
+          while (msgBox.firstChild) msgBox.removeChild(msgBox.firstChild);
+          var n = el(doc, "p", text, isErr ? "error" : "muted");
+          n.setAttribute("aria-live", "polite"); msgBox.appendChild(n); return n;
+        }
+        review.addEventListener("click", function () {
+          review.disabled = true;
+          (async function () {
+            if (typeof AssetOps === "undefined" || typeof Tx === "undefined" ||
+                typeof Account === "undefined" || typeof Wallet === "undefined" ||
+                typeof Format === "undefined" || typeof Chain === "undefined") {
+              throw new Error("Asset backend missing.");
+            }
+            var amountHuman = (amtF.input.value || "").trim();
+            var raw = Format.parseAmount(amountHuman, CORE_PRECISION);
+            if (!/[1-9]/.test(raw)) throw new Error("Amount must be greater than zero.");
+            var from = await Account.resolve((whoF.input.value || "").trim() || "1.2.0");
+            var before = poolRaw;
+            var pair = AssetOps.buildFundFeePool({
+              fromAccountId: from.id, assetId: a.id,
+              amountHuman: amountHuman, corePrecision: CORE_PRECISION
+            });
+            var f = await AssetOps.fee(pair, "1.3.0");
+            pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
+            if (!isCurrent(myGen)) return;
+            while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
+            actBox.appendChild(el(doc, "h3", "Confirm fee-pool funding"));
+            var dl = el(doc, "dl", null, "xfer-confirm");
+            function confRow(term, human, rawTitle) {
+              dl.appendChild(el(doc, "dt", term));
+              var dd = el(doc, "dd", human); if (rawTitle) dd.title = rawTitle;
+              dl.appendChild(dd);
+            }
+            var amtHuman;
+            try { amtHuman = Format.formatAmount(raw, CORE_PRECISION) + " (core)"; }
+            catch (e) { amtHuman = String(raw); }
+            confRow("Asset", a.symbol + " (" + a.id + ")");
+            confRow("Amount", amtHuman, raw);
+            confRow("From", (from.name || from.id) + " (" + from.id + ")");
+            var feeHuman;
+            try { feeHuman = Format.formatAmount(String(f.amount), CORE_PRECISION) + " (core)"; }
+            catch (e) { feeHuman = String(f.amount); }
+            confRow("Fee", feeHuman, String(f.amount));
+            var netName = "testnet";
+            try { netName = (typeof Store !== "undefined" && Store.loadSettings().network) || "testnet"; }
+            catch (e) { /* display-only */ }
+            confRow("Network", netName);
+            actBox.appendChild(dl);
+            var back = touchable(el(doc, "button", "Back")); back.type = "button";
+            var send = touchable(el(doc, "button", "Sign & Send")); send.type = "button";
+            actBox.appendChild(back); actBox.appendChild(send);
+            back.addEventListener("click", function () { renderAsset(root, symbol); });
+            send.addEventListener("click", function () {
+              back.disabled = true; send.disabled = true;
+              var st = el(doc, "p", "Signing…", "muted");
+              st.setAttribute("aria-live", "polite"); actBox.appendChild(st);
+              (async function () {
+                var unsigned = await Tx.buildTx([pair]);
+                var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
+                if (!wif) throw new Error("wallet-locked");
+                st.textContent = "Broadcasting…";
+                var r = await AssetOps.sendAndProve(unsigned, wif, async function () {
+                  try {
+                    var n = await Explorer.asset(a.symbol);
+                    var after = n && n.dynamic && n.dynamic.fee_pool !== undefined
+                      ? String(n.dynamic.fee_pool) : null;
+                    if (after === null || before === null) return null;
+                    return (BigInt(after) - BigInt(before) === BigInt(raw)) ? n : null;
+                  } catch (e) { return null; }
+                });
+                var headN = 0;
+                try {
+                  var dbId = await Chain.db();
+                  var gp = await Chain.call(dbId, "get_dynamic_global_properties", []);
+                  headN = (gp && gp.head_block_number) || 0;
+                } catch (e) { /* head is display-only */ }
+                if (!isCurrent(myGen)) return;
+                while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
+                actBox.appendChild(el(doc, "h1", "Fee pool funded"));
+                var okP = el(doc, "p",
+                  "Observed at head block #" + headN + " (" + r.via + ").", "xfer-ok");
+                okP.setAttribute("aria-live", "polite"); actBox.appendChild(okP);
+                actBox.appendChild(el(doc, "p",
+                  amtHuman + " → " + a.symbol + " pool (re-read delta matches).", "muted"));
+                var backLink = anchor(doc, "Open " + a.symbol, "#/asset/" + a.symbol);
+                actBox.appendChild(backLink);
+              })().catch(function (e) {
+                try { actBox.removeChild(st); } catch (x) { /* gone */ }
+                var m = (e && e.message) ? e.message : String(e || "Send failed.");
+                if (m.indexOf("wallet-locked") !== -1) m = "Wallet is locked.";
+                else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) {
+                  m = "Network unavailable. Check Settings → Nodes and retry.";
+                }
+                fundMsg(m, true); back.disabled = false;
+              });
+            });
+          })().catch(function (e) {
+            review.disabled = false;
+            var m = (e && e.message) ? e.message : String(e || "Could not prepare the funding.");
+            fundMsg(m, true);
+          });
+        });
+      })();
       actBox.appendChild(el(doc, "p",
-        "Full management view lives in its owning slice — this is a read-only summary.", "muted"));
-      actBox.appendChild(el(doc, "p",
-        "Fee pool funding and claiming live in the asset management view (deferred here).", "muted"));
+        "Fee-pool claiming (issuer) stays deferred here — no claim serializer in this view.", "muted"));
       if (!j.is_smartcoin) {
         infoBox.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;

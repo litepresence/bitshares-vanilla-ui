@@ -1,7 +1,7 @@
 /* AssetOps: asset-op builders + percent/ratio helpers + sendAndProve.
  * Owns: pure op-data builders returning [opId, opData] with a
  *   zero-placeholder fee for live fee-fill at confirm time (ops 10/11/12/13/
- *   14/15/19), the hundredths-vs-ratio helper pairs (integer/string math
+ *   14/15/16/19), the hundredths-vs-ratio helper pairs (integer/string math
  *   only), live fee via Tx.fee, and sign+send+prove via Tx.sign (vote-pattern
  *   shape). No DOM, no broadcast strings — publishing lives in the views.
  * Consumes: Asset.describe (buildFeed backing-leg lookup — asset.js loads FIRST;
@@ -22,8 +22,8 @@
  * MONEY DISCIPLINE (#6): amounts stay RAW digit strings (parseAmount in, no float);
  *   hundredths + ratios stay RAW ints via the helpers below (views never divide ad-hoc).
  *   FEE RULES: create tier = symbol length, descriptions add price_per_kbyte — both
- *   OBSERVED live via AssetOps.fee, never estimated here. SCOPE: ops 16/17/18 OUT
- *   (slice 13); no memo encryption in v1 (views pass memoOrNull:null).
+ *   OBSERVED live via AssetOps.fee, never estimated here. SCOPE: ops 17/18 OUT
+ *   (settle/global-settle deferred); op 16 funded here; no memo encryption in v1 (views pass memoOrNull:null).
  * NAMED-ERROR HOMES: not-issuer (update gate, views enforce via describe);
  *   not-market-issued (buildFeed + reserve/feed gates); symbol-taken
  *   (create gate via the lookup pre-check in views).
@@ -289,6 +289,26 @@ var AssetOps = (function () {
       extensions: [] }];
   }
 
+  /* Op-16 asset_fund_fee_pool (fund a UIA fee pool with CORE).
+   * Field order <- #4 asset_ops.hpp:322-334 + FC :728
+   * (fee)(from_account)(asset_id)(amount)(extensions); amount is a bare
+   * int64 in CORE units (not an asset pair). amountHuman parses at
+   * corePrecision (fee_pool lives in core asset — asset_object.hpp:65;
+   * #1 AssetActions.fundPool uses core precision, #2 DeepLinkDialog
+   * fundFeePool path included). from_account need not be the issuer —
+   * anyone may fund. Returns [16, opData] with zero-placeholder fee. */
+  function buildFundFeePool(args) {
+    args = args || {};
+    _assertAccountId(args.fromAccountId, "fromAccountId");
+    _assertAssetId(args.assetId, "assetId");
+    _assertPrecision(args.corePrecision, "corePrecision");
+    _needFormat();
+    var raw = Format.parseAmount(args.amountHuman, args.corePrecision);
+    if (!/[1-9]/.test(raw)) throw new Error("fund amount must be greater than zero");
+    return [16, { fee: { amount: "0", asset_id: CORE_ASSET }, from_account: args.fromAccountId,
+      asset_id: args.assetId, amount: raw, extensions: [] }];
+  }
+
   /* Op-19 asset_publish_feed. ASYNC by necessity: the settlement-quote and
    * CER legs need the backing id from Asset.describe().bitasset (no safe
    * placeholder exists). mcr/mssr are explicit ratio ints — NO silent
@@ -374,7 +394,7 @@ var AssetOps = (function () {
   }
 
   return { buildCreate: buildCreate, buildUpdate: buildUpdate, buildUpdateBitasset: buildUpdateBitasset,
-    buildUpdateProducers: buildUpdateProducers, buildIssue: buildIssue, buildReserve: buildReserve, buildFeed: buildFeed,
+    buildUpdateProducers: buildUpdateProducers, buildIssue: buildIssue, buildReserve: buildReserve, buildFundFeePool: buildFundFeePool, buildFeed: buildFeed,
     fee: fee, sendAndProve: sendAndProve, pctHumanToHundredths: pctHumanToHundredths, hundredthsToPct: hundredthsToPct,
     pctHumanToRatio: pctHumanToRatio, ratioToPct: ratioToPct };
 })();
