@@ -142,6 +142,20 @@ var CreateAccountUI = (function () {
     wrap.appendChild(el(doc, "p", testnet
       ? "Register a new testnet account through the faucet (testnet network)."
       : "Registration uses the testnet faucet — switch to testnet in Settings to register. Name checks work on either network.", "muted"));
+    /* Punchlist MED: CREATE ACCOUNT vs LOGIN selector card (original
+     * create-account.png). This form below is the create path; #/login
+     * unlocks an existing wallet. Plain literals only. */
+    (function selectorCard() {
+      var card = el(doc, "div", null, "ca-selector");
+      card.appendChild(el(doc, "strong", "Create account (this form)"));
+      card.appendChild(doc.createTextNode(" · "));
+      var a = doc.createElement("a");
+      a.href = "#/login";
+      a.textContent = "Login instead";
+      touchable(a);
+      card.appendChild(a);
+      wrap.appendChild(card);
+    })();
     var nameF = fieldRow(doc, t("createaccount.account_name", "Account name "), { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
     wrap.appendChild(nameF.row);
     var checkBtn = touchable(el(doc, "button", t("createaccount.check_availability", "Check availability")));

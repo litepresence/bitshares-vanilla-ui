@@ -265,6 +265,54 @@ var WalletUI = (function () {
     return (typeof Wallet === "undefined" || !Wallet);
   }
 
+  /* Punchlist HIGH: wallet console summary card (WalletManager
+   * WalletOptions concept: active-wallet + change/import/claims links).
+   * Single-slot keystore: at most one wallet exists, so the "card" names
+   * the stored wallet (bts-vanilla-wallet-name-v1 or "unnamed") + lock
+   * state + the same manager links the footer carries. Sub-routes
+   * (/wallet/create, /change, /import-keys, /balance-claims, /brainkey)
+   * are NOT rebuilt: wallet.js has no .bin-decrypt or WIF-import entry
+   * point, so those paths stay stated-unsupported links below, never
+   * dead routes. Plain literals only. */
+  function consoleCard(doc) {
+    var box = doc.createElement("section");
+    box.className = "wallet-console";
+    var h = doc.createElement("h2");
+    h.textContent = "Wallet console";
+    box.appendChild(h);
+    var name = null;
+    try { name = localStorage.getItem("bts-vanilla-wallet-name-v1"); } catch (e) { name = null; }
+    var stored = hasStoredWallet(), unlocked = false;
+    try { unlocked = Wallet.isUnlocked(); } catch (e) { unlocked = false; }
+    var line = doc.createElement("p");
+    line.textContent = stored
+      ? "Active wallet: " + (name || "unnamed") + (unlocked ? " (unlocked)" : " (locked)")
+      : "No wallet on this device yet.";
+    box.appendChild(line);
+    var links = doc.createElement("p");
+    function link(href, text) {
+      var a = doc.createElement("a");
+      a.href = href;
+      a.textContent = text;
+      return a;
+    }
+    if (stored) {
+      links.appendChild(link("#/vesting", "Balance claims"));
+      links.appendChild(doc.createTextNode(" · "));
+      links.appendChild(link("#/wallet/password", "Change password"));
+      links.appendChild(doc.createTextNode(" · "));
+    }
+    links.appendChild(link("#/existing-account", "Import keys"));
+    links.appendChild(doc.createTextNode(" · "));
+    links.appendChild(link("#/create-wallet-brainkey", "New wallet"));
+    box.appendChild(links);
+    var note = doc.createElement("p");
+    note.className = "muted";
+    note.textContent = "Single-key wallet: .bin backup files and bare private keys (WIF) are not supported — brainkey import only.";
+    box.appendChild(note);
+    return box;
+  }
+
   /* Manager/status screen: locked shows a password prompt; unlocked shows the
    * three role pubkeys, a Lock button, and a backup-brainkey revealer.
    * Params: none. Fails inline (wrong password, missing wallet, locked read). */
@@ -282,6 +330,8 @@ var WalletUI = (function () {
       wrap.appendChild(missing);
       return;
     }
+
+    wrap.appendChild(consoleCard(doc));
 
     if (Wallet.isUnlocked()) {
       Wallet.touch();
@@ -597,6 +647,18 @@ var WalletUI = (function () {
     honesty.className = "muted";
     honesty.textContent = t("wallet.have_a_bin_backup_file_or_bare_private_k", "Have a .bin backup file or bare private keys instead? This wallet imports brainkeys only — .bin decrypt and WIF import are not supported. Nothing is uploaded anywhere.");
     box.appendChild(honesty);
+    /* Punchlist MED: ExistingAccountOptions help links (wallet-types /
+     * backup-types concept). Plain literals, verified help topics. */
+    (function optionHelp() {
+      var hp = doc.createElement("p");
+      hp.className = "muted";
+      var hw = doc.createElement("a"); hw.href = "#/help/wallets"; hw.textContent = "Wallet types";
+      hp.appendChild(hw);
+      hp.appendChild(doc.createTextNode(" · "));
+      var hb = doc.createElement("a"); hb.href = "#/help/backups"; hb.textContent = "Backup types";
+      hp.appendChild(hb);
+      box.appendChild(hp);
+    })();
     if (hasStoredWallet()) {
       var have = doc.createElement("p");
       have.className = "muted";

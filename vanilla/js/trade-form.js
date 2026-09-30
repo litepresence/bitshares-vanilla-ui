@@ -974,6 +974,19 @@ var TradeForm = (function () {
         bar.appendChild(b);
       });
       mountEl.appendChild(bar);
+      /* Punchlist HIGH: BORROW entry on the buy form (BuySell.jsx:1476-1489
+       * margin-short concept). The #/borrow desk owns the open-new-position
+       * form — this link is the entry point, not a second form (same
+       * single-home rationale as the faucet). Plain literals only. */
+      (function borrowEntry() {
+        var brow = el(doc, "p", null, "muted");
+        var blink = doc.createElement("a");
+        blink.href = "#/borrow";
+        blink.textContent = "Borrow (margin)";
+        blink.title = "Open a margin position on the borrow desk";
+        brow.appendChild(blink);
+        mountEl.appendChild(brow);
+      })();
       if (P.scaledOpen) {
         scaledForm(doc, mountEl, mountEl, P);
         return;

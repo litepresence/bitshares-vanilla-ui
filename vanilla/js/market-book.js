@@ -278,8 +278,13 @@ var MarketBook = (function () {
       var tr = doc.createElement("tr");
       tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
       try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+      /* Punchlist MED: book-row prices trimmed to 6 decimals at RENDER
+       * (trim6 above — same rule as the spread line). The chain ships long
+       * human strings via price_to_string (market.js header); the full
+       * string stays in the price cell's title. */
+      var fullPx = (lv.displayPrice !== undefined && lv.displayPrice !== null) ? String(lv.displayPrice) : "";
       var texts = [
-        lv.displayPrice !== undefined ? String(lv.displayPrice) : "",
+        fullPx === "" ? "" : trim6(fullPx),
         lv.quote !== undefined ? String(lv.quote) : "",
         lv.base !== undefined ? String(lv.base) : ""
       ];
@@ -297,6 +302,7 @@ var MarketBook = (function () {
          * row-side class — mirrored column order stays AS-IS, raw/title attrs
          * on the row (fill-price title + aria-label) are untouched. */
         td.className = "book-cell" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "");
+        if (ci === 0 && fullPx) td.title = fullPx;
         /* The row's single .depth-bar anchors in the price-side cell
          * (asks: first cell; bids: last cell) so desk-grid.css can grow it
          * across the row from the price side as a full-row cumulative wash
@@ -321,9 +327,11 @@ var MarketBook = (function () {
       cbar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
       cbar.setAttribute("aria-hidden", "true");
       card.appendChild(cbar);
-      [String(lv.displayPrice || ""), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text, ci) {
+      [(fullPx === "" ? "" : trim6(fullPx)), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text, ci) {
         /* Phone-card price (first div) mirrors the table price color hook. */
-        card.appendChild(el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "")));
+        var cd = el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : ""));
+        if (ci === 0 && fullPx) cd.title = fullPx;
+        card.appendChild(cd);
       });
       cards.appendChild(card);
       /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
@@ -455,7 +463,11 @@ var MarketBook = (function () {
     rows.forEach(function (r) {
       var tr = doc.createElement("tr");
       tr.appendChild(el(doc, "td", timeText(r.time)));
-      tr.appendChild(el(doc, "td", r.displayPrice === null ? "—" : String(r.displayPrice)));
+      /* Punchlist MED: fill prices trimmed like book rows (trim6); the full
+       * chain string stays in the cell title. */
+      var ftd = el(doc, "td", (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice)));
+      if (r.displayPrice !== null && r.displayPrice !== undefined) ftd.title = String(r.displayPrice);
+      tr.appendChild(ftd);
       tr.appendChild(el(doc, "td", (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol)));
       tbody.appendChild(tr);
     });
@@ -472,7 +484,9 @@ var MarketBook = (function () {
       var card = doc.createElement("div");
       card.className = "node-card";
       card.appendChild(el(doc, "div", timeText(r.time)));
-      card.appendChild(el(doc, "div", r.displayPrice === null ? "—" : String(r.displayPrice)));
+      var fcd = el(doc, "div", (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice)));
+      if (r.displayPrice !== null && r.displayPrice !== undefined) fcd.title = String(r.displayPrice);
+      card.appendChild(fcd);
       card.appendChild(el(doc, "div", (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol)));
       cards.appendChild(card);
     });

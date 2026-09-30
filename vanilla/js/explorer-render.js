@@ -406,6 +406,21 @@ var ExplorerRender = (function () {
     if (keys.length === 0) box.appendChild(el(doc, "p", t("explorer.no_fields", "No fields."), "muted"));
     keys.forEach(function (k) { fieldRow(doc, dl, k, fields[k], ctx, 0); });
     box.appendChild(dl);
+    /* Punchlist: raw-JSON toggle (Transaction.jsx:42-73 concept) — the
+     * named rows above stay the primary view; the triangle shows the
+     * verbatim op for proof. Plain literal label, never throws. */
+    try {
+      var det = doc.createElement("details");
+      det.className = "raw";
+      var sum = doc.createElement("summary");
+      sum.setAttribute("aria-label", "Show raw operation JSON");
+      sum.textContent = "Raw JSON";
+      det.appendChild(sum);
+      var pre = doc.createElement("pre");
+      pre.textContent = JSON.stringify(op, null, 2);
+      det.appendChild(pre);
+      box.appendChild(det);
+    } catch (e) { /* named rows stand */ }
     return box;
   }
 

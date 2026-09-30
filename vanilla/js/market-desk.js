@@ -329,6 +329,28 @@ var MarketDesk = (function () {
       });
       head.appendChild(starBtn);
     } catch (e) { /* header works without the star */ }
+    /* Punchlist LOW: header pair-flip (invert) control next to the star
+     * (original header flip concept). Re-renders the swapped QUOTE_BASE
+     * pair via the hash router — cheap, no state to keep in sync (same
+     * pattern as the charts Invert toggle below). Plain literals only. */
+    try {
+      var flipBtn = doc.createElement("button");
+      flipBtn.type = "button";
+      flipBtn.id = "mkt-head-flip";
+      flipBtn.textContent = "⇄";
+      flipBtn.title = "Invert market pair";
+      flipBtn.setAttribute("aria-label", "Invert market pair");
+      touchable(flipBtn);
+      flipBtn.addEventListener("click", function () {
+        try {
+          var p = Market.parseId(id);
+          if (typeof window !== "undefined" && window.location) {
+            window.location.hash = "#/market/" + p.base + "_" + p.quote;
+          }
+        } catch (e) { /* malformed id: router already shows 404 */ }
+      });
+      head.appendChild(flipBtn);
+    } catch (e) { /* header works without the flip */ }
     try {
       var gearBtn = doc.createElement("button");
       gearBtn.type = "button";

@@ -224,11 +224,13 @@ var DashboardUI = (function () {
 
     var acctSection = doc.createElement("section");
     wrap.appendChild(acctSection);
+    /* Punchlist MED: markets directory (StarredMarkets + FeaturedMarkets
+     * tabs) above the fold — balances/history fill below. */
+    paintMarkets(doc, wrap);
     var balSection = doc.createElement("section");
     wrap.appendChild(balSection);
     var histSection = doc.createElement("section");
     wrap.appendChild(histSection);
-    paintMarkets(doc, wrap);
     paintQuickLinks(doc, wrap);
 
     acctSection.appendChild(el(doc, "p", t("transfer.loading", "Loading…"), "muted"));

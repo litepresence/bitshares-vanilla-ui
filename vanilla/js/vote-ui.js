@@ -355,6 +355,23 @@ var VoteUI = (function () {
     var budgetLine = el(doc, "p", t("vote.worker_budget_loading", "Worker budget: loading…"), "muted");
     budgetLine.setAttribute("aria-live", "polite");
     wrap.appendChild(budgetLine);
+    /* Punchlist MED: hide-legacy-proposals toggle (Workers.jsx:129,153
+     * concept). Always-on honest checkbox: worker lists come from
+     * get_all_workers(false), so expired rows are excluded by construction
+     * (vote.js lists()) — there is nothing to unhide. Plain literals only. */
+    (function legacyToggle() {
+      var lab = doc.createElement("label");
+      var box = doc.createElement("input");
+      box.type = "checkbox";
+      box.checked = true;
+      box.disabled = true;
+      box.setAttribute("aria-disabled", "true");
+      touchable(box);
+      lab.appendChild(box);
+      lab.appendChild(doc.createTextNode(" Hide legacy proposals (always on — expired workers are excluded at fetch)"));
+      lab.title = "Worker lists come from get_all_workers(false); expired rows never arrive.";
+      wrap.appendChild(lab);
+    })();
     var joinBox = el(doc, "div", null, "vote-join");
     wrap.appendChild(joinBox);
     fillBudget(doc, budgetLine, myGen);

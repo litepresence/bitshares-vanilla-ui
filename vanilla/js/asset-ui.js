@@ -150,11 +150,19 @@ var AssetUI = (function () {
     w.appendChild(el(d, "h1", t("assets.title", "Assets"))); nav(d, w);
     var f = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), "asset-issuer", ""); w.appendChild(f.row);
     var go = touch(el(d, "button", t("asset.load_issued", "Load issued assets"))); go.type = "button"; w.appendChild(go);
+    /* Punchlist MED: default table without a manual LOAD — the explorer
+     * all-assets table is one link away, and the wallet account's issued
+     * list auto-loads once the prefill below resolves. Plain literals only. */
+    (function browseAll() {
+      var p = el(d, "p", null, "muted");
+      var a = d.createElement("a"); a.setAttribute("href", "#/explorer/assets"); a.textContent = "Browse all assets"; touch(a);
+      p.appendChild(a); w.appendChild(p);
+    })();
     var list = el(d, "div", null, "asset-list"); w.appendChild(list);
     var fees = el(d, "div", null, "asset-fees"); w.appendChild(fees);
     if (typeof AssetFeedUI !== "undefined" && AssetFeedUI.feeSection) AssetFeedUI.feeSection(d, fees);
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
-      if (g === gen && !f.input.value) f.input.value = me.name; }).catch(function () { /* manual stands */ });
+      if (g === gen && !f.input.value) { f.input.value = me.name; try { go.click(); } catch (e) { /* manual LOAD stands */ } } }).catch(function () { /* manual stands */ });
     go.addEventListener("click", function () {
       var v = f.input.value.trim(); if (!v) { err(d, list,t("asset.enter_issuer", "Enter an issuer account.")); return; }
       wipe(list); status(d, list, t("asset.loading_issued", "Loading issued assets…"));

@@ -137,6 +137,22 @@ var AccountsUI = (function () {
       btn.id = "accts-unlock-do"; btn.type = "button"; wrap.appendChild(btn);
       var errBox = el(doc, "div", null, "error");
       errBox.setAttribute("aria-live", "polite"); wrap.appendChild(errBox);
+      /* Punchlist MED: logged-out LoginSelector row (DashboardAccountsOnly
+       * concept): CREATE ACCOUNT + LOGIN shortcuts beside the unlock form.
+       * Plain literals only, existing routes only. */
+      (function gateRow() {
+        var p = el(doc, "p", null, "muted");
+        var c = doc.createElement("a");
+        c.href = "#/create-account";
+        c.textContent = "Create account";
+        p.appendChild(c);
+        p.appendChild(doc.createTextNode(" · "));
+        var l = doc.createElement("a");
+        l.href = "#/login";
+        l.textContent = "Login";
+        p.appendChild(l);
+        wrap.appendChild(p);
+      })();
       btn.addEventListener("click", function () {
         errBox.textContent = ""; btn.disabled = true;
         Promise.resolve().then(function () { return Wallet.unlock(f.input.value); })
