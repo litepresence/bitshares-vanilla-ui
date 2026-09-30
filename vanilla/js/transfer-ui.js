@@ -429,10 +429,10 @@ var TransferUI = (function () {
      * review-period below; Review re-labels accordingly. */
     var mode = (state && state.mode === "propose") ? "propose" : "send";
     var modeRow = el(doc, "div", null, "xfer-field xfer-mode");
-    var sendModeBtn = touchable(el(doc, "button", "Send"));
+    var sendModeBtn = touchable(el(doc, "button", t("transfer.mode_send", "Send")));
     sendModeBtn.type = "button";
     sendModeBtn.id = "xfer-mode-send";
-    var proposeModeBtn = touchable(el(doc, "button", "Propose"));
+    var proposeModeBtn = touchable(el(doc, "button", t("transfer.mode_propose", "Propose")));
     proposeModeBtn.type = "button";
     proposeModeBtn.id = "xfer-mode-propose";
     modeRow.appendChild(sendModeBtn);
@@ -467,7 +467,7 @@ var TransferUI = (function () {
     wrap.appendChild(expiryF.row);
     wrap.appendChild(reviewPeriodF.row);
     var proposeNotice = el(doc, "p",
-      "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself. Proposal fee is quoted live in the core asset at review.", "muted");
+      t("transfer.propose_notice_locked", "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself.") + " " + t("transfer.propose_notice_fee", "Proposal fee is quoted live in the core asset at review."), "muted");
     wrap.appendChild(proposeNotice);
 
     /* Toggle refresh: button emphasis + propose-field visibility + Review
@@ -506,7 +506,7 @@ var TransferUI = (function () {
       if (isPropose) {
         while (feeQuote.firstChild) feeQuote.removeChild(feeQuote.firstChild);
       }
-      if (isPropose) reviewBtn.textContent = "Review proposal";
+      if (isPropose) reviewBtn.textContent = t("transfer.review_proposal", "Review proposal");
       else reviewBtn.textContent = t("transfer.review", "Review transfer");
       updateGate();
     }
@@ -716,14 +716,14 @@ var TransferUI = (function () {
         var propV = proposerF.input.value.trim();
         var expV = expiryF.input.value.trim();
         var revV = reviewPeriodF.input.value.trim();
-        if (!propV) reasons.push("Proposer is required.");
+        if (!propV) reasons.push(t("transfer.proposer_required", "Proposer is required."));
         if (!expV) {
-          reasons.push("Proposal expiration is required.");
+          reasons.push(t("transfer.proposal_expiration_required", "Proposal expiration is required."));
         } else if (isNaN(Date.parse(expV.length === 16 ? expV + ":00" : expV))) {
-          reasons.push("Proposal expiration is invalid.");
+          reasons.push(t("transfer.proposal_expiration_invalid", "Proposal expiration is invalid."));
         }
         if (revV !== "" && !/^\d+$/.test(revV)) {
-          reasons.push("Review period must be a non-negative integer.");
+          reasons.push(t("transfer.review_period_integer", "Review period must be a non-negative integer."));
         }
       }
       while (gateBox.firstChild) gateBox.removeChild(gateBox.firstChild);
@@ -1138,9 +1138,9 @@ var TransferUI = (function () {
    * so a throw here means a race, never a surprise). */
   function normaliseExpiration(v) {
     var s = String(v || "").trim();
-    if (!s) throw new Error("Proposal expiration is required.");
+    if (!s) throw new Error(t("transfer.proposal_expiration_required", "Proposal expiration is required."));
     var iso = (s.length === 16) ? s + ":00" : s;
-    if (isNaN(Date.parse(iso))) throw new Error("Proposal expiration is invalid.");
+    if (isNaN(Date.parse(iso))) throw new Error(t("transfer.proposal_expiration_invalid", "Proposal expiration is invalid."));
     return iso;
   }
 
@@ -1148,7 +1148,7 @@ var TransferUI = (function () {
   function parseReviewPeriod(v) {
     var s = String(v === undefined || v === null ? "" : v).trim();
     if (s === "") return null;
-    if (!/^\d+$/.test(s)) throw new Error("Review period must be a non-negative integer.");
+    if (!/^\d+$/.test(s)) throw new Error(t("transfer.review_period_integer", "Review period must be a non-negative integer."));
     return parseInt(s, 10);
   }
 
@@ -1164,7 +1164,7 @@ var TransferUI = (function () {
     }
     var fromAcc = await Account.resolve(String(snap.from || "").trim() || "1.2.0");
     var to = await Account.resolve(String(snap.to).trim());
-    if (fromAcc.id === to.id) throw new Error("Sender and recipient must be different.");
+    if (fromAcc.id === to.id) throw new Error(t("transfer.sender_recipient_different", "Sender and recipient must be different."));
     var asset = await lookupAssetLocal(snap.asset);
     var amountInt;
     try {
@@ -1179,7 +1179,7 @@ var TransferUI = (function () {
     if (memoText) {
       var toFull = await fullAccountLocal(to.id);
       var toMemoKey = toFull && toFull.options ? toFull.options.memo_key : null;
-      if (!toMemoKey) throw new Error("Recipient " + to.name + " has no memo key; clear the memo to continue.");
+      if (!toMemoKey) throw new Error(t("transfer.recipient_prefix", "Recipient ") + to.name + t("transfer.no_memo_key_suffix", " has no memo key; clear the memo to continue."));
       if (snap.encrypted) {
         if (isLocked) {
           lockedEnc = true;
@@ -1235,7 +1235,7 @@ var TransferUI = (function () {
    * proof (the new proposal id observed on chain — the barter
    * confirmPropose pattern). built = {proposer, leg, pair, before, snap}. */
   function showProposeConfirm(doc, wrap, root, built, fh, onBack) {
-    wrap.appendChild(el(doc, "h1", "Confirm proposal (op 22)"));
+    wrap.appendChild(el(doc, "h1", t("transfer.confirm_proposal_title", "Confirm proposal (op 22)")));
     var list = el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(el(doc, "dt", term));
@@ -1244,23 +1244,23 @@ var TransferUI = (function () {
       list.appendChild(dd);
     }
     var leg = built.leg;
-    row("Proposer", built.proposer.name + " (" + built.proposer.id + ")");
-    row("Expiration", built.pair[1].expiration_time);
+    row(t("transfer.proposer_label", "Proposer"), built.proposer.name + " (" + built.proposer.id + ")");
+    row(t("transfer.expiration_label", "Expiration"), built.pair[1].expiration_time);
     var rev = built.pair[1].review_period_seconds;
-    row("Review period", (rev === null || rev === undefined) ? "none" : Proposal.durToHuman(rev));
+    row(t("transfer.review_period_label", "Review period"), (rev === null || rev === undefined) ? t("transfer.review_period_none", "none") : Proposal.durToHuman(rev));
     row(t("confirm.from", "From"), leg.fromAcc.name + " (" + leg.fromAcc.id + ")");
     row(t("confirm.to", "To"), leg.to.name + " (" + leg.to.id + ")");
     row(t("confirm.amount", "Amount"),
       Format.formatAmount(leg.amountInt, leg.asset.precision) + " " + leg.asset.symbol, leg.amountInt);
-    if (leg.memoKind === "encrypted") row(t("confirm.memo", "Memo"), "Encrypted");
-    else if (leg.memoKind === "plain") row(t("confirm.memo", "Memo"), "Plain: " + leg.memoText);
+    if (leg.memoKind === "encrypted") row(t("confirm.memo", "Memo"), t("transfer.memo_encrypted", "Encrypted"));
+    else if (leg.memoKind === "plain") row(t("confirm.memo", "Memo"), t("transfer.memo_plain_prefix", "Plain: ") + leg.memoText);
     else if (leg.lockedEnc) row(t("confirm.memo", "Memo"),
       t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain."));
-    else row(t("confirm.memo", "Memo"), "(none)");
-    row("Fee (live)", fh.text, String(built.pair[1].fee.amount));
+    else row(t("confirm.memo", "Memo"), t("transfer.memo_none", "(none)"));
+    row(t("transfer.fee_live_label", "Fee (live)"), fh.text, String(built.pair[1].fee.amount));
     row(t("confirm.network", "Network"), networkNameLocal());
     wrap.appendChild(list);
-    wrap.appendChild(el(doc, "p", "Enclosed op: transfer (op 0) — executes only after approvals.", "muted"));
+    wrap.appendChild(el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted"));
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
@@ -1295,8 +1295,8 @@ var TransferUI = (function () {
       Promise.resolve().then(async function () {
         var wid = await Account.myAccountId();
         if (built.proposer.id !== wid) {
-          throw new Error("Proposer must match the unlocked wallet account (fee-payer signs) — got " +
-            built.proposer.name + " (" + built.proposer.id + "), wallet is " + wid + ".");
+          throw new Error(t("transfer.proposer_mismatch_prefix", "Proposer must match the unlocked wallet account (fee-payer signs) — got ") +
+            built.proposer.name + " (" + built.proposer.id + t("transfer.proposer_mismatch_wallet_mid", "), wallet is ") + wid + ".");
         }
         var unsigned = await Tx.buildTx([built.pair]);
         status.textContent = t("transfer.s1", "Broadcasting…");
@@ -1319,7 +1319,7 @@ var TransferUI = (function () {
         clearRoot(root);
         showProposeResult(doc, makeWrap(doc, root), root, built, fh, res, head);
       }).catch(function (e) {
-        var msg = (e && e.message) ? e.message : "Could not build the proposal.";
+        var msg = (e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal.");
         if (wrap.contains(status)) wrap.removeChild(status);
         showError(doc, wrap, msg, t("transfer.prepare_failed", "Could not prepare the transfer."));
         backBtn.disabled = false;
@@ -1331,7 +1331,7 @@ var TransferUI = (function () {
   /* Proposal result: the re-read proposal id + head block + channel.
    * Links to the proposals page. Never blank. */
   function showProposeResult(doc, wrap, root, built, fh, res, head) {
-    wrap.appendChild(el(doc, "h1", "Proposal sent"));
+    wrap.appendChild(el(doc, "h1", t("transfer.proposal_sent_title", "Proposal sent")));
     var pid = "?";
     try {
       if (res && res.proof) {
@@ -1340,13 +1340,13 @@ var TransferUI = (function () {
       }
     } catch (e) { /* "?" stands */ }
     var via = (res && res.via) ? res.via : "?";
-    var ok = el(doc, "p", "Proposal " + pid + " observed at head block #" + String(head) + " (" + via + ").", "xfer-ok");
+    var ok = el(doc, "p", t("transfer.proposal_observed_prefix", "Proposal ") + pid + t("transfer.proposal_observed_mid", " observed at head block #") + String(head) + " (" + via + ").", "xfer-ok");
     ok.setAttribute("aria-live", "polite");
     wrap.appendChild(ok);
     wrap.appendChild(el(doc, "p",
       Format.formatAmount(built.leg.amountInt, built.leg.asset.precision) + " " +
-      built.leg.asset.symbol + " → " + built.leg.to.name + " enclosed; fee " + fh.text + ".", "muted"));
-    var link = el(doc, "a", "View proposals");
+      built.leg.asset.symbol + " → " + built.leg.to.name + t("transfer.enclosed_fee_mid", " enclosed; fee ") + fh.text + ".", "muted"));
+    var link = el(doc, "a", t("transfer.view_proposals", "View proposals"));
     link.setAttribute("href", "#/proposals");
     touchable(link);
     wrap.appendChild(link);
@@ -1372,13 +1372,13 @@ var TransferUI = (function () {
     }
     Promise.resolve().then(async function () {
       if (typeof Proposal === "undefined" || !Proposal || typeof Proposal.buildCreate !== "function") {
-        throw new Error("Proposal backend missing: js/proposal.js failed to load.");
+        throw new Error(t("transfer.proposal_backend_missing", "Proposal backend missing: js/proposal.js failed to load."));
       }
       var wid = await Account.myAccountId();
       var proposer = await Account.resolve(String(snap.proposer || "").trim() || "1.2.0");
       if (proposer.id !== wid) {
-        throw new Error("Proposer must match the unlocked wallet account (fee-payer signs) — got " +
-          proposer.name + " (" + proposer.id + "), wallet is " + wid + ".");
+        throw new Error(t("transfer.proposer_mismatch_prefix", "Proposer must match the unlocked wallet account (fee-payer signs) — got ") +
+          proposer.name + " (" + proposer.id + t("transfer.proposer_mismatch_wallet_mid", "), wallet is ") + wid + ".");
       }
       var leg = await resolveProposeLeg(snap, false);
       var expIso = normaliseExpiration(snap.expiration);
@@ -1404,10 +1404,10 @@ var TransferUI = (function () {
           });
         });
       }).catch(function (e) {
-        fail((e && e.message) ? e.message : "Could not build the proposal.");
+        fail((e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal."));
       });
     }).catch(function (e) {
-      fail((e && e.message) ? e.message : "Could not build the proposal.");
+      fail((e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal."));
     });
   }
 
@@ -1424,7 +1424,7 @@ var TransferUI = (function () {
     function done() { reviewBtn.disabled = false; }
     Promise.resolve().then(async function () {
       if (typeof Proposal === "undefined" || !Proposal || typeof Proposal.buildCreate !== "function") {
-        throw new Error("Proposal backend missing: js/proposal.js failed to load.");
+        throw new Error(t("transfer.proposal_backend_missing", "Proposal backend missing: js/proposal.js failed to load."));
       }
       var proposer = await Account.resolve(String(vals.proposer || "").trim() || "1.2.0");
       var leg = await resolveProposeLeg(vals, true);
@@ -1437,7 +1437,7 @@ var TransferUI = (function () {
       return { proposer: proposer, leg: leg, pair: pair, fh: fh };
     }).then(function (P) {
       while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "h3", "Proposal preview (locked)"));
+      box.appendChild(el(doc, "h3", t("transfer.propose_preview_title", "Proposal preview (locked)")));
       var list = el(doc, "dl", null, "xfer-confirm");
       function row(term, text, title) {
         list.appendChild(el(doc, "dt", term));
@@ -1445,17 +1445,17 @@ var TransferUI = (function () {
         if (title) dd.title = title;
         list.appendChild(dd);
       }
-      row("Proposer", P.proposer.name + " (" + P.proposer.id + ")");
-      row("Expiration", P.pair[1].expiration_time);
+      row(t("transfer.proposer_label", "Proposer"), P.proposer.name + " (" + P.proposer.id + ")");
+      row(t("transfer.expiration_label", "Expiration"), P.pair[1].expiration_time);
       var rev = P.pair[1].review_period_seconds;
-      row("Review period", (rev === null || rev === undefined) ? "none" : Proposal.durToHuman(rev));
+      row(t("transfer.review_period_label", "Review period"), (rev === null || rev === undefined) ? t("transfer.review_period_none", "none") : Proposal.durToHuman(rev));
       row(t("confirm.from", "From"), P.leg.fromAcc.name + " (" + P.leg.fromAcc.id + ")");
       row(t("confirm.to", "To"), P.leg.to.name + " (" + P.leg.to.id + ")");
       row(t("confirm.amount", "Amount"),
         Format.formatAmount(P.leg.amountInt, P.leg.asset.precision) + " " + P.leg.asset.symbol, P.leg.amountInt);
-      row(t("confirm.memo", "Memo"), P.leg.memoKind === "plain" ? "Plain: " + P.leg.memoText :
-        (P.leg.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : "(none)"));
-      row("Fee (live)", P.fh.text, String(P.pair[1].fee.amount));
+      row(t("confirm.memo", "Memo"), P.leg.memoKind === "plain" ? t("transfer.memo_plain_prefix", "Plain: ") + P.leg.memoText :
+        (P.leg.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : t("transfer.memo_none", "(none)")));
+      row(t("transfer.fee_live_label", "Fee (live)"), P.fh.text, String(P.pair[1].fee.amount));
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
       box.appendChild(el(doc, "p",
@@ -1497,7 +1497,7 @@ var TransferUI = (function () {
             var w2 = makeWrap(doc, root);
             if (built.switched) {
               w2.appendChild(el(doc, "p",
-                "Unlocked — proposal rebuilt with you (" + built.proposer.name + ") as proposer.", "muted"));
+                t("transfer.unlocked_rebuilt_prefix", "Unlocked — proposal rebuilt with you (") + built.proposer.name + t("transfer.unlocked_rebuilt_suffix", ") as proposer."), "muted"));
             }
             showProposeConfirm(doc, w2, root, built, built.fh, function () {
               clearRoot(root);
@@ -1518,7 +1518,7 @@ var TransferUI = (function () {
       done();
     }).catch(function (e) {
       while (box.firstChild) box.removeChild(box.firstChild);
-      showError(doc, box, (e && e.message) ? e.message : "Could not build the proposal.",
+      showError(doc, box, (e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal."),
         t("transfer.prepare_failed", "Could not prepare the transfer."));
       done();
     });
