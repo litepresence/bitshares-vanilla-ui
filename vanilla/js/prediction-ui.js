@@ -305,6 +305,9 @@ var PredictionUI = (function () {
       return typeof s === "string" && /^\d+(\.\d+)?$/.test(s) && s !== "0" && s !== "1" &&
         s !== "NaN" && s !== "-NaN";
     }
+    /* enrichRow: house/confidence/likelihood/backing for one PMA row (3 best-effort reads).
+     * WHY all-dash fallback: issuer/ticker/backing gaps must not blank the list row.
+     * Param row (scan row); returns {done, house, conf, like, backSym}. */
     async function enrichRow(row) {
       var out = { done: true, house: null, conf: null, like: null, backSym: null };
       var a = row.asset || {}, b = row.bitasset || {};

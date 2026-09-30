@@ -304,6 +304,9 @@ var HtlcUI = (function () {
     box.appendChild(note);
     var all = (Array.isArray(sent) ? sent : []).map(function (r) { return { r: r, dir: t("htlc.sent", "Sent") }; })
       .concat((Array.isArray(received) ? received : []).map(function (r) { return { r: r, dir: t("htlc.received", "Received") }; }));
+    /* paint: repaint the HTLC sent/received table under the search filter q.
+     * WHY helper: the filter input and the initial load share this render;
+     * empty matches show an honest muted line, never blank. Param q; no return. */
     function paint(q) {
       while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
       if (!all.length) {

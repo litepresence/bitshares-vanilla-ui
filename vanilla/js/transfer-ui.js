@@ -775,6 +775,9 @@ var TransferUI = (function () {
       bindAssetEvents();
     }
 
+    /* loadBalancesForSender: reload sender balances + fee options on sender change.
+     * WHY stale-guarded: slow resolves must not overwrite a newer sender (balWho check).
+     * No params; async via Account.resolve/balances; failed state dashes availability. */
     function loadBalancesForSender() {
       var who = fromF.input.value.trim() || from.id;
       balWho = who;

@@ -304,6 +304,9 @@ var MarketDesk = (function () {
       starBtn.id = "mkt-head-star";
       starBtn.setAttribute("aria-label", t("market.favourite_prefix", "Favourite ") + id);
       touchable(starBtn);
+      /* paintStar: repaint the favourite star from localStorage (aria-pressed + title).
+       * WHY helper: toggle and initial paint share this read; storage gaps show ☆.
+       * No params, no return; never throws. */
       function paintStar() {
         var fav = false;
         try {

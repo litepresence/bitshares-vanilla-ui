@@ -374,6 +374,9 @@ var ExplorerAssets = (function () {
         if (typeof a.dynamic_asset_data_id === "string") dynIds.push(a.dynamic_asset_data_id);
         if (typeof a.bitasset_data_id === "string") bitIds.push(a.bitasset_data_id);
       });
+      /* finish: join dynamic/bitasset lookups into allRows then repaint.
+       * WHY nested: both lookup batches share this tail; caller holds the gen guard.
+       * No params, no return; never throws (missing objects stay null/dash). */
       function finish() {
         allRows = (rows || []).map(function (a) {
           var isSmart = !!(a && a.bitasset_data_id);
@@ -417,6 +420,9 @@ var ExplorerAssets = (function () {
         finish();
       });
     }
+    /* filteredSorted: apply mode/search filter + sortKey sort over allRows.
+     * WHY separate: paintCached reuses it on every keystroke/sort without re-fetch.
+     * No params; returns a new array (BigInt supply compare, nulls last). */
     function filteredSorted() {
       var q = (assetState.q || "").toUpperCase();
       var out = (allRows || []).filter(function (r) {
@@ -456,6 +462,9 @@ var ExplorerAssets = (function () {
       if (assetState.sortKey !== key) return "";
       return assetState.sortDir >= 0 ? " ▲" : " ▼";
     }
+    /* paintCached: repaint the cached allRows via filteredSorted (gen-guarded).
+     * WHY cached: search/sort/paging repaint locally; chain reads happen once.
+     * No params, no return; empty view shows an honest muted line. */
     function paintCached() {
       if (!isCurrent(myGen)) return;
       if (!allRows) return;
@@ -633,6 +642,9 @@ var ExplorerAssets = (function () {
       actBox.style.display = "none";
       wrap.appendChild(infoBox);
       wrap.appendChild(actBox);
+      /* selectTab: toggle the asset detail info/actions panes (aria-selected + bold).
+       * WHY helper: both tab buttons share this state flip; styling-only, never throws.
+       * Param which ("info"|"actions"); no return. */
       function selectTab(which) {
         var info = which !== "actions";
         infoBox.style.display = info ? "" : "none";
@@ -648,6 +660,9 @@ var ExplorerAssets = (function () {
       actBtn.addEventListener("click", function () { selectTab("actions"); });
       selectTab("info");
       var dl = el(doc, "dl", null, "xplore-fields");
+      /* humanRowInto: append a dt/dd row with a Format-human amount (raw in title).
+       * WHY helper: asset-page rows share the dash-on-missing contract (principle #6).
+       * Params target, term, raw (chain int string); no return, never throws. */
       function humanRowInto(target, term, raw) {
         target.appendChild(el(doc, "dt", term));
         var dd = doc.createElement("dd");
@@ -779,6 +794,9 @@ var ExplorerAssets = (function () {
         review.type = "button"; actBox.appendChild(review);
         var msgBox = el(doc, "div", null, "xplore-fundmsg");
         actBox.appendChild(msgBox);
+        /* fundMsg: replace the fee-pool form notice (aria-live, error vs muted).
+         * WHY helper: review errors and hints share this slot; display-only.
+         * Params text, isErr; returns the notice node. */
         function fundMsg(text, isErr) {
           while (msgBox.firstChild) msgBox.removeChild(msgBox.firstChild);
           var n = el(doc, "p", text, isErr ? "error" : "muted");
@@ -807,6 +825,9 @@ var ExplorerAssets = (function () {
             while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
             actBox.appendChild(el(doc, "h3", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
             var dl = el(doc, "dl", null, "xfer-confirm");
+            /* confRow: append a confirm dt/dd row (human visible, raw in title).
+             * WHY helper: fee-pool confirm rows share the human+raw contract (#6).
+             * Params term, human, rawTitle; no return. */
             function confRow(term, human, rawTitle) {
               dl.appendChild(el(doc, "dt", term));
               var dd = el(doc, "dd", human); if (rawTitle) dd.title = rawTitle;

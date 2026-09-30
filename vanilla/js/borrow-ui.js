@@ -368,6 +368,9 @@ var BorrowUI = (function () {
     var count = el(doc, "span", "", "muted");
     var next = touchable(el(doc, "button", t("borrow.next", "Next"))); next.type = "button";
     nav.appendChild(prev); nav.appendChild(count); nav.appendChild(next); wrap.appendChild(nav);
+    /* draw: repaint the how-it-works stepper text + counter + prev/next disabled.
+     * WHY helper: both nav buttons share this state flip; display-only, never throws.
+     * No params, no return. */
     function draw() {
       p.textContent = steps[idx];
       count.textContent = t("borrow.step", "Step ") + (idx + 1) + " of " + steps.length;

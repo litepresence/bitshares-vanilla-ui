@@ -299,6 +299,9 @@ var InstantTradeUI = (function () {
     if (frac.charAt(frac.length - 1) === "0") frac = frac.charAt(0);
     return whole + "." + frac + "%";
   }
+  /* marketFeeRaw: market-fee for a receive amount (pct hundredths, capped at maxRaw).
+   * WHY pure BigInt: percent math in float would drift money (principle #6).
+   * Params amountRaw/pct/maxRaw (raw strings/number); returns raw string or null. */
   function marketFeeRaw(amountRaw, pct, maxRaw) {
     try {
       if (typeof amountRaw !== "string" || !/^\d+$/.test(amountRaw)) return null;
@@ -311,6 +314,9 @@ var InstantTradeUI = (function () {
       return fee.toString();
     } catch (e) { return null; }
   }
+  /* fetchMarketFeeOpts: read market-fee flag/pct/max for an asset id (one get_assets).
+   * WHY null-open: non-fee assets simply hide the market-fee preview, never error.
+   * Param assetId; returns {pct, symbol, precision, maxRaw} or null. */
   async function fetchMarketFeeOpts(assetId) {
     try {
       var dbId = await Chain.db();
@@ -326,6 +332,9 @@ var InstantTradeUI = (function () {
       return { pct: pct, symbol: a.symbol, precision: a.precision, maxRaw: maxRaw };
     } catch (e) { return null; }
   }
+  /* feeAssetMeta: symbol+precision for the fee preview asset (one get_assets).
+   * WHY separate: fee display needs precision while Tx.feeMulti gives raw only.
+   * Param feeAssetId; returns {symbol, precision}; throws bad-asset-shape. */
   async function feeAssetMeta(feeAssetId) {
     var dbId = await Chain.db();
     var rows = await Chain.call(dbId, "get_assets", [[feeAssetId]]);
@@ -675,10 +684,16 @@ var InstantTradeUI = (function () {
     var recvIn = doc.getElementById("it-receive-amount");
     if (!sellIn || !recvIn) return;
     var guard = false, feeTimer = null, mktOptsPromise = null;
+    /* mktOpts: memoised market-fee opts for this convert (one fetch per load).
+     * WHY memo: every keystroke preview would otherwise re-read the asset.
+     * No params; returns the shared promise. */
     function mktOpts() {
       if (!mktOptsPromise) mktOptsPromise = fetchMarketFeeOpts(ctx.receiveId);
       return mktOptsPromise;
     }
+    /* paintTable: render the walkthrough levels (human amounts, raw in titles).
+     * WHY helper: both directions share this table; empty book shows honest muted.
+     * Param rows (walk level list); no return. */
     function paintTable(rows) {
       while (tblWrap.firstChild) tblWrap.removeChild(tblWrap.firstChild);
       if (!rows || rows.length === 0) {
@@ -715,6 +730,9 @@ var InstantTradeUI = (function () {
       tblWrap.appendChild(table);
       tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + t("instant.level_suffix", " level") + (rows.length === 1 ? "" : "s") + t("instant.walk_suffix", " walk"), "muted"));
     }
+    /* paintMkt: paint the market-fee preview line (hidden when the asset has none).
+     * WHY best-effort: fee preview must never block typing; failures dash the line.
+     * Param receiveRaw (raw string); no return. */
     function paintMkt(receiveRaw) {
       mktOpts().then(function (opt) {
         if (!opt) { try { mktP.style.display = "none"; } catch (e) { /* hidden stands */ } return; }
@@ -795,6 +813,10 @@ var InstantTradeUI = (function () {
       }
       guard = false;
     }
+    /* updateFromReceive: mirror of updateFromSell (receive input drives the walk).
+     * WHY separate: each direction parses its own side then walks pro-rata (floor);
+     * the guard stops listener loops; invalid input leaves the sibling untouched.
+     * No params, no return; failures dash price/table/fee. */
     function updateFromReceive() {
       if (guard) return;
       guard = true;
