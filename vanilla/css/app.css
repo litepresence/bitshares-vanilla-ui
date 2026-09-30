@@ -751,6 +751,20 @@ img, canvas, pre { max-width: 100%; }
 .mkt-tabs button:hover { color: var(--text); }
 .mkt-tabs button[aria-pressed="true"], .mkt-tabs button[aria-selected="true"] {
   color: var(--accent); border-bottom-color: var(--accent); }
+/* Dashboard markets strip (above fold, compact): tab row reuses .mkt-tabs;
+ * chips scroll horizontally in-region so 390px phones never overflow the
+ * page; single-row scroll on desktop keeps the strip compact. Tokens only. */
+.mkt-strip { margin: 0 0 8px; }
+.mkt-strip-list { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 8px;
+  -webkit-overflow-scrolling: touch; }
+.mkt-strip-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; padding: 6px 12px; background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 16px; text-decoration: none;
+  white-space: nowrap; }
+.mkt-strip-chip:hover { border-color: var(--accent); }
+.mkt-strip-pair { font-weight: 700; }
+.mkt-strip-px, .mkt-strip-chg { font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+.mkt-strip-chg { color: var(--muted); }
 /* Account page tabs + density (retro round 2 D3 — original 5-tab language).
  * .acct-tabs rides .mkt-tabs (shared tab treatment); wraps on phones so all
  * five tabs stay visible at 360px. Density: smaller cell padding + tabular

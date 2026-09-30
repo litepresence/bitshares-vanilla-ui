@@ -231,15 +231,20 @@ var DashboardUI = (function () {
       ]));
     }
 
+    /* Auditor MED: compact markets strip above the fold (Starred +
+     * Featured tabs, chips) directly under the welcome/unlock block and
+     * above the acting-as account + Balances; the full directory stays
+     * below (after history). Placed before acctSection so the locked
+     * gate + strip still fit in a 900px viewport. Reuses
+     * favMarkets/FEATURED/tickRow — no new chain patterns. */
+    paintMarketStrip(doc, wrap, myGen);
     var acctSection = doc.createElement("section");
     wrap.appendChild(acctSection);
-    /* Punchlist MED: markets directory (StarredMarkets + FeaturedMarkets
-     * tabs) above the fold — balances/history fill below. */
-    paintMarkets(doc, wrap);
     var balSection = doc.createElement("section");
     wrap.appendChild(balSection);
     var histSection = doc.createElement("section");
     wrap.appendChild(histSection);
+    paintMarkets(doc, wrap);
     paintQuickLinks(doc, wrap);
 
     acctSection.appendChild(el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
@@ -473,6 +478,95 @@ var DashboardUI = (function () {
       section.appendChild(el(doc, "h2", t("account.history_title", "History")));
       showError(doc, section, e, t("account.err_history", "History unavailable on this node."));
     });
+  }
+
+  /* Compact markets strip (above the fold): Starred + Featured tabs with
+   * capped chip rows (price/change via the shared tickRow cache — one
+   * fetch per id per tick, same cap discipline as the full directory).
+   * Defaults to BTS (curated FEATURED pairs) so the above-fold view shows
+   * price/change immediately; Starred is empty on fresh profiles. Locked +
+   * unlocked both fine (public Market.stats reads only). Phone: chips
+   * scroll horizontally in-region (no page overflow @390); desktop keeps
+   * the same single-row scroll so the strip stays compact. No new i18n
+   * keys (reuses market/favourites strings), no new chain patterns. */
+  var STRIP_MAX = 6;
+  var STRIP_DEFAULT = "BTS";
+  function paintMarketStrip(doc, wrap, myGen) {
+    var section = doc.createElement("section");
+    section.className = "mkt-strip";
+    section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
+    var tabs = doc.createElement("div");
+    tabs.className = "mkt-tabs";
+    tabs.setAttribute("role", "tablist");
+    var pane = doc.createElement("div");
+    pane.className = "mkt-strip-pane";
+    var names = ["Starred", "BTS", "USD", "CNY", "BTC"];
+    names.forEach(function (name) {
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = name === "Starred" ? t("market.starred_tab", "Starred") : name;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", name === STRIP_DEFAULT ? "true" : "false");
+      touchable(b);
+      b.addEventListener("click", function () {
+        Array.prototype.forEach.call(tabs.querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-selected", x === b ? "true" : "false");
+        });
+        paintStripPane(doc, pane, name, myGen);
+      });
+      tabs.appendChild(b);
+    });
+    section.appendChild(tabs);
+    section.appendChild(pane);
+    wrap.appendChild(section);
+    paintStripPane(doc, pane, STRIP_DEFAULT, myGen);
+  }
+
+  /* One strip pane: Starred reads the fav key; quote panes read FEATURED.
+   * Capped at STRIP_MAX chips, sorted for stability. Each chip links to
+   * its market; price/change fill fail-open ("—" on miss). Never blank:
+   * empty Starred shows the shared favourites empty state + links. */
+  function paintStripPane(doc, pane, name, myGen) {
+    while (pane.firstChild) pane.removeChild(pane.firstChild);
+    var ids = name === "Starred" ? favMarkets() : (FEATURED[name] || []).slice();
+    ids = ids.slice().sort().slice(0, STRIP_MAX);
+    if (!ids.length) {
+      pane.appendChild(el(doc, "p",
+        name === "Starred"
+          ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
+          : t("account.s3", "No recent activity."), "muted"));
+      pane.appendChild(linkPara(doc, [
+        ["#/market/" + encodeURIComponent(defaultMarket()), defaultMarket()],
+        ["#/favourites", t("favourites.favourites", "Favourites")]
+      ]));
+      return;
+    }
+    var list = doc.createElement("div");
+    list.className = "mkt-strip-list";
+    ids.forEach(function (id) {
+      var a = doc.createElement("a");
+      a.className = "mkt-strip-chip";
+      a.href = "#/market/" + encodeURIComponent(id);
+      touchable(a);
+      var pair = el(doc, "span", id, "mkt-strip-pair");
+      var px = el(doc, "span", "…", "mkt-strip-px num");
+      var chg = el(doc, "span", "…", "mkt-strip-chg num");
+      a.appendChild(pair);
+      a.appendChild(px);
+      a.appendChild(chg);
+      list.appendChild(a);
+      if (typeof Market !== "undefined" && Market) {
+        tickRow(id).then(function (r) {
+          if (myGen !== gen) return;
+          px.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
+          chg.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+        });
+      } else {
+        px.textContent = "—";
+        chg.textContent = "—";
+      }
+    });
+    pane.appendChild(list);
   }
 
   /* Markets directory (mirrors #1 DashboardPage tabs: StarredMarkets +
