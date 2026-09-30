@@ -209,6 +209,11 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
       if (seen[s.pub]) throw new Error("tb-bad-envelope: duplicate signature pub " + s.pub);
       seen[s.pub] = true;
     });
+    /* Expiry validates BEFORE any state mutation: a failed import must leave
+     * the live queue, fees, and built envelope untouched (a throw after
+     * assignment would clobber good state with an unusable envelope). */
+    if (!env.tx.expiration || !Number.isFinite(Date.parse(env.tx.expiration + "Z"))) throw new Error("tb-bad-envelope: tx.expiration missing");
+    if (Date.parse(env.tx.expiration + "Z") < Date.now()) throw new Error("tb-expired: envelope expired — re-base to continue (old signatures are dropped)");
     _ops = [];
     _ctr = 0;
     env.ops.forEach(function (p) {
@@ -224,7 +229,6 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     _signatures = sigs.slice();
     _chainId = env.chain_id;
     _built = clone(env.tx);
-    if (Date.parse(_built.expiration + "Z") < Date.now()) throw new Error("tb-expired: envelope expired — re-base to continue (old signatures are dropped)");
     notify();
     return { ops: list(), signatures: _signatures.slice(), requiredAuths: _requiredAuths };
   }
@@ -488,7 +492,7 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
       var no = d.new_options || {};
       rows.push({ label: "Voting account", value: String(no.voting_account || "—") });
       rows.push({ label: "Votes", value: String(((no.votes || []).length) + " selected") });
-      rows.push({ label: "Witnesses / committee", value: String(no.num_witness || "—") + " / " + String(no.num_committee || "—") });
+      rows.push({ label: "Witnesses / committee", value: String(no.num_witness == null ? "—" : no.num_witness) + " / " + String(no.num_committee == null ? "—" : no.num_committee) });
     } else if (opId === 61) {
       rows.push({ label: "Account", value: await _nameOf(d.account) });
       rows.push({ label: "Pool", value: String(d.pool || "—") });
