@@ -350,3 +350,58 @@
 > (`afk-fund-264c/ab43`, `afk-tkt-6a47`) all `null` — zero clutter. Full
 > exact-response table in `vanilla/notes/ltm-witness-committee-2026-09-30.md`
 > (funding-round-2 section). No row changes; counts unchanged; MISSING: 0.
+
+## TxBuilder delta (2026-09-30) — composer capability, no new ops
+
+> Append-only note for the TxBuilder composer landing (plan
+> `docs/superpowers/plans/2026-09-30-txbuilder.md`, Tasks 1–8).
+> Convention: same as above — behavior delta only; no §A/§B/§C status
+> cell flips (composer reuses already-PORTED op paths, adds no op).
+> Every claim below was verified by `rg` in the cited file:line (never
+> invented). Offline proof is the committed `tooling/txbuilder-test.js`
+> (53/53 stdlib-only, exit 0); live proof is
+> `vanilla/notes/txbuilder-parity.md` vectors T1–T6.
+
+- Composer capability (NO new ops — same serializers, new bundling):
+  `vanilla/js/txbuilder.js` (565 lines) owns queued `[opId, opData]`
+  state + `feeAll` (`txbuilder.js:111`, ONE `get_required_fees` call)
+  + `buildUnsigned` (`txbuilder.js:129`) + versioned export/import
+  envelope (`exportJSON` `txbuilder.js:142`, `importJSON`
+  `txbuilder.js:164`, strict `tb-bad-envelope`/`tb-chain-mismatch`/
+  `tb-ops-drift`/`tb-expired` guards) + `resolveAuths`
+  (`txbuilder.js:264`, batched `get_objects`) + `signLocal`
+  (`txbuilder.js:331`, append-only, `tb-wallet-locked` when locked) +
+  `describe` (`txbuilder.js:431`, pilot ops 0/6/61 human rows + honest
+  `not yet described` fallback) + `wrapProposal` (`txbuilder.js:497`,
+  delegates to `Proposal.buildCreate`, no new builder) +
+  `broadcastSigned` (`txbuilder.js:512`, callback-first/plain-fallback
+  + per-op provers, long-tail `accepted by node, inclusion not proven`
+  wording). Desk is `vanilla/js/txbuilder-ui.js` (178 lines,
+  `renderDesk` `:76`, `mountBadge` `:150`), route `/txbuilder`
+  (`router.js:235`), tags (`index.html:130-131`), badge hook
+  (`app.js:841`). Unit suite `tooling/txbuilder-test.js` covers state
+  core (add/remove/clear/invalidation, fee-asset guard), envelope
+  (feeAll/buildUnsigned/export/import incl. expired + non-JSON guards),
+  auth (threshold-met + all-missing honesty), describe (titles +
+  fallback), wrap/broadcast shapes (proposal wrap, empty/sigless
+  negatives) — fully offline via stubbed Chain/Wallet/Format.
+- Testnet bundle 0+6 @101018463 (composer proof, NOT a new op):
+  direct-send 2-op bundle op-0 dust `10000` raw + op-6 vote no-op
+  re-publish, ONE fee call `totalRaw 92633`, human rows `0.10000 TEST`
+  (raw in `title` only), sign `stillMissing []`, `via
+  broadcast_transaction_with_callback`, op-0 history content-match at
+  block `101018463/0` + op-6 slate re-read
+  (`vanilla/notes/txbuilder-parity.md:33-66,157-159`).
+- Pilot outlets (additive, one-shot paths untouched): Transfer
+  `Add to TxBuilder` (`transfer-confirm.js:321,328`), Voting
+  `Add vote to TxBuilder` (`vote-ui.js:685,691`), Pool stake
+  `Add deposit to TxBuilder` (`pool-ui.js:178,185`) — each guarded by
+  `typeof TxBuilder` absence checks, navigating to `#/txbuilder`.
+- Missing-key honesty: empty wallet yields all-missing `resolveAuths`
+  rows (never throws); locked wallet `signLocal` throws
+  `tb-wallet-locked`; T2 live vector shows `committee-account
+  missing:true` with `nested-auth` note and `signatures []`
+  (`vanilla/notes/txbuilder-parity.md:68-73`).
+- Counts: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20 substantive
+  PORTED + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged.
+  MISSING (unjustified): still 0.
