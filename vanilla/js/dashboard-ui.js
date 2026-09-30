@@ -132,14 +132,19 @@ var DashboardUI = (function () {
   /* Session ticker cache (id -> {latest, chg} or null-miss). Fail-open:
    * misses render "—" and retry on next visit, never an error panel. */
   var _tickCache = {};
+  /* In-flight ticker memo (perf: Starred+Featured tabs fetch the same pairs
+   * in one tick — one fetch per id per tick, never two. Pending only:
+   * cleared on settle; resolved rows still cache in _tickCache. Identical. */
+  var _tickPending = {};
   function tickRow(id) {
     if (Object.prototype.hasOwnProperty.call(_tickCache, id)) return Promise.resolve(_tickCache[id]);
+    if (Object.prototype.hasOwnProperty.call(_tickPending, id)) return _tickPending[id];
     var pair = null;
     try {
       if (typeof Market === "undefined" || !Market || typeof Market.parseId !== "function") return Promise.resolve(null);
       pair = Market.parseId(id);
     } catch (e) { _tickCache[id] = null; return Promise.resolve(null); }
-    return Market.assets(pair.quote, pair.base).then(function (a) {
+    var p = Market.assets(pair.quote, pair.base).then(function (a) {
       return Market.stats(a.base.id, a.quote.id);
     }).then(function (s) {
       var row = {
@@ -150,6 +155,10 @@ var DashboardUI = (function () {
       _tickCache[id] = row;
       return row;
     }).catch(function () { _tickCache[id] = null; return null; });
+    _tickPending[id] = p;
+    p.then(function () { delete _tickPending[id]; },
+      function () { delete _tickPending[id]; });
+    return p;
   }
 
   /* Network default market for the empty-favourites state

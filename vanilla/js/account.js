@@ -20,6 +20,12 @@ var Account = (function () {
     return typeof s === "string" && ID_RE.test(s);
   }
 
+  /* In-flight resolve memo (perf: per-row account links fire same-tick
+   *   bursts for repeat ids — one RPC per id per tick, never two. Pending
+   *   only: entries clear on settle, so no completed data is ever cached
+   *   (renames stay fresh). Same promise shared, behavior identical. */
+  var _resolvePending = {};
+
   /* Resolve an account name or 1.2.N id to {id, name}.
    * Params: nameOrId non-empty string.
    * Returns: Promise of {id, name}.
@@ -28,6 +34,20 @@ var Account = (function () {
     if (typeof nameOrId !== "string" || !nameOrId) {
       throw new Error("unknown-account");
     }
+    var key = nameOrId;
+    if (Object.prototype.hasOwnProperty.call(_resolvePending, key)) {
+      return _resolvePending[key];
+    }
+    var p = _resolveInner(nameOrId);
+    _resolvePending[key] = p;
+    /* Clear on settle (both paths — a rejected entry must never poison). */
+    p.then(function () { delete _resolvePending[key]; },
+      function () { delete _resolvePending[key]; });
+    return p;
+  }
+
+  /* Inner resolve body (unchanged contract — see resolve above). */
+  async function _resolveInner(nameOrId) {
     var dbId = await Chain.db();
     if (_isId(nameOrId)) {
       var rows = await Chain.call(dbId, "get_accounts", [[nameOrId]]);
@@ -83,6 +103,19 @@ var Account = (function () {
     return out;
   }
 
+  /* In-flight history-api-id memo (perf: history() + historyPaged() fire
+   *   together on every account load — one "history" RPC per tick, never two.
+   *   Pending only: cleared on settle, the resolved id still caches in
+   *   Chain (sole owner). Behavior identical. */
+  var _histIdPending = null;
+  function _histId() {
+    if (_histIdPending) return _histIdPending;
+    _histIdPending = Chain.history();
+    _histIdPending.then(function () { _histIdPending = null; },
+      function () { _histIdPending = null; });
+    return _histIdPending;
+  }
+
   /* Fetch raw operation history for an account id (newest first, opaque rows).
    * Params: id account id string; limit positive int (default 20).
    * Returns: Promise of the raw get_account_history array.
@@ -91,7 +124,7 @@ var Account = (function () {
     if (limit === undefined) limit = 20;
     var histId;
     try {
-      histId = await Chain.history();
+      histId = await _histId();
     } catch (e) {
       throw new Error("history-unavailable");
     }
@@ -142,7 +175,7 @@ var Account = (function () {
   async function _historyPage(id, limit, start) {
     var histId;
     try {
-      histId = await Chain.history();
+      histId = await _histId();
     } catch (e) {
       throw new Error("history-unavailable");
     }

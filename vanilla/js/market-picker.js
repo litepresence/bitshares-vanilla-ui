@@ -66,14 +66,23 @@ var MarketPicker = (function () {
    * get_ticker row (raw.base_volume) — no added batch, no invented data
    * (dexux-plots.md N+1 ban: per-row ticker stays capped, see paint). */
   var _tickCache = {};
+  /* In-flight ticker memo (perf: the kinds-arrived repaint re-fires tickData
+   * for rows whose first fetch is still flying — one assets+stats pair per
+   * id per tick, never two. Pending only: cleared on settle; resolved rows
+   * still cache in _tickCache. Identical. */
+  var _tickPending = {};
   function tickData(id, done) {
     if (Object.prototype.hasOwnProperty.call(_tickCache, id)) { done(_tickCache[id]); return; }
+    if (Object.prototype.hasOwnProperty.call(_tickPending, id)) {
+      _tickPending[id].then(function (row) { done(row); });
+      return;
+    }
     var pair = null;
     try {
       if (typeof Market === "undefined" || !Market) { done(null); return; }
       pair = Market.parseId(id);
     } catch (e) { _tickCache[id] = null; done(null); return; }
-    Market.assets(pair.quote, pair.base).then(function (a) {
+    var p = Market.assets(pair.quote, pair.base).then(function (a) {
       return Market.stats(a.base.id, a.quote.id);
     }).then(function (s) {
       var row = {
@@ -84,8 +93,12 @@ var MarketPicker = (function () {
           ? String(s.raw.base_volume) : null
       };
       _tickCache[id] = row;
-      done(row);
-    }).catch(function () { _tickCache[id] = null; done(null); });
+      return row;
+    }).catch(function () { _tickCache[id] = null; return null; });
+    _tickPending[id] = p;
+    p.then(function (row) { delete _tickPending[id]; done(row); },
+      function () { delete _tickPending[id]; done(null); });
+    return;
   }
   /* Change-sign class (retro round 3 — the original FIND MARKETS CHANGE
    * column reads red/green; ours stayed muted grey per the round-2 residual).
@@ -225,6 +238,10 @@ var MarketPicker = (function () {
    * visible) instead of hiding markets on missing data. */
   var _kindCache = {};
   var _kindFilter = "ALL";
+  /* In-flight kinds memo (perf: All/Starred renders fire ensureKinds in one
+   * tick — one batched lookup per tick, never two. Pending only: cleared on
+   * settle; resolved rows still cache in _kindCache. Identical. */
+  var _kindPending = null;
 
   function ensureKinds(symbols) {
     var missing = [];
@@ -239,7 +256,16 @@ var MarketPicker = (function () {
         typeof Chain.db !== "function" || typeof Chain.call !== "function") {
       return Promise.resolve(_kindCache);
     }
-    return Chain.db().then(function (dbId) {
+    /* Share only when the same symbol set is already flying; a different
+     * set waits, then re-runs (its missing rows are recomputed against the
+     * filled cache, so it fetches just the remainder — never less data). */
+    if (_kindPending !== null) {
+      if (_kindPending.key === missing.join(",")) {
+        return _kindPending.p.then(function () { return _kindCache; });
+      }
+      return _kindPending.p.then(function () { return ensureKinds(symbols); });
+    }
+    var fetchP = Chain.db().then(function (dbId) {
       return Chain.call(dbId, "lookup_asset_symbols", [missing]);
     }).then(function (rows) {
       for (var j = 0; j < missing.length; j++) {
@@ -249,6 +275,10 @@ var MarketPicker = (function () {
     }).catch(function () {
       return _kindCache;
     });
+    _kindPending = { key: missing.join(","), p: fetchP };
+    fetchP.then(function () { if (_kindPending && _kindPending.p === fetchP) _kindPending = null; },
+      function () { if (_kindPending && _kindPending.p === fetchP) _kindPending = null; });
+    return fetchP;
   }
 
   /* Paint the market picker list (search + kind radios + favorites + typed entry).

@@ -148,11 +148,31 @@ var Market = (function () {
     return { quote: parts[0], base: parts[1] };
   }
 
+  /* In-flight asset-pair memo, keyed QUOTE_BASE (perf: desk entry fires
+   *   Market.assets plus picker/feed lookups for the same pair in one tick —
+   *   one lookup per pair per tick, never two. Pending only: cleared on
+   *   settle, nothing completed is cached. Same promise shared, identical. */
+  var _assetsPending = {};
+
   /* Resolve both market assets to {id, symbol, precision} via
    * lookup_asset_symbols (database_api.hpp: lookup path, same call #1's
-   * ChainStore uses for quote/base assets).
+   * ChainStore uses for quote/base assets). bitasset_data_id rides along
+   * (additive — the desk feed reuses it instead of re-looking-up the pair).
    * Fails: "bad-asset-shape" on unknown symbols or non-numeric precision. */
   async function assets(quoteSym, baseSym) {
+    var key = String(quoteSym).toUpperCase() + "_" + String(baseSym).toUpperCase();
+    if (Object.prototype.hasOwnProperty.call(_assetsPending, key)) {
+      return _assetsPending[key];
+    }
+    var p = _assetsInner(quoteSym, baseSym);
+    _assetsPending[key] = p;
+    p.then(function () { delete _assetsPending[key]; },
+      function () { delete _assetsPending[key]; });
+    return p;
+  }
+
+  /* Inner pair resolve (unchanged contract — see assets above). */
+  async function _assetsInner(quoteSym, baseSym) {
     var dbId = await Chain.db();
     var rows = await Chain.call(dbId, "lookup_asset_symbols", [[quoteSym, baseSym]]);
     if (!rows || !rows[0] || !rows[1]) throw new Error("bad-asset-shape");
@@ -160,8 +180,10 @@ var Market = (function () {
       throw new Error("bad-asset-shape");
     }
     return {
-      quote: { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision },
-      base: { id: rows[1].id, symbol: rows[1].symbol, precision: rows[1].precision }
+      quote: { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision,
+        bitasset_data_id: rows[0].bitasset_data_id || null },
+      base: { id: rows[1].id, symbol: rows[1].symbol, precision: rows[1].precision,
+        bitasset_data_id: rows[1].bitasset_data_id || null }
     };
   }
 

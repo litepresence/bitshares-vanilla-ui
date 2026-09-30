@@ -72,6 +72,12 @@ var MarketCandles = (function () {
   /* Session cache for the live bucket list (timeframes(), slice-07 Task 3).
    * Null until first fetch; a copy is returned so callers cannot poison it. */
   var _bucketsCache = null;
+  /* In-flight buckets memo (perf: fill() calls timeframes() and candles()
+   * together — candles() awaits timeframes() internally, so every desk load
+   * fired the same zero-arg call twice. One RPC per tick, never two. Pending
+   * only: cleared on settle; the resolved list still caches in
+   * _bucketsCache. Behavior identical. */
+  var _bucketsPending = null;
 
   /* Supported bucket sizes in seconds from the live history api
    * (get_market_history_buckets, api.hpp:229). Sorted ascending, cached
@@ -82,6 +88,15 @@ var MarketCandles = (function () {
    * Fails: "history-unavailable" when the history api is missing. */
   async function timeframes() {
     if (_bucketsCache !== null) return _bucketsCache.slice();
+    if (_bucketsPending !== null) return _bucketsPending.then(function (nums) { return nums.slice(); });
+    _bucketsPending = _timeframesInner();
+    _bucketsPending.then(function () { _bucketsPending = null; },
+      function () { _bucketsPending = null; });
+    return _bucketsPending.then(function (nums) { return nums.slice(); });
+  }
+
+  /* Inner bucket-list fetch (unchanged contract — see timeframes above). */
+  async function _timeframesInner() {
     var histId;
     try {
       histId = await Chain.history();

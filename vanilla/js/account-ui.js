@@ -278,11 +278,16 @@ var AccountUI = (function () {
    * never per-row refetch on filter). Every leg is best-effort: failures
    * resolve to null and render as dashes with a muted note — a missing
    * read never blanks the tab.
-   * Params: acctId "1.2.N", balances (Account.balances rows).
+   * Params: acctId "1.2.N", balances (Account.balances rows), shared
+   * (optional {orders, positions} zero-arg fns returning the render's shared
+   * open-orders/margin promises — perf: the Orders/Margin tabs read the same
+   * rows in the same render, so one fetch serves both; absent means fetch
+   * here as before).
    * Returns a Promise of {inOrders, vesting, collateral (assetId->raw, or
    * null when that read failed), prices (assetId->{latest, change}), bts
    * ({id, prec, symbol} or null), capped, notes}. Never rejects. */
-  function enrichPortfolio(acctId, balances) {
+  function enrichPortfolio(acctId, balances, shared) {
+    var useShared = (shared && typeof shared === "object") ? shared : null;
     var out = { inOrders: {}, vesting: null, collateral: null, prices: {},
       bts: null, capped: false, notes: [] };
     if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
@@ -297,6 +302,7 @@ var AccountUI = (function () {
     /* IN ORDERS: sum open-order sell legs per asset (the same WS method the
      * Orders tab reads — one extra call, never per-row). */
     jobs.push(Promise.resolve().then(function () {
+      if (useShared && typeof useShared.orders === "function") return useShared.orders();
       return Account.openOrders(acctId);
     }).then(function (orders) {
       (orders || []).forEach(function (o) {
@@ -323,6 +329,7 @@ var AccountUI = (function () {
      * backend dashes the column instead of breaking the tab. */
     if (typeof Credit !== "undefined" && Credit && typeof Credit.positions === "function") {
       jobs.push(Promise.resolve().then(function () {
+        if (useShared && typeof useShared.positions === "function") return useShared.positions();
         return Credit.positions(acctId);
       }).then(function (rows) {
         var map = {};
@@ -564,8 +571,11 @@ var AccountUI = (function () {
    * Reference concept only: #1 AccountOverview MarginPositionsTable.
    * Read-only table (Position / Collateral / Debt / Borrower); adjust or
    * close flows live on #/borrow — linked, not rebuilt. A missing Credit
-   * backend or a failed read renders an honest line, never a blank tab. */
-  function renderMargin(doc, section, acct) {
+   * backend or a failed read renders an honest line, never a blank tab.
+   * sharedPositions (optional zero-arg fn): the render's shared positions
+   * promise (perf — same rows the Balances enrichment reads; one fetch per
+   * render, never two). */
+  function renderMargin(doc, section, acct, sharedPositions) {
     var loading = doc.createElement("p");
     loading.className = "muted";
     loading.textContent = t("account.loading_margin_positions", "Loading margin positions…");
@@ -578,7 +588,10 @@ var AccountUI = (function () {
       section.appendChild(miss);
       return;
     }
-    Promise.resolve().then(function () { return Credit.positions(acct.id); }).then(function (rows) {
+    Promise.resolve().then(function () {
+      if (typeof sharedPositions === "function") return sharedPositions();
+      return Credit.positions(acct.id);
+    }).then(function (rows) {
       section.removeChild(loading);
       if (!rows || rows.length === 0) {
         var empty = doc.createElement("p");
@@ -1334,6 +1347,27 @@ var AccountUI = (function () {
      * — columns untouched). */
     try { wrap.classList.add("acct"); } catch (e) { /* density skips */ }
 
+    /* Perf: one open-orders fetch + one margin fetch per render. The Orders
+     * tab, the Margin tab, and the Balances enrichment all read the same rows
+     * in the same render — shared lazy promises serve all three (created on
+     * first use, so an unused tab costs nothing). Same data, same render,
+     * never cached across renders. */
+    var ordersSharedP = null, positionsSharedP = null;
+    function sharedOrders() {
+      if (!ordersSharedP) ordersSharedP = Account.openOrders(acct.id);
+      return ordersSharedP;
+    }
+    function sharedPositions() {
+      if (!positionsSharedP) {
+        if (typeof Credit === "undefined" || !Credit || typeof Credit.positions !== "function") {
+          return Promise.reject(new Error("margin backend missing"));
+        }
+        positionsSharedP = Credit.positions(acct.id);
+      }
+      return positionsSharedP;
+    }
+    var sharedReads = { orders: sharedOrders, positions: sharedPositions };
+
     var balSection = doc.createElement("section");
     var balH = doc.createElement("h2");
     balH.textContent = t("account.s7", "Balances");
@@ -1386,7 +1420,7 @@ var AccountUI = (function () {
     marH.textContent = t("account.margin_positions", "Margin Positions");
     marSection.appendChild(marH);
     wrap.appendChild(marSection);
-    renderMargin(doc, marSection, acct);
+    renderMargin(doc, marSection, acct, sharedPositions);
 
     var creSection = doc.createElement("section");
     var creH = doc.createElement("h2");
@@ -1436,7 +1470,7 @@ var AccountUI = (function () {
 
     Account.balances(acct.id).then(function (list) {
       balSection.removeChild(balLoading);
-      enrichPortfolio(acct.id, list).then(function (enrich) {
+      enrichPortfolio(acct.id, list, sharedReads).then(function (enrich) {
         renderPortfolio(doc, balSection, acct, list, enrich);
       });
     }).catch(function (e) {
@@ -1481,8 +1515,9 @@ var AccountUI = (function () {
 
     /* Public read: any account's open orders render with NO login (#1 shows
      * them for every viewed account; only cancel requires ownership, and
-     * cancel lives on the market desk — no cancel buttons here by design). */
-    Account.openOrders(acct.id).then(function (orders) {
+     * cancel lives on the market desk — no cancel buttons here by design).
+     * Shared with the Balances enrichment (perf: one fetch per render). */
+    sharedOrders().then(function (orders) {
       ordSection.removeChild(ordLoading);
       renderOpenOrders(doc, ordSection, orders);
     }).catch(function (e) {

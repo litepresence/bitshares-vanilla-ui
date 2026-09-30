@@ -630,7 +630,7 @@ var ExplorerBlocks = (function () {
     stopLive();
     showStatus(doc, body, t("explorer.loading_blocks", "Loading blocks…"));
     function rowsFor(top) {
-      if (top === null || top === undefined) return Explorer.recentBlocks(TIP_ROWS);
+      if (top === null || top === undefined) return Explorer.recentBlocks(TIP_ROWS, true);
       var heights = [];
       for (var h = top - 1; h > top - 1 - RECENT_N && h >= 1; h--) heights.push(h);
       return Promise.all(heights.map(function (hh) {
@@ -1009,7 +1009,16 @@ var ExplorerBlocks = (function () {
       var pHd = (typeof Explorer.head === "function") ? failOpen(Explorer.head(), null) : Promise.resolve(null);
       var pSets = (typeof Explorer.activeSets === "function") ? failOpen(Explorer.activeSets(), null) : Promise.resolve(null);
       var pSup = (typeof Explorer.btsSupply === "function") ? failOpen(Explorer.btsSupply(), null) : Promise.resolve(null);
-      var pOps = (typeof Explorer.recentOps === "function") ? failOpen(Explorer.recentOps(12, 8), []) : Promise.resolve([]);
+      /* Perf: the tip's own recentBlocks pass already fetched these bodies
+       * (withBodies above) — hand them to recentOps so the same top heights
+       * are not fetched twice. Same render only, map is local. */
+      var preBodies = {};
+      try {
+        (rows || []).forEach(function (r) {
+          if (r && r.body && typeof r.height === "number") preBodies[r.height] = r.body;
+        });
+      } catch (e) { preBodies = {}; }
+      var pOps = (typeof Explorer.recentOps === "function") ? failOpen(Explorer.recentOps(12, 8, preBodies), []) : Promise.resolve([]);
       Promise.all([pHd, pSets, pSup, pOps]).then(function (res) {
         if (!isCurrent(myGen)) return;
         paintTip(rows, res[0], res[1], res[2], res[3]);

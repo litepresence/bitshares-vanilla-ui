@@ -1349,11 +1349,17 @@ var MarketDesk = (function () {
           typeof MarketInd === "undefined" || !MarketInd) return;
       var q = state.assets.quote, b = state.assets.base;
       var dbId;
+      /* Perf: Market.assets already resolved this pair (its rows carry
+       * bitasset_data_id) — reuse the feed leg instead of re-looking-up the
+       * same symbols. Falls back to the lookup when the legs lack it. */
+      var directBid = (q && q.bitasset_data_id) || (b && b.bitasset_data_id) || null;
       Chain.db().then(function (id) {
         dbId = id;
+        if (directBid) return Chain.call(dbId, "get_objects", [[directBid]]);
         return Chain.call(dbId, "lookup_asset_symbols", [[q.symbol, b.symbol]]);
       }).then(function (rows) {
         if (!alive()) return null;
+        if (directBid) return rows;
         var bid = null;
         (rows || []).forEach(function (r) {
           if (r && r.bitasset_data_id && !bid) bid = r.bitasset_data_id;

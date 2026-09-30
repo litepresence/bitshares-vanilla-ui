@@ -125,6 +125,12 @@ var Asset = (function () {
     });
   }
 
+  /* In-flight describe memo (perf: per-row symbol joins fire same-tick
+   *   bursts for repeat ids — one join per id per tick, never two. Pending
+   *   only: entries clear on settle, so no completed data is cached
+   *   (issuer/supply legs stay fresh). Same promise shared, identical. */
+  var _describePending = {};
+
   /* Full asset join for a symbol or 1.3.x id (Explorer.asset when loaded,
    * else direct lookup + get_objects join). Returns {id, symbol, precision,
    * issuer_id, issuer_name ("" when unresolvable — display-only),
@@ -137,6 +143,18 @@ var Asset = (function () {
    * "unknown-asset" / "not-connected". */
   async function describe(symbolOrId) {
     if (typeof symbolOrId !== "string" || !symbolOrId) throw new Error("unknown-asset");
+    if (Object.prototype.hasOwnProperty.call(_describePending, symbolOrId)) {
+      return _describePending[symbolOrId];
+    }
+    var p = _describeInner(symbolOrId);
+    _describePending[symbolOrId] = p;
+    p.then(function () { delete _describePending[symbolOrId]; },
+      function () { delete _describePending[symbolOrId]; });
+    return p;
+  }
+
+  /* Inner describe body (unchanged contract — see describe above). */
+  async function _describeInner(symbolOrId) {
     var join = null;
     if (typeof Explorer !== "undefined" && Explorer.asset) {
       try { join = await Explorer.asset(symbolOrId); } catch (e) {

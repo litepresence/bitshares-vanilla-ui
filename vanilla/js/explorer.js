@@ -61,8 +61,34 @@ var Explorer = (function () {
     "2.15": "buyback", "2.16": "fba_accumulator", "2.17": "collateral_bid",
     "2.18": "credit_deal_summary"};
 
+  /* In-flight RPC memo, keyed by method+params (perf: the blocks tip
+   *   fires same-tick bursts — head/recent/ops each fetch dynamic_global,
+   *   per-row amount/account joins repeat ids. One socket write per key per
+   *   tick, never two. Pending ONLY: entries delete on settle, so no
+   *   completed data is ever cached here (blocks bodies are shared per-render
+   *   via withBodies/preloaded, never across renders). Same promise shared,
+   *   behavior identical. */
+  var _inflight = {};
+  function _key(method, params) {
+    try { return method + "|" + JSON.stringify(params || []); }
+    catch (e) { return method + "|" + String(params); }
+  }
+
   /* One database-API round trip; "not-connected" when no socket is open. */
   async function _dbCall(method, params) {
+    var k = _key(method, params);
+    if (Object.prototype.hasOwnProperty.call(_inflight, k)) {
+      return _inflight[k];
+    }
+    var p = _dbCallInner(method, params);
+    _inflight[k] = p;
+    p.then(function () { delete _inflight[k]; },
+      function () { delete _inflight[k]; });
+    return p;
+  }
+
+  /* Inner database-API round trip (unchanged contract — see _dbCall). */
+  async function _dbCallInner(method, params) {
     var dbId;
     try { dbId = await Chain.db(); } catch (e) { throw new Error("not-connected"); }
     try { return await Chain.call(dbId, method, params || []); } catch (e) {
@@ -114,11 +140,17 @@ var Explorer = (function () {
   /* Newest-first [{height, timestamp, witness, tx_count}]. Params: count
    * 1..50 (default 20). Batch method with per-height fallback. Block headers
    * carry no tx count, so counts are filled per displayed row via get_block
-   * (parallel; any single failure -> null, never a throw). */
-  async function recentBlocks(count) {
+   * (parallel; any single failure -> null, never a throw). withBodies
+   * (optional, default false — perf): when true each row also carries `body`
+   * (the fetched full block, null when its fetch failed) so the caller can
+   * hand the same bodies to recentOps' preloaded map instead of re-fetching
+   * the same top heights (the tip used to fetch them twice). Same render
+   * only — bodies are never stored across calls. */
+  async function recentBlocks(count, withBodies) {
     var n = parseInt(count, 10);
     if (!(n >= 1)) n = 20;
     n = Math.min(n, RECENT_MAX);
+    var wantBodies = withBodies === true;
     var top = (await _dbCall("get_dynamic_global_properties", [])).head_block_number;
     var heights = [], h, i;
     for (h = Math.max(1, top - n + 1); h <= top; h++) heights.push(h);
@@ -145,8 +177,10 @@ var Explorer = (function () {
     }
     var counts = await Promise.all(rows.map(function (r) {
       return _dbCall("get_block", [r.height]).then(function (blk) {
+        if (wantBodies) r.body = blk || null;
         return (blk && Array.isArray(blk.transactions)) ? blk.transactions.length : null;
       }).catch(function (e) {
+        if (wantBodies) r.body = null;
         if (e && e.message === "not-connected") throw e;
         return null;
       });
@@ -192,10 +226,13 @@ var Explorer = (function () {
    * above strips fields to type refs; the feed needs amounts/accounts).
    * Same two methods recentBlocks/block already use
    * (get_dynamic_global_properties + get_block) — no new chain surface.
-   * Params: maxOps (default 10), maxBlocks scanned newest-first (default 8).
+   * Params: maxOps (default 10), maxBlocks scanned newest-first (default 8),
+   * preloaded (optional {height: body} — bodies fetched by the caller's own
+   * recentBlocks(withBodies) pass; heights found there skip get_block, so the
+   * tip no longer fetches the same top blocks twice. Same render only).
    * Returns [{block, tx, op, type_idx, type_name, virtual, fields}]. Gaps
    * (null blocks) are skipped, never thrown. */
-  async function recentOps(maxOps, maxBlocks) {
+  async function recentOps(maxOps, maxBlocks, preloaded) {
     var mo = parseInt(maxOps, 10);
     if (!(mo >= 1)) mo = 10;
     mo = Math.min(mo, 20);
@@ -204,11 +241,16 @@ var Explorer = (function () {
     mb = Math.min(mb, 12);
     var top = (await _dbCall("get_dynamic_global_properties", [])).head_block_number;
     var out = [];
+    var pre = (preloaded && typeof preloaded === "object") ? preloaded : null;
     for (var h = top; h >= 1 && h > top - mb && out.length < mo; h--) {
       var blk;
-      try { blk = await _dbCall("get_block", [h]); } catch (e) {
-        if (e && e.message === "not-connected") throw e;
-        continue;
+      if (pre && Object.prototype.hasOwnProperty.call(pre, h) && pre[h]) {
+        blk = pre[h];
+      } else {
+        try { blk = await _dbCall("get_block", [h]); } catch (e) {
+          if (e && e.message === "not-connected") throw e;
+          continue;
+        }
       }
       if (!blk || !Array.isArray(blk.transactions)) continue;
       for (var ti = 0; ti < blk.transactions.length && out.length < mo; ti++) {
