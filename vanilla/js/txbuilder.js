@@ -22,14 +22,20 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
   var _chainId = null;
   var _built = null;
 
-  /* Deep-clone via JSON (opData is plain chain JSON — no functions, no cycles). */
+  /* Deep-clone via JSON (opData is plain chain JSON — no functions, no cycles).
+   * Params: o (plain object). Returns a detached copy. Fails: throws on
+   * cyclic/non-serializable input (never happens for chain opData). */
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 
-  /* Invalidate every derived answer on any queue mutation (no silent staleness). */
+  /* Invalidate every derived answer on any queue mutation (no silent staleness).
+   * Params: none. Returns nothing. Fails: never. */
   function invalidate() {
     _fees = null; _requiredAuths = null; _signatures = []; _chainId = null; _built = null;
   }
 
+  /* notify: fan out a state() snapshot to every subscriber.
+   * Params: none (reads module state). Returns nothing.
+   * Fails: never throws — one bad listener is swallowed so the composer stands. */
   function notify() {
     var s = state();
     for (var i = 0; i < _subs.length; i++) {
@@ -37,6 +43,10 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     }
   }
 
+  /* hasSerializer: presence check only — rejects opIds with no serializer.
+   * Params: opId (integer, unused beyond the presence contract — every known
+   * op shares the single Tx._ser table). Returns boolean.
+   * Fails: never throws (try/catch yields false when Tx is absent). */
   function hasSerializer(opId) {
     try {
       var T = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : null;
@@ -60,6 +70,9 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return key;
   }
 
+  /* Remove one queued entry by its local key.
+   * Params: key (string, "tb-NNNN-xxxx"). Returns true when removed,
+   * false when the key is unknown. Fails: never throws. */
   function removeOp(key) {
     for (var i = 0; i < _ops.length; i++) {
       if (_ops[i].key === key) { _ops.splice(i, 1); invalidate(); notify(); return true; }
@@ -67,8 +80,13 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return false;
   }
 
+  /* Clear the whole queue (derived answers invalidated, subscribers told).
+   * Params: none. Returns nothing. Fails: never. */
   function clear() { _ops = []; invalidate(); notify(); }
 
+  /* Set the single fee asset for the next feeAll quote.
+   * Params: assetId (string "1.3.N"). Returns nothing.
+   * Fails: throws tb-bad-asset on any non-1.3.N string. */
   function setFeeAsset(assetId) {
     if (typeof assetId !== "string" || !/^1\.3\.\d+$/.test(assetId)) throw new Error("tb-bad-asset: fee asset must be 1.3.N, got " + JSON.stringify(assetId));
     _feeAssetId = assetId;
@@ -76,9 +94,16 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     notify();
   }
 
+  /* list: shallow copy of queued entries (callers must not mutate module state).
+   * Params: none. Returns array of entry objects. Fails: never. */
   function list() { return _ops.slice(); }
+  /* count: queue length for the header badge + pilot confirm screens.
+   * Params: none. Returns integer >= 0. Fails: never. */
   function count() { return _ops.length; }
 
+  /* Subscribe to composer state snapshots (header badge + desk re-render).
+   * Params: fn (function receiving one state() snapshot). Returns an
+   * unsubscribe function. Fails: throws tb-bad-op when fn is not a function. */
   function subscribe(fn) {
     if (typeof fn !== "function") throw new Error("tb-bad-op: subscribe needs a function");
     _subs.push(fn);
@@ -88,6 +113,9 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     };
   }
 
+  /* state: point-in-time snapshot for views (arrays defensively copied).
+   * Params: none. Returns {ops, feeAssetId, fees, requiredAuths,
+   * availablePubs, signatures, chainId, built}. Fails: never. */
   function state() {
     return { ops: _ops.slice(), feeAssetId: _feeAssetId, fees: _fees, requiredAuths: _requiredAuths,
       availablePubs: _availablePubs.slice(), signatures: _signatures.slice(), chainId: _chainId, built: _built };

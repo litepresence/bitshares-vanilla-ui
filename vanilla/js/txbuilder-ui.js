@@ -49,7 +49,10 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     dl.appendChild(dt); dl.appendChild(dd);
   }
 
-  /* Render one queued op card: title + human rows + raw details + Remove. */
+  /* Render one queued op card: title + human rows + raw details + Remove.
+   * Params: wrap (element receiving the card), entry ({key, opId, opData,
+   * source} from TxBuilder.list()). Returns a promise (describe is async).
+   * Fails: never throws — describe errors render as an Error row. */
   async function renderCard(wrap, entry) {
     var card = el("div", "card tb-card");
     var h = el("h3", null, (entry.source || ("op " + entry.opId)));
@@ -72,7 +75,10 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     wrap.appendChild(card);
   }
 
-  /* Full desk: queue | fees+auths grid, send choice, export/import. */
+  /* Full desk: queue | fees+auths grid, send choice, export/import.
+   * Params: root (route container, emptied first). Returns a promise
+   * (awaits one renderCard per queued op). Fails: never throws — fee/auth/
+   * export failures render inline in their own panes. */
   async function renderDesk(root) {
     root.innerHTML = "";
     var wrap = el("div", "wrap wide"); root.appendChild(wrap);
@@ -146,7 +152,10 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     scol.appendChild(impArea); scol.appendChild(impBtn);
   }
 
-  /* Header badge: count only, hidden at 0, links to the desk. */
+  /* Header badge: count only, hidden at 0, links to the desk.
+   * Params: none (queries .topbar/header/body once, then subscribes).
+   * Returns nothing. Fails: never throws — missing TxBuilder is a silent
+   * no-op so routes render without the composer loaded. */
   function mountBadge() {
     if (document.getElementById("tb-badge") || typeof TxBuilder === "undefined") return;
     var bar = document.querySelector(".topbar") || document.querySelector("header") || document.body;
@@ -167,7 +176,10 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     try { paint(TxBuilder.state()); } catch (e) { /* subscription paints next */ }
   }
 
-  /* renderDeskInto: router-facing alias (keeps the route entry one line). */
+  /* renderDeskInto: router-facing alias (keeps the route entry one line).
+   * Params: root (route container passed through to renderDesk).
+   * Returns the renderDesk promise (fire-and-forget at the call site).
+   * Fails: same as renderDesk — never throws. */
   function renderDeskInto(root) { renderDesk(root); }
 
   TxBuilderUI.renderDesk = renderDeskInto;
