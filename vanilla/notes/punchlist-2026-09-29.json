@@ -1259,8 +1259,24 @@
    "notes": "Renders ok (22-topic index). XBTS/IOXBank gateway topics present.",
    "page": "#/help",
    "route_status": "ok"
-  }
- ],
+  },
+   {
+    "missing": [
+     {
+      "element": "Multi-op compose desk: queue ops across accounts, human describe rows, feeAll, authority resolution, export/import envelope, Direct/Proposal send (added-post-round-1)",
+      "ref": "vanilla/js/txbuilder-ui.js:1, vanilla/js/router.js:235",
+      "severity": "enhancement",
+      "status": "fixed",
+      "fixed_in": "66def4e",
+      "verified": "testnet",
+      "reason": "Desk route + badge + wiring landed in 66def4e (txbuilder-ui.js desk, router /txbuilder, app badge, index tags); composer core 1fa2fa8, fee/build/export/import 7bc052a, auth/sign b041478, describe b49a276, proposal-wrap/broadcast 79b5728, pilot outlets on transfer/vote/pool-stake 0ab4091, fee-shape fix 8dcf40f, parity T1-T6 vectors 687a7f1 (T1 2-op op-0+op-6 broadcast block 101018463/0, ONE get_required_fees call), unit tests + matrix 8b985b6, i18n fef5263. Added-post-round-1: no #1 counterpart, vanilla-only extra like #/ops."
+     }
+    ],
+    "notes": "No #1 counterpart (added-post-round-1) — vanilla-only multi-op composer desk. Queue cards with human rows + raw-JSON details, fees/auth panes, Direct/Proposal send-choice, export/import, review-then-sign; header badge count; pilot 'Open in TxBuilder' outlets on transfer, vote, pool stake.",
+    "page": "#/txbuilder",
+    "route_status": "ok"
+   }
+  ],
  "round": "director-round-1",
  "totals": {
   "pages": 40,
