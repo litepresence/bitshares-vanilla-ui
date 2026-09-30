@@ -232,6 +232,7 @@ var Router = (function () {
     { path: "/referrals", title: "Referrals", render: function (root) { ReferralsUI.renderReferrals(root); } },
     { path: "/favourites", title: "Favourites", render: function (root) { FavouritesUI.renderFavourites(root); } },
     { path: "/ops", title: "Top Operations", render: function (root) { OpsUI.renderOps(root); } },
+    { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 

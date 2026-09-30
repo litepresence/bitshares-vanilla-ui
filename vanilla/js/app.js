@@ -838,6 +838,7 @@ var App = (function () {
       } catch (e) { /* click-toggle still works */ }
     }
     connect(settings.activeNode);
+    try { if (typeof TxBuilderUI !== "undefined" && TxBuilderUI.mountBadge) TxBuilderUI.mountBadge(); } catch (e) { /* desk badge optional */ }
   }
 
   /* Classic script: auto-boot in browsers only; require() under node stays side-effect free. */
