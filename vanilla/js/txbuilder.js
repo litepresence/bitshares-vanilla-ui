@@ -114,7 +114,11 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     if (!T || typeof T.feeMulti !== "function") throw new Error("tb-not-connected: Tx.feeMulti is not loaded");
     var pairs = _pairs();
     var ans = await T.feeMulti(pairs, _feeAssetId);
-    _fees = { perOp: ans.perOp, totalRaw: String(ans.totalRaw), totalDisplay: String(ans.totalDisplay) };
+    // Shape bridge: shipped Tx.feeMulti answers {fees,...} while the Task 2
+    // stub (and the contract) say {perOp,...} — accept both, never undefined.
+    var per = ans.perOp || ans.fees;
+    if (!Array.isArray(per)) throw new Error("tb-bad-envelope: fee answer has no per-op list");
+    _fees = { perOp: per, totalRaw: String(ans.totalRaw), totalDisplay: String(ans.totalDisplay) };
     _built = null; _signatures = [];
     notify();
     return { perOp: _fees.perOp, totalRaw: _fees.totalRaw, totalDisplay: _fees.totalDisplay };
