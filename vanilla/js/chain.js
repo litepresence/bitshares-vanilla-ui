@@ -68,7 +68,7 @@ var Chain = (function () {
    *   fresh ones) — a stale cache would address the new connection wrongly.
    *   The market-notice handler dies with it too (server-side subscriptions
    *   do not survive reconnect — the route resubscribes). */
-  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; marketCb = null; }
+  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; marketCb = null; _dbPending = null; _historyPending = null; _netPending = null; }
 
   /* blockNumberFromId: graphene block ids lead with the 4-byte big-endian
    * block number (astro-ui BlocksLive parity). Returns the number or null. */
@@ -277,25 +277,42 @@ var Chain = (function () {
       setStatus({state: "closed", node: (lastStatus && lastStatus.node) || null});
     }
   }
-  var _dbId = null;
+  var _dbId = null, _dbPending = null;
+  /* In-flight dedupe: concurrent db() calls before cache warm share one
+   * login "database" RPC instead of racing N identical calls (perf audit:
+   * database ×6 on desk load). Rejection clears the slot so the next call
+   * retries; close paths fail in-flight calls via failPending as before. */
   function db() {
     if (_dbId !== null) return Promise.resolve(_dbId);
-    return call(1, "database", []).then(function (id) { _dbId = id; return id; });
+    if (_dbPending) return _dbPending;
+    _dbPending = call(1, "database", []).then(function (id) {
+      _dbId = id; _dbPending = null; return id;
+    }, function (e) { _dbPending = null; throw e; });
+    return _dbPending;
   }
-  var _historyId = null;
-  /* history: cached "history" api id (mirrors db()). Params: none. Returns a
-   *   Promise for the numeric api id. Fails: rejects when not connected or on
-   *   call timeout (via call()). */
+  var _historyId = null, _historyPending = null;
+  /* history: cached "history" api id (mirrors db(), same in-flight dedupe).
+   * Params: none. Returns a Promise for the numeric api id. Fails: rejects
+   *   when not connected or on call timeout (via call()). */
   function history() {
     if (_historyId !== null) return Promise.resolve(_historyId);
-    return call(1, "history", []).then(function (id) { _historyId = id; return id; });
+    if (_historyPending) return _historyPending;
+    _historyPending = call(1, "history", []).then(function (id) {
+      _historyId = id; _historyPending = null; return id;
+    }, function (e) { _historyPending = null; throw e; });
+    return _historyPending;
   }
-  /* Network-broadcast api id (mirrors db()): cached after first login.
-   * Added for slice-04-transfer Task 2; used by Tx.broadcast. */
-  var _netId = null;
+  /* Network-broadcast api id (mirrors db(), same in-flight dedupe): cached
+   * after first login. Added for slice-04-transfer Task 2; used by
+   * Tx.broadcast. */
+  var _netId = null, _netPending = null;
   function net() {
     if (_netId !== null) return Promise.resolve(_netId);
-    return call(1, "network_broadcast", []).then(function (id) { _netId = id; return id; });
+    if (_netPending) return _netPending;
+    _netPending = call(1, "network_broadcast", []).then(function (id) {
+      _netId = id; _netPending = null; return id;
+    }, function (e) { _netPending = null; throw e; });
+    return _netPending;
   }
   /* subscribeMarket: route-owned market-notice feed (database_api.hpp:602-610
    *   subscribe_to_market(callback, A, B) — asset ids, not a callback id).
