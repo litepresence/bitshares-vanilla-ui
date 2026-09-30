@@ -124,7 +124,9 @@ var BorrowUI = (function () {
     root.innerHTML = "";
     ["Credit", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    /* borrow-prose hook (app.css): direct-child explainer paragraphs cap at
+     * ~75ch like help articles. Display-only class; forms/tables untouched. */
+    var wrap = el(doc, "div", null, "wrap borrow-prose"); root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
@@ -363,7 +365,9 @@ var BorrowUI = (function () {
     ];
     var idx = 0;
     var p = el(doc, "p", steps[0], "muted"); wrap.appendChild(p);
-    var nav = el(doc, "div", null, "xfer-field");
+    /* borrow-stepnav hook (app.css): flex + gap so the "Step N of 4" counter
+     * never jams against the Previous/Next buttons. Display-only class. */
+    var nav = el(doc, "div", null, "xfer-field borrow-stepnav");
     var prev = touchable(el(doc, "button", t("borrow.previous", "Previous"))); prev.type = "button";
     var count = el(doc, "span", "", "muted");
     var next = touchable(el(doc, "button", t("borrow.next", "Next"))); next.type = "button";

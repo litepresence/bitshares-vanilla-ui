@@ -479,8 +479,11 @@ var HelpUI = (function () {
     wrap.appendChild(list);
   }
 
-  /* Topic: title + guide summary + full article body + in-app pointer + back. */
+  /* Topic: title + guide summary + full article body + in-app pointer + back.
+   * help-article hook (app.css): prose paragraphs/ul cap at ~75ch so article
+   * lines stay readable at desk widths. Display-only class, no strings. */
   function paintTopic(doc, wrap, topic) {
+    try { wrap.classList.add("help-article"); } catch (e) { /* class best-effort */ }
     wrap.appendChild(el(doc, "h1", t("help.topic_" + topic[0] + "_title", topic[1])));
     wrap.appendChild(el(doc, "p", t("help.topic_" + topic[0] + "_text", topic[2])));
     paintBody(doc, wrap, topic[0]);

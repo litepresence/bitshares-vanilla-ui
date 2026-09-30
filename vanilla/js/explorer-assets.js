@@ -628,12 +628,17 @@ var ExplorerAssets = (function () {
       marketBtn.title = marketID;
       marketBtn.setAttribute("aria-label", t("explorer.open_preferred_market", "Open preferred market ") + marketID);
       wrap.appendChild(marketBtn);
-      /* Tabs (plain labels per file-scope i18n note; #1 Tabs info/actions). */
+      /* Tabs (shared .xplore-tab underline treatment with explorer-ui.js —
+       * grey caps, active accent underline; same bar so all tab rows agree).
+       * #1 Tabs info/actions (Asset.jsx:2337-2403). */
       var tabBar = el(doc, "div", null, "xplore-tabs");
-      var infoBtn = touchable(el(doc, "button", t("explorer.asset_info", "ASSET INFO")));
+      tabBar.setAttribute("role", "tablist");
+      var infoBtn = touchable(el(doc, "button", t("explorer.asset_info", "ASSET INFO"), "xplore-tab active"));
       infoBtn.type = "button";
-      var actBtn = touchable(el(doc, "button", t("explorer.actions", "ACTIONS")));
+      infoBtn.setAttribute("role", "tab");
+      var actBtn = touchable(el(doc, "button", t("explorer.actions", "ACTIONS"), "xplore-tab"));
       actBtn.type = "button";
+      actBtn.setAttribute("role", "tab");
       tabBar.appendChild(infoBtn);
       tabBar.appendChild(actBtn);
       wrap.appendChild(tabBar);
@@ -642,7 +647,8 @@ var ExplorerAssets = (function () {
       actBox.style.display = "none";
       wrap.appendChild(infoBox);
       wrap.appendChild(actBox);
-      /* selectTab: toggle the asset detail info/actions panes (aria-selected + bold).
+      /* selectTab: toggle the asset detail info/actions panes (shared
+       * .xplore-tab/.active classes with explorer-ui.js + aria-selected).
        * WHY helper: both tab buttons share this state flip; styling-only, never throws.
        * Param which ("info"|"actions"); no return. */
       function selectTab(which) {
@@ -652,8 +658,8 @@ var ExplorerAssets = (function () {
         try {
           infoBtn.setAttribute("aria-selected", info ? "true" : "false");
           actBtn.setAttribute("aria-selected", info ? "false" : "true");
-          infoBtn.style.fontWeight = info ? "bold" : "";
-          actBtn.style.fontWeight = info ? "" : "bold";
+          infoBtn.className = info ? "xplore-tab active" : "xplore-tab";
+          actBtn.className = info ? "xplore-tab" : "xplore-tab active";
         } catch (e) { /* styling only */ }
       }
       infoBtn.addEventListener("click", function () { selectTab("info"); });

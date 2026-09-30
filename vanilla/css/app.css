@@ -1143,3 +1143,40 @@ p.muted[aria-live="polite"],
   }
   button:active, a.btn:active, .appfoot-actions a:active { transform: none; }
 }
+
+/* Vision micro-sweep 2026-09-30 (newest-feature papercuts, principle #4):
+ * alignment/spacing/labels/empty-state grouping only — no behavior, no new
+ * strings (i18n untouched), no chain reads. Tokens only so all three themes
+ * keep working. Verify: re-shot #/asset/BTS ACTIONS, #/borrow, #/instant-trade/BTS_CNY,
+ * #/help/voting @1440+390, zero console errors. */
+
+/* (v1) Borrow stepper nav (borrow-ui.js howStepper .borrow-stepnav): the
+ * counter sat jammed between Previous/Next ("PREVIOUSStep 1 of 4NEXT").
+ * Flex + gap gives it air; wraps on 360px phones. */
+.borrow-stepnav { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; }
+.borrow-stepnav span { margin: 0 4px; }
+
+/* (v2) Instant-trade swap cell on phones: the bare ⇄ glyph rode its own
+ * wrapped flex row at content width (orphaned, edge-hugging). Full-row with
+ * centered glyph + vertical air at phone widths; desk rule untouched
+ * (inline flex centering already owns it there). */
+@media (max-width: 639px) {
+  .it-duo > .it-panel { flex: 1 1 100%; }
+  .it-duo > .it-swap-cell { flex: 1 1 100%; justify-content: center;
+    padding: 2px 0; min-height: 44px; }
+}
+
+/* (v3) Instant-trade quote grouping (#it-walk): stats + walkthrough + fee
+ * previews read as loose floating sentences. A quiet panel groups them as
+ * one quote; :empty guard so the pre-load shell never paints a bare box. */
+#it-walk:not(:empty) { border: 1px solid var(--border); background: var(--panel);
+  padding: 10px 14px; margin: 12px 0; }
+#it-walk p { margin: 6px 0; }
+#it-walk p:first-child { margin-top: 0; }
+#it-walk p:last-child { margin-bottom: 0; }
+
+/* (v4) Article prose width: help articles + borrow explainers ran full-bleed
+ * (~140 chars/line at 1440px). Cap direct-child prose at ~75ch; headings,
+ * forms, tables, and steppers untouched. */
+.help-article > p, .help-article > ul,
+.borrow-prose > p { max-width: 75ch; }
