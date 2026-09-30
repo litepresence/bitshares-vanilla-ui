@@ -280,3 +280,24 @@
 - Counts this round: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20
   substantive PORTED + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged.
   MISSING (unjustified): still 0.
+
+## Nightly delta 2 (2026-09-30) — op 16 fee-pool funding (testnet-proved)
+
+- Op 16 `asset_fund_fee_pool` (fee)(from_account)(asset_id)(amount, bare
+  int64 core)(extensions=absent): serializer `serializeAssetFundFeePoolOp` +
+  dispatch (`tx.js`), builder `AssetOps.buildFundFeePool` (`asset-ops.js`,
+  human CORE amount via `Format.parseAmount`, zero rejected), fee via
+  `AssetOps.fee` → `get_required_fees`, send via `sendAndProve`.
+  Field order vs #4 `asset_ops.hpp:728` + BJS `operations.js` (fetched raw
+  2026-09-30) + #3 `bitshares-api.js:2566` — unanimous (op number corrected
+  from 17: 17 = `asset_settle` per `operations.hpp:72`).
+- Testnet proof (commit `444eb18`, artifacts
+  `tooling/prove-feepool-fund-16.cjs` + fee-pool section): funded
+  fixture-issued AFKTEST10 (1.3.1849, p4) dust 0.1 TEST = 10000 raw, pool
+  10004248 → 10014248 (delta exact), fee 100 raw, wallet delta −10100 exact,
+  head #100989922. Unit vectors 20/20 (`tooling/fee-pool-fund-16-test.js`).
+- Asset page ACTIONS tab gained the funding form (amount + from-account +
+  Review → named-row confirm → unlock-at-sign → pool-delta re-read proof);
+  also fixed a 10× display bug (fee-pool shown at asset precision, now core
+  p5). Claiming (ops 43/47) stays honestly deferred.
+- Counts: unchanged otherwise. MISSING (unjustified): still 0.
