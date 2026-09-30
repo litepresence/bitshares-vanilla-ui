@@ -1152,14 +1152,10 @@ var TradeForm = (function () {
     if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(recvRaw)) {
       throw new Error("Price is too small for this amount: one leg rounds to zero.");
     }
-    var bals = await balancesMap(P.me.id);
-    var sellBal = bals[sellAssetId];
-    if (!sellBal || sellBal.raw < BigInt(sellRaw)) {
-      var have = sellBal
-        ? Format.formatAmount(sellBal.raw.toString(), sellBal.precision) + " " + sellBal.symbol
-        : "0 " + sellSym(side, ctx);
-      throw new Error("Insufficient " + sellSym(side, ctx) + " balance: have " + have + ".");
-    }
+    /* Chain-state gate removed (owner directive): balances and fees are NOT
+     * pre-checked client-side — the chain is the authority and its exact
+     * rejection surfaces via showError on review/broadcast. Review proceeds
+     * to confirm; chain validates on broadcast. */
     var ops = [createOp(P.me.id, sellAssetId, sellRaw, recvAssetId, recvRaw, expWire, vals.fok)];
     var unsigned = await Tx.buildTx(ops);
     var feeRes = await Tx.feeMulti(unsigned.operations, FEE_ASSET);
@@ -1180,17 +1176,6 @@ var TradeForm = (function () {
         }
       }
     } catch (e) { mktFee = null; }
-    var feeRaw = BigInt(feeRes.totalRaw);
-    var feeBal = bals[unsigned.operations[0][1].fee.asset_id];
-    var feeHave = feeBal ? feeBal.raw : 0n;
-    var need = (unsigned.operations[0][1].fee.asset_id === sellAssetId)
-      ? BigInt(sellRaw) + feeRaw : feeRaw;
-    var haveBal = (unsigned.operations[0][1].fee.asset_id === sellAssetId)
-      ? sellBal.raw : feeHave;
-    if (haveBal < need) {
-      throw new Error("Insufficient " + feeMeta.symbol + " for the fee: need " +
-        humanFee(need.toString(), feeMeta) + ".");
-    }
     return {
       side: side, ratio: ratio, sellAssetId: sellAssetId, recvAssetId: recvAssetId,
       sellRaw: sellRaw, recvRaw: recvRaw, expWire: expWire, fok: !!vals.fok,
@@ -1244,6 +1229,7 @@ var TradeForm = (function () {
     row(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
     row(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
+    mount.appendChild(el(doc, "p", "Chain validates balances and fees on broadcast.", "muted"));
     /* The exact operation about to be signed (unsigned, no secrets).
      * Review bytes before Sign & Send. */
     var detOp = doc.createElement("details");
@@ -1487,19 +1473,13 @@ var TradeForm = (function () {
     return { orders: orders, sellAssetId: sellAssetId, recvAssetId: recvAssetId };
   }
 
-  /* Scaled review: preview math + balance pre-check + ONE buildTx + ONE
-   * feeMulti over all N ops (per-op fees summed + displayed). */
+  /* Scaled review: preview math + ONE buildTx + ONE feeMulti over all N
+   * ops (per-op fees summed + displayed). Chain-state gate removed (owner
+   * directive): no client balance pre-check — chain validates on broadcast. */
   async function reviewScaled(P, spec) {
     var calc = scaledOrders(P, spec);
     var ctx = P.ctx;
     var expWire = expiryWire(spec);
-    var bals = await balancesMap(P.me.id);
-    var sellBal = bals[calc.sellAssetId];
-    var totalRaw = calc.orders.reduce(function (acc, o) { return acc + BigInt(o.sellRaw); }, 0n);
-    if (!sellBal || sellBal.raw < totalRaw) {
-      var s = calc.sellAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
-      throw new Error("Insufficient " + s + " balance for the scaled total.");
-    }
     var ops = calc.orders.map(function (o) {
       return createOp(P.me.id, calc.sellAssetId, o.sellRaw,
         calc.recvAssetId, o.recvRaw, expWire, false);
@@ -1561,6 +1541,7 @@ var TradeForm = (function () {
     confirmRow(t("trade.row_expiration", "Expiration"), R.expWire);
     confirmRow(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
+    mount.appendChild(el(doc, "p", "Chain validates balances and fees on broadcast.", "muted"));
     /* All N operations about to be signed (unsigned, no secrets). */
     var detOps = doc.createElement("details");
     detOps.className = "raw";

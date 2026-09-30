@@ -491,8 +491,9 @@ var BorrowUI = (function () {
         var ratio = previewRatio(collRaw, coll.precision, debtRaw, debt.precision, bit, coll.id, debt.id);
         var mcrRow = (ratio.mcr === null) ? "unknown (no feed read)"
           : Credit.tcrUnitsToHuman(ratio.mcr) + "%";
-        if (ratio.kind === "feed" && ratio.mcr !== null && ratio.belowMcr)
-          throw new Error("below-mcr (backing " + ratio.x + t("borrow.under_maintenance", " under maintenance ") + mcrRow + t("borrow.the_chain_would_reject_raise_collateral_or_lo", " — the chain would reject; raise collateral or lower debt)"));
+        /* Chain-state gate removed (owner directive): below-MCR is NOT blocked
+         * client-side — the ratio rows below stay as the honest hint and the
+         * chain validates on broadcast, its exact error via showError. */
         var pair = Credit.buildCallUpdate({ accountId: acct.id, collRaw: collRaw, collId: coll.id,
           debtRaw: debtRaw, debtId: debt.id, tcrUnitsOrNull: tcr });
         var fee = await Credit.fee(pair, "1.3.0");

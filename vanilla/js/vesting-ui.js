@@ -299,7 +299,7 @@ var VestingUI = (function () {
         var fM = ui.field(doc, t("vesting.amount_at_most_the_balance", "Amount (at most the balance)"), { value: defVal, inputmode: "decimal" });
         o2.appendChild(fM.row);
         o2.appendChild(ui.el(doc, "p", t("vesting.balance_2", "Balance: ") + vr.cells[2].text + " · " + availTxt +
-          " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + "). Over-claims fail on chain, so this form blocks them.", "muted"));
+          " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + "). Over-claims fail on chain — chain validates on broadcast.", "muted"));
         var ibox = ui.el(doc, "div"); o2.appendChild(ibox);
         ui.reviewSection(doc, ibox, uiGen, t("vesting.review_claim", "Review claim"), {
           build: async function () {
@@ -307,7 +307,9 @@ var VestingUI = (function () {
             var raw = (fM.input.value.trim() === vr.r.balance_raw) ? fM.input.value.trim()
               : Format.parseAmount(fM.input.value.trim(), info.precision);
             if (BigInt(raw) <= 0n) throw new Error(t("vesting.claim_amount_must_be_0", "Claim amount must be > 0."));
-            if (BigInt(raw) > BigInt(vr.r.balance_raw)) throw new Error(t("vesting.claim_exceeds_the_balance_lower_the_amount", "Claim exceeds the balance — lower the amount."));
+            /* Chain-state gate removed (owner directive): over-claims are NOT
+             * blocked client-side — the chain is the authority and its exact
+             * rejection surfaces via showError. Review proceeds. */
             var pair = ProposalMisc.buildVestingWithdraw({ ownerId: vr.r.owner, vestingId: vr.r.id, amountRaw: raw, assetId: vr.r.asset_id });
             await Proposal.fee(pair, "1.3.0");
             return { pair: pair, fee: pair[1].fee, human: Format.formatAmount(raw, info.precision) + " " + info.symbol,
