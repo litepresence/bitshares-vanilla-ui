@@ -26,10 +26,11 @@ var PoolUI = (function () {
    * when i18n.js failed to load: never blank, never throws. Dynamic sentences keep
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
-   * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+   * every default below is byte-verbatim in the HEAD blob. vars fills %(name)s
+   * placeholders; without I18n the raw default returns unfilled. */
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
     return dflt;
   }
@@ -177,19 +178,18 @@ var PoolUI = (function () {
     /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
      * deposit without broadcasting. Create/unstake/swap confirms render no
      * outlet. The pair passes as JS values only (never into the DOM); the
-     * one-shot Sign & Send below is untouched. Plain literal label, no new
-     * i18n key (recorded for the next i18n batch). */
+     * one-shot Sign & Send below is untouched. */
     try {
       if (cfg && cfg.pair && cfg.pair[0] === 61 && cfg.pair[1] &&
           typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function") {
-        var tbDep = touchable(el(doc, "button", "Add deposit to TxBuilder"));
+        var tbDep = touchable(el(doc, "button", t("txbuilder.add_deposit", "Add deposit to TxBuilder")));
         tbDep.type = "button";
         tbDep.addEventListener("click", function () {
           var tbSrc = "pool:deposit " + String(cfg.pair[1].pool || "");
           TxBuilder.addOp(cfg.pair[0], cfg.pair[1], tbSrc);
           try {
             if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
-              Notify.push("info", "Added to TxBuilder", tbSrc + " (op 61) — " + TxBuilder.count() + " in queue", {});
+              Notify.push("info", t("txbuilder.added_title", "Added to TxBuilder"), t("txbuilder.added_body_tpl", "%(src)s (op %(op)s) — %(n)s in queue", { src: tbSrc, op: 61, n: TxBuilder.count() }), {});
             }
           } catch (e2) { /* toast optional; the desk badge is the record */ }
           location.hash = "#/txbuilder";

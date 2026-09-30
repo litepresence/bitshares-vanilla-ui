@@ -321,12 +321,11 @@ var TransferConfirm = (function () {
     /* TxBuilder outlet (additive): queue this unsigned transfer without
      * broadcasting. One-shot Sign & Send above is untouched — this block
      * only reads ctx.unsigned.operations[0] as JS values (never into the
-     * DOM) and navigates to the desk. Labels are plain literals (no new
-     * i18n keys — recorded for the next i18n batch). */
+     * DOM) and navigates to the desk. */
     try {
       if (typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function" &&
           ctx && ctx.unsigned && ctx.unsigned.operations && ctx.unsigned.operations[0]) {
-        var tbAdd = touchable(el(doc, "button", "Add to TxBuilder"));
+        var tbAdd = touchable(el(doc, "button", t("txbuilder.add_transfer", "Add to TxBuilder")));
         tbAdd.type = "button";
         tbAdd.id = "xfer-tb-add";
         var tbPair = ctx.unsigned.operations[0];
@@ -338,7 +337,7 @@ var TransferConfirm = (function () {
           (!!ctx.memoText && !(tbPair[1] && tbPair[1].memo));
         if (tbLockedMemo) {
           tbAdd.disabled = true;
-          tbAdd.title = "Unlock to include the encrypted memo";
+          tbAdd.title = t("txbuilder.unlock_memo_hint", "Unlock to include the encrypted memo");
         } else {
           tbAdd.addEventListener("click", function () {
             var tbFrom = (from && from.name) || String((tbPair[1] && tbPair[1].from) || "?");
@@ -347,7 +346,7 @@ var TransferConfirm = (function () {
             TxBuilder.addOp(tbPair[0], tbPair[1], tbSrc);
             try {
               if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
-                Notify.push("info", "Added to TxBuilder", tbSrc + " (op " + tbPair[0] + ") — " + TxBuilder.count() + " in queue", {});
+                Notify.push("info", t("txbuilder.added_title", "Added to TxBuilder"), t("txbuilder.added_body_tpl", "%(src)s (op %(op)s) — %(n)s in queue", { src: tbSrc, op: tbPair[0], n: TxBuilder.count() }), {});
               }
             } catch (e2) { /* toast optional; the desk badge is the record */ }
             location.hash = "#/txbuilder";
