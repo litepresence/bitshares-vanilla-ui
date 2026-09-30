@@ -390,3 +390,114 @@ touched — sweep only, so `node --check` is N/A (nothing touched),
   picker Starred — shot.mjs has no click step), live green/red picker
   CHANGE on a moving market, phone-width re-check of tonight's tall
   content (1440 only this sweep).
+
+---
+
+# Round 4 (2026-09-30) — punchlist-pages recapture (heavily-changed only)
+
+Same server + shooter as rounds 1–3
+(`python3 -m http.server 8081 --directory vanilla`,
+`PLAYWRIGHT_BROWSERS_PATH=/workspace/tooling/visual/.browsers node
+tooling/visual/shot.mjs --url <route> --width 1440/390`). Every shot below
+was READ (no blind claims). Touched file: `vanilla/js/account-ui.js` ONLY
+(small-JS display trim, no CSS, no strings, no behavior, no serializer).
+Untouched per scope: reference/, docs/, tooling/, chain.js, tx.js, wallet.js,
+crypto.js, CSS, locales.
+
+## Fixed (one cheap-exact retro delta)
+
+1. **Account PRICE(BTS) 16-decimal → trim6 at RENDER** (`account-ui.js`
+   trim6, duplicated from `market-ind.js:639` / `market-book.js:162` /
+   `market-picker.js:57` per the no-shared-abstraction doctrine): pure
+   string truncation of `^-?\d+\.\d{7,}$` to 6 decimals. Format math
+   untouched — `valueRawOf` still uses the FULL ticker string, so VALUE(BTS)
+   and totals are unchanged; the full-precision chain string stays on each
+   price cell/card `title` (table PRICE td + phone-card mid). Live proof on
+   `#/account/committee-account`: SILVER `1547.987616` (was
+   `1547.98761609907120743034`), GOLD `45977.011494` (was
+   `45977.011494252873563218`), CNY `15.541518`, EUR `808.421734`, USD
+   `60.975869` — matches the original `account.png` 5–6-decimal density
+   (60.00000, 8.90000, 0.50000). D1 rule finally covers the portfolio
+   column it missed.
+
+## Per-page deltas (found → fixed / deferred)
+
+- `#/market/BTS_CNY` desk (1440 + 390): strip Latest/Δ/Vol/Bid–Ask + Feed
+  `0.066686` trimmed, spread/midpoint trimmed, picker VOL/PRICE/CHANGE
+  table with muted zeros — rounds 2–3 hold. Phone 390: strip wraps, no
+  sideways overflow. → NO FIX (already recaptured; below-fold 2x3 covered
+  by the sweep tall shot).
+- `#/account/committee-account` (1440 + 390): balances table correct +
+  human-scaled; PRICE column was the 16-decimal outlier → FIXED above.
+  Phone 390: tabs wrap, cards view intact (`r4-acct-fix-phone.png`). →
+  DEFERRED R4-D1 (below): pill tabs vs original text tabs; per-row MANAGE
+  links vs original icon/dash affordances; no-comma thousands (see below).
+- `#/fees` (1440 + 390): General group + `# | Operation | Type |
+  Standard fee | LTM fee` with scale applied + LTM column read clean
+  (punchlist `7958649`). Phone 390: table rides its existing
+  `overflow-x:auto` scroll wrapper (`fees-ui.js:182`) — columns scroll in
+  place instead of hiding, per the code comment. No original fees capture
+  exists — visual sanity only. → NO FIX (scroll contract already holds).
+- `#/borrow` (1440 + 390): functional margin desk (positions + op-3 adjust
+  + op-3 open + op-45 bids) renders clean, locked preview notices honest.
+  Original `borrow.png` is the showcase splash (Create CDP + GET STARTED),
+  not the margin desk — intentional product divergence (the desk is the
+  functional home per punchlist `887a520`). → NO FIX (a splash-chrome
+  restyle would misrepresent the desk; recorded, not gold-plated).
+- `#/wallet` (1440 + 390): console card + unlock + honesty note render
+  clean. Original `wallet.png` is the empty multi-wallet console (grey
+  placeholder cards + RESTORE BACKUP / NEW LOCAL WALLET outline buttons) —
+  different model by design (single-slot brainkey keystore; punchlist
+  `f28d5e3`/`15b3e81` scope). → NO FIX (outline-button restyle is candy,
+  not structure; model divergence is documented in the punchlist).
+- `#/proposals` (1440 + 390): list + create-proposal forms render clean,
+  locked viewing-as notice honest. No original proposals capture exists —
+  visual sanity only. → NO FIX.
+
+## Deferred (observed, NOT gold-plated this round)
+
+- **R4-D1 (tabs): pill vs text.** All `.mkt-tabs` hosts (desk ALL/STARRED,
+  account 7-tab row, pool/swap/dashboard toggles) render as bordered pills
+  (`desk-grid.css` pill block wins over `app.css:744-752` text-tab rule —
+  probed: account tab button computes to `1px solid + 8px radius + panel
+  bg`). Original `market.png` (MY/FIND) + `account.png` (Balances/Open
+  Orders/…) are borderless text tabs with accent underline. Unifying to
+  text tabs is CSS-only but GLOBAL (every desk changes) — needs a design
+  call, not a one-page hex tweak. Recorded, not attempted.
+- **R4-D2 (account actions): all-links vs icon/dash.** Ours prints all 5
+  MANAGE links on every row; original shows send-arrow/deposit-icon/trade-
+  chart/borrow-help/settle-flag with dashes where N/A (needs availability
+  logic — behavior-adjacent, out of display-only scope).
+- **R4-D3 (thousands commas):** ours `136289.07401` vs original
+  `136,289.07401` (QTY/VALUE/total). Grouping is display-only and cheap,
+  but touches every money cell — batch with the formatter, not as a
+  one-column tweak. Recorded.
+
+## Shots (all in /tmp, all READ, zero console errors each)
+
+- r4-desk.png (1440) + r4-desk-phone.png (390): desk + picker.
+- r4-acct.png (1440, BEFORE) + r4-acct-fix.png (1440, AFTER: trimmed
+  PRICE) + r4-acct-phone.png / r4-acct-fix-phone.png (390).
+- r4-fees.png (1440) + r4-fees-phone.png (390): grouped fees + scroll.
+- r4-borrow.png (1440) + r4-borrow-phone.png (390): margin desk.
+- r4-wallet.png (1440) + r4-wallet-phone.png (390): console + unlock.
+- r4-props.png (1440) + r4-props-phone.png (390): proposals.
+- Originals compared: `original-pages/market.png`, `account.png`,
+  `borrow.png`, `wallet.png` (fees/proposals have no original capture —
+  sanity only, stated above).
+
+## Verify
+
+- `node --check vanilla/js/account-ui.js`: OK.
+- `python3 tooling/check_rot.py`: PASS.
+- `python3 tooling/check_i18n.py`: OK (10 dicts key-complete, 2587 keys;
+  3495 t() call sites drift-free — zero strings added/changed this round).
+- 14 shots, zero console errors on every one (shooter exits 2 on errors).
+- 44px: no interactive element added or resized (trim changes text only;
+  titles are non-interactive).
+- Anti-rot gates: (a) 10-year test — pure string slice + title attr, no new
+  dependency; (b) newly depended on: nothing; (c) deletable subset: trim6 +
+  two title lines revert to verbatim 16-decimal by deleting the call.
+- NOT verified headlessly: title-attr hover/long-press read (shot.mjs has
+  no hover step) — needs the human browser pass: hover a trimmed PRICE
+  cell + phone-card mid and confirm the full chain string shows.

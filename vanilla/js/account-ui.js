@@ -216,6 +216,20 @@ var AccountUI = (function () {
     return String(raw);
   }
 
+  /* trim6 at RENDER (retro round 4, D1 rule ported to the portfolio PRICE
+   * column): get_ticker latest strings can carry 16+ decimals (SILVER
+   * 1547.9876… vs original account.png 5-decimal prices); the original
+   * shows ~6. Pure string truncation of ^-?\d+\.\d{7,}$ to 6 decimals.
+   * Format math untouched; the full-precision chain string stays on the
+   * cell's title attr. Duplicated from market-ind.js:639 / market-book.js:162
+   * / market-picker.js:57 per the no-shared-abstraction doctrine. */
+  function trim6(s) {
+    s = String(s);
+    var m = /^(-?\d+)\.(\d+)$/.exec(s);
+    if (m && m[2].length > 6) return m[1] + "." + m[2].slice(0, 6);
+    return s;
+  }
+
   /* Dash text for honestly-missing cells (reuses the shared dash key). */
   function dashText() { return t("settings.dash", "—"); }
 
@@ -403,7 +417,8 @@ var AccountUI = (function () {
           : (vMap[b.asset_id] !== undefined ? fmtRaw(vMap[b.asset_id], b.precision) : dashText())),
         collH: (!cMap ? dashText()
           : (cMap[b.asset_id] !== undefined ? fmtRaw(cMap[b.asset_id], b.precision) : dashText())),
-        priceH: (price !== null && price !== undefined && price !== "" ? price : dashText()),
+        priceH: (price !== null && price !== undefined && price !== "" ? trim6(price) : dashText()),
+        priceFull: (price !== null && price !== undefined && price !== "" ? String(price) : ""),
         changeH: (change !== null && change !== undefined && change !== "" ? change : dashText()),
         valueH: (valueH !== null ? valueH : dashText()),
         valueRaw: valueRaw
@@ -479,9 +494,11 @@ var AccountUI = (function () {
           qtyCell.textContent = r.b.display;
           qtyCell.title = r.b.raw;
           tr.appendChild(qtyCell);
-          [r.inOH, r.vestH, r.collH, r.priceH, r.changeH, r.valueH].forEach(function (txt) {
+          [r.inOH, r.vestH, r.collH, r.priceH, r.changeH, r.valueH].forEach(function (txt, ci) {
             var td = doc.createElement("td");
             td.textContent = txt;
+            /* PRICE column keeps the full chain string on title (D1 rule). */
+            if (ci === 3 && r.priceFull) td.title = r.priceFull;
             tr.appendChild(td);
           });
           var actCell = doc.createElement("td");
@@ -505,6 +522,7 @@ var AccountUI = (function () {
           var mid = doc.createElement("div");
           mid.className = "muted";
           mid.textContent = r.priceH + " BTS · " + r.valueH + " BTS";
+          if (r.priceFull) mid.title = r.priceFull + " BTS (full chain precision)";
           card.appendChild(mid);
           var acts = doc.createElement("div");
           acts.appendChild(actionLinks(doc, r.b.symbol, btsSym));
