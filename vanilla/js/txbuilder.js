@@ -488,6 +488,54 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return rows;
   }
 
+  /* Wrap the whole queue as op-22 (alternative send path — direct send stays
+   * default). Delegates to Proposal.buildCreate; no new builder here. */
+  function wrapProposal(args) {
+    args = args || {};
+    if (!args.feePayerId || !/^1\.2\.\d+$/.test(args.feePayerId)) throw new Error("tb-bad-op: feePayerId must be 1.2.N");
+    if (!args.expirationIso || !Number.isFinite(Date.parse(args.expirationIso))) throw new Error("tb-bad-op: expirationIso must parse");
+    var P = globalThis.Proposal;
+    if (!P || typeof P.buildCreate !== "function") throw new Error("tb-not-connected: Proposal.buildCreate is not loaded");
+    return P.buildCreate({ feePayerId: args.feePayerId, expirationIso: args.expirationIso,
+      reviewPeriodSecOrNull: (typeof args.reviewPeriodSecOrNull === "undefined" ? null : args.reviewPeriodSecOrNull),
+      innerOps: _pairs() });
+  }
+
+  /* Broadcast a signed (possibly partially-signed) tx. Transport: callback
+   * method first, plain fallback once. Proof: per-op provers where supplied;
+   * unknown opIds report accepted-but-unproven (never displayed as confirmed).
+   * Partial broadcast is deliberate: allowed when at least one signature exists. */
+  async function broadcastSigned(tx, provers) {
+    provers = provers || {};
+    if (!tx || !Array.isArray(tx.operations) || !tx.operations.length) throw new Error("tb-empty: nothing to broadcast");
+    var sigs = tx.signatures || _signatures.map(function (s) { return s.hex; });
+    if (!sigs.length) throw new Error("tb-empty: no signatures — sign or import signatures first");
+    var C = globalThis.Chain;
+    var netId = await C.net();
+    var via = "broadcast_transaction_with_callback";
+    var wire = Object.assign({}, tx, { signatures: sigs });
+    try {
+      await C.call(netId, "broadcast_transaction_with_callback", [Math.floor(Math.random() * 4294967296), wire]);
+    } catch (e) {
+      via = "broadcast_transaction";
+      await C.call(netId, "broadcast_transaction", [wire]);
+    }
+    var perOp = [];
+    for (var i = 0; i < tx.operations.length; i++) {
+      var opId = tx.operations[i][0];
+      var fn = provers[opId];
+      if (typeof fn === "function") {
+        try {
+          var ok = await fn(tx.operations[i][1], tx);
+          perOp.push({ opId: opId, status: ok ? "observed" : "not observed" });
+        } catch (e) { perOp.push({ opId: opId, status: "not observed" }); }
+      } else {
+        perOp.push({ opId: opId, status: "accepted by node, inclusion not proven for op " + opId + " — check history before retrying" });
+      }
+    }
+    return { perOp: perOp, via: via };
+  }
+
   TxBuilder.addOp = addOp;
   TxBuilder.removeOp = removeOp;
   TxBuilder.clear = clear;
@@ -503,6 +551,8 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
   TxBuilder.resolveAuths = resolveAuths;
   TxBuilder.signLocal = signLocal;
   TxBuilder.describe = describe;
+  TxBuilder.wrapProposal = wrapProposal;
+  TxBuilder.broadcastSigned = broadcastSigned;
   // feeAll / resolveAuths / buildUnsigned / signLocal / describe / wrapProposal /
   // exportJSON / importJSON / broadcastSigned land in Tasks 2-4+6 on this same global.
   if (typeof globalThis !== "undefined") { globalThis.TxBuilder = TxBuilder; }
