@@ -146,3 +146,96 @@ only ids/blocks/fees/reasons.
 - `tooling/prove_committee_create_29.cjs` (runnable, stdlib-only, redacted)
 - This note: `vanilla/notes/ltm-witness-committee-2026-09-30.md`
 - Matrix delta appended in `vanilla/notes/op-coverage-matrix.md` (no status flips)
+
+## Funding round 2026-09-30 evening — FAUCET REFUSED, zero state change, STOPPED
+
+> Task: fund fixture `lite-test-1` (`1.2.26833`) to ~165+ TEST via
+> `testnet-faucet.xbts.io`, then op-8 upgrade, then op-20/29 inclusion.
+> Outcome: NO funding delivered, NO broadcast, nothing spent, no state
+> created. Fixture keys never left the fixture file (in-memory only for the
+> gated prove reads); throwaway WIFs lived in `/tmp` only (600-perms, shredded
+> after — never committed, never printed). All POSTs respected rate limits
+> with full 30-min quiet waits; no proxy/workaround attempted.
+
+### Step 1 — fixture balance via get_objects (live tip `wss://testnet.dex.trading/`)
+
+Head `#101016012` (`2026-09-30T19:11:24Z`), chain `39f5e2ed…617447`:
+
+| Item | Observed |
+|---|---|
+| `get_objects [["1.2.26833"]]` | `lite-test-1`, registrar `1.2.25483`, membership `1970-01-01T00:00:00` (basic) |
+| Owner/active/memo | byte-match fixture pubs (`TEST5NXc…`, `TEST7MBQV…`, `TEST7iku8…`) |
+| Balances | `3873890` raw TEST (`38.73890`, p5) + `120000` `1.3.1849` (AFKTEST10) + zeros |
+| Op-8 fee (`get_required_fees`) | `20000000` raw (`200.00000` TEST) — shortfall `16126110` raw (`161.26110`) |
+| Witness / committee | `null` / `null` |
+| Stale-node artifact | `wss://testnet.xbts.io/ws` (head `2026-09-29T18:32:30`, ~24h stale) read `3844543` raw once — trust the live tip (`3873890`, matches the morning note); no funds moved |
+
+Balance before = balance after = `3873890` raw. Zero deltas (no broadcasts).
+
+### Step 2 — faucet claims (exact responses, honest backoff)
+
+Faucet `GET /` alive throughout (Express welcome page). All POSTs
+`{account:{name,owner_key,active_key,memo_key}}` with fresh noble keys
+(`Crypto.keypairFromPrivateHex`, TEST prefix), keys saved to `/tmp` BEFORE
+POST (600-perms) so a client timeout never loses keys:
+
+| # | UTC | Name | Result (exact) |
+|---|---|---|---|
+| 1 | 19:0x | `lite-test-1` (fixture pubs, direct) | HTTP 200 `{"error":{"base":["Error registration new account."]}}` — existing name refused, as expected; no drip endpoint exists |
+| 2 | ~19:0x | `afk-fund-264c` (fresh) | Client abort after 20s (`This operation was aborted`); on-chain `null` — server never processed |
+| 3 | 19:12 | `afk-fund-ab43` (fresh, keys saved) | HTTP 200 `{"error":{"base":["Only one account per IP 30 min"]}}` — rate limit (shared sandbox IP or attempt #2 counted) |
+| 4 | 19:45 | `afk-fund-ab43` (reuse, 33-min quiet wait) | Client abort after 30s; on-chain `null` |
+| 5 | 19:46 | `afk-fund-ab43` (reuse, patient 60s) | HTTP 200 `{"error":{"base":["Only one account per IP 30 min"]}}` — the 19:45 timeout evidently counted server-side, resetting the window |
+| 6 | 20:18 | `afk-fund-ab43` (reuse, 32-min quiet wait) | HTTP 200 `{"error":{"base":["Error registration new account."]}}` — window passed, but generic refusal (registrar `xbts-testnet` holds `59445578898` raw TEST, so NOT empty; account count `26838` proves the faucet works for others) |
+| 7 | 20:50 | `afk-tkt-6a47` (fresh `afk-tkt-*` pattern per slice-14 precedent, keys saved) | `fetch failed` after 90s (network); on-chain `null`, count still `26838` |
+
+Verdict per task rule: **STOP — faucet refuses (generic error + network
+failures + rate limits); do NOT work around anti-spam.** No further POSTs.
+Throwaway names `afk-fund-264c`, `afk-fund-ab43`, `afk-tkt-6a47` all verify
+`null` on-chain — zero clutter created. `/tmp` key files shredded.
+
+### Step 3 — op-8 upgrade: NOT attempted (unaffordable, no funds)
+
+Fee `20000000` vs held `3873890` — gate fails first. No `buildTx`/`sign`/
+broadcast constructed. Membership re-read still basic (`1970-01-01T00:00:00`).
+Upgrade block: NONE (stop reason: funds).
+
+### Step 4 — gated prove scripts (vanilla path, post-40-hex-fix)
+
+Client-bug block from the morning note is **RESOLVED**: `chain.js:104-107`
++ `tx-send.js:47-48` now accept 40-hex RIPEMD160 (commit `87e15f5`), and both
+scripts CONNECT (`chain_id_prefix 39f5e2ede1f8bc1a`, ~860ms) before gating:
+
+- `node tooling/prove_witness_create_20.cjs` →
+  `pre_read balance 3873890 / basic / witness null` →
+  `ltm_gate STOP` (`fixture is not a lifetime member…`) EXIT=3, zero cost
+- `node tooling/prove_committee_create_29.cjs` →
+  `pre_read balance 3873890 / basic / committee null` →
+  `ltm_gate STOP` (same) EXIT=3, zero cost
+
+Inclusion blocks: NONE (stop reason: LTM gate — upgrade first).
+
+### Cleanup / leftover state
+
+- **Nothing to clean.** No transaction broadcast, no objects created, balance
+  untouched (`3873890` raw). Witness/committee still `null`, membership still
+  basic. Standing clutter unchanged (AFKTEST10/M11, proposals `1.10.1493/94`).
+- Unblock path unchanged: (1) head-shape fix DONE (`87e15f5`); (2) fund
+  fixture ≥ ~165 TEST (faucet refused tonight — owner transfer or a later
+  faucet window); (3) re-run op-8 → `2106-02-07T06:28:15` re-read, then the
+  two prove scripts to inclusion + `get_objects` re-reads.
+
+### Repro (redacted)
+
+```bash
+node --check tooling/prove_witness_create_20.cjs
+node --check tooling/prove_committee_create_29.cjs
+node tooling/prove_witness_create_20.cjs    # STOP exit 3 at ltm_gate — costs nothing
+node tooling/prove_committee_create_29.cjs  # STOP exit 3 at ltm_gate — costs nothing
+python3 tooling/check_rot.py                # PASS
+git check-ignore -v tooling/testnet-lite-test-1.json  # ignored
+```
+
+SAFETY: TESTNET ONLY via `tooling/testnet-lite-test-1.json` (gitignored,
+`600`-perms). NEVER mainnet, NEVER commit secrets/keys. Logs carry
+ids/blocks/fees/reasons only.

@@ -334,3 +334,19 @@
 - Leftover state: NONE this round (witness/committee lookups `null`,
   balance untouched). Standing clutter unchanged (AFKTEST10/M11,
   `1.10.1493/94`). Post-success note must list created ids (no delete op).
+
+## LTM funding round 2 (2026-09-30 evening) — faucet refused, STOPPED, no flips
+
+> Task: fund `lite-test-1` (`1.2.26833`) to ~165+ TEST via
+> `testnet-faucet.xbts.io`, upgrade op-8, prove op-20/29. Outcome: faucet
+> delivered NOTHING (direct-claim generic error, 2× rate-limit
+> `Only one account per IP 30 min` with honest 30-min waits, 1× generic
+> `Error registration new account`, 2× client timeout + 1× fetch-failed
+> network); registrar funded (`59445578898` raw), count `26838`, so NOT empty
+> — refused/flaky. Balance before = after = `3873890` raw; membership basic;
+> witness/committee `null`. Op-8 NOT attempted (shortfall `16126110` raw).
+> Both prove scripts CONNECT (40-hex fix `87e15f5` resolved the morning
+> connect-block) then STOP at `ltm_gate` EXIT=3, zero cost. Throwaway names
+> (`afk-fund-264c/ab43`, `afk-tkt-6a47`) all `null` — zero clutter. Full
+> exact-response table in `vanilla/notes/ltm-witness-committee-2026-09-30.md`
+> (funding-round-2 section). No row changes; counts unchanged; MISSING: 0.
