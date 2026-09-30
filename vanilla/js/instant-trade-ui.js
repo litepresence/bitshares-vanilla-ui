@@ -67,7 +67,7 @@ var InstantTradeUI = (function () {
   }
   var gen = 0;
   var FEE_ASSET = "1.3.0";
-  var PROVE_TIMEOUT_MS = 30000, PROVE_INTERVAL_MS = 2500, PRICE_PLACES = 8;
+  var PROVE_TIMEOUT_MS = 30000, PROVE_INTERVAL_MS = 2500, PRICE_PLACES = 6;
   var BOOK_LIMIT = 50, FEE_DEBOUNCE_MS = 400, WALK_ROWS_MAX = 10;
   /* textContent-only element (user/chain strings never reach HTML). */
   function el(doc, tag, text, cls) {

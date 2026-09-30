@@ -1018,3 +1018,17 @@ tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }
 @keyframes xplore-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes xplore-bump { 0% { transform: scale(1); } 30% { transform: scale(1.04); } 100% { transform: scale(1); } }
 .xplore-live.xplore-bump { animation: xplore-bump 0.45s ease-out 1; }
+
+/* Retro recapture round 5 (2026-09-30, vanilla/notes/retro-round-1.md):
+ * two cheap-exact deltas only (CSS, tokens — all three themes keep working).
+ * 1. Transfer Send/Propose toggle as primary/ghost
+ * (#1 SendModal.jsx:551-564 EqualWidthContainer: Send primary solid when
+ * send-mode, Propose primary solid when propose-mode, the other ghost).
+ * The JS already sets aria-pressed (transfer-ui.js refreshMode), so this is
+ * CSS only: equal-width flex row + transparent/bordered ghost for the
+ * inactive side. (0,2,1) beats the global button rule (0,0,1); active keeps
+ * the solid --button-bg. No behavior, no strings. */
+.xfer-mode { display: flex; gap: 8px; }
+.xfer-mode button { flex: 1 1 0; }
+.xfer-mode button[aria-pressed="false"] { background: transparent;
+  color: var(--accent); border: 1px solid var(--accent); }

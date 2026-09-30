@@ -501,3 +501,156 @@ crypto.js, CSS, locales.
 - NOT verified headlessly: title-attr hover/long-press read (shot.mjs has
   no hover step) — needs the human browser pass: hover a trimmed PRICE
   cell + phone-card mid and confirm the full chain string shows.
+
+---
+
+# Round 5 (2026-09-30) — newest/changed pages recapture
+
+Same server + shooter as rounds 1–4
+(`python3 -m http.server 8081 --directory vanilla`,
+`PLAYWRIGHT_BROWSERS_PATH=/workspace/tooling/visual/.browsers node
+tooling/visual/shot.mjs --url <route> --width 1440/390`). Every shot below
+was READ (no blind claims). Touched files: `vanilla/js/instant-trade-ui.js`
+(one constant) + `vanilla/css/app.css` (one Round-5 block, tokens only).
+Untouched per scope: reference/, docs/, tooling/, chain.js, tx.js, wallet.js,
+crypto.js, locales (zero strings added/changed).
+
+## Fixed (two cheap-exact retro deltas, no behavior change)
+
+1. **Instant-trade stats 8-decimal → 6-decimal** (`instant-trade-ui.js`
+   PRICE_PLACES 8→6): the `#/instant-trade/BTS_CNY` stats line printed
+   8 places (`0.06434377`) while the desk strip (rounds 2–3, trim6) prints
+   6 (`0.064343`). Same BigInt path (`humanPrice` + `effectiveHuman` via
+   `ratioToDec`), only the place count changes; full-precision chain
+   strings stay on `title` attrs. Live proof: Latest `0.064343` · Best bid
+   `0.063417` · Best ask `0.064337` (was `0.06434377 / 0.06341714 /
+   0.06433729`). Effective price + walkthrough table prices follow the
+   same constant when typed.
+2. **Transfer Send/Propose toggle as primary/ghost** (`app.css` Round-5
+   block, CSS only): `#1 SendModal.jsx:551-564` renders Send vs Propose in
+   an EqualWidthContainer with primary-solid vs ghost-outline by flag.
+   Ours rendered both buttons solid cyan (SEND bold, PROPOSE normal,
+   touching). Now `.xfer-mode` is an equal-width flex row (`display:flex;
+   gap:8px`, buttons `flex:1`) and the inactive side
+   (`button[aria-pressed="false"]`, already set by `refreshMode`) is
+   ghost — transparent bg, accent text, 1px accent border
+   (`(0,2,1)` beats the global `button` rule; active keeps solid
+   `--button-bg`). Live proof on `#/transfer`: SEND solid, PROPOSE
+   outline, equal widths with gap (`r5-transfer-fix.png`).
+
+## Per-page deltas (found → fixed / deferred)
+
+- `#/instant-trade/BTS_CNY` (1440 + 390 + tall): dual SELL/RECEIVE +
+  swap + walkthrough render clean; stats were the 8-decimal outlier →
+  FIXED above. Phone 390: panels stack, no sideways overflow. Original
+  `instant-trade.png` is the minimal SELL/RECEIVE card (icons + bare ⇄
+  + SELL button); ours is the functional convert superset by design
+  (QuickTrade flow per file header: walkthrough + effective price + fee
+  previews + REVIEW). → DEFERRED R5-D1: SWAP solid button vs original
+  bare glyph (label change needs strings, out of CSS/small-JS scope).
+- `#/borrow` (1440 + 390 + tall 2400): positions + op-3 adjust + op-3
+  open + stepper ("Step 1 of 4" + PREVIOUS/NEXT) + op-45 bids render
+  clean, locked previews honest. Original `borrow.png` is the showcase
+  splash (Create CDP + GET STARTED), not the margin desk — intentional
+  divergence (Round 4, punchlist `887a520`). → NO FIX.
+- `#/wallet` (1440 + 390): console + unlock + honesty note render clean.
+  Original `wallet.png` is the empty multi-wallet console (grey
+  placeholder cards + RESTORE BACKUP / NEW LOCAL WALLET outline
+  buttons) — different model by design (single-slot brainkey keystore;
+  Round 4). → NO FIX (outline-button restyle is candy on divergent
+  content, not structure).
+- `#/proposals` (1440 + 390 + tall 2400): list (empty until LIST clicked
+  — committee-account has no live proposals today) + create-proposal
+  forms render clean. No original proposals capture exists; nearest
+  reference is `Proposals.jsx` (scam/unknown badges, approver lists,
+  NestedApprovalState) — ours ports WORDS-only trust badges + approvals
+  cell + inline `<details>` raw JSON per code comment. → NO FIX
+  (badges/approvals/raw JSON need live proposal data to shoot; empty
+  state is honest).
+- `#/transfer` (1440 + 390 + tall 2400): propose toggle was the
+  both-solid outlier → FIXED above. Encrypted-memo 18px box, fee
+  selector, REVIEW + gating reasons read clean. No original transfer
+  capture exists; SendModal primary/ghost is the codebase counterpart
+  (cited above). Phone 390: rows stack, toggle below fold scrolls in
+  place. → FIXED.
+- `#/vesting` (1440 + 390 + tall 2400): table empty until LIST clicked
+  (no vesting for 1.2.0 today) + create op-32 + claim op-37 + blind
+  panel render clean. Progress columns (Required/Earned/Remaining days
+  + Available %) already match `AccountVesting.jsx:285-339` (#/balance_
+  type/cashback/required/earned/remaining/available/action) per the
+  punchlist build. → NO FIX (columns need live rows to shoot).
+- `#/prediction` (1440 + 390): 10-column list renders (Asset /
+  Description / Condition / Expiry / Validity / House / Market
+  confidence / Predicted likelihood / Market / Details —
+  `prediction-ui.js:364` + `appendRow`) vs original `prediction.png`
+  8-column (ASSET/HOUSE/PREDICTION/MARKET CONFIDENCE/MARKET PREDICATED
+  LIKELIHOOD/DESCRIPTION/RESOLUTION DATE/ACTION). Ours splits
+  description into main/condition/expiry/validity and adds
+  Market+Details links — superset, retro-faithful. Live row
+  ABITS.JUN20BTS30 shows the long CJK description forcing the scroll
+  region (nowrap per `.prediction-scroll` contract); remaining 8 cols
+  sit right of the fold at 1440 with real data — same contract as
+  pools/offers tables. Phone 390: toolbar wraps, table rides the scroll
+  region (opt-in `display:table`). → NO FIX (unwrap would break the
+  scroll contract; original shot shows "No Data" so wrap behavior with
+  data is unprovable).
+
+## Deferred (observed, NOT gold-plated this round)
+
+- **R5-D1 (instant SWAP chrome):** ours solid "SWAP ⇅" button vs original
+  bare ⇄ glyph. Restyle to ghost/bare is CSS, but the "SWAP ⇅" label
+  itself differs (strings/i18n scope) — batch with the next copy pass,
+  not as a lone hex tweak.
+- **R5-D2 (wallet console card):** original centered title + placeholder
+  cards + outline buttons vs ours left-aligned H1+H2 + links + solid
+  UNLOCK. Model divergence (Round 4); card chrome on different content
+  is candy.
+- **R5-D3 (prediction description width):** long-CJK row forces scroll
+  at 1440; original "No Data" shot cannot prove wrap-vs-scroll with
+  data. Keep the scroll-region contract.
+- **R5-D4 (proposals/vesting live rows):** badges/approvals/raw JSON
+  (proposals) and progress columns (vesting) need funded accounts with
+  live objects to shoot — empty states verified honest today; human
+  pass with live data wanted.
+
+## Shots (all in /tmp, all READ, zero console errors each)
+
+- r5-instant.png (1440, BEFORE) + r5-instant-fix.png (1440, AFTER:
+  6-decimal stats) + r5-instant-phone.png / r5-instant-fix-phone.png
+  (390) + r5-instant-tall.png (1440×2000: REVIEW + full-desk link).
+- r5-borrow.png (1440) + r5-borrow-phone.png (390) + r5-borrow-tall.png
+  (1440×2400: open form + stepper + op-45).
+- r5-wallet.png (1440) + r5-wallet-phone.png (390).
+- r5-props.png (1440) + r5-props-phone.png (390) + r5-props-tall.png
+  (1440×2400: create form + enclosed ops).
+- r5-transfer.png (1440, BEFORE) + r5-transfer-tall.png (BEFORE tall:
+  both-solid toggle) + r5-transfer-fix.png (AFTER tall: ghost toggle)
+  + r5-transfer-phone.png / r5-transfer-fix-phone.png (390).
+- r5-vesting.png (1440) + r5-vesting-tall.png (1440×2400: op-32 +
+  op-37 + blind) + r5-vesting-phone.png (390, in batch).
+- r5-pred.png (1440) + r5-pred-phone.png (390).
+- Originals compared: `original-pages/instant-trade.png`,
+  `borrow.png`, `wallet.png`, `prediction.png` (transfer/proposals/
+  vesting have no original capture — codebase counterparts cited
+  above, sanity only as stated).
+
+## Verify
+
+- `node --check vanilla/js/instant-trade-ui.js`: OK.
+  `node --check vanilla/js/transfer-ui.js`: N/A — untouched (CSS-only
+  toggle; transfer-ui.js read for the aria-pressed contract only).
+- `python3 tooling/check_rot.py`: PASS.
+- `python3 tooling/check_i18n.py`: OK (10 dicts key-complete, 2587 keys;
+  3495 t() call sites drift-free — zero strings added/changed).
+- 18 shots, zero console errors on every one (shooter exits 2 on errors).
+- 44px: no target added or resized (place-count changes text only;
+  ghost toggle keeps `touchable()` min-heights + flex equal widths;
+  phone stacks verified at 390).
+- Anti-rot gates: (a) 10-year test — one integer constant + 3 CSS rules
+  on tokens, no new dependency; (b) newly depended on: nothing;
+  (c) deletable subset: PRICE_PLACES reverts to 8 in one digit; the
+  Round-5 CSS block deletes to both-solid buttons.
+- NOT verified headlessly: propose-mode CLICK-through (shot.mjs has no
+  click step — toggle mirrors the proven pattern; ghost shows on the
+  inactive side by aria-pressed) — human pass: click PROPOSE, confirm
+  proposer/expiry/review-period reveal + ghost flips to SEND.
