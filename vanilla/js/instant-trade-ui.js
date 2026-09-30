@@ -1,7 +1,8 @@
 /* instant-trade-ui.js — QuickTrade dual SELL/RECEIVE convert flow with order walkthrough.
  * Owns: /instant-trade + /instant-trade/:marketID as the reference QuickTrade
- *   convert screen (dual SELL/RECEIVE panels + swap + per-side balances +
- *   order-walkthrough with effective price + fee display, then Review/Sign of
+ *   convert screen (dual SELL/RECEIVE panels + bare-glyph swap + per-side
+ *   balances + order-walkthrough with effective/last price + depth note +
+ *   fee display, then Review/Sign of
  *   ONE op-1 limit_order_create). Legacy QUOTE_BASE loader compat: a deep link
  *   like #/instant-trade/BTS_CNY auto-loads as sell=BTS receive=CNY (same
  *   SYM_SYM split as the old limit path, so the old auto-load does not
@@ -428,9 +429,18 @@ var InstantTradeUI = (function () {
     recvBal.id = "it-receive-bal"; recvBox.appendChild(recvBal);
     var swapCell = el(doc, "div", null, "it-swap-cell");
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
-    var swapBtn = touchable(el(doc, "button", t("swap.title", "Swap") + " ⇅"));
+    var swapBtn = touchable(el(doc, "button", "⇄"));
     swapBtn.id = "it-swap"; swapBtn.type = "button";
     swapBtn.setAttribute("aria-label", t("swap.title", "Swap") + t("instant.swap_suffix_sell_receive", " sell/receive"));
+    /* Bare-glyph swap (SellReceive.jsx concept: Icon name="swap" with no
+     * button chrome): transparent, accent ⇄ at ~1.5em. touchable() keeps the
+     * 44px target (min-height) plus min-width below. Same id/handler/
+     * aria-label — visual change only, no new strings. */
+    try {
+      swapBtn.style.background = "transparent"; swapBtn.style.border = "none";
+      swapBtn.style.color = "var(--accent, #1E9ED7)"; swapBtn.style.fontSize = "1.5em";
+      swapBtn.style.minWidth = "44px"; swapBtn.style.cursor = "pointer"; swapBtn.style.padding = "0 8px";
+    } catch (e) { /* glyph styling best-effort */ }
     swapCell.appendChild(swapBtn);
     duo.appendChild(sellBox); duo.appendChild(swapCell); duo.appendChild(recvBox);
     wrap.appendChild(duo);
@@ -561,6 +571,39 @@ var InstantTradeUI = (function () {
     /* Walkthrough live region: effective price + fee display + orders table. */
     var effP = el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted");
     effP.id = "it-effective"; walkBox.appendChild(effP);
+    /* Last-price walkthrough row (QuickTrade getPriceSection "last" concept):
+     * dedicated row from the already-fetched ticker latest (latestH above),
+     * receive-per-sell with both syms; dash when the ticker has no latest. */
+    var lastP = el(doc, "p", null, "muted");
+    lastP.id = "it-last";
+    if (latestH) {
+      lastP.textContent = t("instant.latest", "Latest: ") + latestH.human + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym;
+      try { lastP.title = latestH.raw; } catch (e) { /* title best-effort */ }
+    } else {
+      lastP.textContent = t("instant.latest", "Latest: ") + "—";
+    }
+    walkBox.appendChild(lastP);
+    /* Feed-price row OMITTED (honest, not blank): QuickTrade shows a feed
+     * price only for bitasset markets (showFeedPrice: one leg's backing
+     * asset is the other leg), fed from MarketsStore feedPrice. No clean
+     * feed read exists in this file — loadConvert fetches ticker + book
+     * only, and a bitasset current_feed lookup would be a new chain read —
+     * so no feed row is rendered rather than a guessed one. */
+    /* Liquidity note (QuickTrade getFeeSection "liquidity penalty" concept):
+     * depth-derived slippage hint from the clean in-file book read (level
+     * count + top-of-book via the same humanPrice path as the stats strip).
+     * Static reference by design: the live effective-price row above moves
+     * against this top-of-book quote as the typed amount walks deeper. */
+    var liqP = el(doc, "p", null, "muted");
+    liqP.id = "it-liquidity";
+    var depthN = (M.book.bids || []).length;
+    if (bidH && depthN > 0) {
+      liqP.textContent = t("market.order_book", "Order book") + ": " + String(depthN) + t("instant.level_suffix", " level") + (depthN === 1 ? "" : "s") + t("instant.best_bid", " · Best bid: ") + bidH.human + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym;
+      try { liqP.title = bidH.raw; } catch (e) { /* title best-effort */ }
+    } else {
+      liqP.textContent = t("market.order_book", "Order book") + ": —";
+    }
+    walkBox.appendChild(liqP);
     var feeP = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
     feeP.id = "it-fee-preview"; walkBox.appendChild(feeP);
     var mktP = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
@@ -576,6 +619,10 @@ var InstantTradeUI = (function () {
     void P;
     while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
     walkBox.appendChild(el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted"));
+    var lastE = el(doc, "p", t("instant.latest", "Latest: ") + "—", "muted");
+    lastE.id = "it-last"; walkBox.appendChild(lastE);
+    var liqE = el(doc, "p", t("market.order_book", "Order book") + ": —", "muted");
+    liqE.id = "it-liquidity"; walkBox.appendChild(liqE);
     walkBox.appendChild(el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
