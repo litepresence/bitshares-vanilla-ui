@@ -305,6 +305,32 @@ var Router = (function () {
     return path;
   }
 
+  /* a11ySweep: post-render accessibility backstop (a11y audit 2026-09-30).
+   * Owns: th scope="col" on our tables, role/aria-label on 2D plot canvases,
+   *   aria-label on raw-JSON disclosures missing one. Consumes: view DOM only.
+   *   LWC internals (layout tables, chart canvases inside .mkt-price-host /
+   *   .mkt-osc-host without .mkt-canvas) are untouched — their text fallback
+   *   is the surrounding raw <details> + status notes, not per-canvas labels.
+   *   Never throws; never restructures. */
+  function a11ySweep(root) {
+    if (!root || typeof root.querySelectorAll !== "function") return;
+    try {
+      var ths = root.querySelectorAll("table.node-table th:not([scope]), table.pools-table th:not([scope]), .xplore-scroll table th:not([scope])");
+      for (var i = 0; i < ths.length; i++) ths[i].setAttribute("scope", "col");
+    } catch (e) { /* tables stand unlabeled */ }
+    try {
+      var cvs = root.querySelectorAll("canvas.mkt-canvas:not([aria-label])");
+      for (var c = 0; c < cvs.length; c++) {
+        cvs[c].setAttribute("role", "img");
+        cvs[c].setAttribute("aria-label", "Chart plot. Tabular data follows.");
+      }
+    } catch (e) { /* canvases stand unnamed */ }
+    try {
+      var sums = root.querySelectorAll("details.raw > summary:not([aria-label])");
+      for (var s = 0; s < sums.length; s++) sums[s].setAttribute("aria-label", "Show raw JSON");
+    } catch (e) { /* disclosures stand */ }
+  }
+
   /* render: draws currentPath into #view. Params: none. Returns nothing.
    *   Fails: never throws on routing — unknown paths render the 404 view
    *   (view errors themselves propagate). No-op before start(). */
@@ -324,6 +350,7 @@ var Router = (function () {
     }
     if (typeof document !== "undefined") document.title = title;
     fn(view, params);
+    try { a11ySweep(view); } catch (e) { /* paint stands */ }
     /* Candy-2 view-enter restart (tab-switch micro-fade; CSS owns motion). */
     try {
       if (view && view.classList) {
@@ -335,13 +362,31 @@ var Router = (function () {
   }
 
   /* start: binds hashchange and renders once. Params: viewEl (element).
-   *   Returns nothing. Fails: never throws — render is safe on any hash. */
+   *   Returns nothing. Fails: never throws — render is safe on any hash.
+   *   A MutationObserver re-runs a11ySweep on async fills (chain tables /
+   *   canvases render after the sync render above; without this the scope
+   *   backstop misses them — observed 2026-09-30: only #/settings passed). */
+  var a11yTimer = null;
   function start(viewEl) {
     view = viewEl;
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       window.removeEventListener("hashchange", render);
       window.addEventListener("hashchange", render);
     }
+    try {
+      if (typeof MutationObserver !== "undefined" && view &&
+          typeof view.nodeType === "number" && !start._a11yWired) {
+        start._a11yWired = true;
+        var obs = new MutationObserver(function () {
+          if (a11yTimer) return;
+          a11yTimer = setTimeout(function () {
+            a11yTimer = null;
+            try { a11ySweep(view); } catch (e) { /* paint stands */ }
+          }, 300);
+        });
+        obs.observe(view, { childList: true, subtree: true });
+      }
+    } catch (e) { /* sync sweep stands */ }
     render();
   }
 

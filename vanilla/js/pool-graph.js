@@ -358,7 +358,13 @@ var PoolGraph = (function () {
       ctx.fillStyle = muted; ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";
     }
-    if (!edges.length) { emptyLine("No pools touch these assets."); _wire(canvas, {}, [], doc); return { empty: true }; }
+    if (!edges.length) {
+      emptyLine("No pools touch these assets."); _wire(canvas, {}, [], doc);
+      /* A11y: empty map is not interactive (no tabindex trap) but stays
+       * named so the canvas text is exposed. */
+      try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "Pool map. No pools touch these assets."); } catch (e) {}
+      return { empty: true };
+    }
     var base = layout(graph, assetA, assetB, g.w, g.h);
     var offs = _offsetsFor(canvas, graph, assetA, assetB);
     var pos = {};
@@ -411,6 +417,14 @@ var PoolGraph = (function () {
     }
     _wire(canvas, pos, hits.concat(mids.map(function (m) { return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId }; })), doc);
     try { canvas.setAttribute("tabindex", "0"); } catch (e) {}
+    /* A11y 2026-09-30: named canvas (keyboard Enter above). Router sweep
+     * skips labeled canvases, so this specific label wins over its generic. */
+    try {
+      if (!canvas.getAttribute("aria-label")) {
+        canvas.setAttribute("role", "img");
+        canvas.setAttribute("aria-label", "Pool map. Press Enter to open the core asset.");
+      }
+    } catch (e) {}
     try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}
     return { empty: false, nodes: hits.length, edges: mids.length };
   }

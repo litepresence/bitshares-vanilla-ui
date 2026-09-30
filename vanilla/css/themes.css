@@ -90,7 +90,13 @@
  * Glyphs stay unfiltered (dark-on-light, as ref-ui). */
 :root[data-theme="vanilla-ui-theme"] {
   --bg: #FAF6EA; --panel: #ffffff; --text: #2A1A12; --muted: #6F5F50;
-  --accent: #1E9ED7; --accent-text: #ffffff; --button-bg: #1E9ED7;
+  /* A11y 2026-09-30: --accent/--button-bg darkened #1E9ED7 -> #0F6E99 (tub sky
+   * logo, darkened for text). Provenance: tub sky hue kept; lightness cut
+   * until 4.5:1 passes on both cream ground and white panels — measured
+   * #0F6E99 on #FAF6EA 5.24, on #FFFFFF 5.66, white-on-#0F6E99 5.66
+   * (was 2.81/3.03/3.03). --button-bg-deep #1786bb -> #0B5C7E keeps the hover
+   * depth below the new resting shade (white-on 7.38). */
+  --accent: #0F6E99; --accent-text: #ffffff; --button-bg: #0F6E99;
   --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
   --live: #1DA866;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
@@ -99,7 +105,7 @@
    * cream-darkened --border #E5DCC8 (both tub-derived) — reads as shadowed
    * cream on the white --panel, never cold office grey. */
   --panel-deep: #F1EAD6;
-  --button-bg-deep: #1786bb;
+  --button-bg-deep: #0B5C7E;
   --icon-filter: none;
 }
 /* dex-ux-theme (dark): sampled from /workspace/reference/bitshares-dex-ux

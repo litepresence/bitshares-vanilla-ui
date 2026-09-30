@@ -370,9 +370,30 @@ var CreditUI = (function () {
     panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
     panel.setAttribute("aria-label", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id);
     overlay.appendChild(panel); hostBox.appendChild(overlay);
-    function close() { if (overlay.parentElement) overlay.parentElement.removeChild(overlay); }
+    /* A11y 2026-09-30: focus return + trap + listener cleanup. Previously
+     * only the Escape path removed onKey (overlay-click/Cancel leaked it)
+     * and focus never returned to the invoking row. */
+    var returnFocus = null;
+    try { returnFocus = doc.activeElement || null; } catch (e) { returnFocus = null; }
+    function close() {
+      if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
+      try { doc.removeEventListener("keydown", onKey); } catch (e) { /* once */ }
+      try { if (returnFocus && typeof returnFocus.focus === "function") returnFocus.focus(); } catch (e) { /* tab order stands */ }
+    }
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-    function onKey(e) { if (e.key === "Escape") { close(); doc.removeEventListener("keydown", onKey); } }
+    function onKey(e) {
+      if (e.key === "Escape") { close(); return; }
+      if (e.key !== "Tab") return;
+      try {
+        var f = panel.querySelectorAll("button, input, select, textarea, a[href], [tabindex]");
+        var vis = [];
+        for (var i = 0; i < f.length; i++) { if (!f[i].disabled && f[i].tabIndex >= 0) vis.push(f[i]); }
+        if (!vis.length) return;
+        var first = vis[0], last = vis[vis.length - 1];
+        if (e.shiftKey && doc.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && doc.activeElement === last) { e.preventDefault(); first.focus(); }
+      } catch (x) { /* tab order stands */ }
+    }
     doc.addEventListener("keydown", onKey);
     panel.appendChild(el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
     var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
