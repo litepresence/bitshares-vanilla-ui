@@ -490,7 +490,7 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     } else if (opId === 6) {
       rows.push({ label: "Account", value: await _nameOf(d.account) });
       var no = d.new_options || {};
-      rows.push({ label: "Voting account", value: String(no.voting_account || "—") });
+      rows.push({ label: "Voting account", value: no.voting_account ? await _nameOf(no.voting_account) : "—" });
       rows.push({ label: "Votes", value: String(((no.votes || []).length) + " selected") });
       rows.push({ label: "Witnesses / committee", value: String(no.num_witness == null ? "—" : no.num_witness) + " / " + String(no.num_committee == null ? "—" : no.num_committee) });
     } else if (opId === 61) {

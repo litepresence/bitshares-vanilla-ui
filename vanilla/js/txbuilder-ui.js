@@ -108,9 +108,16 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     var feeBtn = el("button", "btn", t("txbuilder.quote_fees", "Quote fees"));
     feeBtn.setAttribute("type", "button");
     var feeOut = el("p", "tb-fees", st.fees ? (t("txbuilder.total_prefix", "Total ") + st.fees.totalDisplay) : t("txbuilder.fees_pending", "Fees not quoted yet."));
+    /* #6: raw fee integers live in the title only — screen text stays human. */
+    try { if (st.fees) feeOut.title = "raw " + st.fees.totalRaw + " " + (st.feeAssetId || ""); } catch (e) { /* text stands */ }
     feeBtn.addEventListener("click", async function () {
       feeBtn.disabled = true;
-      try { var f = await TxBuilder.feeAll(); feeOut.textContent = t("txbuilder.fees_total_tpl", "Total %(total)s (%(raw)s raw)", { total: f.totalDisplay, raw: f.totalRaw }); }
+      try {
+        var f = await TxBuilder.feeAll();
+        var fst = TxBuilder.state();
+        feeOut.textContent = t("txbuilder.total_prefix", "Total ") + f.totalDisplay;
+        try { feeOut.title = "raw " + f.totalRaw + " " + (fst.feeAssetId || ""); } catch (te) { /* text stands */ }
+      }
       catch (e) { feeOut.textContent = t("txbuilder.fee_error_prefix", "Fee error: ") + String((e && e.message) || e); }
       feeBtn.disabled = false;
     });
