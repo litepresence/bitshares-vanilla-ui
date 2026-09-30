@@ -54,8 +54,8 @@ body { margin: 0; background: var(--bg); color: var(--text);
   border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
 /* Warning banner (mirrors #1 root.png scam banner): --warn band, dark text
  * for contrast on amber in every theme; dismiss persists in localStorage. */
-#warn-banner { display: flex; align-items: center; gap: 12px; padding: 8px 16px;
-  background: var(--warn); color: #1a1a1a; font-size: 0.85rem; }
+#warn-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: var(--warn); color: #1a1a1a; font-size: 0.8rem; }
 #warn-banner[hidden] { display: none; }
 #warn-banner span { flex: 1 1 auto; }
 #warn-dismiss { flex: 0 0 auto; background: transparent; color: inherit;
@@ -67,6 +67,7 @@ body { margin: 0; background: var(--bg); color: var(--text);
   border-radius: 8px; padding: 24px 20px; margin: 12px auto 16px;
   max-width: 520px; text-align: center; }
 .dashboard-gate h2 { margin: 0 0 4px; }
+.dashboard-gate-logo { width: 64px; height: 64px; margin: 4px auto 8px; display: block; }
 .dashboard-gate-row { display: flex; gap: 12px; justify-content: center;
   flex-wrap: wrap; margin: 16px 0; }
 a.btn { display: inline-flex; align-items: center; justify-content: center;
@@ -346,8 +347,8 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-picker-list a { display: inline-flex; align-items: center; min-height: 44px;
   padding: 6px 12px; color: var(--text); text-decoration: none; border-radius: 6px; }
 .mkt-picker-list a:hover, .mkt-picker-list a[aria-current="page"] { background: var(--panel); }
-.mkt-direct { display: flex; gap: 8px; margin-top: 8px; }
-.mkt-direct input { flex: 1; min-width: 0; }
+.mkt-direct { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mkt-direct input { flex: 1 1 180px; min-width: 0; }
 .mkt-foot { display: flex; align-items: center; gap: 12px; }
 .mkt table { margin-bottom: 12px; }
 @media (min-width: 1200px) {
@@ -1032,3 +1033,13 @@ tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }
 .xfer-mode button { flex: 1 1 0; }
 .xfer-mode button[aria-pressed="false"] { background: transparent;
   color: var(--accent); border: 1px solid var(--accent); }
+
+/* Evening vision sweep (2026-09-30): help index two-column at desktop.
+ * Mirrors #1 help.png (left topic list beside the intro copy) without
+ * touching article views: single column on phones, two balanced columns
+ * at >=1024px. Tokens only, no behavior, no strings. */
+.help-index { line-height: 2; }
+@media (min-width: 1024px) {
+  .help-index { column-count: 2; column-gap: 48px; }
+  .help-index li { break-inside: avoid; }
+}

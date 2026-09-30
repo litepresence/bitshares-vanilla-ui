@@ -257,6 +257,18 @@ var DashboardUI = (function () {
   function gateCard(doc) {
     var card = doc.createElement("section");
     card.className = "dashboard-gate";
+    /* Brand mark (mirrors #1 root.png: logo above the welcome heading).
+     * Same byte-copied asset as the header brand; decorative here since
+     * the header logo already carries the accessible name. */
+    try {
+      var logo = doc.createElement("img");
+      logo.src = "assets/logo-ico-blue.png";
+      logo.alt = "";
+      logo.width = 64;
+      logo.height = 64;
+      logo.className = "dashboard-gate-logo";
+      card.appendChild(logo);
+    } catch (e) { /* gate works without the mark */ }
     card.appendChild(el(doc, "h2", t("dashboard.welcome", "Welcome to BitShares")));
     card.appendChild(el(doc, "p", t("dashboard.tagline", "Your Decentralized Platform"), "muted"));
     var row = doc.createElement("p");

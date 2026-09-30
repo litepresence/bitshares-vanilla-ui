@@ -43,7 +43,9 @@ var SettingsPrefs = (function () {
   }
 
   /* Theme selector (ref-ui-theme/vanilla-ui-theme/dex-ux-theme, current
-   * selected; option labels stay the ids — honest, no locale churn).
+   * selected; option labels are the same human names the header switcher
+   * shows (app.js THEME_NAMES) so both copies agree — values stay the ids.
+   * English literals, no dict churn, matching the header pattern).
    * The change handler (settings.js) persists + flips data-theme on <html>.
    * Params: doc, settings, t. Returns: {label, select}. */
   function buildTheme(doc, settings, t) {
@@ -51,10 +53,15 @@ var SettingsPrefs = (function () {
     themeLabel.textContent = t("settings.theme_label", "Theme ");
     var themeSelect = doc.createElement("select");
     themeSelect.id = "theme-select";
+    var themeNames = {
+      "ref-ui-theme": "Classic",
+      "vanilla-ui-theme": "Vanilla light",
+      "dex-ux-theme": "DEX dark"
+    };
     ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"].forEach(function (t) {
       var opt = doc.createElement("option");
       opt.value = t;
-      opt.textContent = t;
+      opt.textContent = themeNames[t] || t;
       if (settings.theme === t) opt.selected = true;
       themeSelect.appendChild(opt);
     });

@@ -471,6 +471,7 @@ var HelpUI = (function () {
   }
   function paintIndexList(doc, wrap) {
     var list = doc.createElement("ul");
+    list.className = "help-index";
     TOPICS.forEach(function (e) {
       var li = doc.createElement("li"), a = doc.createElement("a");
       a.href = "#/help/" + e[0]; a.textContent = t("help.topic_" + e[0] + "_title", e[1]); li.appendChild(a); list.appendChild(li);
