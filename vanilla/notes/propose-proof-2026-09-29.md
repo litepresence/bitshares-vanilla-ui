@@ -103,7 +103,100 @@ SAFETY: TESTNET ONLY via `tooling/testnet-lite-test-1.json` (gitignored,
 `600`-perms). NEVER mainnet, NEVER commit secrets/keys — the proof script
 reads the fixture at runtime and prints only ids/blocks/fees.
 
-## Artifacts
+## Artifacts (F1)
 
 - `tooling/prove_transfer_propose_f1.cjs` (runnable, stdlib-only, redacted)
 - This note: `vanilla/notes/propose-proof-2026-09-29.md`
+
+---
+
+## F2 — consensus-legal inclusion proof (fixture → committee-account) — 2026-09-30
+
+> F1 tested the prescribed self-transfer shape and was consensus-rejected
+> (`transfer.cpp:42 from != to`) — byte-proof only, by chain design. F2
+> repeats the SAME vanilla path with the consensus-legal shape the task
+> prescribes: inner op-0 `lite-test-1 (1.2.26833) → committee-account
+> (1.2.0)`, amount `1` raw TEST (`1.3.0`), no memo, `review_period 3600`,
+> expiry `+24h`. TESTNET ONLY.
+
+### Verdict
+
+**INCLUSION PROVED: `1.10.1493` re-read via `get_objects` (plus accidental
+duplicate `1.10.1494` — see honesty note).** The op-22 wrapper built,
+fee-filled, signed, and broadcast through the unmodified vanilla sources;
+`proposalsFor` count advanced and `get_objects` returns the enclosed op-0,
+review time, and proposer. No funding, no account creation attempted.
+
+### Testnet observation (committed F2 script, 2026-09-30 ~02:44 UTC)
+
+- Node: `wss://testnet.xbts.io/ws`, chain-id prefix `39f5e2ede1f8bc1a`
+  (testnet, matches fixture `chain_id`).
+- Endpoints pre-read via `get_accounts`: from `1.2.26833` (`lite-test-1`)
+  exists; to `1.2.0` exists, name `committee-account` — the task's
+  "always exists" premise HOLDS on testnet (no missing-account path taken).
+- Head before: `#100989922` (same number F1 saw ~3 min earlier — recorded
+  honestly; proposals still increment, so the node accepts transactions
+  while reporting a static head over this window).
+- Inner: op-0 `1.2.26833 → 1.2.0`, amount `1` raw TEST (`1.3.0`), no memo.
+- Envelope: expiry `2026-10-01T02:44:13` (+24h), review `3600`.
+- Wrapper fee (live `get_required_fees` on op-22): **`4787` raw TEST**
+  (`1.3.0`) — vs F1's `4982` for the self-transfer shape (different inner
+  bytes, recorded as observed).
+- `proposalsFor(1.2.26833)` before: `4`.
+- Broadcast (`broadcast_transaction_with_callback`, no fallback needed):
+  **ACCEPTED**.
+- Re-read: `proposalsFor` count `4 → 5`; `get_objects(["1.10.1493"])`
+  returns:
+  - `id: 1.10.1493`, `proposer: 1.2.26833`,
+  - `expiration_time: 2026-10-01T02:44:13`,
+  - `review_period_time: 2026-10-01T01:44:13` (absolute timestamp =
+    expiry − 3600s; `review_period_seconds` slot is `null` on this node —
+    the chain stores the review DEADLINE, not the duration),
+  - enclosed `operations[0]: [0, {from: 1.2.26833, to: 1.2.0,
+    amount: {amount: 1, asset_id: 1.3.0}}]`.
+- Observed head at proof: `#100989922`. Wrapper fee pair recorded:
+  `{amount: "4787", asset_id: "1.3.0"}`.
+
+### Honesty note — accidental duplicate `1.10.1494`
+
+A second F2 run (intended as a read-only re-check) re-executed the script,
+which always broadcasts, and created **`1.10.1494`** with identical shape
+(expiry `2026-10-01T02:44:37`, fee `4787`, head `#100989922`,
+`proposalsFor` before `5`). That run's `proposals_before: 5` independently
+confirms `1.10.1493` persisted (4 → 5). No further runs after this was
+noticed — each broadcast pays the proposal fee, so re-proving by
+re-broadcasting is wasteful by construction. Future re-reads must use
+`get_objects` only, never re-run the prove script.
+
+### What this proves / does not prove
+
+- PROVES: the propose-toggle wire path end to end with a consensus-legal
+  leg — build → wrapper fee → sign → broadcast → `proposalsFor` +
+  `get_objects` inclusion proof (`1.10.1493`, `1.10.1494` duplicate).
+- DOES NOT PROVE: execution of the inner transfer (proposals execute only
+  after review/approval — neither attempted here); the F1 self-transfer
+  shape remains un-includable by chain design; prior `1.10.1492` claim
+  remains unverified and uncounted.
+- CONTRADICTS / CLARIFIES vs F1: inclusion IS provable once `from != to`
+  (F1's "NOT proved by design" was shape-specific, not path-specific);
+  `1.2.0` exists on testnet as `committee-account`; review time reads back
+  as absolute `review_period_time`, not seconds.
+
+### Repro (redacted — fixture read at runtime, never committed)
+
+```bash
+node --check /workspace/tooling/prove_transfer_propose_f2.cjs
+node /workspace/tooling/prove_transfer_propose_f2.cjs   # broadcasts once per run — do NOT re-run to "re-check"; re-read with get_objects
+python3 /workspace/tooling/check_rot.py
+git check-ignore -v tooling/testnet-lite-test-1.json
+```
+
+SAFETY: TESTNET ONLY via `tooling/testnet-lite-test-1.json` (gitignored,
+`600`-perms). NEVER mainnet, NEVER commit secrets/keys — the proof script
+reads the fixture at runtime and prints only ids/blocks/fees.
+
+### Artifacts (F2)
+
+- `tooling/prove_transfer_propose_f2.cjs` (runnable, stdlib-only, redacted;
+  F1 script left untouched)
+- This note: `vanilla/notes/propose-proof-2026-09-29.md` (F2 section)
