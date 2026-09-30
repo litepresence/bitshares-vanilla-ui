@@ -92,7 +92,9 @@ var Chain = (function () {
     } catch (e) { /* heartbeat covers */ }
   }
   /* H4/M1: dynamic-props shape gate — head_block_number must be a
-   *   positive safe integer, head_block_id 64 hex chars, time a parseable
+   *   positive safe integer, head_block_id 40 hex chars (RIPEMD160 block id,
+   *   types.hpp:304 — NOT 64; a 64-char demand broke all signing), time a
+   *   parseable
    *   string. Throws bad-head-shape naming the field. connect() rejects
    *   with it (error state, no tx built on garbage); beat() drops bad
    *   replies silently (the next beat retries). */
@@ -101,8 +103,8 @@ var Chain = (function () {
     if (!Number.isSafeInteger(props.head_block_number) || props.head_block_number <= 0) {
       throw new Error("bad-head-shape: head_block_number must be a positive safe integer");
     }
-    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{64}$/.test(props.head_block_id)) {
-      throw new Error("bad-head-shape: head_block_id must be 64 hex chars");
+    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{40}$/.test(props.head_block_id)) {
+      throw new Error("bad-head-shape: head_block_id must be 40 hex chars");
     }
     if (typeof props.time !== "string" || !Number.isFinite(Date.parse(props.time + "Z"))) {
       throw new Error("bad-head-shape: time does not parse");

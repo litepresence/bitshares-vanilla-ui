@@ -44,8 +44,8 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (!Number.isSafeInteger(props.head_block_number) || props.head_block_number <= 0) {
       throw new Error("bad-head-block: head_block_number must be a positive safe integer");
     }
-    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{64}$/.test(props.head_block_id)) {
-      throw new Error("bad-head-block: head_block_id must be 64 hex chars");
+    if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{40}$/.test(props.head_block_id)) {
+      throw new Error("bad-head-block: head_block_id must be 40 hex chars");
     }
     if (typeof props.time !== "string" || !Number.isFinite(Date.parse(props.time + "Z"))) {
       throw new Error("bad-head-block: props.time does not parse");

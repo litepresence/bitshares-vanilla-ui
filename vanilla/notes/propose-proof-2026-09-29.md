@@ -200,3 +200,128 @@ reads the fixture at runtime and prints only ids/blocks/fees.
 - `tooling/prove_transfer_propose_f2.cjs` (runnable, stdlib-only, redacted;
   F1 script left untouched)
 - This note: `vanilla/notes/propose-proof-2026-09-29.md` (F2 section)
+
+---
+
+## F3 — Signing path restored: 40-hex fix + UI-path inclusion proof — 2026-09-30
+
+> Commit `8c40f45` introduced a head-shape gate demanding 64-hex block ids;
+> the real chain returns 40-hex RIPEMD160 (`protocol/types.hpp:304`
+> `using block_id_type = fc::ripemd160`). Every `Chain.connect` rejected with
+> `bad-head-shape` and every `Tx.buildTx` threw `bad-head-block` — ALL UI
+> signing was broken (browser + Node). The fix (uncommitted at task start,
+> verified then proven here): `vanilla/js/chain.js:106` + `vanilla/js/tx-send.js:47`
+> `{64}` → `{40}` with a `types.hpp:304 — NOT 64` comment. TESTNET ONLY.
+
+### Verdict
+
+**SIGNING PATH RESTORED — INCLUSION PROVED: `1.10.1495` re-read via
+`get_objects` at head `#100989922`.** Unit (40 accepts / 39-41-non-hex-bad-time-
+zero-64 reject on BOTH validators), live connect (no rejection, stays open),
+UI-path broadcast (real `Tx.buildTx` + `Tx.sign` + broadcast with
+`wallet.js` loaded), and LTM-gated witness re-runs (now pass connect, stop at
+LTM as designed) are all green.
+
+### Fix verification (before any proof)
+
+- `vanilla/js/chain.js:106` reads `/^[0-9a-fA-F]{40}$/` + comment
+  `head_block_id 40 hex chars (RIPEMD160 block id, types.hpp:304 — NOT 64; a
+  64-char demand broke all signing)` — no `{64}` remains.
+- `vanilla/js/tx-send.js:47` reads the same `{40}` + `must be 40 hex chars` —
+  no `{64}` remains.
+- Chain truth re-checked: `reference/bitshares-core/.../protocol/types.hpp:304`
+  `using block_id_type = fc::ripemd160;` (160-bit = 40 hex). Live heads confirm:
+  `0604fbe2e1e7ed8ddbce2872d2ec9c53146be213` (40 chars, xbts) and
+  `060560c4c0d58ccb50f17443302bdc8096e7f34a` (40 chars, dex.trading).
+
+### (1) Unit — `tooling/verify_head40_unit.cjs` — GREEN
+
+Real sources in vm sandboxes (chain.js via `Chain.connect` StubWS path,
+tx-send.js via `Tx.buildTx` mocked-Chain path). All 19 checks pass:
+
+- File gates: chain.js reads `{40}` / no `{64}`; tx-send.js reads `{40}` / no `{64}`.
+- Chain (`assertPropsShape`): 40-hex passes, 40-hex UPPER passes, 39-hex fails
+  `bad-head-shape`, 41-hex fails, 64-hex fails (old demand gone), non-hex
+  fails, bad time fails, zero head fails.
+- Tx (`assertHeadProps`): 40-hex passes (envelope `ref_block_num/prefix`
+  derived), 39/41/non-hex/bad-time/zero-head/64-hex all fail `bad-head-block`.
+
+### (2) Connect — `tooling/head40_connect_proof.cjs` — GREEN
+
+Real `vanilla/js/chain.js` + stdlib `MiniWebSocket`, no fixture, no secrets:
+
+- `wss://testnet.xbts.io/ws`: connected, chain-id prefix `39f5e2ede1f8bc1a`,
+  latency `1013ms`, head `#100989922`, `head_id_len: 40`,
+  prefix `0604fbe2`, **stayed open 6s (`state: open`)** — no bad-head-shape
+  rejection. First node sufficed (dex.trading not needed).
+
+### (3) UI-path broadcast — `tooling/prove_signing_restored_40hex.cjs` — GREEN
+
+Real vanilla sources loaded in Node (order mirrors `index.html`, wallet.js
+REQUIRED): `vendor/noble-classic.js`, `data/brainkey-dict.js`, `crypto.js`,
+`wallet.js`, `store.js`, `chain.js`, `tx.js`, `tx-send.js`, `format.js`,
+`account.js`, `proposal.js`. Fixture WIF in memory only (= what an unlocked
+wallet hands `Tx.sign`); logs carry ids/blocks/fees only.
+
+- Modules: `wallet: object, tx_buildTx: function, tx_sign: function`.
+- Node `wss://testnet.xbts.io/ws`, chain-id prefix `39f5e2ede1f8bc1a`.
+- Head before `#100989922` (`head_id_len: 40`).
+- Endpoints: `1.2.26833 lite-test-1` → `1.2.0 committee-account` (both exist).
+- Inner: op-0 `1` raw TEST (`1.3.0`), no memo (`Tx.buildTransfer` placeholder).
+- Wrapper: expiry `2026-10-01T19:07:09` (+24h), review `3600`,
+  live fee `4787` raw TEST (`Proposal.fee` → `Tx.fee` unwrap).
+- `proposals_before: 6`; broadcast `broadcast_transaction_with_callback`
+  (no fallback needed); poll `proposalsFor` → new row.
+- **Proved `1.10.1495` at head `#100989922`** (`via: broadcast_transaction_with_callback+re-read`):
+  `get_objects(["1.10.1495"])` returns `proposer: 1.2.26833`,
+  `expiration_time: 2026-10-01T19:07:09`,
+  `review_period_time: 2026-10-01T18:07:09` (= expiry − 3600s),
+  enclosed `[0, {from: 1.2.26833, to: 1.2.0, amount: {amount: 1, asset_id: 1.3.0}}]`,
+  wrapper fee `{amount: "4787", asset_id: "1.3.0"}`, elapsed `3276ms`.
+- Standing clutter grows by one (no delete op exists): proposals
+  `1.10.1493/1494` (F2) + `1.10.1495` (here). Do NOT re-run to "re-check" —
+  re-read with `get_objects`; each run pays the fee.
+
+### (4) LTM-gated witness re-runs — PASS CONNECT, STOP at LTM (by design)
+
+Both previously STOPPED at connect (`bad-head-shape: ... 64 hex chars`,
+exit 3, zero cost). After the fix, with zero script changes:
+
+- `prove_witness_create_20.cjs`: `connected` (dex.trading, `876ms`) →
+  `pre_read` (balance `3873890` raw, membership `1970-01-01T00:00:00` basic,
+  witness `null`) → `ltm_gate STOP` (exit 3):
+  `fixture is not a lifetime member; witness_create is consensus-unprovable
+  until op-8 upgrades it`. Fee/dust gate never reached; nothing broadcast.
+- `prove_committee_create_29.cjs`: identical shape (`864ms`, committee
+  `null`) → `ltm_gate STOP` (exit 3). Nothing broadcast.
+- The remaining block is FUNDS (op-8 fee `20000000` raw vs `3873890` held —
+  see `vanilla/notes/ltm-witness-committee-2026-09-30.md`), NOT the client.
+  Post-funding these scripts run unchanged to inclusion.
+
+### Repro (redacted — fixture read at runtime, never committed)
+
+```bash
+node --check /workspace/tooling/verify_head40_unit.cjs
+node /workspace/tooling/verify_head40_unit.cjs          # offline, no secrets
+node --check /workspace/tooling/head40_connect_proof.cjs
+node /workspace/tooling/head40_connect_proof.cjs        # live connect, no secrets
+node --check /workspace/tooling/prove_signing_restored_40hex.cjs
+node /workspace/tooling/prove_signing_restored_40hex.cjs # BROADCASTS once per run — do NOT re-run; re-read with get_objects
+node /workspace/tooling/prove_witness_create_20.cjs     # STOP exit 3 at ltm_gate (connect now passes) — costs nothing
+node /workspace/tooling/prove_committee_create_29.cjs   # STOP exit 3 at ltm_gate (connect now passes) — costs nothing
+node --check /workspace/vanilla/js/chain.js && node --check /workspace/vanilla/js/tx-send.js
+python3 /workspace/tooling/check_rot.py
+git check-ignore -v tooling/testnet-lite-test-1.json
+```
+
+SAFETY: TESTNET ONLY via `tooling/testnet-lite-test-1.json` (gitignored,
+`600`-perms). NEVER mainnet, NEVER commit secrets/keys — all scripts read the
+fixture at runtime and print only ids/blocks/fees/reasons.
+
+### Artifacts (F3)
+
+- `tooling/verify_head40_unit.cjs` (offline unit, stdlib-only, no secrets)
+- `tooling/head40_connect_proof.cjs` (live connect, stdlib-only, no secrets)
+- `tooling/prove_signing_restored_40hex.cjs` (UI-path broadcast, stdlib-only, redacted)
+- This note: `vanilla/notes/propose-proof-2026-09-29.md` (F3 section)
+- Fix itself: `vanilla/js/chain.js` + `vanilla/js/tx-send.js` (`{64}` → `{40}`)
