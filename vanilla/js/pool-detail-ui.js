@@ -281,7 +281,7 @@ var PoolDetailUI = (function () {
     }
     var swaps = (tape && tape.swaps) || [];
     if (!tape || !tape.source) { note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."); return; }
-    if (!swaps.length) { note.textContent = t("pool.no_swaps", "No swaps yet."); return; }
+    if (!swaps.length) { note.textContent = t("pool.no_swaps", "No swaps yet.") + " Swaps appear after the first exchange in this pool — run one from #/swap."; return; }
     P.swaps = swaps;
     note.textContent = swaps.length + " swaps. " + (tape.source === "es"
       ? t("pool.hist_source_es", "Swap history via community index.")
@@ -535,13 +535,13 @@ var PoolDetailUI = (function () {
     book.appendChild(u.el(doc, "p", t("pool.synth_note", "Synthetic depth from the CPMM curve at current reserves — not resting orders."), "muted"));
     if (typeof MarketBook === "undefined" || typeof PoolHistory === "undefined" ||
         typeof MarketBook.renderBook !== "function") {
-      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool).") + " Stake both legs from the Stake form to open depth.", "muted"));
       return;
     }
     var precA = precOr5(r.prec_a), precB = precOr5(r.prec_b);
     var levels = synthLevels || null;
     if (!levels || (!levels.asks.length && !levels.bids.length)) {
-      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool).") + " Stake both legs from the Stake form to open depth.", "muted"));
       return;
     }
     var spreadLine = u.el(doc, "p", "", "muted");
@@ -555,7 +555,7 @@ var PoolDetailUI = (function () {
         spreadLine: spreadLine
       });
     } catch (e) {
-      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool)."), "muted"));
+      book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool).") + " Stake both legs from the Stake form to open depth.", "muted"));
       return;
     }
     /* Click-fill: DOM rows follow their side array order (chain order,
@@ -694,7 +694,7 @@ var PoolDetailUI = (function () {
     if (!tape || !tape.source) {
       poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
     } else if (!swaps.length) {
-      poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet."), "muted"));
+      poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + " Swaps appear after the first exchange in this pool — run one from #/swap.", "muted"));
     } else {
       var scroller = doc.createElement("div");
       scroller.className = "pool-hist-scroll";
@@ -732,7 +732,7 @@ var PoolDetailUI = (function () {
       function drawMine(mine) {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
-        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool."), "muted")); return; }
+        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + " Run one from #/swap — your swaps in this pool list here.", "muted")); return; }
         var scroller = doc.createElement("div");
         scroller.className = "pool-hist-scroll";
         scroller.appendChild(tapeTable(doc, mine.slice(0, 20), row));
@@ -996,7 +996,7 @@ var PoolDetailUI = (function () {
           var m = String((e && e.message) || e || "");
           try {
             if (m.indexOf("not-connected") !== -1) P.graphNote.textContent = "Pool map unavailable (offline).";
-            else P.graphNote.textContent = "No pools touch these assets.";
+            else P.graphNote.textContent = "No pools touch these assets — pick a pair with a pool, or create one at #/pools.";
           } catch (x) {}
         });
       } catch (e) { /* map best-effort */ }
@@ -1016,7 +1016,7 @@ var PoolDetailUI = (function () {
       PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
         { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
       var n = (gd.graph.edges || []).length;
-      if (!n) P.graphNote.textContent = "No pools touch these assets.";
+      if (!n) P.graphNote.textContent = "No pools touch these assets — pick a pair with a pool, or create one at #/pools.";
       else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = "No BTS path — treat pair as unverified.";
       else {
         var bits = [];

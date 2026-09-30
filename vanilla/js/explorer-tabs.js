@@ -77,7 +77,7 @@ var ExplorerTabs = (function () {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (!rows || !rows.length) {
-        body.appendChild(el(doc, "p", "No pools found.", "muted"));
+        body.appendChild(el(doc, "p", "No pools found — create one from the Pools desk (#/pools) Stake form.", "muted"));
         return;
       }
       var t = table(doc, ["Pool", "Share", "Asset A", "Asset B"]);
@@ -129,7 +129,7 @@ var ExplorerTabs = (function () {
         if (!live()) return;
         while (out.firstChild) out.removeChild(out.firstChild);
         if (!names || !names.length) {
-          out.appendChild(el(doc, "p", "No accounts found.", "muted"));
+          out.appendChild(el(doc, "p", "No accounts found — check the name prefix, or register a new name at Create Account (#/create-account).", "muted"));
           return;
         }
         var ul = doc.createElement("ul");

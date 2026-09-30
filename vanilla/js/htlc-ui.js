@@ -310,7 +310,7 @@ var HtlcUI = (function () {
     function paint(q) {
       while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
       if (!all.length) {
-        note.textContent = t("htlc.no_contracts", "No contracts.");
+        note.textContent = t("htlc.no_contracts", "No contracts.") + " Create one from the New HTLC form below — sent and received contracts list here.";
         return;
       }
       var n = 0;

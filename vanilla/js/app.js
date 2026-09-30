@@ -183,7 +183,7 @@ var App = (function () {
     panel.appendChild(search);
     var empty = document.createElement("p");
     empty.className = "nav-dir-empty muted";
-    empty.textContent = t("shell.menu_no_match", "No matching pages.");
+    empty.textContent = t("shell.menu_no_match", "No matching pages.") + " Clear the search to see every page.";
     empty.style.display = "none";
     /* Account actions (mirrors #1 dropdown head: lock toggle, create,
      * follow, send/deposit/withdraw). Route-backed (no modal system in

@@ -1006,7 +1006,7 @@ var MarketDesk = (function () {
       if (!live()) return;
       while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
       if (fills.length === 0) {
-        myBody.appendChild(el(doc, "p", t("market.no_my_trades", "No fills for your account on this market."), "muted"));
+        myBody.appendChild(el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + " Place an order from the Buy/Sell panels — unlock the wallet to see your fills.", "muted"));
         return;
       }
       var table = doc.createElement("table");
@@ -1308,7 +1308,7 @@ var MarketDesk = (function () {
           var m = String((e && e.message) || e || "");
           try {
             if (m.indexOf("not-connected") !== -1) state.graphNote.textContent = "Pool map unavailable (offline).";
-            else state.graphNote.textContent = "No pools touch these assets.";
+            else state.graphNote.textContent = "No pools touch these assets — pick a pair with a pool, or create one at #/pools.";
           } catch (x) {}
         });
       } catch (e) { /* graph best-effort */ }
@@ -1432,7 +1432,7 @@ var MarketDesk = (function () {
       PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
         { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
       var n = (gd.graph.edges || []).length;
-      if (!n) state.graphNote.textContent = "No pools touch these assets.";
+      if (!n) state.graphNote.textContent = "No pools touch these assets — pick a pair with a pool, or create one at #/pools.";
       else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = "No BTS path — treat pair as unverified.";
       else {
         var bits = [];

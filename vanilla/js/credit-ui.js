@@ -157,7 +157,7 @@ var CreditUI = (function () {
   /* Table (desktop, sticky first col via .node-table) + cards (phone <560px). */
   function deskTable(doc, headers, rows, cardLines) {
     var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
+    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + " Offers appear once anyone creates one — draft yours in the Create offer form on this desk.", "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table";
     table.appendChild(tableHead(doc, headers));
     var tbody = doc.createElement("tbody");
@@ -298,7 +298,7 @@ var CreditUI = (function () {
    * modal. Header words Available/Expiration/Loan are batch-3-keyed. */
   function openOffersTable(doc, hostBox, myGen, rows) {
     var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
+    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + " Offers appear once anyone creates one — draft yours in the Create offer form on this desk.", "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table offers-table";
     table.appendChild(tableHead(doc, [t("credit.offer", "Offer"), t("credit.asset", "Asset"), t("credit.owner", "Owner"),
       t("credit.total", "Total"), t("credit.available", "Available"), t("credit.min_deal_amount", "Min deal amount"),
@@ -514,7 +514,7 @@ var CreditUI = (function () {
       Credit.offersByOwner(me.id, {}).then(function (rows) {
         if (myGen !== gen) return; clearBox(mineBox);
         mineBox.appendChild(deskTable(doc, [t("credit.offer", "Offer"), t("credit.owner", "Owner"), t("credit.asset", "Asset"), t("credit.current", "Current"), t("credit.total", "Total"), t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"), t("credit.enabled", "Enabled"), ""], offerRows(rows), offerCards));
-      }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", t("credit.no_owned_offers", "No owned offers."), "muted")); } });
+      }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", t("credit.no_owned_offers", "No owned offers.") + " Create one in the Create offer form below — owned offers list here.", "muted")); } });
       showOpenOffers(Credit.offers({}));
     }).catch(function () { if (myGen === gen) showOpenOffers(Credit.offers({})); });
   }

@@ -433,7 +433,7 @@ var MarketPicker = (function () {
        * per-row ticker fetch below must never grow unbounded — hard slice. */
       rows = rows.slice(0, 20);
       if (rows.length === 0) {
-        ul.appendChild(el(doc, "li", t("market.no_match", "No markets match."), "muted"));
+        ul.appendChild(el(doc, "li", t("market.no_match", "No markets match.") + " Try another spelling, or open any market from the picker.", "muted"));
         return;
       }
       /* Column header (original MARKET/VOL/PRICE/CHANGE language). */

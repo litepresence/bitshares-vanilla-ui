@@ -634,7 +634,7 @@ var InstantTradeUI = (function () {
     liqE.id = "it-liquidity"; walkBox.appendChild(liqE);
     walkBox.appendChild(el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
     walkBox.appendChild(el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
-    walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+    walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + " Place one from the trade form on this page — it lists here until filled or cancelled.", "muted"));
   }
 
   /* Per-side balance lines (locked 0 + hint; unlocked real via one balances
@@ -697,7 +697,7 @@ var InstantTradeUI = (function () {
     function paintTable(rows) {
       while (tblWrap.firstChild) tblWrap.removeChild(tblWrap.firstChild);
       if (!rows || rows.length === 0) {
-        tblWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        tblWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + " Type a price manually above, or place one from the full desk — it lists here once resting.", "muted"));
         return;
       }
       var table = doc.createElement("table");

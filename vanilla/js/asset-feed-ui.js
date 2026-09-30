@@ -108,7 +108,7 @@ var AssetFeedUI = (function () {
     Asset.feeSchedule().then(function (s) {
       if (my !== feeGen) return; wipe(box);
       box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
-      if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned."), "muted")); return; }
+      if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned.") + " The node sent an empty schedule — retry or check Settings → Nodes.", "muted")); return; }
       var sc = el(d, "div", null, "xplore-scroll"); sc.style.overflowX = "auto";
       var tb = d.createElement("table"), th = d.createElement("thead"), hr = d.createElement("tr");
       [t("asset.op_col", "Op"),  "Fee"].forEach(function (h) { hr.appendChild(el(d, "th", h)); });
@@ -183,7 +183,7 @@ var AssetFeedUI = (function () {
         sd.title = "base " + cur.settlement_price.base.amount + " / quote " + cur.settlement_price.quote.amount; dl.appendChild(sd);
         dl.appendChild(el(d, "dt", t("asset.cer_row", "CER"))); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
         cd.title = "base " + cur.core_exchange_rate.base.amount + " / quote " + cur.core_exchange_rate.quote.amount; dl.appendChild(cd);
-      } else body.appendChild(el(d, "p", t("asset.no_live_feed", "No live feed published yet."), "muted"));
+      } else body.appendChild(el(d, "p", t("asset.no_live_feed", "No live feed published yet.") + " Feeds appear once publishers publish for this asset.", "muted"));
       dl.appendChild(el(d, "dt", t("asset.mcr_row", "MCR"))); var m1 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mcr) + "%"); m1.title = String(info.bitasset.mcr); dl.appendChild(m1);
       dl.appendChild(el(d, "dt", t("explorer.th_mssr", "MSSR"))); var m2 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mssr) + "%"); m2.title = String(info.bitasset.mssr); dl.appendChild(m2);
       body.appendChild(dl);

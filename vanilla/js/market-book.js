@@ -237,7 +237,7 @@ var MarketBook = (function () {
       sideWrap.appendChild(el(doc, "h3", isAsk ? t("market.asks", "Asks") : t("market.bids", "Bids")));
     }
     if (!levels || levels.length === 0) {
-      sideWrap.appendChild(el(doc, "p", "No " + title.toLowerCase() + ".", "muted"));
+      sideWrap.appendChild(el(doc, "p", "No " + title.toLowerCase() + " yet — place one from the Buy/Sell panels below; resting orders list here.", "muted"));
       return;
     }
     var maxTot = 0;
@@ -447,7 +447,7 @@ var MarketBook = (function () {
     var rows = ctx.rows;
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
     if (!rows || rows.length === 0) {
-      parentEl.appendChild(el(doc, "p", t("market.no_fills", "No recent fills on this market."), "muted"));
+      parentEl.appendChild(el(doc, "p", t("market.no_fills", "No recent fills on this market.") + " Fills appear once orders match — place one from the Buy/Sell panels.", "muted"));
       /* Honest tape empty state too (same guarded mount as below). */
       mountTape(doc, parentEl, []);
       return;

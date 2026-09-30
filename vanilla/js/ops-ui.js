@@ -195,7 +195,7 @@ var OpsUI = (function () {
     var keys = Object.keys(counts).map(function (k) { return parseInt(k, 10); });
     keys.sort(function (a, b) { return counts[b] - counts[a]; });
     if (keys.length === 0) {
-      wrap.appendChild(el(doc, "p", "No operations in the sampled blocks.", "muted"));
+      wrap.appendChild(el(doc, "p", "No operations in the sampled blocks — widen the sample or retry at the chain tip.", "muted"));
       return;
     }
     var scroller = el(doc, "div", null, "ops-scroll");

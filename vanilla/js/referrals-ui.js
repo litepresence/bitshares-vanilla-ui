@@ -217,7 +217,7 @@ var ReferralsUI = (function () {
     if (myGen !== gen) return;
     box.removeChild(loading);
     if (!ids.length) {
-      box.appendChild(el(doc, "p", t("referrals.no_registrar_or_referrer_recorded_for_this_ac", "No registrar or referrer recorded for this account."), "muted"));
+      box.appendChild(el(doc, "p", t("referrals.no_registrar_or_referrer_recorded_for_this_ac", "No registrar or referrer recorded for this account.") + " Faucet-created accounts normally carry one.", "muted"));
       return;
     }
     var dl = el(doc, "dl", null, "xplore-fields");
@@ -243,7 +243,7 @@ var ReferralsUI = (function () {
       (acct.lifetime_referrer_fee_percentage !== undefined) ||
       (acct.referrer_rewards_percentage !== undefined);
     if (!have) {
-      box.appendChild(el(doc, "p", t("referrals.no_fee_split_fields_returned_for_this_account", "No fee-split fields returned for this account."), "muted"));
+      box.appendChild(el(doc, "p", t("referrals.no_fee_split_fields_returned_for_this_account", "No fee-split fields returned for this account.") + " The node omitted them — retry or try another node.", "muted"));
       body.appendChild(box);
       return;
     }
@@ -314,7 +314,7 @@ var ReferralsUI = (function () {
       if (myGen !== gen) return;
       box.removeChild(loading);
       if (!rows || rows.length === 0) {
-        box.appendChild(el(doc, "p", t("referrals.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+        box.appendChild(el(doc, "p", t("referrals.no_vesting_balances_for_this_account", "No vesting balances for this account.") + " Balances appear after a transfer with a vesting policy lands here.", "muted"));
         return;
       }
       var ul = doc.createElement("ul");

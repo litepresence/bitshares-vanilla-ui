@@ -144,7 +144,7 @@ var ProposalUI = (function () {
   /* Table (desktop) + cards (phone) with sticky-first-col CSS; href links col 0, action buttons ride cards. */
   function deskTable(doc, headers, rows) {
     var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet."), "muted")); return box; }
+    if (!rows.length) { box.appendChild(el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet.") + " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below.", "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
     headers.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
@@ -713,7 +713,7 @@ var ProposalUI = (function () {
       ctx.wrap.appendChild(el(doc, "p", approvalCell(p), "muted"));
       ap.lines.forEach(function (ln) { ctx.wrap.appendChild(el(doc, "p", ln)); });
       ctx.wrap.appendChild(rawJson(doc, t("proposal.raw_proposal_json", "Raw proposal JSON"), p));
-      if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations."), "muted"));
+      if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations.") + " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N).", "muted"));
       symJoin(innerAssetIds(entries)).then(function (join) {
         if (myGen !== gen) return;
         entries.forEach(function (e) {

@@ -207,7 +207,7 @@ var ExplorerAssets = (function () {
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
     else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
     else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry.");
     else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
@@ -472,7 +472,7 @@ var ExplorerAssets = (function () {
       while (navWrap.firstChild) navWrap.removeChild(navWrap.firstChild);
       var view = filteredSorted();
       if (view.length === 0) {
-        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
+        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page.") + " Clear the search filter to see the full page.", "muted"));
       } else {
         var scroller = el(doc, "div", null, "xplore-scroll");
         scroller.style.overflowX = "auto";
@@ -565,7 +565,7 @@ var ExplorerAssets = (function () {
       rows = rows || [];
       if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
         while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
-        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page."), "muted"));
+        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page.") + " Clear the search filter to see the full page.", "muted"));
         return;
       }
       enrichAndStore(rows);
@@ -924,7 +924,7 @@ var ExplorerAssets = (function () {
         while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild);
         var f = (rows || [])[0];
         if (!f || !f.is_smartcoin || !f.settlement_raw) {
-          feedBox.appendChild(el(doc, "p", t("explorer.no_feeds", "No live feeds published."), "muted"));
+          feedBox.appendChild(el(doc, "p", t("explorer.no_feeds", "No live feeds published.") + " Feeds appear once publishers publish for an asset.", "muted"));
           return;
         }
         var fdl = el(doc, "dl", null, "xplore-fields");

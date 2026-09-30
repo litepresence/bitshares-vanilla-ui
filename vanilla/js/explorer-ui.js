@@ -134,7 +134,7 @@ var ExplorerUI = (function () {
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
     else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
     else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry.");
     else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
@@ -277,7 +277,7 @@ var ExplorerUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return;
         go.disabled = false;
-        showError(doc, msg, e, t("explorer.not_found", "Nothing found for that search."));
+        showError(doc, msg, e, (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry."));
       });
     });
 

@@ -287,7 +287,7 @@ var WalletUI = (function () {
     var line = doc.createElement("p");
     line.textContent = stored
       ? t("wallet.console_active_prefix", "Active wallet: ") + (name || t("wallet.console_unnamed", "unnamed")) + (unlocked ? t("wallet.console_unlocked_suffix", " (unlocked)") : t("wallet.console_locked_suffix", " (locked)"))
-      : t("wallet.console_empty", "No wallet on this device yet.");
+      : (t("wallet.console_empty", "No wallet on this device yet.") + " Create one (#/create-wallet-brainkey) or import an existing account (#/existing-account) — links below.");
     box.appendChild(line);
     var links = doc.createElement("p");
     function link(href, text) {

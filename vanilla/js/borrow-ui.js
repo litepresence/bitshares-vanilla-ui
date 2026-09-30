@@ -649,7 +649,7 @@ var BorrowUI = (function () {
   function bidsTable(doc, bids, R) {
     var box = el(doc, "div");
     if (!bids || !bids.length) {
-      box.appendChild(el(doc, "p", "No collateral bids on " + R.asset.symbol + " yet.", "muted"));
+      box.appendChild(el(doc, "p", "No collateral bids on " + R.asset.symbol + " yet. Place one from the bid form below — bids list here.", "muted"));
       return box;
     }
     var table = doc.createElement("table"); table.className = "node-table";

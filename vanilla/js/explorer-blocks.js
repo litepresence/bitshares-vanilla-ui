@@ -170,7 +170,7 @@ var ExplorerBlocks = (function () {
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
     else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
     else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
-    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || t("explorer.not_found", "Nothing found for that search.");
+    else if (msg.indexOf("unknown-object") !== -1) msg = fallback || (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry.");
     else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
@@ -919,7 +919,7 @@ var ExplorerBlocks = (function () {
       actPanel.appendChild(el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
       actPanel.appendChild(el(doc, "div", t("explorer.info_h", "INFO"), "xplore-subh"));
       if (!ops || ops.length === 0) {
-        actPanel.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity."), "muted"));
+        actPanel.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity.") + " New chain operations list here as they arrive.", "muted"));
       } else {
         (ops || []).slice(0, 12).forEach(function (op) {
           var row = el(doc, "div", null, "xplore-act-row");
@@ -973,7 +973,7 @@ var ExplorerBlocks = (function () {
       if (!isCurrent(myGen)) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (rows.length === 0) {
-        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found."), "muted"));
+        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found.") + " The node returned nothing in this range — try Older blocks or check Settings → Nodes.", "muted"));
         return;
       }
       var isTip = (oldest === null || oldest === undefined);
@@ -1157,7 +1157,7 @@ var ExplorerBlocks = (function () {
           }
         });
         if (b.transactions.length === 0) {
-          wrap.appendChild(el(doc, "p", t("explorer.no_txs", "No transactions in this block."), "muted"));
+          wrap.appendChild(el(doc, "p", t("explorer.no_txs", "No transactions in this block.") + " Empty blocks carry no transactions — open another block from Recent blocks.", "muted"));
           wrap.appendChild(topBtn);
           return;
         }
@@ -1209,7 +1209,7 @@ var ExplorerBlocks = (function () {
       wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index));
       wrap.appendChild(anchor(doc, t("explorer.back_to_block_prefix", "← Block #") + tx.block, "#/block/" + tx.block));
       var ctx = { gen: myGen, root: root, tab: "blocks" };
-      if (tx.ops.length === 0) wrap.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction."), "muted"));
+      if (tx.ops.length === 0) wrap.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") + " Nothing was enclosed — valid, not an error.", "muted"));
       tx.ops.forEach(function (op, k) {
         wrap.appendChild(opSection(doc, op, ctx, t("explorer.op_prefix", "Op ") + k));
       });

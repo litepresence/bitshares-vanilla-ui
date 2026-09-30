@@ -241,7 +241,7 @@ var PoolUI = (function () {
     *   detail desk (#/pools/:id), which owns the inline swap and stake panels
     *   — the list stays a list (no separate STAKE column: same destination).
     *   Sort: Pool ID / Taker / Withdrawal headers toggle page-sort. */
-    if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found."), "muted");
+    if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found.") + " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first.", "muted");
     var view = rows.slice();
     function sortVal(r) {
       if (sortKey === "taker") return Number(r.taker_units) || 0;
@@ -441,7 +441,7 @@ var PoolUI = (function () {
         if (locked) mineBox.appendChild(viewingAsNotice(doc));
         Pool.mine(me.id).then(function (rows) {
           if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows));
-        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", t("pool.no_mine", "No owned pools."), "muted")); } });
+        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", t("pool.no_mine", "No owned pools.") + " Stake both legs in any pool above — owned pools list here.", "muted")); } });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap,e,t("trade.fail_account", "Could not load your account.")); });
     })();
   }

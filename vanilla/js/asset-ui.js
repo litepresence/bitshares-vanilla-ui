@@ -168,7 +168,7 @@ var AssetUI = (function () {
       wipe(list); status(d, list, t("asset.loading_issued", "Loading issued assets…"));
       Account.resolve(v).then(function (a) { return Asset.issuedBy(a.id, "1.3.0", 100); }).then(function (rows) {
         if (g !== gen) return; wipe(list);
-        if (!rows.length) { list.appendChild(el(d, "p", t("asset.no_issued", "No assets issued by this account."), "muted")); return; }
+        if (!rows.length) { list.appendChild(el(d, "p", t("asset.no_issued", "No assets issued by this account.") + " Create one at #/assets/create — issued assets list here.", "muted")); return; }
         rows.forEach(function (r) {
           var card = el(d, "div", null, "asset-row");
           card.style.display = "flex"; card.style.flexWrap = "wrap"; card.style.gap = "8px";

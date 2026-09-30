@@ -253,11 +253,11 @@ var VoteSlate = (function () {
         rowsBox.appendChild(el(doc, "p",
           st.tab === "worker"
             ? t("vote.no_workers", "No workers found. Testnets often have none — this is valid, not an error.")
-            : t("vote.empty_tab", "Nothing in this list."), "muted"));
+            : t("vote.empty_tab", "Nothing in this list.") + " Entries appear when the chain carries them — workers are proposed from #/create-worker.", "muted"));
         return;
       }
       if (shown.length === 0) {
-        rowsBox.appendChild(el(doc, "p", t("vote.no_matches", "No matches for this search."), "muted"));
+        rowsBox.appendChild(el(doc, "p", t("vote.no_matches", "No matches for this search.") + " Clear the search to see the full list.", "muted"));
         return;
       }
       shown.forEach(function (e) {

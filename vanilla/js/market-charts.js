@@ -143,7 +143,7 @@ var MarketCharts = (function () {
       g.ctx.fillStyle = muted;
       g.ctx.font = "13px system-ui, sans-serif";
       g.ctx.textAlign = "center";
-      g.ctx.fillText(emptyText || "No price history.", g.w / 2, g.h / 2);
+      g.ctx.fillText(emptyText || "No price history — fills draw this line; place an order or try another pair.", g.w / 2, g.h / 2);
       g.ctx.textAlign = "left";
       return;
     }
@@ -213,7 +213,7 @@ var MarketCharts = (function () {
       g.ctx.fillStyle = muted;
       g.ctx.font = "13px system-ui, sans-serif";
       g.ctx.textAlign = "center";
-      g.ctx.fillText(emptyText || "No depth data.", g.w / 2, g.h / 2);
+      g.ctx.fillText(emptyText || "No depth data — resting orders draw this curve; place one from the Buy/Sell panels.", g.w / 2, g.h / 2);
       g.ctx.textAlign = "left";
       return;
     }

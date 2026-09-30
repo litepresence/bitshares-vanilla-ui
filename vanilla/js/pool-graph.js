@@ -359,10 +359,10 @@ var PoolGraph = (function () {
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";
     }
     if (!edges.length) {
-      emptyLine("No pools touch these assets."); _wire(canvas, {}, [], doc);
+      emptyLine("No pools touch these assets — pick a pair with a pool, or create one at #/pools."); _wire(canvas, {}, [], doc);
       /* A11y: empty map is not interactive (no tabindex trap) but stays
        * named so the canvas text is exposed. */
-      try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "Pool map. No pools touch these assets."); } catch (e) {}
+      try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools."); } catch (e) {}
       return { empty: true };
     }
     var base = layout(graph, assetA, assetB, g.w, g.h);

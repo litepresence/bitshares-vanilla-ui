@@ -386,7 +386,7 @@ var AccountUI = (function () {
     if (!list.length) {
       var empty = doc.createElement("p");
       empty.className = "muted";
-      empty.textContent = t("account.s1", "No balances.");
+      empty.textContent = t("account.s1", "No balances.") + " Fund it with a transfer, or place a market order — holdings list here.";
       section.appendChild(empty);
       (enrich.notes || []).forEach(function (n) {
         var nn = doc.createElement("p");
@@ -475,7 +475,7 @@ var AccountUI = (function () {
       if (!rows.length) {
         var none = doc.createElement("p");
         none.className = "muted";
-        none.textContent = t("account.no_assets_match_this_filter", "No assets match this filter.");
+        none.textContent = t("account.no_assets_match_this_filter", "No assets match this filter.") + " Clear the filter to see the full portfolio.";
         box.appendChild(none);
       } else {
         var table = doc.createElement("table");
@@ -596,7 +596,7 @@ var AccountUI = (function () {
       if (!rows || rows.length === 0) {
         var empty = doc.createElement("p");
         empty.className = "muted";
-        empty.textContent = t("account.no_margin_positions_for_this_account", "No margin positions for this account.");
+        empty.textContent = t("account.no_margin_positions_for_this_account", "No margin positions for this account.") + " Lock collateral from the borrow page (#/borrow) — positions list here.";
         section.appendChild(empty);
         return;
       }
@@ -677,7 +677,7 @@ var AccountUI = (function () {
       if (!rows || rows.length === 0) {
         var empty = doc.createElement("p");
         empty.className = "muted";
-        empty.textContent = t("account.no_credit_offers_for_this_account", "No credit offers for this account.");
+        empty.textContent = t("account.no_credit_offers_for_this_account", "No credit offers for this account.") + " Create one from the credit desk (#/credit-offer) — owned offers list here.";
         section.appendChild(empty);
       } else {
         var table = doc.createElement("table");
@@ -757,7 +757,7 @@ var AccountUI = (function () {
     if (!orders || orders.length === 0) {
       var empty = doc.createElement("p");
       empty.className = "muted";
-      empty.textContent = t("account.s2", "No open orders.");
+      empty.textContent = t("account.s2", "No open orders.") + " Place one from the trade form on a market page — open orders list here until filled or cancelled.";
       section.appendChild(empty);
       return;
     }
@@ -828,7 +828,7 @@ var AccountUI = (function () {
     if (!rows || rows.length === 0) {
       var empty = doc.createElement("p");
       empty.className = "muted";
-      empty.textContent = t("account.s3", "No recent activity.");
+      empty.textContent = t("account.s3", "No recent activity.") + " Transfers, orders, and fills list here once they happen.";
       section.appendChild(empty);
       return;
     }

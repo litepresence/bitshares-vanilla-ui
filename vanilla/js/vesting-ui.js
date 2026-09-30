@@ -348,7 +348,7 @@ var VestingUI = (function () {
         rawP.then(function (byId) {
           if (!live(myGen, uiGen)) return; ui.clearBox(listBox);
           if (!rows.length) {
-            listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+            listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + " Balances appear after a transfer with a vesting policy lands here.", "muted"));
             try { ProposalMisc.requireClaimable(rows); } catch (e) { ui.showError(doc, listBox, e); }
             go.disabled = false; return;
           }
@@ -373,7 +373,7 @@ var VestingUI = (function () {
               return hay.indexOf(needle) !== -1;
             });
             if (!shown.length) {
-              results.appendChild(ui.el(doc, "p", needle ? t("vesting.no_matching_vesting_rows", "No matching vesting rows.") : t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account."), "muted"));
+              results.appendChild(ui.el(doc, "p", needle ? (t("vesting.no_matching_vesting_rows", "No matching vesting rows.") + " Clear the filter to see all rows.") : (t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + " Balances appear after a transfer with a vesting policy lands here."), "muted"));
               return;
             }
             results.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),

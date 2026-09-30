@@ -393,7 +393,7 @@ var DashboardUI = (function () {
       section.appendChild(el(doc, "h2", t("account.s7", "Balances")));
       section.appendChild(el(doc, "p", t("dashboard.top_holdings_for_the_watched_account_", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."), "muted"));
       if (!list || list.length === 0) {
-        section.appendChild(el(doc, "p", t("account.s1", "No balances."), "muted"));
+        section.appendChild(el(doc, "p", t("account.s1", "No balances.") + " Fund it with a transfer, or place a market order — holdings list here.", "muted"));
         return;
       }
       var table = doc.createElement("table");
@@ -459,7 +459,7 @@ var DashboardUI = (function () {
       clearRoot(section);
       section.appendChild(el(doc, "h2", t("account.history_title", "History")));
       if (!rows || rows.length === 0) {
-        section.appendChild(el(doc, "p", t("account.s3", "No recent activity."), "muted"));
+        section.appendChild(el(doc, "p", t("account.s3", "No recent activity.") + " Transfers, orders, and fills list here once they happen.", "muted"));
         return;
       }
       var ul = doc.createElement("ul");
@@ -534,7 +534,7 @@ var DashboardUI = (function () {
       pane.appendChild(el(doc, "p",
         name === "Starred"
           ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
-          : t("account.s3", "No recent activity."), "muted"));
+          : (t("account.s3", "No recent activity.") + " No markets are configured for this strip — open any market from the picker."), "muted"));
       pane.appendChild(linkPara(doc, [
         ["#/market/" + encodeURIComponent(defaultMarket()), defaultMarket()],
         ["#/favourites", t("favourites.favourites", "Favourites")]
@@ -610,7 +610,7 @@ var DashboardUI = (function () {
       pane.appendChild(el(doc, "p",
         name === "Starred"
           ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
-          : t("account.s3", "No recent activity."), "muted"));
+          : (t("account.s3", "No recent activity.") + " No markets are configured for this strip — open any market from the picker."), "muted"));
       pane.appendChild(linkPara(doc, [
         ["#/market/" + encodeURIComponent(defaultMarket()), defaultMarket()],
         ["#/favourites", t("favourites.favourites", "Favourites")]
