@@ -301,3 +301,36 @@
   also fixed a 10× display bug (fee-pool shown at asset precision, now core
   p5). Claiming (ops 43/47) stays honestly deferred.
 - Counts: unchanged otherwise. MISSING (unjustified): still 0.
+
+## LTM / witness-create / committee-create delta (2026-09-30) — STOPPED, two blocks
+
+> Task: upgrade fixture `lite-test-1` (`1.2.26833`) to LTM (op-8), then full
+> inclusion proofs for op-20 `witness_create` + op-29 `committee_member_create`.
+> Outcome: NO broadcast, nothing spent, no state created. Full detail in
+> `vanilla/notes/ltm-witness-committee-2026-09-30.md`. No row changes
+> PORTED→anything; rows A15/B9/C29 keep PORTED-with-caveat, caveat now doubled.
+> Counts: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20 substantive PORTED
+> + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged. MISSING: still 0.
+
+- Funds block (task STOP rule): op-8 fee `20000000` raw (`200.00000` TEST,
+  p5, live `get_required_fees`) vs fixture `3873890` raw (`38.73890` TEST);
+  shortfall `16126110` raw (`161.26110` TEST). Membership still basic
+  (`1970-01-01T00:00:00`; LTM sentinel `2106-02-07T06:28:15`). No top-up
+  attempted (task: do not fund without recording — funding request:
+  ≥ ~165 TEST via `testnet-faucet.xbts.io`, owner decision).
+- Client-bug block (found verifying): `Chain.connect` + `Tx.buildTx` head
+  gates (`chain.js:104-105`, `tx-send.js:47-48`, landed `8c40f45`) demand
+  64-hex `head_block_id`, but the real chain uses 40-hex RIPEMD160
+  (`types.hpp:304`; both testnet nodes agree: xbts.io head `#100989922`
+  STALE ~24h, dex.trading `#101015748` live). Verbatim:
+  `bad-head-shape: head_block_id must be 64 hex chars` on BOTH nodes via the
+  real vanilla path — browser app equally affected (connect rejects). Fix
+  recommended in the note, NOT applied (scripts + note only this round).
+- Scripts committed (stdlib-only, redacted, `node --check` clean):
+  `tooling/prove_witness_create_20.cjs` + `tooling/prove_committee_create_29.cjs`
+  (LTM + fee+dust gates, exit 3 = STOP). Both STOP at connect with the exact
+  gate error (EXIT=3, zero cost); post-fix they prove to inclusion + re-read.
+  Op-20/29 fees observed `100` raw each — trivial once LTM exists.
+- Leftover state: NONE this round (witness/committee lookups `null`,
+  balance untouched). Standing clutter unchanged (AFKTEST10/M11,
+  `1.10.1493/94`). Post-success note must list created ids (no delete op).
