@@ -44,7 +44,7 @@ Missing field = slice not done. No exceptions for "trivial" slices.
 | Mistake | Fix |
 |---|---|
 | Starting slice N+1 before slice N passes audit | Finish the parity note first; slices are sequential |
-| Editing anything under `bitshares-ui/`, `astro-ui/`, `wallet-extension/`, `bitshares-core/` | Read-only. Copy to `/tmp` or `vanilla/notes/` to experiment |
+| Editing anything under `reference/` | Read-only. Copy to `/tmp` or `vanilla/notes/` to experiment |
 | Inline float math for amounts | Route through `format.js`; the audit greps for this |
 | Adding a dependency "just for this slice" | Answer §4.5(b) in writing, with a removal plan — or don't add it |
 | Skipping themes/tests "for now" | "For now" is how #3583 started; the note requires both |

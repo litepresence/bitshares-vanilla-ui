@@ -64,6 +64,21 @@ var ExplorerBlocks = (function () {
     statTimer = null;
   }
 
+  /* Decimal block-age shaping (pure, offline-testable): durations, not
+   * money — display rounding via toFixed(1) is fine. Old UI never had
+   * decimals (integer "N seconds ago"); this tenths display is NEW flash,
+   * labeled honestly here. Params: nowMs + newestTs in epoch ms. Returns
+   * e.g. "0.4 seconds ago". Clamps negatives/NaN to "0.0 seconds ago". */
+  function agoTextAt(nowMs, newestTs) {
+    var sec = 0;
+    try {
+      var d = (nowMs - newestTs) / 1000;
+      if (isFinite(d)) sec = Math.max(0, d);
+    } catch (e) { sec = 0; }
+    if (!isFinite(sec)) sec = 0;
+    return sec.toFixed(1) + " " + t("explorer.ago_many_suffix", "seconds ago");
+  }
+
   /* Account-id shape (data copy of the explorer-ui.js regex — slice-3
    * account route target; logic lives in explorer-assets.js). */
   var ACCT_RE = /^1\.2\.\d+$/;
@@ -749,13 +764,16 @@ var ExplorerBlocks = (function () {
       });
       liveOff = off;
     }
-    /* "N seconds ago" label for a head timestamp (original BlockTimeAgo
-     * concept, Blocks.jsx:23-48: green-when-fresh rides in CSS). */
+    /* "N.N seconds ago" label for a head timestamp (original BlockTimeAgo
+     * concept, Blocks.jsx:23-48: green-when-fresh rides in CSS). Decimal
+     * tenths are NEW flash — the old UI floored to integer seconds; thin
+     * wrapper over the pure agoTextAt above so tooling vectors cover the
+     * shaping offline. Tip updates stay push-driven (chain.js
+     * set_block_applied_callback); this timer only repaints the label. */
     function agoText(newestTs) {
-      var sec = 0;
-      try { sec = Math.max(0, Math.round((Date.now() - newestTs) / 1000)); } catch (e) { sec = 0; }
-      if (sec <= 1) return t("explorer.ago_one", "1 second ago");
-      return sec + " " + t("explorer.ago_many_suffix", "seconds ago");
+      var now = 0;
+      try { now = Date.now(); } catch (e) { now = newestTs; }
+      return agoTextAt(now, newestTs);
     }
     /* Tip stats strip + two-column activity/blocks layout (original
      * Blocks.jsx:305-504 stat rows + 507-602 activity/blocks pair — concepts
@@ -897,9 +915,13 @@ var ExplorerBlocks = (function () {
         }
       }
       repaint();
-      /* Freshness ticker (1s): the LAST BLOCK cell counts up until the next
-       * head arrives, and trips the stall UI past 15s without a head.
-       * Gen-guarded self-clear; stopLive clears on leave. */
+      /* Freshness ticker (~150ms): the LAST BLOCK cell counts up in tenths
+       * until the next head arrives, and trips the stall UI past 15s without
+       * a head. No new polling — tip updates stay push-driven via the Store
+       * connection feed; this only repaints cLast.val.textContent in place
+       * (other stat cells repaint on push only). Reuses tr.xplore-flash +
+       * xplore-bump as-is, no new keyframes. Gen-guarded self-clear;
+       * stopLive clears on leave; >15000ms stall branch untouched. */
       try {
         clearStatTick();
         statTimer = setInterval(function () {
@@ -910,7 +932,7 @@ var ExplorerBlocks = (function () {
             if (stalled) ensureStall(headNum);
             else clearStall();
           } catch (e) { /* next tick */ }
-        }, 1000);
+        }, 150);
       } catch (e) { /* static label stands */ }
 
       /* Two-column activity + blocks (side by side ≥1200px, stacked below). */
@@ -1232,7 +1254,8 @@ var ExplorerBlocks = (function () {
   return {
     blocksTab: blocksTab,
     renderBlock: renderBlock,
-    renderTx: renderTx
+    renderTx: renderTx,
+    _test: { agoTextAt: agoTextAt }
   };
 })();
 

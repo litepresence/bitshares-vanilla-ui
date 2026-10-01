@@ -8,8 +8,9 @@
  *   Exchange.jsx below-chart actionCards + MyMarkets right rail: buyForm
  *   :2089/sellForm, marketHistory :2551, myMarketHistory :2583,
  *   myOpenOrders :2618, settlementOrders :2656, myMarkets :2428; toggle
- *   group-1 default panelTabs :362-371) — while the POOL desk (plain .mkt)
- *   keeps the legacy book|trades areas. Plus every desk scroll region
+ *   group-1 default panelTabs :362-371) — while the POOL desk
+ *   (.mkt.mkt-pool) keeps the legacy book|trades areas, with its .mkt-book
+ *   cell holding the same split bids|asks cells side-by-side on desktop. Plus every desk scroll region
  *   (.book-scroll/.trades-scroll/.orders-scroll/.picker-scroll plus the
  *   phone-card lists), sticky table headers inside those regions,
  *   .mkt-tabs toggle styling, and .depth-bar geometry + colors. All colors
@@ -56,8 +57,9 @@
  * the main area (price + volume + depth slice + oscillators inside
  * mkt-charts). Below it the EXCHANGE desk (.mkt-exchange) runs the retro
  * equal 2x3: row 1 buy | sell | trades-toggle, row 2 bids | asks | orders;
- * the picker rail (side) spans all rows full-height. The POOL desk (plain
- * .mkt) keeps the legacy book | trades areas untouched.
+ * the picker rail (side) spans all rows full-height. The POOL desk
+ * (.mkt.mkt-pool) keeps the legacy book | trades areas; its book cell holds
+ * the split bids | asks cells (side-by-side ≥1200px, stacked below).
  * Phones (<1200px) stack every cell single-column; the rail drops last. */
 .mkt {
   grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "stats" "side";
@@ -155,6 +157,31 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+}
+
+/* Pool split book (pool-detail-ui.js depthPane mirrors market-desk.js
+ * bids/asks cells): phones stack single-column for free (no rule here);
+ * desktop ≥1200px places Buy | Sell side-by-side inside the .mkt-book cell
+ * while the h2, curve canvas, and muted notes span full width. Reuses the
+ * shared .mkt-bids/.mkt-asks cells — no pool-only book classes. */
+@media (min-width: 1200px) {
+  .mkt-pool .mkt-book {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  .mkt-pool .mkt-book > h2,
+  .mkt-pool .mkt-book > details,
+  .mkt-pool .mkt-book > p {
+    grid-column: 1 / -1;
+  }
+  .mkt-pool .mkt-bids {
+    grid-column: 1;
+  }
+  .mkt-pool .mkt-asks {
+    grid-column: 2;
+  }
 }
 
 /* Fixed-height scroll regions (native overflow, sticky headers). Max-height

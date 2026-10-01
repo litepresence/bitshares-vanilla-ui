@@ -3,7 +3,7 @@
 Stdlib only. Run from /workspace."""
 import json
 
-with open("bitshares-ui/app/lib/common/dictionary_en.json") as fh:
+with open("reference/bitshares-ui/app/lib/common/dictionary_en.json") as fh:
     words = json.load(fh)["en"].split(",")
 print("words:", len(words))
 assert len(words) == 49744, "expected 49744 dictionary words"

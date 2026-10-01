@@ -25,7 +25,7 @@ contract). You read it yourself too.
 | `vanilla/notes/` | Parity notes, one per slice (completion tracking) |
 | `tooling/` | Audit/probe scripts (`check_rot.py`, `ws-probe.mjs`) |
 | `docs/superpowers/plans/` | Implementation plans (dispatch source of truth) |
-| `bitshares-ui/`, `astro-ui/`, `wallet-extension/`, `bitshares-core/` | References (immutable — workers never write here) |
+| `reference/bitshares-ui/`, `reference/astro-ui/`, … | References (immutable — workers never write here) |
 
 Reference files are never modified by anyone, including you.
 

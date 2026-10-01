@@ -155,8 +155,8 @@ var TourUI = (function () {
         "#tour-card .tour-eyebrow{font-size:0.8rem;opacity:0.75;margin:0 0 4px;}" +
         "#tour-card .tour-links{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;}" +
         "#tour-card .tour-cta{display:inline-block;margin:0 0 10px;min-height:44px;line-height:44px;}" +
-        "#tour-card .tour-row{display:flex;align-items:center;gap:8px;}" +
-        "#tour-card .tour-row button{min-height:44px;min-width:44px;}" +
+        "#tour-card .tour-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}" +
+        "#tour-card .tour-row > button{min-height:44px;min-width:44px;}" +
         "#tour-card .tour-dots{display:flex;gap:6px;margin-left:auto;}" +
         "#tour-card .tour-dot{width:12px;height:12px;border-radius:50%;border:1px solid currentColor;background:transparent;padding:0;min-height:12px;min-width:12px;}" +
         "#tour-card .tour-dot[aria-current=\"step\"]{background:var(--accent,#1ec3fa);border-color:var(--accent,#1ec3fa);}" +

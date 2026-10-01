@@ -86,3 +86,37 @@ no build, no npm, no framework. (b) New deps: NONE (fetch is platform;
 endpoint is data like a node URL, removable by deleting one constant).
 (c) Deletable: ES adapter (chain covers), synth book (curve remains),
 per-indicator branches (base 25 remain). `check_rot.py` PASS.
+
+## 8. Split-book mirror (2026-10-01) — pool book matches the exchange 2-cell split
+
+1. Reference behavior: exchange splits via `MarketBook.renderSplit` into
+   `mkt-bids`/`mkt-asks` cells (`vanilla/js/market-desk.js:585-597`,
+   `vanilla/css/desk-grid.css:85-89`); both desks share `renderBookSide`
+   (`vanilla/js/market-book.js:226-368`, single code path, best-first —
+   asks asc / bids desc is the contract, no sort changes).
+2. Vanilla implementation: `vanilla/js/pool-detail-ui.js` depthPane
+   (lines ~635-658) builds the same two section cells (`mkt-bids` "Buy
+   orders" + div, `mkt-asks` "Sell orders" + div) and calls
+   `MarketBook.renderSplit(doc, bidsBody, asksBody, …)`; desk div is now
+   `mkt mkt-pool` (line 62); spread `p.muted` + synth note stay above,
+   click-fill (queries `.book-asks`/`.book-bids`) and
+   `details.plot.pool-curve` untouched. CSS: `.mkt-pool .mkt-book` 2-col
+   grid ≥1200px, full-width h2/details/p, stacked below
+   (`vanilla/css/desk-grid.css:160-186`). No renderBookSide fork, no new
+   `.book-*` classes, no `.book-grid` restyle, no sort touches.
+3. Manual tests: `node --check` PASS on pool-detail-ui/market-book/
+   market-desk; `tooling/check_rot.py` PASS; CSS braces balanced (57/57);
+   no new script tags (both files already in `index.html`). Headless
+   shots of `#/pools/1.19.133` @390+1440 ATTEMPTED but BLOCKED — the
+   vendored headless shell cannot launch in this env (`libnspr4.so`
+   missing, exit 127 both widths); no screenshots produced. Human tester
+   round still owes the 390/1440 + theme-trio check.
+4. Vectors: none new — no amount/percent/price math changed (same levels,
+   same `renderBookSide` row math, same precisions).
+5. Screenshots: none (see 3 — env-blocked, recorded).
+6. Headers/descriptions: depthPane + CSS block comments updated in place;
+   no dead text (`var host` removed, no other `host` uses in depthPane).
+7. Anti-rot: (a) 2036: same shared renderer, no new dependency — survives
+   with the rest of the desk. (b) New deps: NONE (one extra CSS block +
+   reused classes). (c) Deletable: the `.mkt-pool` grid block (book stacks
+   single-column without it); the split itself is the exchange call.

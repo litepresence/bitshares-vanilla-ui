@@ -147,8 +147,10 @@ var DashboardUI = (function () {
     CNY: ["BTS_CNY", "BTC_CNY"],
     BTC: ["BTS_BTC", "ETH_BTC"]
   };
-  /* Session ticker cache (id -> {latest, chg} or null-miss). Fail-open:
-   * misses render "—" and retry on next visit, never an error panel. */
+  /* Session ticker cache (id -> {latest, chg}). Fail-open: misses render
+   * "—" and retry on next visit, never an error panel. Misses are NEVER
+   * cached: an offline paint must not poison later renders (a cached null
+   * would make the refill re-render serve "—" forever). */
   var _tickCache = {};
   /* In-flight ticker memo (perf: Starred+Featured tabs fetch the same pairs
    * in one tick — one fetch per id per tick, never two. Pending only:
@@ -161,7 +163,7 @@ var DashboardUI = (function () {
     try {
       if (typeof Market === "undefined" || !Market || typeof Market.parseId !== "function") return Promise.resolve(null);
       pair = Market.parseId(id);
-    } catch (e) { _tickCache[id] = null; return Promise.resolve(null); }
+    } catch (e) { return Promise.resolve(null); }
     var p = Market.assets(pair.quote, pair.base).then(function (a) {
       return Market.stats(a.base.id, a.quote.id);
     }).then(function (s) {
@@ -172,11 +174,44 @@ var DashboardUI = (function () {
       };
       _tickCache[id] = row;
       return row;
-    }).catch(function () { _tickCache[id] = null; return null; });
+    }).catch(function () { return null; });
     _tickPending[id] = p;
     p.then(function () { delete _tickPending[id]; },
       function () { delete _tickPending[id]; });
     return p;
+  }
+
+  /* clearTickMisses: drop legacy cached-null misses (pre-fix sessions cached
+   * offline failures as null). Params: none. Returns the dropped count.
+   * Non-null rows are untouched. Never throws. */
+  function clearTickMisses() {
+    var n = 0;
+    for (var k in _tickCache) {
+      if (Object.prototype.hasOwnProperty.call(_tickCache, k) && _tickCache[k] === null) {
+        delete _tickCache[k];
+        n++;
+      }
+    }
+    return n;
+  }
+
+  /* wireTickMissClear: one-time connection-open hook that drops cached-null
+   * misses so the next paint refetches live tickers. Params: none. Returns
+   * nothing. Never throws; no-op when Store is absent (Node smoke). */
+  var _tickMissClearWired = false;
+  function wireTickMissClear() {
+    if (_tickMissClearWired) return;
+    try {
+      if (typeof Store === "undefined" || !Store || typeof Store.subscribe !== "function") return;
+    } catch (e) { return; }
+    _tickMissClearWired = true;
+    try {
+      Store.subscribe("connection", function (st) {
+        if (st && st.state === "open") {
+          try { clearTickMisses(); } catch (e) { /* refill still attempts */ }
+        }
+      });
+    } catch (e) { _tickMissClearWired = false; }
   }
 
   /* Network default market for the empty-favourites state
@@ -202,10 +237,38 @@ var DashboardUI = (function () {
     /* Landing rule (Option B, 2026-10-01): locked visitors get the splash,
      * unlocked visitors get the watched-account dashboard unchanged. The
      * landing paints immediately (static hero/cards/steps + fail-open live
-     * fills) so a down node never blanks first paint; the dashboard keeps
-     * its connect-wait below. */
+     * fills) so a down node never blanks first paint; when the shared socket
+     * is still connecting, a connection-open subscription refills the live
+     * cells (accounts-ui.js connect-wait pattern) instead of leaving "—"
+     * forever. The dashboard keeps its connect-wait below. */
     if (landingFor(isUnlockedNow())) {
       paintLanding(doc, root, myGen);
+      try { wireTickMissClear(); } catch (e) { /* refill subscription below still attempts */ }
+      try {
+        if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
+            Chain.status().state !== "open" &&
+            typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
+          var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
+          var off = Store.subscribe("connection", function (st) {
+            if (settled || myGen !== gen) return;
+            if (st && st.state === "open") {
+              settled = true;
+              try { off(); } catch (e) { /* unsubscribed */ }
+              try { clearTimeout(timer); } catch (e) { /* timer gone */ }
+              try { clearTickMisses(); } catch (e) { /* refill still attempts */ }
+              if (typeof location === "undefined" || location.hash === hashAtEntry) renderDashboard(root);
+            }
+          });
+          var timer = setTimeout(function () {
+            if (settled || myGen !== gen) return;
+            settled = true;
+            try { off(); } catch (e) { /* unsubscribed */ }
+            /* Fail-open: the static shell + "—" cells stand; no error panel. */
+          }, CONNECT_TIMEOUT_MS);
+        } else {
+          try { clearTickMisses(); } catch (e) { /* opportunistic only */ }
+        }
+      } catch (e) { /* static paint above stands */ }
       return;
     }
     var wrap = makeWrap(doc, root);
@@ -833,19 +896,7 @@ var DashboardUI = (function () {
       ]);
     }).then(function (r) {
       if (myGen !== gen) return blank;
-      var out = { head: null, time: null, accounts: null, assets: null, witnesses: null, committee: null, topVol: null };
-      var g = r[0];
-      if (g && typeof g === "object") {
-        out.head = (Number.isSafeInteger(g.head_block_number) && g.head_block_number > 0) ? g.head_block_number : null;
-        out.time = (typeof g.time === "string" && g.time) ? g.time : null;
-      }
-      out.accounts = asCount(r[1]);
-      out.assets = asCount(r[2]);
-      out.witnesses = asCount(r[3]);
-      out.committee = asCount(r[4]);
-      var rows = r[5];
-      out.topVol = (Array.isArray(rows) && rows[0] && typeof rows[0] === "object") ? rows[0] : null;
-      return out;
+      return shapePulse(r);
     }).then(null, function () { return blank; });
   }
 
@@ -854,6 +905,28 @@ var DashboardUI = (function () {
   function asCount(v) {
     if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return v;
     return null;
+  }
+
+  /* shapePulse: pure shaping of the fetchPulse Promise.all wave. Params: r
+   * (array [globalProps, accountCount, assetCount, witnessCount,
+   * committeeCount, topMarkets] or anything on malformed input). Returns
+   * {head,time,accounts,assets,witnesses,committee,topVol} with nulls on any
+   * miss. Never throws. Unit-tested via _test.shapePulse (refill shaping). */
+  function shapePulse(r) {
+    var out = { head: null, time: null, accounts: null, assets: null, witnesses: null, committee: null, topVol: null };
+    if (!Array.isArray(r)) return out;
+    var g = r[0];
+    if (g && typeof g === "object") {
+      out.head = (Number.isSafeInteger(g.head_block_number) && g.head_block_number > 0) ? g.head_block_number : null;
+      out.time = (typeof g.time === "string" && g.time) ? g.time : null;
+    }
+    out.accounts = asCount(r[1]);
+    out.assets = asCount(r[2]);
+    out.witnesses = asCount(r[3]);
+    out.committee = asCount(r[4]);
+    var rows = r[5];
+    out.topVol = (Array.isArray(rows) && rows[0] && typeof rows[0] === "object") ? rows[0] : null;
+    return out;
   }
 
   /* Verbatim count text (grouping stays deferred): null -> em dash. */
@@ -979,7 +1052,7 @@ var DashboardUI = (function () {
 
   return {
     renderDashboard: renderDashboard,
-    _test: { landingFor: landingFor, fmtCount: fmtCount, asCount: asCount, topVolText: topVolText }
+    _test: { landingFor: landingFor, fmtCount: fmtCount, asCount: asCount, topVolText: topVolText, shapePulse: shapePulse, tickRow: tickRow, clearTickMisses: clearTickMisses, _tickCache: _tickCache }
   };
 })();
 

@@ -1,5 +1,5 @@
 # Vendored crypto provenance
-- noble-secp256k1.js: byte-copy of wallet-extension/src/lib/noble-secp256k1.js
+- noble-secp256k1.js: byte-copy of reference/wallet-extension/src/lib/noble-secp256k1.js
   (itself vendored from @noble/secp256k1 v2.3.0, MIT, Paul Miller).
   Source sha256: 462b6380c45640f92dd613f39d044e4dd4f87b18831338a3fe4e2a019d30c83d. Do NOT edit by hand.
   Used for: private→public derivation (all secret-scalar ops).

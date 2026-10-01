@@ -80,10 +80,11 @@ var Router = (function () {
    *   links — BUT locked visitors get the Option-B splash instead
    *   (2026-10-01: hero + live markets + chain pulse + cards + trust +
    *   steps + CTA; unlocked path byte-identical to before, §3.1 deviation
-   *   recorded in slice-01-settings.md). dashboard-ui.js lazy-loads here so index.html needs no new
-   *   script tag: when the global is absent we inject js/dashboard-ui.js
-   *   once, paint a loading line, and re-render on load; a failed load
-   *   falls back to the old market redirect so the page is never blank. */
+   *   recorded in slice-01-settings.md). dashboard-ui.js eager-loads via
+   *   index.html (dashboard script tag) so DashboardUI is present at boot:
+   *   ensureDashboard below is only the load-failure fallback (inject once,
+   *   paint a loading line, re-render on load; failed load falls back to
+   *   the old market redirect so the page is never blank). */
   var dashLoading = false;
 
   /* dashSrc: absolute URL for the dashboard script (document.baseURI keeps

@@ -113,3 +113,45 @@ Raw→human vectors: shares are counts, not money — `Format.pct1` vectors in
 Anti-rot gate: (a) static + two database-API reads, runs in 10 years;
 (b) zero new deps (no ES fetch, no recharts); (c) deletable: the donut (table
 stands alone — kept because astro parity names the breakdown).
+
+## Decimal block-age delta (2026-10-01, tenths ticker, no new polling)
+
+Reference behavior: old UI never had decimals — `Blocks.jsx:23-48`
+BlockTimeAgo floored to integer seconds. The tenths display here is NEW
+flash, labeled honestly as such in code (`explorer-blocks.js:62-71,766-772`).
+
+Vanilla implementation (file:line):
+- `vanilla/js/explorer-blocks.js:72-82` — pure `agoTextAt(nowMs, newestTs)`:
+  `Math.max(0, (nowMs-newestTs)/1000).toFixed(1) + " " + t("explorer.ago_many_suffix", "seconds ago")`
+  (durations, not money — display rounding fine; negatives/NaN clamp to
+  `"0.0 seconds ago"`; reuses the existing suffix key, no new copy/keys).
+- `:773-777` — thin `agoText(newestTs)` wrapper (`Date.now()` → `agoTextAt`).
+- `:918-935` — `statTimer` 1000ms → 150ms, updating ONLY
+  `cLast.val.textContent` in place; `>15000ms` stall branch, gen guards, and
+  `stopLive` teardown untouched. Tip updates stay push-driven (Store
+  connection feed via `chain.js` `set_block_applied_callback`, zero RPC/block).
+- `:1258` — `_test: { agoTextAt }` headless seam (no DOM).
+- CSS: no change — reuses `tr.xplore-flash` + `.xplore-bump` as-is, no new
+  keyframes (nothing to add to the `prefers-reduced-motion` disable list at
+  `app.css:1098-1112`); `aria-live="off"` on the stats grid stays,
+  `xplore-live` line stays polite.
+
+Manual test + observed result (offline, this sandbox 2026-10-01):
+- `node --check vanilla/js/explorer-blocks.js` clean.
+- `node tooling/explorer-blocks-ago-test.js` 15/15 green (10 shaping vectors
+  + 5 source guards: exactly one `setInterval` at `, 150)`, stall/teardown/push
+  markers present).
+- `python3 tooling/check_rot.py` PASS; `python3 tooling/check_i18n.py` OK
+  (10 dicts key-complete, 3791 `t()` call sites drift-free — suffix default
+  still matches `en.json`; retained `explorer.ago_one` simply unrendered).
+- Headless `shot.mjs` NOT run here (Playwright chromium missing in sandbox —
+  `chrome-headless-shell` absent; recorded, not skipped silently). Live
+  tenths repaint + theme/viewport trio is with the human browser pass.
+
+Raw→human vectors (durations, `tooling/explorer-blocks-ago-test.js`):
+`0ms→"0.0 seconds ago"`, `400ms→"0.4"`, `1000ms→"1.0"` (was `"1 second ago"`),
+`1234ms→"1.2"`, `1500ms→"1.5"`, `3200ms→"3.2"`, `16000ms→"16.0"`,
+future/NaN→`"0.0"`.
+Anti-rot gate: (a) static + existing push feed, runs in 10 years; (b) zero new
+deps (no new interval source, no keyframes, no keys); (c) deletable: the
+tenths (integer label stands alone — kept because liveness flash is the point).

@@ -12,8 +12,8 @@ import os
 import re
 
 WORKSPACE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-THEME_DIR = os.path.join(WORKSPACE, "bitshares-ui/app/assets/stylesheets/themes")
-STYLE_DIR = os.path.join(WORKSPACE, "bitshares-ui/app/assets/stylesheets")
+THEME_DIR = os.path.join(WORKSPACE, "reference/bitshares-ui/app/assets/stylesheets/themes")
+STYLE_DIR = os.path.join(WORKSPACE, "reference/bitshares-ui/app/assets/stylesheets")
 OUT = os.path.join(WORKSPACE, "vanilla/assets/PALETTE.md")
 THEMES = ["dark", "light", "midnight"]
 
@@ -157,7 +157,7 @@ def main():
     lines = []
     lines.append("# Reference UI palette (resolved)")
     lines.append("")
-    lines.append("Extracted from `bitshares-ui/app/assets/stylesheets/themes/` by")
+    lines.append("Extracted from `reference/bitshares-ui/app/assets/stylesheets/themes/` by")
     lines.append("`tooling/extract_palette.py` — every `$variable` resolved through")
     lines.append("references + `darken()`/`lighten()` to its final value, per theme.")
     lines.append("Use these exact values when pixel-matching slices (principle #2).")

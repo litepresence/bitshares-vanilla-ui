@@ -59,7 +59,7 @@ var PoolDetailUI = (function () {
       if (!live(myGen, uiGen)) return;
       root.innerHTML = "";
       var wrap = u.el(doc, "div", null, "wrap mkt-wrap"); root.appendChild(wrap);
-      var desk = u.el(doc, "div", null, "mkt"); wrap.appendChild(desk);
+      var desk = u.el(doc, "div", null, "mkt mkt-pool"); wrap.appendChild(desk);
       var head = doc.createElement("section"); head.className = "mkt-head"; desk.appendChild(head);
       head.appendChild(u.el(doc, "h1", "Pool " + row.id));
       var strip = doc.createElement("div"); strip.className = "mkt-statstrip"; strip.setAttribute("aria-live", "polite");
@@ -613,8 +613,8 @@ var PoolDetailUI = (function () {
 
   function depthPane(doc, book, r, synthLevels) {
     /* Synthetic resting-book view: the CPMM curve rendered as bids/asks
-     * through the SHARED MarketBook renderer (same tables, depth bars,
-     * spread line, staircase as the exchange desk) + the x·y=k canvas above.
+     * through the SHARED MarketBook.renderSplit path (same tables, depth
+     * bars, spread line as the exchange desk) + the x·y=k canvas above.
      * Levels arrive precomputed from detailFill (shared with the charts-stack
      * depth slice above). Rows are synthetic (no counterparty) — the note
      * says so. Clicking a row prefills the inline swap form. */
@@ -622,7 +622,7 @@ var PoolDetailUI = (function () {
     drawCurve(doc, book, r); /* x·y=k canvas above the table; silent no-op on empty pools */
     book.appendChild(u.el(doc, "p", t("pool.synth_note", "Synthetic depth from the CPMM curve at current reserves — not resting orders."), "muted"));
     if (typeof MarketBook === "undefined" || typeof PoolHistory === "undefined" ||
-        typeof MarketBook.renderBook !== "function") {
+        typeof MarketBook.renderSplit !== "function") {
       book.appendChild(u.el(doc, "p", t("pool.depth_unavailable", "Depth unavailable (empty pool).") + t("pool.depth_hint", " Stake both legs from the Stake form to open depth."), "muted"));
       return;
     }
@@ -634,10 +634,24 @@ var PoolDetailUI = (function () {
     }
     var spreadLine = u.el(doc, "p", "", "muted");
     book.appendChild(spreadLine);
-    var host = doc.createElement("div");
-    book.appendChild(host);
+    /* Split book cells (mirror market-desk.js:585-597): BUY ORDERS (bids) |
+     * SELL ORDERS (asks) as two section cells; MarketBook.renderSplit fills
+     * both through the shared renderBookSide path (bare — the cells own the
+     * h2s). Spread line + synth note stay above; curve canvas untouched. */
+    var bidsSec = doc.createElement("section");
+    bidsSec.className = "mkt-bids";
+    book.appendChild(bidsSec);
+    bidsSec.appendChild(u.el(doc, "h2", "Buy orders"));
+    var bidsBody = doc.createElement("div");
+    bidsSec.appendChild(bidsBody);
+    var asksSec = doc.createElement("section");
+    asksSec.className = "mkt-asks";
+    book.appendChild(asksSec);
+    asksSec.appendChild(u.el(doc, "h2", "Sell orders"));
+    var asksBody = doc.createElement("div");
+    asksSec.appendChild(asksBody);
     try {
-      MarketBook.renderBook(doc, host, {
+      MarketBook.renderSplit(doc, bidsBody, asksBody, {
         book: levels, basePrec: precB, quotePrec: precA,
         baseSymbol: r.sym_b || r.asset_b_id, quoteSymbol: r.sym_a || r.asset_a_id,
         spreadLine: spreadLine
@@ -669,7 +683,7 @@ var PoolDetailUI = (function () {
       } catch (e) { /* read-only desk stands */ }
     }
     try {
-      var sides = host.querySelectorAll(".book-asks, .book-bids");
+      var sides = book.querySelectorAll(".book-asks, .book-bids");
       Array.prototype.forEach.call(sides, function (side) {
         var isAsk = side.className.indexOf("book-asks") !== -1;
         var arr = isAsk ? levels.asks : levels.bids;

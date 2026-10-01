@@ -305,3 +305,56 @@ Anti-rot: (a) static DOM + 6 read-only db calls — ten-year safe; (b) one
 322KB owner-art webp (the page's only image, cached after first load —
 removal = hero text block stands alone); (c) deletable: pulse band (strip
 + cards carry the page).
+
+## Delta 2026-10-01 — Splash refill fix (dead sections on slow connect)
+
+Root causes (both verified): (1) `paintLanding` fired `Market.stats` /
+`Chain.db` against the still-connecting socket (boot paints `/`
+synchronously, connect is async) with zero `Store.subscribe("connection")`
+on the landing path — deterministic "not connected" -> "—" everywhere,
+never refilled; (2) `tickRow` cached failures as null
+(`_tickCache[id]=null` on `.catch`) poisoning later renders.
+
+Reference behavior: #1 has no splash (DashboardPage gate + desk redirect);
+the refill pattern is vanilla's own `renderDashboard:220-235` /
+`accounts-ui.js:85-89` connect-wait (hashAtEntry/settled/timeout guards).
+
+Vanilla implementation (file:line):
+- `vanilla/js/dashboard-ui.js` landing branch paints the static shell
+  immediately (never blank) then, when `Chain.status().state!=="open"`,
+  subscribes to `connection` — on open clears tick misses and re-invokes
+  `renderDashboard(root)` under the same hashAtEntry/settled/
+  `CONNECT_TIMEOUT_MS` guards (timeout settles silently, fail-open: the
+  shell + "—" cells stand, no error panel); Chain-open path opportunistically
+  clears stale nulls.
+- `tickRow`: `.catch` returns null WITHOUT caching; parse-throw path likewise
+  uncached; `_tickPending` still clears on settle. New `clearTickMisses()`
+  drops legacy nulls (returns the count) + one-time `wireTickMissClear()`
+  clears on every connection-open.
+- Pure `shapePulse(r)` extracted from `fetchPulse` (same null-on-miss
+  shaping); `fetchPulse` now delegates. Exposed via `_test`
+  (`shapePulse`, `tickRow`, `clearTickMisses`, `_tickCache`) for headless vectors.
+- `vanilla/js/router.js` comment fixed: `dashboard-ui.js` eager-loads via
+  `vanilla/index.html:138`; `ensureDashboard` is load-failure fallback only.
+- No new i18n literals (refill reuses the existing shell/connecting strings;
+  timeout is silent) — zero dict edits.
+
+Manual test + observed result (this sandbox, 2026-10-01):
+- Slow-connect sim (headless reasoning + code read): boot `/` locked with
+  socket connecting -> static hero/cards/steps paint with "…" skeletons,
+  live cells miss fail-open; on `Store.emitConnection({state:"open"})` the
+  landing re-renders and `Market.stats`/`Chain.db` succeed (misses were never
+  cached, legacy nulls cleared first).
+- `node --check` clean on `dashboard-ui.js`, `router.js`, `splash-test.js`;
+  `tooling/splash-test.js` 50/50 (22 pre-existing + 14 shapePulse + 14
+  tick-miss/clear vectors); `python3 tooling/check_rot.py` PASSED;
+  `python3 tooling/check_i18n.py` OK (10 dicts key-complete, drift-free).
+
+Raw→human vectors: none new (counts stay verbatim via `fmtCount`/`asCount`;
+`topVolText` unchanged; new `shapePulse` vectors assert the same shaping).
+Theme + viewport: refill re-renders the same splash DOM (trio + 360px/1440px
+behavior unchanged); no new targets, no layout change.
+Anti-rot: (a) static DOM + one `Store.subscribe` + 6 read-only db calls —
+ten-year safe; (b) zero new deps (no new script tags, no CDN, no build);
+(c) deletable subset: the landing subscription (page still paints static +
+fail-open fills, just without auto-refill).

@@ -1,6 +1,6 @@
 # Reference UI palette (resolved)
 
-Extracted from `bitshares-ui/app/assets/stylesheets/themes/` by
+Extracted from `reference/bitshares-ui/app/assets/stylesheets/themes/` by
 `tooling/extract_palette.py` — every `$variable` resolved through
 references + `darken()`/`lighten()` to its final value, per theme.
 Use these exact values when pixel-matching slices (principle #2).

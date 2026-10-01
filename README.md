@@ -127,6 +127,8 @@ git clone --branch master https://github.com/pi314x/bitshares-wallet-browser-ext
 git clone --branch develop --filter=blob:none --sparse https://github.com/bitshares/bitshares-core.git reference/bitshares-core
 git -C reference/bitshares-core sparse-checkout set libraries/app/include libraries/protocol libraries/chain/include libraries/wallet/include
 git clone --branch main https://github.com/squidKid-deluxe/bitshares-dex-ux.git reference/bitshares-dex-ux
+git clone --branch main --filter=blob:none --sparse https://github.com/open-graphene/open-graphene.git reference/open-graphene
+git -C reference/open-graphene sparse-checkout set open-graphene-packages/rust/graphene-chain-bitshares/graphene-chain-bitshares-spec/dist/bitshares.open-graphene.json
 ```
 
 - Chain-API questions: core headers win; testnet broadcast is final proof.

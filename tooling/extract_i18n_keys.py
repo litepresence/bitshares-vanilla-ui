@@ -21,8 +21,8 @@ Method (recorded for the parity note):
     batches rename with en.json + check_i18n.py updated in the same task).
   - Values are byte-verbatim (unicode preserved, no trim).
 
-Reference: bitshares-ui/app/assets/locales/locale-en.json (2709 leaves,
-60 top-level sections, measured 2026-09-28); astro-ui/src/data/locales
+Reference: reference/bitshares-ui/app/assets/locales/locale-en.json (2709 leaves,
+60 top-level sections, measured 2026-09-28); reference/astro-ui/src/data/locales
 (second-opinion es only). Neither reference is modified.
 """
 import json
@@ -32,7 +32,7 @@ import re
 import sys
 
 VANILLA = "/workspace/vanilla/js"
-REF_LOCALES = "/workspace/bitshares-ui/app/assets/locales"
+REF_LOCALES = "/workspace/reference/bitshares-ui/app/assets/locales"
 
 # View file -> dict section. Batch-1 sources (settings.js, app.js, router.js,
 # index.html) are excluded here: hand-curated nav/settings/shell sections.
@@ -156,7 +156,7 @@ def cmd_inventory():
         print("%-22s section=%-16s literals=%d" % (fname, SECTION_OF[fname], len(lits)))
     print("total stub-candidate literals:", total)
     print()
-    print("== reference #1 leaf inventory (bitshares-ui/app/assets/locales/) ==")
+    print("== reference #1 leaf inventory (reference/bitshares-ui/app/assets/locales/) ==")
     for f in sorted(glob.glob(os.path.join(REF_LOCALES, "*.json"))):
         d = json.load(open(f, encoding="utf-8"))
 

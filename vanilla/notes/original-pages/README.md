@@ -1,6 +1,6 @@
 # Original UI page map — bts.exchange, captured 2026-09-27 headless @1440px
 
-All routes from `bitshares-ui/app/App.jsx:504-650`. Public unless noted.
+All routes from `reference/bitshares-ui/app/App.jsx:504-650`. Public unless noted.
 Reference for principle #2 (retro parity). Compare with our renders in the
 per-slice parity notes.
 

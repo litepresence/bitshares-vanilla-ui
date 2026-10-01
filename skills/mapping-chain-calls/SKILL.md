@@ -21,11 +21,12 @@ When NOT to use: pure UI work with no chain interaction.
 
 | # | Source | Authority |
 |---|---|---|
-| 4 | `bitshares-core/.../database_api.hpp`, `api.hpp`, `protocol/<op>.hpp` | Ground truth. Wins every conflict. |
+| 4 | `reference/bitshares-core/.../database_api.hpp`, `api.hpp`, `protocol/<op>.hpp` | Ground truth. Wins every conflict. |
 | BJS | Upstream `bitshares/bitsharesjs` (serializer + ecc), consulted on demand via raw GitHub — never cloned, never installed | Official JS rendering of the protocol; core devs update it with API changes, so it is the authoritative answer to "how does this op serialize in JS today". Second opinion after #4, before #2/#3. |
-| 1 | `bitshares-ui/app/{actions,stores,lib}` | Canonical behavior, but verify — some logic is stale (e.g. `trxHelper.estimateFee`, see issue #3720). Note: #1 embeds bitsharesjs `^6.0.3` as a *pinned snapshot* — treat its serialization as dated, always re-check BJS current. |
-| 2 | `astro-ui/src/bts/`, `src/components/<Op>.jsx` | Modern patterns; signing is Beet-specific — take the op builders and WS calls, not the signing wrapper |
-| 3 | `wallet-extension/src/lib/bitshares-api.js` | 2026 nodes, failover, fee-fill; `popup.js` 78-op table is the confirm-dialog wording spec |
+| 1 | `reference/bitshares-ui/app/{actions,stores,lib}` | Canonical behavior, but verify — some logic is stale (e.g. `trxHelper.estimateFee`, see issue #3720). Note: #1 embeds bitsharesjs `^6.0.3` as a *pinned snapshot* — treat its serialization as dated, always re-check BJS current. |
+| 2 | `reference/astro-ui/src/bts/`, `src/components/<Op>.jsx` | Modern patterns; signing is Beet-specific — take the op builders and WS calls, not the signing wrapper |
+| 3 | `reference/wallet-extension/src/lib/bitshares-api.js` | 2026 nodes, failover, fee-fill; `popup.js` 78-op table is the confirm-dialog wording spec |
+| 6 | `reference/open-graphene/.../dist/bitshares.open-graphene.json` (sparse checkout) | Machine-extracted spec cross-check oracle — third machine opinion for serializer field order/tags. Below BJS; #4 wins conflicts; testnet decides. Reference-only, never a dependency. |
 
 Online mirrors: `docs.bitshares.dev` (Database/History/Broadcast API) and `bitshares.github.io/doxygen`.
 

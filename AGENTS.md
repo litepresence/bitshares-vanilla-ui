@@ -8,17 +8,20 @@
 > (light, vanilla-tub photo); `dex-ux-theme` = `crypo theme` (dark, Crypo
 > designer template — the id stays `dex-ux-theme` for stored-prefs
 > compatibility even though the source is Crypo, not DEX-UX).
-> **References live in `/workspace/reference/` (READ-ONLY, each with its own
-> history; root symlinks `bitshares-ui → reference/bitshares-ui` etc. preserve
-> old paths — never edit through either spelling). `reference/` and the root
-> symlinks are gitignored and NEVER ship: a fresh dev clone re-creates them
-> with the `git clone` commands in §8 Phase 0 (same URLs + branches), then
-> works read-only per §7 rule 1.
+> **References live in `/workspace/reference/` (READ-ONLY checkouts, each with
+> its own history — never edit). `reference/` is gitignored and NEVER ships:
+> a fresh dev clone re-creates it with the `git clone` commands in §8
+> Phase 0 (same URLs + branches), then works read-only per §7 rule 1.
+> (Legacy root symlinks removed 2026-10-01 as tech debt; bare
+> `bitshares-ui/...` paths in prose and file headers mean
+> `reference/bitshares-ui/...`, likewise astro-ui/wallet-extension/
+> bitshares-core.)
 > **Reference #1 (canonical wallet):** `reference/bitshares-ui` — upstream `bitshares/bitshares-ui`, branch `develop`
 > **Reference #2 (modern/dialog-based):** `reference/astro-ui` — `BTS-CM/astro-ui` by grctest, branch `main`
 > **Reference #3 (extension/crypto-audit):** `reference/wallet-extension` — `pi314x/bitshares-wallet-browser-extension`, branch `master`
 > **Reference #4 (chain API contract, sparse):** `reference/bitshares-core` — `bitshares/bitshares-core`, branch `develop` (only `libraries/{app/include,protocol,chain/include,wallet/include}` checked out — no build, no submodules)
 > **Reference #5 (dashboard/style + indicator/plot math, behavior-only):** `reference/bitshares-dex-ux` — `squidKid-deluxe/bitshares-dex-ux` (Python/Falcon + JS, wrong runtime — NEVER a dependency; consult for market-picker logic and plot ideas, NOT for dark-theme CSS — the dark theme is Crypo-sourced, see §3.4)
+> **Reference #6 (machine spec oracle, sparse):** `reference/open-graphene` — `open-graphene/open-graphene`, branch `main` (ONLY `.../graphene-chain-bitshares-spec/dist/bitshares.open-graphene.json` checked out — 78 ops, tags 0–77, spec SHA `caa33ea9`, HEAD `eb78e28` as of 2026-10-01). Serializer cross-check oracle for `mapping-chain-calls` (rank below BJS; #4 wins conflicts; testnet decides). Reference-only, never a dependency.
 > **#1 vs #5 are UNIQUE projects — never confuse them.** #1 is the React-16
 > reference WALLET (wallet.bitshares.org) we behaviorally replace. #5 is a
 > Python dashboard/plot app whose only contributions are picker logic and
@@ -418,6 +421,8 @@ names its own removal plan.
    with license headers intact, a provenance comment per file (source repo +
    commit hash), and an entry in a vendoring manifest. Pinned copies do not
    break on someone else's release day. (Candidates: see §5.5, audit #3 first.)
+   The watch half lives in `vanilla/SECURITY.md` (upstream + advisory +
+   re-vendor trigger per artifact — check it every slice and on CVE demand).
 4. **No build step to run.** `python3 -m http.server` (or `file://`) must
    serve a working app. Optional dev tooling may exist under `tooling/` but
    must never be required to use, test, or deploy the wallet.
@@ -476,10 +481,6 @@ See §5.4 for when to consult which reference.
 │   ├── wallet-extension/      ← #3 extension/crypto-audit (master)
 │   ├── bitshares-core/        ← #4 chain API contract, SPARSE (develop)
 │   └── bitshares-dex-ux/      ← #5 dashboard/style, behavior-only (main)
-├── bitshares-ui → reference/bitshares-ui (symlink, preserves old paths)
-├── astro-ui → reference/astro-ui (symlink)
-├── wallet-extension → reference/wallet-extension (symlink)
-├── bitshares-core → reference/bitshares-core (symlink)
 └── vanilla/                   ← THE REPLACEMENT (static, no deps)
     ├── index.html
     ├── css/
