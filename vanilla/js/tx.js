@@ -334,7 +334,15 @@
  *   range_proofs + blinding-factor ECDH mint: #3 serializes the bytes but
  *   can not CREATE them, #2 mints them only behind Electron-host IPC —
  *   vendoring that crypto is its own audited slice, never smuggled in),
- *   46 execute_bid (VIRTUAL per #4 operations.hpp:102, never signed)
+  *   46 execute_bid (VIRTUAL per #4 operations.hpp:102, never signed)
+  *   4 fill_order (VIRTUAL — chain-created fill record, never signed; named
+  *   here per the spec-diff oracle 2026-10-01 so no virtual goes unnamed)
+  *   77 limit_order_update (in-place price/amount/expiry edit — vanilla
+  *   covers adjustment via cancel op 2 + recreate op 1, slice-06 proven
+  *   live; no form needs the single-op path, honest deferral — assessed
+  *   2026-10-01 for the spec-diff oracle, fields per spec
+  *   (fee)(seller)(order)(new_price)(delta_amount_to_sell)(new_expiration)
+  *   (on_fill)(extensions))
  * - ASSESSED, NOT serialized (verdicts recorded at the dispatch site, this
  *   task — ground truth #4 headers only, no new BJS fetch needed beyond the
  *   four ops above): 5 account_create (faucet flow covers registration —
@@ -2850,7 +2858,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic except chat; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 42/44/46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic except chat; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 77 adjust-via-cancel+recreate; 4/42/44/46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
