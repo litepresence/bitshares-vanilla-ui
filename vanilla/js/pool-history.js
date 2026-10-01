@@ -268,7 +268,9 @@ var PoolHistory = (function () {
    * newest-last buckets shaped for MarketInd.maybeDraw ({timeMs,
    * open/high/low/close, baseVolume} human strings). Empty swaps -> []. */
   function swapsToCandles(swaps, bucketSec, assetB, precB) {
-    if (!bucketSec || bucketSec <= 0) throw new Error("bad bucket");
+    bucketSec = Math.floor(bucketSec);
+    if (!(bucketSec >= 1)) throw new Error("bad bucket: " + JSON.stringify(bucketSec));
+    if (!Number.isInteger(precB) || precB < 0 || precB > 12) throw new Error("bad precision: " + JSON.stringify(precB));
     var buckets = {}, k;
     (swaps || []).forEach(function (sw) {
       if (sw.price === null || sw.price === undefined) return;
@@ -313,8 +315,10 @@ var PoolHistory = (function () {
 
   /* Enrich swaps with the oriented human price (one pass; unknown assets
    * keep a null price and drop from candles, never the tape). Returns the
-   * same array (mutated with .price), newest first. */
+   * same array (mutated with .price), newest first.
+   * Robustness: non-array input throws named "bad swaps" (never raw). */
   function enrich(swaps, assetA, precA, assetB, precB) {
+    if (!Array.isArray(swaps)) throw new Error("bad swaps: expected array, got: " + String(swaps).slice(0, 32));
     (swaps || []).forEach(function (sw) {
       sw.price = priceHuman(sw, precA, precB, assetA, assetB);
     });
@@ -331,9 +335,20 @@ var PoolHistory = (function () {
    * exactly like resting books. Empty/zero reserve -> []. */
   function synthBook(args) {
     args = args || {};
-    var balA = BigInt(args.balanceA_raw), balB = BigInt(args.balanceB_raw);
+    var balA, balB;
+    try {
+      if (typeof args.balanceA_raw !== "string" || !/^\d+$/.test(args.balanceA_raw)) throw new Error("bad reserves");
+      if (typeof args.balanceB_raw !== "string" || !/^\d+$/.test(args.balanceB_raw)) throw new Error("bad reserves");
+      balA = BigInt(args.balanceA_raw); balB = BigInt(args.balanceB_raw);
+    } catch (e) {
+      if (/^bad reserves/.test(e.message)) throw new Error("bad reserves: " + JSON.stringify(args.balanceA_raw) + "/" + JSON.stringify(args.balanceB_raw));
+      throw new Error("bad reserves: " + String(e.message).slice(0, 48));
+    }
     var precA = args.precA, precB = args.precB;
+    if (!Number.isInteger(precA) || precA < 0 || precA > 12) throw new Error("bad precision: precA " + JSON.stringify(precA));
+    if (!Number.isInteger(precB) || precB < 0 || precB > 12) throw new Error("bad precision: precB " + JSON.stringify(precB));
     var taker = Number(args.taker_units) || 0;
+    if (!Number.isInteger(taker) || taker < 0 || taker > 10000) taker = 0; // hostile fee defaults to 0 haircut (never inflate out)
     if (balA <= 0n || balB <= 0n) return { bids: [], asks: [] };
     function side(sellReserve, outReserve, sellPrec, outPrec, sellIsA) {
       var levels = [];

@@ -38,9 +38,11 @@ var MarketCandles = (function () {
   /* asset id -> numeric precision, filled on demand via get_assets. */
   var _precCache = {};
 
-  /* True for optional leading "-" followed by digits only (raw-int shape). */
+  /* True for digit-only raw-int strings (unsigned; chain amounts are >= 0).
+   * Negatives from a hostile node fail the gate (treated as gaps, never
+   * rendered as negative money). */
   function _isIntStr(s) {
-    return typeof s === "string" && /^-?\d+$/.test(s);
+    return typeof s === "string" && /^\d+$/.test(s);
   }
 
   /* Fail fast with a clear message if Task-1 price math has not landed. */
@@ -228,6 +230,7 @@ var MarketCandles = (function () {
         var lB = String(row.low_base), lQ = String(row.low_quote);
         if (_isIntStr(oB) && _isIntStr(oQ) && _isIntStr(cB) && _isIntStr(cQ) &&
           _isIntStr(hB) && _isIntStr(hQ) && _isIntStr(lB) && _isIntStr(lQ)) {
+          try {
           var o = Format.formatPrice(oB, precs[baseId], oQ, precs[quoteId], PRICE_PLACES);
           var h = Format.formatPrice(hB, precs[baseId], hQ, precs[quoteId], PRICE_PLACES);
           var l = Format.formatPrice(lB, precs[baseId], lQ, precs[quoteId], PRICE_PLACES);
@@ -263,6 +266,7 @@ var MarketCandles = (function () {
           prevQ = cQ;
           prevHuman = c;
           prevNum = cn;
+          } catch (e) { entry = null; /* malformed row (zero quote etc.) is a gap, never a whole-chart reject */ }
         }
       }
       if (!entry) {

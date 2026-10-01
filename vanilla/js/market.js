@@ -98,9 +98,11 @@ var Market = (function () {
     return out;
   }
 
-  /* True for optional leading "-" followed by digits only (raw-int shape). */
+  /* True for digit-only raw-int strings (unsigned; chain amounts >= 0).
+   * Negatives from a hostile node fail the gate (treated as unmappable,
+   * never rendered as negative money). */
   function _isIntStr(s) {
-    return typeof s === "string" && /^-?\d+$/.test(s);
+    return typeof s === "string" && /^\d+$/.test(s);
   }
 
   /* Fail fast with a clear message if Task-1 price math has not landed. */
@@ -306,12 +308,20 @@ var Market = (function () {
     for (i = 0; i < rows.length; i++) {
       var row = rows[i] || {};
       var pair = _fillPair(row, baseId, quoteId);
+      var dp = null, ba = null, qa = null;
+      if (pair) {
+        try {
+          dp = Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES);
+          ba = Format.formatAmount(pair.rawB, precs[baseId]);
+          qa = Format.formatAmount(pair.rawQ, precs[quoteId]);
+        } catch (e) { dp = null; ba = null; qa = null; /* zero-quote etc. is a dash, never a whole-history reject */ }
+      }
       out.push({
         raw: row,
         time: row.time || row.block_time || null,
-        displayPrice: pair ? Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES) : null,
-        baseAmount: pair ? Format.formatAmount(pair.rawB, precs[baseId]) : null,
-        quoteAmount: pair ? Format.formatAmount(pair.rawQ, precs[quoteId]) : null
+        displayPrice: dp,
+        baseAmount: ba,
+        quoteAmount: qa
       });
     }
     return out;

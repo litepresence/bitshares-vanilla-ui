@@ -11,10 +11,35 @@
 var Format = (function () {
   "use strict";
 
+  /* Precision guard: chain precisions are integers 0..12 (asset precision
+   * range; Format never pads beyond it). Throws named "bad precision" —
+   * never coerces strings/NaN/Infinity (which would loop or mis-pad). */
+  function _assertPrecision(p) {
+    if (!Number.isInteger(p) || p < 0 || p > 12) throw new Error("bad precision: " + JSON.stringify(p));
+  }
+
+  /* Raw-int guard: unsigned digit strings (or safe-int/bigint >= 0).
+   * Throws named "bad amount" — never lets BigInt throw raw to the UI. */
+  function _toBigInt(raw, name) {
+    if (typeof raw === "bigint") {
+      if (raw < 0n) throw new Error("bad amount: " + String(name));
+      return raw;
+    }
+    if (typeof raw === "number") {
+      if (!Number.isSafeInteger(raw) || raw < 0) throw new Error("bad amount: " + JSON.stringify(raw));
+      return BigInt(raw);
+    }
+    if (typeof raw === "string" && /^\d+$/.test(raw)) {
+      try { return BigInt(raw); } catch (e) { throw new Error("bad amount: " + raw.slice(0, 32)); }
+    }
+    throw new Error("bad amount: " + String(raw).slice(0, 32));
+  }
+
   /* formatAmount: raw chain integer string + asset precision -> display string
    * with full precision digits. Params: raw (string|number|bigint), precision (number).
    * Returns display string. Throws on non-digit input. */
   function formatAmount(raw, precision) {
+    _assertPrecision(precision);
     if (typeof raw !== "string") raw = String(raw);
     var neg = raw.charAt(0) === "-";
     if (neg) raw = raw.slice(1);
@@ -28,6 +53,7 @@ var Format = (function () {
    * Params: str (string), precision (number). Returns integer string.
    * Throws on malformed input or excess decimals. */
   function parseAmount(str, precision) {
+    _assertPrecision(precision);
     str = String(str).trim();
     var m = /^(\d+)(?:\.(\d+))?$/.exec(str);
     if (!m) throw new Error("bad amount: " + str);
@@ -44,9 +70,12 @@ var Format = (function () {
    *   basePrec, quoteRaw, quotePrec, places (places >= 0). Returns the decimal
    *   string. Throws on zero quote amount or negative places. Integer-only
    *   BigInt math — never binary float for money. */
-  function formatPrice(baseRaw, basePrec, quoteRaw, quotePrec, places) {    var b = BigInt(baseRaw), q = BigInt(quoteRaw);
+  function formatPrice(baseRaw, basePrec, quoteRaw, quotePrec, places) {
+    _assertPrecision(basePrec);
+    _assertPrecision(quotePrec);
+    if (!Number.isInteger(places) || places < 0 || places > 18) throw new Error("bad places: " + JSON.stringify(places));
+    var b = _toBigInt(baseRaw, "base"), q = _toBigInt(quoteRaw, "quote");
     if (q === 0n) throw new Error("zero quote amount");
-    if (places < 0) throw new Error("bad places");
     var num = b * (10n ** BigInt(quotePrec)) * (10n ** BigInt(places));
     var den = q * (10n ** BigInt(basePrec));
     var rounded = (num * 10n / den + 5n) / 10n; // round-half-up at places+1
@@ -66,7 +95,10 @@ var Format = (function () {
     var m = /^(\d+)(?:\.(\d+))?$/.exec(s);
     if (!m) throw new Error("bad price: " + String(str));
     var frac = m[2] || "";
-    return { num: BigInt(m[1] + frac), den: 10n ** BigInt(frac.length) };
+    if (frac.length > 18) throw new Error("bad price: too many decimals");
+    var num;
+    try { num = BigInt(m[1] + frac); } catch (e) { throw new Error("bad price: " + String(str).slice(0, 32)); }
+    return { num: num, den: 10n ** BigInt(frac.length) };
   }
 
   return {

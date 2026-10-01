@@ -109,7 +109,9 @@ var Chain = (function () {
     if (typeof props.head_block_id !== "string" || !/^[0-9a-fA-F]{40}$/.test(props.head_block_id)) {
       throw new Error("bad-head-shape: head_block_id must be 40 hex chars");
     }
-    if (typeof props.time !== "string" || !Number.isFinite(Date.parse(props.time + "Z"))) {
+    if (typeof props.time !== "string") throw new Error("bad-head-shape: time does not parse");
+    var t = /[Zz]$/.test(props.time) ? props.time : props.time + "Z"; // nodes send with or without Z — never double it
+    if (!Number.isFinite(Date.parse(t))) {
       throw new Error("bad-head-shape: time does not parse");
     }
   }

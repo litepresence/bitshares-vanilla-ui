@@ -624,24 +624,39 @@ var Tx = (function () {
 
   /* int64/uint64 little-endian (amounts, nonce). BigInt only — binary float
    * can not represent 64-bit money values, so Number input is rejected
-   * unless it is a safe integer; digit strings are the normal path. */
+   * unless it is a safe integer; digit strings are the normal path.
+   * H4 hardening: negatives and >2^64-1 throw loudly (never fold to bytes). */
   function writeInt64LE(value) {
     var big;
     if (typeof value === "bigint") big = value;
     else if (typeof value === "string") {
       if (!/^\d+$/.test(value)) throw new Error("int64 bad digit string: " + value);
-      big = BigInt(value);
+      try { big = BigInt(value); } catch (e) { throw new Error("int64 bad digit string: " + value); }
     } else if (Number.isSafeInteger(value) && value >= 0) big = BigInt(value);
     else throw new Error("int64 needs a digit string or safe integer, got: " + value);
+    if (big < 0n) throw new Error("int64 out of range (negative): " + String(value).slice(0, 32));
+    if (big > 0xFFFFFFFFFFFFFFFFn) throw new Error("int64 out of range (overflow): " + String(value).slice(0, 32));
     var buf = new Uint8Array(8);
     for (var i = 0; i < 8; i++) buf[i] = Number((big >> BigInt(i * 8)) & 0xFFn);
     return buf;
   }
 
   /* Base-128 varint for op ids, counts, object instances. BigInt loop so
-   * large instance numbers can not lose precision. */
+   * large instance numbers can not lose precision. H4: wraps BigInt()
+   * conversion so NaN/floats/strings throw NAMED (never raw TypeError). */
   function varintUint32(value) {
-    var v = typeof value === "bigint" ? value : BigInt(value);
+    var v;
+    try {
+      if (typeof value === "bigint") v = value;
+      else if (typeof value === "number") {
+        if (!Number.isInteger(value)) throw new Error("varint needs a non-negative integer, got: " + value);
+        v = BigInt(value);
+      } else if (typeof value === "string" && /^\d+$/.test(value)) v = BigInt(value);
+      else throw new Error("varint needs a non-negative integer, got: " + String(value).slice(0, 32));
+    } catch (e) {
+      if (/^varint needs/.test(e.message)) throw e;
+      throw new Error("varint needs a non-negative integer, got: " + String(value).slice(0, 32));
+    }
     if (v < 0n) throw new Error("varint needs a non-negative integer, got: " + value);
     var out = [];
     while (v >= 0x80n) { out.push(Number((v & 0x7Fn) | 0x80n)); v >>= 7n; }
