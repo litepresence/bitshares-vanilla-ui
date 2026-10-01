@@ -4,12 +4,12 @@
  * vectors (exact where integer-clean, 1e-9 approx otherwise).
  * Exit 0 green, 1 red. */
 "use strict";
-const I = require("/workspace/vanilla/js/indicators.js");
-require("/workspace/vanilla/js/indicators-osc.js");
-require("/workspace/vanilla/js/indicators-tulip.js");
-require("/workspace/vanilla/js/indicators-tmom.js");
-require("/workspace/vanilla/js/indicators-tvol.js");
-require("/workspace/vanilla/js/indicators-qx.js");
+const I = require("/workspace/vanilla/js/api/indicators.js");
+require("/workspace/vanilla/js/api/indicators-osc.js");
+require("/workspace/vanilla/js/api/indicators-tulip.js");
+require("/workspace/vanilla/js/api/indicators-tmom.js");
+require("/workspace/vanilla/js/api/indicators-tvol.js");
+require("/workspace/vanilla/js/api/indicators-qx.js");
 
 let pass = 0, fail = 0;
 function eq(got, want, name) {

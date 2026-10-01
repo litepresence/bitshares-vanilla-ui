@@ -45,16 +45,16 @@ function isWrongMoneyString(s) {
 }
 
 /* ---- load REAL sources ---- */
-globalThis.Format = require("/workspace/vanilla/js/format.js");
-const Tx = require("/workspace/vanilla/js/tx.js");
+globalThis.Format = require("/workspace/vanilla/js/api/format.js");
+const Tx = require("/workspace/vanilla/js/api/tx.js");
 globalThis.Chain = { call: () => Promise.reject(new Error("no chain in vectors")), history: () => Promise.reject(new Error("no chain")), db: () => Promise.reject(new Error("no chain")) };
 globalThis.Store = { loadSettings: () => ({ network: "mainnet" }) };
 globalThis.Asset = { describe: () => Promise.reject(new Error("no chain")) };
-globalThis.Pool = require("/workspace/vanilla/js/pool.js");
-const MF = require("/workspace/vanilla/js/market-fills-history.js");
-const PH = require("/workspace/vanilla/js/pool-history.js");
+globalThis.Pool = require("/workspace/vanilla/js/api/pool.js");
+const MF = require("/workspace/vanilla/js/api/market-fills-history.js");
+const PH = require("/workspace/vanilla/js/api/pool-history.js");
 globalThis.MarketFills = MF;
-const MC = require("/workspace/vanilla/js/market-candles.js");
+const MC = require("/workspace/vanilla/js/api/market-candles.js");
 
 /* ============ 1. Format.parseAmount ============ */
 (function () {
@@ -315,9 +315,9 @@ const MC = require("/workspace/vanilla/js/market-candles.js");
 (async () => {
   // Market.trades exercises internal _fillPair: missing legs / zero / flipped / bad time / null price
   try {
-    delete require.cache[require.resolve("/workspace/vanilla/js/market.js")];
-    const Market = require("/workspace/vanilla/js/market.js");
-    globalThis.Format = require("/workspace/vanilla/js/format.js");
+    delete require.cache[require.resolve("/workspace/vanilla/js/api/market.js")];
+    const Market = require("/workspace/vanilla/js/api/market.js");
+    globalThis.Format = require("/workspace/vanilla/js/api/format.js");
     const rows = [
       { op: { fill_price: { base: { amount: "100000", asset_id: "1.3.0" }, quote: { amount: "5000", asset_id: "1.3.113" } } }, time: "2026-09-01T10:15:00Z" },
       { op: { fill_price: { base: { amount: "5000", asset_id: "1.3.113" }, quote: { amount: "100000", asset_id: "1.3.0" } } }, time: "2026-09-01T10:16:00Z" }, // flipped
@@ -357,8 +357,8 @@ const MC = require("/workspace/vanilla/js/market-candles.js");
 
   // MarketCandles interpolation: empty / single / out-of-order / future / bad timestamps
   try {
-    delete require.cache[require.resolve("/workspace/vanilla/js/market-candles.js")];
-    const MC2 = require("/workspace/vanilla/js/market-candles.js");
+    delete require.cache[require.resolve("/workspace/vanilla/js/api/market-candles.js")];
+    const MC2 = require("/workspace/vanilla/js/api/market-candles.js");
     const nowSlot = Math.floor(Date.now() / 3600000) * 3600000;
     const iso = (ms) => new Date(ms).toISOString().slice(0, -5);
     function chainWith(bucketRows) {
@@ -415,7 +415,7 @@ const MC = require("/workspace/vanilla/js/market-candles.js");
 
   // Chain parsers: blockNumberFromId short/garbage via notice (tip never moves backwards, never throws)
   try {
-    const CHAIN_SRC = fs.readFileSync("/workspace/vanilla/js/chain.js", "utf8");
+    const CHAIN_SRC = fs.readFileSync("/workspace/vanilla/js/sdk/chain.js", "utf8");
     function noticeHeads(blockIds) {
       return new Promise((resolve) => {
         let sockets = [];
@@ -438,7 +438,7 @@ const MC = require("/workspace/vanilla/js/market-candles.js");
         const sandbox = { console, setTimeout, clearTimeout, setInterval, clearInterval, WebSocket: StubWS, localStorage: { getItem: () => null, setItem: () => {} }, document: { getElementById: () => null }, Store: { emitConnection: () => {} }, module: { exports: {} } };
         sandbox.globalThis = sandbox;
         vm.createContext(sandbox);
-        vm.runInContext(CHAIN_SRC, sandbox, { filename: "chain.js" });
+        vm.runInContext(CHAIN_SRC, sandbox, { filename: "sdk/chain.js" });
         const Chain = sandbox.Chain;
         const p = Chain.connect("wss://fake/ws", { timeoutMs: 4000, heartbeatMs: 60000 }).catch(() => null);
         setImmediate(() => { try { sockets[0].open(); } catch (e) {} });
@@ -484,7 +484,7 @@ const MC = require("/workspace/vanilla/js/market-candles.js");
         const sandbox = { console, setTimeout, clearTimeout, setInterval, clearInterval, WebSocket: StubWS, localStorage: { getItem: () => null, setItem: () => {} }, document: { getElementById: () => null }, Store: { emitConnection: () => {} }, module: { exports: {} } };
         sandbox.globalThis = sandbox;
         vm.createContext(sandbox);
-        vm.runInContext(fs.readFileSync("/workspace/vanilla/js/chain.js", "utf8"), sandbox, { filename: "chain.js" });
+        vm.runInContext(fs.readFileSync("/workspace/vanilla/js/sdk/chain.js", "utf8"), sandbox, { filename: "sdk/chain.js" });
         const Chain = sandbox.Chain;
         const pr = Chain.connect("wss://fake/ws", { timeoutMs: 4000, heartbeatMs: 60000 });
         setImmediate(() => { try { sockets[0].open(); } catch (e) {} });

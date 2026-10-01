@@ -21,7 +21,7 @@ When NOT to use: pure inventory/mapping work with no new UI code (that is `mappi
 1. **Brainstorm the slice design** (REQUIRED: use the brainstorming skill). Present the design, get approval.
 2. **Write the implementation plan** (REQUIRED: use the writing-plans skill). Keep the slice small enough to verify on testnet in one session.
 3. **Map chain calls first** (REQUIRED: use `mapping-chain-calls`). No WS method or op field enters the code without a recorded source.
-4. **Implement in `/workspace/vanilla/` only.** Static files, zero runtime deps. All money math goes through `vanilla/js/format.js` — never inline `amount / Math.pow(10, precision)` (binary float for money is a bug, not a shortcut).
+4. **Implement in `/workspace/vanilla/` only.** Static files, zero runtime deps. All money math goes through `vanilla/js/api/format.js` — never inline `amount / Math.pow(10, precision)` (binary float for money is a bug, not a shortcut).
 5. **Verify on testnet.** Connect → read → sign → broadcast, observed — not assumed.
 6. **Write the parity note** under `/workspace/vanilla/notes/<slice>.md`, then run the audit (REQUIRED: use `auditing-vanilla-slices`).
 

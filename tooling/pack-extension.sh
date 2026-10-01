@@ -33,7 +33,7 @@ for target in chromium firefox; do
 import sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8").read()
-tag = '<script src="js/wallet.js"></script>'
+tag = '<script src="js/api/wallet.js"></script>'
 assert tag in s, "wallet.js tag moved — update pack-extension.sh"
 s = s.replace(tag, '<script src="adapter/storage.js"></script>\n' + tag, 1)
 open(p, "w", encoding="utf-8").write(s)

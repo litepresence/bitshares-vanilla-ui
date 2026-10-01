@@ -9,11 +9,11 @@
 const fs = require("fs");
 const vm = require("vm");
 
-vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/vendor/noble-classic.js", "utf8"), { filename: "noble-classic.js" });
-vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/data/brainkey-dict.js", "utf8"), { filename: "brainkey-dict.js" });
-const Crypto = require("/workspace/vanilla/js/crypto.js");
+vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/sdk/vendor/noble-classic.js", "utf8"), { filename: "noble-classic.js" });
+vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/sdk/data/brainkey-dict.js", "utf8"), { filename: "brainkey-dict.js" });
+const Crypto = require("/workspace/vanilla/js/sdk/crypto.js");
 globalThis.Crypto = Crypto;
-const Wallet = require("/workspace/vanilla/js/wallet.js");
+const Wallet = require("/workspace/vanilla/js/api/wallet.js");
 
 const mem = new Map();
 globalThis.localStorage = {

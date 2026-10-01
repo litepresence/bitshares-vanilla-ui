@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /* settle-cr-test.js — R1d+R1e vectors: settlement estimate, CR bands, settle sort.
- * Stdlib only. Exit 0 green, 1 red. All money math via vanilla/js/format.js.
+ * Stdlib only. Exit 0 green, 1 red. All money math via vanilla/js/api/format.js.
  * Chain truth: #1 ExchangeHeader.jsx:190-198 (offset formula, base CORE branch),
  *   BorrowModal.jsx:572-604 = MarginPosition.jsx:79-97 (CR + MCR/1000 + 0.5 band),
  *   #4 database_api.hpp:558 get_settle_orders(assetId,100) <=300, sorted earliest->latest.
  */
 "use strict";
-const Format = require("/workspace/vanilla/js/format.js");
-const Market = require("/workspace/vanilla/js/market.js");
+const Format = require("/workspace/vanilla/js/api/format.js");
+const Market = require("/workspace/vanilla/js/api/market.js");
 let pass = 0, fail = 0;
 function eq(got, want, name) {
   const ok = JSON.stringify(got) === JSON.stringify(want);

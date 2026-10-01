@@ -1,6 +1,6 @@
 /* verify_head40_unit.cjs — offline unit for the 40-hex head-block fix.
  *
- * What it owns: proves vanilla/js/chain.js assertPropsShape + vanilla/js/tx-send.js
+ * What it owns: proves vanilla/js/sdk/chain.js assertPropsShape + vanilla/js/api/tx-send.js
  *   assertHeadProps accept 40-hex RIPEMD160 block ids (chain truth
  *   protocol/types.hpp:304 `using block_id_type = fc::ripemd160`) and reject
  *   39/41-hex, non-hex, bad time, zero head (plus 64-hex, the old wrong demand).
@@ -16,8 +16,8 @@
 const fs = require("fs");
 const vm = require("vm");
 
-const CHAIN_SRC = "/workspace/vanilla/js/chain.js";
-const TXSEND_SRC = "/workspace/vanilla/js/tx-send.js";
+const CHAIN_SRC = "/workspace/vanilla/js/sdk/chain.js";
+const TXSEND_SRC = "/workspace/vanilla/js/api/tx-send.js";
 
 let fails = [];
 function pass(n) { console.log("PASS " + n); }
@@ -79,7 +79,7 @@ function chainConnectWithProps(props, rawMode) {
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    vm.runInContext(fs.readFileSync(CHAIN_SRC, "utf8"), sandbox, { filename: "chain.js" });
+    vm.runInContext(fs.readFileSync(CHAIN_SRC, "utf8"), sandbox, { filename: "sdk/chain.js" });
     const Chain = sandbox.Chain;
     const pr = Chain.connect("wss://fake/ws", { timeoutMs: 4000, heartbeatMs: 60000 });
     setImmediate(() => { try { sockets[0].open(); } catch (e) {} });
@@ -144,7 +144,7 @@ async function txVectors() {
     // tx-send.js reads globalThis.Tx / Tx at load; provide both
     sandbox.Tx = sandbox.Tx;
     vm.createContext(sandbox);
-    vm.runInContext(fs.readFileSync(TXSEND_SRC, "utf8"), sandbox, { filename: "tx-send.js" });
+    vm.runInContext(fs.readFileSync(TXSEND_SRC, "utf8"), sandbox, { filename: "api/tx-send.js" });
     const Tx = sandbox.Tx;
     // minimal op-0 envelope shape buildTx validates structurally
     const ops = [[0, { fee: { amount: 0, asset_id: "1.3.0" }, from: "1.2.1", to: "1.2.0", amount: { amount: "1", asset_id: "1.3.0" }, extensions: [] }]];

@@ -52,13 +52,13 @@ function loadVanilla(rel) {
   const src = fs.readFileSync(new URL("../vanilla/" + rel, import.meta.url), "utf8");
   vm.runInThisContext(src, { filename: rel });
 }
-loadVanilla("js/vendor/noble-classic.js"); // globals: nobleGetPublicKey/SignAsync/SharedSecret
-loadVanilla("js/crypto.js");               // global Crypto
-loadVanilla("js/format.js");               // global Format
-loadVanilla("js/tx.js");                   // global Tx (serializers)
-loadVanilla("js/tx-send.js");              // Tx.fee/feeMulti/buildTx/sign
-loadVanilla("js/proposal.js");             // global Proposal (fee/sendAndProve)
-loadVanilla("js/proposal-ticket.js");      // global ProposalTicket (builders/reads)
+loadVanilla("js/sdk/vendor/noble-classic.js"); // globals: nobleGetPublicKey/SignAsync/SharedSecret
+loadVanilla("js/sdk/crypto.js");               // global Crypto
+loadVanilla("js/api/format.js");               // global Format
+loadVanilla("js/api/tx.js");                   // global Tx (serializers)
+loadVanilla("js/api/tx-send.js");              // Tx.fee/feeMulti/buildTx/sign
+loadVanilla("js/api/proposal.js");             // global Proposal (fee/sendAndProve)
+loadVanilla("js/builders/proposal-ticket.js"); // global ProposalTicket (builders/reads)
 const Crypto = globalThis.Crypto, Format = globalThis.Format;
 const Tx = globalThis.Tx, Proposal = globalThis.Proposal, ProposalTicket = globalThis.ProposalTicket;
 

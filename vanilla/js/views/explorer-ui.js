@@ -406,7 +406,7 @@ var ExplorerUI = (function () {
       ExplorerBlocks.renderBlock(root, height);
       return;
     }
-    missingView(root, "Block", "js/explorer-blocks.js");
+    missingView(root, "Block", "js/views/explorer-blocks.js");
   }
 
   function renderTx(root, height, txIndex) {
@@ -415,7 +415,7 @@ var ExplorerUI = (function () {
       ExplorerBlocks.renderTx(root, height, txIndex);
       return;
     }
-    missingView(root, "Transaction", "js/explorer-blocks.js");
+    missingView(root, "Transaction", "js/views/explorer-blocks.js");
   }
 
   function renderAsset(root, symbol) {
@@ -424,7 +424,7 @@ var ExplorerUI = (function () {
       ExplorerAssets.renderAsset(root, symbol);
       return;
     }
-    missingView(root, "Asset", "js/explorer-assets.js");
+    missingView(root, "Asset", "js/views/explorer-assets.js");
   }
 
   var api = {

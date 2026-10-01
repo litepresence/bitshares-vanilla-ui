@@ -160,7 +160,7 @@ async function main() {
 
   // ---- load vanilla modules (real code paths, not re-implementations) ----
   const root = "/workspace/vanilla/js";
-  const nobleSrc = fs.readFileSync(path.join(root, "vendor/noble-classic.js"), "utf8") +
+  const nobleSrc = fs.readFileSync(path.join(root, "sdk/vendor/noble-classic.js"), "utf8") +
     "\n;globalThis.__noble = { getPublicKey, signAsync, getSharedSecret };";
   vm.runInThisContext(nobleSrc, { filename: "noble-classic.js" });
   globalThis.nobleGetPublicKey = globalThis.__noble.getPublicKey;
@@ -168,18 +168,18 @@ async function main() {
   globalThis.nobleGetSharedSecret = globalThis.__noble.getSharedSecret;
   delete globalThis.__noble;
   globalThis.BRAINKEY_DICT = [];
-  globalThis.Format = require(path.join(root, "format.js"));
-  globalThis.Crypto = require(path.join(root, "crypto.js"));
+  globalThis.Format = require(path.join(root, "api/format.js"));
+  globalThis.Crypto = require(path.join(root, "sdk/crypto.js"));
   globalThis.Chain = {
     db: async () => dbId, history: async () => histId, net: async () => netId,
     call: (api, m, p) => rpc(api, m, p),
     status: () => ({ state: "open", node: urlStr, latencyMs: 0, chainId }),
   };
-  const Tx = require(path.join(root, "tx.js"));
+  const Tx = require(path.join(root, "api/tx.js"));
   globalThis.Tx = Tx;
-  const Pool = require(path.join(root, "pool.js"));
+  const Pool = require(path.join(root, "api/pool.js"));
   globalThis.Pool = Pool;
-  const AssetOps = require(path.join(root, "asset-ops.js"));
+  const AssetOps = require(path.join(root, "builders/asset-ops.js"));
   globalThis.AssetOps = AssetOps;
 
   async function head() { return (await rpc(dbId, "get_dynamic_global_properties", [])).head_block_number || 0; }

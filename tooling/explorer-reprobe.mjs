@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* explorer-reprobe.mjs — live testnet probe exercising the REAL vanilla files
- * (vanilla/js/format.js + vanilla/js/explorer.js) after the 4-bug repair.
+ * (vanilla/js/api/format.js + vanilla/js/api/explorer.js) after the 4-bug repair.
  * Stdlib-only WS client (framing copied from tooling/ws-probe.mjs, same repo).
  * Checks: head().head_block_time defined (chain `time`), recentBlocks rows
  * carry time/witness/tx_count, resolveObject space/type for 1.3.0 / 1.2.5 /
@@ -14,8 +14,8 @@ import crypto from "node:crypto";
 import { createRequire } from "node:module";
 
 const require = createRequire(process.cwd() + "/tooling/");
-const Format = require("../vanilla/js/format.js");
-const Explorer = require("../vanilla/js/explorer.js");
+const Format = require("../vanilla/js/api/format.js");
+const Explorer = require("../vanilla/js/api/explorer.js");
 
 const urlStr = process.argv[2] || "wss://testnet.xbts.io/ws";
 const CALL_TIMEOUT_MS = 15000;

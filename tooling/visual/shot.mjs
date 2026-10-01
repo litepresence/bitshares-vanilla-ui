@@ -7,6 +7,11 @@
 //   node shot.mjs --url http://localhost:8081/#/settings --width 390 --theme dark --out /tmp/s-mobile.png
 //
 // Requires: PLAYWRIGHT_BROWSERS_PATH=$PWD/.browsers (this dir). Stdlib + playwright-core only.
+// OS deps (Ubuntu 22.04, one-time as root — the failure mode is the
+// headless shell exiting on missing libnspr4.so; unblocked 2026-10-01):
+//   apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2
+//     libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2
+//     libgbm1 libpango-1.0-0 libcairo2 libasound2
 import { chromium } from "playwright-core";
 
 const args = Object.fromEntries(

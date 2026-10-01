@@ -160,9 +160,9 @@ globalThis.document = { getElementById: () => null, addEventListener: () => {}, 
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
 
 /* ---- Load the REAL vanilla sources (order mirrors index.html; wallet.js required) ---- */
-["vendor/noble-classic.js", "data/brainkey-dict.js", "crypto.js", "wallet.js",
-  "store.js", "chain.js", "tx.js", "tx-send.js",
-  "format.js", "account.js", "proposal.js"
+["sdk/vendor/noble-classic.js", "sdk/data/brainkey-dict.js", "sdk/crypto.js", "api/wallet.js",
+  "store.js", "sdk/chain.js", "api/tx.js", "api/tx-send.js",
+  "api/format.js", "api/account.js", "api/proposal.js"
 ].forEach((f) => {
   vm.runInThisContext(fs.readFileSync(V + f, "utf8"), { filename: V + f });
 });

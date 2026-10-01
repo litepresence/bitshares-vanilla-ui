@@ -3,7 +3,7 @@
  * open-graphene BitShares spec (reference #6).
  *
  * What it owns: read-only comparison of two local files —
- *   (1) vanilla/js/tx.js op dispatch table + serialize* function names, vs
+ *   (1) vanilla/js/api/tx.js op dispatch table + serialize* function names, vs
  *   (2) reference/open-graphene/.../dist/bitshares.open-graphene.json
  *   (78 ops, wireTags 0-77). Prints a human-readable mismatch report to
  *   stdout. NEVER auto-edits serializers; NEVER fetches network (local files
@@ -23,7 +23,7 @@
  * Usage: node tooling/spec-diff.js [specPath] [txPath]
  *   defaults (relative to workspace root = parent of tooling/):
  *     reference/open-graphene/open-graphene-packages/rust/graphene-chain-bitshares/graphene-chain-bitshares-spec/dist/bitshares.open-graphene.json
- *     vanilla/js/tx.js
+ *     vanilla/js/api/tx.js
  * Exit codes: 0 = compared, no mismatch; 2 = compared, mismatch found
  *   (missing non-virtual tag, virtual tag dispatched, or spec virtual list
  *   drifted from expectation); 1 = fatal (missing file / bad JSON / IO).
@@ -73,7 +73,7 @@ const DEFAULT_SPEC = path.join(
   "reference/open-graphene/open-graphene-packages/rust/graphene-chain-bitshares",
   "graphene-chain-bitshares-spec/dist/bitshares.open-graphene.json"
 );
-const DEFAULT_TX = path.join(WORKSPACE, "vanilla/js/tx.js");
+const DEFAULT_TX = path.join(WORKSPACE, "vanilla/js/api/tx.js");
 
 /* Virtual ops that must NEVER be signed. Cross-checked against the spec's own
  * isVirtual flags below (drift => mismatch). Source: #4 operations.hpp

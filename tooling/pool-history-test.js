@@ -3,11 +3,11 @@
  * orientation, ES-doc parsing. Needs Format + Pool + PoolHistory globals
  * (same attach pattern as the indicator tests). Exit 0 green, 1 red. */
 "use strict";
-globalThis.Format = require("/workspace/vanilla/js/format.js");
+globalThis.Format = require("/workspace/vanilla/js/api/format.js");
 globalThis.Chain = { call: () => Promise.reject(new Error("no chain in vectors")) };
 globalThis.Asset = { describe: () => Promise.reject(new Error("no chain")) };
-globalThis.Pool = require("/workspace/vanilla/js/pool.js");
-const PH = require("/workspace/vanilla/js/pool-history.js");
+globalThis.Pool = require("/workspace/vanilla/js/api/pool.js");
+const PH = require("/workspace/vanilla/js/api/pool-history.js");
 
 let pass = 0, fail = 0;
 function eq(got, want, name) {

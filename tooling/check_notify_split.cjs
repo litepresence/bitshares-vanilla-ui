@@ -7,10 +7,10 @@
  * Usage: node tooling/check_notify_split.cjs (from /workspace).
  */
 "use strict";
-const Notify = require("../vanilla/js/notify.js");
-const NotifyRules = require("../vanilla/js/notify-rules.js");
-const NotifyHost = require("../vanilla/js/notify-host.js");
-const NotifyUI = require("../vanilla/js/notify-ui.js");
+const Notify = require("../vanilla/js/api/notify.js");
+const NotifyRules = require("../vanilla/js/api/notify-rules.js");
+const NotifyHost = require("../vanilla/js/views/notify-host.js");
+const NotifyUI = require("../vanilla/js/views/notify-ui.js");
 
 let pass = 0, fail = 0;
 function eq(actual, expected, name) {

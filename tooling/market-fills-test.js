@@ -2,9 +2,9 @@
 /* market-fills-test: unit vectors for MarketFills (deep-candles plan Task 1).
  * Stdlib only. Exit 0 = all pass, 1 = any failure. */
 "use strict";
-globalThis.Format = require("/workspace/vanilla/js/format.js");
+globalThis.Format = require("/workspace/vanilla/js/api/format.js");
 globalThis.Chain = { call: function () { return Promise.reject(new Error("no chain in vectors")); } };
-var MF = require("/workspace/vanilla/js/market-fills-history.js");
+var MF = require("/workspace/vanilla/js/api/market-fills-history.js");
 var pass = 0, fail = 0;
 function eq(got, want, name) {
   var ok = JSON.stringify(got) === JSON.stringify(want);
@@ -151,8 +151,8 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
       };
     }
     globalThis.Chain = chainStub();
-    delete require.cache[require.resolve("/workspace/vanilla/js/market-candles.js")];
-    var MC2 = require("/workspace/vanilla/js/market-candles.js");
+    delete require.cache[require.resolve("/workspace/vanilla/js/api/market-candles.js")];
+    var MC2 = require("/workspace/vanilla/js/api/market-candles.js");
     var rc = await Promise.race([
       MC2.candles("1.3.0", "1.3.113", 3600, 5),
       new Promise(function (_, rej) { setTimeout(function () { rej(new Error("candles waited on ES")); }, 3000); })
@@ -178,8 +178,8 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     var _fetch = globalThis.fetch;
     globalThis.fetch = function () { return Promise.reject(new Error("no net in test")); };
     globalThis.Chain = { history: () => Promise.resolve(2), call: (api, m) => Promise.resolve([]), db: () => Promise.resolve(1) };
-    delete require.cache[require.resolve("/workspace/vanilla/js/market-candles.js")];
-    const MC = require("/workspace/vanilla/js/market-candles.js");
+    delete require.cache[require.resolve("/workspace/vanilla/js/api/market-candles.js")];
+    const MC = require("/workspace/vanilla/js/api/market-candles.js");
     const r = await MC.candles("1.3.113", "1.3.0", 3600, 5);
     eq(Array.isArray(r.buckets), true, "candles returns buckets");
     eq(r.buckets.length <= 2000, true, "candles capped 2000");

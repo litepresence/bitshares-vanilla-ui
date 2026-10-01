@@ -93,10 +93,10 @@ var Router = (function () {
   function dashSrc() {
     try {
       if (typeof document !== "undefined" && document.baseURI) {
-        return new URL("js/dashboard-ui.js", document.baseURI).toString();
+        return new URL("js/views/dashboard-ui.js", document.baseURI).toString();
       }
     } catch (e) { /* relative fallback below */ }
-    return "js/dashboard-ui.js";
+    return "js/views/dashboard-ui.js";
   }
 
   /* ensureDashboard: true when DashboardUI.renderDashboard is callable,

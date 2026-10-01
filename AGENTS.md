@@ -183,7 +183,7 @@ principle #1 outranks all six below.
    `hashchange` router, `localStorage`/`IndexedDB` directly. Prefer what browsers
    guarantee for decades over what npm guarantees for months.
 3. **Chain isolation layer.** Exactly ONE module talks to `bitsharesjs-ws`-style
-   nodes (`/vanilla/js/chain/`). Everything else talks to that module. This is
+   nodes (`vanilla/js/sdk/chain.js`). Everything else talks to that module. This is
    where API-call inventory pays off.
 4. **Crypto must be vendored + auditable.** The old UI delegates signing to
    `bitsharesjs`. We cannot `npm install bitsharesjs` at runtime. Options (to be
@@ -262,7 +262,7 @@ price, fee, or vote weight off by orders of magnitude — a silent,
 money-looking bug. Rules:
 
 - **One formatting module.** All amount/percent/price display goes through a
-  single `vanilla/js/format.js` (amount→string, string→integer for inputs,
+  single `vanilla/js/api/format.js` (amount→string, string→integer for inputs,
   percent fields↔labels, price pairs with both precisions). No ad-hoc
   `/ Math.pow(10, precision)` scattered across views. Reference #1's
   equivalent is `MarketClasses.toReal()` + `precisionsRatio`
@@ -431,7 +431,7 @@ names its own removal plan.
    migration cost. If a file grows large, that is a signal it does too much
    (see brainstorming skill: one clear purpose per unit).
 6. **Minimal chain-facing surface.** Exactly one module talks to nodes
-   (`vanilla/js/chain/`). The node list is data (editable, with testnet
+   (`vanilla/js/sdk/chain.js`). The node list is data (editable, with testnet
    defaults), not code. Gateway/faucet integrations are isolated adapters
    with explicit "unavailable" states, never load-bearing imports.
 7. **The 2036 test.** Every design decision, every slice review, every "done"
@@ -484,7 +484,9 @@ See §5.4 for when to consult which reference.
 └── vanilla/                   ← THE REPLACEMENT (static, no deps)
     ├── index.html
     ├── css/
-    ├── js/
+    ├── js/                      ← sdk/ (chain, crypto) · api/ (tx, data reads)
+    │                              builders/ (op construction) · views/ (*-ui)
+    │                              + shell at root (app, router, store, …)
     └── assets/
 
 bitshares-ui/
@@ -691,7 +693,7 @@ with our MIT repo, 85 stars) is the approved source for indicator
 MATHEMATICS: its `qx.ti` module wraps Tulip plus community indicators (SMA,
 EMA, MACD, RSI, Stoch, BBands, ATR, Fisher, PSAR, …). Rules, same as BJS:
 
-- Port formulas into dependency-free JS (`vanilla/js/indicators.js`), verified
+- Port formulas into dependency-free JS (`vanilla/js/api/indicators.js`), verified
   against Tulip/QTradeX published vectors — never install, never import, never
   copy matplotlib plotting code (desktop Python has no place in a browser wallet).
 - Consult the repo raw on demand for formulas beyond Tulip; record which

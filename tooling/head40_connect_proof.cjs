@@ -1,6 +1,6 @@
 /* head40_connect_proof.cjs — live connect proof for the 40-hex fix.
  *
- * What it owns: Chain.connect to testnet with the REAL vanilla/js/chain.js in
+ * What it owns: Chain.connect to testnet with the REAL vanilla/js/sdk/chain.js in
  *   Node (stdlib MiniWebSocket polyfill, same shape as the prove_* scripts),
  *   proving the bad-head-shape rejection is gone and the socket stays open.
  * Consumes: Chain.connect/db/call/status only. No fixture, no secrets.
@@ -128,7 +128,7 @@ class MiniWebSocket {
 globalThis.WebSocket = MiniWebSocket;
 globalThis.document = { getElementById: () => null };
 
-["chain.js", "store.js"].forEach((f) => {
+["sdk/chain.js", "store.js"].forEach((f) => {
   vm.runInThisContext(fs.readFileSync(V + f, "utf8"), { filename: V + f });
 });
 

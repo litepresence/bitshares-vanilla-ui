@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /* trollbox-test.js — offline unit proofs for the R1c on-chain trollbox slice.
  *
- * What it owns: stdlib-only checks that vanilla/js/trollbox.js (pack/unpack,
+ * What it owns: stdlib-only checks that vanilla/js/builders/trollbox.js (pack/unpack,
  *   catalog math, budget, decode, clean-text, probe-error map, pager cursor,
  *   post builder) + the tx.js op-35 chat exception (9198/9199 only) implement
  *   the task contract with zero network, zero keys, zero float money math.
- * Consumes: vanilla/js/trollbox.js + vanilla/js/tx.js (require — offline;
+ * Consumes: vanilla/js/builders/trollbox.js + vanilla/js/api/tx.js (require — offline;
  *   stubbed Chain global for the pager vector only, no socket).
  * Side effects: none (prints FAIL lines, summary, exit 0 green / 1 red).
  * Created by: R1c trollbox task (slice-14 delta).
  */
 "use strict";
 
-const TB_PATH = "/workspace/vanilla/js/trollbox.js";
-const TX_PATH = "/workspace/vanilla/js/tx.js";
+const TB_PATH = "/workspace/vanilla/js/builders/trollbox.js";
+const TX_PATH = "/workspace/vanilla/js/api/tx.js";
 
 let pass = 0, fail = 0;
 function ok(cond, name, extra) {

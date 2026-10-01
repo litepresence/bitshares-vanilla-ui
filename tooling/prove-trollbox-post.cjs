@@ -119,9 +119,9 @@ class MiniWebSocket {
   close() { try { this._sock.write(buildFrame(0x8, Buffer.alloc(0))); } catch (e) {} try { this._sock.destroy(); } catch (e) {} this.readyState = 3; }
 }
 globalThis.WebSocket = MiniWebSocket;
-["vendor/noble-classic.js", "data/brainkey-dict.js", "store.js", "chain.js",
-  "format.js", "crypto.js", "account.js", "tx.js", "tx-send.js",
-  "trollbox.js"
+["sdk/vendor/noble-classic.js", "sdk/data/brainkey-dict.js", "store.js", "sdk/chain.js",
+  "api/format.js", "sdk/crypto.js", "api/account.js", "api/tx.js", "api/tx-send.js",
+  "builders/trollbox.js"
 ].forEach((f) => {
   vm.runInThisContext(fs.readFileSync(V + f, "utf8"), { filename: V + f });
 });

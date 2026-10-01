@@ -49,7 +49,7 @@ Slice renders acceptably in original blue, light, and dark. Parity note contains
 ### 6. Human terms (principle #6, §3.5)
 
 ```bash
-grep -rn "Math.pow(10" vanilla/js/   # hits allowed ONLY in vanilla/js/format.js
+grep -rn "Math.pow(10" vanilla/js/   # hits allowed ONLY in vanilla/js/api/format.js
 ```
 
 Every displayed number has a raw→human test vector in the parity note, including one non-BTS precision and one percent field (`2000` → `20%`). Any raw integer on screen, or float math for money outside `format.js`, fails the audit.
@@ -62,7 +62,7 @@ Navigate the slice's full flow at 360–390px phone width AND at desktop width (
 
 ```bash
 grep -rniE "TODO|FIXME|XXX|HACK" vanilla/js/ vanilla/css/ ; echo "dead-text hits above (want none)"
-wc -l vanilla/js/*.js  # any file past ~400 lines is a split candidate
+find vanilla/js -name '*.js' | xargs wc -l | sort -n | tail -n 8  # any file past ~400 lines is a split candidate
 ```
 
 Every file opens with a module header (owns/consumes/side effects/origin); every non-trivial function has what/params/returns/failure-modes; comments explain WHY, never restate WHAT. Missing headers, unexplained functions, or dead text fail the audit. (The full end-to-end readability pass is its own final slice — this check enforces per-slice hygiene so that pass is polish, not rescue.)

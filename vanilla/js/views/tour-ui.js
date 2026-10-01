@@ -7,8 +7,8 @@
  *   guarded), I18n.t (strings with verbatim en defaults). No chain calls,
  *   no signing, no keystore touch. Side effects: body-level overlay div +
  *   injected <style>, one class on the highlighted target, hashchange/
- *   keydown/resize listeners + a #view MutationObserver (all removed on
- *   end) plus one session-long body observer (+ a hashchange hook for
+ *   keydown/resize/passive-scroll listeners + a #view MutationObserver (all
+ *   removed on end) plus one session-long body observer (+ a hashchange hook for
  *   dismissed profiles) that keeps the dashboard replay button injected
  *   across async fills and hash-only navigations — both idempotent and
  *   never removed, by design. Missing targets skip forward honestly, never throw.
@@ -30,6 +30,12 @@ var TourUI = (function () {
   var placeTimer = null;
   var bootTimer = null;
   var bootObs = null;
+  /* Scroll-once tracker: smooth-scrollIntoView hijacks the user's own
+   * scrolling when it re-fires, so it must run exactly once per real
+   * step/target change — never on observer re-renders of the same card.
+   * Reset on end() so replays scroll fresh (stale node refs never linger). */
+  var scrollIdx = -1;
+  var scrollTgt = null;
 
   /* Display strings via I18n.t with the pre-conversion literal kept verbatim
    * as enDefault (English-identical offline). Falls back to the default when
@@ -115,6 +121,27 @@ var TourUI = (function () {
         title: ["tour.s5_title", "Keep exploring"],
         body: ["tour.s5_body", "Liquidity pools, the chain explorer, voting, and help are one click away. Everything stays viewable while locked: unlock only to sign."] }
     ];
+  }
+
+  /* Pure scroll gate: true only on a real step/target change. Params: i +
+   * target (now) vs lastI + lastT (last scrolled). No side effects — the
+   * caller records the new key after scrolling. Unit-tested. */
+  function scrollChanged(i, target, lastI, lastT) {
+    return i !== lastI || target !== lastT;
+  }
+
+  /* Pure re-render gate for observer refires: rebuild the card only when
+   * the current step's target situation actually changed. Params: step
+   * (current step def), found (live target or null), shown (highlighted
+   * node or null), hasCard (a card is already showing). A newly
+   * materialized target re-renders (highlight upgrades); a target-required
+   * step whose target vanished re-resolves (skips forward honestly);
+   * everything else — including every routine async fill — skips, so no
+   * rebuild and no scroll hijack. Unit-tested with sentinel objects. */
+  function needsRerender(step, found, shown, hasCard) {
+    if (found) return found !== shown;
+    if (step && step.centerOk) return !hasCard;
+    return true;
   }
 
   /* First live target for a step, or null. Never throws. */
@@ -285,10 +312,17 @@ var TourUI = (function () {
         target.classList.add("tour-target");
         highlighted = target;
       } catch (e) { highlighted = null; }
+      /* Scroll-once: smooth scrolling hijacks the user's own scrolling when
+       * it re-fires, so it runs only on a real step/target change — never
+       * on observer re-renders of the same card (the jerky-scroll fix). */
       try {
-        if (reducedMotion()) target.scrollIntoView({ block: "center" });
-        else if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" });
-        else target.scrollIntoView();
+        if (scrollChanged(i, target, scrollIdx, scrollTgt)) {
+          scrollIdx = i;
+          scrollTgt = target;
+          if (reducedMotion()) target.scrollIntoView({ block: "center" });
+          else if (typeof target.scrollIntoView === "function") target.scrollIntoView({ behavior: "smooth", block: "center" });
+          else target.scrollIntoView();
+        }
       } catch (e) { /* card still shows */ }
     }
     placeCard(target);
@@ -326,6 +360,8 @@ var TourUI = (function () {
   function end() {
     setDismissed();
     active = false;
+    scrollIdx = -1;
+    scrollTgt = null;
     clearHighlight();
     try { if (card && card.parentNode) card.parentNode.removeChild(card); } catch (e) { /* gone */ }
     card = null;
@@ -334,6 +370,7 @@ var TourUI = (function () {
       if (typeof window !== "undefined") {
         window.removeEventListener("hashchange", onHash);
         window.removeEventListener("resize", onMove);
+        window.removeEventListener("scroll", onMove);
       }
       if (viewObs) { viewObs.disconnect(); viewObs = null; }
     } catch (e) { /* listeners best-effort */ }
@@ -361,7 +398,9 @@ var TourUI = (function () {
     } catch (e) { /* current card stands */ }
   }
 
-  /* Scroll/resize re-anchors the card (debounced). Never throws. */
+  /* Scroll/resize/hash re-anchors the card (debounced, position-only — no
+   * rebuild, no scroll hijack). Scroll binds passive where supported so it
+   * never blocks the user's own scrolling. Never throws. */
   function onMove() {
     if (!active || !card) return;
     if (placeTimer) { try { clearTimeout(placeTimer); } catch (e) { /* reset below */ } }
@@ -390,7 +429,15 @@ var TourUI = (function () {
         setTimeout(function () {
           pending = false;
           if (!active) return;
-          try { showStep(stepIdx); } catch (e) { /* card stands */ }
+          /* Re-render gate: routine async fills must NOT rebuild the card
+           * (each rebuild re-placed + re-scrolled = jerky scroll). Only
+           * re-resolve when the current step's target situation changed:
+           * newly materialized, or vanished from a target-required step. */
+          try {
+            var list = steps();
+            var cur = (stepIdx >= 0 && stepIdx < list.length) ? list[stepIdx] : null;
+            if (needsRerender(cur, findTarget(cur), highlighted, !!card)) showStep(stepIdx);
+          } catch (e) { /* card stands */ }
         }, 300);
       });
       viewObs.observe(view, { childList: true, subtree: true });
@@ -442,6 +489,14 @@ var TourUI = (function () {
       if (typeof window !== "undefined") {
         window.addEventListener("hashchange", onHash);
         window.addEventListener("resize", onMove);
+        /* Passive scroll re-anchor: keeps the fixed card glued to its
+         * target while the user scrolls (onMove only re-places, debounced).
+         * Options-object throws on old browsers — fall back to bare bind. */
+        try {
+          window.addEventListener("scroll", onMove, { passive: true });
+        } catch (e) {
+          try { window.addEventListener("scroll", onMove); } catch (f) { /* no re-anchor */ }
+        }
       }
       watchView();
       showStep(0);
@@ -526,7 +581,7 @@ var TourUI = (function () {
 
   if (typeof document !== "undefined") boot();
 
-  return { start: start, dismissed: dismissed };
+  return { start: start, dismissed: dismissed, _test: { scrollChanged: scrollChanged, needsRerender: needsRerender } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.TourUI === "undefined") { globalThis.TourUI = TourUI; }

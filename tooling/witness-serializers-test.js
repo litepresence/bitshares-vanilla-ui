@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* Witness/committee serializer vectors (ops 20/21/29/30) — offline byte proofs.
 
- * What it owns: byte-exact checks that vanilla/js/tx.js serializes
+ * What it owns: byte-exact checks that vanilla/js/api/tx.js serializes
  *   witness_create (op 20), witness_update (op 21),
  *   committee_member_create (op 29) and committee_member_update (op 30) in
  *   #4 FC_REFLECT field order with NO trailing extensions byte (witness.hpp
@@ -10,7 +10,7 @@
  *   /committee_member_update agree — fetched 2026-09-29), plus the loud
  *   guards (missing/non-string/oversize url, bad key/id) and both dispatch
  *   paths (serializeOperationData + serializeTransaction framing).
- * Consumes: vanilla/js/tx.js only (require — offline, no socket, no keys;
+ * Consumes: vanilla/js/api/tx.js only (require — offline, no socket, no keys;
  *   the TEST pubkey below is public chain data, never a secret).
  * Side effects: none (prints PASS/FAIL lines, exit 0 green / 1 red).
  * Created by: witness serializers task (ops 20/21 + committee 29/30),
@@ -32,7 +32,7 @@
  *   as op 29 (+ op 30 for pair completeness) and op 35 stays deferred.
  */
 "use strict";
-const Tx = require("/workspace/vanilla/js/tx.js");
+const Tx = require("/workspace/vanilla/js/api/tx.js");
 const S = Tx._ser;
 
 /* Public TEST key (chain data, not a secret — decodes to 33 raw bytes). */

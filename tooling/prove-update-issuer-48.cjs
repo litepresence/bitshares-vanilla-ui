@@ -143,9 +143,9 @@ class MiniWebSocket {
 }
 globalThis.WebSocket = MiniWebSocket;
 globalThis.document = { getElementById: () => null };
-["vendor/noble-classic.js", "data/brainkey-dict.js", "store.js", "chain.js",
-  "format.js", "crypto.js", "account.js", "tx.js", "tx-send.js",
-  "explorer.js", "asset.js", "asset-ops.js"
+["sdk/vendor/noble-classic.js", "sdk/data/brainkey-dict.js", "store.js", "sdk/chain.js",
+  "api/format.js", "sdk/crypto.js", "api/account.js", "api/tx.js", "api/tx-send.js",
+  "api/explorer.js", "api/asset.js", "builders/asset-ops.js"
 ].forEach((f) => {
   vm.runInThisContext(fs.readFileSync(V + f, "utf8"), { filename: V + f });
 });

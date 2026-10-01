@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* asset-settle-claims-174748-test.js — offline byte proofs for ops 17/43/47/48.
  *
- * What it owns: byte-exact checks that vanilla/js/tx.js serializes
+ * What it owns: byte-exact checks that vanilla/js/api/tx.js serializes
  *   asset_settle (op 17) in #4 FC_REFLECT field order
  *   (fee)(account)(amount:asset)(extensions),
  *   asset_claim_fees (op 43) in (fee)(issuer)(amount_to_claim:asset)
@@ -12,7 +12,7 @@
  *   (new_issuer)(extensions), plus the AssetOps builders (human amounts ->
  *   raw, loud guards) and the assessed-but-deferred verdicts (ops
  *   5/9/18/31/35/36 stay undispatched). No socket, no keys.
- * Consumes: vanilla/js/tx.js + vanilla/js/asset-ops.js + vanilla/js/format.js
+ * Consumes: vanilla/js/api/tx.js + vanilla/js/builders/asset-ops.js + vanilla/js/api/format.js
  *   (require — offline; the account/asset ids below are public chain data).
  * Side effects: none (prints PASS lines, exit 0 green / 1 red).
  * Created by: ops 17/43/47/48 serializer task, mapping-chain-calls procedure
@@ -45,9 +45,9 @@
  *   multisig approve signs op 23)
  */
 "use strict";
-const Tx = require("/workspace/vanilla/js/tx.js");
-const Format = require("/workspace/vanilla/js/format.js");
-const AssetOps = require("/workspace/vanilla/js/asset-ops.js");
+const Tx = require("/workspace/vanilla/js/api/tx.js");
+const Format = require("/workspace/vanilla/js/api/format.js");
+const AssetOps = require("/workspace/vanilla/js/builders/asset-ops.js");
 const S = Tx._ser;
 
 /* Public testnet ids (chain data, not secrets). */

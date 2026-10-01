@@ -7,7 +7,7 @@
  */
 "use strict";
 var assert = require("assert");
-var DashboardUI = require("../vanilla/js/dashboard-ui.js");
+var DashboardUI = require("../vanilla/js/views/dashboard-ui.js");
 var T = DashboardUI._test;
 
 var passed = 0;

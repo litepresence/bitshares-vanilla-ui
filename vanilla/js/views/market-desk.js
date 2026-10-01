@@ -1287,10 +1287,10 @@ var MarketDesk = (function () {
   function graphSrc() {
     try {
       if (typeof document !== "undefined" && document.baseURI) {
-        return new URL("js/pool-graph.js", document.baseURI).toString();
+        return new URL("js/api/pool-graph.js", document.baseURI).toString();
       }
     } catch (e) { /* relative fallback below */ }
-    return "js/pool-graph.js";
+    return "js/api/pool-graph.js";
   }
   function ensurePoolGraph(cb) {
     try {

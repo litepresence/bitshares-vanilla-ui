@@ -10,7 +10,7 @@
 var assert = require("assert");
 var fs = require("fs");
 var path = require("path");
-var ExplorerBlocks = require("../vanilla/js/explorer-blocks.js");
+var ExplorerBlocks = require("../vanilla/js/views/explorer-blocks.js");
 
 var T = ExplorerBlocks._test;
 assert.ok(T && typeof T.agoTextAt === "function", "_test.agoTextAt exported");
@@ -34,7 +34,7 @@ eq(T.agoTextAt(NOW, NaN), "0.0 seconds ago", "NaN ts clamps to 0.0");
 eq(T.agoTextAt(NaN, NOW - 1000), "0.0 seconds ago", "NaN now clamps to 0.0");
 
 /* No-new-polling guard: one setInterval at ~150ms, stall + teardown intact. */
-var src = fs.readFileSync(path.join(__dirname, "..", "vanilla", "js", "explorer-blocks.js"), "utf8");
+var src = fs.readFileSync(path.join(__dirname, "..", "vanilla", "js", "views/explorer-blocks.js"), "utf8");
 var intervals = src.match(/setInterval\s*\(/g) || [];
 assert.strictEqual(intervals.length, 1, "exactly one setInterval (got " + intervals.length + ")");
 passed++;

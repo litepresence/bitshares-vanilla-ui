@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /* txbuilder-test.js — offline unit proofs for the TxBuilder composer.
  *
- * What it owns: stdlib-only checks that vanilla/js/txbuilder.js implements
+ * What it owns: stdlib-only checks that vanilla/js/api/txbuilder.js implements
  *   the plan contract (state core + fee/build/export/import + auth/sign
  *   honesty + describe rows + wrap/broadcast shapes) with zero network,
  *   zero keys, zero floats on money. Every vector mirrors
  *   docs/superpowers/plans/2026-09-30-txbuilder.md Tasks 1/2/3/4/6/8
  *   (TB1 state, TB2 envelope, TB3 auth, TB4 describe, TB6 wrap/broadcast,
  *   TB8 offline round-trip + leak scan).
- * Consumes: vanilla/js/txbuilder.js (require — offline; stubbed globals
+ * Consumes: vanilla/js/api/txbuilder.js (require — offline; stubbed globals
  *   Tx/Chain/Wallet/Account/Format/Proposal/Crypto only, no socket).
  * Side effects: none (prints PASS lines, exit 0 green / 1 red).
  * Created by: TxBuilder test-commit task 2026-09-30 (reconstructs the eight
@@ -16,7 +16,7 @@
  */
 "use strict";
 
-const PATH = "/workspace/vanilla/js/txbuilder.js";
+const PATH = "/workspace/vanilla/js/api/txbuilder.js";
 const CHAIN_ID = "4018d784aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SIG_HEX = "ab".repeat(65); // 130 hex chars — import envelope shape
 

@@ -114,7 +114,7 @@ def main():
 
     # Call-site drift (ambiguity A): t() defaults must equal en.json values.
     calls = 0
-    sources = glob.glob(os.path.join(JS_DIRS[0], "*.js")) + [INDEX_HTML]
+    sources = glob.glob(os.path.join(JS_DIRS[0], "**", "*.js"), recursive=True) + [INDEX_HTML]
     for path in sources:
         try:
             src = open(path, encoding="utf-8").read()

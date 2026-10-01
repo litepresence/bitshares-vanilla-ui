@@ -1,9 +1,9 @@
 /* crypto.js — async key derivation + key formats for the vanilla wallet.
  *
  * What it owns: all hashing, brainkey derivation, and WIF / prefixed-pubkey
- * formatting. Consumes: globals BRAINKEY_DICT (js/data/brainkey-dict.js) and
- * nobleGetPublicKey (js/vendor/noble-classic.js). Load order in index.html:
- * noble-classic.js, brainkey-dict.js, then this file. Side effects: none
+ * formatting. Consumes: globals BRAINKEY_DICT (js/sdk/data/brainkey-dict.js)
+ * and nobleGetPublicKey (js/sdk/vendor/noble-classic.js). Load order in
+ * index.html: noble-classic.js, brainkey-dict.js, then this file. Side effects: none
  * beyond the `Crypto` global. Created by: building-vanilla-slices skill,
  * slice-02-wallet plan Task 3.
  *

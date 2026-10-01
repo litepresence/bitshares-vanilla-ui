@@ -3,7 +3,7 @@
  * layout deterministic. Pure (no chain except the mocked cap probe). Exit 0 green, 1 red. */
 "use strict";
 globalThis.Chain = { db: () => Promise.reject(new Error("no chain in vectors")), call: () => Promise.reject(new Error("no chain")) };
-const PG = require("/workspace/vanilla/js/pool-graph.js");
+const PG = require("/workspace/vanilla/js/api/pool-graph.js");
 
 let pass = 0, fail = 0;
 function eq(got, want, name) {

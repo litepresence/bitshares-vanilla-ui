@@ -183,7 +183,7 @@ var WalletUI = (function () {
   }
 
   /* Lazily built dictionary set for the brainkey hint. Reads the global word
-   * list crypto.js consumes (js/data/brainkey-dict.js); null when absent
+ *   list crypto.js consumes (js/sdk/data/brainkey-dict.js); null when absent
    * (file:// with missing dict) so the hint degrades to length-only. */
   var _dictSet = null;
   var _dictTried = false;

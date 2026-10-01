@@ -6,8 +6,8 @@
  */
 "use strict";
 var assert = require("assert");
-var Format = require("../vanilla/js/format.js");
-var TopOpsUI = require("../vanilla/js/top-ops-ui.js");
+var Format = require("../vanilla/js/api/format.js");
+var TopOpsUI = require("../vanilla/js/views/top-ops-ui.js");
 var T = TopOpsUI._test;
 
 var passed = 0;

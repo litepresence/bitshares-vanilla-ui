@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /* fee-pool-fund-16-test.js — offline byte proofs for op-16 asset_fund_fee_pool.
  *
- * What it owns: byte-exact checks that vanilla/js/tx.js serializes
+ * What it owns: byte-exact checks that vanilla/js/api/tx.js serializes
  *   asset_fund_fee_pool (op 16) in #4 FC_REFLECT field order
  *   (fee)(from_account)(asset_id)(amount:int64 core)(extensions), plus the
  *   AssetOps.buildFundFeePool builder (human CORE amount -> raw) and loud
  *   guards. No socket, no keys.
- * Consumes: vanilla/js/tx.js + vanilla/js/asset-ops.js + vanilla/js/format.js
+ * Consumes: vanilla/js/api/tx.js + vanilla/js/builders/asset-ops.js + vanilla/js/api/format.js
  *   (require — offline; the account/asset ids below are public chain data).
  * Side effects: none (prints PASS lines, exit 0 green / 1 red).
  * Created by: op-16 fee-pool funding task, mapping-chain-calls procedure
@@ -22,9 +22,9 @@
  *   `|| 0` fallback — missing amount throws loudly)
  */
 "use strict";
-const Tx = require("/workspace/vanilla/js/tx.js");
-const Format = require("/workspace/vanilla/js/format.js");
-const AssetOps = require("/workspace/vanilla/js/asset-ops.js");
+const Tx = require("/workspace/vanilla/js/api/tx.js");
+const Format = require("/workspace/vanilla/js/api/format.js");
+const AssetOps = require("/workspace/vanilla/js/builders/asset-ops.js");
 const S = Tx._ser;
 
 /* Public testnet ids (chain data, not secrets). */

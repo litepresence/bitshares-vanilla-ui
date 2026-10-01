@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Keepalive regression test (stdlib only): heartbeat + auto-reconnect.
- * Stubs WebSocket/Store/document, loads vanilla/js/chain.js, asserts:
+ * Stubs WebSocket/Store/document, loads vanilla/js/sdk/chain.js, asserts:
  *  1. a get_dynamic_global_properties heartbeat fires after open
  *     (headBlock advances),  2. unexpected close triggers a reconnect.
  * Exit 0 green, 1 red. */
@@ -67,7 +67,7 @@ const sandbox = {
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync("/workspace/vanilla/js/chain.js", "utf8"), sandbox, { filename: "chain.js" });
+vm.runInContext(fs.readFileSync("/workspace/vanilla/js/sdk/chain.js", "utf8"), sandbox, { filename: "sdk/chain.js" });
 const Chain = sandbox.Chain;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

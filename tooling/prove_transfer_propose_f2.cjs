@@ -169,8 +169,8 @@ globalThis.WebSocket = MiniWebSocket;
 globalThis.document = { getElementById: () => null };
 
 /* ---- Load the real vanilla sources (order mirrors index.html) ---- */
-["vendor/noble-classic.js", "chain.js", "store.js", "tx.js", "tx-send.js",
-  "format.js", "crypto.js", "account.js", "proposal.js"
+["sdk/vendor/noble-classic.js", "sdk/chain.js", "store.js", "api/tx.js", "api/tx-send.js",
+  "api/format.js", "sdk/crypto.js", "api/account.js", "api/proposal.js"
 ].forEach((f) => {
   vm.runInThisContext(fs.readFileSync(V + f, "utf8"), { filename: V + f });
 });
