@@ -783,6 +783,21 @@ img, canvas, pre { max-width: 100%; }
 .mkt-tabs button:hover { color: var(--text); }
 .mkt-tabs button[aria-pressed="true"], .mkt-tabs button[aria-selected="true"] {
   color: var(--accent); border-bottom-color: var(--accent); }
+/* Vote + asset-create tabs (.vote-tabs hosts in vote-ui.js:386,
+ * vote-slate.js:207, asset-ui.js:222 — previously unstyled, so every tab
+ * rendered as a generic solid primary button and the active tab was
+ * indistinguishable from the rest): same uppercase accent-underline
+ * treatment as .mkt-tabs/.trade-tabs. vote-slate sets aria-selected AND
+ * .active; asset-ui sets .active only — match both. Tokens only. */
+.vote-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
+  margin: 8px 0 12px; flex-wrap: wrap; row-gap: 0; }
+.vote-tabs .vote-tab { background: transparent; color: var(--muted); border: 0;
+  border-radius: 0; border-bottom: 2px solid transparent;
+  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; }
+.vote-tabs .vote-tab:hover { color: var(--text); }
+.vote-tabs .vote-tab.active, .vote-tabs .vote-tab[aria-selected="true"] {
+  color: var(--accent); border-bottom-color: var(--accent); }
 /* Dashboard markets strip (above fold, compact): tab row reuses .mkt-tabs;
  * chips scroll horizontally in-region so 390px phones never overflow the
  * page; single-row scroll on desktop keeps the strip compact. Tokens only. */
