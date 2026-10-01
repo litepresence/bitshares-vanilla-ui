@@ -2839,5 +2839,24 @@
   },
   "ops": {
     "no_ops_hint": "No operations in the sampled blocks — widen the sample or retry at the chain tip."
+  },
+  "tour": {
+    "s1_title": "Welcome to BitShares Vanilla",
+    "s1_body": "A plain HTML, JavaScript, and CSS wallet for the BitShares chain. Look around and play: every page reads public chain data with no login. Your password is asked only when you sign.",
+    "s2_title": "Pick a market",
+    "s2_body": "This strip lists starred and featured markets with live prices. Choose any chip to open that trading desk.",
+    "s2_cta": "Open the Exchange",
+    "s3_title": "Desk plots",
+    "s3_body": "Price candles, volume, and depth plus the indicators menu: overlays like SMA and EMA, oscillators like RSI, MACD, and Stochastic.",
+    "s4_title": "Practice quoting",
+    "s4_body": "The Buy and Sell panels accept any numbers for practice. Nothing leaves your machine until you review and sign with an unlocked wallet.",
+    "s5_title": "Keep exploring",
+    "s5_body": "Liquidity pools, the chain explorer, voting, and help are one click away. Everything stays viewable while locked: unlock only to sign.",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done",
+    "skip": "Skip",
+    "take_tour": "Take tour",
+    "step_of": "Step %(current)s of %(total)s"
   }
 }
