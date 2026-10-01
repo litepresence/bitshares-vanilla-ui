@@ -35,6 +35,20 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 3. Resize check: set the viewport to 390px wide (DevTools → Toggle device
    toolbar → Responsive → 390). The sidebar/nav must collapse (hamburger
    or bottom nav — never a sidebar eating the phone screen). Record PASS/FAIL.
+4. Fresh-profile tour (NEW — scroll-hijack fix): use a fresh browser
+   profile (or clear site data) so the 5-step "Welcome to BitShares
+   Vanilla" popup auto-starts on the landing page.
+   - Scroll the page up and down while the popup is open.
+     Expected: smooth gliding, popup tracking its target. FAIL = any
+     yanking/fighting.
+   - Click through all 5 steps. Expected: each step scrolls exactly once
+     on arrival; NEXT/DONE/SKIP labels sit inside their buttons (never
+     running off right); dots are small circles.
+   - Dismiss, then click "Take tour" (dashboard). Expected: replay works.
+5. Landing refill (NEW): with network throttled to Slow 3G (DevTools →
+   Network), load `/` locked.
+   - Expected: hero/cards/steps paint immediately; market chips + chain
+     pulse fill in with live numbers once connected (never stuck "—").
 
 ## 1. Settings / nodes (`#/settings`)
 
@@ -157,6 +171,10 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 4. Open `#/top-ops`. Expected: a table (type/name/count/share) + donut
    chart labeled "last 200 blocks on <node>", Refresh button re-runs it.
    Works on testnet (unlike the old stats page which was mainnet-only).
+5. Block age (NEW — decimal timer): on the Blocks tab, watch the latest
+   block's age line for 10 seconds.
+   - Expected: it ticks in tenths (`2.3 seconds ago`-style) and resets on
+     each new block. No full-page flicker — only the age text changes.
 
 ## 8. Assets (`#/assets`, `#/assets/create`, `#/asset/<symbol>`)
 
@@ -181,7 +199,11 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 
 1. Pools list renders with volumes. Open a pool detail: deposit/withdraw
    forms + history render.
-2. Swap page: pick two assets, enter amount. Expected: live preview quote
+2. Pool book layout (NEW — mirrors exchange): the book shows Bids and Asks
+   SIDE BY SIDE (not stacked), best bid and best ask on the same top line
+   near the center. At phone width they stack — that is correct, record
+   desktop 1440px+ for this check.
+3. Swap page: pick two assets, enter amount. Expected: live preview quote
    + fee line; Review → sign only on dev order.
 3. Pool connection map (if shown): nodes/links render, no console errors.
 
@@ -189,9 +211,14 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 
 1. Credit offers list + offer detail (deals) render.
 2. Same-T funds list renders.
-3. Borrow page: margin positions table WITH collateral-ratio column;
+3. Same-T row actions (REGRESSION — the type gate caught this dead):
+   click Borrow+Repay, Repay, Update, Delete on an owned fund row.
+   - Expected: each opens its form below (no dead click, no console error).
+     Fill to Review, then cancel. (Before 2026-10-01 every one of these
+     clicks threw; PASS = all four open.)
+4. Borrow page: margin positions table WITH collateral-ratio column;
    open-position + adjust forms to Review, cancel.
-4. Fee display: fees show in `1.3.0` (CORE) with a "fee-asset switching
+5. Fee display: fees show in `1.3.0` (CORE) with a "fee-asset switching
    deferred" note — confirm the note exists.
 
 ## 12. Proposals (`#/proposals`), tickets (`#/tickets`), misc + trollbox (`#/trollbox`)
