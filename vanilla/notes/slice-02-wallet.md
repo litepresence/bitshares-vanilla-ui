@@ -289,3 +289,45 @@ Screenshots (trio + 360px/1440px): PENDING browser pass above.
 
 Slice is NOT done until the BROWSER PASS (§3) is all-PASS and the faucet
 round-trip is re-run live (faucet currently dead — see §3 Step 3b).
+
+## Ship-day R1a security perfection audit (2026-10-01, owner: "must be complete and perfected to ship")
+
+Method: full read of `wallet.js` (469), `crypto.js` header/derivation (1–120),
+`wallet-ui.js` password paths, `auth-ui.js` login paths, `password-ui.js`,
+`tx-send.js` signing boundary; secrets + WIF-flow + lock-site greps. No code
+changes needed — every property below verified on disk:
+
+- KDF/envelope: PBKDF2-HMAC-SHA-256 600k (`wallet.js:21,126`), 16B salt +
+  12B IV from `getRandomValues` per call (`:160-161`), AES-256-GCM,
+  versioned envelope `v:1` with shape + iteration checks (`:150-156`);
+  decrypt failures map to `wrong password` vs `corrupt wallet` distinctly
+  (`:203-207`). Classic brainkey path (NOT SLIP-48) with bytes-through chain
+  (`crypto.js:99-112`).
+- Password handling: `type=password` + `autocomplete=new-password`
+  (`wallet-ui.js:93-94`); 8-char + match enforced at create (`:585-590`);
+  strength hint meter (`:169-182`); password locals + inputs wiped on BOTH
+  outcomes (`:400-402`, `:565-568`, `auth-ui.js:196`); change-password is
+  verify-before-rewrite + proof + lock-after (`password-ui.js:2,127,141).
+- Memory discipline: unlock lives in `Wallet.keys` only; `lock()` documents
+  the JS-string truth (overwrite-then-drop, GC-collects — no scrub pretense,
+  `wallet.js:354-385`); 5-min inactivity auto-lock (`:24,247-250`) +
+  hidden-tab lock (`:460-464`); signing activity does NOT extend the session
+  (fails closed — secure direction); no lock-after-broadcast by design
+  (would break scaled/multi-op flows; 5-min timer covers).
+- Rate-limit: in-memory exponential 1,2,4…30s + persisted lockout envelope
+  surviving restarts, max(memory,disk) on entry (`:276-352`).
+- Key-flow containment: zero `console.log/dir` in shipped `vanilla/js`
+  (grep clean); WIFs read from `Wallet.keys` only at signing call sites;
+  `tx-send.js` never touches key bytes (opaque, `:11`); head validation
+  40-hex + chain-id pin + `get_required_fees` rail (security round `8c40f45`
+  as fixed by `87e15f5`).
+- Honest boundaries on screen (R1b): brainkey-only import, no `.bin`/WIF
+  decrypt, no cloud password-keys (`auth-ui.js:15-26,162,221-231`,
+  `wallet-ui.js:36,311`); backup revealer gated on unlock
+  (`getBrainkey` throws locked, `wallet.js:409-413`).
+- Extension seam: storage backend + in-memory/persisted backoff intact;
+  lock fan-out both directions (`wallet.js:387-401`, `app.js:880-895`).
+
+R1a verdict 2026-10-01: COMPLETE — no gaps found, nothing deferred. Human
+browser pass (unlock/lock/auto-lock timing on device) stays the final gate
+per R6 manual §Wallet.

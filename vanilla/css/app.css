@@ -54,10 +54,10 @@ body { margin: 0; background: var(--bg); color: var(--text);
 .nav-dir-actions a:hover { background: var(--bg); }
 .nav-dir-btn { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
   border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
-/* Warning banner (mirrors #1 root.png scam banner): --warn band, dark text
- * for contrast on amber in every theme; dismiss persists in localStorage. */
+/* Warning banner (mirrors #1 root.png scam banner): per-theme --banner-*
+ * tokens (themes.css); dismiss persists in localStorage. */
 #warn-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
-  background: var(--warn); color: #1a1a1a; font-size: 0.8rem; }
+  font-size: 0.8rem; }
 #warn-banner[hidden] { display: none; }
 #warn-banner span { flex: 1 1 auto; }
 #warn-dismiss { flex: 0 0 auto; background: transparent; color: inherit;
@@ -666,6 +666,24 @@ img, canvas, pre { max-width: 100%; }
   .ops-scroll table.node-table { display: table; }
 }
 
+/* Ranked-ops layout (R1c #/top-ops): donut + legend stack on phones,
+ * side-by-side at >=900px; the count table reuses .ops-scroll above.
+ * Tokens only — all three themes. The donut svg scales by viewBox (width
+ * 100% capped at 320px); wedges fill via inline style.fill on theme vars. */
+.topops-layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr);
+  margin: 12px 0; }
+.topops-donut { width: 100%; max-width: 320px; height: auto; justify-self: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+.topops-legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px;
+  align-content: start; }
+.topops-legend li { display: flex; align-items: center; gap: 8px; min-height: 44px;
+  overflow-wrap: anywhere; }
+.topops-sw { flex: 0 0 auto; width: 16px; height: 16px; border-radius: 4px;
+  border: 1px solid var(--border); }
+@media (min-width: 900px) {
+  .topops-layout { grid-template-columns: 340px minmax(0, 1fr); align-items: start; }
+}
+
 /* (f) Voting rows ≥720px: rows are wrapping flex cards with inline styles
  * (vote-slate.js rowCard — display:flex, wrap, gap; main flex 1 1 200px).
  * Keep the wrap (worker sub-rows need their own line) but stop the weight
@@ -703,19 +721,32 @@ img, canvas, pre { max-width: 100%; }
 }
 
 /* Retro forgery pass (target: vanilla/notes/original-header-exchange-2026-09-28.png).
- * Token-driven wherever a token exists so all three themes keep working;
- * literal hex appears ONLY for the banner (provenance below), which is a
- * fixed light notice in every theme — same as #1, whose banner is an antd
- * Alert independent of the theme stylesheets. */
+ * Token-driven throughout so all three themes keep working; the banner skin
+ * below rides the per-theme --banner-* tokens (themes.css) — same as #1,
+ * whose banner is an antd Alert independent of the theme stylesheets. */
 
-/* Gold banner: #1 renders its top notice via <Alert type="warning|info" banner />
- * (NewsHeadline.jsx:139; grep for "background" in NewsHeadline.jsx/Deprecate.jsx
- * finds no inline background — the color lives in the antd Alert stylesheet).
- * antd v3 Alert warning banner = background #fffbe6, border #ffe58f, dark text.
- * The target capture shows that pale-gold treatment, so #warn-banner samples
- * #fffbe6 (not the solid --warn #fcab53) with the dark #1a1a1a text kept. */
-#warn-banner { background: #fffbe6; border-bottom: 1px solid #ffe58f; color: #1a1a1a; }
+/* Banner skin: per-theme tokens (themes.css --banner-*). Replaces the
+ * fixed-light antd v3 Alert sampling (#fffbe6/#ffe58f/#1a1a1a from
+ * NewsHeadline.jsx:139, which leaked a light banner into dark themes):
+ * ref-ui ambered dark + white, vanilla ochre cream + chocolate, dex-ux
+ * #2a2e39 + white w/ #fbbc06 border. Node-agnostic CSS only. */
+#warn-banner { background: var(--banner-bg); border-bottom: 1px solid var(--banner-border); color: var(--banner-text); }
 .warn-icon { flex: 0 0 auto; font-size: 1rem; line-height: 1; }
+/* Compat banner (R1c dead-browser notice): same per-theme --banner-* skin
+ * as #warn-banner above (was fixed pale-gold #fffbe6; the ship-day 2026-10-01
+ * banner-token follow-up this comment anticipated has now landed).
+ * Hidden by default: app.js removes [hidden] only when feature detection
+ * finds a genuinely-missing platform API. */
+#compat-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  background: var(--banner-bg); border-bottom: 1px solid var(--banner-border); color: var(--banner-text); font-size: 0.8rem; }
+#compat-banner[hidden] { display: none; }
+#compat-banner #compat-msg { flex: 1 1 auto; }
+#compat-banner a { flex: 0 0 auto; color: inherit; text-decoration: underline;
+  min-height: 44px; display: inline-flex; align-items: center; }
+#compat-dismiss { flex: 0 0 auto; background: transparent; color: inherit;
+  border: 0; border-radius: 6px; min-width: 44px; min-height: 44px;
+  padding: 4px 8px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.05em; }
 
 /* Brand logo (#1 branding.js:64-66 getLogo() -> assets/logo-ico-blue.png,
  * Header.jsx:399 height 40): same file, same height; alt="BitShares" is the
@@ -886,7 +917,11 @@ img, canvas, pre { max-width: 100%; }
   .xplore-stat-val { font-size: 1.05rem; }
 }
 .xplore-green { color: var(--live); text-transform: uppercase; }
-.xplore-warn { color: var(--warn); }
+/* Small-text warn uses ride --warn-text (4.5:1 body-text contract: vanilla
+ * #7A5A0A 5.90 cream/6.37 white, ref #fcab53 7.58 bg/5.56 panel, dex
+ * #fbbc06 10.48 bg — themes.css). .mkt-star + toast borders stay --warn
+ * (graphic-only, no text). */
+.xplore-warn { color: var(--warn-text); }
 .xplore-split { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 1200px) {
   .xplore-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -903,7 +938,7 @@ img, canvas, pre { max-width: 100%; }
   border: 1px solid var(--muted); border-radius: 3px; font-size: 0.72rem;
   font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
   white-space: nowrap; color: var(--muted); }
-.xplore-pill-place { color: var(--warn); border-color: var(--warn); }
+.xplore-pill-place { color: var(--warn-text); border-color: var(--warn-text); }
 .xplore-pill-cancel { color: var(--danger); border-color: var(--danger); }
 .xplore-pill-transfer { color: var(--accent); border-color: var(--accent); }
 .xplore-pill-muted { color: var(--muted); border-color: var(--muted); }
@@ -1257,3 +1292,25 @@ p.muted[aria-live="polite"],
  * forms, tables, and steppers untouched. */
 .help-article > p, .help-article > ul,
 .borrow-prose > p { max-width: 75ch; }
+
+/* Trollbox desk (#/trollbox, R1c): channel tabs, plain-text list, composer.
+ * Tokens only (three themes); 44px targets; single-column stack on phones,
+ * wider list column on desktop. No hover-dependent UI. */
+.trollbox-wrap .trollbox-channels { display: flex; flex-wrap: wrap; gap: 8px 16px;
+  align-items: center; margin: 12px 0; }
+.trollbox-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.trollbox-tab { min-height: 44px; padding: 6px 12px; border: 1px solid var(--border);
+  border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+.trollbox-tab.active { outline: 2px solid var(--accent); outline-offset: -2px; font-weight: 700; }
+.trollbox-list { list-style: none; margin: 12px 0; padding: 0; display: flex;
+  flex-direction: column; gap: 8px; }
+.trollbox-msg { border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); padding: 8px 12px; overflow-wrap: anywhere; }
+.trollbox-msghead { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.trollbox-msgtext { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.trollbox-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.trollbox-wrap textarea { width: 100%; max-width: 100%; min-height: 88px; }
+@media (min-width: 1200px) {
+  .trollbox-wrap .trollbox-list { max-width: 900px; }
+  .trollbox-wrap textarea { max-width: 900px; }
+}

@@ -16,6 +16,12 @@
   <span>WARNING: Users of the BitShares blockchain, DO NOT ACCEPT suspicious offers to trade tokens on private markets or tokens that are not listed in the Withdrawals section or in default market pairs.</span>
   <button id="warn-dismiss" type="button" aria-label="Dismiss warning">×</button>
 </div>
+<div id="compat-banner" role="note" hidden>
+  <span class="warn-icon" aria-hidden="true">⚠</span>
+  <span id="compat-msg">Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Browsing still works — wallet signing may not.</span>
+  <a id="compat-help" href="#/help">Help</a>
+  <button id="compat-dismiss" type="button" aria-label="Dismiss compatibility notice">Dismiss</button>
+</div>
 <header class="topbar">
   <a class="brand" href="#/" aria-label="BitShares"><img class="brand-logo" src="assets/logo-ico-blue.png" alt="BitShares" width="40" height="40"></a>
   <a id="lock-toggle" href="#/login" aria-label="Unlock">🔒</a>
@@ -30,7 +36,7 @@
 </nav>
 <main id="view" aria-live="polite"></main>
 <footer id="appfoot" aria-label="Node status">
-  <span class="appfoot-left" id="appfoot-version">BITSHARES · <a href="#/help">Disclaimer</a></span>
+  <span class="appfoot-left" id="appfoot-version">BITSHARES · v1.0.0 · <a href="#/help">Disclaimer</a></span>
   <span class="appfoot-right" id="appfoot-status" aria-live="polite">connecting…</span>
   <span class="appfoot-actions"><a id="foot-report" href="https://t.me/bitsharesDEV" target="_blank" rel="noopener">REPORT</a><a id="foot-help" href="#/help">Help</a></span>
 </footer>
@@ -110,6 +116,8 @@
 <script src="js/proposal-ui.js"></script>
 <script src="js/ticket-ui.js"></script>
 <script src="js/misc-ui.js"></script>
+<script src="js/trollbox.js"></script>
+<script src="js/trollbox-ui.js"></script>
 <script src="js/prediction-ui.js"></script>
 <script src="js/vesting-ui.js"></script>
 <script src="js/notify.js"></script>
@@ -126,6 +134,7 @@
 <script src="js/referrals-ui.js"></script>
 <script src="js/favourites-ui.js"></script>
 <script src="js/ops-ui.js"></script>
+<script src="js/top-ops-ui.js"></script>
 <script src="js/dashboard-ui.js"></script>
 <script src="js/txbuilder.js"></script>
 <script src="js/txbuilder-ui.js"></script>

@@ -1,5 +1,5 @@
 /* tx.js — graphene serializer registry + dispatch (ops 0-3, 6-8,
- * 10-17, 19-24, 25-30, 32-34, 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75, 76).
+ * 10-17, 19-24, 25-30, 32-35 (35 chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75, 76).
  * Envelope/fee/sign/send live in tx-send.js (slice-18 cap split).
  *
  * What it owns: binary serialization of transfer (op 0), limit_order_create
@@ -16,7 +16,8 @@
  * withdraw_permission_delete (op 28), committee_member_create (op 29),
  * committee_member_update (op 30), htlc_create (op 49), htlc_redeem
  * (op 50), htlc_extend (op 52), vesting_balance_create/withdraw (ops 32/33),
- * worker_create (op 34), balance_claim (op 37, fee always 0), custom_authority_create/update/delete
+ * worker_create (op 34), custom chat op-35 (9198/9199 only, R1c single
+ * exception), balance_claim (op 37, fee always 0), custom_authority_create/update/delete
  * (ops 54/55/56), ticket_create/update (ops 57/58), liquidity_pool_create (op 59),
  * liquidity_pool_delete (op 60), liquidity_pool_deposit (op 61),
  * liquidity_pool_withdraw (op 62), liquidity_pool_exchange (op 63) and
@@ -304,6 +305,11 @@
   *                             variant incl. set/vector forms; the pair tag
   *                             member is an upstream gap there — vanilla implements
   *                             it per #4 as int64 + vector<restriction>)
+  * - serializeCustomTrollboxOp (op-35 chat exception, 9198/9199 only)
+  *                          <- #3 bitshares-api.js:2867-2875 (fee, payer, set,
+  *                             u16 id, bytes) + #4 .../protocol/custom.hpp
+  *                             FC_REFLECT (fee)(payer)(required_auths)(id)(data)
+  *                             + operations.hpp:91 (op 35); R1c single exception
   * - serializeCustomAuthority{Create,Update,Delete}Op
   *                          <- #3 bitshares-api.js:3197-3242
   *                             + #4 .../protocol/custom_authority.hpp:36-122
@@ -342,8 +348,9 @@
  *   31 committee_member_update_global_parameters (chain_parameters is dozens
  *   of nested structs; #3 punts with a JSON blob that is NOT the wire bytes
  *   — no auditable vanilla source; committee-only + proposal-only, honest
- *   deferral), 35 custom_operation (generic payer/auths/id/data payload, no
- *   vanilla UI builds it — stays deferred), 36 assert_operation (predicates
+  *   deferral), 35 GENERIC custom_operation stays deferred — the single R1c
+  *   chat exception (sub-ids 9198/9199) serializes via serializeCustomTrollboxOp
+  *   and rejects every other sub-id, 36 assert_operation (predicates
  *   are NOT the multisig approve path: approvals sign op 23 via
  *   Proposal.buildApprove — no UI builds predicates, stays deferred)
   * - op dispatch 25-28, 49/50/52
@@ -2616,6 +2623,50 @@ var Tx = (function () {
     ]);
   }
 
+  /* custom_operation chat exception (op 35, sub-ids 9198/9199 ONLY — R1c
+   * trollbox single exception). Wire order per #4 custom.hpp FC_REFLECT:
+   * (fee)(payer)(required_auths:flat_set)(id:u16)(data:bytes). Hand-ported:
+   * serializeCustomOp <- #3 bitshares-api.js:2867-2875 (fee, payer, set,
+   * u16 id, bytes) + #4 custom.hpp (field order) + operations.hpp:91
+   * (op 35). STRICT guards: op.id must be exactly 9198 (forum) or 9199
+   * (trollbox) — any other sub-id throws (generic custom ops stay deferred);
+   * payer must be 1.2.N; required_auths must be a non-empty 1.2.N array
+   * containing the payer (flat_set canonical sort via serializeIdSet);
+   * data must be non-empty even-length hex (the Trollbox.packAccountStorageMap
+   * hex — empty data throws, never a silent empty post). */
+  function serializeCustomTrollboxOp(op) {
+    if (!op || typeof op !== "object") throw new Error("custom_operation op must be an object");
+    if (op.id !== 9198 && op.id !== 9199) {
+      throw new Error("custom_operation id not allowed (trollbox 9199 / forum 9198 only), got: " + JSON.stringify(op.id));
+    }
+    if (typeof op.payer !== "string" || !/^1\.2\.\d+$/.test(op.payer)) {
+      throw new Error("custom_operation payer must be an account id (1.2.N), got: " + JSON.stringify(op.payer));
+    }
+    if (!Array.isArray(op.required_auths) || op.required_auths.length === 0) {
+      throw new Error("custom_operation required_auths must be a non-empty array");
+    }
+    for (var i = 0; i < op.required_auths.length; i++) {
+      if (typeof op.required_auths[i] !== "string" || !/^1\.2\.\d+$/.test(op.required_auths[i])) {
+        throw new Error("custom_operation required_auths[" + i + "] must be an account id (1.2.N)");
+      }
+    }
+    if (op.required_auths.indexOf(op.payer) === -1) {
+      throw new Error("custom_operation required_auths must contain the payer");
+    }
+    if (typeof op.data !== "string" || op.data.length === 0) {
+      throw new Error("custom_operation data must be a non-empty hex string");
+    }
+    var dataBytes = hexToBytes(op.data);
+    if (dataBytes.length === 0) throw new Error("custom_operation data must be a non-empty hex string");
+    return concatBytes([
+      serializeAsset(op.fee),
+      serializeObjectId(op.payer),
+      serializeIdSet(op.required_auths),
+      writeUint16LE(op.id),
+      concatBytes([varintUint32(dataBytes.length), dataBytes])
+    ]);
+  }
+
   /* Nested-op data dispatch for op-22 recursion: delegates to the SAME
    * per-op functions the outer serializeTransaction path uses, so enclosed
    * bytes can never drift from top-level bytes. Covers every op this file
@@ -2654,6 +2705,7 @@ var Tx = (function () {
     if (opType === 32) return serializeVestingBalanceCreateOp(opData);
     if (opType === 33) return serializeVestingBalanceWithdrawOp(opData);
     if (opType === 34) return serializeWorkerCreateOp(opData);
+    if (opType === 35) return serializeCustomTrollboxOp(opData);
     if (opType === 37) return serializeBalanceClaimOp(opData);
     if (opType === 43) return serializeAssetClaimFeesOp(opData);
     if (opType === 45) return serializeBidCollateralOp(opData);
@@ -2684,7 +2736,7 @@ var Tx = (function () {
     if (opType === 73) return serializeCreditDealRepayOp(opData);
     if (opType === 75) return serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return serializeCreditDealUpdateOp(opData);
-    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-34, 37, " +
+    throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, " +
       "43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
   }
 
@@ -2733,6 +2785,10 @@ var Tx = (function () {
       else if (opType === 32) parts.push(serializeVestingBalanceCreateOp(opData));
       else if (opType === 33) parts.push(serializeVestingBalanceWithdrawOp(opData));
       else if (opType === 34) parts.push(serializeWorkerCreateOp(opData));
+      /* Op-35 SINGLE EXCEPTION (R1c trollbox): chat sub-ids 9198/9199 only —
+       * the serializer itself rejects any other sub-id. Generic custom ops
+       * stay deferred (see the ASSESSED note below). */
+      else if (opType === 35) parts.push(serializeCustomTrollboxOp(opData));
       else if (opType === 37) parts.push(serializeBalanceClaimOp(opData));
       else if (opType === 43) parts.push(serializeAssetClaimFeesOp(opData));
       else if (opType === 45) parts.push(serializeBidCollateralOp(opData));
@@ -2758,7 +2814,8 @@ var Tx = (function () {
       // committee bitassets; no vanilla form, proposal-nesting is the future
       // path), 31 committee_member_update_global_parameters (chain_parameters
       // needs its own audited slice; #3's JSON blob is not the wire bytes),
-      // 35 custom_operation (generic payload no UI builds — stays deferred),
+      // 35 custom_operation GENERIC (any sub-id except the 9198/9199 chat
+      // exception above — stays deferred; the dispatch line rejects others),
       // 36 assert_operation (predicates are not approvals — multisig approve
       // flows sign op 23 via Proposal.buildApprove; no UI builds predicates).
       // Do not "complete" this list with them.
@@ -2793,7 +2850,7 @@ var Tx = (function () {
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-34, 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 42/44/46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic except chat; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 42/44/46/51/53/74 virtual), got op " + opType);
     }
     parts.push(varintUint32((tx.extensions || []).length));
     return concatBytes(parts);
@@ -2819,6 +2876,7 @@ var Tx = (function () {
       committee_member_create: 29, committee_member_update: 30,
       vesting_balance_create: 32, vesting_balance_withdraw: 33,
       worker_create: 34,
+      custom_operation: 35,
       balance_claim: 37,
       asset_claim_fees: 43,
       bid_collateral: 45,
@@ -2904,6 +2962,7 @@ var Tx = (function () {
       serializeVestingBalanceWithdrawOp: serializeVestingBalanceWithdrawOp,
       serializeWorkerInitializer: serializeWorkerInitializer,
       serializeWorkerCreateOp: serializeWorkerCreateOp,
+      serializeCustomTrollboxOp: serializeCustomTrollboxOp,
       serializeBalanceClaimOp: serializeBalanceClaimOp,
       serializeCustomAuthorityCreateOp: serializeCustomAuthorityCreateOp,
       serializeCustomAuthorityUpdateOp: serializeCustomAuthorityUpdateOp,

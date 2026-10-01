@@ -211,6 +211,40 @@ var BorrowUI = (function () {
         var me = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
           : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
         var rows = await Credit.positions(me.id);
+        /* R1e CR enrichment: one bitasset_data read per unique debt leg, then
+         * previewRatio (Format-only math) per position. Fail-open: a feed miss
+         * leaves _cr null and the table shows "—" with MCR title when known. */
+        try {
+          var byDebt = {}, need = [];
+          rows.forEach(function (p) {
+            if (!byDebt[p.debt_id]) { byDebt[p.debt_id] = true; need.push(p.debt_id); }
+          });
+          var dbId = await Chain.db();
+          var metas = need.length ? await Chain.call(dbId, "get_assets", [need]) : [];
+          var bidByDebt = {};
+          (metas || []).forEach(function (a, i) {
+            if (a && a.bitasset_data_id) bidByDebt[need[i]] = a.bitasset_data_id;
+          });
+          var bids = Object.keys(bidByDebt).map(function (k) { return bidByDebt[k]; });
+          var bobjs = bids.length ? await Chain.call(dbId, "get_objects", [bids]) : [];
+          var bitByDebt = {};
+          Object.keys(bidByDebt).forEach(function (debtId) {
+            var bid = bidByDebt[debtId];
+            var ix = bids.indexOf(bid);
+            if (ix !== -1 && bobjs && bobjs[ix]) bitByDebt[debtId] = bobjs[ix];
+          });
+          rows.forEach(function (p) {
+            try {
+              var b = bitByDebt[p.debt_id] || null;
+              if (b) {
+                p._cr = previewRatio(p.coll_raw, p.coll_prec, p.debt_raw, p.debt_prec, b, p.coll_id, p.debt_id);
+                try {
+                  if (b.current_feed && Number.isInteger(b.current_feed.maintenance_collateral_ratio)) p._mcr = b.current_feed.maintenance_collateral_ratio;
+                } catch (e) { /* title stays blank */ }
+              }
+            } catch (e) { p._cr = null; }
+          });
+        } catch (e) { /* enrichment best-effort; table still renders balances */ }
         return { me: me, rows: rows };
       }).then(function (R) {
         if (myGen !== gen) return; clearBox(listBox);
@@ -229,13 +263,17 @@ var BorrowUI = (function () {
       if (myGen === gen) go.click();
     }).catch(function () { if (myGen === gen && fAcct.input.value) go.click(); /* locked: the 1.2.0 default still loads */ });
   }
-  /* Positions table (desktop) + cards (phone); TCR at divisor 1000. */
+  /* Positions table (desktop) + cards (phone); TCR at divisor 1000 + R1e CR.
+   * CR cell comes from p._cr (enriched by the loader: previewRatio via Format,
+   * feed-valued with danger/warning/safe suffix, nominal honestly labelled).
+   * Missing feed -> "—" with MCR title when known. No float here — Format owns
+   * integers; this only paints strings. */
   function posTable(doc, rows) {
     var box = el(doc, "div");
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
-    [t("borrow.hdr_order", "Order"), t("borrow.hdr_collateral", "Collateral"), t("borrow.hdr_debt", "Debt"), t("borrow.hdr_target_ratio", "Target ratio"), ""].forEach(function (t) {
-      var th = doc.createElement("th"); th.textContent = t; hr.appendChild(th); });
+    [t("borrow.hdr_order", "Order"), t("borrow.hdr_collateral", "Collateral"), t("borrow.hdr_debt", "Debt"), t("borrow.hdr_target_ratio", "Target ratio"), t("borrow.hdr_cr", "Collateral ratio"), ""].forEach(function (h) {
+      var th = doc.createElement("th"); th.textContent = h; hr.appendChild(th); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); table.appendChild(thead);
     var tbody = doc.createElement("tbody");
     rows.forEach(function (p) {
@@ -243,8 +281,23 @@ var BorrowUI = (function () {
       var c = amt(p.coll_raw, p.coll_prec, p.coll_sym, p.coll_id);
       var d = amt(p.debt_raw, p.debt_prec, p.debt_sym, p.debt_id);
       var tcr = (p.tcr_units === null || p.tcr_units === undefined) ? "—" : Credit.tcrUnitsToHuman(p.tcr_units) + "%";
+      var cr = "—", crTitle = null;
+      if (p._cr && p._cr.x) {
+        cr = p._cr.x;
+        try {
+          crTitle = (p._cr.mcr !== null && p._cr.mcr !== undefined)
+            ? "MCR " + Format.mcrUnitsToHuman(p._cr.mcr) + "%" : null;
+        } catch (e) { crTitle = null; }
+      } else if (p._mcr !== null && p._mcr !== undefined) {
+        try { crTitle = "MCR " + Format.mcrUnitsToHuman(p._mcr) + "%"; } catch (e) { crTitle = null; }
+      }
       [[p.call_id], [c.text, c.raw], [d.text, d.raw], [tcr]].forEach(function (x) {
         var td = el(doc, "td", x[0]); if (x[1]) td.title = "raw " + x[1]; tr.appendChild(td); });
+      var tdCr = el(doc, "td", cr);
+      if (crTitle) tdCr.title = crTitle;
+      if (p._cr && p._cr.belowMcr) tdCr.className = "cr-danger";
+      else if (p._cr && p._cr.warn) tdCr.className = "cr-warn";
+      tr.appendChild(tdCr);
       var link = doc.createElement("td");
       var a = el(doc, "a", t("borrow.market", "Market")); a.setAttribute("href", "#/market/" + p.coll_sym + "_" + p.debt_sym);
       link.appendChild(a); tr.appendChild(link); tbody.appendChild(tr);
@@ -258,6 +311,8 @@ var BorrowUI = (function () {
       c.appendChild(el(doc, "div", p.call_id));
       c.appendChild(el(doc, "div", "Collateral " + col.text));
       c.appendChild(el(doc, "div", "Debt " + debt.text));
+      var crLine = (p._cr && p._cr.x) ? p._cr.x : t("borrow.hdr_cr", "Collateral ratio") + " —";
+      c.appendChild(el(doc, "div", crLine));
       box.appendChild(cards); cards.appendChild(c);
     });
     return box;
@@ -313,11 +368,22 @@ var BorrowUI = (function () {
             : ((R.pos.tcr_units === null || R.pos.tcr_units === undefined ? "—" : Credit.tcrUnitsToHuman(R.pos.tcr_units) + "%") + " → " + Credit.tcrUnitsToHuman(R.tcr) + "%");
           clearBox(out);
           out.appendChild(el(doc, "h3", t("borrow.confirm_margin_adjust", "Confirm margin adjust")));
+          var crRow = "—";
+          try {
+            if (R.pos._cr && R.pos._cr.x) {
+              crRow = R.pos._cr.x;
+              if (R.pos._cr.mcr !== null && R.pos._cr.mcr !== undefined) {
+                try { crRow += " (MCR " + Format.mcrUnitsToHuman(R.pos._cr.mcr) + "%)"; } catch (e) { /* display stands */ }
+              }
+            }
+          } catch (e) { crRow = "—"; }
           out.appendChild(confirmList(doc, [
             [t("borrow.account", "Account"), me.name + " (" + me.id + ")"], [t("borrow.order", "Order"), R.pos.call_id],
+            [t("borrow.hdr_cr", "Collateral ratio"), crRow],
             [t("borrow.delta_collateral", "Delta collateral"), (op.delta_collateral.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_collateral.amount, R.cPrec), "raw " + op.delta_collateral.amount],
             [t("borrow.delta_debt", "Delta debt"), (op.delta_debt.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_debt.amount, R.dPrec) + (op.delta_debt.amount.charAt(0) === "-" ? " — NEW DEBT, warned" : ""), "raw " + op.delta_debt.amount],
             [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
+          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
           var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
           var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);
@@ -386,45 +452,55 @@ var BorrowUI = (function () {
     next.addEventListener("click", function () { if (idx < steps.length - 1) { idx++; draw(); } });
     draw();
   }
-  /* Feed-valued backing-ratio preview (BigInt only, display at the end).
-   * CR = collHuman * feedPrice / debtHuman with feedPrice in debt-per-backing
-   * = baseHuman/quoteHuman; orientation VERIFIED at runtime (quote leg must be
-   * the collateral asset, base leg the debt asset). With matching precisions
-   * the scale factors cancel: CR = collRaw*baseRaw / (quoteRaw*debtRaw).
-   * Anything unverifiable (prediction market, missing/inverted/zero feed leg)
-   * falls back to an honestly-labelled nominal unit ratio — never a guessed
-   * CR. Returns {kind ("feed"|"nominal"), x (display), mcr (raw u16|null),
-   * belowMcr}. MCR compare stays integer: CR < mcr/1000. */
+  /* Feed-valued backing-ratio preview (R1e — all money math via Format).
+   * Ports #1 BorrowModal.jsx:572-604 = MarginPosition.jsx:79-97:
+   * feedPrice=1/get_asset_price(quoteRaw,backing,baseRaw,debt);
+   * CR=humanCollateral/(humanDebt/feedPrice); MCR=current_feed
+   * .maintenance_collateral_ratio/1000; status cr<mcr danger, cr<mcr+0.5
+   * warning. With precisions cancelled CR = collRaw*baseRaw/(quoteRaw*debtRaw)
+   * via Format.collateralNumDen; display via Format.formatRatio2dp/pct2dp;
+   * bands via Format.ratioBelowMcr/PlusHalf (exact, boundary-exclusive).
+   * Orientation VERIFIED at runtime (quote leg must be the collateral asset,
+   * base leg the debt asset). Anything unverifiable (prediction market,
+   * missing/inverted/zero feed leg) falls back to an honestly-labelled
+   * nominal unit ratio via Format.nominalNumDen — never a guessed CR.
+   * Returns {kind ("feed"|"nominal"), x (display), mcr (raw u16|null),
+   * belowMcr, warn}. No BigInt/Math.pow here — Format owns integers. */
   function previewRatio(collRaw, collPrec, debtRaw, debtPrec, bit, collId, debtId) {
     var mcr = null;
     try {
       var fd = bit && bit.current_feed;
       if (fd && Number.isInteger(fd.maintenance_collateral_ratio)) mcr = fd.maintenance_collateral_ratio;
     } catch (e) { mcr = null; }
-    function units2(num, den) { /* round(num/den, 2dp) -> "1.75"; BigInt, den > 0 */
-      var q = (num * 100n + den / 2n) / den, s = q.toString();
-      while (s.length < 3) s = "0" + s;
-      return s.slice(0, -2) + "." + s.slice(-2);
+    function bandSuffix(num, den) {
+      if (mcr === null) return "";
+      try {
+        if (Format.ratioBelowMcr(num, den, mcr)) return " · " + t("borrow.cr_danger", "Below maintenance — danger");
+        if (Format.ratioBelowMcrPlusHalf(num, den, mcr)) return " · " + t("borrow.cr_warning", "Near maintenance — warning");
+        return " · " + t("borrow.cr_safe", "Above maintenance");
+      } catch (e) { return ""; }
     }
     if (!(bit && bit.is_prediction_market)) {
       try {
         var sp = bit.current_feed && bit.current_feed.settlement_price;
         var base = sp && sp.base, quote = sp && sp.quote;
         if (base && quote && String(base.asset_id) === String(debtId) && String(quote.asset_id) === String(collId) &&
-            /^\d+$/.test(String(base.amount)) && /^\d+$/.test(String(quote.amount)) &&
-            BigInt(base.amount) > 0n && BigInt(quote.amount) > 0n) {
-          var num = BigInt(collRaw) * BigInt(base.amount), den = BigInt(quote.amount) * BigInt(debtRaw);
-          var below = (mcr !== null) ? (num * 1000n < BigInt(mcr) * den) : false;
-          return { kind: "feed", x: "≈ " + units2(num, den) + "× (" + units2(num * 100n, den) + "%) · feed-valued",
-            mcr: mcr, belowMcr: below };
+            /^\d+$/.test(String(base.amount)) && /^\d+$/.test(String(quote.amount))) {
+          var nd = Format.collateralNumDen(String(collRaw), String(base.amount), String(quote.amount), String(debtRaw));
+          var r2 = Format.formatRatio2dp(nd.num, nd.den), p2 = Format.formatRatioPct2dp(nd.num, nd.den);
+          var below = (mcr !== null) ? Format.ratioBelowMcr(nd.num, nd.den, mcr) : false;
+          var warn = (mcr !== null) ? (!below && Format.ratioBelowMcrPlusHalf(nd.num, nd.den, mcr)) : false;
+          return { kind: "feed", x: "≈ " + r2 + "× (" + p2 + "%) · feed-valued" + bandSuffix(nd.num, nd.den),
+            mcr: mcr, belowMcr: below, warn: warn, num: nd.num, den: nd.den };
         }
       } catch (e) { /* fall through to nominal */ }
     }
-    var n = BigInt(collRaw) * (10n ** BigInt(debtPrec)), d = BigInt(debtRaw) * (10n ** BigInt(collPrec));
+    var nn = Format.nominalNumDen(String(collRaw), collPrec, String(debtRaw), debtPrec);
     var why = (bit && bit.is_prediction_market) ? "prediction market settles 1:1 — feed ratio not applied"
       : "no verifiable feed read — not the margin ratio";
-    return { kind: "nominal", x: "≈ " + units2(n, d) + " collateral units per debt unit (nominal — " + why + ")",
-      mcr: mcr, belowMcr: false };
+    var nx = Format.formatRatio2dp(nn.num, nn.den);
+    return { kind: "nominal", x: "≈ " + nx + " collateral units per debt unit (nominal — " + why + ")",
+      mcr: mcr, belowMcr: false, warn: false, num: nn.num, den: nn.den };
   }
   /* Op-3 OPEN: borrow-to-create (the punchlist HIGH gap was adjust-only).
    * One call_order_update with delta_collateral POSITIVE (locks) + delta_debt
@@ -490,7 +566,7 @@ var BorrowUI = (function () {
         if (dup) throw new Error("have-position (" + dup.call_id + t("borrow.already_covers", " already covers ") + coll.symbol + "/" + debt.symbol + t("borrow.use_adjust_above", " — use Adjust above)"));
         var ratio = previewRatio(collRaw, coll.precision, debtRaw, debt.precision, bit, coll.id, debt.id);
         var mcrRow = (ratio.mcr === null) ? "unknown (no feed read)"
-          : Credit.tcrUnitsToHuman(ratio.mcr) + "%";
+          : Format.mcrUnitsToHuman(ratio.mcr) + "%";
         /* Chain-state gate removed (owner directive): below-MCR is NOT blocked
          * client-side — the ratio rows below stay as the honest hint and the
          * chain validates on broadcast, its exact error via showError. */
@@ -512,11 +588,12 @@ var BorrowUI = (function () {
             [t("borrow.account", "Account"), R.acct.name + " (" + R.acct.id + ")"],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(R.collRaw, R.coll.precision) + " " + R.coll.symbol, "raw " + R.collRaw],
             [t("borrow.hdr_debt", "Debt"), Format.formatAmount(R.debtRaw, R.debt.precision) + " " + R.debt.symbol, "raw " + R.debtRaw],
-            ["Backing ratio", R.ratio.x],
-            ["Maintenance ratio", R.mcrRow + (R.ratio.kind === "nominal" ? " (target only — preview is nominal)" : "")],
+            [t("borrow.backing_ratio", "Backing ratio"), R.ratio.x],
+            [t("borrow.maintenance_ratio", "Maintenance ratio"), R.mcrRow + (R.ratio.kind === "nominal" ? " (target only — preview is nominal)" : "")],
             [t("borrow.target_ratio", "Target ratio"), tcrRow],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)],
             [t("borrow.network", "Network"), "testnet"]]));
+          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
           var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
           var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);
@@ -738,6 +815,7 @@ var BorrowUI = (function () {
             [t("borrow.debt_covered", "Debt covered"), Format.formatAmount(S.debtRaw, R.debtPrec) + " " + R.asset.symbol, "raw " + S.debtRaw],
             [t("borrow.fund", "Fund"), Format.formatAmount(R.fundRaw, R.backingPrec), "raw " + R.fundRaw],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(S.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
+          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
           var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
           var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);

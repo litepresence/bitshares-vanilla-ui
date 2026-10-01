@@ -1371,7 +1371,7 @@ var MarketDesk = (function () {
 
   /* Repaint the pool-map canvas from cached graphData (theme/resize path).
    * Skips when toggled off or stale. Never throws outward. */
-  /* Feed + settlement for the strip (retro round 2 D1 — read path mirrors
+  /* Feed + settlement estimate for the strip (R1d — read path mirrors
    * asset-feed-ui.js loadFeed: lookup_asset_symbols -> bitasset_data_id ->
    * get_objects -> current_feed.settlement_price, formatted with BOTH
    * precisions via Format.formatPrice). Runs ONCE per desk (not per stats
@@ -1379,12 +1379,12 @@ var MarketDesk = (function () {
    * base-per-quote: the settlement amounts map by asset_id onto the market
    * legs (precisions already known from state.assets); legs that don't match
    * the pair skip the feed (backing differs from the market quote) instead
-   * of guessing. Settlement follows #1 ExchangeHeader.jsx:160-198 halfway:
-   * globally-settled assets (settlement_fund > 0) show the on-chain
-   * settlement_price as "Global Settlement" (same object, zero extra calls);
-   * the offset-adjusted estimate for live assets needs exact
-   * reciprocal-percent math that #1 does in float — out of display-only
-   * scope, so no Settlement cell there (recorded in retro-round-1.md).
+   * of guessing. Settlement ports #1 ExchangeHeader.jsx:190-198 (wins over
+   * astro's offset-less dialog per #4 asset_ops force-settlement comment):
+   * offset=bit.options.force_settlement_offset_percent; base CORE(1.3.0) ?
+   * feed/(1+off/10000) : feed*(1+off/10000) via Format.settleEstimate (exact
+   * BigInt, never float); globally-settled (settlement_fund>0) uses
+   * bitasset.settlement_price directly, same object, zero extra calls.
    * Non-MPA pairs and every failure fail OPEN (state.feed null, no cells,
    * the ticker strip stands). Params: (doc, state) with state.assets set.
    * Never throws outward. */
@@ -1462,6 +1462,26 @@ var MarketDesk = (function () {
               out.settle = {
                 global: true,
                 value: Format.formatPrice(sB, b.precision, sQ, q.precision, 8)
+              };
+            }
+          } else {
+            /* Live asset: offset-adjusted estimate (R1d). Offset lives on the
+             * bitasset_data options; missing/invalid fails OPEN (feed stands,
+             * no settle cell) instead of guessing. baseIsCore follows #1
+             * baseId=="1.3.0" branch. */
+            var offRaw = bit && bit.options && bit.options.force_settlement_offset_percent;
+            var off = (Number.isInteger(offRaw) && offRaw >= 0 && offRaw <= 0xFFFF) ? offRaw : null;
+            if (off === null && offRaw !== undefined && offRaw !== null) {
+              var parsed = Number(offRaw);
+              off = (Number.isInteger(parsed) && parsed >= 0 && parsed <= 0xFFFF) ? parsed : null;
+            }
+            if (off === null && (offRaw === undefined || offRaw === null)) off = 0;
+            if (off !== null && typeof Format.settleEstimate === "function") {
+              var baseIsCore = String(b.id) === "1.3.0";
+              out.settle = {
+                global: false,
+                offset: off,
+                value: Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, 8)
               };
             }
           }

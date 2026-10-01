@@ -74,3 +74,23 @@ Plan: `docs/superpowers/plans/2026-09-28-slice-10-assets.md` (Tasks 1–4).
 ## Anti-rot gate (§4.5): (a) yes — static + existing Tx/Chain reuse; (b) nothing
 new depended on (BJS fetched once as reference, never imported); (c) smallest
 deletable: feed page (create/issue/update stand). `check_rot.py` PASS.
+
+## Delta 2026-10-01 — R1d settlement estimate (reads/display only, no new ops)
+
+- Formula ports #1 `ExchangeHeader.jsx:190-198` (wins over astro's offset-less
+  dialog per #4 `asset_ops.hpp` force-settlement comment): `offset=
+  bit.options.force_settlement_offset_percent`; base CORE(`1.3.0`) ?
+  `feed/(1+off/10000)` : `feed*(1+off/10000)` via `Format.settleEstimate`
+  (exact BigInt, `vanilla/js/format.js`); `feedReal` from
+  `current_feed.settlement_price` with BOTH legs' precisions via
+  `Format.formatPrice`; globally-settled (`settlement_fund>0`) uses
+  `bitasset.settlement_price` directly, same object, zero extra calls
+  (`vanilla/js/market-desk.js:fetchFeed`).
+- Strip shows Feed + Settlement (`vanilla/js/market-ind.js:renderStrip`;
+  live title carries `offset X/10000`, global keeps Global Settlement label).
+- Fee asset stays `1.3.0` default; switching deferred (honest note in
+  borrow confirms, same round).
+- Vectors: `tooling/settle-cr-test.js` 40/40 (offset 0 == feed, nonzero both
+  branches, non-BTS p4/p2, global vs live differ, fund BigInt flags).
+  `node --check` clean, `check_rot` PASS, `Math.pow(10` outside `format.js`
+  empty.

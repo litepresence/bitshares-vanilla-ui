@@ -693,9 +693,14 @@ var MarketInd = (function () {
       cell(t("market.stat_feed", "Feed Price"), feed.feed);
     }
     if (feed && feed.settle && feed.settle.value !== null && feed.settle.value !== undefined) {
-      cell(feed.settle.global
+      var isGlobal = !!feed.settle.global;
+      var settleFull = String(feed.settle.value);
+      if (!isGlobal && feed.settle.offset !== undefined && feed.settle.offset !== null) {
+        settleFull += " (offset " + String(feed.settle.offset) + "/10000)";
+      }
+      cell(isGlobal
         ? t("market.stat_global_settle", "Global Settlement")
-        : t("market.stat_settle", "Settlement Price"), feed.settle.value);
+        : t("market.stat_settle", "Settlement Price"), feed.settle.value, settleFull);
     }
   }
 

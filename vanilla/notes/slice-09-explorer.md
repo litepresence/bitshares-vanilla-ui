@@ -67,3 +67,49 @@ Reads-only slice: no signing, no confirm dialog (`tx.js`/`crypto.js` untouched).
 ## Anti-rot gate (§4.5): (a) yes — static reads via existing chain.js, no new
 deps; (b) nothing new depended on; (c) smallest deletable: feeds tab (blocks/
 txs/assets stand). `check_rot.py` PASS.
+
+## R1c delta — ranked ops via bounded chain-scan (2026-10-01, R1c part 1 task B)
+
+Reference behavior (read-only): `astro-ui/src/pages/top-operations.astro` +
+`BlockchainTopOperations.jsx:303-307` (Type/Name/Quantity/% table, Refresh
+button, <1% grouped as Other, recharts donut) + `nanoeffects/TopOperations.ts:
+15-85` (off-chain POST `https://es.bitshares.dev` aggregation). Vanilla REFUSES
+the ES transport (doctrine — external index is a dependency) and astro's
+mainnet-only limit (its testnet branch renders "unsupported").
+
+Vanilla implementation (file:line):
+- `vanilla/js/top-ops-ui.js` (new): `TopOpsUI.renderTopOps` — head via
+  `Chain.db()` + `get_dynamic_global_properties` (#4 `database_api.hpp:229`),
+  then N=200 `get_block` calls (#4 `:182`) in CHUNK=25 waves over the shared
+  socket; counts `operation_type` by id (array `[idx, fields]` or `{type}`
+  shapes; virtual ids kept and labeled `(virtual)`); table (Type/Operation/
+  Count/Share) + hand-rolled SVG donut (`polar`/`ringWedge`/`sliceSpans`, top 8
+  + Other, theme-token fills, `role="img"` + table carries the same data);
+  Refresh button; honest `topops.sample` label ("last 200 blocks … on <node>")
+  + `topops.testnet` note; every share via `Format.pct1` (new in
+  `vanilla/js/format.js`: BigInt tenths-of-a-percent, `"33.3%"`, never float).
+  textContent-only; gen-guarded teardown; 44px targets; `.topops-layout`
+  stacks on phones, side-by-side ≥900px (tokens only, `app.css`).
+- `vanilla/js/router.js`: new `#/top-ops` route (legacy `#/ops` N≤200 sample
+  view retained); `vanilla/js/app.js`: Explore-group nav link + `navText`.
+- Locales: 13 `topops.*` keys en-identical in all 10 dicts (sync script).
+- Vectors: `tooling/top-ops-test.js` 41/41 green (pct1 incl. `1/3→33.3%`,
+  `1/200→0.5%`, zero-total; wedge flags/ring; spans cover 360°; Other fold).
+
+Manual test + observed result (headless, this sandbox 2026-10-01):
+- `node --check` clean (format/top-ops-ui/app/router); `check_rot.py` PASS;
+  `check_i18n.py` OK (2752 keys, drift-free); static smoke: `Router.match(
+  "/top-ops")` → route, `TopOpsUI.renderTopOps` function, N=200.
+- Live 200-block scan NOT run here (no browser chain session in sandbox;
+  `shot.mjs` blocked by missing `libnspr4.so`, recorded above). Testnet proof
+  (connect → scan → table+donut on testnet node, phone + desktop widths) is
+  with the human tester; the scan path uses only the two long-proven WS
+  methods above (same calls `explorer.js` already makes).
+- Matrix: op-coverage C3 flipped DEFERRED → PORTED (this route); B18 flipped
+  DEFERRED → PORTED (the R1c banner in the slice-01 delta above).
+
+Raw→human vectors: shares are counts, not money — `Format.pct1` vectors in
+`tooling/top-ops-test.js` (41/41). No asset amounts on this page.
+Anti-rot gate: (a) static + two database-API reads, runs in 10 years;
+(b) zero new deps (no ES fetch, no recharts); (c) deletable: the donut (table
+stands alone — kept because astro parity names the breakdown).

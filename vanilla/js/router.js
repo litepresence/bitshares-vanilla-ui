@@ -228,6 +228,7 @@ var Router = (function () {
     { path: "/pools", title: "Liquidity Pools", render: function (root) { PoolUI.renderPools(root); } },
     { path: "/swap", title: "Swap", render: function (root) { PoolSwapUI.renderSwap(root); } },
     { path: "/alerts", title: "Price Alerts", render: function (root) { NotifyUI.render(root); } },
+    { path: "/trollbox", title: "Trollbox", render: function (root) { TrollboxUI.renderTrollbox(root); } },
     { path: "/assets", title: "Assets", render: function (root) { AssetUI.renderAssets(root); } },
     { path: "/assets/create", title: "Create Asset", render: function (root) { AssetUI.renderCreate(root); } },
     { path: "/assets/update/:symbol", title: "Update Asset", render: function (root, params) { AssetManageUI.renderUpdate(root, params && params.symbol); } },
@@ -236,6 +237,7 @@ var Router = (function () {
     { path: "/fees", title: "Network Fees", render: function (root) { FeesUI.renderFees(root); } },
     { path: "/referrals", title: "Referrals", render: function (root) { ReferralsUI.renderReferrals(root); } },
     { path: "/favourites", title: "Favourites", render: function (root) { FavouritesUI.renderFavourites(root); } },
+    { path: "/top-ops", title: "Top Operations", render: function (root) { TopOpsUI.renderTopOps(root); } },
     { path: "/ops", title: "Top Operations", render: function (root) { OpsUI.renderOps(root); } },
     { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
     { path: "*", title: "Page Not Found", render: render404 }

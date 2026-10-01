@@ -399,7 +399,14 @@
     "e_g_bts": "e.g. BTS",
     "step": "Step ",
     "next": "Next",
-    "bids_suffix": " yet. Place one from the bid form below — bids list here."
+    "bids_suffix": " yet. Place one from the bid form below — bids list here.",
+    "hdr_cr": "Collateral ratio",
+    "cr_danger": "Below maintenance — danger",
+    "cr_warning": "Near maintenance — warning",
+    "cr_safe": "Above maintenance",
+    "fee_asset_note": "Fee asset 1.3.0 (switching deferred).",
+    "backing_ratio": "Backing ratio",
+    "maintenance_ratio": "Maintenance ratio"
   },
   "credit_detail": {
     "title": "Credit Offer"
@@ -1177,7 +1184,13 @@
     "no_side_suffix": " yet — place one from the Buy/Sell panels below; resting orders list here.",
     "fills_hint": " Fills appear once orders match — place one from the Buy/Sell panels.",
     "my_trades_hint": " Place an order from the Buy/Sell panels — unlock the wallet to see your fills.",
-    "try_spelling_hint": " Try another spelling, or open any market from the picker."
+    "try_spelling_hint": " Try another spelling, or open any market from the picker.",
+    "tab_orders": "My orders",
+    "tab_settle": "Settlement orders",
+    "loading_settle": "Loading settlement orders…",
+    "fail_settle": "Could not load settlement orders.",
+    "th_settle_date": "Settlement date",
+    "no_settle_market": "No bitasset in this market — no settlement orders."
   },
   "misc": {
     "title": "Invoice",
@@ -2858,5 +2871,54 @@
     "skip": "Skip",
     "take_tour": "Take tour",
     "step_of": "Step %(current)s of %(total)s"
+  },
+  "compat": {
+    "msg": "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.",
+    "dismiss": "Dismiss"
+  },
+  "topops": {
+    "title": "Top Operations",
+    "scope": "Last 200 blocks on this node — a live sample, not a chain-wide ranking.",
+    "testnet": "Works on testnet and mainnet (unlike the reference index, which is mainnet-only).",
+    "refresh": "Refresh",
+    "loading": "Reading the last 200 blocks…",
+    "retry": "Retry",
+    "offline": "Network unavailable. Check Settings → Nodes and retry.",
+    "empty": "No operations in the last 200 blocks — retry at the chain tip.",
+    "sample": "Sample: blocks %(lo)s–%(hi)s (%(blocks)s blocks, %(txs)s transactions, %(total)s operations) on %(node)s.",
+    "skipped": " — %(n)s block(s) unreadable, skipped.",
+    "chart_aria": "Donut chart of operation shares. Tabular data follows.",
+    "other": "Other",
+    "back": "Back to Explorer"
+  },
+  "trollbox": {
+    "title": "Trollbox",
+    "intro": "Messages are posted on-chain from your account and visible to everyone. The sender pays a small network fee per message.",
+    "channels_title": "Channels",
+    "language_label": "Language",
+    "status_checking": "Checking node…",
+    "status_live": "Live",
+    "status_unsupported": "Plugin unavailable",
+    "status_error": "Node unreachable",
+    "retry": "Retry",
+    "loading_messages": "Loading messages…",
+    "unsupported_body": "This node does not run the custom_operations plugin, so chat history cannot be read here. Broadcasting still works from any node; switch to a node with the plugin enabled in Settings → Nodes to read history.",
+    "error_body": "The connected node did not answer the plugin probe. Check your connection and retry.",
+    "change_node": "Go to node settings",
+    "empty_channel": "No messages in this channel yet — be the first to post.",
+    "composer_title": "Post a message",
+    "composer_placeholder": "Write a plain-text message…",
+    "login_gate": "Unlock your wallet to post. Reading works without login.",
+    "password_label": "Wallet password",
+    "unlock": "Unlock",
+    "unlock_failed": "Unlock failed.",
+    "post": "Post on-chain",
+    "posting": "Posting…",
+    "posted_ok": "Posted and read back on-chain.",
+    "fee_prefix": "Network fee: ",
+    "bytes_prefix": "Bytes: ",
+    "over_chars": "Message exceeds 1024 characters — shorten it.",
+    "empty_text": "Message text is empty.",
+    "post_failed_prefix": "Post failed: "
   }
 }

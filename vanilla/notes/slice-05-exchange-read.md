@@ -260,3 +260,21 @@ Full trio + both viewports in a REAL browser remain PENDING-BROWSER (tester Step
   empty + testnet USD_TEST 50 bids + depth chart), market@1440-tall — all zero
   console errors. shot.mjs gained a `--network` flag (seeds settings before
   load) for network-specific shots.
+
+## Delta 2026-10-01 — R1e open-settle tab (reads/display only, no new ops)
+
+- Tab ports #1 `MyOpenOrders activeTab open_settlement` (`Exchange.jsx:
+  2656-2693`, `OpenSettleOrders.jsx`, `MarketsActions settleOrderUpdate
+  get_settle_orders [asset,100]`): `Market.settleOrders(assetId,100)`
+  (`database_api.hpp:558`, limit 1-300) + `Market.sortSettles` (ascending
+  `settlement_date`, missing last, non-mutating) + `MarketOrders` My/ Settlement
+  tabs (lazy-load, public, no unlock) with price/amount/date table + phone
+  cards + raw details (`vanilla/js/market.js`, `vanilla/js/market-orders.js`).
+- Bitasset leg via `isMarketAsset` shape (`market_utils.js:461`: quote
+  bitasset backed by base or vice versa); non-bitasset market shows honest
+  `market.no_settle_market`; empty shows `market.no_orders`; price is the live
+  settlement estimate (global fund>0 uses `settlement_price`, else
+  `Format.settleEstimate` with offset, same rule as the strip).
+- Vectors: `tooling/settle-cr-test.js` 40/40 incl. settle-date sort (01/02/03
+  + missing last, input untouched, empty). `node --check` clean, `check_rot`
+  PASS, trio/viewport unchanged (same desk grid, new tab only).

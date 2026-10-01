@@ -2,7 +2,8 @@
  * first paint before App.boot is always styled); vanilla-ui-theme (light)
  * and dex-ux-theme (dark) override.
  * Owns: --bg/--panel/--text/--muted/--accent/--button-bg/--buy/--sell/
- *   --warn/--danger/--live/--border/--header-bg/--plot-bg custom properties
+ *   --warn/--warn-text/--banner-bg/--banner-text/--banner-border/--danger/
+ *   --live/--border/--header-bg/--plot-bg custom properties
  *   per theme. Consumes: vanilla/assets/PALETTE.md finals (dark/light/midnight
  *   columns) + #1 SCSS vars cited inline per token. Side effects: stylesheet
  *   only (no JS, no globals — data-theme switch on <html> selects the block).
@@ -67,11 +68,18 @@
   /* HELP button: #1's own hover treatment (darken($bs-blue, 10%),
    * _theme-template.scss:2213-2216) as a resting shade. */
   --button-bg-deep: #03739a;
+  /* --banner-*: warning banners per theme (ship-day 2026-10-01 — the fixed
+   * light antd #fffbe6 banner leaked into dark themes). ref-ui ambered dark
+   * surface #4A3200 w/ white text (white-on 12.02) + --warn amber border
+   * (graphic accent). --warn-text == --warn here: #fcab53 already 7.58 on
+   * --bg #2a2a2a / 5.56 on --panel #3f3f3f — PASS, no darkening needed. */
+  --banner-bg: #4A3200; --banner-text: #ffffff; --banner-border: #fcab53;
+  --warn-text: #fcab53;
   --icon-filter: invert(1);
 }
 /* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
- * tub photo (workspace root "Homemade Vanilla Ice Cream.jpg", viewed
- * 2026-09-28) — warm cream label/ice-cream, chocolate script, sky-blue logo,
+ * tub photo (vanilla/notes/vanilla-theme/tub.jpg, viewed 2026-09-28) —
+ * warm cream label/ice-cream, chocolate script, sky-blue logo,
  * golden lid. Token reasoning:
  * --bg #FAF6EA: the label's warm cream (page ground; panels stay --panel
  *   white so cards lift off the ground like the photo's white flower).
@@ -102,8 +110,17 @@
    * (was 2.81/3.03/3.03). --button-bg-deep #1786bb -> #0B5C7E keeps the hover
    * depth below the new resting shade (white-on 7.38). */
   --accent: #0F6E99; --accent-text: #ffffff; --button-bg: #0F6E99;
-  --buy: #1DA866; --sell: #D35A41; --warn: #C8961E; --danger: #D35A41;
-  --live: #1DA866;
+  /* A11y 2026-10-01: --buy/--sell darkened for text (#1DA866->#0E7A4A,
+   * #D35A41->#B8452F; hue kept, lightness cut). Measured old: #1DA866 on
+   * #FAF6EA 2.84, on #FFFFFF 3.07; #D35A41 on #FAF6EA 3.66, on #FFFFFF
+   * 3.96 (all <4.5 FAIL for the book-price + picker-CHANGE text uses).
+   * New: #0E7A4A on #FAF6EA 4.98, on #FFFFFF 5.38; #B8452F on #FAF6EA
+   * 4.94, on #FFFFFF 5.34. --live follows --buy (footer host is text on
+   * --panel white: old 3.07 FAIL -> 5.38). --warn stays lid ochre
+   * (graphic/large use only); --warn-text #7A5A0A carries small text
+   * (5.90 on cream, 6.37 on white). */
+  --buy: #0E7A4A; --sell: #B8452F; --warn: #C8961E; --danger: #D35A41;
+  --live: #0E7A4A;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --plot-bg: #ffffff;
   /* --panel-deep: warm stripe between cream ground --bg #FAF6EA and the
@@ -111,6 +128,12 @@
    * cream on the white --panel, never cold office grey. */
   --panel-deep: #F1EAD6;
   --button-bg-deep: #0B5C7E;
+  /* --banner-*: ochre-tinted cream #F3E2B8 (darker/warmer than --bg #FAF6EA,
+   * never the same ground) w/ chocolate --banner-text #2A1A12 (13.05;
+   * == --text) + lid-ochre --banner-border #C8961E (== --warn, graphic).
+   * Provenance: tub lid/label (vanilla/notes/vanilla-theme/tub.jpg). */
+  --banner-bg: #F3E2B8; --banner-text: #2A1A12; --banner-border: #C8961E;
+  --warn-text: #7A5A0A;
   --icon-filter: none;
 }
 /* dex-ux-theme (dark): resampled from the Crypo designer template
@@ -172,8 +195,9 @@
  * Table header/row: header #4f5966 unmapped (too dim, see --muted note);
  *   row text #ffffff on #131722 (:1847/:1797), hover #2a2e39 (:1823);
  *   Crypo dark has no alternating stripe (uniform tr) so striping reuses
- *   the --panel-deep lift. No new tokens added — every Crypo dark surface
- *   maps onto the existing token set. */
+  *   the --panel-deep lift. Banner/warn-text tokens below are the single
+  *   exception (ship-day 2026-10-01 per-theme banner contract); everything
+  *   else maps onto the existing token set. */
 :root[data-theme="dex-ux-theme"] {
   --bg: #131722; --panel: #131722; --text: #ffffff; --muted: #c5cbce;
   --plot-bg: #131722;
@@ -188,6 +212,12 @@
    * instead of darken. Contrast preserved in both directions. */
   --panel-deep: #1c2030;
   --toast-shadow: rgba(0, 0, 0, 0.5);
+  /* --banner-*: Crypo ground #2a2e39 (== --border input ground) w/ white
+   * text (13.56) + Crypo-amber --banner-border #fbbc06 (== --warn, graphic
+   * accent). --warn-text == --warn here: #fbbc06 already 10.48 on --bg —
+   * PASS, no darkening needed. */
+  --banner-bg: #2a2e39; --banner-text: #ffffff; --banner-border: #fbbc06;
+  --warn-text: #fbbc06;
   /* Dark surfaces need light glyphs: full invert maps the vendored
    * black fills to white. Only monochrome glyphs are wired (nav, alarm,
    * fi-star, swap, hamburger) so no colored icon distorts; a colored

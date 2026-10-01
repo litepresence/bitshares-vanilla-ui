@@ -65,3 +65,23 @@ Plan: `docs/superpowers/plans/2026-09-28-slice-13-credit.md` (Tasks 1–4).
 ## Anti-rot gate (§4.5): (a) yes — static + existing Tx/Chain reuse; (b) nothing
 new depended on; (c) smallest deletable: barter page (credit/samet/borrow
 stand). `check_rot.py` PASS.
+
+## Delta 2026-10-01 — R1e collateral ratio (reads/display only, no new ops)
+
+- Formula ports #1 `BorrowModal.jsx:572-604 = MarginPosition.jsx:79-97`:
+  `feedPrice=1/get_asset_price(quoteRaw,backing,baseRaw,debt)`;
+  `CR=humanCollateral/(humanDebt/feedPrice)` (= `collRaw*baseRaw/
+  (quoteRaw*debtRaw)`, precisions cancel) via `Format.collateralNumDen`;
+  display via `Format.formatRatio2dp/pct2dp`; `MCR=current_feed.
+  maintenance_collateral_ratio/1000` via `Format.mcrUnitsToHuman`;
+  status `cr<mcr` danger, `cr<mcr+0.5` warning (exclusive boundaries, exact
+  `Format.ratioBelowMcr/PlusHalf`), nominal fallback via
+  `Format.nominalNumDen` honestly labelled (`vanilla/js/borrow-ui.js:
+  previewRatio`, `posTable` CR column + cards, adjust/open confirms).
+- Positions loader enriches each debt leg with one `bitasset_data` read
+  (fail-open, table still renders balances). Fee asset stays `1.3.0`;
+  confirms carry "Fee asset 1.3.0 (switching deferred)." (`borrow.
+  fee_asset_note`, 10 dicts).
+- Vectors: `tooling/settle-cr-test.js` 40/40 (CR 1.0 danger / 2.0 warning /
+  3.0 safe, boundary mcr and mcr+0.5 exclusive, 1.749/2.249 edges, MCR
+  humans, nominal round-trip). `node --check` clean, `check_rot` PASS.

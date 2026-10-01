@@ -1,19 +1,23 @@
-/* MarketOrders: my-open-orders rendering for the DEX desk (display + cancel).
+/* MarketOrders: my-open-orders + open-settlement rendering for the DEX desk.
  * Owns: typed-account preview row (Account input + Look up, public reads —
  *   locked + blank keeps the locked hint), loading state, order rows as table +
  *   phone cards with per-row raw JSON, Cancel buttons per row/card plus the
- *   cancel-all box (≥2 orders, unlocked auto-load only), and the fill-size tape histogram
- *   (dex-ux plot proposal 2: order-of-magnitude bins over fill integer
- *   amounts, canvas 2D, collapsible, mounted by MarketBook into the
- *   mkt-trades pane from already-fetched rows — no new chain call).
+ *   cancel-all box (≥2 orders, unlocked auto-load only), the open-settlement
+ *   tab (R1e: db get_settle_orders(assetId,100) <=300, price/amount/date table
+ *   sorted by settlement_date via Market.sortSettles, empty->no_orders), and
+ *   the fill-size tape histogram (dex-ux plot proposal 2: order-of-magnitude
+ *   bins over fill integer amounts, canvas 2D, collapsible, mounted by
+ *   MarketBook into the mkt-trades pane from already-fetched rows — no new
+ *   chain call).
  *   Cancel CONFIRM/SEND/RESULT flows are owned by
  *   TradeUI (slice-06) — this file only mounts buttons + boxes and re-renders
  *   the list when TradeUI reports done.
- * Consumes: Market.myOrders (read-only fetch, via global — same as before
- *   the split), Wallet.isUnlocked (read-only gate, never modified), Format
- *   (formatAmount/formatPrice — BigInt, 8 places like Market), ctx.assets
- *   (quote/base id/symbol/precision, never modified), TradeUI (cancel UI only,
- *   guarded — rows render without buttons when it failed to load).
+ * Consumes: Market.myOrders/.settleOrders/.sortSettles (read-only fetch, via
+ *   global — same as before the split), Wallet.isUnlocked (read-only gate,
+ *   never modified), Format (formatAmount/formatPrice/settleEstimate — BigInt,
+ *   8 places like Market), ctx.assets (quote/base id/symbol/precision +
+ *   bitasset_data_id, never modified), TradeUI (cancel UI only, guarded —
+ *   rows render without buttons when it failed to load).
  * Globals/side effects: DOM under the given parent element only; global
  *   MarketOrders only. showError/network/defaultMarket are private copies of
  *   the market-ui.js helpers (same per-file convention as transfer-ui.js) so
@@ -23,7 +27,7 @@
  *   commented at the site.
  * Created by: building-vanilla-slices skill, slice-05 refactor (market-ui split).
  * Extended by: dex-ux plots task (AFK round — proposal 2 tape histogram,
- *   chain-history only, ES refused).
+ *   chain-history only, ES refused) + R1e open-settle tab.
  */
 var MarketOrders = (function () {
   "use strict";
@@ -118,6 +122,45 @@ var MarketOrders = (function () {
       unlocked = typeof Wallet !== "undefined" && Wallet &&
         (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
     } catch (e) { unlocked = false; }
+    /* Tabs: My orders | Settlement orders (R1e, mirrors #1 MyOpenOrders
+     * activeTab my_orders/open_settlement). Settlement is public chain data
+     * (no unlock) and lazy-loads on first open; My keeps the existing
+     * auto-load below. Buttons stay >=44px. */
+    var tabs = doc.createElement("div");
+    tabs.className = "mkt-tabs";
+    tabs.setAttribute("role", "tablist");
+    tabs.setAttribute("aria-label", t("market.trades_toggle_label", "Recent or my trades"));
+    var tabOrders = touchable(el(doc, "button", t("market.tab_orders", "My orders")));
+    tabOrders.type = "button";
+    tabOrders.setAttribute("role", "tab");
+    var tabSettle = touchable(el(doc, "button", t("market.tab_settle", "Settlement orders")));
+    tabSettle.type = "button";
+    tabSettle.setAttribute("role", "tab");
+    tabs.appendChild(tabOrders);
+    tabs.appendChild(tabSettle);
+    parentEl.appendChild(tabs);
+    var myWrap = doc.createElement("div");
+    myWrap.setAttribute("role", "tabpanel");
+    parentEl.appendChild(myWrap);
+    var settleWrap = doc.createElement("div");
+    settleWrap.setAttribute("role", "tabpanel");
+    settleWrap.style.display = "none";
+    parentEl.appendChild(settleWrap);
+    var settleLoaded = false;
+    function paintTabs(isSettle) {
+      tabOrders.setAttribute("aria-selected", isSettle ? "false" : "true");
+      tabSettle.setAttribute("aria-selected", isSettle ? "true" : "false");
+      tabOrders.setAttribute("aria-pressed", isSettle ? "false" : "true");
+      tabSettle.setAttribute("aria-pressed", isSettle ? "true" : "false");
+      myWrap.style.display = isSettle ? "none" : "";
+      settleWrap.style.display = isSettle ? "" : "none";
+    }
+    tabOrders.addEventListener("click", function () { paintTabs(false); });
+    tabSettle.addEventListener("click", function () {
+      paintTabs(true);
+      if (!settleLoaded) { settleLoaded = true; loadSettle(); }
+    });
+    paintTabs(false);
     /* Typed-account preview row (principle #9: reads never gate on unlock). */
     var acctRow = doc.createElement("div");
     var lab = el(doc, "span", t("account.card_account", "Account") + " ");
@@ -133,9 +176,9 @@ var MarketOrders = (function () {
     acctRow.appendChild(acctInput);
     acctRow.appendChild(doc.createTextNode(" "));
     acctRow.appendChild(viewBtn);
-    parentEl.appendChild(acctRow);
+    myWrap.appendChild(acctRow);
     var body = doc.createElement("div");
-    parentEl.appendChild(body);
+    myWrap.appendChild(body);
     /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       while (body.firstChild) body.removeChild(body.firstChild);
@@ -272,6 +315,160 @@ var MarketOrders = (function () {
         while (body.firstChild) body.removeChild(body.firstChild);
         showError(doc, body, e, t("market.fail_orders", "Could not load your orders."));
       });
+    }
+    /* loadSettle: R1e open-settlement tab (public read, no unlock).
+     * Resolves the market bitasset leg via isMarketAsset shape (quote bitasset
+     * backed by base, or base bitasset backed by quote — market_utils.js:461),
+     * then db get_settle_orders(assetId,100) (database_api.hpp:558, <=300),
+     * sorted by settlement_date via Market.sortSettles. Price is the live
+     * settlement estimate (global fund>0 uses settlement_price directly,
+     * else Format.settleEstimate with the bitasset offset — same rule as the
+     * desk strip); amount is balance human via Format; date via I18n.date.
+     * Empty -> no_orders; non-bitasset market -> honest no_settle_market note.
+     * Never throws outward (fails inline). */
+    function loadSettle() {
+      if (!live()) return;
+      while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+      settleWrap.appendChild(el(doc, "p", t("market.loading_settle", "Loading settlement orders…"), "muted"));
+      Promise.resolve().then(async function () {
+        if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") throw new Error("not connected");
+        if (typeof Market === "undefined" || !Market || typeof Market.settleOrders !== "function") throw new Error("settle backend missing");
+        var q = assets.quote, b = assets.base;
+        var qBid = (q && q.bitasset_data_id) || null, bBid = (b && b.bitasset_data_id) || null;
+        if (!qBid && !bBid) return { none: true };
+        var dbId = await Chain.db();
+        var bits = {};
+        if (qBid) {
+          var qo = await Chain.call(dbId, "get_objects", [[qBid]]);
+          if (qo && qo[0]) bits.quote = qo[0];
+        }
+        if (bBid) {
+          var bo = await Chain.call(dbId, "get_objects", [[bBid]]);
+          if (bo && bo[0]) bits.base = bo[0];
+        }
+        var marketAssetId = null, bit = null, settledPrec = null, settledSym = null;
+        var qBack = bits.quote && bits.quote.options && bits.quote.options.short_backing_asset;
+        var bBack = bits.base && bits.base.options && bits.base.options.short_backing_asset;
+        if (qBack === b.id) { marketAssetId = q.id; bit = bits.quote; settledPrec = q.precision; settledSym = q.symbol; }
+        else if (bBack === q.id) { marketAssetId = b.id; bit = bits.base; settledPrec = b.precision; settledSym = b.symbol; }
+        else return { none: true };
+        var rows = await Market.settleOrders(marketAssetId, 100);
+        var sorted = (typeof Market.sortSettles === "function") ? Market.sortSettles(rows) : (rows || []).slice();
+        /* Live price for the tab: same rule as the desk strip (global fund>0
+         * -> settlement_price; else offset estimate). Feed legs map by asset_id
+         * onto the market legs; unmappable -> price "—", never guessed. */
+        var price = "—", priceTitle = null;
+        try {
+          var fundStr = String(bit.settlement_fund !== undefined && bit.settlement_fund !== null ? bit.settlement_fund : "0");
+          var isSettled = /^-?\d+$/.test(fundStr.trim()) ? BigInt(fundStr.trim()) > 0n : Number(bit.settlement_fund) > 0;
+          var cur = bit.current_feed && bit.current_feed.settlement_price;
+          var rawB = null, rawQ = null;
+          if (cur && cur.base && cur.quote) {
+            [cur.base, cur.quote].forEach(function (leg) {
+              if (leg.asset_id === b.id) rawB = String(leg.amount);
+              else if (leg.asset_id === q.id) rawQ = String(leg.amount);
+            });
+          }
+          if (isSettled && bit.settlement_price && bit.settlement_price.base && bit.settlement_price.quote) {
+            var sB = null, sQ = null;
+            [bit.settlement_price.base, bit.settlement_price.quote].forEach(function (leg) {
+              if (leg.asset_id === b.id) sB = String(leg.amount);
+              else if (leg.asset_id === q.id) sQ = String(leg.amount);
+            });
+            if (sB !== null && sQ !== null) price = Format.formatPrice(sB, b.precision, sQ, q.precision, PRICE_PLACES);
+          } else if (rawB !== null && rawQ !== null) {
+            var offRaw = bit.options && bit.options.force_settlement_offset_percent;
+            var off = (Number.isInteger(offRaw) && offRaw >= 0 && offRaw <= 0xFFFF) ? offRaw : 0;
+            var baseIsCore = String(b.id) === "1.3.0";
+            price = Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, PRICE_PLACES);
+            priceTitle = "offset " + String(off) + "/10000";
+          }
+        } catch (e) { price = "—"; }
+        return { rows: sorted, price: price, priceTitle: priceTitle, assetId: marketAssetId, prec: settledPrec, sym: settledSym };
+      }).then(function (R) {
+        if (!live()) return;
+        while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+        if (!R || R.none) {
+          settleWrap.appendChild(el(doc, "p", t("market.no_settle_market", "No bitasset in this market — no settlement orders."), "muted"));
+          return;
+        }
+        paintSettle(R.rows, R.price, R.priceTitle, R.prec, R.sym);
+      }).catch(function (e) {
+        if (!live()) return;
+        while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+        showError(doc, settleWrap, e, t("market.fail_settle", "Could not load settlement orders."));
+      });
+    }
+    /* paintSettle: price/amount/date table sorted by settlement_date (input
+     * already sorted). Amount human via Format (raw in title, never bare);
+     * date via I18n.date with raw fallback; price shared estimate with offset
+     * title. Empty -> no_orders (brief contract). Phone cards + raw details
+     * mirror the my-orders pattern. No-ops when live() is false. */
+    function paintSettle(rows, price, priceTitle, prec, sym) {
+      if (!live()) return;
+      while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+      if (!rows || rows.length === 0) {
+        settleWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        return;
+      }
+      var table = doc.createElement("table");
+      table.className = "node-table";
+      var thead = doc.createElement("thead");
+      var hr = doc.createElement("tr");
+      [t("market.col_price", "Price"), t("market.th_amount", "Amount"), t("market.th_settle_date", "Settlement date")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      var tbody = doc.createElement("tbody");
+      var cards = doc.createElement("div");
+      cards.className = "node-cards orders-cards";
+      rows.forEach(function (r) {
+        var bal = (r && r.balance) || {};
+        var amtRaw = (bal.amount !== undefined && bal.amount !== null) ? String(bal.amount) : null;
+        var amt = "—", amtTitle = null;
+        if (amtRaw !== null && /^-?\d+$/.test(amtRaw) && typeof prec === "number") {
+          try { amt = Format.formatAmount(amtRaw, prec) + (sym ? " " + sym : ""); amtTitle = "raw " + amtRaw; }
+          catch (e) { amt = amtRaw; }
+        } else if (amtRaw !== null) { amt = amtRaw; }
+        var dateRaw = (r && r.settlement_date) ? String(r.settlement_date) : "—";
+        var dateShown = dateRaw;
+        try {
+          if (dateRaw !== "—" && typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") dateShown = I18n.date(dateRaw);
+        } catch (e) { dateShown = dateRaw; }
+        var tr = doc.createElement("tr");
+        var tdP = el(doc, "td", String(price));
+        if (priceTitle) tdP.title = priceTitle;
+        tr.appendChild(tdP);
+        var tdA = el(doc, "td", String(amt));
+        if (amtTitle) tdA.title = amtTitle;
+        tr.appendChild(tdA);
+        var tdD = el(doc, "td", String(dateShown));
+        if (dateShown !== dateRaw) tdD.title = dateRaw;
+        tr.appendChild(tdD);
+        tbody.appendChild(tr);
+        var card = doc.createElement("div");
+        card.className = "node-card";
+        card.appendChild(el(doc, "div", String(price)));
+        card.appendChild(el(doc, "div", String(amt)));
+        card.appendChild(el(doc, "div", String(dateShown)));
+        cards.appendChild(card);
+      });
+      table.appendChild(tbody);
+      var scroller = doc.createElement("div");
+      scroller.className = "orders-scroll";
+      scroller.appendChild(table);
+      settleWrap.appendChild(scroller);
+      settleWrap.appendChild(cards);
+      var detAll = doc.createElement("details");
+      detAll.className = "raw";
+      var sumAll = doc.createElement("summary");
+      sumAll.setAttribute("aria-label", t("market.raw_orders", "Show raw orders JSON"));
+      touchable(sumAll);
+      detAll.appendChild(sumAll);
+      var preAll = doc.createElement("pre");
+      try { preAll.textContent = JSON.stringify(rows, null, 2); }
+      catch (e) { preAll.textContent = String(rows); }
+      detAll.appendChild(preAll);
+      settleWrap.appendChild(detAll);
     }
     viewBtn.addEventListener("click", loadTyped);
     if (!unlocked) {

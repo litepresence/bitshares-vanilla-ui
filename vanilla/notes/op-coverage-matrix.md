@@ -20,7 +20,7 @@
 | A1 | `/` → DashboardPage (:503) | index.astro + Home.jsx | `/` (:111) → PORTED (slice-05/07; documented deviation: redirects to last/default market desk with link, no blank page) |
 | A2 | `/account/:account_name` → AccountPage (:510) | balances, recent-activity, open-orders, call-orders.astro | `/account/:account_name` (:112) → PORTED (slice-03: balances, open orders, history, 22 live vectors; +2026-09-29 G6 public-first lookup, any account opens locked — account-ui.js:572) |
 | A3 | `/accounts` → DashboardAccountsOnly (:512) | — (no equiv) | `/accounts` (:113) → PORTED (`accounts-ui.js`: wallet card + lookup + manage links) |
-| A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading; +2026-09-29 typed-account My fills/orders preview locked, logged-out quote panels, equal 2x3, overlay mesh, feed/settlement strip reads-only — market-desk.js:702,1230; market-ind.js:352,975; trade-form.js:389; desk-grid.css:51) |
+| A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading; +2026-09-29 typed-account My fills/orders preview locked, logged-out quote panels, equal 2x3, overlay mesh, feed/settlement strip reads-only — market-desk.js:702,1230; market-ind.js:352,975; trade-form.js:389; desk-grid.css:51; +2026-10-01 R1d offset estimate + R1e open-settle tab — market.js:settleOrders/sortSettles, market-orders.js tabs, market-desk.js:fetchFeed) |
 | A5 | `/credit-offer` → CreditOfferPage (:520) | offers, offer, lend.astro | `/credit-offer` (:116) + `/credit-offer/:id` (:115) → PORTED (slice-13: offer 1.21.43 → deals 1.22.70/71) |
 | A6 | `/settings`, `/settings/:tab` (:524–528) | nodes, theme, visuals, page_themes.astro | `/settings`, `/settings/:tab` (:118–119) → PORTED (slice-01 nodes/latency/testnet; slice-17 switcher; 3 themes) |
 | A7 | `/invoice/:data` → Invoice (:529) | create_invoice, pay_invoice, stored_invoices, invoice_inventory.astro | `/invoice/:data` (:120) + `/invoice` (:121) → PORTED (slice-14 MiscUI) |
@@ -36,7 +36,7 @@
 | A17 | `/asset/:symbol` → Asset (:571) | smartcoin, smartcoins, issued_assets.astro | `/asset/:symbol` (:140) → PORTED (slice-09/10) |
 | A18 | `/block/:height` → Block (:575) | blocks.astro | `/block/:height` (:141) → PORTED (slice-09, fixtures 100916767/68) |
 | A19 | `/block/:height/:txIndex` → Block (:580) | blocks.astro | `/block/:height/:txIndex` (:142) → PORTED (slice-09) |
-| A20 | `/borrow` → Borrow showcase (:585) | borrow.astro | `/borrow` (:143) → PORTED (slice-13 BorrowUI: margin positions, call orders, settle op-17) |
+| A20 | `/borrow` → Borrow showcase (:585) | borrow.astro | `/borrow` (:143) → PORTED (slice-13 BorrowUI: margin positions, call orders, settle op-17; +2026-10-01 R1e CR column + bands + fee-asset deferred note — borrow-ui.js:previewRatio/posTable) |
 | A21 | `/barter` → Barter (:587) | barter.astro | `/barter` (:144) → PORTED (slice-13/14: op-22 PROPOSE proven 1.10.1491) |
 | A22 | `/direct-debit` → DirectDebit (:588) | withdraw_permissions.astro | `/direct-debit` (:145) → PORTED (slice-11: debit 1.12.139 full lifecycle) |
 | A23 | `/spotlight` → ShowcaseGrid (:593) | featured.astro | `/spotlight` (:146) → PORTED (slice-11 DebitUI.renderSpotlight) |
@@ -72,7 +72,7 @@
 | B15 | WalletUnlockModal (Wallet/) | — (Beet outsourced) | WalletUI unlock/auto-lock → PORTED (slice-02) |
 | B16 | GatewaySelectorModal (Gateways/) | — | GatewayUI desk → PORTED (slice-15) |
 | B17 | ChoiceModal.js (generic confirm) | ui/dialog.jsx | generic inline-confirm pattern → PORTED (used slices 06, 12, 13) |
-| B18 | BrowserSupportModal.jsx | — | DEFERRED: evergreen-browser assumption documented; no modal needed (reason: dead-browser warning adds no wallet function) |
+| B18 | BrowserSupportModal.jsx | — | PORTED as a dismissible feature-detected banner (R1c 2026-10-01: `compatMissing()` gates WebSocket/WebCrypto/BigInt/storage — never UA sniff, never a load gate; neutral copy + `#/help` link, dismissal in localStorage; #1's UA-sniff + Chrome upsell refused) |
 | B19 | ReportModal.jsx (issue reporter) | — | DEFERRED: points at GitHub issues; out of wallet scope (reason: not a chain/wallet function) |
 
 ## C. Astro-only pages (no #1 route) → vanilla route
@@ -81,7 +81,7 @@
 |---|---|---|---|
 | C1 | balances, recent-activity, open-orders, call-orders.astro | portfolio / activity / open orders | merged in A2 → PORTED (slice-03) |
 | C2 | top-markets.astro | 24hr trading rankings | market picker + ticker stats → PORTED (slice-05) |
-| C3 | top-operations.astro | most-used ops stats | DEFERRED: ranked op-count stats panel (reason: op browser + enum tables PORTED slice-09; ranking is analytics, not wallet function; tracked) |
+| C3 | top-operations.astro | most-used ops stats | `/top-ops` → PORTED (R1c 2026-10-01: bounded N=200 chain-scan via Chain.db/call `get_block`, Type/Name/Count/Share table + hand-rolled SVG donut, Refresh, honest last-200 label + testnet-works note, `Format.pct1` shares; legacy `#/ops` N≤200 sample view retained) |
 | C4 | top-pools.astro | most active pools | merged in A32 → PORTED (slice-12) |
 | C5 | order.astro | limit-order form | trade form → PORTED (slice-06: limit, FoK, scaled N=2–20) |
 | C6 | tfunds, tfund_user.astro | Same-T funds create/update/delete | `/samet` (:117) → PORTED (slice-13: funds 1.20.29/30) |
@@ -104,8 +104,8 @@
 | C23 | blind_transfers.astro | blind transfers | DEFERRED (reason: slice-14 honest downscope — commitments + bulletproofs + stealth ECDH have no auditable vanilla source; tracked, never silently half-ported) |
 | C24 | timed_transfer.astro | delayed transfers | PORTED via `/proposals` generic propose flow (slice-14; note: no dedicated prefill — propose-a-transfer covers the chain path) |
 | C25 | withdraw_permissions.astro | direct debit | merged in A22 → PORTED (slice-11) |
-| C26 | settlement.astro | force-settlement (op-17) | PORTED via `/borrow` + asset ops (slice-10/13; asset_settle op-17 serializer slice-14) |
-| C27 | settlement_bids.astro | collateral bidding (op-45 bid_collateral; 46 is VIRTUAL execute_bid) | PORTED (op-45 serializer + `#/borrow` settlement-bid section; broadcast tester-queued) |
+| C26 | settlement.astro | force-settlement (op-17) | PORTED via `/borrow` + asset ops (slice-10/13; asset_settle op-17 serializer slice-14; +2026-10-01 R1d settlement estimate: offset-adjusted feed via Format.settleEstimate, global fund>0 uses settlement_price — market-desk.js:fetchFeed, market-ind.js:renderStrip) |
+| C27 | settlement_bids.astro | collateral bidding (op-45 bid_collateral; 46 is VIRTUAL execute_bid) | PORTED (op-45 serializer + `#/borrow` settlement-bid section; broadcast tester-queued; +2026-10-01 R1e open-settle tab: get_settle_orders(assetId,100) sorted by settlement_date — market.js:settleOrders/sortSettles, market-orders.js tabs) |
 | C28 | borrow, lend.astro | borrow/lend | merged in A20/A5 → PORTED (slice-13) |
 | C29 | ltm.astro | lifetime membership (op-8 account_upgrade) | PORTED (op-8 serializer + Membership section on account view; broadcast tester-queued) |
 | C30 | monthly_referrer.astro | referrer stats (read-only) | PORTED (`#/referrals`: registrar/referrer/splits/vesting; counts honestly absent) |
@@ -115,7 +115,7 @@
 | C34 | change_password.astro | keystore password change | PORTED (`#/wallet/password`: verify + re-encrypt + proof) |
 | C35 | favourites.astro | favourite assets/accounts/markets | PORTED (`#/favourites` dashboard) |
 | C36 | forum, forum_thread.astro | docs/forum mirror | DEFERRED (reason: external community forum, not a wallet function; same class as ReportModal) |
-| C37 | trollbox.astro | deprecated chat | DEFERRED (reason: dead chat widget, not a wallet function) |
+| C37 | trollbox.astro | deprecated chat | `/trollbox` → PORTED (R1c 2026-10-01: reads via Chain.custom + 100/page pager, 9199-only post path, live inclusion tester-queued — see slice-14 delta; dex.trading restricts custom_operations reads, xbts.io plugin-open) |
 | C38 | featured.astro | featured pools | merged in A23 → PORTED (slice-11) |
 | C39 | create_account, create_worker, instant_trade, htlc, barter, debt pages | (dupes of A-rows) | merged in A9/A27/A31/A29/A21/A22 → status per A-row |
 | C40 | swap.astro | pool swaps | `/swap` (:162) → PORTED (slice-12) |
@@ -136,8 +136,8 @@
 ## Counts
 
 - Section A (#1 routes): 33 rows — PORTED 33, STUB 0, DEFERRED 0, MISSING 0.
-- Section B (#1 modals/widgets): 19 rows — PORTED 17, DEFERRED 2 (B18 browser warning, B19 issue reporter), MISSING 0.
-- Section C (astro-only pages): 41 rows = 20 PORTED substantive + 11 merge-pointers to §A rows (C1, C19, C20, C22, C25, C28, C32, C33, C38, C39, C41) + 10 DEFERRED (C3 top-ops stats, C23 blind, C27 bid_collateral, C29 LTM op-8, C30 referrer display, C31 fee-schedule table, C34 password change, C35 favourites dashboard, C36 forum, C37 trollbox — all reasoned), MISSING 0.
+- Section B (#1 modals/widgets): 19 rows — PORTED 18, DEFERRED 1 (B19 issue reporter), MISSING 0.
+- Section C (astro-only pages): 41 rows = 28 substantive PORTED (20 + C27/C29/C30/C31/C34/C35 confirmed PORTED per-row + C3 ranked-ops + C37 trollbox PORTED 2026-10-01) + 11 merge-pointers to §A rows (C1, C19, C20, C22, C25, C28, C32, C33, C38, C39, C41) + 2 DEFERRED (C23 blind, C36 forum — reasoned; corrected 2026-10-01 per R2: the old "10 DEFERRED" line mislisted six PORTED rows), MISSING 0.
 - Section D (out-of-scope, decided): 7 items, all with standing-directive reasons.
 - **MISSING (unjustified): 0.** Every App.jsx route has a row in §A; every astro page has a row in §A or §C; every vanilla router entry maps to a row above. Former STUB routes (A3, A9–A14, A27, A28, A30, A31) all built out in stub batches 1–3 + op-34; no placeholders remain in §A. DEFERRED items each carry a reason + tracking note (C18 tickets PROVEN on-chain, throwaway-funded).
 
@@ -405,3 +405,58 @@
 - Counts: §A 33 PORTED / §B 17 PORTED + 2 DEFERRED / §C 20 substantive
   PORTED + 11 merge-pointers + 10 DEFERRED / §D 7 — unchanged.
   MISSING (unjustified): still 0.
+
+## R1c part-1 delta (2026-10-01) — B18 + C3 PORTED, zero new deps
+
+- B18 (dead-browser notice) DEFERRED → PORTED: `vanilla/js/app.js`
+  `compatMissing()` + `#compat-banner` (`index.html`, `app.css`), neutral copy
+  + `#/help` link, dismissal `bts-vanilla-compat-off-v1`; #1's UA-sniff
+  (`App.jsx:345-356`) + Chrome upsell (`BrowserSupportModal.jsx:9-15`,
+  `locale-en.json:496-497`) refused. Delta in `slice-01-settings.md`.
+- C3 (ranked ops) DEFERRED → PORTED: `#/top-ops` (`vanilla/js/top-ops-ui.js`,
+  route in `router.js`, Explore nav link in `app.js`) — N=200 `get_block`
+  chain-scan (`database_api.hpp:182/:229`), table + SVG donut, Refresh, honest
+  last-200 label + testnet-works note, `Format.pct1` shares; astro's ES POST
+  (`TopOperations.ts:15-85`) refused, mainnet-only limit lifted. Vectors
+  `tooling/top-ops-test.js` 41/41. Delta in `slice-09-explorer.md`.
+- Counts now: §A 33 PORTED / §B 18 PORTED + 1 DEFERRED / §C 21 substantive
+  PORTED + 11 merge-pointers + 1 BUILDING (C37 trollbox) + 2 DEFERRED /
+  §D 7. MISSING (unjustified): still 0. Verification this round:
+  `node --check` clean, `check_rot.py` PASS, `check_i18n.py` OK (2752 keys),
+  `top-ops-test.js` 41/41; `shot.mjs` blocked by sandbox-missing `libnspr4.so`
+  (recorded, static smoke substituted); live 200-block testnet scan + human
+  browser passes queued with the tester.
+
+## R1d+R1e delta (2026-10-01) — settlement estimate + CR + open-settle tab (reads only)
+
+- R1d (C26-ported note): settlement estimate on the desk strip
+  (`market-desk.js:fetchFeed`, `market-ind.js:renderStrip`,
+  `Format.settleEstimate`): offset from `bit.options.
+  force_settlement_offset_percent`, CORE-base branch per #1, global fund>0
+  uses `settlement_price` directly. Fee asset stays `1.3.0` + deferred note.
+- R1e CR (A20-ported note): collateral ratio column + bands in `#/borrow`
+  (`borrow-ui.js:previewRatio/posTable`, `Format.collateralNumDen/
+  formatRatio2dp/pct2dp/ratioBelowMcr/PlusHalf/mcrUnitsToHuman/nominalNumDen`):
+  danger `cr<mcr`, warning `cr<mcr+0.5` (exclusive), nominal honestly labelled.
+- R1e tab (A4-ported note, C20 unchanged — explorer untouched):
+  open-settle tab on the desk (`market.js:settleOrders/sortSettles`,
+  `market-orders.js` My/Settlement tabs): `get_settle_orders(assetId,100)`
+  <=300, price/amount/date sorted by `settlement_date`, empty->`no_orders`.
+- Vectors: `tooling/settle-cr-test.js` 40/40 (offset 0/nonzero, non-BTS p4/p2,
+  global branch, CR bands incl. boundary mcr and mcr+0.5, settle-date sort).
+  Verification: `node --check` clean (6 files), `check_rot` PASS,
+  `check_i18n` OK (2793 keys, 13 new keys ×10 dicts), `Math.pow(10` outside
+  `format.js` empty. Counts unchanged; MISSING still 0.
+
+## R1c trollbox delta (2026-10-01) — C37 BUILDING → PORTED
+- C37 (trollbox) BUILDING → PORTED: `#/trollbox` (`vanilla/js/trollbox.js` +
+  `trollbox-ui.js`, `Chain.custom()`, op-35 9198/9199-only exception in
+  `tx.js`, 28 `trollbox.*` keys ×10 dicts). Reads: 100/page pager + meta probe;
+  post: live fee + direct key read-back. Live inclusion tester-queued (one
+  accepted post, key absent — see slice-14 delta). Detail in
+  `vanilla/notes/slice-14-proposals.md` (R1c trollbox delta).
+- Counts now: §A 33 PORTED / §B 18 PORTED + 1 DEFERRED / §C 22 substantive
+  PORTED + 11 merge-pointers + 0 BUILDING + 2 DEFERRED (C23 blind, C36 forum) /
+  §D 7. MISSING (unjustified): still 0. Verification this round:
+  `tooling/trollbox-test.js` 75/75, `node --check` clean, `check_rot.py` PASS,
+  `check_i18n.py` OK (2793 keys, 3756 sites drift-free).

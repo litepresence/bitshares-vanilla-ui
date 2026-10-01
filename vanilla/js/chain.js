@@ -71,7 +71,7 @@ var Chain = (function () {
    *   fresh ones) — a stale cache would address the new connection wrongly.
    *   The market-notice handler dies with it too (server-side subscriptions
    *   do not survive reconnect — the route resubscribes). */
-  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; marketCb = null; _dbPending = null; _historyPending = null; _netPending = null; }
+  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; _customId = null; marketCb = null; _dbPending = null; _historyPending = null; _netPending = null; _customPending = null; }
 
   /* blockNumberFromId: graphene block ids lead with the 4-byte big-endian
    * block number (astro-ui BlocksLive parity). Returns the number or null. */
@@ -389,6 +389,22 @@ var Chain = (function () {
     }, function (e) { _netPending = null; throw e; });
     return _netPending;
   }
+  /* Custom-operations api id (mirrors db(), same in-flight dedupe): cached
+   * after first login. Added for the R1c trollbox slice; used by Trollbox
+   * reads (get_storage_info) only. Resolves on plugin nodes; REJECTS on
+   * nodes without the custom_operations plugin (login "custom_operations"
+   * answers -32601 / "not available") — callers map that to the honest
+   * "unsupported" empty state via Trollbox.isPluginMissingError, never a
+   * silent blank. Broadcasts never need this api (network_broadcast). */
+  var _customId = null, _customPending = null;
+  function custom() {
+    if (_customId !== null) return Promise.resolve(_customId);
+    if (_customPending) return _customPending;
+    _customPending = call(1, "custom_operations", []).then(function (id) {
+      _customId = id; _customPending = null; return id;
+    }, function (e) { _customPending = null; throw e; });
+    return _customPending;
+  }
   /* subscribeMarket: route-owned market-notice feed (database_api.hpp:602-610
    *   subscribe_to_market(callback, A, B) — asset ids, not a callback id).
    *   Params: baseId/quoteId (asset id strings like "1.3.0"), cb (push handler
@@ -417,6 +433,6 @@ var Chain = (function () {
     } catch (e) { /* best-effort only */ }
     return Promise.resolve();
   }
-  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, status: function () { return lastStatus; }};
+  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, custom: custom, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, status: function () { return lastStatus; }};
 })();
 if (typeof module !== "undefined") { module.exports = Chain; }

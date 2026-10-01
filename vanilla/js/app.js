@@ -48,8 +48,8 @@ var App = (function () {
       "#/credit-offer", "#/direct-debit", "#/spotlight", "#/tickets", "#/airdrop",
       "#/htlc", "#/prediction"] },
     { heading: "Explore", hrefs: ["#/explorer", "#/assets", "#/assets/create",
-      "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/news"] },
-    { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/help"] }
+      "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/top-ops", "#/news"] },
+    { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/trollbox", "#/help"] }
   ];
 
   /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
@@ -125,9 +125,11 @@ var App = (function () {
       case "#/assets/feed": return t("assets_feed.title", "Publish Feed");
       case "#/fees": return t("fees.network_fees", "Network fees");
       case "#/ops": return "Top Operations";
+      case "#/top-ops": return t("topops.title", "Top Operations");
       case "#/news": return t("news.news", "News");
       case "#/settings": return t("nav.settings", "Settings");
       case "#/alerts": return t("notify.title", "Price Alerts");
+      case "#/trollbox": return t("trollbox.title", "Trollbox");
       case "#/favourites": return t("favourites.favourites", "Favourites");
       case "#/help": return t("help.help", "Help");
       default: return href;
@@ -641,8 +643,9 @@ var App = (function () {
     }
   }
 
-  /* paintVersion: bottom-LEFT version string "BITSHARES <chainid8> •
-   * Disclaimer" (original footer: chain prefix + disclaimer link). The 8
+  /* paintVersion: bottom-LEFT version string "BITSHARES <chainid8> • v1.0.0 •
+   * Disclaimer" (original footer: chain prefix + disclaimer link; the app
+   * version stamp was ruled in ship-day R8). The 8
    * chars come from Chain.status().chainId, uppercased; a missing chain id
    * omits the hash silently (prefix + disclaimer still paint — never blank,
    * never throws). Called from paintFooter so every connection event
@@ -668,7 +671,7 @@ var App = (function () {
       }
       while (left.firstChild) left.removeChild(left.firstChild);
       var doc = left.ownerDocument || document;
-      left.appendChild(doc.createTextNode("BITSHARES" + hash + " • "));
+      left.appendChild(doc.createTextNode("BITSHARES" + hash + " • v1.0.0 • "));
       var a = doc.createElement("a");
       a.setAttribute("href", "#/help");
       a.textContent = "Disclaimer";
@@ -753,6 +756,50 @@ var App = (function () {
     return settings;
   }
 
+  /* compatMissing: feature-detect the platform APIs the wallet genuinely
+   *   needs (R1c dead-browser notice — feature detection, NOT UA sniffing).
+   *   #1 sniffed navigator.userAgent for firefox/chrome/edge
+   *   (App.jsx:345-356) and upsold Chrome via a google.com link
+   *   (BrowserSupportModal.jsx:9-15); vanilla refuses both the sniff and
+   *   the upsell. Gates on actually-required APIs only: WebSocket (chain
+   *   socket), WebCrypto subtle (keystore digest), BigInt (money math),
+   *   and local storage (localStorage and/or IndexedDB — either one keeps
+   *   settings alive). Params: none. Returns an array of missing capability
+   *   names (identifiers, never localized). Empty = fully supported.
+   *   Fails: never throws — a detection fault counts as missing, never as
+   *   a boot block. */
+  function compatMissing() {
+    var missing = [];
+    try {
+      if (typeof WebSocket !== "function" && typeof WebSocket !== "object") missing.push("WebSocket");
+    } catch (e) { missing.push("WebSocket"); }
+    try {
+      var subtle = null;
+      if (typeof crypto !== "undefined" && crypto) subtle = crypto.subtle || crypto.webkitSubtle;
+      if (!subtle || typeof subtle.digest !== "function") missing.push("WebCrypto");
+    } catch (e) { missing.push("WebCrypto"); }
+    try {
+      if (typeof BigInt !== "function") missing.push("BigInt");
+    } catch (e) { missing.push("BigInt"); }
+    try {
+      var storageOK = false;
+      try {
+        if (typeof localStorage !== "undefined" && localStorage) {
+          localStorage.setItem("bts-vanilla-compat-probe", "1");
+          localStorage.removeItem("bts-vanilla-compat-probe");
+          storageOK = true;
+        }
+      } catch (e) { storageOK = false; }
+      if (!storageOK) {
+        try {
+          if (typeof indexedDB !== "undefined" && indexedDB) storageOK = true;
+        } catch (e2) { /* stays false */ }
+      }
+      if (!storageOK) missing.push("local storage");
+    } catch (e) { missing.push("local storage"); }
+    return missing;
+  }
+
   /* finishBoot: wire footer + settings subscriptions and first paint.
    * Params: settings (Store envelope, already loaded). Returns nothing.
    * Fails: never — every DOM/storage touch is guarded; errors surface in
@@ -775,6 +822,40 @@ var App = (function () {
           banner.setAttribute("hidden", "");
           try { localStorage.setItem("bts-vanilla-warn-off-v1", "1"); } catch (e) { /* session-only */ }
         });
+      }
+    } catch (e) { /* banner keeps static state */ }
+    /* Dead-browser notice (R1c): a dismissible banner — NEVER a load gate —
+     *   shown ONLY when compatMissing() reports something genuinely absent.
+     *   Dismissal persists in localStorage (view-state flags stay on direct
+     *   localStorage by design — store.js seam). Copy is neutral (no browser
+     *   upsell, no google.com link — the link goes to #/help instead) and
+     *   resolves via t() with en-identical stubs in all 10 locale dicts.
+     *   Never throws — without DOM or storage the banner simply stays hidden. */
+    try {
+      var compat = document.getElementById("compat-banner");
+      var cdismiss = document.getElementById("compat-dismiss");
+      if (compat) {
+        var missing = compatMissing();
+        var compatOff = false;
+        try { compatOff = localStorage.getItem("bts-vanilla-compat-off-v1") === "1"; } catch (e) { /* shows */ }
+        if (missing.length > 0 && !compatOff) {
+          compat.removeAttribute("hidden");
+          var cmsg = document.getElementById("compat-msg");
+          if (cmsg) {
+            cmsg.textContent = t("compat.msg", "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.", { missing: missing.join(", ") });
+          }
+          var chelp = document.getElementById("compat-help");
+          if (chelp) chelp.textContent = t("help.help", "Help");
+        } else {
+          compat.setAttribute("hidden", "");
+        }
+        if (cdismiss) {
+          cdismiss.textContent = t("compat.dismiss", "Dismiss");
+          cdismiss.addEventListener("click", function () {
+            compat.setAttribute("hidden", "");
+            try { localStorage.setItem("bts-vanilla-compat-off-v1", "1"); } catch (e) { /* session-only */ }
+          });
+        }
       }
     } catch (e) { /* banner keeps static state */ }
     var toggle = document.getElementById("nav-toggle");

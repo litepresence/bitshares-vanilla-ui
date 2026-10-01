@@ -28,3 +28,6 @@ bitshares-dex-ux
 
 # Extension build output (reproducible via tooling/pack-extension.sh).
 extension-wrapper/dist/
+
+# Local scratch reports (task/issue drafts). Never shipped, never committed.
+build/

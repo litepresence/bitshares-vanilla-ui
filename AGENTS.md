@@ -1,19 +1,30 @@
-# AGENTS.md — Vanilla BitShares UI Replacement Project
+# AGENTS.md — bitshares-vanilla-ui (Vanilla BitShares UI Replacement Project)
 
 > **Workspace root:** `/workspace`
+> **Repo name:** `bitshares-vanilla-ui` — all docs refer to the project by
+> this name. The shipped code lives in `vanilla/` (directory name unchanged).
+> **Theme aliases (all spellings valid):** `default theme` = `ref-ui-theme`
+> (classic BitShares look, default); `vanilla-theme` = `vanilla-ui-theme`
+> (light, vanilla-tub photo); `dex-ux-theme` = `crypo theme` (dark, Crypo
+> designer template — the id stays `dex-ux-theme` for stored-prefs
+> compatibility even though the source is Crypo, not DEX-UX).
 > **References live in `/workspace/reference/` (READ-ONLY, each with its own
 > history; root symlinks `bitshares-ui → reference/bitshares-ui` etc. preserve
-> old paths — never edit through either spelling).**
+> old paths — never edit through either spelling). `reference/` and the root
+> symlinks are gitignored and NEVER ship: a fresh dev clone re-creates them
+> with the `git clone` commands in §8 Phase 0 (same URLs + branches), then
+> works read-only per §7 rule 1.
 > **Reference #1 (canonical wallet):** `reference/bitshares-ui` — upstream `bitshares/bitshares-ui`, branch `develop`
 > **Reference #2 (modern/dialog-based):** `reference/astro-ui` — `BTS-CM/astro-ui` by grctest, branch `main`
 > **Reference #3 (extension/crypto-audit):** `reference/wallet-extension` — `pi314x/bitshares-wallet-browser-extension`, branch `master`
 > **Reference #4 (chain API contract, sparse):** `reference/bitshares-core` — `bitshares/bitshares-core`, branch `develop` (only `libraries/{app/include,protocol,chain/include,wallet/include}` checked out — no build, no submodules)
-> **Reference #5 (dashboard/style + indicator/plot math, behavior-only):** `reference/bitshares-dex-ux` — `squidKid-deluxe/bitshares-dex-ux` (Python/Falcon + JS, wrong runtime — NEVER a dependency; consult for dark-theme CSS, market-picker logic, plot ideas)
+> **Reference #5 (dashboard/style + indicator/plot math, behavior-only):** `reference/bitshares-dex-ux` — `squidKid-deluxe/bitshares-dex-ux` (Python/Falcon + JS, wrong runtime — NEVER a dependency; consult for market-picker logic and plot ideas, NOT for dark-theme CSS — the dark theme is Crypo-sourced, see §3.4)
 > **#1 vs #5 are UNIQUE projects — never confuse them.** #1 is the React-16
 > reference WALLET (wallet.bitshares.org) we behaviorally replace. #5 is a
-> Python dashboard/plot app whose only contributions are styling cues,
-> picker logic, and visualization ideas (its Kibana/ES transport is REFUSED
-> per the doctrine — chain history only). If a note cites one for the other's
+> Python dashboard/plot app whose only contributions are picker logic and
+> visualization ideas (its Kibana/ES transport is REFUSED
+> per the doctrine — chain history only; it is NOT the dark-theme source —
+> that is Crypo, see §3.4). If a note cites one for the other's
 > job, it is wrong — fix the citation.
 > **This file is mission control.** Any agent working here reads this first.
 
@@ -33,7 +44,7 @@
 >   Internal architecture may be reconsidered freely so long as the original
 >   styling does not change. (Elaboration: §3.3.)
 > - **#5 — THREE THEMES.** `ref-ui-theme` (the classic BitShares look — default),
->   `dex-ux-theme` (dark, sampled from #5's CSS), `vanilla-ui-theme` (light,
+>   `dex-ux-theme` (dark, Crypo designer template), `vanilla-ui-theme` (light,
 >   modern classy cream/chocolate/sky from the user's vanilla-tub photo).
 >   (Elaboration: §3.4.)
 > - **#6 — HUMAN TERMS, NEVER RAW INTEGERS.** Every number the user sees must
@@ -219,7 +230,8 @@ Vanilla stack, modern feel. Concretely:
 ### 3.4 Three themes (principle #5)
 
 Ship three built-in themes: **ref-ui-theme** (the classic BitShares look —
-default), **dex-ux-theme** (dark, sampled from #5's CSS), and
+default), **dex-ux-theme** (dark, sampled from the Crypo designer template in
+`reference/crypo/crypo/Crypo/` — HEX VALUES ONLY, never a dependency), and
 **vanilla-ui-theme** (light, modern classy cream/chocolate/sky from the user's
 vanilla-tub photo). Implement via CSS custom properties (one
 `themes.css`, `data-theme` switch on `<html>`, persisted in settings with

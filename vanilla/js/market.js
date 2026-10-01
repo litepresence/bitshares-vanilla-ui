@@ -394,6 +394,45 @@ var Market = (function () {
     return rows;
   }
 
+  /* Open force-settlement orders for a bitasset (R1e tab).
+   * database get_settle_orders(assetId, limit), database_api.hpp:558
+   * (limit must not exceed api_limit_get_settle_orders; 100 is the R1e
+   * default, 300 is the #1 MarketsActions ceiling — callers stay <=300).
+   * Returns the raw array (ordered earliest settlement_date to latest per
+   * #4; callers re-sort via sortSettles for display safety). Empty is VALID.
+   * Fails: "bad-asset" on malformed id; Chain errors pass through (callers
+   * render history-unavailable/offline inline, never blank). */
+  async function settleOrders(assetId, limit) {
+    if (typeof assetId !== "string" || !/^1\.3\.\d+$/.test(assetId)) throw new Error("bad-asset");
+    if (limit === undefined || limit === null) limit = 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 300) throw new Error("bad limit (1-300)");
+    var dbId = await Chain.db();
+    var rows = await Chain.call(dbId, "get_settle_orders", [assetId, limit]);
+    if (!Array.isArray(rows)) return [];
+    return rows;
+  }
+
+  /* sortSettles: pure ascending sort by settlement_date (ISO strings compare
+   * lexicographically; missing dates sort last, never throw). Params: rows
+   * array of force_settlement_objects ({settlement_date, balance, owner}).
+   * Returns a NEW sorted array (input untouched). Used by the desk tab and
+   * the offline vectors — chain already returns sorted per #4, this is the
+   * display guard. */
+  function sortSettles(rows) {
+    var list = Array.isArray(rows) ? rows.slice() : [];
+    list.sort(function (a, b) {
+      var da = a && a.settlement_date ? String(a.settlement_date) : null;
+      var db = b && b.settlement_date ? String(b.settlement_date) : null;
+      if (da === null && db === null) return 0;
+      if (da === null) return 1;
+      if (db === null) return -1;
+      if (da < db) return -1;
+      if (da > db) return 1;
+      return 0;
+    });
+    return list;
+  }
+
   return {
     parseId: parseId,
     assets: assets,
@@ -404,7 +443,9 @@ var Market = (function () {
     candles: candles,
     deepen: deepen,
     timeframes: timeframes,
-    myOrders: myOrders
+    myOrders: myOrders,
+    settleOrders: settleOrders,
+    sortSettles: sortSettles
   };
 })();
 

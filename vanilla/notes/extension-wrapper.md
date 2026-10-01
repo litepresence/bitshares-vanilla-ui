@@ -58,3 +58,12 @@ Headers own/consume/side-effects on all new files; no dead text.
 dev-only. (b) New deps: none (python3+zipfile already required by tooling;
 icons generated, not downloaded). (c) Deletable: whole directory —
 vanilla stands alone. `check_rot.py` PASS.
+
+## 7. Ship-day ruling R5 (2026-10-01, binding)
+
+Tier-1 human install drill GATES v1 (fresh-profile install + lock/unlock
+round-trip + adapter-ahead-of-wallet check, observed + dated in TEST-PLAN).
+Tier-2 (approval UI, 60s timeout, `allowedAccountIds`, session holder,
+HTTPS + chain-id checks — validators ship unwired) is scheduled follow-up,
+never a v1 blocker. Web-app-alone was the original proposal; the 2026-09-28
+owner call moved Tier-1 into v1 and this ruling keeps it there.

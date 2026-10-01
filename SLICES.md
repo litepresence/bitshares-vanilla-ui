@@ -1,4 +1,4 @@
-# Slice Roadmap — Vanilla BitShares UI
+# Slice Roadmap — bitshares-vanilla-ui
 
 > The binding build order. Each slice: brainstorm → plan (`docs/superpowers/plans/`) → build → testnet-verify → parity note (`vanilla/notes/`) → 8-check audit. A slice is NOT done until its parity note is green; browser passes marked ⏳ are with the human tester. This file is the answer to "what's left".
 
@@ -144,17 +144,34 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 
 ## Standing directives (user, 2026-09-28 — binding for all remaining slices)
 - Retro look: continually review the ref UI via BOTH `vanilla/notes/original-pages/` screenshots AND the `bitshares-ui` codebase; iterate every page until the retro look holds. No page is done until it reads true against the original.
-- Themes: dex-ux-theme (dark) follows bitshares-dex-ux CSS (sampled file:line in themes.css header); vanilla-ui-theme (light) is modern classy cream/chocolate/sky from the user's vanilla-tub photo (palette in dexux-ref-adjacent note); ref-ui-theme stays default. Every slice renders acceptably in all three (screenshot trio in parity note).
+- Themes: dex-ux-theme (dark, Crypo-sourced — extracted template at `reference/crypo/crypo/Crypo/`, HEX VALUES ONLY; alias "crypo theme", id stays `dex-ux-theme`); vanilla-ui-theme (light, from `vanilla/notes/vanilla-theme/tub.jpg`, alias "vanilla-theme"); ref-ui-theme stays default (alias "default theme"). Every slice renders acceptably in all three (screenshot trio in parity note). Per-theme banner tokens (`--banner-bg/--banner-text/--banner-border`); warn-ochre small-text resolved visually per theme.
 - Completeness: port EVERY ref-UI route (§6) PLUS every astro-ui operation page (§5.4). Maintain the op-coverage matrix (`#1 route/modal` × `#2 page` × `vanilla slice`) — no astro-only op discovered late. Testnet-prove everything.
 
 - Testnet fixtures: `tooling/testnet-lite-test-1.json` (git-ignored, 600-perms) — funded `lite-test-1` account for broadcasts. Faucet: `testnet-faucet.xbts.io` ALIVE (registered `t9-vanilla-6742`); `faucet.testnet.bitshares.eu` dead (404 + self-signed). Leftover chain state (no delete op exists, intentional): `AFKTEST10` (1.3.1849) 9.0000 held by issuer; `AFKTESTM11` (1.3.1850) supply 0 with live feed (MCR 1750/MSSR 1500).
 - bitsharesjs policy: REFERENCE ONLY, never a dependency. Consult upstream raw files on demand when porting op serializers (see `mapping-chain-calls`); #4 headers win conflicts; testnet broadcast is final proof.
 - Charting decision: TradingView REJECTED (proprietary blob, mirror download, 922-line bridge treadmill). Vendored lightweight-charts 5.2.1 (Apache-2.0) for the price pane + our canvas for depth; canvas line fallback retained.
 - Indicator-math source: QTradeX (`squidKid-deluxe`, WTFPL) approved for formulas incl. beyond-Tulip indicators (see AGENTS.md §5.7). Port into `indicators*.js`, verified against published vectors; never installed, never imported.
-- DEX-UX (`reference/bitshares-dex-ux`, squidKid-deluxe, Python/Falcon — behavior-only, never a dependency) consulted for: market-selector patterns (two-round search, MPA/UIA/LPT/POOL/BTS filters), dex-ux-theme values (sampled file:line), networkx-plot ideas (plots TBD — Kibana/ES transport refused; chain-history plots only). #1 (React-16 wallet) vs #5 (Python dashboard) are UNIQUE projects — never confuse them.
+- DEX-UX (`reference/bitshares-dex-ux`, squidKid-deluxe, Python/Falcon — behavior-only, never a dependency) consulted for: market-selector patterns (two-round search, MPA/UIA/LPT/POOL/BTS filters), networkx-plot ideas (plots TBD — Kibana/ES transport refused; chain-history plots only). NOT consulted for dark-theme values (those are Crypo-sourced, see Themes line). #1 (React-16 wallet) vs #5 (Python dashboard) are UNIQUE projects — never confuse them.
 - Serializer grows one op-set per slice inside `vanilla/js/tx.js`: op 0 (slice 4); ops 1+2 (slice 6); op 6 (slice 8); ops 10/11/12/13/14/15/19 (slice 10); ops 25/26/27/28 + 49/50/52 (slice 11; 51/53 VIRTUAL never signed). Nothing generated, so nothing to regenerate.
 - Headless visual iteration: `tooling/visual/shot.mjs` (dev-only aid; human browser pass stays the gate).
 - Image assets vendored: `vanilla/assets/` (459 files: 84 SVG icons, 105 token logos, 243 flags, button-state SVGs, app art — byte-copies per `PROVENANCE.md`, MIT). Styling that applies them lands per-slice.
 - Full palette extracted: `vanilla/assets/PALETTE.md` (93 variables × dark/light/midnight, all `$refs` + `darken()`/`lighten()` resolved to final values incl. rgba, via `tooling/extract_palette.py`) + font stacks. Per-slice pixel-matching consumes exact values from here.
 - Original-page screenshot arsenal: `vanilla/notes/original-pages/` (35 routes captured headless + README index) — side-by-side reference for retro parity.
 - Tracked debt: roelandp node proven DNS-dead GLOBALLY (DoH NXDOMAIN 2026-09-30) → replaced by probe-verified `wss://api.bts.mobi/ws` (mainnet chain-id match); 2 pre-existing `#fff` literals in `app.css` (theme trio must catch); slice-02 fixture brainkey provenance open (does not derive fixture keys — our classic derivation proven independently).
+
+## Owner rulings 2026-10-01 (binding — ship-day decisions)
+
+- Project/repo name: `bitshares-vanilla-ui` (code dir `vanilla/` unchanged). Theme aliases: default theme = ref-ui-theme; vanilla-theme = vanilla-ui-theme; dex-ux-theme = crypo theme (id kept).
+- Banners: each theme gets its own `--banner-bg/--banner-text/--banner-border` tokens (replaces fixed-light antd banner); warn-ochre small-text resolved visually per theme (owner trusts builder eye + headless trio).
+- R1a wallet security: must be complete and perfected to ship (no deferral).
+- R1b deferred + documented: `.bin` decrypt/import, cloud password login, multi-wallet subroutes, balance-claims paths (single-slot brainkey keystore is final).
+- R1c build: on-chain trollbox (op-35 custom ops, astro `Trollbox.jsx`/`Forum.jsx` pattern), ranked-ops via bounded chain-scan (NOT astro's ES endpoint — doctrine), dead-browser notice via feature detection (NOT UA sniff, NOT Chrome upsell). Defer + document: issue reporter, forum mirror.
+- R1d build: live-MPA settlement estimate (exact reciprocal-percent string math, #1's offset formula — #4 op comment sides with #1 over #2's offset-less dialog). Defer: QR, op-35-generic builder, escrow broadcast, scammer registry, settlement-bid extras.
+- R1e build: collateral ratio display + open-settlement-orders tab (`get_settle_orders`, #4 `database_api.hpp:558`); fee asset stays `1.3.0` default with switching deferred + noted. No explorer activity joins, no gateway history panels, no news feed (all deferred + documented).
+- R1f gateways: XBTSX/IOB/GDEX-manual/BIT20-disabled only — final.
+- R2 matrix counts line fixed (table = truth; C3/C37 BUILDING, C23/C36 DEFERRED).
+- R3/R4 LTM: skipped for v1 — serializers-done suffices, documented; no faucet work without owner order.
+- R5 extension: Tier-1 human install drill gates v1; Tier-2 approval/signing-gate is follow-up. Documented in `vanilla/notes/extension-wrapper.md`.
+- R6 tester document: `docs/tester-manual.md` (junior-dev click-by-click, full coverage incl. new features).
+- R7 proposal-wrap non-broadcast stands; `1.10.1492` stays uncounted.
+- R8 hygiene: `build/` gitignored; footer version stamp `v1.0.0`; `docs/afk-resume.md` refreshed ship-day.
