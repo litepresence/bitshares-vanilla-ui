@@ -19,7 +19,7 @@ var Store = (function () {
   var SETTINGS_KEY = "bts-vanilla-settings-v1";
 
   var DEFAULT_NODES = {
-    mainnet: ["wss://api.bitshares.dev/ws", "wss://dex.iobanker.com/ws", "wss://node.xbts.io/ws", "wss://public.xbts.io/ws", "wss://cloud.xbts.io/ws", "wss://btsws.roelandp.nl/ws"],
+    mainnet: ["wss://api.bitshares.dev/ws", "wss://dex.iobanker.com/ws", "wss://node.xbts.io/ws", "wss://public.xbts.io/ws", "wss://cloud.xbts.io/ws", "wss://api.bts.mobi/ws"],
     testnet: ["wss://testnet.xbts.io/ws", "wss://testnet.dex.trading/"]
   };
 
