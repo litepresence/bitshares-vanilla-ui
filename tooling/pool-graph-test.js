@@ -143,6 +143,54 @@ function ok(cond, name) {
   const g = await PG.buildGraph("1.3.1", "1.3.2", { cap: 25 });
   ok(g.nodes.length <= 25, "buildGraph node cap 25 (got " + g.nodes.length + ")");
   ok(calls <= 15, "buildGraph RPC budget <=15 (got " + calls + ")");
+
+  // 6. Concurrency-order: shuffled resolve order still yields identical graph + layout.
+  // Same calls, different delay patterns (ascending vs descending) -> byte-identical result.
+  // Also proves batching: peak in-flight >1 (sequential would stay at 1).
+  async function buildWithDelays(delayFn, failAsset) {
+    let inFlight = 0, maxInFlight = 0;
+    globalThis.Chain = {
+      db: async () => 1,
+      call: async (dbId, method, params) => {
+        if (method === "lookup_asset_symbols") return (params[0] || []).map((id) => ({ id: id, symbol: id === "1.3.0" ? "BTS" : id, precision: 5 }));
+        if (method !== "get_liquidity_pools_by_one_asset") return [];
+        const asset = params[0];
+        if (asset === failAsset) throw new Error("boom leg-fail");
+        inFlight++; if (inFlight > maxInFlight) maxInFlight = inFlight;
+        try {
+          const d = delayFn(asset) || 0;
+          if (d) await new Promise((r) => setTimeout(r, d));
+          return poolsByAsset[asset] || [];
+        } finally { inFlight--; }
+      }
+    };
+    const t0 = Date.now();
+    const graph = await PG.buildGraph("1.3.1", "1.3.2", { cap: 25 });
+    const ms = Date.now() - t0;
+    return { graph, ms, maxInFlight };
+  }
+  function delayAsc(asset) {
+    const m = { "1.3.1": 5, "1.3.2": 30, "1.3.50": 0, "1.3.51": 10, "1.3.52": 20, "1.3.53": 30, "1.3.54": 40, "1.3.55": 50 };
+    return m[asset] || 0;
+  }
+  function delayDesc(asset) {
+    const m = { "1.3.1": 30, "1.3.2": 5, "1.3.50": 50, "1.3.51": 40, "1.3.52": 30, "1.3.53": 20, "1.3.54": 10, "1.3.55": 0 };
+    return m[asset] || 0;
+  }
+  const rA = await buildWithDelays(delayAsc, null);
+  const rB = await buildWithDelays(delayDesc, null);
+  eq(rA.graph, rB.graph, "concurrent resolve order identical graph");
+  const layA = PG.layout(rA.graph, "1.3.1", "1.3.2", 800, 180);
+  const layB = PG.layout(rB.graph, "1.3.1", "1.3.2", 800, 180);
+  eq(layA, layB, "concurrent resolve order identical layout");
+  ok(rA.maxInFlight > 1 && rB.maxInFlight > 1, "L1/L2 batched (peak in-flight " + rA.maxInFlight + "/" + rB.maxInFlight + " >1)");
+  console.log("  timing concurrent asc " + rA.ms + "ms desc " + rB.ms + "ms (sequential floor would be ~sum of legs)");
+
+  // 6b. Leg guard: one L2 asset failing resolves [] for that leg, never rejects the batch.
+  const rFail = await buildWithDelays(delayAsc, "1.3.52");
+  ok(Array.isArray(rFail.graph.edges), "failing leg still resolves graph");
+  ok(!JSON.stringify(rFail.graph.edges).includes("1.19." + (300 + 2 * 3)), "failing leg pools absent, other legs present");
+  ok(rFail.graph.edges.length > 0, "partial graph non-empty despite one leg failing");
   console.log("Pool-graph vectors: " + pass + " pass, " + fail + " fail");
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.log("FAIL buildGraph threw " + e); process.exit(1); });

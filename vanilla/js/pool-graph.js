@@ -135,26 +135,43 @@ var PoolGraph = (function () {
   /* 2-layer graph from two asset ids. Returns {nodes:[{assetId,sym}], edges:[{poolId,a,b,sizeRaw}]}.
    * L0=A,B; L1=one_asset each cap 8 biggest-first; L2=up to 6 counters limit 3; nodes cap 25
    * (smallest L2 pools dropped first). Partial on leg failures; throws not-connected only
-   * when every pool fetch is offline. Never guesses symbols (bare ids stand). */
+   * when every pool fetch is offline. Never guesses symbols (bare ids stand).
+   * Discovery is concurrent (same calls, timing only): L1 pair via one Promise.all,
+   * L2 counters via one Promise.all (<=6 legs, <=8 total — no pool needed). Each leg
+   * never rejects the batch (failure -> []); results merge back in deterministic
+   * counters order before layout, so resolve order never changes the ring layout. */
   async function buildGraph(assetA, assetB, opts) {
     _assertAsset(assetA); _assertAsset(assetB);
     opts = opts || {};
     var cap = opts.cap || NODE_CAP;
-    var l1a = [], l1b = [], offline = 0;
-    try { l1a = await poolsForAsset(assetA, 8); } catch (e) { if (e && e.message === "not-connected") offline++; else l1a = []; }
-    try { l1b = await poolsForAsset(assetB, 8); } catch (e) { if (e && e.message === "not-connected") offline++; else l1b = []; }
+    /* L1 legs run concurrently; per-leg guard maps failure -> {rows:[],offline} so
+     * one leg never rejects the batch. Order is fixed (A then B) regardless of resolve order. */
+    async function _safeL1(asset) {
+      try { return { rows: await poolsForAsset(asset, 8), offline: false }; }
+      catch (e) {
+        if (e && e.message === "not-connected") return { rows: [], offline: true };
+        return { rows: [], offline: false };
+      }
+    }
+    var l1res = await Promise.all([_safeL1(assetA), _safeL1(assetB)]);
+    var offline = (l1res[0].offline ? 1 : 0) + (l1res[1].offline ? 1 : 0);
     if (offline === 2) throw new Error("not-connected");
-    l1a = _selectL1(l1a, L1_CAP); l1b = _selectL1(l1b, L1_CAP);
+    var l1a = _selectL1(l1res[0].rows, L1_CAP), l1b = _selectL1(l1res[1].rows, L1_CAP);
     var l1 = l1a.concat(l1b);
     var seenPool = {}, pools = [];
     l1.forEach(function (p) { if (!seenPool[p.id]) { seenPool[p.id] = 1; pools.push(p); } });
     var counters = _pickL2Assets(pools, assetA, assetB, L2_ASSETS);
-    for (var i = 0; i < counters.length; i++) {
-      var rows = [];
-      try { rows = await poolsForAsset(counters[i], L2_LIMIT); }
-      catch (e) { if (e && e.message === "not-connected") continue; rows = []; }
-      rows = _selectL1(rows, L2_LIMIT);
-      rows.forEach(function (p) { if (!seenPool[p.id]) { seenPool[p.id] = 1; pools.push(p); } });
+    /* L2 legs run concurrently (<=6 at once); each leg resolves [] on failure
+     * (offline leg skips like the old continue) so the batch never rejects.
+     * Merge follows counters[] order — not resolve order — to keep layout deterministic. */
+    async function _safeL2(asset) {
+      try { return await poolsForAsset(asset, L2_LIMIT); }
+      catch (e) { return []; }
+    }
+    var l2rows = await Promise.all(counters.map(function (id) { return _safeL2(id); }));
+    for (var i = 0; i < l2rows.length; i++) {
+      var l2sel = _selectL1(l2rows[i] || [], L2_LIMIT);
+      l2sel.forEach(function (p) { if (!seenPool[p.id]) { seenPool[p.id] = 1; pools.push(p); } });
     }
     /* Node-cap trim: drop smallest L2 pools (never L1) until nodes fit. */
     function nodeSet(list) { var s = {}; s[assetA] = 1; s[assetB] = 1; list.forEach(function (p) { s[p.asset_a_id] = 1; s[p.asset_b_id] = 1; }); return Object.keys(s); }
