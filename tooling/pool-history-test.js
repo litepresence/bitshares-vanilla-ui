@@ -98,5 +98,74 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     paid: [{ amount: 1, asset_id: "1.3.0" }], received: [{ amount: 2, asset_id: "1.3.1" }] } } } } }, "1.19.133"),
   null, "esSwap missing pool id rejects (mainnet-only index guard)");
 
-console.log("Pool-history vectors: " + pass + " pass, " + fail + " fail");
-process.exit(fail ? 1 : 0);
+// 5. ES capped search_after pagination (offline, fetch stubbed).
+// 500/page, max 4 pages = 2000 events, 15s total budget.
+(async () => {
+  function mkSwapHit(tag, idx) {
+    return {
+      _source: {
+        operation_type: 63,
+        block_data: { block_num: 1000 + idx, block_time: "2026-09-28T20:12:24" },
+        operation_history: {
+          op_object: { account: "1.2.1", pool: "1.19.133" },
+          operation_result_object: { which: 4, data_object: {
+            paid: [{ amount: 12018, asset_id: "1.3.5537" }],
+            received: [{ amount: 128265851, asset_id: "1.3.0" }] } }
+        }
+      },
+      sort: [tag + "-" + idx]
+    };
+  }
+  function swapPage(n, tag) {
+    const a = [];
+    for (let i = 0; i < n; i++) a.push(mkSwapHit(tag, i));
+    return a;
+  }
+  try {
+    const _f0 = globalThis.fetch;
+    const pages = [swapPage(500, "p1"), swapPage(500, "p2"), swapPage(2, "p3")];
+    let calls = 0;
+    const bodies = [];
+    globalThis.fetch = function (url, opts) {
+      calls++;
+      try { bodies.push(opts && opts.body ? String(opts.body) : ""); } catch (x) { bodies.push(""); }
+      const hits = pages[Math.min(calls - 1, pages.length - 1)] || [];
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits } }) });
+    };
+    const pres = await PH.esSwaps("1.19.133", 2000);
+    eq(pres.swaps.length, 1002, "es pagination 3-page merge");
+    eq(calls, 3, "es pagination short-page stop (3rd <500)");
+    let b2 = {};
+    try { b2 = JSON.parse(bodies[1] || "{}"); } catch (x) { b2 = {}; }
+    eq(!!b2.search_after, true, "es pagination uses search_after");
+    eq(JSON.stringify(b2.search_after), JSON.stringify(["p1-499"]), "es pagination search_after = last sort");
+    if (_f0 !== undefined) globalThis.fetch = _f0; else delete globalThis.fetch;
+  } catch (e) { fail++; console.log("FAIL es pagination 3-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  try {
+    const _f1 = globalThis.fetch;
+    let c1 = 0;
+    globalThis.fetch = function () {
+      c1++;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: swapPage(2, "s1") } }) });
+    };
+    const r1 = await PH.esSwaps("1.19.133", 2000);
+    eq(r1.swaps.length, 2, "es short page returns 2");
+    eq(c1, 1, "es short-page stops after 1 fetch");
+    if (_f1 !== undefined) globalThis.fetch = _f1; else delete globalThis.fetch;
+  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  try {
+    const _f2 = globalThis.fetch;
+    let c2 = 0;
+    globalThis.fetch = function () {
+      c2++;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: swapPage(500, "c" + c2) } }) });
+    };
+    const r2 = await PH.esSwaps("1.19.133", 5000);
+    eq(c2, 4, "es cap respects max 4 pages");
+    eq(r2.swaps.length <= 2000, true, "es cap respects 2000 events");
+    if (_f2 !== undefined) globalThis.fetch = _f2; else delete globalThis.fetch;
+  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+
+  console.log("Pool-history vectors: " + pass + " pass, " + fail + " fail");
+  process.exit(fail ? 1 : 0);
+})();

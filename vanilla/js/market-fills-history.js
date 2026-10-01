@@ -35,6 +35,13 @@ var MarketFills = (function () {
   var ES_URL = "https://es.bitshares.dev/bitshares-*/_search";
   var ES_TIMEOUT_MS = 15000;
   var ES_SIZE = 500;
+  /* Capped pagination: 500/page, max 4 pages = 2000 events (candle cap).
+   * Pattern: reference/bitshares-historical-charts main.js:214-261
+   * (queryElasticsearchWithPagination — search_after loop, short-page stop).
+   * Our _source query bodies stay; only the search_after + cap + total
+   * budget are ported. */
+  var ES_MAX_PAGES = 4;
+  var ES_MAX_EVENTS = 2000;
 
   /* Fixed decimals for BigInt price strings (follows #1 Price.toReal
    * reward `parseFloat(real.toFixed(8))`, MarketClasses.js:284). */
@@ -59,9 +66,12 @@ var MarketFills = (function () {
    * BOTH legs plus taker-only (is_maker:false avoids double-counting each
    * match's maker+taker sides), newest first. POST (browsers drop bodies
    * on GET). Legs are asset symbols when known, else asset ids — the index
-   * tokenizes both (pool-id text query proven live 2026-09-28). */
-  function esQuery(baseSym, quoteSym) {
-    return {
+   * tokenizes both (pool-id text query proven live 2026-09-28).
+   * searchAfter (optional): ES sort key from the previous page's last hit
+   * (.sort on block_data.block_time desc) — capped pagination stays on the
+   * same sort the adapter already uses. */
+  function esQuery(baseSym, quoteSym, searchAfter) {
+    var q = {
       track_total_hits: false,
       sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
       size: ES_SIZE,
@@ -77,6 +87,8 @@ var MarketFills = (function () {
         }
       }
     };
+    if (searchAfter) q.search_after = searchAfter;
+    return q;
   }
 
   /* One ES hit -> normalized fill {time, paid, received} or null. The ES
@@ -112,41 +124,73 @@ var MarketFills = (function () {
     } catch (e) { return null; }
   }
 
-  /* ES adapter: up to `limit` recent fills, newest first. Rejects on ANY
-   * failure (network/CORS/timeout/shape) — the caller falls back to chain. */
+  /* ES adapter: up to `limit` recent fills, newest first (capped at the
+   * candle cap 2000). Capped search_after pagination: 500/page, max 4
+   * pages = 2000 raw events; strict leg guards apply per page (esFill);
+   * stops early when a page returns <500 raw hits or the want is reached.
+   * 15s TOTAL budget across pages (one deadline, not per page). Rejects
+   * on ANY failure (network/CORS/timeout/shape) — the caller falls back
+   * to chain. */
   function esFills(baseId, quoteId, limit) {
     assertMarketIds(baseId, quoteId);
+    var want = limit === undefined ? ES_SIZE : Math.floor(limit);
+    if (!(want >= 1)) want = ES_SIZE;
+    if (want > ES_MAX_EVENTS) want = ES_MAX_EVENTS;
     return new Promise(function (resolve, reject) {
       var ctrl = null, timer = null, done = false;
+      var deadline = Date.now() + ES_TIMEOUT_MS;
       function fail(e) {
         if (done) return; done = true;
         try { clearTimeout(timer); } catch (x) {}
         try { if (ctrl) ctrl.abort(); } catch (x) {}
         reject(e);
       }
+      function finish(out) {
+        if (done) return; done = true;
+        try { clearTimeout(timer); } catch (x) {}
+        resolve({ fills: out, source: "es" });
+      }
       try {
         if (typeof fetch !== "function") { reject(new Error("no fetch")); return; }
-        if (typeof AbortController === "function") ctrl = new AbortController();
         timer = setTimeout(function () { fail(new Error("es timeout")); }, ES_TIMEOUT_MS);
-        fetch(ES_URL, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(esQuery(baseId, quoteId)),
-          signal: ctrl ? ctrl.signal : undefined
-        }).then(function (resp) {
-          if (!resp || !resp.ok) { fail(new Error("es status " + (resp && resp.status))); return null; }
-          return resp.json();
-        }).then(function (data) {
+        var out = [];
+        var searchAfter = null;
+        var pages = 0;
+        function fetchPage() {
           if (done) return;
-          done = true;
-          try { clearTimeout(timer); } catch (x) {}
-          var hits = (data && data.hits && data.hits.hits) || [];
-          var out = [];
-          for (var i = 0; i < hits.length && out.length < limit; i++) {
-            var f = esFill(hits[i], baseId, quoteId);
-            if (f) out.push(f);
-          }
-          resolve({ fills: out, source: "es" });
-        }).catch(fail);
+          if (pages >= ES_MAX_PAGES || out.length >= want) { finish(out); return; }
+          if (Date.now() >= deadline) { fail(new Error("es timeout")); return; }
+          var q = esQuery(baseId, quoteId, searchAfter);
+          try {
+            if (typeof AbortController === "function") ctrl = new AbortController();
+            else ctrl = null;
+          } catch (x) { ctrl = null; }
+          var opts = {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(q)
+          };
+          if (ctrl) opts.signal = ctrl.signal;
+          fetch(ES_URL, opts).then(function (resp) {
+            if (done) return null;
+            if (!resp || !resp.ok) { fail(new Error("es status " + (resp && resp.status))); return null; }
+            return resp.json();
+          }).then(function (data) {
+            if (done) return;
+            if (Date.now() >= deadline && out.length === 0) { fail(new Error("es timeout")); return; }
+            var hits = (data && data.hits && data.hits.hits) || [];
+            for (var i = 0; i < hits.length && out.length < want; i++) {
+              var f = esFill(hits[i], baseId, quoteId);
+              if (f) out.push(f);
+            }
+            pages++;
+            if (hits.length < ES_SIZE || out.length >= want || pages >= ES_MAX_PAGES) { finish(out); return; }
+            var last = hits[hits.length - 1];
+            if (!last || !last.sort) { finish(out); return; }
+            searchAfter = last.sort;
+            fetchPage();
+          }).catch(fail);
+        }
+        fetchPage();
       } catch (e) { fail(e); }
     });
   }
@@ -316,7 +360,8 @@ var MarketFills = (function () {
     fillsForMarket: fillsForMarket, fillsToCandles: fillsToCandles, mergeDeep: mergeDeep,
     esQuery: esQuery, esFill: esFill, priceHuman: priceHuman,
     chainFills: chainFills, esFills: esFills,
-    ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
+    ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS, ES_SIZE: ES_SIZE,
+    ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
     _test: { esQuery: esQuery, esFill: esFill, chainRow: chainRow }
   };
 })();

@@ -62,6 +62,67 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
 /* 12-13: MarketCandles deep orchestration (plan Task 2 Step 1 verbatim,
  * plus a fast fetch stub so ES degrades to chain without network). */
 (async () => {
+  /* 14-18: ES capped search_after pagination (offline, fetch stubbed).
+   * 500/page, max 4 pages = 2000 events, 15s total budget. */
+  function mkPageHit(tag, idx) {
+    return {
+      _source: {
+        operation_type: "4",
+        operation_history: { op_object: { pays: { amount: "100", asset_id: "1.3.0" }, receives: { amount: "200", asset_id: "1.3.113" } } },
+        block_data: { block_time: "2026-09-01T10:15:00Z" }
+      },
+      sort: [tag + "-" + idx]
+    };
+  }
+  function pageOf(n, tag) {
+    var a = [];
+    for (var i = 0; i < n; i++) a.push(mkPageHit(tag, i));
+    return a;
+  }
+  try {
+    var _f0 = globalThis.fetch;
+    var pages = [pageOf(500, "p1"), pageOf(500, "p2"), pageOf(2, "p3")];
+    var calls = 0, bodies = [];
+    globalThis.fetch = function (url, opts) {
+      calls++;
+      try { bodies.push(opts && opts.body ? String(opts.body) : ""); } catch (x) { bodies.push(""); }
+      var hits = pages[Math.min(calls - 1, pages.length - 1)] || [];
+      return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits } }); } });
+    };
+    var pres = await MF.esFills("1.3.0", "1.3.113", 2000);
+    eq(pres.fills.length, 1002, "es pagination 3-page merge");
+    eq(calls, 3, "es pagination short-page stop (3rd <500)");
+    var b2 = {};
+    try { b2 = JSON.parse(bodies[1] || "{}"); } catch (x) { b2 = {}; }
+    eq(!!b2.search_after, true, "es pagination uses search_after");
+    eq(JSON.stringify(b2.search_after), JSON.stringify(["p1-499"]), "es pagination search_after = last sort");
+    if (_f0 !== undefined) { globalThis.fetch = _f0; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL es pagination 3-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  try {
+    var _f1 = globalThis.fetch;
+    var c1 = 0;
+    globalThis.fetch = function () {
+      c1++;
+      return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: pageOf(2, "s1") } }); } });
+    };
+    var r1 = await MF.esFills("1.3.0", "1.3.113", 2000);
+    eq(r1.fills.length, 2, "es short page returns 2");
+    eq(c1, 1, "es short-page stops after 1 fetch");
+    if (_f1 !== undefined) { globalThis.fetch = _f1; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  try {
+    var _f2 = globalThis.fetch;
+    var c2 = 0;
+    globalThis.fetch = function () {
+      c2++;
+      var hits = pageOf(500, "c" + c2);
+      return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits } }); } });
+    };
+    var r2 = await MF.esFills("1.3.0", "1.3.113", 5000);
+    eq(c2, 4, "es cap respects max 4 pages");
+    eq(r2.fills.length <= 2000, true, "es cap respects 2000 events");
+    if (_f2 !== undefined) { globalThis.fetch = _f2; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
   try {
     var _fetch = globalThis.fetch;
     globalThis.fetch = function () { return Promise.reject(new Error("no net in test")); };
