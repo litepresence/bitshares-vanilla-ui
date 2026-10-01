@@ -114,7 +114,7 @@ var SametUI = (function () {
       CreditSamet.fundsByOwner(me.id, {}).then(function (rows) {
         if (!live(myGen, uiGen)) return; draw(mineBox, rows, true);
       }).catch(function () {
-        if (live(myGen, uiGen)) { ui.clearBox(mineBox); mineBox.appendChild(ui.el(doc, "p", t("samet.no_owned_funds", "No owned funds.") + " Create one from the create form below — owned Same-T funds list here.", "muted")); }
+        if (live(myGen, uiGen)) { ui.clearBox(mineBox); mineBox.appendChild(ui.el(doc, "p", t("samet.no_owned_funds", "No owned funds.") + t("samet.create_hint", " Create one from the create form below — owned Same-T funds list here."), "muted")); }
       });
       go.click();
     }).catch(function () { if (live(myGen, uiGen)) go.click(); });

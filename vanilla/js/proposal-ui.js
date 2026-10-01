@@ -144,7 +144,7 @@ var ProposalUI = (function () {
   /* Table (desktop) + cards (phone) with sticky-first-col CSS; href links col 0, action buttons ride cards. */
   function deskTable(doc, headers, rows) {
     var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet.") + " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below.", "muted")); return box; }
+    if (!rows.length) { box.appendChild(el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet.") + t("proposal.create_hint", " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
     headers.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
@@ -558,7 +558,7 @@ var ProposalUI = (function () {
     /* A11y delta 2026-10-01: unnamed <select> announced only "combobox" —
      * plain aria-label (no new t() key, so check_i18n stays green; a later
      * i18n batch can key it). Same for the authority select below. */
-    try { kindSel.setAttribute("aria-label", "Inner operation type"); } catch (e) { /* options stand */ }
+    try { kindSel.setAttribute("aria-label", t("proposal.inner_type_aria", "Inner operation type")); } catch (e) { /* options stand */ }
     Object.keys(INNER_DEFS).forEach(function (k) {
       var o = doc.createElement("option"); o.value = k; o.textContent = "Inner op: " + k; kindSel.appendChild(o);
     });
@@ -574,7 +574,7 @@ var ProposalUI = (function () {
         var rm = touchable(el(doc, "button", t("proposal.remove", "Remove"))); rm.type = "button";
         /* A11y delta 2026-10-01: bare "Remove" repeats per row — name which
          * enclosed op it drops (plain suffix, no new i18n key). */
-        try { rm.setAttribute("aria-label", t("proposal.remove", "Remove") + " enclosed op " + (i + 1)); } catch (e) { /* text stands */ }
+        try { rm.setAttribute("aria-label", t("proposal.remove", "Remove") + t("proposal.enclosed_op_mid", " enclosed op ") + (i + 1)); } catch (e) { /* text stands */ }
         rm.addEventListener("click", function () { inners.splice(i, 1); drawInners(); });
         p.appendChild(rm); addedBox.appendChild(p);
       });
@@ -720,7 +720,7 @@ var ProposalUI = (function () {
       ctx.wrap.appendChild(el(doc, "p", approvalCell(p), "muted"));
       ap.lines.forEach(function (ln) { ctx.wrap.appendChild(el(doc, "p", ln)); });
       ctx.wrap.appendChild(rawJson(doc, t("proposal.raw_proposal_json", "Raw proposal JSON"), p));
-      if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations.") + " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N).", "muted"));
+      if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations.") + t("proposal.empty_hint", " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N)."), "muted"));
       symJoin(innerAssetIds(entries)).then(function (join) {
         if (myGen !== gen) return;
         entries.forEach(function (e) {
@@ -733,7 +733,7 @@ var ProposalUI = (function () {
       var fP2 = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
       var ow = doc.createElement("select"); touchable(ow);
-      try { ow.setAttribute("aria-label", "Authority"); } catch (e) { /* options stand */ }
+      try { ow.setAttribute("aria-label", t("misc.authority", "Authority")); } catch (e) { /* options stand */ }
       ["active", "owner"].forEach(function (k) { var o = doc.createElement("option"); o.value = k; o.textContent = k + " authority"; ow.appendChild(o); });
       ctx.wrap.appendChild(ow);
       [[t("proposal.approve", "Approve"), false], [t("proposal.reject_approval", "Reject approval"), true]].forEach(function (ab) {

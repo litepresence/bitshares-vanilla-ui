@@ -299,7 +299,7 @@ var VestingUI = (function () {
         var fM = ui.field(doc, t("vesting.amount_at_most_the_balance", "Amount (at most the balance)"), { value: defVal, inputmode: "decimal" });
         o2.appendChild(fM.row);
         o2.appendChild(ui.el(doc, "p", t("vesting.balance_2", "Balance: ") + vr.cells[2].text + " · " + availTxt +
-          " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + "). Over-claims fail on chain — chain validates on broadcast.", "muted"));
+          " claimable now (" + fmtBp(vr.r.prog && vr.r.prog.availBp) + t("vesting.overclaim_suffix", "). Over-claims fail on chain — chain validates on broadcast."), "muted"));
         var ibox = ui.el(doc, "div"); o2.appendChild(ibox);
         ui.reviewSection(doc, ibox, uiGen, t("vesting.review_claim", "Review claim"), {
           build: async function () {
@@ -350,7 +350,7 @@ var VestingUI = (function () {
         rawP.then(function (byId) {
           if (!live(myGen, uiGen)) return; ui.clearBox(listBox);
           if (!rows.length) {
-            listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + " Balances appear after a transfer with a vesting policy lands here.", "muted"));
+            listBox.appendChild(ui.el(doc, "p", t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + t("vesting.balances_hint", " Balances appear after a transfer with a vesting policy lands here."), "muted"));
             try { ProposalMisc.requireClaimable(rows); } catch (e) { ui.showError(doc, listBox, e); }
             go.disabled = false; return;
           }
@@ -375,7 +375,7 @@ var VestingUI = (function () {
               return hay.indexOf(needle) !== -1;
             });
             if (!shown.length) {
-              results.appendChild(ui.el(doc, "p", needle ? (t("vesting.no_matching_vesting_rows", "No matching vesting rows.") + " Clear the filter to see all rows.") : (t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + " Balances appear after a transfer with a vesting policy lands here."), "muted"));
+              results.appendChild(ui.el(doc, "p", needle ? (t("vesting.no_matching_vesting_rows", "No matching vesting rows.") + t("vesting.clear_filter_hint", " Clear the filter to see all rows.")) : (t("vesting.no_vesting_balances_for_this_account", "No vesting balances for this account.") + t("vesting.balances_hint", " Balances appear after a transfer with a vesting policy lands here.")), "muted"));
               return;
             }
             results.appendChild(ui.deskTable(doc, [t("vesting.id", "ID"), t("vesting.owner", "Owner"), t("vesting.balance", "Balance"), t("vesting.policy", "Policy"),

@@ -33,6 +33,17 @@ var PoolGraph = (function () {
   var ASSET_RE = /^1\.3\.\d+$/;
   var L1_CAP = 8, L2_ASSETS = 6, L2_LIMIT = 3, NODE_CAP = 25;
 
+  /* Batch-9 i18n: display strings resolve via I18n.t with the pre-conversion
+   * literal kept verbatim as enDefault (English-identical on any transport,
+   * incl. file:// where dict fetch fails). Falls back to the default when
+   * i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* _assertAsset: reject non-asset ids up front (throws). _isSocketError:
    * true for transport-level failures (caller maps to offline state). */
   function _assertAsset(id) { if (typeof id !== "string" || !ASSET_RE.test(id)) throw new Error("bad asset id: " + JSON.stringify(id)); }
@@ -362,7 +373,7 @@ var PoolGraph = (function () {
       emptyLine("No pools touch these assets — pick a pair with a pool, or create one at #/pools."); _wire(canvas, {}, [], doc);
       /* A11y: empty map is not interactive (no tabindex trap) but stays
        * named so the canvas text is exposed. */
-      try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools."); } catch (e) {}
+      try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", t("pool.map_touch_aria", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools.")); } catch (e) {}
       return { empty: true };
     }
     var base = layout(graph, assetA, assetB, g.w, g.h);
@@ -422,7 +433,7 @@ var PoolGraph = (function () {
     try {
       if (!canvas.getAttribute("aria-label")) {
         canvas.setAttribute("role", "img");
-        canvas.setAttribute("aria-label", "Pool map. Press Enter to open the core asset.");
+        canvas.setAttribute("aria-label", t("pool.map_core_aria", "Pool map. Press Enter to open the core asset."));
       }
     } catch (e) {}
     try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}

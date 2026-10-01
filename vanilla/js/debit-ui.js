@@ -85,7 +85,7 @@ var DebitUI = (function () {
       if (myGen !== gen) return; u.routeFail(root, "Direct Debit", e, t("debit.load_failed", "Could not load permissions."), retry); });
   }
   function permTable(u, doc, rows, side) { /* limit/claimed/available human, period human, status */
-    if (!rows.length) return u.el(doc, "p", side === "giver" ? (t("debit.empty_giver", "You granted no permissions.") + " Create one from the New / update permission form below.") : (t("debit.empty_recipient", "No permissions granted to you.") + " Ask the granter to add one from the Direct Debit form."), "muted");
+    if (!rows.length) return u.el(doc, "p", side === "giver" ? (t("debit.empty_giver", "You granted no permissions.") + t("debit.giver_hint", " Create one from the New / update permission form below.")) : (t("debit.empty_recipient", "No permissions granted to you.") + t("debit.recipient_hint", " Ask the granter to add one from the Direct Debit form.")), "muted");
     var table = doc.createElement("table"); table.className = "node-table";
     table.appendChild(u.tableHead(doc, [t("debit.perm_col", "Permission"),  side === "giver" ? t("debit.auth_row", "Authorized") : t("debit.giver_row", "Giver"),
       t("instant.limit", "Limit"), t("debit.used_col", "Used"), t("debit.avail_col", "Available"), t("debit.period_row", "Period"), t("prediction.hdr_status", "Status")]));

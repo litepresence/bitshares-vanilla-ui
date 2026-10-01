@@ -125,7 +125,7 @@ var SettingsPage = (function () {
       }
       /* M2: cap custom URL length (overlong URLs break row storage/lookup). */
       if (v.length > 256) {
-        customError.textContent = "URL too long: 256 characters maximum.";
+        customError.textContent = t("settings.err_long", "URL too long: 256 characters maximum.");
         return;
       }
       customError.textContent = "";

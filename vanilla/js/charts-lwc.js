@@ -205,7 +205,7 @@ var ChartsLwc = (function () {
   function emptyPane(doc, hostEl, text) {
     var d = doc.createElement("div");
     d.className = "mkt-chart-empty muted";
-    d.textContent = text || (t("market.empty_pane", "No data.") + " Buckets appear once this market has fills — try another pair from the market picker.");
+    d.textContent = text || (t("market.empty_pane", "No data.") + t("market.buckets_hint", " Buckets appear once this market has fills — try another pair from the market picker."));
     hostEl.appendChild(d);
   }
 
@@ -276,7 +276,7 @@ var ChartsLwc = (function () {
     var colors = paneColors(opts.colors);
     var bars = toLwcCandles(opts.candles);
     if (bars.length === 0) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_price_history", "No price history on this market.") + " Fills draw this line — place an order or try another pair."));
+      if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_price_history", "No price history on this market.") + t("market.fills_line_hint", " Fills draw this line — place an order or try another pair.")));
       return handle;
     }
     var LW = hasLightweight() ? lw() : null;
@@ -366,7 +366,7 @@ var ChartsLwc = (function () {
       if (anyPts) break;
     }
     if (!anyPts) {
-      if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_osc_data", "No oscillator data.") + " Values compute once this market has price history."));
+      if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_osc_data", "No oscillator data.") + t("market.osc_hint", " Values compute once this market has price history.")));
       return handle;
     }
     var LW = hasLightweight() ? lw() : null;

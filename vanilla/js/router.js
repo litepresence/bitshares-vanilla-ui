@@ -323,12 +323,12 @@ var Router = (function () {
       var cvs = root.querySelectorAll("canvas.mkt-canvas:not([aria-label])");
       for (var c = 0; c < cvs.length; c++) {
         cvs[c].setAttribute("role", "img");
-        cvs[c].setAttribute("aria-label", "Chart plot. Tabular data follows.");
+        cvs[c].setAttribute("aria-label", t("shell.chart_aria", "Chart plot. Tabular data follows."));
       }
     } catch (e) { /* canvases stand unnamed */ }
     try {
       var sums = root.querySelectorAll("details.raw > summary:not([aria-label])");
-      for (var s = 0; s < sums.length; s++) sums[s].setAttribute("aria-label", "Show raw JSON");
+      for (var s = 0; s < sums.length; s++) sums[s].setAttribute("aria-label", t("market.raw_fallback", "Show raw JSON"));
     } catch (e) { /* disclosures stand */ }
   }
 

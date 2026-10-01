@@ -107,7 +107,8 @@
     "down": "caído",
     "theme_classic": "Classic",
     "theme_vanilla_light": "Vanilla light",
-    "theme_dex_dark": "DEX dark"
+    "theme_dex_dark": "DEX dark",
+    "err_long": "URL too long: 256 characters maximum."
   },
   "shell": {
     "brand": "BitShares",
@@ -126,7 +127,9 @@
     "unlock": "Unlock",
     "follow": "Follow",
     "unfollow": "Unfollow",
-    "report": "REPORT"
+    "report": "REPORT",
+    "clear_search_hint": " Clear the search to see every page.",
+    "chart_aria": "Chart plot. Tabular data follows."
   },
   "dashboard": {
     "welcome": "Welcome to BitShares",
@@ -134,7 +137,8 @@
     "create": "Create Account",
     "restore_prefix": "Optionally, ",
     "full_balances_suffix": " — full balances",
-    "top_holdings_for_the_watched_account_": "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."
+    "top_holdings_for_the_watched_account_": "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page.",
+    "strip_hint": " No markets are configured for this strip — open any market from the picker."
   },
   "account": {
     "title": "Account",
@@ -248,7 +252,13 @@
     "restore_your_account": "Restore your account",
     "gate_create_account": "Create account",
     "gate_login": "Login",
-    "price_full_suffix": " BTS (full chain precision)"
+    "price_full_suffix": " BTS (full chain precision)",
+    "s1_hint": " Fund it with a transfer, or place a market order — holdings list here.",
+    "filter_hint": " Clear the filter to see the full portfolio.",
+    "margin_hint": " Lock collateral from the borrow page (#/borrow) — positions list here.",
+    "credit_hint": " Create one from the credit desk (#/credit-offer) — owned offers list here.",
+    "orders_hint": " Place one from the trade form on a market page — open orders list here until filled or cancelled.",
+    "activity_hint": " Transfers, orders, and fills list here once they happen."
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -455,7 +465,8 @@
     "previous": "Previous",
     "e_g_bts": "e.g. BTS",
     "step": "Step ",
-    "next": "Next"
+    "next": "Next",
+    "bids_suffix": " yet. Place one from the bid form below — bids list here."
   },
   "credit_detail": {
     "title": "Credit Offer"
@@ -620,7 +631,10 @@
     "expiration": "Expiration",
     "expiration_mid": " · Expiration ",
     "loan": "Loan",
-    "total_prefix": "Total "
+    "total_prefix": "Total ",
+    "deals_hint": " Deals appear after someone borrows against this offer.",
+    "offers_hint": " Offers appear once anyone creates one — draft yours in the Create offer form on this desk.",
+    "owned_hint": " Create one in the Create offer form below — owned offers list here."
   },
   "debit": {
     "title": "Direct Debit",
@@ -691,7 +705,9 @@
     "tile_debit_desc": "Recurring withdrawal permissions.",
     "tile_htlc_desc": "Lock funds with a hash + timelock.",
     "tile_instant_desc": "Simple buy/sell view.",
-    "tile_prediction_desc": "Prediction markets."
+    "tile_prediction_desc": "Prediction markets.",
+    "giver_hint": " Create one from the New / update permission form below.",
+    "recipient_hint": " Ask the granter to add one from the Direct Debit form."
   },
   "explorer_assets": {
     "title": "Asset",
@@ -907,7 +923,16 @@
     "review_funding": "Review funding",
     "send_failed": "Send failed.",
     "viewing_as_committee": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
-    "wallet_locked_msg": "Wallet is locked."
+    "wallet_locked_msg": "Wallet is locked.",
+    "clear_filter_hint": " Clear the search filter to see the full page.",
+    "feeds_hint": " Feeds appear once publishers publish for an asset.",
+    "activity_hint": " New chain operations list here as they arrive.",
+    "blocks_hint": " The node returned nothing in this range — try Older blocks or check Settings → Nodes.",
+    "txs_hint": " Empty blocks carry no transactions — open another block from Recent blocks.",
+    "ops_hint": " Nothing was enclosed — valid, not an error.",
+    "fields_hint": " The object carries no displayable properties.",
+    "no_pools_found": "No pools found — create one from the Pools desk (#/pools) Stake form.",
+    "no_accounts_found": "No accounts found — check the name prefix, or register a new name at Create Account (#/create-account)."
   },
   "gateway": {
     "title": "Deposit / Withdraw",
@@ -1078,7 +1103,8 @@
     "sent_prefix": "Sent (",
     "sent_received_mid": ") · Received (",
     "showing_prefix": "Showing ",
-    "to": "To"
+    "to": "To",
+    "create_hint": " Create one from the New HTLC form below — sent and received contracts list here."
   },
   "market_book": {
     "title": "Exchange",
@@ -1098,7 +1124,8 @@
     "tape_largest": "largest bin",
     "tape_max": "max",
     "tape_note": "Fills binned by size",
-    "tape_skipped": "unmappable skipped"
+    "tape_skipped": "unmappable skipped",
+    "tape_hint": " The tape fills as orders match on this market."
   },
   "market": {
     "title": "Exchange",
@@ -1207,7 +1234,17 @@
     "columns_fixed": "⚙ Columns (fixed)",
     "favourite_prefix": "Favourite ",
     "star_this_market": "Star this market",
-    "starred_click_to_unstar": "Starred — click to unstar"
+    "starred_click_to_unstar": "Starred — click to unstar",
+    "buckets_hint": " Buckets appear once this market has fills — try another pair from the market picker.",
+    "fills_line_hint": " Fills draw this line — place an order or try another pair.",
+    "osc_hint": " Values compute once this market has price history.",
+    "place_order_hint": " Place one from the trade form on this page — it lists here until filled or cancelled.",
+    "type_price_hint": " Type a price manually above, or place one from the full desk — it lists here once resting.",
+    "no_prefix": "No ",
+    "no_side_suffix": " yet — place one from the Buy/Sell panels below; resting orders list here.",
+    "fills_hint": " Fills appear once orders match — place one from the Buy/Sell panels.",
+    "my_trades_hint": " Place an order from the Buy/Sell panels — unlock the wallet to see your fills.",
+    "try_spelling_hint": " Try another spelling, or open any market from the picker."
   },
   "misc": {
     "title": "Invoice",
@@ -1440,7 +1477,8 @@
     "symbol_or_1_3_x": "symbol or 1.3.x",
     "unpaid": "Unpaid",
     "update": "Update",
-    "viewing_as": "Viewing as committee-account (1.2.0)."
+    "viewing_as": "Viewing as committee-account (1.2.0).",
+    "create_hint": " Create one from the create form below — owned Same-T funds list here."
   },
   "tickets": {
     "title": "Tickets"
@@ -1526,7 +1564,8 @@
     "highest_bid_lives_in_the_order_book_above": "Highest bid lives in the order book above — click a bid row to fill the price.",
     "lowest_ask_lives_in_the_order_book_above": "Lowest ask lives in the order book above — click an ask row to fill the price.",
     "borrow_margin_link": "Borrow (margin)",
-    "borrow_margin_title": "Open a margin position on the borrow desk"
+    "borrow_margin_title": "Open a margin position on the borrow desk",
+    "chain_hint": "Chain validates balances and fees on broadcast."
   },
   "transfer": {
     "title": "Transfer",
@@ -1686,7 +1725,10 @@
     "no_matching_vesting_rows": "No matching vesting rows.",
     "remaining_days": "Remaining (days)",
     "required_days": "Required (days)",
-    "search_id_owner_asset_ph": "Search id, owner, asset…"
+    "search_id_owner_asset_ph": "Search id, owner, asset…",
+    "balances_hint": " Balances appear after a transfer with a vesting policy lands here.",
+    "clear_filter_hint": " Clear the filter to see all rows.",
+    "overclaim_suffix": "). Over-claims fail on chain — chain validates on broadcast."
   },
   "voting": {
     "title": "Voting",
@@ -1735,7 +1777,8 @@
     "console_unlocked_suffix": " (unlocked)",
     "console_unnamed": "unnamed",
     "option_backup_types": "Backup types",
-    "option_wallet_types": "Wallet types"
+    "option_wallet_types": "Wallet types",
+    "console_hint": " Create one (#/create-wallet-brainkey) or import an existing account (#/existing-account) — links below."
   },
   "auth": {
     "a_local_wallet_creates_a_brainkey_on_this_dev": "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password.",
@@ -1821,7 +1864,8 @@
     "title": "Confirm transfer",
     "to": "To",
     "transfer_failed": "Transfer failed.",
-    "view_account": "View account "
+    "view_account": "View account ",
+    "fee_hint": " Check the fee before signing — tick the box and click Sign & Send again to proceed."
   },
   "createaccount": {
     "a_fresh_brainkey_is_generated_for_the_new_acc": "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys.",
@@ -2364,7 +2408,11 @@
     "trusted": "trusted",
     "unknown_source": "UNKNOWN SOURCE",
     "unverified": "unverified",
-    "owner_suffix": " (owner): "
+    "owner_suffix": " (owner): ",
+    "create_hint": " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below.",
+    "empty_hint": " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N).",
+    "inner_type_aria": "Inner operation type",
+    "enclosed_op_mid": " enclosed op "
   },
   "referrals": {
     "account": "Account ",
@@ -2402,7 +2450,9 @@
     "use_my_account": "Use my account",
     "vesting_balances": "Vesting balances",
     "vesting_balances_unavailable_on_this_node": "Vesting balances unavailable on this node.",
-    "wallet_is_locked_enter_the_name_manually_inst": "Wallet is locked — enter the name manually instead."
+    "wallet_is_locked_enter_the_name_manually_inst": "Wallet is locked — enter the name manually instead.",
+    "faucet_hint": " Faucet-created accounts normally carry one.",
+    "node_hint": " The node omitted them — retry or try another node."
   },
   "ticket": {
     "account": "Account",
@@ -2564,7 +2614,9 @@
     "proxies_follow_another_account_s_slate_re": "Proxies follow another account's slate — read how voting works before setting one.",
     "what_is_a_proxy": "? What is a proxy?",
     "hide_legacy_label": " Hide legacy proposals (always on — expired workers are excluded at fetch)",
-    "hide_legacy_title": "Worker lists come from get_all_workers(false); expired rows never arrive."
+    "hide_legacy_title": "Worker lists come from get_all_workers(false); expired rows never arrive.",
+    "clear_search_hint": " Clear the search to see the full list.",
+    "empty_hint": " Entries appear when the chain carries them — workers are proposed from #/create-worker."
   },
   "asset": {
     "acting_field": "Acting account (name or 1.2.N)",
@@ -2673,7 +2725,10 @@
     "issue": "Issue",
     "issuer_defaults_to_the_viewing_as_accoun": "Issuer defaults to the viewing-as account (1.2.0 locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here.",
     "open_an_account": "Open an account",
-    "browse_all": "Browse all assets"
+    "browse_all": "Browse all assets",
+    "schedule_hint": " The node sent an empty schedule — retry or check Settings → Nodes.",
+    "feed_hint": " Feeds appear once publishers publish for this asset.",
+    "create_hint": " Create one at #/assets/create — issued assets list here."
   },
   "pool": {
     "a_to_b_col": "A→B out (raw)",
@@ -2791,7 +2846,17 @@
     "book_title": "Order book",
     "fill_swap": "Fill swap",
     "balances_for_the_sell_and_buy_assets_live_": "Balances for the sell and buy assets live on the account page — open it to check before swapping.",
-    "open_account_balances": "Open account balances"
+    "open_account_balances": "Open account balances",
+    "touch_hint": "No pools touch these assets — pick a pair with a pool, or create one at #/pools.",
+    "swaps_hint": " Swaps appear after the first exchange in this pool — run one from #/swap.",
+    "depth_hint": " Stake both legs from the Stake form to open depth.",
+    "my_swaps_hint": " Run one from #/swap — your swaps in this pool list here.",
+    "map_touch_aria": "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools.",
+    "map_core_aria": "Pool map. Press Enter to open the core asset.",
+    "events_hint": " Deposits, withdrawals, and exchanges in this pool list here once they happen.",
+    "create_stake_hint": ". Create one from the Pools desk (#/pools) Stake form.",
+    "zero_supply_hint": " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first.",
+    "owned_hint": " Stake both legs in any pool above — owned pools list here."
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",
@@ -2838,5 +2903,8 @@
     "add_vote": "Add vote to TxBuilder",
     "add_deposit": "Add deposit to TxBuilder",
     "unlock_memo_hint": "Unlock to include the encrypted memo"
+  },
+  "ops": {
+    "no_ops_hint": "No operations in the sampled blocks — widen the sample or retry at the chain tip."
   }
 }

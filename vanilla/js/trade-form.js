@@ -1229,7 +1229,7 @@ var TradeForm = (function () {
     row(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
     row(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
-    mount.appendChild(el(doc, "p", "Chain validates balances and fees on broadcast.", "muted"));
+    mount.appendChild(el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
     /* The exact operation about to be signed (unsigned, no secrets).
      * Review bytes before Sign & Send. */
     var detOp = doc.createElement("details");
@@ -1541,7 +1541,7 @@ var TradeForm = (function () {
     confirmRow(t("trade.row_expiration", "Expiration"), R.expWire);
     confirmRow(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
-    mount.appendChild(el(doc, "p", "Chain validates balances and fees on broadcast.", "muted"));
+    mount.appendChild(el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
     /* All N operations about to be signed (unsigned, no secrets). */
     var detOps = doc.createElement("details");
     detOps.className = "raw";

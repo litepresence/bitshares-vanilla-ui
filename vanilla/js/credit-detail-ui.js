@@ -185,7 +185,7 @@ var CreditDetailUI = (function () {
       });
       box.appendChild(ui.deskTable(doc, [t("credit.deal", "Deal"), t("credit.borrower", "Borrower"), t("credit.debt", "Debt"), t("credit.collateral", "Collateral"), t("credit.rate", "Rate"), t("credit.auto_repay", "Auto-repay")], rows,
         function (r) { return [r.d.id + " · borrower " + r.d.borrower, "Debt " + r.cells[2].text, "Collateral " + r.cells[3].text, "Rate " + r.cells[4].text]; }));
-      if (!deals.length) { box.appendChild(ui.el(doc, "p", t("credit.no_deals_on_this_offer_yet", "No deals on this offer yet.") + " Deals appear after someone borrows against this offer.", "muted")); return; }
+      if (!deals.length) { box.appendChild(ui.el(doc, "p", t("credit.no_deals_on_this_offer_yet", "No deals on this offer yet.") + t("credit.deals_hint", " Deals appear after someone borrows against this offer."), "muted")); return; }
       var sel = doc.createElement("select"); ui.touchable(sel);
       deals.forEach(function (d) {
         var op = doc.createElement("option"); op.value = d.id; op.textContent = d.id; sel.appendChild(op); });

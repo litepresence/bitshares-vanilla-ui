@@ -31,6 +31,17 @@ var OpsUI = (function () {
   var CHUNK = 25; /* parallel block-fetch width (one shared socket) */
   var lastN = DEFAULT_N; /* sticky sample size for the session */
 
+  /* Batch-9 i18n: display strings resolve via I18n.t with the pre-conversion
+   * literal kept verbatim as enDefault (English-identical on any transport,
+   * incl. file:// where dict fetch fails). Falls back to the default when
+   * i18n.js failed to load: never blank, never throws. */
+  function t(key, dflt, vars) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
+    } catch (e) { /* default below */ }
+    return dflt;
+  }
+
   /* Op index -> short name, FC_REFLECT order <- operations.hpp:56-133.
    * PROVENANCE: value-copy of the OP_NAMES table in vanilla/js/explorer.js
    * (lines 24-44), which cites bitshares-core operations.hpp:56-133. Copied
@@ -195,7 +206,7 @@ var OpsUI = (function () {
     var keys = Object.keys(counts).map(function (k) { return parseInt(k, 10); });
     keys.sort(function (a, b) { return counts[b] - counts[a]; });
     if (keys.length === 0) {
-      wrap.appendChild(el(doc, "p", "No operations in the sampled blocks — widen the sample or retry at the chain tip.", "muted"));
+      wrap.appendChild(el(doc, "p", t("ops.no_ops_hint", "No operations in the sampled blocks — widen the sample or retry at the chain tip."), "muted"));
       return;
     }
     var scroller = el(doc, "div", null, "ops-scroll");

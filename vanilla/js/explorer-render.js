@@ -405,7 +405,7 @@ var ExplorerRender = (function () {
     var dl = el(doc, "dl", null, "xplore-fields");
     var fields = (op.fields && typeof op.fields === "object") ? op.fields : {};
     var keys = Object.keys(fields);
-    if (keys.length === 0) box.appendChild(el(doc, "p", t("explorer.no_fields", "No fields.") + " The object carries no displayable properties.", "muted"));
+    if (keys.length === 0) box.appendChild(el(doc, "p", t("explorer.no_fields", "No fields.") + t("explorer.fields_hint", " The object carries no displayable properties."), "muted"));
     keys.forEach(function (k) { fieldRow(doc, dl, k, fields[k], ctx, 0); });
     box.appendChild(dl);
     /* Punchlist: raw-JSON toggle (Transaction.jsx:42-73 concept) — the

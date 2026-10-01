@@ -160,7 +160,7 @@ var MarketOrders = (function () {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (mine.length === 0) {
-        body.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + " Place one from the trade form on this page — it lists here until filled or cancelled.", "muted"));
+        body.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
         return;
       }
       /* rerender: full re-render after a cancel flow completes. */
@@ -398,7 +398,7 @@ var MarketOrders = (function () {
     var bins = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
     if (bins.length === 0) {
       det.appendChild(el(doc, "p",
-        t("market_orders.tape_empty", "No fills to bin — tape empty.") + " The tape fills as orders match on this market.", "muted"));
+        t("market_orders.tape_empty", "No fills to bin — tape empty.") + t("market_orders.tape_hint", " The tape fills as orders match on this market."), "muted"));
       return;
     }
     var note = el(doc, "p",

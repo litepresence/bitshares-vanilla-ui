@@ -280,7 +280,7 @@ var TransferConfirm = (function () {
     if (ctx.feeWarning) {
       var feeWarn = el(doc, "div", null, "error");
       feeWarn.setAttribute("aria-live", "assertive");
-      feeWarn.textContent = ctx.feeWarning + " Check the fee before signing — tick the box and click Sign & Send again to proceed.";
+      feeWarn.textContent = ctx.feeWarning + t("confirm.fee_hint", " Check the fee before signing — tick the box and click Sign & Send again to proceed.");
       wrap.appendChild(feeWarn);
       var ackRow = el(doc, "label", null, "xfer-field");
       feeAckBox = doc.createElement("input");

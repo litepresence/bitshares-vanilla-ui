@@ -128,7 +128,7 @@ var PoolSwapUI = (function () {
       Pool.history(poolId, 20).then(function (rows) {
         if (!live(myGen, uiGen)) return;
         u.clearBox(poolBody);
-        if (!rows || !rows.length) { poolBody.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet.") + " Deposits, withdrawals, and exchanges in this pool list here once they happen.", "muted")); return; }
+        if (!rows || !rows.length) { poolBody.appendChild(u.el(doc, "p", t("pool.no_events", "No pool events yet.") + t("pool.events_hint", " Deposits, withdrawals, and exchanges in this pool list here once they happen."), "muted")); return; }
         var table = doc.createElement("table"); table.className = "node-table";
         table.appendChild(u.tableHead(doc, [t("pool.time_col", "Time (UTC)"), t("pool.event_col", "Event")]));
         var tbody = doc.createElement("tbody");
@@ -167,7 +167,7 @@ var PoolSwapUI = (function () {
         /* Suffix tracks the resolved sell asset (input keeps its id/value). */
         if (fAmt.suffix) fAmt.suffix.textContent = found.sell.symbol;
         if (!found.rows.length) {
-          pickBox.appendChild(u.el(doc, "p", "No pool exists for " + found.sell.symbol + "/" + found.buy.symbol + ". Create one from the Pools desk (#/pools) Stake form.", "muted"));
+          pickBox.appendChild(u.el(doc, "p", "No pool exists for " + found.sell.symbol + "/" + found.buy.symbol + t("pool.create_stake_hint", ". Create one from the Pools desk (#/pools) Stake form."), "muted"));
           return;
         }
         var sel = doc.createElement("select"); u.touchable(sel);
@@ -230,7 +230,7 @@ var PoolSwapUI = (function () {
     function drawMine(mine) {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox);
-      if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + " Run one from #/swap — your swaps in this pool list here.", "muted")); return; }
+      if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + t("pool.my_swaps_hint", " Run one from #/swap — your swaps in this pool list here."), "muted")); return; }
       var table = doc.createElement("table"); table.className = "node-table";
       table.appendChild(u.tableHead(doc, [t("pool.block_col", "Block"), t("pool.sell_col", "Sell"), t("pool.min_recv_row", "Min to receive")]));
       var tbody = doc.createElement("tbody");
