@@ -355,16 +355,25 @@ var AccountUI = (function () {
         if (b && b.asset_id !== bts.id) need.push(b.asset_id);
       });
       if (need.length > 20) { out.capped = true; need = need.slice(0, 20); }
-      var ticks = need.map(function (aid) {
-        return dbCall("get_ticker", [bts.id, aid]).then(function (tk) {
-          out.prices[aid] = {
-            latest: (tk && tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null,
-            change: (tk && tk.percent_change !== undefined && tk.percent_change !== null)
-              ? String(tk.percent_change) : null
-          };
-        }).catch(function () { out.prices[aid] = { latest: null, change: null }; });
-      });
-      return Promise.all(ticks).then(function () { /* batch settled */ });
+      /* Bounded burst: Promise.all in chunks of 5 (never 20-at-once).
+       * Results merge back keyed by asset id (deterministic rows, same
+       * shape as before); one asset failing dashes that row only — a
+       * per-asset catch means the chunk (and batch) never rejects. */
+      function fetchChunk(idx) {
+        if (idx >= need.length) return Promise.resolve();
+        var slice = need.slice(idx, idx + 5);
+        var burst = slice.map(function (aid) {
+          return dbCall("get_ticker", [bts.id, aid]).then(function (tk) {
+            out.prices[aid] = {
+              latest: (tk && tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null,
+              change: (tk && tk.percent_change !== undefined && tk.percent_change !== null)
+                ? String(tk.percent_change) : null
+            };
+          }).catch(function () { out.prices[aid] = { latest: null, change: null }; });
+        });
+        return Promise.all(burst).then(function () { return fetchChunk(idx + 5); });
+      }
+      return fetchChunk(0).then(function () { /* batch settled */ });
     }).catch(function () {
       out.bts = null;
       out.notes.push("BTS price batch unavailable — price/value columns dashed.");
