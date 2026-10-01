@@ -163,9 +163,15 @@ var AccountUI = (function () {
    * source stays visible instead of failing the gate. Reused t() calls
    * below cite pre-existing keys with byte-identical defaults only. */
 
-  /* Decimal string -> {num, den} BigInts ("12.5" -> 125n/10n), or null on
+  /** Decimal string -> {num, den} BigInts ("12.5" -> 125n/10n), or null on
    * any other shape. Integer-only; feeds exact BTS-value multiplication
-   * (binary float for money is a bug, not a shortcut). */
+   * (binary float for money is a bug, not a shortcut).
+   * TYPE NOTE: explicit bigint return pins decFrac against tsc's evolving-any
+   * inference (bare `var num` + try/catch reads back as number at the
+   * multiply site). No shared vanilla/js/api/types.js exists yet (group 1
+   * owns it); this local annotation stands alone, nothing to merge.
+   * @param {any} s display decimal (string expected, anything coerced)
+   * @returns {{num: bigint, den: bigint} | null} exact ratio, UNREDUCED */
   function decFrac(s) {
     if (typeof s !== "string") s = String(s === null || s === undefined ? "" : s);
     var m = /^(\d+)(?:\.(\d+))?$/.exec(s.trim());
@@ -178,10 +184,14 @@ var AccountUI = (function () {
     return { num: num, den: den };
   }
 
-  /* Exact floor of qtyHuman * priceHuman scaled to a raw integer at prec
+  /** Exact floor of qtyHuman * priceHuman scaled to a raw integer at prec
    * decimals (value in BTS smallest units). Returns the digit string, or
    * null when either side is not a plain non-negative decimal (caller
-   * dashes the cell — never throws on chain data). */
+   * dashes the cell — never throws on chain data).
+   * @param {any} qtyHuman display quantity
+   * @param {any} priceHuman display price (BTS per unit)
+   * @param {any} prec asset precision (non-negative integer)
+   * @returns {string | null} raw integer digits, or null on bad input */
   function valueRawOf(qtyHuman, priceHuman, prec) {
     var q = decFrac(qtyHuman), p = decFrac(priceHuman);
     if (!q || !p) return null;
@@ -381,13 +391,18 @@ var AccountUI = (function () {
     return Promise.all(jobs).then(function () { return out; });
   }
 
-  /* Portfolio table + phone cards (punchlist 1-5): Asset (linked to
+  /** Portfolio table + phone cards (punchlist 1-5): Asset (linked to
    * #/asset/:symbol) | QTY | IN ORDERS | IN VESTING | IN COLLATERAL |
    * PRICE(BTS) | 24HR | VALUE(BTS) | actions. A search input filters rows
    * client-side (no refetch); a muted subtext line carries the summed BTS
    * total (floor of qty*price per asset, BTS row at face value, visible
    * rows only). Missing legs render as dashes (see enrichPortfolio notes).
-   * Params: doc, section, acct ({id, name}), balances, enrich. */
+   * Params: doc, section, acct ({id, name}), balances, enrich.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} section mount element for the portfolio panel
+   * @param {any} acct account object ({id, name})
+   * @param {any} balances balance rows for the account
+   * @param {any} enrich enrichment helpers (prices/flags) */
   function renderPortfolio(doc, section, acct, balances, enrich) {
     var list = Array.isArray(balances) ? balances : [];
     var bts = enrich.bts;

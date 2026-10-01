@@ -11,6 +11,13 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
 (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').TxEnvelope} TxEnvelope
+   * @typedef {import('./types.js').CountResult} CountResult
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   */
+
   var _ops = [];
   var _ctr = 0;
   var _subs = [];
@@ -358,8 +365,9 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     return rows.map(function (r) { return Object.assign({}, r); });
   }
 
-  /* Sign with every distinct matching local WIF (append-only; same-pub re-sign
-   * replaces its entry). Locked wallet throws tb-wallet-locked. */
+  /** Sign with every distinct matching local WIF (append-only; same-pub re-sign
+   * replaces its entry). Locked wallet throws tb-wallet-locked.
+   * @returns {Promise<any>} */
   async function signLocal() {
     if (!_ops.length) throw new Error("tb-empty: nothing queued");
     var W = globalThis.Wallet || {};
@@ -388,7 +396,7 @@ var TxBuilder = (typeof globalThis !== "undefined" && globalThis.TxBuilder) ? gl
     if (needOwner && W.keys.owner) consider(W.keys.owner.pub, W.keys.owner.wif);
     var signed = [];
     for (var i = 0; i < wifs.length; i++) {
-      var sig = await globalThis.Crypto.signHash(digest, wifs[i].wif);
+      var sig = await /** @type {any} */ (globalThis.Crypto).signHash(digest, wifs[i].wif);
       if (!(sig instanceof Uint8Array) || sig.length !== 65) throw new Error("tb-bad-envelope: Crypto.signHash must return 65 bytes");
       var hex = T._ser.bytesToHex ? T._ser.bytesToHex(sig) : Array.prototype.map.call(sig, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
       var at = -1;

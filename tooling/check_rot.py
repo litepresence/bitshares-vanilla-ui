@@ -83,6 +83,29 @@ def main():
             continue
 
         _, ext = os.path.splitext(base)
+        if base.lower().endswith(".d.ts"):
+            # Narrow carve-out (2026-10-01, type-gate): ambient declarations
+            # need no build step (tsc runs --noEmit; browsers never load them).
+            # Self-policing: a .d.ts referenced by any <script> tag or import
+            # fails as a violation — unloaded-by-construction is the rule.
+            loaded = False
+            for probe in iter_files(VANILLA):
+                if probe == path:
+                    continue
+                if os.path.splitext(probe)[1].lower() not in TEXT_EXTS | {".html"}:
+                    continue
+                try:
+                    with open(probe, "r", encoding="utf-8", errors="strict") as fh:
+                        if base in fh.read():
+                            loaded = True
+                            break
+                except (OSError, UnicodeError):
+                    continue
+            if loaded:
+                violations.append(
+                    "%s: loaded .d.ts would need a build step" % rel
+                )
+            continue
         if ext.lower() in BUILD_REQUIRED_EXTS:
             violations.append(
                 "%s: %s sources need a build step (ship plain .js/.css)" % (rel, ext)

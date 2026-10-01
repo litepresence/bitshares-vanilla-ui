@@ -95,8 +95,9 @@ var CreateAccountUI = (function () {
     return null;
   }
 
-  /* Route entry. Gates backends, waits for the shared socket (transfer-ui.js
-   * connect-wait pattern), then paints the form. */
+  /** Route entry. Gates backends, waits for the shared socket (transfer-ui.js
+   * connect-wait pattern), then paints the form.
+   * @param {HTMLElement} root router mount element */
   function renderCreateAccount(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -132,8 +133,12 @@ var CreateAccountUI = (function () {
     paintForm(doc, root, myGen, { name: "", checked: null, takenId: null, brainkey: "" });
   }
 
-  /* Creation form: name + Check, brainkey (generated, read-only, regenable),
-   * Register. State survives re-renders via P. */
+  /** Creation form: name + Check, brainkey (generated, read-only, regenable),
+   * Register. State survives re-renders via P.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} root router mount element
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} P form state {name, brainkey, checked, takenId} */
   function paintForm(doc, root, myGen, P) {
     if (myGen !== gen) return;
     clearRoot(root);
@@ -251,12 +256,21 @@ var CreateAccountUI = (function () {
     });
   }
 
-  /* Generate a fresh brainkey into P + the visible textarea. */
+  /** Generate a fresh brainkey into P + the visible textarea.
+   * TYPE NOTE: the global Crypto object collides with DOM lib's Crypto
+   * interface (constructor type), so its wallet methods read back missing;
+   * casts pin it to any. Local casts only, nothing to merge.
+   * @param {Document} doc owner document
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} P form state {name, brainkey, checked, takenId}
+   * @param {HTMLElement} out output box for errors
+   * @returns {void} */
   function genBrainkey(doc, myGen, P, out) {
-    Crypto.suggestBrainkey().then(function (bk) {
+    (/** @type {any} */ (Crypto).suggestBrainkey)().then(function (bk) {
       if (myGen !== gen) return;
       P.brainkey = bk;
-      var area = doc.getElementById("ca-brainkey");
+      /** @type {HTMLTextAreaElement | null} */
+      var area = /** @type {any} */ (doc.getElementById("ca-brainkey"));
       if (area) area.value = bk;
     }).catch(function (e) {
       if (myGen === gen) showError(doc, out, e, t("createaccount.could_not_generate_a_brainkey", "Could not generate a brainkey."));
@@ -282,15 +296,18 @@ var CreateAccountUI = (function () {
     }
   }
 
-  /* Derive owner<-seq0, active<-seq1, memo<-seq2 (same roles as wallet.js
+  /** Derive owner<-seq0, active<-seq1, memo<-seq2 (same roles as wallet.js
    * _deriveFreshKeys) and POST the #1 faucet shape. Returns
-   * {name, id, pubs} after an on-chain verify. */
+   * {name, id, pubs} after an on-chain verify.
+   * @param {string} name account name to register
+   * @param {string} brainkey normalized brainkey words
+   * @returns {Promise<{name: string, id: string, pubs: any}>} faucet result */
   async function registerViaFaucet(name, brainkey) {
-    var norm = Crypto.normalizeBrainkey(brainkey), pubs = {};
+    var norm = (/** @type {any} */ (Crypto).normalizeBrainkey)(brainkey), pubs = {};
     var roles = [["owner", 0], ["active", 1], ["memo", 2]];
     for (var i = 0; i < roles.length; i++) {
-      var privHex = await Crypto.brainPrivateKeyHex(norm, roles[i][1]);
-      pubs[roles[i][0]] = (await Crypto.keypairFromPrivateHex(privHex)).pub;
+      var privHex = await (/** @type {any} */ (Crypto).brainPrivateKeyHex)(norm, roles[i][1]);
+      pubs[roles[i][0]] = (await (/** @type {any} */ (Crypto).keypairFromPrivateHex)(privHex)).pub;
     }
     var ctrl = null, timer = null;
     try {

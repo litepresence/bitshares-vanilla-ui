@@ -143,10 +143,10 @@ var ChartsLwc = (function () {
    * LightweightCharts forces the canvas fallback path below. */
   function hasLightweight() {
     try {
-      if (typeof window !== "undefined" && window && window.LightweightCharts &&
-          typeof window.LightweightCharts.createChart === "function") return true;
-      if (typeof globalThis !== "undefined" && globalThis.LightweightCharts &&
-          typeof globalThis.LightweightCharts.createChart === "function") return true;
+      if (typeof window !== "undefined" && window && /** @type {any} */ (window).LightweightCharts &&
+          typeof /** @type {any} */ (window).LightweightCharts.createChart === "function") return true;
+      if (typeof globalThis !== "undefined" && /** @type {any} */ (globalThis).LightweightCharts &&
+          typeof /** @type {any} */ (globalThis).LightweightCharts.createChart === "function") return true;
     } catch (e) { /* absent: fall back */ }
     return false;
   }
@@ -154,11 +154,11 @@ var ChartsLwc = (function () {
   /* The vendored global, or null when absent (same guards as above). */
   function lw() {
     try {
-      if (typeof window !== "undefined" && window && window.LightweightCharts) {
-        return window.LightweightCharts;
+      if (typeof window !== "undefined" && window && /** @type {any} */ (window).LightweightCharts) {
+        return /** @type {any} */ (window).LightweightCharts;
       }
-      if (typeof globalThis !== "undefined" && globalThis.LightweightCharts) {
-        return globalThis.LightweightCharts;
+      if (typeof globalThis !== "undefined" && /** @type {any} */ (globalThis).LightweightCharts) {
+        return /** @type {any} */ (globalThis).LightweightCharts;
       }
     } catch (e) { /* ignore */ }
     return null;

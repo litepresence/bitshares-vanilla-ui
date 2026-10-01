@@ -197,7 +197,15 @@ var CreditUI = (function () {
   }
   function rateText(u) { return { text: Credit.rateUnitsToHuman(u) + "%", raw: String(u) }; }
   function who(me) { return me.name + " (" + me.id + ")"; }
-  /* Confirm + publish: fresh-WIF sign inside sendAndProve, re-read proof, result. */
+  /** Confirm + publish: fresh-WIF sign inside sendAndProve, re-read proof, result.
+   * TYPE NOTE: the cfg.build promise resolves {pair, fee, prove} but tsc
+   * reads the chain as Promise<void>; member casts pin each field to any.
+   * No shared types.js yet (group 1 owns it); local casts only.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} out output box (cleared + rebuilt)
+   * @param {any} cfg {title, rows, makeUnsigned, prove, okText}
+   * @param {number} myGen route generation (liveness token)
+   * @returns {void} */
   function sendConfirm(doc, out, cfg, myGen) {
     clearBox(out);
     out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
@@ -233,18 +241,23 @@ var CreditUI = (function () {
       });
     });
   }
-  /* build {pair,fee,prove,extra} + live fee -> named rows -> sendConfirm. */
+  /** build {pair,fee,prove,extra} + live fee -> named rows -> sendConfirm.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} out output box (cleared + rebuilt)
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} cfg {build, rows, title, ok, fail, btn?}
+   * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
     clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out, t("credit.resolving_and_estimating_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
       if (myGen !== gen) return done();
-      feeText(built.fee).then(function (f) {
+      feeText((/** @type {any} */ (built).fee)).then(function (f) {
         if (myGen !== gen) return done();
         sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f),
-          makeUnsigned: function () { return Tx.buildTx([built.pair]); },
-          prove: built.prove, okText: cfg.ok(built) }, myGen);
+          makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
+          prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
       }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, t("credit.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
@@ -465,7 +478,8 @@ var CreditUI = (function () {
     panel.appendChild(closeBtn);
     try { fBor.input.focus(); } catch (e) { /* keyboard path stays via tab order */ }
   }
-  /* Route entry: #/credit-offer — filters + offer table + my-offers + create. */
+  /** Route entry: #/credit-offer — filters + offer table + my-offers + create.
+   * @param {HTMLElement} root router mount element */
   function renderOffers(root) {
     if (!root) return;
     var ctx = routeReady(root, t("credit.credit_offers", "Credit Offers"), function () { renderOffers(root); });

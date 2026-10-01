@@ -51,7 +51,8 @@ var DebitUI = (function () {
   function findRow(lists, permId) {
     return lists.asGiver.concat(lists.asRecipient).find(function (r) { return r.id === permId; }) || null;
   }
-  /* Route entry: #/direct-debit — giver + recipient tables + action forms. */
+  /** Route entry: #/direct-debit — giver + recipient tables + action forms.
+   * @param {HTMLElement} root router mount element */
   function renderDirectDebit(root) {
     if (!root) return;
     var u = U(), retry = function () { renderDirectDebit(root); };
@@ -223,9 +224,10 @@ var DebitUI = (function () {
       title: t("debit.confirm_delete", "Confirm delete"), ok: function (R) { return "Permission " + R.row.id + " deleted."; },
       fail: t("debit.delete_fee_failed", "Could not estimate the delete fee.") });
   }
-  /* Route entry: #/spotlight — tile grid (ShowcaseGrid parity, no chain op).
+  /** Route entry: #/spotlight — tile grid (ShowcaseGrid parity, no chain op).
    * The grid renders WITHOUT unlock (login-gated tiles link out); only the
-   * recurring helper needs the wallet. */
+   * recurring helper needs the wallet.
+   * @param {HTMLElement} root router mount element */
   function renderSpotlight(root) {
     if (!root) return;
     var u = U(), doc = root.ownerDocument || document, myGen = ++gen;
@@ -278,7 +280,15 @@ var DebitUI = (function () {
         var recv = await Asset.describe(fRecv.input.value.trim() || "USD");
         var n = parseInt(String(fCount.input.value).trim(), 10);
         if (!Number.isInteger(n) || n < 2 || n > 20) throw new Error(t("debit.err_count", "Order count must be 2–20."));
+        /* TYPE NOTE: exact-ratio math is BigInt end to end. TS 7 types
+         * any-arithmetic as number, so pinning the ratios to any still
+         * breaks at the BigInt multiply sites — the SHAPE below keeps
+         * D/lowD/highD and everything derived BigInt-clean. The shape
+         * matches Format.parsePriceRatio's {num, den} BigInt return.
+         * No shared types.js yet (group 1 owns it); local only. */
+        /** @type {{num: bigint, den: bigint}} */
         var lowR = Format.parsePriceRatio(fLow.input.value.trim());
+        /** @type {{num: bigint, den: bigint}} */
         var highR = Format.parsePriceRatio(fHigh.input.value.trim());
         var D = lowR.den * highR.den, lowD = lowR.num * highR.den, highD = highR.num * lowR.den;
         if (highD <= lowD) throw new Error(t("debit.err_range", "High price must be above low price."));

@@ -313,9 +313,10 @@ var WalletUI = (function () {
     return box;
   }
 
-  /* Manager/status screen: locked shows a password prompt; unlocked shows the
+  /** Manager/status screen: locked shows a password prompt; unlocked shows the
    * three role pubkeys, a Lock button, and a backup-brainkey revealer.
-   * Params: none. Fails inline (wrong password, missing wallet, locked read). */
+   * Params: none. Fails inline (wrong password, missing wallet, locked read).
+   * @param {HTMLElement} root router mount element */
   function renderWallet(root) {
     var doc = root.ownerDocument;
     clearRoot(root);
@@ -399,7 +400,8 @@ var WalletUI = (function () {
         unlockBtn.disabled = true;
         /* H2: the password lives in a local + the input; both are wiped on
          * either outcome so nothing lingers in DOM or closure. */
-        var pwInput = doc.getElementById("wallet-password");
+        /** @type {HTMLInputElement | null} */
+        var pwInput = /** @type {any} */ (doc.getElementById("wallet-password"));
         var pw = pwInput ? pwInput.value : "";
         Promise.resolve()
           .then(function () { return Wallet.unlock(pw); })
@@ -419,12 +421,13 @@ var WalletUI = (function () {
     navLinks(doc, wrap, "manager");
   }
 
-  /* Create screen: generated brainkey plus write-down checkbox gate, then
+  /** Create screen: generated brainkey plus write-down checkbox gate, then
    * password plus confirm plus strength hint, then create/cancel. Wallet name
    * shows only when a stored wallet exists (WalletCreate.jsx:168-186
    * concept — single-slot keystore, so label-only with an overwrite warning).
    * Custom-brainkey toggle flips the textarea editable with a dictionary
-   * hint (BrainkeyInput concept). All failures show inline. */
+   * hint (BrainkeyInput concept). All failures show inline.
+   * @param {HTMLElement} root router mount element */
   function renderCreate(root) {
     var doc = root.ownerDocument;
     clearRoot(root);
@@ -532,7 +535,10 @@ var WalletUI = (function () {
       bkArea.readOnly = true;
       bkArea.placeholder = "Generating brainkey…";
       customBtn.style.display = "";
-      return Crypto.suggestBrainkey().then(function (bk) {
+    /* TYPE NOTE: the global Crypto object collides with DOM lib's Crypto
+     * interface (constructor type), so suggestBrainkey reads back missing;
+     * the cast pins it to any. Local cast only, nothing to merge. */
+      return (/** @type {any} */ (Crypto).suggestBrainkey)().then(function (bk) {
         bkArea.value = bk;
         refreshBkHint();
       }).catch(function (e) {
@@ -565,8 +571,10 @@ var WalletUI = (function () {
       /* H2: password locals + inputs are wiped on either outcome. The
        * brainkey textarea keeps its value by design (the user is writing
        * it down on this screen). */
-      var pwInput = doc.getElementById("create-password");
-      var confirmInput = doc.getElementById("create-confirm");
+      /** @type {HTMLInputElement | null} */
+      var pwInput = /** @type {any} */ (doc.getElementById("create-password"));
+      /** @type {HTMLInputElement | null} */
+      var confirmInput = /** @type {any} */ (doc.getElementById("create-confirm"));
       var pw = pwInput ? pwInput.value : "";
       var confirm = confirmInput ? confirmInput.value : "";
       if (!check.checked) {
@@ -697,9 +705,10 @@ var WalletUI = (function () {
     return box;
   }
 
-  /* Import screen: brainkey textarea plus password, verified against the
+  /** Import screen: brainkey textarea plus password, verified against the
    * chain (sequences 0..9) before anything is saved. Inline errors for
-   * short brainkeys, chain failures, and unknown (no-chain-keys) brainkeys. */
+   * short brainkeys, chain failures, and unknown (no-chain-keys) brainkeys.
+   * @param {HTMLElement} root router mount element */
   function renderImport(root) {
     var doc = root.ownerDocument;
     clearRoot(root);
@@ -735,7 +744,8 @@ var WalletUI = (function () {
       err.textContent = "";
       var bk = bkArea.value;
       /* H2: same password wipe as unlock/create above. */
-      var pwInput = doc.getElementById("import-password");
+      /** @type {HTMLInputElement | null} */
+      var pwInput = /** @type {any} */ (doc.getElementById("import-password"));
       var pw = pwInput ? pwInput.value : "";
       if (!pw) {
         err.textContent = "Password required: enter a non-empty password.";

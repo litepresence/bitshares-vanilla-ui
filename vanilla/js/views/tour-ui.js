@@ -327,7 +327,7 @@ var TourUI = (function () {
     }
     placeCard(target);
     try {
-      var focusBtn = box.querySelector("#tour-next");
+      var focusBtn = /** @type {any} */ (box.querySelector("#tour-next"));
       if (focusBtn && typeof focusBtn.focus === "function") focusBtn.focus({ preventScroll: true });
     } catch (e) { /* focus stays */ }
   }

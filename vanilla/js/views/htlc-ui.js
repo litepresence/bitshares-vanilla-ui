@@ -232,17 +232,26 @@ var HtlcUI = (function () {
       });
     });
   }
-  function reviewPaid(doc, out, myGen, cfg) { /* review: build {pair,fee,prove} + live fee -> rows -> sendConfirm */
+  /** review: build {pair,fee,prove} + live fee -> rows -> sendConfirm.
+   * TYPE NOTE: the cfg.build promise resolves {pair, fee, prove} but tsc
+   * reads the chain as Promise<void>; member casts pin each field to any.
+   * No shared types.js yet (group 1 owns it); local casts only.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} out output box (cleared + rebuilt)
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} cfg {build, rows, title, ok, fail, clear?, btn?}
+   * @returns {void} */
+  function reviewPaid(doc, out, myGen, cfg) {
     clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out,t("account.resolving_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
       if (myGen !== gen) return done();
-      feeText(built.fee).then(function (f) {
+      feeText((/** @type {any} */ (built).fee)).then(function (f) {
         if (myGen !== gen) return done();
         sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f),
-          makeUnsigned: function () { return Tx.buildTx([built.pair]); },
-          prove: built.prove, okText: cfg.ok(built), clear: cfg.clear || [] }, myGen);
+          makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
+          prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built), clear: cfg.clear || [] }, myGen);
         done();
       }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
@@ -257,7 +266,8 @@ var HtlcUI = (function () {
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
     return btn;
   }
-  /* Route entry: #/htlc — sent + received tables + create form. */
+  /** Route entry: #/htlc — sent + received tables + create form.
+   * @param {HTMLElement} root router mount element */
   function renderHtlc(root) {
     if (!root) return;
     var ctx = routeReady(root, t("htlc.list_title", "Hashed Timelock Contracts"), function () { renderHtlc(root); });
@@ -403,7 +413,9 @@ var HtlcUI = (function () {
         },
         title: t("htlc.confirm_create", "Confirm HTLC"), ok: function () { return t("htlc.created", "HTLC created."); }, clear: [fSecret.input, fHash.input, fSize.input], fail: t("htlc.create_failed", "Could not prepare the HTLC.") });
   }
-  /* Route entry: #/htlc/:id — detail + redeem + extend; unknown id is an empty state. */
+  /** Route entry: #/htlc/:id — detail + redeem + extend; unknown id is an empty state.
+   * @param {HTMLElement} root router mount element
+   * @param {string} id HTLC object id (1.16.x) */
   function renderHtlcDetail(root, id) {
     if (!root) return;
     var retry = function () { renderHtlcDetail(root, id); };

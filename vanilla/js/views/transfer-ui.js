@@ -249,6 +249,9 @@ var TransferUI = (function () {
     } catch (e) { /* malformed query: prefill empty */ }
     return out;
   }
+  /** Route entry: #/transfer (form + confirm + propose wiring).
+   * @param {HTMLElement} root router mount element
+   * @param {any} prefillTo optional prefilled recipient (query param) */
   function renderTransfer(root, prefillTo) {
     /* Shared-socket wait (deep links land before boot connects), then show
      * the form immediately — PUBLIC-FIRST, no unlock gate. The sender
@@ -629,8 +632,11 @@ var TransferUI = (function () {
           if (!memoKey) throw new Error("no-memo-key");
           if (encBox.checked) {
             if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) throw new Error("wallet-locked");
-            if (typeof Crypto === "undefined" || !Crypto.encryptMemo) throw new Error("no-crypto");
-            memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, memoKey);
+            /* TYPE NOTE: the global Crypto object collides with DOM lib's
+             * Crypto interface (constructor type), so its wallet methods
+             * read back missing; the cast pins it to any. Local cast only. */
+            if (typeof Crypto === "undefined" || !(/** @type {any} */ (Crypto).encryptMemo)) throw new Error("no-crypto");
+            memoObj = await (/** @type {any} */ (Crypto).encryptMemo)(memoText, Wallet.keys.memo.wif, memoKey);
           } else {
             memoObj = { from: "", to: memoKey, nonce: "0", message: utf8HexLocal(memoText) };
           }
@@ -872,7 +878,11 @@ var TransferUI = (function () {
           var wid = await Account.myAccountId();
           if (rf.id !== wid) {
             var err = new Error("from-mismatch");
-            err.fromName = rf.name; err.fromId = rf.id; err.walletId = wid;
+            /* TYPE NOTE: named mismatch fields ride on the Error for the
+             * catch below; casts pin the ad-hoc shape. Local only. */
+            (/** @type {any} */ (err).fromName = rf.name);
+            (/** @type {any} */ (err).fromId = rf.id);
+            (/** @type {any} */ (err).walletId = wid);
             throw err;
           }
         }).then(function () {
@@ -1194,7 +1204,7 @@ var TransferUI = (function () {
           memoKind = "locked-encrypted";
         } else {
           if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) throw new Error("wallet-locked");
-          memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, toMemoKey);
+          memoObj = await (/** @type {any} */ (Crypto).encryptMemo)(memoText, Wallet.keys.memo.wif, toMemoKey);
           memoKind = "encrypted";
         }
       } else {

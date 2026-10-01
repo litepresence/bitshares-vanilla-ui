@@ -18,6 +18,13 @@
 var ExplorerTabs = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./types.js').TopMarketRow} TopMarketRow
+   * @typedef {import('./types.js').CountResult} CountResult
+   * @typedef {import('./types.js').PulseResult} PulseResult
+   * @typedef {import('./types.js').TFunction} TFunction
+   */
+
   /* Batch-3 i18n (slice-17 precedent): display strings resolve via I18n.t with
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
@@ -66,7 +73,11 @@ var ExplorerTabs = (function () {
     return { table: t, tbody: tb };
   }
 
-  /* poolsTab: first 20 pools (id/share/legs) + desk link. */
+  /** poolsTab: first 20 pools (id/share/legs) + desk link.
+   * @param {any} doc
+   * @param {any} body
+   * @param {any} live
+   * @returns {void} */
   function poolsTab(doc, body, live) {
     if (typeof Pool === "undefined" || !Pool || typeof Pool.list !== "function") {
       errBox(doc, body, "Pool backend missing: js/pool.js failed to load.");
@@ -77,9 +88,10 @@ var ExplorerTabs = (function () {
       if (!live()) return;
       while (body.firstChild) body.removeChild(body.firstChild);
       if (!rows || !rows.length) {
-        body.appendChild(el(doc, "p", t("explorer.no_pools_found", "No pools found — create one from the Pools desk (#/pools) Stake form."), "muted"));
+        body.appendChild(el(doc, "p", /** @type {any} */ (t)("explorer.no_pools_found", "No pools found — create one from the Pools desk (#/pools) Stake form."), "muted"));
         return;
       }
+      /** @type {any} */
       var t = table(doc, ["Pool", "Share", "Asset A", "Asset B"]);
       rows.forEach(function (r) {
         var tr = doc.createElement("tr");

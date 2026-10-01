@@ -26,3 +26,5 @@ extension-wrapper/dist/
 
 # Local scratch reports (task/issue drafts). Never shipped, never committed.
 build/
+
+tooling/typecheck/node_modules/

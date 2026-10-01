@@ -27,6 +27,12 @@
  */
 var Credit = (function () {
   "use strict";
+  /**
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('./types.js').RawInt} RawInt
+   * @typedef {import('./types.js').ChainObjectId} ChainObjectId
+   */
   var CORE_ASSET = "1.3.0";
   /* #4 denom: u32 1000 = 0.1%, 10000 = 1% (config.hpp:121). TCR_DIVISOR 1000
    * proven Task-2 Step 1 (BorrowModal.jsx:57-60/:478-481, ambiguity G). */
@@ -102,13 +108,15 @@ var Credit = (function () {
     var a = BigInt(amount_raw), r = BigInt(rate_units), d = BigInt(FEE_RATE_DENOM);
     return ((a * r + d - 1n) / d).toString();
   }
-  /* Seconds -> largest whole unit word ("259200" -> "3 days"); remainders stay seconds. No moment. */
+  /** Seconds -> largest whole unit word ("259200" -> "3 days"); remainders stay seconds. No moment.
+   * @param {any} seconds
+   * @returns {string} */
   function durToHuman(seconds) {
     var s = typeof seconds === "string" ? parseInt(seconds, 10) : seconds;
     if (!Number.isInteger(s) || s < 0) throw new Error("seconds must be a non-negative integer");
     var units = [[604800, "week"], [86400, "day"], [3600, "hour"], [60, "minute"]];
     for (var i = 0; i < units.length; i++) {
-      if (s >= units[i][0] && s % units[i][0] === 0) { var n = s / units[i][0]; return n + " " + units[i][1] + (n === 1 ? "" : "s"); } }
+      if (s >= /** @type {number} */ (units[i][0]) && s % /** @type {number} */ (units[i][0]) === 0) { var n = s / /** @type {number} */ (units[i][0]); return n + " " + units[i][1] + (n === 1 ? "" : "s"); } }
     return s + " second" + (s === 1 ? "" : "s");
   }
   /* Human duration -> seconds ("3 days" / "3d" / "90 min" / "3600" / 3600). No humanize-duration. */
@@ -241,6 +249,7 @@ var Credit = (function () {
     args = args || {};
     _assertId(args.accountId, ACCOUNT_RE, "accountId"); _assertId(args.collId, ASSET_RE, "collId"); _assertId(args.debtId, ASSET_RE, "debtId");
     _assertSigned(args.collRaw, "collRaw"); _assertSigned(args.debtRaw, "debtRaw");
+    /** @type {any} */
     var ext = [];
     if (args.tcrUnitsOrNull !== null && args.tcrUnitsOrNull !== undefined && String(args.tcrUnitsOrNull) !== "") {
       _assertU16(args.tcrUnitsOrNull, "tcrUnitsOrNull");
@@ -323,6 +332,7 @@ var Credit = (function () {
     if (BigInt(args.collRaw) <= 0n) throw new Error("collateral must be > 0");
     var minDur = durToSeconds(args.minDurSec);
     if (!(minDur > 0)) throw new Error("min duration must be > 0");
+    /** @type {any} */
     var ext = [];
     if (args.autoRepayOrNull !== null && args.autoRepayOrNull !== undefined && String(args.autoRepayOrNull) !== "") {
       if (args.autoRepayOrNull !== 0 && args.autoRepayOrNull !== 1 && args.autoRepayOrNull !== 2) throw new Error("auto_repay must be 0/1/2");

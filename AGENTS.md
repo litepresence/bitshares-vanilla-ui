@@ -776,6 +776,9 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
    observed result. Run `verification-before-completion` before declaring done.
    Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
    and the `tooling/check_rot.py` scan. A slice that works but rots is not done.
+   Every "done" claim must ALSO pass the hard type gate
+   (`bash tooling/check_types.sh` — tsc checkJs, zero emit). A slice that
+   works but doesn't typecheck is not done.
 6. **Chain safety.** Real keys only on testnet during dev. Never paste mainnet
    private keys/brainkeys into logs, issues, or commits. Test transfers on
    testnet faucet accounts.

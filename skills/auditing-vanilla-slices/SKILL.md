@@ -67,6 +67,19 @@ find vanilla/js -name '*.js' | xargs wc -l | sort -n | tail -n 8  # any file pas
 
 Every file opens with a module header (owns/consumes/side effects/origin); every non-trivial function has what/params/returns/failure-modes; comments explain WHY, never restate WHAT. Missing headers, unexplained functions, or dead text fail the audit. (The full end-to-end readability pass is its own final slice — this check enforces per-slice hygiene so that pass is polish, not rescue.)
 
+### 9. Type gate (hard — added 2026-10-01)
+
+```bash
+bash tooling/check_types.sh  # tsc --checkJs --noEmit over vanilla/js/** (exit 0 = clean)
+```
+
+New/changed code must typecheck: JSDoc `@param`/`@returns`/`@typedef` on
+touched seams, shared shapes in `vanilla/js/api/types.js`, cross-file
+globals in `vanilla/js/globals.d.ts` (dev-only — never add a script tag
+for it; the rot gate fails a loaded `.d.ts`). Only parenthesized
+`/** @type {X} */ (expr)` casts as code-shape change — any behavior delta
+fails the audit. A red gate fails the slice, no exceptions.
+
 ## Red Flags — Stop and Fix
 
 - "It's just a demo/prototype, we'll harden later"

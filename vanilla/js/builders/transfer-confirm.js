@@ -40,6 +40,13 @@
 var TransferConfirm = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('../api/types.js').TFunction} TFunction
+   * @typedef {import('../api/types.js').HumanAmount} HumanAmount
+   * @typedef {import('../api/types.js').RawInt} RawInt
+   * @typedef {import('../api/types.js').OpTuple} OpTuple
+   */
+
   /* Batch-2a i18n: display strings resolve via I18n.t with the
    * pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back
@@ -143,7 +150,7 @@ var TransferConfirm = (function () {
     return { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision };
   }
 
-  /* Validate everything and build the unsigned tx + live fee. Resolves a
+  /** Validate everything and build the unsigned tx + live fee. Resolves a
    * confirm context; rejects with a human-readable Error. Amounts stay
    * integer strings throughout — Format.parseAmount is the only parser.
    * Thrown messages below are DISPLAY strings (they reach setFieldError /
@@ -151,7 +158,9 @@ var TransferConfirm = (function () {
    * bare routing codes ("unknown-account", "wallet-locked"): those never
    * render raw (every showError maps them first) and transfer-ui.js routes
    * on them via msg.indexOf, so they stay byte-stable codes. When batch-2a
-   * keys gain real translations, that indexOf routing must move to codes. */
+   * keys gain real translations, that indexOf routing must move to codes.
+   * @param {any} vals
+   * @returns {Promise<any>} */
   async function review(vals) {
     if (!vals.to) throw new Error(t("transfer.recipient_required", "Recipient is required."));
     var to = await Account.resolve(vals.to);
@@ -177,7 +186,7 @@ var TransferConfirm = (function () {
         if (!Wallet.keys || !Wallet.keys.memo || !Wallet.keys.memo.wif) {
           throw new Error("wallet-locked");
         }
-        memoObj = await Crypto.encryptMemo(memoText, Wallet.keys.memo.wif, toMemoKey);
+        memoObj = await /** @type {any} */ (Crypto).encryptMemo(memoText, Wallet.keys.memo.wif, toMemoKey);
         memoKind = "encrypted";
       } else {
         var fromPub = (Wallet.keys && Wallet.keys.memo && Wallet.keys.memo.pub) || "";

@@ -35,6 +35,12 @@
 "use strict";
 
 var Crypto = (function () {
+  /**
+   * @typedef {import('../api/types.js').RawInt} RawInt
+   * @typedef {import('../api/types.js').HumanAmount} HumanAmount
+   * @typedef {import('../api/types.js').ChainObjectId} ChainObjectId
+   * @namespace Crypto
+   */
   var DICT_SIZE = 49744;
 
   /* Encode a string to UTF-8 bytes; pass Uint8Array input through. */
@@ -65,15 +71,19 @@ var Crypto = (function () {
     return bytes;
   }
 
-  /* Raw SHA-256 digest bytes of bytes-or-string input. */
+  /** Raw SHA-256 digest bytes of bytes-or-string input.
+   * @param {any} input
+   * @returns {Promise<Uint8Array>} */
   async function sha256Bytes(input) {
-    var buf = await crypto.subtle.digest("SHA-256", toBytes(input));
+    var buf = await crypto.subtle.digest("SHA-256", /** @type {any} */ (toBytes(input)));
     return new Uint8Array(buf);
   }
 
-  /* Raw SHA-512 digest bytes of bytes-or-string input. */
+  /** Raw SHA-512 digest bytes of bytes-or-string input.
+   * @param {any} input
+   * @returns {Promise<Uint8Array>} */
   async function sha512Bytes(input) {
-    var buf = await crypto.subtle.digest("SHA-512", toBytes(input));
+    var buf = await crypto.subtle.digest("SHA-512", /** @type {any} */ (toBytes(input)));
     return new Uint8Array(buf);
   }
 
@@ -360,14 +370,20 @@ var Crypto = (function () {
     B: BigInt(7)
   };
 
-  /* Non-negative remainder; ported from #3 crypto-utils.js:38-41. */
+  /** Non-negative remainder; ported from #3 crypto-utils.js:38-41.
+   * @param {bigint} a
+   * @param {bigint} m
+   * @returns {bigint} */
   function ecMod(a, m) {
     var result = a % m;
     return result >= 0n ? result : result + m;
   }
 
-  /* Modular inverse via extended Euclid; ported from #3
-   * crypto-utils.js:43-60. Public-operand math only. */
+  /** Modular inverse via extended Euclid; ported from #3
+   * crypto-utils.js:43-60. Public-operand math only.
+   * @param {bigint} a
+   * @param {bigint} m
+   * @returns {bigint} */
   function ecModInverse(a, m) {
     a = ecMod(a, m);
     if (a === 0n) throw new Error("No modular inverse for 0");
@@ -383,8 +399,12 @@ var Crypto = (function () {
     return ecMod(oldS, m);
   }
 
-  /* Modular exponentiation; ported from #3 crypto-utils.js:62-75.
-   * Public-operand math only. */
+  /** Modular exponentiation; ported from #3 crypto-utils.js:62-75.
+   * Public-operand math only.
+   * @param {bigint} base
+   * @param {bigint} exp
+   * @param {bigint} m
+   * @returns {bigint} */
   function ecModPow(base, exp, m) {
     var result = 1n;
     base = ecMod(base, m);
@@ -416,12 +436,16 @@ var Crypto = (function () {
     return result;
   }
 
-  /* Elliptic-curve point ops, PUBLIC points only (the recovery path below
+  /** Elliptic-curve point ops, PUBLIC points only (the recovery path below
    * never handles a secret scalar — signing/ECDH stay in noble). Ported
    * from #3 crypto-utils.js:80-206, keeping the double-and-add-ALWAYS
-   * multiply loop and the on-curve check in fromCompressed. */
+   * multiply loop and the on-curve check in fromCompressed.
+   * @param {any} x
+   * @param {any} y */
   function ECPoint(x, y) {
+    /** @type {any} */
     this.x = x;
+    /** @type {any} */
     this.y = y;
   }
   ECPoint.infinity = function () { return new ECPoint(null, null); };
@@ -431,6 +455,9 @@ var Crypto = (function () {
   ECPoint.prototype.equals = function (other) {
     return this.x === other.x && this.y === other.y;
   };
+  /** ECPoint add (public points only).
+   * @param {any} other
+   * @returns {any} */
   ECPoint.prototype.add = function (other) {
     if (this.isInfinity()) return other;
     if (other.isInfinity()) return this;
@@ -439,7 +466,7 @@ var Crypto = (function () {
       if (ecMod(this.y + other.y, P) === 0n) return ECPoint.infinity();
       return this.double();
     }
-    var slope = ecMod((other.y - this.y) * ecModInverse(other.x - this.x, P), P);
+    var slope = ecMod((/** @type {bigint} */ (other.y) - /** @type {bigint} */ (this.y)) * ecModInverse(/** @type {bigint} */ (other.x) - /** @type {bigint} */ (this.x), P), P);
     var x3 = ecMod(slope * slope - this.x - other.x, P);
     var y3 = ecMod(slope * (this.x - x3) - this.y, P);
     return new ECPoint(x3, y3);

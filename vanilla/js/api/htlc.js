@@ -35,6 +35,12 @@
  */
 var Htlc = (function () {
   "use strict";
+  /**
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').ChainObjectId} ChainObjectId
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('./types.js').RawInt} RawInt
+   */
   var CORE_ASSET = "1.3.0";
   var HTLC_START = "1.16.0", PERM_START = "1.12.0", PAGE_MAX = 100;
   var PROVE_TIMEOUT_MS = 60000, PROVE_INTERVAL_MS = 2500;
@@ -378,14 +384,16 @@ var Htlc = (function () {
       await _sleep(PROVE_INTERVAL_MS);
     }
   }
-  /* Seconds -> human duration ("86400" -> "1 day"; 90000 -> "1 day 1 hour"). Integer math only.
-   * Views show this AND raw seconds in confirms (both, never raw-only — principle #6). */
+  /** Seconds -> human duration ("86400" -> "1 day"; 90000 -> "1 day 1 hour"). Integer math only.
+   * Views show this AND raw seconds in confirms (both, never raw-only — principle #6).
+   * @param {any} sec
+   * @returns {string} */
   function formatDuration(sec) {
     var n = (typeof sec === "string") ? parseInt(sec, 10) : sec;
     if (!Number.isInteger(n) || n < 0) throw new Error("bad duration seconds: " + JSON.stringify(sec));
     var parts = [], u = [[86400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]], i, q;
     for (i = 0; i < u.length; i++) {
-      q = Math.floor(n / u[i][0]); n = n % u[i][0];
+      q = Math.floor(n / /** @type {number} */ (u[i][0])); n = n % /** @type {number} */ (u[i][0]);
       if (q) parts.push(q + " " + u[i][1] + (q === 1 ? "" : "s"));
     }
     return parts.length ? parts.join(" ") : "0 seconds";

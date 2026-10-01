@@ -30,6 +30,12 @@
  */
 var Proposal = (function () {
   "use strict";
+  /**
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('./types.js').TxEnvelope} TxEnvelope
+   * @typedef {import('./types.js').ChainObjectId} ChainObjectId
+   */
   var CORE_ASSET = "1.3.0";
   var PROPOSAL_RE = /^1\.10\.\d+$/, ACCOUNT_RE = /^1\.2\.\d+$/, ASSET_RE = /^1\.3\.\d+$/;
   var DIGITS_RE = /^\d+$/, COMMIT_RE = /^[0-9a-fA-F]{66}$/;
@@ -82,13 +88,15 @@ var Proposal = (function () {
         proposer: payer, fee_paying_account: payer, proposed_ops_count: ops.length };
     });
   }
-  /* Seconds -> largest whole unit word ("86400" -> "1 day"). No moment. THE ONLY duration converter. */
+  /** Seconds -> largest whole unit word ("86400" -> "1 day"). No moment. THE ONLY duration converter.
+   * @param {any} seconds
+   * @returns {string} */
   function durToHuman(seconds) {
     var s = typeof seconds === "string" ? parseInt(seconds, 10) : seconds;
     if (!Number.isInteger(s) || s < 0) throw new Error("seconds must be a non-negative integer");
     var units = [[604800, "week"], [86400, "day"], [3600, "hour"], [60, "minute"]];
     for (var i = 0; i < units.length; i++) {
-      if (s >= units[i][0] && s % units[i][0] === 0) { var n = s / units[i][0]; return n + " " + units[i][1] + (n === 1 ? "" : "s"); } }
+      if (s >= /** @type {number} */ (units[i][0]) && s % /** @type {number} */ (units[i][0]) === 0) { var n = s / /** @type {number} */ (units[i][0]); return n + " " + units[i][1] + (n === 1 ? "" : "s"); } }
     return s + " second" + (s === 1 ? "" : "s");
   }
   /* Inner-op pairs: accept bare [type, data] AND {op: [type, data]} (ambiguity B) -> canonical {op: [t, d]}. */

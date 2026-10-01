@@ -32,6 +32,12 @@
  */
 var Pool = (function () {
   "use strict";
+  /**
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('./types.js').RawInt} RawInt
+   * @typedef {import('./types.js').TopMarketRow} TopMarketRow
+   */
   var CORE_ASSET = "1.3.0";
   var POOL_RE = /^1\.19\.\d+$/, ACCOUNT_RE = /^1\.2\.\d+$/, ASSET_RE = /^1\.3\.\d+$/;
   var DIGITS_RE = /^\d+$/;
@@ -279,7 +285,7 @@ var Pool = (function () {
       asset_a: a, asset_b: b, share_asset: args.shareId,
       taker_fee_percent: taker, withdrawal_fee_percent: wd, extensions: [] };
     var pair = [59, opData];
-    pair.sorted = { a: a, b: b }; /* non-index prop: invisible to JSON/serializers, read by the confirm */
+    /** @type {any} */ (pair).sorted = { a: a, b: b }; /* non-index prop: invisible to JSON/serializers, read by the confirm */
     return pair;
   }
   /* Op-61 deposit/stake. Leg ids REQUIRED (chain enforces a<b order) — views source them from Pool.get. */

@@ -12,6 +12,12 @@
 "use strict";
 
 var Account = (function () {
+  /**
+   * @typedef {import('./types.js').ChainObjectId} ChainObjectId
+   * @typedef {import('./types.js').RawInt} RawInt
+   * @typedef {import('./types.js').HumanAmount} HumanAmount
+   * @namespace Account
+   */
   var ID_RE = /^1\.2\.\d+$/;
   var FIRST_HISTORY_OP = "1.11.0";
 
@@ -396,17 +402,18 @@ var Account = (function () {
       counted: rep.counted, skipped: rep.skipped, truncated: walk.truncated };
   }
 
-  /* Return the account id bound to the unlocked wallet's active (seq1) key.
+  /** Return the account id bound to the unlocked wallet's active (seq1) key.
    * Params: none (reads Wallet in-memory keys + brainkey).
    * Returns: Promise of the account id string.
    * Fails: "wallet-locked" unless unlocked; "no-account" when the active
-   *   pub has no key reference on chain. */
+   *   pub has no key reference on chain.
+   * @returns {Promise<string>} */
   async function myAccountId() {
     var unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys;
     if (!unlocked || !Wallet.keys) throw new Error("wallet-locked");
     var brainkey = Wallet.getBrainkey();
-    var privHex = await Crypto.brainPrivateKeyHex(brainkey, 1);
-    var kp = await Crypto.keypairFromPrivateHex(privHex);
+    var privHex = await /** @type {any} */ (Crypto).brainPrivateKeyHex(brainkey, 1);
+    var kp = await /** @type {any} */ (Crypto).keypairFromPrivateHex(privHex);
     var dbId = await Chain.db();
     var refs = await Chain.call(dbId, "get_key_references", [[kp.pub]]);
     if (refs && refs[0] && refs[0][0]) return refs[0][0];

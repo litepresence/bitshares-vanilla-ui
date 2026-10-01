@@ -248,7 +248,7 @@ var TicketUI = (function () {
         }
         return { issuer: issuer, info: info, resolved: resolved, total: total };
       }).then(function (prev) {
-        if (!prev || !live(myGen, uiGen)) { prev.disabled = false; return; }
+        if (!prev || !live(myGen, uiGen)) { /** @type {any} */ (prev).disabled = false; return; }
         ui.clearBox(box);
         box.appendChild(ui.el(doc, "p", prev.resolved.length + " recipients · total " +
           Format.formatAmount(String(prev.total), prev.info.precision) + " " + prev.info.symbol +
@@ -284,7 +284,7 @@ var TicketUI = (function () {
               ok: function () { return t("ticket.airdrop_batch_issued_and_first_recipient_bala", "Airdrop batch issued and first-recipient balance re-read."); } });
           })(prev.resolved.slice(c, c + AIRDROP_CHUNK), c / AIRDROP_CHUNK);
         }
-        prev.disabled = false;
+        /** @type {any} */ (prev).disabled = false;
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, t("ticket.could_not_preview_the_airdrop", "Could not preview the airdrop.")); prev.disabled = false; });
     });
   }

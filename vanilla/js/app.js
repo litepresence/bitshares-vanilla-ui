@@ -9,12 +9,22 @@
 var App = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./api/types.js').TFunction} TFunction
+   * @typedef {import('./api/types.js').ChainStatus} ChainStatus
+   * @typedef {import('./api/types.js').CountResult} CountResult
+   * @typedef {import('./api/types.js').PulseResult} PulseResult
+   */
+
   var lastNode = null, lastNetwork = null, lastTheme = null;
 
-  /* Batch-1 i18n (slice-17 Task 2): localize the static shell chrome that
- *   lives in index.html (brand, nav links, menu toggle).
- *   Called at boot and after every locale switch; connection status paints
- *   through the footer subscription only. */
+  /** Batch-1 i18n (slice-17 Task 2): localize the static shell chrome that
+   *   lives in index.html (brand, nav links, menu toggle).
+   *   Called at boot and after every locale switch; connection status paints
+   *   through the footer subscription only.
+   * @param {string} key
+   * @param {string} dflt
+   * @returns {string} */
   function t(key, dflt) {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
@@ -775,7 +785,7 @@ var App = (function () {
     } catch (e) { missing.push("WebSocket"); }
     try {
       var subtle = null;
-      if (typeof crypto !== "undefined" && crypto) subtle = crypto.subtle || crypto.webkitSubtle;
+      if (typeof crypto !== "undefined" && crypto) subtle = crypto.subtle || /** @type {any} */ (crypto).webkitSubtle;
       if (!subtle || typeof subtle.digest !== "function") missing.push("WebCrypto");
     } catch (e) { missing.push("WebCrypto"); }
     try {
@@ -842,7 +852,7 @@ var App = (function () {
           compat.removeAttribute("hidden");
           var cmsg = document.getElementById("compat-msg");
           if (cmsg) {
-            cmsg.textContent = t("compat.msg", "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.", { missing: missing.join(", ") });
+            cmsg.textContent = /** @type {any} */ (t)("compat.msg", "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.", { missing: missing.join(", ") });
           }
           var chelp = document.getElementById("compat-help");
           if (chelp) chelp.textContent = t("help.help", "Help");
@@ -900,7 +910,7 @@ var App = (function () {
         if (open) {
           try {
             var q = nav.querySelector(".nav-dir-search");
-            if (q && typeof q.focus === "function") q.focus();
+            if (q && typeof /** @type {any} */ (q).focus === "function") /** @type {any} */ (q).focus();
           } catch (e) { /* toggle keeps focus */ }
         }
       });

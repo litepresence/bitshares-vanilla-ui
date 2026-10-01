@@ -249,19 +249,27 @@ var ProposalUI = (function () {
       });
     });
   }
-  /* build {pair|ops, fee, prove} + live fee -> named rows -> sendConfirm. */
+  /** build {pair|ops, fee, prove} + live fee -> named rows -> sendConfirm.
+   * TYPE NOTE: the cfg.build promise resolves {pair|ops, fee, prove} but
+   * tsc reads the chain as Promise<void>; member casts pin each field to
+   * any. No shared types.js yet (group 1 owns it); local casts only.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} out output box (cleared + rebuilt)
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} cfg {build, rows, title, ok, fail, extra?, btn?}
+   * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
     clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out, t("proposal.resolving_and_estimating_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
       if (myGen !== gen) return done();
-      feeText(built.fee).then(function (f) {
+      feeText((/** @type {any} */ (built).fee)).then(function (f) {
         if (myGen !== gen) return done();
         sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f),
           extra: (typeof cfg.extra === "function" ? function (d) { return cfg.extra(d, built); } : null),
-          makeUnsigned: function () { return Tx.buildTx(built.ops || [built.pair]); },
-          prove: built.prove, okText: cfg.ok(built) }, myGen);
+          makeUnsigned: function () { return Tx.buildTx((/** @type {any} */ (built).ops) || [(/** @type {any} */ (built).pair)]); },
+          prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
       }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, t("proposal.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
@@ -532,7 +540,8 @@ var ProposalUI = (function () {
     if (kind === "whitelist") return "whitelist " + vals[1] + " → " + vals[2];
     return "ticket " + vals[3] + " " + vals[2] + " → " + vals[1];
   }
-  /* Route entry: #/proposals — table + my-proposals filter + create form. */
+  /** Route entry: #/proposals — table + my-proposals filter + create form.
+   * @param {HTMLElement} root router mount element */
   function renderProposals(root) {
     if (!root) return;
     var ctx = routeReady(root, t("proposal.proposals", "Proposals"), function () { renderProposals(root); });
@@ -686,7 +695,9 @@ var ProposalUI = (function () {
       }).catch(function (e) { if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
     });
   }
-  /* Route entry: #/proposals/:id — detail + nested table + approve/unapprove/delete. */
+  /** Route entry: #/proposals/:id — detail + nested table + approve/unapprove/delete.
+   * @param {HTMLElement} root router mount element
+   * @param {string} id proposal object id (1.10.x) */
   function renderProposalDetail(root, id) {
     if (!root) return;
     var ctx = routeReady(root, "Proposal " + id, function () { renderProposalDetail(root, id); });

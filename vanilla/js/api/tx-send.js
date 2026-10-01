@@ -20,6 +20,13 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
 (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./types.js').TxEnvelope} TxEnvelope
+   * @typedef {import('./types.js').OpTuple} OpTuple
+   * @typedef {import('./types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('./types.js').RawInt} RawInt
+   */
+
   /* SHA-256 digest bytes via platform WebCrypto (no dependency). */
   async function sha256Bytes(u8) {
     var buf = await crypto.subtle.digest("SHA-256", u8);
@@ -70,12 +77,17 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     return rows[0].precision;
   }
 
-  /* H3 fee rail: refuse to auto-proceed on a suspicious fee. Throws an
+  /** H3 fee rail: refuse to auto-proceed on a suspicious fee. Throws an
    * Error starting "fee-suspicious" (with the answered fee on .detail so
    * the transfer confirm screen can show it behind an explicit ack gate).
    * Rules: fee above 5 units of the fee asset (the sketch's 5-BTS-equiv
    * proxy — exact for BTS-quoted fees, conservative otherwise), or an op-0
-   * fee above 50% of the transferred amount in the same asset. */
+   * fee above 50% of the transferred amount in the same asset.
+   * @param {any} opId
+   * @param {any} opData
+   * @param {any} fee
+   * @param {any} dbId
+   * @returns {Promise<void>} */
   async function assertFeeSane(opId, opData, fee, dbId) {
     var raw = String(fee.amount);
     if (!/^\d+$/.test(raw)) throw new Error("get_required_fees fee is not a digit string: " + raw);
@@ -85,7 +97,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (BigInt(raw) > ceiling) {
       var err = new Error("fee-suspicious: fee " + raw + " " + feeAsset +
         " exceeds the 5-unit ceiling (" + ceiling.toString() + " raw). Refusing to auto-proceed — verify the fee asset and amount.");
-      err.detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, ceilingRaw: ceiling.toString() };
+      /** @type {any} */ (err).detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, ceilingRaw: ceiling.toString() };
       throw err;
     }
     if (opId === 0 && opData && opData.amount && typeof opData.amount === "object") {
@@ -94,7 +106,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
       if (/^\d+$/.test(amtRaw) && amtAsset === feeAsset && BigInt(raw) * 2n > BigInt(amtRaw)) {
         var err2 = new Error("fee-suspicious: fee " + raw + " exceeds 50% of the transfer amount " +
           amtRaw + " (" + feeAsset + "). Refusing to auto-proceed — lower the fee asset cost or the amount.");
-        err2.detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, amountRaw: amtRaw };
+        /** @type {any} */ (err2).detail = { fee: { amount: fee.amount, asset_id: feeAsset }, feeRaw: raw, feeAssetId: feeAsset, precision: prec, amountRaw: amtRaw };
         throw err2;
       }
     }
@@ -176,7 +188,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (total > railCeiling) {
       var rerr = new Error("fee-suspicious: total fee " + total.toString() + " " + displayFeeId +
         " exceeds the 5-unit ceiling (" + railCeiling.toString() + " raw). Refusing to auto-proceed.");
-      rerr.detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId };
+      /** @type {any} */ (rerr).detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId };
       throw rerr;
     }
     if (opsArray.length === 1 && opsArray[0][0] === 0) {
@@ -185,7 +197,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
       if (/^\d+$/.test(aRaw) && (a0.asset_id || feeAssetId) === displayFeeId && total * 2n > BigInt(aRaw)) {
         var rerr2 = new Error("fee-suspicious: total fee " + total.toString() + " exceeds 50% of the transfer amount " +
           aRaw + " (" + displayFeeId + "). Refusing to auto-proceed.");
-        rerr2.detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId, amountRaw: aRaw };
+        /** @type {any} */ (rerr2).detail = { fees: opsArray.map(function (entry) { return entry[1].fee; }), totalRaw: total.toString(), feeAssetId: displayFeeId, amountRaw: aRaw };
         throw rerr2;
       }
     }
@@ -267,11 +279,14 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     return buildTx([[0, op]]);
   }
 
-  /* Sign: digest = SHA-256(chainId + packed tx), compact sig via
+  /** Sign: digest = SHA-256(chainId + packed tx), compact sig via
    * Crypto.signHash (Task 3 interface: (hashU8, wif) -> Promise 65 bytes).
    * The WIF string passes through opaquely — never decoded here. Serializer
    * bytes come from Tx._ser (moved-call boundary with tx.js — identical
-   * bytes, see vector proof in the slice-18 worker report). */
+   * bytes, see vector proof in the slice-18 worker report).
+   * @param {any} txObj
+   * @param {any} activeWIF
+   * @returns {Promise<any>} */
   async function sign(txObj, activeWIF) {
     if (!txObj || !Array.isArray(txObj.operations) || !txObj.operations.length) {
       throw new Error("txObj has no operations");
@@ -279,7 +294,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     if (typeof activeWIF !== "string" || !activeWIF) throw new Error("activeWIF must be a non-empty string");
     var st = (typeof Chain !== "undefined" && Chain.status) ? Chain.status() : null;
     if (!st || !st.chainId) throw new Error("chain id unknown: connect first");
-    if (typeof Crypto === "undefined" || typeof Crypto.signHash !== "function") {
+    if (typeof Crypto === "undefined" || typeof /** @type {any} */ (Crypto).signHash !== "function") {
       throw new Error("Crypto.signHash is not loaded (Task 3)");
     }
     var packed = Tx._ser.serializeTransaction(txObj);
@@ -288,7 +303,7 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     msg.set(chainBytes);
     msg.set(packed, chainBytes.length);
     var digest = await sha256Bytes(msg);
-    var sig = await Crypto.signHash(digest, activeWIF);
+    var sig = await /** @type {any} */ (Crypto).signHash(digest, activeWIF);
     if (!(sig instanceof Uint8Array) || sig.length !== 65) throw new Error("Crypto.signHash must return 65 bytes");
     txObj.signatures = [Tx._ser.bytesToHex(sig)];
     return txObj;

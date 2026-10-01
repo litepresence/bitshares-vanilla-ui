@@ -10,6 +10,12 @@
  * Created by: building-vanilla-slices skill, slice-01-shell-settings plan. */
 var Chain = (function () {
   "use strict";
+  /**
+   * @typedef {import('../api/types.js').ChainStatus} ChainStatus
+   * @typedef {import('../api/types.js').PulseResult} PulseResult
+   * @typedef {import('../api/types.js').CountResult} CountResult
+   * @typedef {import('../api/types.js').ChainObjectId} ChainObjectId
+   */
   var ws = null, nextId = 1, pending = {}, lastStatus = {state: "unknown"};
   /* Keepalive state: heartbeat timer, reconnect backoff, manual-close flag.
    * Idle public-node sockets die silently (NAT/proxy ~30-60s); the heartbeat

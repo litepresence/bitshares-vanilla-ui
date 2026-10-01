@@ -9,6 +9,11 @@
 var Router = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./api/types.js').TFunction} TFunction
+   * @typedef {import('./api/types.js').CountResult} CountResult
+   */
+
   var view = null;
 
   /* Batch-1 i18n (slice-17 Task 2): shell chrome strings only (404, home,
@@ -375,11 +380,13 @@ var Router = (function () {
     } catch (e) { /* paint stands */ }
   }
 
-  /* start: binds hashchange and renders once. Params: viewEl (element).
+  /** start: binds hashchange and renders once. Params: viewEl (element).
    *   Returns nothing. Fails: never throws — render is safe on any hash.
    *   A MutationObserver re-runs a11ySweep on async fills (chain tables /
    *   canvases render after the sync render above; without this the scope
-   *   backstop misses them — observed 2026-09-30: only #/settings passed). */
+   *   backstop misses them — observed 2026-09-30: only #/settings passed).
+   * @param {any} viewEl
+   * @returns {void} */
   var a11yTimer = null;
   function start(viewEl) {
     view = viewEl;
@@ -389,8 +396,8 @@ var Router = (function () {
     }
     try {
       if (typeof MutationObserver !== "undefined" && view &&
-          typeof view.nodeType === "number" && !start._a11yWired) {
-        start._a11yWired = true;
+          typeof view.nodeType === "number" && !/** @type {any} */ (start)._a11yWired) {
+        /** @type {any} */ (start)._a11yWired = true;
         var obs = new MutationObserver(function () {
           if (a11yTimer) return;
           a11yTimer = setTimeout(function () {

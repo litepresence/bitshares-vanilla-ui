@@ -217,17 +217,26 @@ var PoolUI = (function () {
       });
     });
   }
-  function reviewPaid(doc, out, myGen, cfg) { /* build {pair,fee,prove} + live fee -> rows -> sendConfirm */
+  /** build {pair,fee,prove} + live fee -> rows -> sendConfirm.
+   * TYPE NOTE: the cfg.build promise resolves {pair, fee, prove} but tsc
+   * reads the chain as Promise<void>; member casts pin each field to any.
+   * No shared types.js yet (group 1 owns it); local casts only.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} out output box (cleared + rebuilt)
+   * @param {number} myGen route generation (liveness token)
+   * @param {any} cfg {build, rows, title, ok, fail, btn?}
+   * @returns {void} */
+  function reviewPaid(doc, out, myGen, cfg) {
     clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out,t("account.resolving_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
       if (myGen !== gen) return done();
-      feeText(built.fee).then(function (f) {
+      feeText((/** @type {any} */ (built).fee)).then(function (f) {
         if (myGen !== gen) return done();
-        sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f), pair: built.pair,
-          makeUnsigned: function () { return Tx.buildTx([built.pair]); },
-          prove: built.prove, okText: cfg.ok(built) }, myGen);
+        sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f), pair: (/** @type {any} */ (built).pair),
+          makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
+          prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
       }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
@@ -349,12 +358,13 @@ var PoolUI = (function () {
     });
     table.appendChild(tbody); return table;
   }
-  /* Route entry: #/pools — filters + pool table + my-pools + create form.
+  /** Route entry: #/pools — filters + pool table + my-pools + create form.
    * Pager: page-size select (10/25/50, default 10 like the ref) + Prev/Next +
    * "Page N". No numbered pages: the chain exposes no pool count, so totals
    * are not invented — hasNext comes from fetching one row over the page.
    * startId paging is inclusive on most nodes, so a leading duplicate of the
-   * previous page's last row is dropped (over-fetch of 2 covers it). */
+   * previous page's last row is dropped (over-fetch of 2 covers it).
+   * @param {HTMLElement} root router mount element */
   function renderPools(root) {
     if (!root) return;
     var ctx = routeReady(root, t("pools.title", "Liquidity Pools"), function () { renderPools(root); });

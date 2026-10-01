@@ -16,6 +16,13 @@
 var Wallet = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('./types.js').ChainObjectId} ChainObjectId
+   * @typedef {import('./types.js').RawInt} RawInt
+   * @typedef {import('./types.js').HumanAmount} HumanAmount
+   * @namespace Wallet
+   */
+
   var LS_KEY = "bts-vanilla-wallet-v1";
   var ENVELOPE_V = 1;
   var ITERATIONS = 600000;
@@ -214,21 +221,23 @@ var Wallet = (function () {
     }
   }
 
-  /* Derive fresh roles owner<-seq0, active<-seq1, memo<-seq2. Returns {owner,active,memo}. */
+  /** Derive fresh roles owner<-seq0, active<-seq1, memo<-seq2. Returns {owner,active,memo}.
+   * @param {any} norm
+   * @returns {Promise<any>} */
   function _deriveFreshKeys(norm) {
     var out = {};
-    return Crypto.brainPrivateKeyHex(norm, 0).then(function (h0) {
-      return Crypto.keypairFromPrivateHex(h0);
+    return /** @type {any} */ (Crypto).brainPrivateKeyHex(norm, 0).then(function (h0) {
+      return /** @type {any} */ (Crypto).keypairFromPrivateHex(h0);
     }).then(function (k0) {
       out.owner = { wif: k0.wif, pub: k0.pub };
-      return Crypto.brainPrivateKeyHex(norm, 1);
+      return /** @type {any} */ (Crypto).brainPrivateKeyHex(norm, 1);
     }).then(function (h1) {
-      return Crypto.keypairFromPrivateHex(h1);
+      return /** @type {any} */ (Crypto).keypairFromPrivateHex(h1);
     }).then(function (k1) {
       out.active = { wif: k1.wif, pub: k1.pub };
-      return Crypto.brainPrivateKeyHex(norm, 2);
+      return /** @type {any} */ (Crypto).brainPrivateKeyHex(norm, 2);
     }).then(function (h2) {
-      return Crypto.keypairFromPrivateHex(h2);
+      return /** @type {any} */ (Crypto).keypairFromPrivateHex(h2);
     }).then(function (k2) {
       out.memo = { wif: k2.wif, pub: k2.pub };
       return out;
@@ -249,17 +258,20 @@ var Wallet = (function () {
     _lockTimer = setTimeout(function () { lock(); }, LOCK_MS);
   }
 
-  /* Create + persist a wallet from a brainkey. Resolves to Wallet.keys when unlocked.
+  /** Create + persist a wallet from a brainkey. Resolves to Wallet.keys when unlocked.
    * Params: password non-empty string; brainkey raw string (>=50 chars post-normalize).
-   * Fails: bad password/brainkey input, short brainkey, missing Crypto, save failure. */
+   * Fails: bad password/brainkey input, short brainkey, missing Crypto, save failure.
+   * @param {any} password
+   * @param {any} brainkey
+   * @returns {Promise<any>} */
   async function create(password, brainkey) {
     if (typeof password !== "string" || password.length === 0) {
       throw new Error("password required: expected a non-empty string");
     }
-    if (typeof Crypto === "undefined" || !Crypto.normalizeBrainkey) {
+    if (typeof Crypto === "undefined" || !/** @type {any} */ (Crypto).normalizeBrainkey) {
       throw new Error("crypto backend missing: Crypto global unavailable");
     }
-    var norm = Crypto.normalizeBrainkey(brainkey);
+    var norm = /** @type {any} */ (Crypto).normalizeBrainkey(brainkey);
     _checkBrainkeyLen(norm);
     var keys = await _deriveFreshKeys(norm);
     var plain = { brainkey: norm, keys: keys, created: new Date().toISOString() };
@@ -412,17 +424,20 @@ var Wallet = (function () {
     return _data.brainkey;
   }
 
-  /* Verify a brainkey against the chain (seq0..9 look-ahead), then create().
+  /** Verify a brainkey against the chain (seq0..9 look-ahead), then create().
    * Params: brainkey raw string, password non-empty string.
-   * Fails: short brainkey, chain unavailable, bad chain response, no-chain-keys. */
+   * Fails: short brainkey, chain unavailable, bad chain response, no-chain-keys.
+   * @param {any} brainkey
+   * @param {any} password
+   * @returns {Promise<any>} */
   async function importBrainkey(brainkey, password) {
     if (typeof password !== "string" || password.length === 0) {
       throw new Error("password required: expected a non-empty string");
     }
-    if (typeof Crypto === "undefined" || !Crypto.normalizeBrainkey) {
+    if (typeof Crypto === "undefined" || !/** @type {any} */ (Crypto).normalizeBrainkey) {
       throw new Error("crypto backend missing: Crypto global unavailable");
     }
-    var norm = Crypto.normalizeBrainkey(brainkey);
+    var norm = /** @type {any} */ (Crypto).normalizeBrainkey(brainkey);
     _checkBrainkeyLen(norm);
     if (typeof Chain === "undefined" || !Chain.db || !Chain.call) {
       throw new Error("chain not ready: Chain.db/call unavailable");
@@ -430,8 +445,8 @@ var Wallet = (function () {
     var pubs = [];
     var seq;
     for (seq = 0; seq <= 9; seq++) {
-      var privHex = await Crypto.brainPrivateKeyHex(norm, seq);
-      var kp = await Crypto.keypairFromPrivateHex(privHex);
+      var privHex = await /** @type {any} */ (Crypto).brainPrivateKeyHex(norm, seq);
+      var kp = await /** @type {any} */ (Crypto).keypairFromPrivateHex(privHex);
       pubs.push(kp.pub);
     }
     var dbId = await Chain.db();

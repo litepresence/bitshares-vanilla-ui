@@ -1420,16 +1420,25 @@ var TradeForm = (function () {
     });
   }
 
-  /* Pure order math for the scaled preview: exact BigInt throughout.
+  /** Pure order math for the scaled preview: exact BigInt throughout.
    * Prices: common denominator D, step=(highD-lowD)/(N-1) floored, LAST price
    * pinned to highD exactly. Amounts: total/N floored per order, integer
-   * remainder on the LAST order (sum == total exactly, no dust loss). */
+   * remainder on the LAST order (sum == total exactly, no dust loss).
+   * @param {any} P form pack ({ctx: {base, quote, basePrec, quotePrec}, me})
+   * @param {any} spec {n, low, high, total, side}
+   * @returns {any} {orders: [{priceNum, priceDen, sellRaw, recvRaw}], sellAssetId, recvAssetId} */
   function scaledOrders(P, spec) {
     var ctx = P.ctx;
     var n = Number(String(spec.n).trim());
     if (!/^\d+$/.test(String(spec.n).trim()) || n < 2 || n > 20) {
       throw new Error("Order count must be a whole number from 2 to 20.");
     }
+    /* TYPE NOTE: exact-ratio math is BigInt end to end. TS 7 types
+     * any-arithmetic as number, so the ratios need their real SHAPE
+     * ({num, den} BigInts, matching Format.parsePriceRatio) to keep
+     * D/lowD/highD and everything derived BigInt-clean. No shared
+     * types.js yet (group 1 owns it); local annotation only. */
+    /** @type {{num: bigint, den: bigint}} */
     var lowR, highR;
     try {
       lowR = Format.parsePriceRatio(spec.low);

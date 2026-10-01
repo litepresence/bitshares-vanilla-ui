@@ -40,6 +40,11 @@
 var AssetOps = (function () {
   "use strict";
 
+  /**
+   * @typedef {import('../api/types.js').OpTuple} OpTuple
+   * @typedef {import('../api/types.js').FeeAssetId} FeeAssetId
+   * @typedef {import('../api/types.js').RawInt} RawInt
+   */
   var CORE_ASSET = "1.3.0";
   var CER_QUOTE_PLACEHOLDER = "1.3.1"; /* chain overwrites with the new asset id */
   var PROVE_TIMEOUT_MS = 60000, PROVE_INTERVAL_MS = 2500;
@@ -356,6 +361,7 @@ var AssetOps = (function () {
     _needFormat();
     var raw = Format.parseAmount(args.amountHuman, args.precision);
     if (!/[1-9]/.test(raw)) throw new Error("claim amount must be greater than zero");
+    /** @type {any} */
     var ext = [];
     var claimFrom = (args.claimFromAssetIdOrNull === undefined) ? null : args.claimFromAssetIdOrNull;
     if (claimFrom !== null) {

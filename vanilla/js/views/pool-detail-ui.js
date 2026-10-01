@@ -46,7 +46,9 @@ var PoolDetailUI = (function () {
   }
   function whoText(me) { return me.name + " (" + me.id + ")"; }
   function precOr5(p) { return (p === null || p === undefined) ? 5 : p; }
-  /* Route entry: #/pools/:id — detail desk mirroring the orderbook desk grid. */
+  /** Route entry: #/pools/:id — detail desk mirroring the orderbook desk grid.
+   * @param {HTMLElement} root router mount element
+   * @param {string} poolId pool object id (1.19.x) or symbol */
   function renderPoolDetail(root, poolId) {
     if (!root) return;
     var u = U(), retry = function () { renderPoolDetail(root, poolId); };
@@ -485,7 +487,7 @@ var PoolDetailUI = (function () {
     return { ctx: ctx, w: w, h: cssH };
   }
 
-  /* Pool x·y=k curve + current point (dex-ux plot proposal 5 — math from
+  /** Pool x·y=k curve + current point (dex-ux plot proposal 5 — math from
    * Pool.curvePoints, itself a BigInt port of falcon_app.py:167-202; never
    * imported). Source balances come from the already-fetched detail row —
    * no new chain call. Collapsible <details open> with a canvas 2D line
@@ -494,7 +496,16 @@ var PoolDetailUI = (function () {
    * parts-per-million in BigInt, then Number() on the 0..1e6 int — exact
    * and pixel-only (never money). Tick labels go human via u.amtText at
    * render (raw fallback when the join missed a precision). Empty pool →
-   * silent no-op (the depth table path below owns the honest empty sentence). */
+   * silent no-op (the depth table path below owns the honest empty sentence).
+   * TYPE NOTE: xmin/xmax/ymin/ymax start null and absorb BigInt span
+   * values; the inferred shape reads back mixed at the xrange/yrange
+   * compare and multiply sites. Pin the accumulators (and the derived
+   * ranges) to any. No shared types.js yet (group 1 owns it); local
+   * annotations only, nothing to merge.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} book mount element for the plot
+   * @param {any} r pool row (balance_a_raw/balance_b_raw + precisions/syms)
+   * @returns {void} */
   function drawCurve(doc, book, r) {
     var u = U(), c;
     try {
@@ -526,7 +537,13 @@ var PoolDetailUI = (function () {
     var buy = cssTok("--buy", "#26de81");
     var muted = cssTok("--muted", "#777777");
     var border = cssTok("--border", "#2a2e39");
-    var i, xmin = null, xmax = null, ymin = null, ymax = null;
+    var i;
+    /* TYPE NOTE: one @type above a multi-declarator var pins only the
+     * first name, so each reserve bound carries its own initializer cast
+     * (null is assignable to bigint with this jsconfig's strict:false;
+     * runtime values are BigInts after the first span() pass). */
+    var xmin = /** @type {bigint} */ (null), xmax = /** @type {bigint} */ (null),
+      ymin = /** @type {bigint} */ (null), ymax = /** @type {bigint} */ (null);
     function span(v, mn, mx) {
       if (mn === null || v < mn) mn = v;
       if (mx === null || v > mx) mx = v;
@@ -553,14 +570,22 @@ var PoolDetailUI = (function () {
     var s3 = span(curY, ymin, ymax);
     ymin = s3[0];
     ymax = s3[1];
-    var xrange = xmax - xmin, yrange = ymax - ymin;
+    var xrange = /** @type {bigint} */ (xmax - xmin), yrange = /** @type {bigint} */ (ymax - ymin);
     var padL = 8, padR = 8, padT = 24, padB = 30;
     var plotW = g.w - padL - padR, plotH = g.h - padT - padB;
+    /** Reserve -> x pixel (parts-per-million BigInt, then Number on the
+     * 0..1e6 int — exact, pixel-only).
+     * @param {bigint} x reserve coordinate
+     * @returns {number} canvas x pixel */
     function fx(x) {
       if (xrange === 0n) return padL + plotW / 2;
       /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */
       return padL + (Number((x - xmin) * 1000000n / xrange) / 1000000) * plotW;
     }
+    /** Reserve -> y pixel (parts-per-million BigInt, then Number on the
+     * 0..1e6 int — exact, pixel-only).
+     * @param {bigint} v reserve coordinate
+     * @returns {number} canvas y pixel */
     function fy(v) {
       if (yrange === 0n) return padT + plotH / 2;
       /* Pixel-only Number(): ppm is a 0..1e6 int, exact in double. */

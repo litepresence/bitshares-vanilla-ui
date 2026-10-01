@@ -68,7 +68,9 @@ var SametUI = (function () {
     return [r.f.id + " · " + (r.f.sym || r.f.asset_id), "Owner " + r.f.owner,
       "Balance " + r.cells[3].text + " · rate " + r.cells[4].text, "Unpaid " + r.cells[5].text];
   }
-  /* Route entry: #/samet — list + my-funds with row actions + create. */
+  /** Route entry: #/samet — list + my-funds with row actions + create.
+   * @param {HTMLElement} root router mount element
+   * @returns {void} */
   function renderSamet(root) {
     if (!root) return;
     var ui;
@@ -119,7 +121,13 @@ var SametUI = (function () {
       go.click();
     }).catch(function () { if (live(myGen, uiGen)) go.click(); });
   }
-  /* Per-fund Borrow / Repay / Update / Delete buttons open the form below. */
+  /** Per-fund Borrow / Repay / Update / Delete buttons open the form below.
+   * @param {Document} doc owner document
+   * @param {HTMLElement} box mount element for the action row
+   * @param {number} myGen route generation (liveness token)
+   * @param {number} uiGen shared-gate generation (CreditUI routeReady token)
+   * @param {any} f fund row (id/asset_id/sym/rate_units/prec/unpaid_raw)
+   * @returns {void} */
   function rowActions(doc, box, myGen, uiGen, f) {
     var ui = U();
     var line = ui.el(doc, "div", null, "xfer-field");
@@ -127,7 +135,7 @@ var SametUI = (function () {
     [[t("samet.borrow_repay", "Borrow+Repay"), "borrow"], [t("samet.repay", "Repay"), "repay"], [t("samet.update", "Update"), "update"], [t("samet.delete", "Delete"), "delete"]].forEach(function (k) {
       var b = ui.touchable(ui.el(doc, "button", k[0])); b.type = "button";
       b.addEventListener("click", function () {
-        if (live(myGen, uiGen)) openAction(doc, box, uiGen, f, k[1]);
+        if (live(myGen, uiGen)) openAction(doc, box, myGen, uiGen, f, k[1]);
       });
       line.appendChild(b);
     });
@@ -155,8 +163,21 @@ var SametUI = (function () {
     var u = fund && fund.unpaid_raw;
     return (typeof u === "string" && /^\d+$/.test(u)) ? u : "0";
   }
-  /* Single-op action form for a fund (borrow+repay combo / repay-only / update / delete). */
-  function openAction(doc, box, uiGen, f, kind) {
+  /** Single-op action form for a fund (borrow+repay combo / repay-only / update / delete).
+   * BUGFIX NOTE (type gate found it): openAction used the route liveness
+   * token myGen but never received it — the old 5-arg call dropped it, so
+   * every Borrow/Repay/Update/Delete click threw ReferenceError (dead
+   * feature) and tsc reported TS2552. Threading myGen through is the only
+   * non-comment change in this file; behavior is restored to the evident
+   * intent (all sibling forms already thread both counters).
+   * @param {Document} doc owner document
+   * @param {HTMLElement} box mount element for the action form
+   * @param {number} myGen route generation (liveness token)
+   * @param {number} uiGen shared-gate generation (CreditUI routeReady token)
+   * @param {any} f fund row (id/asset_id/sym/rate_units/prec/unpaid_raw)
+   * @param {string} kind borrow|repay|update|delete
+   * @returns {void} */
+  function openAction(doc, box, myGen, uiGen, f, kind) {
     var ui = U();
     var out = ui.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     out.appendChild(ui.el(doc, "h3", kind.charAt(0).toUpperCase() + kind.slice(1) + " " + f.id));

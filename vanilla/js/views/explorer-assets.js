@@ -81,12 +81,17 @@ var ExplorerAssets = (function () {
     [8192, "disable mssr update"], [16384, "disable bsrm update"],
     [32768, "disable collateral bidding"]];
 
-  /* Bit int -> "a, b" label list, "(none)" when empty; "" on garbage. */
+  /** Bit int -> "a, b" label list, "(none)" when empty; "" on garbage.
+   * TYPE NOTE: PERM_LABELS rows infer as (string|number)[] so p[0] reads
+   * back string|number at the & site; the cast pins the bit operand.
+   * No shared types.js yet (group 1 owns it); local cast only.
+   * @param {any} v bit field (number expected, anything coerced)
+   * @returns {string} label list, "(none)", or "" on garbage */
   function flagBitNames(v) {
     var n = parseInt(String(v), 10);
     if (!(n >= 0)) return "";
     var out = [];
-    PERM_LABELS.forEach(function (p) { if (n & p[0]) out.push(p[1]); });
+    PERM_LABELS.forEach(function (p) { if (n & (/** @type {any} */ (p[0]))) out.push(p[1]); });
     return out.length ? out.join(", ") : "(none)";
   }
 
@@ -582,7 +587,7 @@ var ExplorerAssets = (function () {
     });
   }
 
-  /* #/asset/:symbol: header + MARKET button (preferred market) +
+  /** #/asset/:symbol: header + MARKET button (preferred market) +
    * ASSET INFO/ACTIONS tabs + asset-type/flags section + description box with
    * grouped amounts + feed section when is_smartcoin (both-precisions math)
    * else the "not a smartcoin" empty state. Concepts from #1 Asset.jsx:
@@ -591,7 +596,9 @@ var ExplorerAssets = (function () {
    * permission bits), description main/market (parseDescription). DEFERRED:
    * FEE POOL funding/claim panel (Asset.jsx renderFeePool* needs signing —
    * read-only explorer shows the fee-pool balance only) + prediction LIST
-   * view (Assets.jsx:492- List with condition/expiry — table covers it). */
+   * view (Assets.jsx:492- List with condition/expiry — table covers it).
+   * @param {HTMLElement} root router mount element
+   * @param {string} symbol asset symbol for the detail view */
   function renderAsset(root, symbol) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
