@@ -70,6 +70,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     det.appendChild(sum); det.appendChild(pre); card.appendChild(det);
     var rm = el("button", "btn danger", t("txbuilder.remove", "Remove"));
     rm.setAttribute("type", "button");
+    /* A11y delta 2026-10-01: bare "Remove" repeats per card — name which op
+     * it removes (reuses the same key, no new i18n). */
+    try { rm.setAttribute("aria-label", t("txbuilder.remove", "Remove") + " " + (entry.source || ("op " + entry.opId))); } catch (e) { /* text stands */ }
     rm.addEventListener("click", function () { TxBuilder.removeOp(entry.key); renderDesk(wrap); });
     card.appendChild(rm);
     wrap.appendChild(card);
@@ -82,7 +85,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
   async function renderDesk(root) {
     root.innerHTML = "";
     var wrap = el("div", "wrap wide"); root.appendChild(wrap);
-    wrap.appendChild(el("h2", null, t("txbuilder.title", "Transaction Builder")));
+    /* A11y delta 2026-10-01: h1 (was h2) — page title level matches every
+     * other route (transfer/voting/proposals use h1). */
+    wrap.appendChild(el("h1", null, t("txbuilder.title", "Transaction Builder")));
     var st = TxBuilder.state();
     if (!st.ops.length) {
       var empty = el("p", "empty", t("txbuilder.empty", "No operations queued. Build one from Transfer, Voting, or Pools — each confirm screen offers Add to TxBuilder — then review it here."));
@@ -90,7 +95,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
       var links = el("p", null, "");
       [[ "#/transfer", t("txbuilder.link_transfer", "Transfer") ], [ "#/voting", t("txbuilder.link_voting", "Voting") ], [ "#/pools", t("txbuilder.link_pools", "Pools") ]].forEach(function (pair) {
         var a = document.createElement("a"); a.href = pair[0]; a.textContent = pair[1]; a.style.marginRight = "12px";
-        try { a.style.display = "inline-block"; a.style.padding = "10px 12px"; } catch (e) { /* native link stands */ }
+        /* A11y delta 2026-10-01: 44px touch floor (principle #7) — was
+         * inline-block with 10px padding only. */
+        try { a.style.display = "inline-flex"; a.style.alignItems = "center"; a.style.minHeight = "44px"; a.style.padding = "0 12px"; } catch (e) { /* native link stands */ }
         links.appendChild(a);
       });
       wrap.appendChild(links);
@@ -108,6 +115,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     var feeBtn = el("button", "btn", t("txbuilder.quote_fees", "Quote fees"));
     feeBtn.setAttribute("type", "button");
     var feeOut = el("p", "tb-fees", st.fees ? (t("txbuilder.total_prefix", "Total ") + st.fees.totalDisplay) : t("txbuilder.fees_pending", "Fees not quoted yet."));
+    /* A11y delta 2026-10-01: fee/auth results replace text on click — polite
+     * live so SR users hear the quote without moving focus. */
+    try { feeOut.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     /* #6: raw fee integers live in the title only — screen text stays human. */
     try { if (st.fees) feeOut.title = "raw " + st.fees.totalRaw + " " + (st.feeAssetId || ""); } catch (e) { /* text stands */ }
     feeBtn.addEventListener("click", async function () {
@@ -126,6 +136,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     var authBtn = el("button", "btn", t("txbuilder.resolve_auths", "Resolve authorities"));
     authBtn.setAttribute("type", "button");
     var authOut = el("div", "tb-auths");
+    try { authOut.setAttribute("aria-live", "polite"); } catch (e) { /* rows stand */ }
     authBtn.addEventListener("click", async function () {
       authBtn.disabled = true; authOut.innerHTML = "";
       try {
@@ -142,6 +153,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     var expBtn = el("button", "btn", t("txbuilder.export_btn", "Export JSON"));
     expBtn.setAttribute("type", "button");
     var expArea = document.createElement("textarea"); expArea.rows = 6; expArea.placeholder = t("txbuilder.export_ph", "Export payload appears here");
+    /* A11y delta 2026-10-01: placeholder is not a name — mirror it as the
+     * accessible name (same key, no new i18n). Same for import below. */
+    try { expArea.setAttribute("aria-label", t("txbuilder.export_ph", "Export payload appears here")); } catch (e) { /* placeholder stands */ }
     try { expArea.style.width = "100%"; expArea.style.maxWidth = "100%"; expArea.style.boxSizing = "border-box"; } catch (e) { /* native area stands */ }
     expBtn.addEventListener("click", async function () {
       try { if (!st.built) await TxBuilder.buildUnsigned(); expArea.value = TxBuilder.exportJSON(); }
@@ -149,6 +163,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     });
     scol.appendChild(expBtn); scol.appendChild(expArea);
     var impArea = document.createElement("textarea"); impArea.rows = 6; impArea.placeholder = t("txbuilder.import_ph", "Paste an export payload, then Import");
+    try { impArea.setAttribute("aria-label", t("txbuilder.import_ph", "Paste an export payload, then Import")); } catch (e) { /* placeholder stands */ }
     try { impArea.style.width = "100%"; impArea.style.maxWidth = "100%"; impArea.style.boxSizing = "border-box"; } catch (e) { /* native area stands */ }
     var impBtn = el("button", "btn", t("txbuilder.import_btn", "Import JSON"));
     impBtn.setAttribute("type", "button");

@@ -555,6 +555,10 @@ var ProposalUI = (function () {
     var fR = field(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)"), { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
     ctx.wrap.appendChild(fP.row); ctx.wrap.appendChild(fE.row); ctx.wrap.appendChild(fR.row);
     var kindSel = doc.createElement("select"); touchable(kindSel);
+    /* A11y delta 2026-10-01: unnamed <select> announced only "combobox" —
+     * plain aria-label (no new t() key, so check_i18n stays green; a later
+     * i18n batch can key it). Same for the authority select below. */
+    try { kindSel.setAttribute("aria-label", "Inner operation type"); } catch (e) { /* options stand */ }
     Object.keys(INNER_DEFS).forEach(function (k) {
       var o = doc.createElement("option"); o.value = k; o.textContent = "Inner op: " + k; kindSel.appendChild(o);
     });
@@ -568,6 +572,9 @@ var ProposalUI = (function () {
       inners.forEach(function (en, i) {
         var p = el(doc, "p", (i + 1) + ". " + innerSummary(en.kind, en.vals));
         var rm = touchable(el(doc, "button", t("proposal.remove", "Remove"))); rm.type = "button";
+        /* A11y delta 2026-10-01: bare "Remove" repeats per row — name which
+         * enclosed op it drops (plain suffix, no new i18n key). */
+        try { rm.setAttribute("aria-label", t("proposal.remove", "Remove") + " enclosed op " + (i + 1)); } catch (e) { /* text stands */ }
         rm.addEventListener("click", function () { inners.splice(i, 1); drawInners(); });
         p.appendChild(rm); addedBox.appendChild(p);
       });
@@ -726,6 +733,7 @@ var ProposalUI = (function () {
       var fP2 = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
       var ow = doc.createElement("select"); touchable(ow);
+      try { ow.setAttribute("aria-label", "Authority"); } catch (e) { /* options stand */ }
       ["active", "owner"].forEach(function (k) { var o = doc.createElement("option"); o.value = k; o.textContent = k + " authority"; ow.appendChild(o); });
       ctx.wrap.appendChild(ow);
       [[t("proposal.approve", "Approve"), false], [t("proposal.reject_approval", "Reject approval"), true]].forEach(function (ab) {

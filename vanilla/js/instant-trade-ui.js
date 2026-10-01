@@ -429,7 +429,9 @@ var InstantTradeUI = (function () {
     var sellAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.sellSym || "SELL" }), { id: "it-sell-amount", value: P.sellAmount, placeholder: "0.00", inputmode: "decimal", unit: P.sellSym || "SELL" });
     sellBox.appendChild(sellAmtF.row);
     var sellBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.sellSym ? " " + P.sellSym : ""), "muted");
-    sellBal.id = "it-sell-bal"; sellBox.appendChild(sellBal);
+    sellBal.id = "it-sell-bal";
+    try { sellBal.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    sellBox.appendChild(sellBal);
     var recvSymF = fieldRow(doc, t("instant.receive_asset_label", "Receive asset "), { id: "it-receive-sym", value: P.receiveSym, placeholder: "CNY", inputmode: "text" });
     recvSymF.input.setAttribute("aria-label", t("instant.receive_asset_symbol_aria", "Receive asset symbol"));
     recvSymF.input.setAttribute("autocapitalize", "characters");
@@ -437,7 +439,9 @@ var InstantTradeUI = (function () {
     var recvAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.receiveSym || "RECEIVE" }), { id: "it-receive-amount", value: P.receiveAmount, placeholder: "0.00", inputmode: "decimal", unit: P.receiveSym || "RECEIVE" });
     recvBox.appendChild(recvAmtF.row);
     var recvBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.receiveSym ? " " + P.receiveSym : ""), "muted");
-    recvBal.id = "it-receive-bal"; recvBox.appendChild(recvBal);
+    recvBal.id = "it-receive-bal";
+    try { recvBal.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    recvBox.appendChild(recvBal);
     var swapCell = el(doc, "div", null, "it-swap-cell");
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
     var swapBtn = touchable(el(doc, "button", "⇄"));
@@ -449,7 +453,9 @@ var InstantTradeUI = (function () {
      * aria-label — visual change only, no new strings. */
     try {
       swapBtn.style.background = "transparent"; swapBtn.style.border = "none";
-      swapBtn.style.color = "var(--accent, #1E9ED7)"; swapBtn.style.fontSize = "1.5em";
+      /* A11y delta 2026-10-01: tokens only — was var(--accent) with a
+       * stale hardcoded fallback (pre-a11y accent, fails the hex grep). */
+      swapBtn.style.color = "var(--accent)"; swapBtn.style.fontSize = "1.5em";
       swapBtn.style.minWidth = "44px"; swapBtn.style.cursor = "pointer"; swapBtn.style.padding = "0 8px";
     } catch (e) { /* glyph styling best-effort */ }
     swapCell.appendChild(swapBtn);
@@ -581,7 +587,12 @@ var InstantTradeUI = (function () {
     refreshBalances(doc, P, M);
     /* Walkthrough live region: effective price + fee display + orders table. */
     var effP = el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted");
-    effP.id = "it-effective"; walkBox.appendChild(effP);
+    effP.id = "it-effective";
+    /* A11y delta 2026-10-01: walked totals replace text per keystroke — polite
+     * live announces the effective price + fee previews without moving focus.
+     * Table itself stays browsable (not live) to avoid row chatter. */
+    try { effP.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    walkBox.appendChild(effP);
     /* Last-price walkthrough row (QuickTrade getPriceSection "last" concept):
      * dedicated row from the already-fetched ticker latest (latestH above),
      * receive-per-sell with both syms; dash when the ticker has no latest. */
@@ -616,9 +627,13 @@ var InstantTradeUI = (function () {
     }
     walkBox.appendChild(liqP);
     var feeP = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
-    feeP.id = "it-fee-preview"; walkBox.appendChild(feeP);
+    feeP.id = "it-fee-preview";
+    try { feeP.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    walkBox.appendChild(feeP);
     var mktP = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
-    mktP.id = "it-mkt-fee"; walkBox.appendChild(mktP);
+    mktP.id = "it-mkt-fee";
+    try { mktP.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    walkBox.appendChild(mktP);
     var tblWrap = el(doc, "div"); tblWrap.id = "it-walk-table";
     try { tblWrap.style.overflowX = "auto"; } catch (e) { /* scroll best-effort */ }
     walkBox.appendChild(tblWrap);
@@ -703,13 +718,22 @@ var InstantTradeUI = (function () {
         return;
       }
       var table = doc.createElement("table");
+      /* A11y delta 2026-10-01: thead + scope="col" — the router sweep only
+       * covers .node-table/.pools-table/.xplore-scroll, so this classless
+       * walkthrough table named nothing before (bare <tr> under <table>). */
+      var thead = doc.createElement("thead");
       var head = doc.createElement("tr");
       [t("market.col_order", "Order"), t("market.col_price", "Price") + " (" + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym + ")",
         t("instant.amount", "Amount") + " (" + ctx.sellSym + ")",
         t("instant.total", "Total") + " (" + ctx.receiveSym + ")"].forEach(function (h) {
-        var th = doc.createElement("th"); th.textContent = h; head.appendChild(th);
+        var th = doc.createElement("th"); th.textContent = h;
+        try { th.setAttribute("scope", "col"); } catch (e) { /* text stands */ }
+        head.appendChild(th);
       });
-      table.appendChild(head);
+      thead.appendChild(head);
+      table.appendChild(thead);
+      var walkBody = doc.createElement("tbody");
+      table.appendChild(walkBody);
       rows.slice(0, WALK_ROWS_MAX).forEach(function (r, i) {
         var tr = doc.createElement("tr");
         var c0 = doc.createElement("td"); c0.textContent = String(i + 1); tr.appendChild(c0);
@@ -727,7 +751,7 @@ var InstantTradeUI = (function () {
         catch (e) { c3.textContent = "—"; }
         try { c3.title = r.receiveTake; } catch (e) { /* title best-effort */ }
         tr.appendChild(c3);
-        table.appendChild(tr);
+        walkBody.appendChild(tr);
       });
       tblWrap.appendChild(table);
       tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + t("instant.level_suffix", " level") + (rows.length === 1 ? "" : "s") + t("instant.walk_suffix", " walk"), "muted"));

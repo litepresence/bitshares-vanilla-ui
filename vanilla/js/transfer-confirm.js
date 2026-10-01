@@ -297,6 +297,10 @@ var TransferConfirm = (function () {
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
+    /* A11y delta 2026-10-01: empty summary showed only a triangle to sighted
+     * keyboard users — visible text mirrors the aria-label (proposal-ui
+     * rawJson precedent), reusing the same key so check_i18n stays green. */
+    sumOp.textContent = t("confirm.op_json_label", "Show unsigned operation JSON");
     sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
     detOp.appendChild(sumOp);
     var preOp = doc.createElement("pre");
