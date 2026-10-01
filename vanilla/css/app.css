@@ -221,6 +221,17 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
 /* The toggle sits on the header bar (blue/dark in every theme, light text)
  * so its glyph is always inverted to light — independent of --icon-filter. */
 #nav-toggle .nav-icon { filter: invert(1); }
+/* Nav-link glyphs sit on var(--header-bg) — dark in ALL three themes
+ * (chocolate #2A1A12 in vanilla-ui-theme, near-black in ref-ui, #131722 in
+ * dex-ux) — while the vanilla light global --icon-filter is none (correct
+ * for its light body panels). Without this, the black-filled vendored
+ * glyphs (e.g. trade.svg IcoMoon paths, dashboard.svg — no fill attr, so
+ * black) vanish on the chocolate bar (light-theme vision sweep 2026-10-01:
+ * Dashboard/Exchange/Credit Offer/Liquidity Pools/Explore icons unreadable
+ * at 1440px). Same precedent as the #nav-toggle/#lock-toggle inverts;
+ * no-op in the two dark themes whose global filter already inverts. Covers
+ * #nav-directory links too (same buildNavLink nav-icon, inside #nav). */
+#nav a .nav-icon { filter: invert(1); }
 #nav a { font-weight: 700; }
 #nav a .nav-icon { margin-right: 8px; }
 /* Bell/star/cell icons: image replaces emoji 1:1; star-off dims the
