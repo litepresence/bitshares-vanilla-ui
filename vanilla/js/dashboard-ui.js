@@ -735,9 +735,11 @@ var DashboardUI = (function () {
       img.className = "splash-hero-img";
       s.appendChild(img);
     } catch (e) { /* hero works without art */ }
-    s.appendChild(el(doc, "h1", t("splash.hero_title", "vanilla/ is dependency-free and static-servable.")));
+    s.appendChild(el(doc, "h1", t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable.")));
     s.appendChild(el(doc, "p",
-      t("splash.hero_sub", "Your keys. Your coins. No one in between. The BitShares wallet that runs from a static folder and can not rot."), "muted"));
+      t("splash.hero_sub", "Your keys. Your coins."), "muted"));
+    s.appendChild(el(doc, "p",
+      t("splash.hero_sub2", "Nothing but fresh vanilla html/js/css in between."), "muted"));
     var row = doc.createElement("p");
     row.className = "splash-cta-row";
     var create = doc.createElement("a");

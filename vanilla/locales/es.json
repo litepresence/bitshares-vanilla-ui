@@ -2989,8 +2989,8 @@
     "post_failed_prefix": "Post failed: "
   },
   "splash": {
-    "hero_title": "vanilla/ is dependency-free and static-servable.",
-    "hero_sub": "Your keys. Your coins. No one in between. The BitShares wallet that runs from a static folder and can not rot.",
+    "hero_title": "bitshares-vanilla-ui is dependency-free and static-servable.",
+    "hero_sub": "Your keys. Your coins.",
     "cta_exchange": "Open exchange",
     "pulse_title": "Chain pulse",
     "pulse_head": "Head block",
@@ -3026,6 +3026,7 @@
     "step3_t": "Trade the book",
     "step3_d": "Limit orders on a real order book. Cancel anything.",
     "final_t": "Ready when you are.",
-    "final_cta": "Create a wallet"
+    "final_cta": "Create a wallet",
+    "hero_sub2": "Nothing but fresh vanilla html/js/css in between."
   }
 }
