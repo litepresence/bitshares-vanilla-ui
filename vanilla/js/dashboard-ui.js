@@ -1,6 +1,12 @@
 /* DashboardUI: the #/ account-overview dashboard (NOT a desk clone).
  * Owns: DOM for the "/" route only — watched-account balances, recent
- *   activity, favourite markets, and quick links. When the wallet is
+ *   activity, favourite markets, and quick links — PLUS the first-run
+ *   landing (splash) shown while the wallet is locked. Locked visitors get
+ *   the landing (hero + live markets + chain pulse + product cards + trust
+ *   + steps + CTA); unlocked visitors get the watched-account dashboard
+ *   exactly as before. Landing is a superset of the old locked gate card,
+ *   so no locked CTA is lost (Create/Login both present).
+ * When the wallet is
  *   unlocked the watched account is the wallet's own (Account.myAccountId);
  *   otherwise it is the read-only committee-account watch (1.2.0), same
  *   default App.jsx:489-495 falls back to when no account is selected.
@@ -50,6 +56,18 @@ var DashboardUI = (function () {
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
   function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+
+  /* Unlocked right now (read-only Wallet probe, never throws). */
+  function isUnlockedNow() {
+    try {
+      return !!(typeof Wallet !== "undefined" && Wallet &&
+        typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked());
+    } catch (e) { return false; }
+  }
+
+  /* Landing rule, pure and unit-tested: anything not-unlocked sees the
+   * splash. Params: unlocked boolean-ish. Returns boolean. */
+  function landingFor(unlocked) { return !unlocked; }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
   }
@@ -181,6 +199,15 @@ var DashboardUI = (function () {
     if (!doc) return;
     var myGen = ++gen;
     clearRoot(root);
+    /* Landing rule (Option B, 2026-10-01): locked visitors get the splash,
+     * unlocked visitors get the watched-account dashboard unchanged. The
+     * landing paints immediately (static hero/cards/steps + fail-open live
+     * fills) so a down node never blanks first paint; the dashboard keeps
+     * its connect-wait below. */
+    if (landingFor(isUnlockedNow())) {
+      paintLanding(doc, root, myGen);
+      return;
+    }
     var wrap = makeWrap(doc, root);
     if (typeof Account === "undefined" || !Account) {
       showError(doc, wrap, t("account.backend_missing_account", "Account backend missing: js/account.js failed to load."));
@@ -676,7 +703,282 @@ var DashboardUI = (function () {
     wrap.appendChild(section);
   }
 
-  return { renderDashboard: renderDashboard };
+  /* First-run landing (Option B splash, 2026-10-01): hero with the project
+   * motto + live markets + chain pulse + product cards + trust trio +
+   * 3 steps + final CTA. Static sections paint immediately (never blank);
+   * live fills (strip, pulse) fail open per cell. textContent-only except
+   * the hero <img> (owner art, empty alt — the h1 carries the meaning). */
+  function paintLanding(doc, root, myGen) {
+    if (myGen !== gen) return;
+    clearRoot(root);
+    var wrap = makeWrap(doc, root);
+    wrap.appendChild(landingHero(doc));
+    paintMarketStrip(doc, wrap, myGen);
+    paintPulse(doc, wrap, myGen);
+    wrap.appendChild(landingCards(doc));
+    wrap.appendChild(landingTrust(doc));
+    wrap.appendChild(landingSteps(doc));
+    wrap.appendChild(landingFinal(doc));
+  }
+
+  /* Hero: framed owner art + motto h1 + honest subcopy + CTAs. The motto is
+   * the promise; the subcopy translates it (keys stay yours, nothing to
+   * install, nothing that rots). Both locked CTAs from the old gate card
+   * survive here (Create + Login). */
+  function landingHero(doc) {
+    var s = doc.createElement("section");
+    s.className = "splash-hero";
+    try {
+      var img = doc.createElement("img");
+      img.src = "assets/hero.webp";
+      img.alt = "";
+      img.className = "splash-hero-img";
+      s.appendChild(img);
+    } catch (e) { /* hero works without art */ }
+    s.appendChild(el(doc, "h1", t("splash.hero_title", "vanilla/ is dependency-free and static-servable.")));
+    s.appendChild(el(doc, "p",
+      t("splash.hero_sub", "Your keys. Your coins. No one in between. The BitShares wallet that runs from a static folder and can not rot."), "muted"));
+    var row = doc.createElement("p");
+    row.className = "splash-cta-row";
+    var create = doc.createElement("a");
+    create.href = "#/create-account";
+    create.className = "btn";
+    create.textContent = t("dashboard.create", "Create Account");
+    touchable(create);
+    row.appendChild(create);
+    var desk = doc.createElement("a");
+    desk.href = "#/market/" + encodeURIComponent(defaultMarket());
+    desk.className = "btn btn-ghost";
+    desk.textContent = t("splash.cta_exchange", "Open exchange");
+    touchable(desk);
+    row.appendChild(desk);
+    s.appendChild(row);
+    s.appendChild(linkPara(doc, [
+      ["#/login", t("auth.login", "Login")],
+      ["#/accounts", t("account.manager_title", "Accounts")]
+    ]));
+    return s;
+  }
+
+  /* Chain pulse band (Crypo number-band slot, real numbers only): head
+   * block + time, account/asset/witness/committee counts, top-market 24h
+   * volume row. One db id, one Promise.all wave; every cell fails open to
+   * "—" (dead method or offline node never blanks the band). Counts render
+   * verbatim (thousands-grouping stays deferred per Tier-2). Aggregate DEX
+   * volume has no chain call (#4 has only per-market volume), so the row
+   * is labeled single-market honestly. */
+  function paintPulse(doc, wrap, myGen) {
+    var s = doc.createElement("section");
+    s.className = "pulse-band";
+    s.appendChild(el(doc, "h2", t("splash.pulse_title", "Chain pulse")));
+    var grid = doc.createElement("div");
+    grid.className = "pulse-grid";
+    s.appendChild(grid);
+    var cells = {};
+    ["head", "time", "accounts", "assets", "witnesses", "committee"].forEach(function (k) {
+      var cell = doc.createElement("div");
+      cell.className = "pulse-cell";
+      cell.appendChild(el(doc, "div", t("splash.pulse_" + k, k), "muted"));
+      var v = el(doc, "div", "…", "num");
+      cell.appendChild(v);
+      grid.appendChild(cell);
+      cells[k] = v;
+    });
+    var vol = doc.createElement("p");
+    vol.className = "muted";
+    vol.textContent = t("splash.topvol_loading", "Top market 24h vol: …");
+    s.appendChild(vol);
+    wrap.appendChild(s);
+    fetchPulse(myGen).then(function (r) {
+      if (myGen !== gen) return;
+      cells.head.textContent = fmtCount(r.head);
+      cells.time.textContent = (r.time === null || r.time === undefined) ? "—" : String(r.time);
+      cells.accounts.textContent = fmtCount(r.accounts);
+      cells.assets.textContent = fmtCount(r.assets);
+      cells.witnesses.textContent = fmtCount(r.witnesses);
+      cells.committee.textContent = fmtCount(r.committee);
+      vol.textContent = topVolText(r.topVol);
+    });
+  }
+
+  /* One-wave pulse fetch. Returns {head,time,accounts,assets,witnesses,
+   * committee,topVol} with nulls on any miss (never throws — offline is a
+   * result, not an error). topVol is the get_top_markets(1) row or null. */
+  function fetchPulse(myGen) {
+    var blank = { head: null, time: null, accounts: null, assets: null, witnesses: null, committee: null, topVol: null };
+    if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
+      return Promise.resolve(blank);
+    }
+    return Chain.db().then(function (dbId) {
+      function one(method, params) {
+        return Chain.call(dbId, method, params || []).then(null, function () { return null; });
+      }
+      function voteCount(fn) {
+        try {
+          if (typeof Vote !== "undefined" && Vote && typeof Vote[fn] === "function") {
+            return Vote[fn]().then(null, function () { return null; });
+          }
+        } catch (e) { /* null below */ }
+        return Promise.resolve(null);
+      }
+      return Promise.all([
+        one("get_dynamic_global_properties", []),
+        one("get_account_count", []),
+        one("get_asset_count", []),
+        voteCount("getWitnessCount"),
+        voteCount("getCommitteeCount"),
+        one("get_top_markets", [1])
+      ]);
+    }).then(function (r) {
+      if (myGen !== gen) return blank;
+      var out = { head: null, time: null, accounts: null, assets: null, witnesses: null, committee: null, topVol: null };
+      var g = r[0];
+      if (g && typeof g === "object") {
+        out.head = (Number.isSafeInteger(g.head_block_number) && g.head_block_number > 0) ? g.head_block_number : null;
+        out.time = (typeof g.time === "string" && g.time) ? g.time : null;
+      }
+      out.accounts = asCount(r[1]);
+      out.assets = asCount(r[2]);
+      out.witnesses = asCount(r[3]);
+      out.committee = asCount(r[4]);
+      var rows = r[5];
+      out.topVol = (Array.isArray(rows) && rows[0] && typeof rows[0] === "object") ? rows[0] : null;
+      return out;
+    }).then(null, function () { return blank; });
+  }
+
+  /* Chain count -> safe value: non-negative safe ints pass through (uint64
+   * counts arrive small); anything else is null (fail-open). */
+  function asCount(v) {
+    if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) return v;
+    return null;
+  }
+
+  /* Verbatim count text (grouping stays deferred): null -> em dash. */
+  function fmtCount(v) {
+    if (v === null || v === undefined) return "—";
+    return String(v);
+  }
+
+  /* Top-market volume line. Params: row (market_ticker) or null. Volumes
+   * are chain-human strings — displayed verbatim, never summed. */
+  function topVolText(row) {
+    if (!row || typeof row.base !== "string" || typeof row.quote !== "string") {
+      return t("splash.topvol_unavailable", "Top market 24h vol: unavailable on this node.");
+    }
+    var vol = (row.quote_volume !== undefined && row.quote_volume !== null) ? String(row.quote_volume) : "—";
+    return t("splash.topvol_prefix", "Top market 24h vol (single market):") +
+      " " + row.base + "/" + row.quote + " " + vol;
+  }
+
+  /* Product doorways (Kraken-card slot, CSS-only): one line each + deep
+   * link. No art files — the hero carries the page's single image. */
+  function landingCards(doc) {
+    var s = doc.createElement("section");
+    s.className = "prod-cards";
+    s.appendChild(el(doc, "h2", t("splash.cards_title", "What you can do here")));
+    var grid = doc.createElement("div");
+    grid.className = "prod-grid";
+    [
+      ["#/market/" + encodeURIComponent(defaultMarket()),
+        t("splash.card_dex_t", "Exchange"), t("splash.card_dex_d", "Trade on the order-book DEX.")],
+      ["#/pools",
+        t("splash.card_pool_t", "Pools"), t("splash.card_pool_d", "Provide liquidity and swap.")],
+      ["#/explorer",
+        t("splash.card_explore_t", "Explorer"), t("splash.card_explore_d", "Blocks, assets and chain data.")],
+      ["#/wallet",
+        t("splash.card_wallet_t", "Wallet"), t("splash.card_wallet_d", "Keys that never leave this device.")]
+    ].forEach(function (c) {
+      var a = doc.createElement("a");
+      a.href = c[0];
+      a.className = "prod-card";
+      touchable(a);
+      a.appendChild(el(doc, "h3", c[1]));
+      a.appendChild(el(doc, "p", c[2], "muted"));
+      grid.appendChild(a);
+    });
+    s.appendChild(grid);
+    return s;
+  }
+
+  /* Trust trio (Crypo feature-trio slot, our truths — every claim is
+   * verifiable in this repo, nothing rented from marketing). */
+  function landingTrust(doc) {
+    var s = doc.createElement("section");
+    s.className = "trust-trio";
+    s.appendChild(el(doc, "h2", t("splash.trust_title", "Why it stays yours")));
+    var grid = doc.createElement("div");
+    grid.className = "trust-grid";
+    [
+      [t("splash.trust_keys_t", "Keys never leave your device"),
+        t("splash.trust_keys_d", "Signing happens locally in your browser. No server ever sees a password or a key.")],
+      [t("splash.trust_browse_t", "Browse everything with no account"),
+        t("splash.trust_browse_d", "Reads never ask for login. The password is requested only at signing.")],
+      [t("splash.trust_numbers_t", "Human numbers, shown fees"),
+        t("splash.trust_numbers_d", "Amounts at the right decimal, percents as percents, every fee previewed before you sign.")]
+    ].forEach(function (c) {
+      var d = doc.createElement("div");
+      d.className = "trust-cell";
+      d.appendChild(el(doc, "h3", c[0]));
+      d.appendChild(el(doc, "p", c[1], "muted"));
+      grid.appendChild(d);
+    });
+    s.appendChild(grid);
+    return s;
+  }
+
+  /* Three DEX-honest steps (Crypo steps slot — no bank-linking here). */
+  function landingSteps(doc) {
+    var s = doc.createElement("section");
+    s.className = "splash-steps";
+    s.appendChild(el(doc, "h2", t("splash.steps_title", "Get started in three steps")));
+    var grid = doc.createElement("div");
+    grid.className = "steps-grid";
+    [
+      ["1", t("splash.step1_t", "Create a wallet"),
+        t("splash.step1_d", "A brainkey is generated on this device. Write it on paper."),
+        "#/create-wallet-brainkey"],
+      ["2", t("splash.step2_t", "Fund it"),
+        t("splash.step2_d", "Testnet faucet or a gateway deposit — tiny first."),
+        "#/deposit-withdraw"],
+      ["3", t("splash.step3_t", "Trade the book"),
+        t("splash.step3_d", "Limit orders on a real order book. Cancel anything."),
+        "#/market/" + encodeURIComponent(defaultMarket())]
+    ].forEach(function (c) {
+      var d = doc.createElement("div");
+      d.className = "step-cell";
+      d.appendChild(el(doc, "div", c[0], "step-num"));
+      d.appendChild(el(doc, "h3", c[1]));
+      d.appendChild(el(doc, "p", c[2], "muted"));
+      var a = doc.createElement("a");
+      a.href = c[3];
+      a.textContent = c[1];
+      touchable(a);
+      d.appendChild(a);
+      grid.appendChild(d);
+    });
+    s.appendChild(grid);
+    return s;
+  }
+
+  /* Final CTA band. */
+  function landingFinal(doc) {
+    var s = doc.createElement("section");
+    s.className = "cta-band";
+    s.appendChild(el(doc, "h2", t("splash.final_t", "Ready when you are.")));
+    var a = doc.createElement("a");
+    a.href = "#/create-wallet-brainkey";
+    a.className = "btn";
+    a.textContent = t("splash.final_cta", "Create a wallet");
+    touchable(a);
+    s.appendChild(a);
+    return s;
+  }
+
+  return {
+    renderDashboard: renderDashboard,
+    _test: { landingFor: landingFor, fmtCount: fmtCount, asCount: asCount, topVolText: topVolText }
+  };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.DashboardUI === "undefined") { globalThis.DashboardUI = DashboardUI; }

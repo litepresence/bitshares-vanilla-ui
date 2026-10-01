@@ -1314,3 +1314,27 @@ p.muted[aria-live="polite"],
   .trollbox-wrap .trollbox-list { max-width: 900px; }
   .trollbox-wrap textarea { max-width: 900px; }
 }
+
+/* Splash landing (Option B, 2026-10-01): Crypo-landing skeleton, our truths.
+ * Token-only surfaces (no art files besides the single hero webp); grids
+ * stack on phones and widen on desktop (560px/1200px house breakpoints). */
+.splash-hero-img { width: 100%; height: auto; display: block;
+  border: 1px solid var(--border); border-radius: 8px; }
+.splash-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; }
+.pulse-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 8px 0; }
+.pulse-cell { border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); padding: 8px 12px; overflow-wrap: anywhere; }
+.prod-grid, .trust-grid, .steps-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 8px 0; }
+.prod-card, .trust-cell, .step-cell { border: 1px solid var(--border); border-radius: 6px;
+  background: var(--panel); padding: 12px; overflow-wrap: anywhere; }
+.prod-card { display: block; }
+.step-num { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+.cta-band { text-align: center; margin: 24px 0 8px; }
+@media (min-width: 560px) {
+  .pulse-grid { grid-template-columns: repeat(3, 1fr); }
+  .prod-grid, .trust-grid, .steps-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1200px) {
+  .pulse-grid { grid-template-columns: repeat(6, 1fr); }
+  .prod-grid { grid-template-columns: repeat(4, 1fr); }
+}

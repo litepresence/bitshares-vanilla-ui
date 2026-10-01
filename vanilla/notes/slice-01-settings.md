@@ -273,3 +273,35 @@ Anti-rot gate: (a) static CSS tokens + platform-only — ten-year safe;
 four lines per theme (banners fall back to unset, layout intact);
 (c) smallest deletable subset: the buy/sell darkening (revert two hexes —
 kept because 12px book/CHANGE text was unreadable at 2.84:1).
+
+## Delta 2026-10-01 — Option-B splash (locked landing)
+
+Reference behavior: #1 `/` → DashboardPage gate (LoginSelector when
+accountCount==0) then desk redirect; vanilla showed the watched-account
+dashboard to everyone (matrix A1 deviation: redirect with link).
+Crypo `landing-page-dark.html` (hero + ticker tape + info blocks + feature
+trio + number band + 3 steps + CTA) is the structural spec — HEX/structure
+only, its lorem copy + fake stats + TradingView embeds refused.
+
+Vanilla implementation: `dashboard-ui.js` `renderDashboard` branches on
+`landingFor(isUnlockedNow())` — locked paints `paintLanding` immediately
+(no connect-wait, fail-open fills), unlocked paints `paintDashboard`
+byte-identical. Sections: motto hero (`assets/hero.webp` framed card +
+CTAs Create/Open-exchange/Login) + reused `paintMarketStrip` + 5-call
+chain pulse (`get_dynamic_global_properties`, `get_account_count`,
+`get_asset_count`, `getWitnessCount`, `getCommitteeCount`, one wave) +
+labeled single-market top-vol row (`get_top_markets(1)` — aggregate volume
+has no chain call, summed rows would violate #6) + CSS-only product cards
++ trust trio + DEX-honest 3 steps + final CTA. Counts verbatim (grouping
+stays Tier-2-deferred); `innerHTML` grep clean; no float math.
+
+Manual test (tester, R6 §0-1 extended): locked `/` at 390px + 1440px in all
+three themes (hero readable incl. light-theme framing, band wraps, cards
+stack); unlock → same URL becomes the dashboard with zero content loss;
+node-down first paint shows hero/cards/steps with "—" live cells.
+`tooling/splash-test.js` 22/22 (routing, counts, top-vol shaping);
+`node --check` clean; rot PASS; i18n OK (38 splash.* keys × 10 dicts).
+Anti-rot: (a) static DOM + 6 read-only db calls — ten-year safe; (b) one
+322KB owner-art webp (the page's only image, cached after first load —
+removal = hero text block stands alone); (c) deletable: pulse band (strip
++ cards carry the page).

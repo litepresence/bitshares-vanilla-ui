@@ -77,7 +77,10 @@ var Router = (function () {
    *   market tabs with a LoginSelector gate); vanilla shows the watched
    *   account (the wallet's own when unlocked, else the committee-account
    *   watch) with balances, recent activity, favourite markets and quick
-   *   links. dashboard-ui.js lazy-loads here so index.html needs no new
+   *   links — BUT locked visitors get the Option-B splash instead
+   *   (2026-10-01: hero + live markets + chain pulse + cards + trust +
+   *   steps + CTA; unlocked path byte-identical to before, §3.1 deviation
+   *   recorded in slice-01-settings.md). dashboard-ui.js lazy-loads here so index.html needs no new
    *   script tag: when the global is absent we inject js/dashboard-ui.js
    *   once, paint a loading line, and re-render on load; a failed load
    *   falls back to the old market redirect so the page is never blank. */

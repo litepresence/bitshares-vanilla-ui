@@ -175,3 +175,4 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - R6 tester document: `docs/tester-manual.md` (junior-dev click-by-click, full coverage incl. new features).
 - R7 proposal-wrap non-broadcast stands; `1.10.1492` stays uncounted.
 - R8 hygiene: `build/` gitignored; footer version stamp `v1.0.0`; `docs/afk-resume.md` refreshed ship-day.
+- Splash (2026-10-01, Option B): `/` shows the landing while locked (motto hero + live strip + 5-call chain pulse + labeled single-market top-vol + cards/trust/steps/CTA), dashboard unchanged when unlocked. Aggregate DEX volume omitted (no chain call; summing rows violates #6). §3.1 deviation recorded in slice-01 delta.

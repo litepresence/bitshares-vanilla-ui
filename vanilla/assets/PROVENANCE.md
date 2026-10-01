@@ -32,3 +32,9 @@ Owner-supplied exception (2026-10-01):
   slot (`index.html:26`, `dashboard-ui.js:279`), so all consumers update
   with no code change. Rationale: project branding for bitshares-vanilla-ui;
   retro parity unaffected (same mark, same 40px header height).
+- `hero.webp` (1920×629, ~322KB — the README header art, owner-supplied
+  2026-10-01, vanilla flower + pods + mark + title) is the splash hero
+  (`dashboard-ui.js` landing branch). Single image on one route, cached
+  after first load; light theme frames it as a card (no recolor, no second
+  file). Background source `docs/header-background.webp` stays out of the
+  app (docs-only, never referenced by shipped code).

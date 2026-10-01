@@ -17,7 +17,7 @@
 
 | # | #1 route → component (App.jsx) | #2 page / component | Vanilla route (router.js) → status |
 |---|---|---|---|
-| A1 | `/` → DashboardPage (:503) | index.astro + Home.jsx | `/` (:111) → PORTED (slice-05/07; documented deviation: redirects to last/default market desk with link, no blank page) |
+| A1 | `/` → DashboardPage (:503) | index.astro + Home.jsx | `/` (:111) → PORTED (slice-05/07; documented deviation: redirects to last/default market desk with link, no blank page; 2026-10-01 Option-B splash: locked visitors get landing — hero motto + live strip + 5-call chain pulse + top-market row + cards/trust/steps/CTA — unlocked path unchanged, §3.1 deviation in slice-01 delta) |
 | A2 | `/account/:account_name` → AccountPage (:510) | balances, recent-activity, open-orders, call-orders.astro | `/account/:account_name` (:112) → PORTED (slice-03: balances, open orders, history, 22 live vectors; +2026-09-29 G6 public-first lookup, any account opens locked — account-ui.js:572) |
 | A3 | `/accounts` → DashboardAccountsOnly (:512) | — (no equiv) | `/accounts` (:113) → PORTED (`accounts-ui.js`: wallet card + lookup + manage links) |
 | A4 | `/market/:marketID` → Exchange (:516) | dex.astro | `/market/:marketID` (:114) → PORTED (slices 05–07: book, charts, 25 indicators, trading; +2026-09-29 typed-account My fills/orders preview locked, logged-out quote panels, equal 2x3, overlay mesh, feed/settlement strip reads-only — market-desk.js:702,1230; market-ind.js:352,975; trade-form.js:389; desk-grid.css:51; +2026-10-01 R1d offset estimate + R1e open-settle tab — market.js:settleOrders/sortSettles, market-orders.js tabs, market-desk.js:fetchFeed) |
