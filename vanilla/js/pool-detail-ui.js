@@ -88,20 +88,20 @@ var PoolDetailUI = (function () {
       var spotEl = u.el(doc, "span", t("pool.spot_row", "Spot") + ": " + spot + " " + (r.sym_b || r.asset_b_id) + "/" + (r.sym_a || r.asset_a_id));
       strip.appendChild(spotEl);
     } catch (e) { /* strip stands without spot */ }
-    /* One tape fetch shared by chart + history (mainnet: ES adapter ->
-     * chain; other networks: chain — the community index is mainnet-only).
-     * Legs passed so cross-chain id collisions can never pollute the tape. */
+    /* One tape fetch shared by chart + history (lazy-deep 2026-10-01 audit:
+     * CHAIN-FIRST — chainSwaps (history api, ≤101 rows by chain assert,
+     * 55ms/69KB measured) paints the desk immediately and never waits on ES.
+     * ES depth arrives in the background via deepenPool in chartPane. Legs
+     * passed so cross-chain id collisions can never pollute the tape. */
     var tape = { swaps: [], source: null };
-    if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.swapsForPool === "function") {
-      var net = "mainnet";
+    if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.chainSwaps === "function") {
       try {
-        if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
-          var st = Store.loadSettings();
-          if (st && (st.network === "testnet" || st.network === "mainnet")) net = st.network;
-        }
-      } catch (e) { /* mainnet default stands */ }
-      try {
-        tape = await PoolHistory.swapsForPool(r.id, 200, { network: net, legA: r.asset_a_id, legB: r.asset_b_id });
+        var cres = await PoolHistory.chainSwaps(r.id, 100);
+        var cswaps = (cres && cres.swaps) || [];
+        try {
+          if (typeof PoolHistory.filterLegs === "function") cswaps = PoolHistory.filterLegs(cswaps, r.asset_a_id, r.asset_b_id);
+        } catch (e) { /* unfiltered stands */ }
+        if (cswaps.length) tape = { swaps: cswaps, source: "chain" };
       } catch (e) { tape = { swaps: [], source: null }; }
     }
     if (!live(myGen, uiGen)) return;
@@ -125,7 +125,11 @@ var PoolDetailUI = (function () {
         });
       }
     } catch (e) { synthLevels = null; }
-    chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels);
+    /* Late-tape hook: historyPane (built below) registers setTape here so the
+     * background deepenPool can fill the list when chain-first came up empty.
+     * Declared before chartPane — the background resolves after both ran. */
+    var histHook = {};
+    chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook);
     var acts = doc.createElement("section"); acts.className = "mkt-side"; desk.appendChild(acts);
     acts.appendChild(u.el(doc, "h2", t("pool.stake_title", "Stake / unstake")));
     stakeBoxes(doc, acts, r, uiGen);
@@ -138,13 +142,13 @@ var PoolDetailUI = (function () {
     depthPane(doc, book, r, synthLevels);
     var hist = doc.createElement("section"); hist.className = "mkt-trades"; desk.appendChild(hist);
     hist.appendChild(u.el(doc, "h2", t("pool.pool_history_title", "Pool history")));
-    historyPane(doc, hist, r, tape, myGen, uiGen);
+    historyPane(doc, hist, r, tape, myGen, uiGen, histHook);
   }
   /* Pool chart buckets (swap-tape timeframes; chain buckets API has no pool
    * leg, so bucketing happens here over enriched swaps). */
   var POOL_BUCKETS = [60, 300, 900, 1800, 3600];
 
-  function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels) {
+  function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook) {
     /* Swap-price candles (ES adapter -> chain fallback) drawn through the
      * SHARED MarketInd stack (timeframes + dropdown menu + LWC price pane +
      * oscillator sub-panes) — the pool desk reads exactly like the exchange
@@ -272,7 +276,20 @@ var PoolDetailUI = (function () {
       fetchPoolMap(doc, P, r, myGen, uiGen);
     } catch (e) { /* desk stands without the pool map */ }
     function rebucket() {
-      P.candles = { buckets: PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB) };
+      /* Lazy-deep merge (2026-10-01 audit): background ES buckets cached by
+       * deepenPool merge UNDER chain authority (fresh P.swaps win every
+       * overlap — same chain-wins rule as the market desk). Bucket-keyed:
+       * a timeframe switch resets the cache, so stale-bucket merges are
+       * impossible. MarketFills missing -> chain buckets stand. */
+      var chainBuckets = PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB);
+      var buckets = chainBuckets;
+      try {
+        if (P.esBuckets && P.esBuckets.length && P._deepBucket === P.bucket &&
+            typeof MarketFills !== "undefined" && MarketFills && typeof MarketFills.mergeDeep === "function") {
+          buckets = MarketFills.mergeDeep(chainBuckets, P.esBuckets, 2000);
+        }
+      } catch (e) { buckets = chainBuckets; }
+      P.candles = { buckets: buckets };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {
         var liveSuffix = (typeof poolLive !== "undefined" && poolLive && poolLive.live) ? " · live" : "";
@@ -280,16 +297,30 @@ var PoolDetailUI = (function () {
       } catch (e) { /* count stands */ }
     }
     var swaps = (tape && tape.swaps) || [];
-    if (!tape || !tape.source) { note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."); return; }
-    if (!swaps.length) { note.textContent = t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap."); return; }
+    if (!tape || !tape.source) {
+      note.textContent = t("pool_detail.s2", "Pool history unavailable (chain-only; no external index).");
+      deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+      return;
+    }
+    if (!swaps.length) {
+      note.textContent = t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap.");
+      deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+      return;
+    }
     P.swaps = swaps;
     note.textContent = swaps.length + " swaps. " + (tape.source === "es"
       ? t("pool.hist_source_es", "Swap history via community index.")
       : t("pool.hist_source_chain", "Swap history via chain."));
     try {
-      MarketInd.paintTimeframes(doc, P, function () { if (live(myGen, uiGen)) rebucket(); });
+      MarketInd.paintTimeframes(doc, P, function () {
+        if (!live(myGen, uiGen)) return;
+        P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+        rebucket();
+        deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+      });
     } catch (e) { /* default bucket stands */ }
     rebucket();
+    deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
     /* Pool live tip (deep-candles 5/5): head-block poll + get_block op-63
      * scan. Each new head is fetched once; its transactions are scanned for
      * [63, body] rows in this pool, built into swap discretes (same shape as
@@ -357,6 +388,63 @@ var PoolDetailUI = (function () {
       } catch (e) { /* poll skips */ }
     }
     try { poolTimer = setInterval(watchHead, 3500); } catch (e) { poolTimer = null; }
+  }
+  /* deepenPool: background ES depth for the pool chart (lazy-deep, 2026-10-01
+   * audit). The desk above already painted chain-first; this fetches the ES
+   * tape ONCE per bucket (2 pages / 1000 events max, ~1.5MB worst, typically
+   * 1 page — measured) and caches its candles for rebucket() to merge under
+   * chain authority. Tape rows stay chain (like the market desk's Recent
+   * tab); only the chart gains depth, and the source line flips to the
+   * existing community-index key. A chain-empty desk (lagging history api)
+   * also fills its tape + history list here. Any failure or empty ES page
+   * keeps the chain paint — never throws outward. No new i18n keys. */
+  function deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook) {
+    try {
+      if (P._deepFlight || P._deepDone) return;
+      if (typeof PoolHistory === "undefined" || !PoolHistory || typeof PoolHistory.swapsForPool !== "function") return;
+      var net = "mainnet";
+      try {
+        if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+          var st = Store.loadSettings();
+          if (st && (st.network === "testnet" || st.network === "mainnet")) net = st.network;
+        }
+      } catch (e) { /* mainnet default stands */ }
+      if (net !== "mainnet") return;
+      P._deepFlight = true;
+      PoolHistory.swapsForPool(r.id, 1000, { network: net, legA: r.asset_a_id, legB: r.asset_b_id }).then(function (res) {
+        P._deepFlight = false;
+        if (!live(myGen, uiGen)) return;
+        var swaps = (res && res.swaps) || [];
+        if (!swaps.length) return;
+        try { PoolHistory.enrich(swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b)); } catch (e) { /* tape renders unpriced */ }
+        var esBuckets = [];
+        try { esBuckets = PoolHistory.swapsToCandles(swaps, P.bucket, r.asset_b_id, P.precB); } catch (e) { esBuckets = []; }
+        if (!esBuckets.length) return;
+        if (!P.swaps.length) {
+          /* Chain was empty (lagging history api): adopt the ES tape for the
+           * list too (cap like the live tip), then paint timeframes + chart.
+           * Live-tip stays off here — parity with the old empty-tape path,
+           * which never reached the watchHead setup either. */
+          P.swaps = swaps.slice(0, 500);
+          try {
+            MarketInd.paintTimeframes(doc, P, function () {
+              if (!live(myGen, uiGen)) return;
+              P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+              rebucket();
+              deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+            });
+          } catch (e) { /* default bucket stands */ }
+          try {
+            if (histHook && typeof histHook.setTape === "function") histHook.setTape(P.swaps, "es");
+          } catch (e) { /* chart below still paints */ }
+        }
+        P.esBuckets = esBuckets;
+        P._deepBucket = P.bucket;
+        P._deepDone = true;
+        try { rebucket(); } catch (e) { /* chain paint stands */ }
+        try { note.textContent = P.swaps.length + " swaps. " + t("pool.hist_source_es", "Swap history via community index."); } catch (e) { /* count stands */ }
+      }).catch(function () { P._deepFlight = false; /* chain paint stands */ });
+    } catch (e) { /* deep is best-effort */ }
   }
   /* Theme token read (plain duplicate of the market-book.js helper —
    * doctrine prefers duplication over a shared chart abstraction). */
@@ -650,7 +738,7 @@ var PoolDetailUI = (function () {
     table.appendChild(tbody);
     return table;
   }
-  function historyPane(doc, hist, r, tape, myGen, uiGen) {
+  function historyPane(doc, hist, r, tape, myGen, uiGen, histHook) {
     /* Swap tape (Time / Price / Paid / Received / Account) + My-swaps
      * toggle — mirrors the market desk Recent/My tabs (same mkt-tabs
      * contract, same locked-hint). Rows come from the shared tape fetch
@@ -690,17 +778,29 @@ var PoolDetailUI = (function () {
     paint();
     var note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); poolBody.appendChild(note);
     poolBody.removeChild(note);
-    var swaps = (tape && tape.swaps) || [];
-    if (!tape || !tape.source) {
-      poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
-    } else if (!swaps.length) {
-      poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap."), "muted"));
-    } else {
-      var scroller = doc.createElement("div");
-      scroller.className = "pool-hist-scroll";
-      scroller.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
-      poolBody.appendChild(scroller);
+    /* paintTape: render one tape state into poolBody (extracted so the
+     * background deepenPool can late-fill the list when chain-first came up
+     * empty — same three branches, same keys, no new words). */
+    function paintTape(swaps, source) {
+      while (poolBody.firstChild) poolBody.removeChild(poolBody.firstChild);
+      if (!source) {
+        poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
+      } else if (!swaps.length) {
+        poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap."), "muted"));
+      } else {
+        var scroller = doc.createElement("div");
+        scroller.className = "pool-hist-scroll";
+        scroller.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
+        poolBody.appendChild(scroller);
+      }
     }
+    paintTape((tape && tape.swaps) || [], tape ? tape.source : null);
+    try {
+      if (histHook) histHook.setTape = function (swaps, source) {
+        if (!live(myGen, uiGen)) return;
+        paintTape(swaps || [], source || null);
+      };
+    } catch (e) { /* initial paint stands */ }
     myBody.appendChild(u.el(doc, "p", t("pool.my_hist_hint", "Open My swaps to see your fills in this pool."), "muted"));
     /* loadMy: My-swaps tab body (typed-account preview + locked hint +
      * unlocked wallet tape, filtered to this pool). Params: container els,

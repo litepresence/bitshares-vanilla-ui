@@ -734,6 +734,10 @@ var MarketDesk = (function () {
         }
       } catch (e) { /* DOM gone */ }
     }
+    /* Exposed for the module-level deepenOnce below (lazy-deep): fill() and
+     * deepenOnce live outside this closure, so the nested paintNote rides
+     * the state bag like state.redraw above. Never reassigned. */
+    state.paintNote = paintNote;
 
     /* LWC panes hold canvases + listeners outside the canvas 2D path, so
      * route change must removePane them (clearRoot alone leaks listeners).
@@ -1116,6 +1120,49 @@ var MarketDesk = (function () {
     });
   }
 
+  /* Lazy-deep backfill (2026-10-01 audit): after the chain-first candle
+   * paint, fetch the background ES buckets ONCE per pair+bucket, then re-run
+   * the chain candles (which merge the cache under fresh authority) and
+   * repaint with the "deep" note. Interval refreshes and live-tip polls never
+   * call this — they stay chain-only, so an idle desk costs ~0 ES bytes
+   * after the first deepen. Params: state (desk), b/q asset rows. Returns
+   * nothing. Never throws outward. */
+  function deepenOnce(state, b, q) {
+    try {
+      var key = b.id + "|" + q.id + "|" + state.bucket;
+      if (state.deepKey === key || state._deepFlight === key) return;
+      if (typeof Market === "undefined" || !Market || typeof Market.deepen !== "function") return;
+      state._deepFlight = key;
+      Market.deepen(b.id, q.id, state.bucket).then(function (d) {
+        if (state._deepFlight === key) state._deepFlight = null;
+        if (!d) return;
+        var nowKey = b.id + "|" + q.id + "|" + state.bucket;
+        if (nowKey !== key) return; // bucket/pair moved on mid-flight
+        try {
+          if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
+        } catch (e) { /* headless: keep going */ }
+        state.deepKey = key;
+        var count = 200;
+        try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) count = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
+        Market.candles(b.id, q.id, state.bucket, count).then(function (c2) {
+          var k2 = b.id + "|" + q.id + "|" + state.bucket;
+          if (k2 !== key) return;
+          try {
+            if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
+          } catch (e) { /* headless: keep going */ }
+          state.candles = c2;
+          try { state.deep = !!(c2 && c2.deep); } catch (err) { state.deep = false; }
+          try { MarketInd.maybeDraw(state); } catch (err) { /* chart best-effort */ }
+          /* paintNote rides state (module scope cannot see the nested
+           * closure); missing means a torn-down desk — never throws. */
+          try { if (typeof state.paintNote === "function") state.paintNote(); } catch (err) { /* note best-effort */ }
+        }).catch(function () { /* chain paint stands */ });
+      }).catch(function () {
+        if (state._deepFlight === key) state._deepFlight = null;
+      });
+    } catch (e) { /* deep is best-effort */ }
+  }
+
   /* Fill every section from the chain; sections fail inline, never blank.
    * Strip/timeframe/chart bodies live in market-ind.js (MarketInd.*) — the
    * chain calls and section wiring stay here, exactly as before. */
@@ -1219,10 +1266,17 @@ var MarketDesk = (function () {
 
     Market.candles(b.id, q.id, state.bucket, MarketInd.CANDLE_COUNT).then(function (c) {
       state.candles = c;
+      try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
       MarketInd.maybeDraw(state);
+      /* Re-paint the deep/live suffix fill() itself reset above: the note
+       * stays honest across 15s refreshes even with no live-push traffic. */
+      try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
+      deepenOnce(state, b, q);
     }).catch(function () {
       state.candles = { buckets: [], closes: [] };
+      try { state.deep = false; } catch (e) { /* flag best-effort */ }
       MarketInd.maybeDraw(state);
+      try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
     });
   }
 

@@ -344,13 +344,27 @@ var Market = (function () {
     throw new Error("candle backend missing: js/market-candles.js failed to load.");
   }
 
-  /* See the timeframes note above: candles live in market-candles.js. */
+  /* See the timeframes note above: candles live in market-candles.js.
+   * candles() paints chain-first (never waits on ES); deepen() below fetches
+   * the background ES backfill once per pair+bucket (lazy-deep, 2026-10-01
+   * audit) — the desk calls it after the chain paint, never on polls. */
   async function candles(baseId, quoteId, bucketSec, count) {
     if (typeof MarketCandles !== "undefined" && MarketCandles &&
         typeof MarketCandles.candles === "function") {
       return MarketCandles.candles(baseId, quoteId, bucketSec, count);
     }
     throw new Error("candle backend missing: js/market-candles.js failed to load.");
+  }
+
+  /* Background ES backfill (see MarketCandles.deepen): resolves {key, fills}
+   * when fresh ES buckets landed for this pair+bucket, null when there is
+   * nothing to merge (testnet / already deep / ES down). Never rejects. */
+  async function deepen(baseId, quoteId, bucketSec) {
+    if (typeof MarketCandles !== "undefined" && MarketCandles &&
+        typeof MarketCandles.deepen === "function") {
+      return MarketCandles.deepen(baseId, quoteId, bucketSec);
+    }
+    return null;
   }
 
   /* Read-only open limit orders for the unlocked wallet's account
@@ -378,6 +392,7 @@ var Market = (function () {
     trades: trades,
     stats: stats,
     candles: candles,
+    deepen: deepen,
     timeframes: timeframes,
     myOrders: myOrders
   };

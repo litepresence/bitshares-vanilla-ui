@@ -35,13 +35,17 @@ var MarketFills = (function () {
   var ES_URL = "https://es.bitshares.dev/bitshares-*/_search";
   var ES_TIMEOUT_MS = 15000;
   var ES_SIZE = 500;
-  /* Capped pagination: 500/page, max 4 pages = 2000 events (candle cap).
+  /* Capped pagination: 500/page, max 2 pages = 1000 events (deep:CANDLES
+   * window is 200 buckets — 1000 fills cover it generously; the 4-page/2000
+   * cap measured ~3MB per fill (762KB/page on 1.19.2, 672KB on BTS_CNY,
+   * 2026-10-01) and no caller needs 2000 events for 200 buckets.
    * Pattern: reference/bitshares-historical-charts main.js:214-261
    * (queryElasticsearchWithPagination — search_after loop, short-page stop).
    * Our _source query bodies stay; only the search_after + cap + total
-   * budget are ported. */
-  var ES_MAX_PAGES = 4;
-  var ES_MAX_EVENTS = 2000;
+   * budget are ported. Foreground never waits on ES (lazy-deep: candles
+   * paint chain-first, this adapter runs background-only via deepen). */
+  var ES_MAX_PAGES = 2;
+  var ES_MAX_EVENTS = 1000;
 
   /* Fixed decimals for BigInt price strings (follows #1 Price.toReal
    * reward `parseFloat(real.toFixed(8))`, MarketClasses.js:284). */
@@ -124,9 +128,9 @@ var MarketFills = (function () {
     } catch (e) { return null; }
   }
 
-  /* ES adapter: up to `limit` recent fills, newest first (capped at the
-   * candle cap 2000). Capped search_after pagination: 500/page, max 4
-   * pages = 2000 raw events; strict leg guards apply per page (esFill);
+  /* ES adapter: up to `limit` recent fills, newest first (capped at 1000 —
+   * the deep-candle window is 200 buckets). Capped search_after pagination:
+   * 500/page, max 2 pages = 1000 raw events; strict leg guards apply per
    * stops early when a page returns <500 raw hits or the want is reached.
    * 15s TOTAL budget across pages (one deadline, not per page). Rejects
    * on ANY failure (network/CORS/timeout/shape) — the caller falls back

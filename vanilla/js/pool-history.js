@@ -26,13 +26,16 @@ var PoolHistory = (function () {
   var ES_URL = "https://es.bitshares.dev/bitshares-*/_search";
   var ES_TIMEOUT_MS = 15000;
   var ES_SIZE = 500;
-  /* Capped pagination: 500/page, max 4 pages = 2000 events (candle cap).
-   * Pattern: reference/bitshares-historical-charts main.js:214-261
+  /* Capped pagination: 500/page, max 2 pages = 1000 events (pool chart
+   * window is 200 buckets — 1000 swaps cover it; the 4-page/2000 cap
+   * measured ~3MB per fill, 2026-10-01). Pattern:
+   * reference/bitshares-historical-charts main.js:214-261
    * (queryElasticsearchWithPagination — search_after loop, short-page stop).
    * Our _source query bodies stay; only the search_after + cap + total
-   * budget are ported. */
-  var ES_MAX_PAGES = 4;
-  var ES_MAX_EVENTS = 2000;
+   * budget are ported. Foreground never waits on ES (lazy-deep: pool desk
+   * paints chain-first, this adapter runs background-only). */
+  var ES_MAX_PAGES = 2;
+  var ES_MAX_EVENTS = 1000;
 
   /* Chain fallback bounds: newest-first block scan, concurrent batches. */
   var SCAN_BATCH = 8;
@@ -96,8 +99,8 @@ var PoolHistory = (function () {
     } catch (e) { return null; }
   }
 
-  /* ES adapter: up to `limit` recent swaps, newest first (capped at 2000).
-   * Capped search_after pagination: 500/page, max 4 pages = 2000 raw
+  /* ES adapter: up to `limit` recent swaps, newest first (capped at 1000).
+   * Capped search_after pagination: 500/page, max 2 pages = 1000 raw
    * events; strict pool guards apply per page (esSwap); stops early when
    * a page returns <500 raw hits or the want is reached. 15s TOTAL budget
    * across pages (one deadline, not per page). Rejects on ANY failure
@@ -163,13 +166,19 @@ var PoolHistory = (function () {
 
   /* Chain fallback: get_liquidity_pool_history rows (op + executed result,
    * proven live 2026-09-28) — newest first already. Pool filter is exact
-   * (rows carry .pool). Rows without results are skipped, never guessed. */
+   * (rows carry .pool). Rows without results are skipped, never guessed.
+   * Chain asserts limit <= 101 (measured 2026-10-01 on api.bitshares.dev:
+   * limit 200 rejects, limit 100 returns 100 rows in 55ms) — clamp here so
+   * the chain-first paint can never throw on the desk's want. */
   function chainSwaps(poolId, limit) {
     assertPoolId(poolId);
-    return Pool.history(poolId, Math.min(500, Math.max(limit, 1))).then(function (rows) {
+    var want = limit === undefined ? 100 : Math.floor(limit);
+    if (!(want >= 1)) want = 100;
+    if (want > 101) want = 101;
+    return Pool.history(poolId, want).then(function (rows) {
       var out = [];
       (rows || []).forEach(function (h) {
-        if (out.length >= limit) return;
+        if (out.length >= want) return;
         try {
           var raw = h.raw || {};
           var op = raw.op || {};
@@ -371,6 +380,7 @@ var PoolHistory = (function () {
   return {
     swapsForPool: swapsForPool, chainSwaps: chainSwaps, esSwaps: esSwaps,
     enrich: enrich, priceHuman: priceHuman, swapsToCandles: swapsToCandles,
+    filterLegs: filterLegs,
     synthBook: synthBook, ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     ES_SIZE: ES_SIZE, ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
     _test: { esSwap: esSwap, esQuery: esQuery, filterLegs: filterLegs, SLICES: SLICES }

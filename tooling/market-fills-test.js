@@ -63,7 +63,9 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
  * plus a fast fetch stub so ES degrades to chain without network). */
 (async () => {
   /* 14-18: ES capped search_after pagination (offline, fetch stubbed).
-   * 500/page, max 4 pages = 2000 events, 15s total budget. */
+   * 500/page, max 2 pages = 1000 events, 15s total budget (lazy-deep audit
+   * 2026-10-01: 672KB/page measured — the 4-page/2000 cap cost ~3MB per fill
+   * and no caller needs 2000 events for a 200-bucket window). */
   function mkPageHit(tag, idx) {
     return {
       _source: {
@@ -81,7 +83,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
   }
   try {
     var _f0 = globalThis.fetch;
-    var pages = [pageOf(500, "p1"), pageOf(500, "p2"), pageOf(2, "p3")];
+    var pages = [pageOf(500, "p1"), pageOf(2, "p3")];
     var calls = 0, bodies = [];
     globalThis.fetch = function (url, opts) {
       calls++;
@@ -90,14 +92,14 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits } }); } });
     };
     var pres = await MF.esFills("1.3.0", "1.3.113", 2000);
-    eq(pres.fills.length, 1002, "es pagination 3-page merge");
-    eq(calls, 3, "es pagination short-page stop (3rd <500)");
+    eq(pres.fills.length, 502, "es pagination 2-page merge");
+    eq(calls, 2, "es pagination short-page stop (2nd <500)");
     var b2 = {};
     try { b2 = JSON.parse(bodies[1] || "{}"); } catch (x) { b2 = {}; }
     eq(!!b2.search_after, true, "es pagination uses search_after");
     eq(JSON.stringify(b2.search_after), JSON.stringify(["p1-499"]), "es pagination search_after = last sort");
     if (_f0 !== undefined) { globalThis.fetch = _f0; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL es pagination 3-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es pagination 2-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
   try {
     var _f1 = globalThis.fetch;
     var c1 = 0;
@@ -119,10 +121,59 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits } }); } });
     };
     var r2 = await MF.esFills("1.3.0", "1.3.113", 5000);
-    eq(c2, 4, "es cap respects max 4 pages");
-    eq(r2.fills.length <= 2000, true, "es cap respects 2000 events");
+    eq(c2, 2, "es cap respects max 2 pages");
+    eq(r2.fills.length <= 1000, true, "es cap respects 1000 events");
     if (_f2 !== undefined) { globalThis.fetch = _f2; } else { delete globalThis.fetch; }
   } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  /* 19-21: lazy-deep — candles() resolves chain-first even when ES hangs
+   * forever, and deepen() merges the backfill when ES lands (offline). */
+  try {
+    var _f3 = globalThis.fetch;
+    globalThis.fetch = function () { return new Promise(function () {}); };
+    var slotISO = new Date(Math.floor(Date.now() / 3600000) * 3600000).toISOString().slice(0, -5);
+    function chainStub() {
+      return {
+        history: function () { return Promise.resolve(2); },
+        db: function () { return Promise.resolve(1); },
+        call: function (api, m) {
+          if (m === "get_market_history_buckets") return Promise.resolve([3600]);
+          if (m === "get_market_history") return Promise.resolve([{
+            key: { open: slotISO },
+            open_base: "100000", open_quote: "5000",
+            close_base: "100000", close_quote: "5000",
+            high_base: "100000", high_quote: "5000",
+            low_base: "100000", low_quote: "5000",
+            base_volume: "100000", quote_volume: "5000"
+          }]);
+          if (m === "get_assets") return Promise.resolve([{ precision: 5 }, { precision: 4 }]);
+          return Promise.resolve([]);
+        }
+      };
+    }
+    globalThis.Chain = chainStub();
+    delete require.cache[require.resolve("/workspace/vanilla/js/market-candles.js")];
+    var MC2 = require("/workspace/vanilla/js/market-candles.js");
+    var rc = await Promise.race([
+      MC2.candles("1.3.0", "1.3.113", 3600, 5),
+      new Promise(function (_, rej) { setTimeout(function () { rej(new Error("candles waited on ES")); }, 3000); })
+    ]);
+    eq(Array.isArray(rc.buckets), true, "lazy candles resolve with hanging ES");
+    eq(rc.deep, false, "lazy candles chain-only while ES hangs");
+    eq(rc.buckets.length, 1, "lazy candles paint the chain row (leading gaps dropped)");
+    if (_f3 !== undefined) { globalThis.fetch = _f3; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL lazy candles hang\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  try {
+    var _f4 = globalThis.fetch;
+    var hits2 = pageOf(2, "d1");
+    globalThis.fetch = function () {
+      return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits2 } }); } });
+    };
+    var dd = await MC2.deepen("1.3.0", "1.3.113", 3600);
+    eq(dd && dd.fills, 2, "deepen fetches ES backfill");
+    var rd = await MC2.candles("1.3.0", "1.3.113", 3600, 5);
+    eq(rd.deep, true, "candles merge the deep cache");
+    if (_f4 !== undefined) { globalThis.fetch = _f4; } else { delete globalThis.fetch; }
+  } catch (e) { fail++; console.log("FAIL deepen merge\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
   try {
     var _fetch = globalThis.fetch;
     globalThis.fetch = function () { return Promise.reject(new Error("no net in test")); };

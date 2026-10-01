@@ -17,8 +17,15 @@
  *   delegates its timeframes/candles to this file, API unchanged).
  * Extended by: dex-ux plots task (AFK round — proposal 3 VWAP math,
  *   chain-history only, ES refused).
- * Extended by: deep-candles plan Task 2 (ES deep merge to 2000, chain wins;
- *   MarketFills + Store consumed guarded, ES throw degrades to chain-only).
+   * Extended by: deep-candles plan Task 2 (ES deep merge, chain wins;
+   *   MarketFills + Store consumed guarded, ES throw degrades to chain-only).
+   * Lazy-deep (2026-10-01 audit): candles() NEVER waits on ES — it paints
+   *   chain-first (chain get_market_history: 42ms/2KB vs ES page: ~1s/670KB
+   *   measured) and merges background ES buckets fetched by deepen() via the
+   *   one-entry _deepCache below (fresh chain buckets stay authoritative).
+   *   deepen() runs once per pair+bucket (desk-guarded), ES capped 2 pages /
+   *   1000 events (~1.4MB worst, typically 1 page); interval refreshes and
+   *   live-tip polls stay chain-only, so idle desks cost ~0 bytes.
  */
 var MarketCandles = (function () {
   "use strict";
@@ -78,6 +85,14 @@ var MarketCandles = (function () {
    * only: cleared on settle; the resolved list still caches in
    * _bucketsCache. Behavior identical. */
   var _bucketsPending = null;
+
+  /* Background ES buckets for the lazy-deep merge (one entry: the pair +
+   * bucket the desk last deepened). Written by deepen(), read synchronously
+   * by candles() — the only cross-call state, cleared on network/pair flip
+   * bucket the desk last deepened). Written by deepen(), read synchronously
+   * by candles() — the only cross-call state, cleared on network/pair flip
+   * by key mismatch (a stale key simply never matches). */
+  var _deepCache = null;
 
   /* Supported bucket sizes in seconds from the live history api
    * (get_market_history_buckets, api.hpp:229). Sorted ascending, cached
@@ -281,11 +296,46 @@ var MarketCandles = (function () {
       out.push(entry);
       closes.push(prevNum); // pixels only, not money (prevNum tracks this slot's close)
     }
-    /* Deep backfill (deep-candles plan Task 2): ES op-4 fills bucketed
-     * locally on the same slot grid, merged chain-wins, capped 2000.
-     * Mainnet only (the community index is mainnet-only); any failure
-     * degrades to chain-only with deep=false, never a throw. */
+    /* Deep backfill, lazy (2026-10-01 audit): merge the background ES buckets
+     * fetched by deepen() UNDER fresh chain authority (chain wins every
+     * overlap, same mergeDeep rule as before). Synchronous cache read — this
+     * function never waits on the network, so first candles paint at chain
+     * speed (~50ms) and deepen visibly the chart when ES lands. Mainnet only
+     * (the community index is mainnet-only); empty cache = chain-only with
+     * deep=false, never a throw. */
     var deep = false;
+    try {
+      var dkey = baseId + "|" + quoteId + "|" + bucket;
+      if (_deepCache && _deepCache.key === dkey &&
+        Array.isArray(_deepCache.esBuckets) && _deepCache.esBuckets.length > 0 &&
+        typeof MarketFills !== "undefined" && MarketFills &&
+        typeof MarketFills.mergeDeep === "function") {
+        out = MarketFills.mergeDeep(out, _deepCache.esBuckets, 2000);
+        closes = out.map(function (e) {
+          var n = Number(e && e.close);
+          return isNaN(n) ? null : n; // pixels only, not money
+        });
+        deep = true;
+      }
+    } catch (e) { deep = false; /* cache merge never breaks chain paint */ }
+    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep };
+  }
+
+  /* deepen: background ES backfill for one pair+bucket (lazy-deep, Playwright
+   *   desk calls this ONCE per pair+bucket after the chain-first paint; the
+   *   next candles() call merges the result under fresh chain authority).
+   * ES want is 1000 fills (2 pages max, ~1.4MB worst, typically 1 page —
+   *   measured 2026-10-01); the 200-bucket window needs far fewer. Mainnet
+   *   only (community index is mainnet-only); any failure or empty ES page
+   *   resolves null and the desk keeps its chain-only paint — never rejects,
+   *   never throws outward (bad bucket still throws like candles()).
+   * Returns {key, fills} on success (fills = raw ES fill count, newest
+   *   first) or null when there is nothing to merge. Pure side effect: one
+   *   _deepCache entry; no DOM, no storage. */
+  async function deepen(baseId, quoteId, bucketSec) {
+    var bucket = Math.floor(bucketSec);
+    if (!(bucket >= 1)) throw new Error("bad-bucket");
+    var key = baseId + "|" + quoteId + "|" + bucket;
     try {
       var net = "mainnet";
       try {
@@ -294,26 +344,23 @@ var MarketCandles = (function () {
           if (st && (st.network === "testnet" || st.network === "mainnet")) net = st.network;
         }
       } catch (e) { /* mainnet default stands */ }
-      if (net === "mainnet" && typeof MarketFills !== "undefined" && MarketFills &&
-        typeof MarketFills.fillsForMarket === "function" &&
-        typeof MarketFills.fillsToCandles === "function" &&
-        typeof MarketFills.mergeDeep === "function") {
-        var fres = await MarketFills.fillsForMarket(baseId, quoteId, 500, { network: net });
-        var fills = fres && fres.fills ? fres.fills : [];
-        if (Array.isArray(fills) && fills.length > 0) {
-          var esBuckets = MarketFills.fillsToCandles(fills, bucket, baseId, precs[baseId], precs[quoteId], quoteId);
-          if (Array.isArray(esBuckets) && esBuckets.length > 0) {
-            out = MarketFills.mergeDeep(out, esBuckets, 2000);
-            closes = out.map(function (e) {
-              var n = Number(e && e.close);
-              return isNaN(n) ? null : n; // pixels only, not money
-            });
-            deep = true;
-          }
-        }
+      if (net !== "mainnet") {
+        if (_deepCache && _deepCache.key === key) _deepCache = null;
+        return null;
       }
-    } catch (e) { deep = false; /* ES throw → chain-only */ }
-    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep };
+      if (_deepCache && _deepCache.key === key) return null; // already deep
+      if (typeof MarketFills === "undefined" || !MarketFills ||
+        typeof MarketFills.fillsForMarket !== "function" ||
+        typeof MarketFills.fillsToCandles !== "function") return null;
+      var fres = await MarketFills.fillsForMarket(baseId, quoteId, 1000, { network: net });
+      var fills = fres && fres.fills ? fres.fills : [];
+      if (!Array.isArray(fills) || fills.length === 0) return null;
+      var precs = await _precisions([baseId, quoteId]);
+      var esBuckets = MarketFills.fillsToCandles(fills, bucket, baseId, precs[baseId], precs[quoteId], quoteId);
+      if (!Array.isArray(esBuckets) || esBuckets.length === 0) return null;
+      _deepCache = { key: key, esBuckets: esBuckets };
+      return { key: key, fills: fills.length };
+    } catch (e) { return null; /* ES/chain throw → chain-only stands */ }
   }
 
   /* Session VWAP + per-bucket spread band (dex-ux proposal 3 — the portable
@@ -371,6 +418,7 @@ var MarketCandles = (function () {
   return {
     timeframes: timeframes,
     candles: candles,
+    deepen: deepen,
     vwap: vwap
   };
 })();
