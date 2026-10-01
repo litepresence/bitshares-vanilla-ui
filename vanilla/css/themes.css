@@ -108,36 +108,79 @@
   --button-bg-deep: #0B5C7E;
   --icon-filter: none;
 }
-/* dex-ux-theme (dark): sampled from /workspace/reference/bitshares-dex-ux
- * (TradingView-dark family). Sample log, file:line -> token:
- * assets/css/style.css:2806 (#dark header bg #131722) -> --bg/--panel/--header-bg
- * assets/css/style.css:2826 (#dark .market-pairs border #2a2e39) -> --border
- *   (also buttons.css:4 focus outline, :30 checked bg — the family border)
- * assets/css/style.css:2810 (#dark header nav a #ffffff) -> dark primary text;
- *   kept --text/--header-text #e0e3eb (softened white; #e0e3eb's heaviest
- *   dex-ux use is light-scope borders e.g. style.css:141 — documented, not
- *   hidden: pure #fff tested harsher, #e0e3eb stays readable at ~13:1)
- * assets/css/style.css:94 + :384 (muted copy #758696) -> --muted
- *   (placeholder #69727a :2862 and span #4f5966 stay unmapped by design)
- * assets/css/style.css:208 (.btn-2 bg #007bff, 29 hits: links/active/primary)
- *   -> --accent AND --button-bg (was BitShares #049cce leaking in)
- * style.css:2895 (#dark .green #26de81) + main.js:110 (candle up) -> --buy
- * style.css:2899 (#dark .red #ff231f) + main.js:111 (candle down) -> --sell
- * --warn/--danger keep BitShares status hues (weak dex-ux cues: amber #fbbc06
- *   x1, red-is-red already == --sell); status semantics, not dex-ux surface.
- * Unmapped dex-ux surfaces by design: #1c2030 sub-nav strip, #343a40 hover. */
+/* dex-ux-theme (dark): resampled from the Crypo designer template
+ * (/workspace/reference/crypo/crypo/Crypo/ — HEX VALUES ONLY, no code/markup/
+ * JS/fonts/images copied). Structure read first: exchange-dark.html
+ * (body#dark + header.dark-bb, .market-pairs search/nav/table, .main-chart,
+ * .market-trade Limit/Market tabs + .market-trade-buy/.market-trade-sell
+ * panels with .btn.buy/.btn.sell) and market-overview-dark.html (dark
+ * TradingView embeds: gridLineColor rgba(42,46,57,1) == #2a2e39 family,
+ * plotLine rgba(25,118,210,1)/fill rgba(33,150,243,0.12) — blue-line cues,
+ * not new tokens). Sample log, assets/css/style.css:line -> token
+ * (assets/scss/theme/_dark.scss mirrors each rule):
+ * style.css:1772 (#dark, #dark header background) -> --bg/--header-bg
+ * style.css:1793 (.market-pairs bg) + :1964 (.market-trade bg) + :1954
+ *   (.market-order bg) + _dark.scss:17-20,153-156,146-148 -> --panel
+ * style.css:2008 (#darkDepthChart bg) + _dark.scss:189-191 -> --plot-bg
+ *   (Crypo chart ground == panel ground; grid #2a2e39 gives definition)
+ * style.css:1847 (tbody tr) + :1776 (header nav a) + :1879 (.market-pairs
+ *   input) + _dark.scss:61-63,5-7,86-88 -> --text #ffffff (17.90:1 on --bg)
+ * style.css:1977 (.market-trade p) + :1950 (.market-news strong/a) + :2139
+ *   (.error-page) + _dark.scss:164-166,142-145,302-305 -> --muted #c5cbce
+ *   (10.92:1 on --bg). REJECTED for muted body copy: #4f5966 table-header/
+ *   nav tone (:1852,:1898,:1973 — 2.52:1 on --bg, FAIL) and #69727a input
+ *   placeholder (:1828 — 3.66:1, FAIL) stay unmapped header/placeholder-only
+ *   by design; #758696 header-icon tone stays unmapped (light-scope rule).
+ * style.css:1780 (header nav hover) + :1788 (nav-item.active) + :193/:208
+ *   (.btn-1/.btn-2 link + primary) + _dark.scss:8-16 -> --accent AND
+ *   --button-bg #007bff (link 4.50:1 on --bg, at the AA threshold)
+ * style.css:208 (.btn-2 white on blue) + :1680/:1687 (buy/sell buttons) ->
+ *   --accent-text #ffffff (white-on-#007bff 3.98 measured — button/large
+ *   use, the same Crypo pattern, not body copy)
+ * style.css:202 (.btn-1:hover/.btn-2:hover) -> --button-bg-deep #0069d9
+ *   (white-on 5.22:1; replaces the non-Crypo #0062cc)
+ * style.css:1861 (.green) + :1097 (button.buy) + :1998 (trade-buy hover) +
+ *   _dark.scss:72-74,181-184 -> --buy #26de81 (10.10:1) AND --live (Crypo
+ *   has no separate connected-dot — the #0089ff pulse :285 is
+ *   notification-only, unmapped; live stays trade-green for the footer
+ *   open-state, as before)
+ * style.css:1865 (.red) + :1107 (button.sell) + :2003 (trade-sell hover) ->
+ *   --sell #ff231f (4.70:1)
+ * style.css:467 (dropdown icon amber — the template's only amber) ->
+ *   --warn #fbbc06 (10.48:1; replaces BitShares #fcab53 leak)
+ * style.css:497 (profile-nav logout red) + :501 (hover) -> --danger #f74745
+ *   (5.06:1; replaces BitShares #e3745b leak — kept distinct from --sell
+ *   #ff231f: Crypo itself uses both reds, trade-side vs account-danger)
+ * style.css:1792 (.market-pairs border) + :145 (.dark-bb header rule) +
+ *   :1986 (.market-trade input) + _dark.scss:17-20 -> --border #2a2e39
+ *   (also Crypo's input ground :1875/:1987/:2104 — inputs sit on --border,
+ *   no new token needed; white-on-#2a2e39 13.56:1)
+ * style.css:1776 (header nav a) -> --header-text #ffffff (was softened
+ *   #e0e3eb; Crypo dark headers are pure white)
+ * style.css:1869 (.market-pairs .nav) + :1883 (.heading) + :1914
+ *   (.market-history .nav) + _dark.scss:78-80,89-92,114-116 ->
+ *   --panel-deep #1c2030 (nav-strip surface; rows LIFT since --bg==--panel).
+ *   Unmapped by design (no new tokens): #1e222d markets-container/wallet/
+ *   settings card (:2059/:2148, _dark.scss:229-231,311-313 — near-identical
+ *   card tone, striping stays on #1c2030), #ff231f63 depth bars (:1933),
+ *   #616d75 file-label, #ffffffbd footer link, #0089ff pulse (above).
+ * Table header/row: header #4f5966 unmapped (too dim, see --muted note);
+ *   row text #ffffff on #131722 (:1847/:1797), hover #2a2e39 (:1823);
+ *   Crypo dark has no alternating stripe (uniform tr) so striping reuses
+ *   the --panel-deep lift. No new tokens added — every Crypo dark surface
+ *   maps onto the existing token set. */
 :root[data-theme="dex-ux-theme"] {
-  --bg: #131722; --panel: #131722; --text: #e0e3eb; --muted: #758696;
+  --bg: #131722; --panel: #131722; --text: #ffffff; --muted: #c5cbce;
   --plot-bg: #131722;
-  --button-bg-deep: #0062cc;
+  --button-bg-deep: #0069d9;
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
-  --buy: #26de81; --sell: #ff231f; --warn: #fcab53; --danger: #e3745b;
+  --buy: #26de81; --sell: #ff231f; --warn: #fbbc06; --danger: #f74745;
   --live: #26de81;
-  --border: #2a2e39; --header-bg: #131722; --header-text: #e0e3eb;
-  /* --panel-deep: the theme's own sub-nav surface #1c2030 (style.css family;
-   * noted "unmapped by design" above — now mapped for striping only). DEVIATION
-   * recorded: --bg == --panel here, so no darker dex-ux surface exists; even
-   * rows LIFT instead of darken. Contrast preserved in both directions. */
+  --border: #2a2e39; --header-bg: #131722; --header-text: #ffffff;
+  /* --panel-deep: Crypo nav-strip surface #1c2030 (style.css:1869/.market-pairs
+   * .nav, :1883/.heading, :1914/.market-history .nav). DEVIATION recorded:
+   * --bg == --panel here, so no darker Crypo surface exists; even rows LIFT
+   * instead of darken. Contrast preserved in both directions. */
   --panel-deep: #1c2030;
   --toast-shadow: rgba(0, 0, 0, 0.5);
   /* Dark surfaces need light glyphs: full invert maps the vendored
