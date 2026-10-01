@@ -917,12 +917,21 @@ img, canvas, pre { max-width: 100%; }
     transform: translateY(0);
     box-shadow: none;
   }
-  /* 2. Table rows: --panel tint + accent left-edge bar reveal. The bar is a
-   * 3px background gradient (not a border, so no layout shift; not a
-   * box-shadow, so border-collapse tables still paint it), layered under the
-   * row — depth-bar children (.depth-bar) ride above it, untouched. */
+  /* 2. Table rows: --panel tint + accent left-edge bar reveal. The bar is an
+   * inset shadow on the FIRST CELL (not a background gradient on the row, and
+   * not a border, so no layout shift). A 3px gradient sized on <tr> floods the
+   * full row in Chromium border-collapse paint (verified 2026-10-01 headless
+   * 1243: hovered striped row filled solid accent, links unreadable
+   * blue-on-blue in ALL three themes) — background-size is lost when the row
+   * background propagates to cells, while a cell generates a real box whose
+   * inset shadow paints reliably above its (sticky, opaque) stripe bg. Cards
+   * keep the gradient (plain boxes paint it correctly). Depth-bar children
+   * (.depth-bar) ride above either treatment, untouched. Tokens only. */
   .node-table tbody tr, table.pools-table tbody tr,
-  tr.book-row, .book-row-card {
+  tr.book-row {
+    transition: background-color 120ms ease;
+  }
+  .book-row-card {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 0 100%;
     background-position: left center;
@@ -930,7 +939,15 @@ img, canvas, pre { max-width: 100%; }
     transition: background-color 120ms ease, background-size 120ms ease;
   }
   .node-table tbody tr:hover, table.pools-table tbody tr:hover,
-  tr.book-row:hover, .book-row-card:hover {
+  tr.book-row:hover {
+    background-color: var(--panel);
+  }
+  .node-table tbody tr:hover td:first-child,
+  table.pools-table tbody tr:hover td:first-child,
+  tr.book-row:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .book-row-card:hover {
     background-color: var(--panel);
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 3px 100%;
