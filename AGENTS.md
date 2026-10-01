@@ -27,6 +27,11 @@
 > that is Crypo, see §3.4). If a note cites one for the other's
 > job, it is wrong — fix the citation.
 > **This file is mission control.** Any agent working here reads this first.
+>
+> **Motto:** `vanilla/ is dependency-free and static-servable.`
+> (`docs/motto.png` — the one-line test every change must pass: if
+> `curl`-ing the folder doesn't include it, the app doesn't need it, and
+> `python3 -m http.server` must serve a working wallet.)
 
 > **Guiding principles (in priority order — all nine are binding):**
 > - **#1 — NEVER RE-CREATE #3583.** The replacement cannot rot the way

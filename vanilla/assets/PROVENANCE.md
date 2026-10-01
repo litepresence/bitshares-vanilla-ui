@@ -24,3 +24,11 @@ Deliberately NOT copied:
 SVG `http://` strings are XML namespace declarations only (`xmlns`), not
 remote references — verified. Styling that *uses* these images (buttons,
 backgrounds) still lands per-slice; these files are the raw material.
+
+Owner-supplied exception (2026-10-01):
+- `logo-ico-blue.png` (64×64, 3.5KB) REPLACED the reference byte-copy with
+  the owner's sky-blue BitShares mark (1050² source `bitshares.png`,
+  downscaled via ffmpeg, transparency kept). Same filename + same header
+  slot (`index.html:26`, `dashboard-ui.js:279`), so all consumers update
+  with no code change. Rationale: project branding for bitshares-vanilla-ui;
+  retro parity unaffected (same mark, same 40px header height).
