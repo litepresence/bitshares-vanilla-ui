@@ -4,7 +4,8 @@
  * formatting. Consumes: globals BRAINKEY_DICT (js/data/brainkey-dict.js) and
  * nobleGetPublicKey (js/vendor/noble-classic.js). Load order in index.html:
  * noble-classic.js, brainkey-dict.js, then this file. Side effects: none
- * beyond the `Crypto` global. Created for slice-02-wallet Task 3.
+ * beyond the `Crypto` global. Created by: building-vanilla-slices skill,
+ * slice-02-wallet plan Task 3.
  *
  * Provenance / credits:
  * - Brainkey normalize + sha512(seq) chain + fromSeed formulas follow the

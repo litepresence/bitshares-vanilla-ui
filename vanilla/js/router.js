@@ -27,6 +27,8 @@ var Router = (function () {
    * match en.json verbatim (drift check compares source text, not \\uXXXX). */
   function notPortedSuffix() { return t("shell.not_ported_suffix", " — not yet ported; tracked in slice N"); }
 
+  /* escapeHtml: &-<>"' escaping for interpolated shell strings. Params: s
+   * (any, stringified). Returns the escaped string. Fails: never. */
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
       if (c === "&") return "&amp;";
@@ -115,6 +117,9 @@ var Router = (function () {
     return false;
   }
 
+  /* renderHome: dashboard route (live DashboardUI when loaded, loading /
+   * fallback shells otherwise — never blank). Params: root (view element).
+   * Returns nothing. Fails: never throws (missing DOM is a no-op). */
   function renderHome(root) {
     if (ensureDashboard(root)) {
       DashboardUI.renderDashboard(root);
@@ -236,6 +241,8 @@ var Router = (function () {
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 
+  /* splitSegments: "/a/b" -> ["a","b"] (root -> []). Params: path string.
+   * Returns the segment array. Fails: never (falsy path yields []). */
   function splitSegments(path) {
     if (!path || path === "/") return [];
     return path.split("/").filter(function (s) { return s.length > 0; });

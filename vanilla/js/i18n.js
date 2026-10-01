@@ -1,7 +1,11 @@
 /* I18n: locale string resolution (registry + t() + locale->en->key fallback +
  * %(name)s interpolation + Intl wrappers + dict cache + Store-envelope pref).
- * Consumes locales/*.json + localStorage. No view DOM; callers toast on
- * {ok:false}. Slice-17. Plurals deferred (batch-1 needs none). Failures are
+ * Owns: locale registry (code -> nested dict), current-locale tag, dict
+ *   fetch/cache/pref helpers, t()/setLocale()/loadCached() entry points.
+ * Consumes locales/*.json + localStorage. Side effects: in-memory registry +
+ *   localStorage pref/cache writes only; no view DOM (callers toast on
+ * {ok:false}). Created by: building-vanilla-slices skill, slice-17-i18n plan.
+ * Slice-17. Plurals deferred (batch-1 needs none). Failures are
  * {ok:false} ('bad-locale' | 'fetch-failed'), never throws. */
 var I18n = (function () {
   "use strict";
@@ -87,6 +91,9 @@ var I18n = (function () {
     } catch (e) { return "en"; }
   }
 
+  /* writePref: persist the locale choice (Store envelope + standalone key).
+   * Params: code (shipped locale code string). Returns nothing. Fails: never
+   * throws — blocked storage still leaves the in-memory locale applied. */
   function writePref(code) {
     try {
       if (typeof Store !== "undefined" && Store && typeof Store.saveSettings === "function") {
@@ -98,6 +105,9 @@ var I18n = (function () {
     } catch (e) { /* storage blocked: memory locale still applies */ }
   }
 
+  /* readCache: validated cached dict for a locale (version + locale tag must
+   * match). Params: code string. Returns the dict object or null on miss /
+   * mismatch / bad JSON. Fails: never throws. */
   function readCache(code) {
     try {
       if (typeof localStorage === "undefined") return null;
@@ -109,6 +119,9 @@ var I18n = (function () {
     } catch (e) { return null; }
   }
 
+  /* writeCache: store a fetched dict under the versioned cache key.
+   * Params: code string, dict object. Returns nothing. Fails: never throws —
+   * cache is optional (the memory registry still applies). */
   function writeCache(code, dict) {
     try {
       if (typeof localStorage !== "undefined") localStorage.setItem(CACHE_KEY + ":" + code, JSON.stringify({ v: VERSION, at: Date.now(), locale: code, dict: dict }));

@@ -5,12 +5,11 @@
  *   detail stays on /account/:name (slice-03) — this view links there, never
  *   duplicates it. Unlock goes through Wallet.unlock only; no crypto here.
  * Consumes: Account (myAccountId/resolve), Wallet (isUnlocked/unlock),
- *   Chain (status), Store (connection subscribe). Global AccountsUI only; gen
- *   counter tears down stale work (unlock/connect races).
+ *   Chain (status), Store (connection subscribe). Side effects: global
+ *   AccountsUI only; gen counter tears down stale work (unlock/connect races).
  *   No amounts on screen: ids + names only, so no Format vectors apply.
  * I18n.t (display strings with verbatim en defaults — batch-2a i18n).
  * Refs: App.jsx:512 (DashboardAccountsOnly); no astro equiv (matrix A3).
- *   No amounts on screen: ids + names only, so no Format vectors apply.
  * Created by: stub-queue build (matrix §A STUB queue, batch 2).
  */
 var AccountsUI = (function () {

@@ -242,6 +242,8 @@ var App = (function () {
       return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === "string"; }) : [];
     } catch (e) { return []; }
   }
+  /* saveContacts: persist the followed-name list. Params: arr (string array).
+   * Returns nothing. Fails: never throws (blocked storage skips). */
   function saveContacts(arr) {
     try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(arr)); } catch (e) { /* follow skips */ }
   }
@@ -714,6 +716,9 @@ var App = (function () {
     }).catch(function () { /* failures surface via connection events */ });
   }
 
+  /* onSettings: settings-emit fan-out (theme apply + node reconnect on
+   * change). Params: next (settings object). Returns nothing. Fails: never
+   * throws — connect failures surface via connection events. */
   function onSettings(next) {
     if (!next) return;
     if (next.theme !== lastTheme) { lastTheme = next.theme; applyTheme(next.theme); syncThemeSwitchers(next.theme); }

@@ -32,6 +32,9 @@ var Chain = (function () {
   var MARKET_CB_ID = 2;
   var marketCb = null;
 
+  /* setStatus: merge a patch into lastStatus and fan out to subscribers.
+   * Params: patch (partial status object). Returns nothing. Fails: never —
+   *   Store.emitConnection swallows listener errors (see store.js emit). */
   function setStatus(patch) {
     lastStatus = Object.assign({state: "unknown", node: null, latencyMs: null, chainId: null, headBlock: null}, lastStatus, patch);
     Store.emitConnection(lastStatus);
@@ -136,16 +139,23 @@ var Chain = (function () {
       }
     }).catch(function () { /* next beat retries */ });
   }
+  /* startHeartbeat: (re)start the 20s get_dynamic_global_properties beat.
+   * Params: ms (optional override). Returns nothing. Fails: never throws —
+   *   missing timers just leave the socket unguarded (heartbeat covers). */
   function startHeartbeat(ms) {
     stopHeartbeat();
     try {
       beatTimer = setInterval(beat, ms || HEARTBEAT_MS);
     } catch (e) { /* without timers the socket still works, just unguarded */ }
   }
+  /* stopHeartbeat: clear the beat timer (connect/disconnect/close paths).
+   * Params: none. Returns nothing. Fails: never (missing timer is a no-op). */
   function stopHeartbeat() {
     try { if (beatTimer !== null) clearInterval(beatTimer); } catch (e) { /* gone */ }
     beatTimer = null;
   }
+  /* clearReconnect: cancel a pending same-node redial (manual disconnects
+   * and fresh connects). Params: none. Returns nothing. Fails: never. */
   function clearReconnect() {
     try { if (reconnectTimer !== null) clearTimeout(reconnectTimer); } catch (e) { /* gone */ }
     reconnectTimer = null;
@@ -222,6 +232,11 @@ var Chain = (function () {
     });
   }
 
+  /* connect: open the shared socket (login->database handshake, chain-id +
+   *   head-block fetch, block-push subscribe best-effort). Params: url string,
+   *   opts {timeoutMs, heartbeatMs, reconnectDelays} optional. Returns a Promise
+   *   for {chainId, headBlockTime, latencyMs}. Fails: rejects on timeout, socket
+   *   error, or bad-head-shape (malformed dynamic props — no tx on garbage). */
   function connect(url, opts) {    var timeoutMs = (opts && opts.timeoutMs) || 12000;
     stopHeartbeat(); clearReconnect(); resetApiIds();
     manualClose = false; lastUrl = url; lastOpts = opts || null;
@@ -324,6 +339,9 @@ var Chain = (function () {
    *   disconnect() below, which suppresses the reconnect. */
   function closeSocket() { try { if (ws) ws.close(); } catch (e) {} ws = null; }
 
+  /* disconnect: manual user disconnect (suppresses auto-reconnect, fails
+   *   in-flight calls, clears api-id caches). Params: none. Returns nothing.
+   *   Fails: never throws. */
   function disconnect() {
     manualClose = true;
     stopHeartbeat(); clearReconnect(); failPending("not connected"); resetApiIds();

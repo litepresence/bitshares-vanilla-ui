@@ -45,9 +45,16 @@ var AssetFeedUI = (function () {
   }
   function status(d, w, t) { var p = el(d, "p", t, "muted"); p.setAttribute("aria-live", "polite"); w.appendChild(p); return p; }
   function netName() { try { return Store.loadSettings().network || "mainnet"; } catch (e) { return "mainnet"; } }
+  /* feePrec: fee-asset precision for human fee rows (get_assets read).
+   * Params: id (asset id string, defaults to CORE 1.3.0). Returns a Promise
+   * for the precision number (5 on lookup miss — honest fallback). Fails: never
+   * rejects (catch returns the fallback). */
   async function feePrec(id) {
     try { var r = await Chain.call(await Chain.db(), "get_assets", [[id || CORE]]); if (r && r[0]) return r[0].precision; } catch (e) { /* p5 */ } return 5;
   }
+  /* head: current head-block number for staleness guards. Params: none.
+   * Returns a Promise for the number (0 when the node is unreachable).
+   * Fails: never rejects (catch returns 0). */
   async function head() { try { var p = await Chain.call(await Chain.db(), "get_dynamic_global_properties", []); return p.head_block_number || 0; } catch (e) { return 0; } }
   function noBackend() { return (typeof Asset === "undefined" || typeof AssetOps === "undefined" || typeof Tx === "undefined" || typeof Account === "undefined" || typeof Wallet === "undefined" || typeof Format === "undefined"); }
   /* cold: offline panel + Retry, plus auto-rerun on reconnect (transfer/

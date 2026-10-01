@@ -2,6 +2,8 @@
  * Owns: reset, shell (topbar/nav/footer), cards/tables/forms/buttons/pickers,
  *   responsive breakpoints (single-column stack under ~1200px, touch targets
  *   >=44px). Consumes: tokens from themes.css only (no literal palette here).
+ *   Side effects: stylesheet only (no JS, no globals).
+ *   Created by: building-vanilla-slices skill, slice-01-shell-settings plan.
  *   No build step: plain CSS served statically. */
 * { box-sizing: border-box; }
 /* Original-pages style pass (buttons + fonts only; layout untouched):

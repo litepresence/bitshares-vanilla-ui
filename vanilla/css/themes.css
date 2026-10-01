@@ -1,7 +1,12 @@
 /* Theme tokens: ref-ui-theme is default (bare :root carries its values, so
  * first paint before App.boot is always styled); vanilla-ui-theme (light)
- * and dex-ux-theme (dark) override. Created by: building-vanilla-slices
- * skill. Renamed 2026-09-28: original-blue->ref-ui-theme, light->vanilla-ui-
+ * and dex-ux-theme (dark) override.
+ * Owns: --bg/--panel/--text/--muted/--accent/--button-bg/--buy/--sell/
+ *   --warn/--danger/--live/--border/--header-bg/--plot-bg custom properties
+ *   per theme. Consumes: vanilla/assets/PALETTE.md finals (dark/light/midnight
+ *   columns) + #1 SCSS vars cited inline per token. Side effects: stylesheet
+ *   only (no JS, no globals — data-theme switch on <html> selects the block).
+ * Created by: building-vanilla-slices skill. Renamed 2026-09-28: original-blue->ref-ui-theme, light->vanilla-ui-
  * theme, dark->dex-ux-theme (store.js migrates stored old ids on load). */
 :root,
 :root[data-theme="ref-ui-theme"] {

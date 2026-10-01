@@ -8,7 +8,9 @@
  *   into the slice-4 #/transfer op-0 form, the ONLY signing path — never a forked
  *   confirm), and honest unavailable panels for disabled gateways. Signs nothing,
  *   broadcasts nothing, adds no serializers. Consumes: Gateway, Chain/Store,
- *   Format (money strings only). Exposes global GatewayUI only. Slice-15 Task 2.
+ *   Format (money strings only). Side effects: DOM under the router root;
+ *   exposes global GatewayUI only. Created by: building-vanilla-slices skill,
+ *   slice-15-gateways plan Task 2.
  * MONEY (#6): host fee ints stay raw until fmtMoney renders them via Format at the
  *   row precision, labeled gateway-stated; chain fees live in the transfer form only.
  */
