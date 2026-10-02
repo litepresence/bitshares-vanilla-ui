@@ -31,6 +31,66 @@ var AssetUI = (function () {
     return dflt;
   }
   var CORE = "1.3.0", SYM_RE = /^[A-Z0-9.]+$/;
+  /* feeTierForSymbol: full symbol string -> op-10 fee-schedule param key.
+   * FEE TRUTH (slice-10 live vectors: op-10 {symbol3, symbol4, long_symbol,
+   * price_per_kbyte}; NO PMO discount exists — a sub-asset like ORG.MARKET
+   * is cheap/expensive purely by its FULL length incl. dots): length 3 ->
+   * "symbol3", length 4 -> "symbol4", length >= 5 -> "long_symbol", anything
+   * shorter -> null (chain minimum is 3; the review gate rejects it with
+   * bad-symbol). Trims + uppercases, never throws. Params: sym (string).
+   * Returns the key or null. */
+  function feeTierForSymbol(sym) {
+    var s = (sym === undefined || sym === null) ? "" : String(sym).trim().toUpperCase();
+    if (s.length === 3) return "symbol3";
+    if (s.length === 4) return "symbol4";
+    if (s.length >= 5) return "long_symbol";
+    return null;
+  }
+  /* isSubAssetOf: "ORG.MARKET" belongs to "ORG". Value-copy of the canonical
+   * PredictionUI helper (OP_NAMES precedent — copied, not imported, so this
+   * file stays self-contained per the doctrine): same contract, same
+   * edge cases ("ORG" is not its own child; prefix-without-dot is false). */
+  function isSubAssetOf(sym, parent) {
+    var s = (sym === undefined || sym === null) ? "" : String(sym).trim().toUpperCase();
+    var p = (parent === undefined || parent === null) ? "" : String(parent).trim().toUpperCase();
+    if (!s || !p) return false;
+    if (p.charAt(p.length - 1) === ".") p = p.slice(0, -1);
+    if (!p) return false;
+    var prefix = p + ".";
+    return s.length > prefix.length && s.indexOf(prefix) === 0 &&
+      /^[A-Z0-9.]+$/.test(s) && s.charAt(s.length - 1) !== ".";
+  }
+  /* pmoTemplate: blank PMO org description (empty pmo_object per the
+   * BTS-CM/pma schema — type fixed, every human field empty for the issuer
+   * to complete). 2-space JSON so the textarea stays readable. No chain
+   * state, pure string. */
+  function pmoTemplate() {
+    return JSON.stringify({ main: "", pmo_object: { type: "PMO/ORGANIZATION@1.0",
+      identity: { name: "", website: "", manifest: "" },
+      governance: { resolution_policy: "", dispute_mechanism: "", onchain_account: "" },
+      attestation: "" } }, null, 2);
+  }
+  /* hashSubParent: "?sub=PARENT" from the current hash query (router strips
+   * the query before matching, so the view reads location.hash itself).
+   * Returns the uppercased parent symbol or "" (absent/invalid/harmless).
+   * Never throws. */
+  function hashSubParent() {
+    try {
+      var h = (typeof location !== "undefined" && location.hash) || "";
+      var q = h.indexOf("?");
+      if (q === -1) return "";
+      var parts = h.slice(q + 1).split("&");
+      for (var i = 0; i < parts.length; i++) {
+        var kv = parts[i].split("=");
+        if (kv[0] === "sub" && kv[1]) {
+          var v = decodeURIComponent(kv[1]).trim().toUpperCase();
+          if (/^[A-Z0-9.]+$/.test(v) && v.charAt(v.length - 1) !== ".") return v;
+          return "";
+        }
+      }
+    } catch (e) { /* no prefill */ }
+    return "";
+  }
   var PERMS = [[1, "charge fee"], [2, "whitelist"], [4, "override"], [8, "restricted"], [16, "no force settle"], [32, "global settle"], [64, "no confidential"], [128, "witness-fed"], [256, "committee-fed"]];
   var FLAGS = [[1, "charge fee"], [2, "whitelist"], [4, "override"], [8, "restricted"], [16, "no force settle"], [64, "no confidential"], [128, "witness-fed"], [256, "committee-fed"]], gen = 0;
   /* el: textContent-only element. touchable: >=44px floor. */
@@ -237,7 +297,72 @@ var AssetUI = (function () {
       var cb = field(d, t("asset.cer_base_field", "CER base (human, core)"), null, "1", "decimal");
       var cq = field(d, t("asset.cer_quote_field", "CER quote (human, new asset)"), null, "1", "decimal");
       var desc = field(d, t("asset.description_row", "Description"), null, "", null, true);
-      [sym, prec, msup, fpct, mfee, cb, cq, desc].forEach(function (x) { body.appendChild(x.row); });
+      /* Sub-asset prefill (?sub=PARENT from the PMO org detail): the symbol
+       * starts as "PARENT." with the cursor left for the child name; manual
+       * typing always wins (only applied when the box is still empty). */
+      var subParent = hashSubParent();
+      if (subParent) sym.input.value = subParent + ".";
+      body.appendChild(sym.row);
+      /* Fee-tier line: tier name by FULL symbol length next to the schedule
+       * param it will charge (Asset.feeSchedule, same reader fees-ui.js
+       * uses — the live get_required_fees fee still lands at review time in
+       * confirm()). Schedule fill is gen-guarded best-effort: tier name
+       * paints synchronously, the param amount joins when the schedule
+       * resolves; a schedule miss leaves the honest tier-only line. */
+      var tierP = el(d, "p", "", "muted"); body.appendChild(tierP);
+      var schedTier = null;
+      function tierWords(key) {
+        if (key === "symbol3") return t("asset.tier_symbol3", "3-char symbols");
+        if (key === "symbol4") return t("asset.tier_symbol4", "4-char symbols");
+        return t("asset.tier_long", "Long symbols (5+)");
+      }
+      function paintTier() {
+        var key = feeTierForSymbol(sym.input.value);
+        var label = t("asset.fee_tier", "Fee tier") + ": ";
+        if (!key) {
+          tierP.textContent = label + "—";
+          return;
+        }
+        var txt = label + tierWords(key) + " (" + key + ")";
+        if (sym.input.value.indexOf(".") !== -1) txt += " · " + t("asset.sub_symbol_hint", "Dotted symbol: keep the parent prefix and dot.");
+        if (schedTier && schedTier[key]) txt += " · " + schedTier[key];
+        txt += " · " + t("asset.fee_no_pmo_discount", "No PMO discount: the create fee follows the full symbol length.");
+        tierP.textContent = txt;
+      }
+      sym.input.addEventListener("input", paintTier);
+      paintTier();
+      if (typeof Asset !== "undefined" && Asset && typeof Asset.feeSchedule === "function") {
+        Asset.feeSchedule().then(function (s) {
+          if (g !== gen) return;
+          var found = null;
+          (s.fees || []).forEach(function (f) { if (f.opId === 10) found = f; });
+          if (!found) return;
+          var precFee = s.fee_asset_precision, out = {};
+          ["symbol3", "symbol4", "long_symbol"].forEach(function (k) {
+            var raw = (found.scaled && found.scaled[k] !== undefined) ? found.scaled[k]
+              : ((found.raw && found.raw[k] !== undefined) ? found.raw[k] : null);
+            if (raw === null) return;
+            try { out[k] = "schedule " + k + " = " + Format.formatAmount(String(raw), precFee) + " core"; }
+            catch (e) { out[k] = "schedule " + k + " = " + String(raw); }
+          });
+          schedTier = out;
+          paintTier();
+        }).catch(function () { /* tier-only line stands */ });
+      }
+      [prec, msup, fpct, mfee, cb, cq, desc].forEach(function (x) { body.appendChild(x.row); });
+      /* PMO create prefill: fills the description with the empty pmo_object
+       * template (issuer completes identity/governance). Overwrites only
+       * with explicit click; the hint confirms the fill landed. */
+      (function pmoPrefill() {
+        var rowB = touch(el(d, "button", t("asset.prefill_pmo", "Prefill PMO template"))); rowB.type = "button";
+        body.appendChild(rowB);
+        if (subParent) body.appendChild(el(d, "p", t("asset.sub_symbol_hint", "Dotted symbol: keep the parent prefix and dot."), "muted"));
+        var filled = el(d, "p", "", "muted"); body.appendChild(filled);
+        rowB.addEventListener("click", function () {
+          desc.input.value = pmoTemplate();
+          filled.textContent = t("asset.pmo_template_hint", "PMO template filled — complete the identity and governance fields.");
+        });
+      })();
       /* LOW punchlist: structured-description guidance — one textarea carries
        * the whole description object; main/title/short/market go inside as
        * JSON-ish text. Batch-3 i18n: keyed. */
@@ -296,6 +421,18 @@ var AssetUI = (function () {
           if (bit) rows.push([t("asset.bitasset_row", "Bitasset"),  "feeds≥" + mf.input.value + ", backing " + bit.short_backing_asset]);
           if (nftObj) rows.push([t("asset.nft_row", "NFT"),  (nftObj.title || "") + " / nft"]);
           rows.push([t("asset.pma_row", "Prediction market"),  (tab === "pma") ? "yes" : "no"]);
+          /* Fee-tier cell next to the live get_required_fees fee: tier name
+           * + which schedule param applied (from the draw-time feeSchedule
+           * fill when it resolved). The fee itself stays the live chain
+           * answer — this row only names the tier behind it. */
+          (function tierRow() {
+            var tierKey = feeTierForSymbol(symbol);
+            if (!tierKey) { rows.push([t("asset.fee_tier", "Fee tier"), "—"]); return; }
+            var cell = tierWords(tierKey) + " (" + tierKey + ")";
+            if (schedTier && schedTier[tierKey]) cell += " · " + schedTier[tierKey];
+            rows.push([t("asset.fee_tier", "Fee tier"), cell,
+              t("asset.fee_no_pmo_discount", "No PMO discount: the create fee follows the full symbol length.")]);
+          })();
           if (g !== gen) return; wipe(root);
           var w2 = wrap(d, root), fpp = await feePrec(f.asset_id);
           confirm(d, w2, root, t("asset.confirm_create", "Confirm asset create"), rows, f.amount, fpp,
@@ -309,7 +446,8 @@ var AssetUI = (function () {
     }
     draw();
   }
-  return { renderAssets: renderAssets, renderCreate: renderCreate };
+  return { renderAssets: renderAssets, renderCreate: renderCreate,
+    _test: { feeTierForSymbol: feeTierForSymbol, isSubAssetOf: isSubAssetOf, pmoTemplate: pmoTemplate } };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.AssetUI === "undefined") { globalThis.AssetUI = AssetUI; }
 if (typeof module !== "undefined") { module.exports = AssetUI; }

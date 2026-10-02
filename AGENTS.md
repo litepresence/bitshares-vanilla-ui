@@ -330,6 +330,22 @@ force from the first file written:
   The app is not complete until this pass and its audit are green — so write
   slice code as if the pass will embarrass you (it will).
 
+### 3.8 Marketing surface, addictive busy box
+
+Beyond replacing the wallet, this app is BitShares **marketing material**:
+the first thing a newcomer meets (splash hero, README art, guided tour)
+should sell the chain — self-custody, live markets, real numbers — before
+asking anything of them. And it is an **addictive busy box**: live-ticking
+stats, chain-pulse bands, candy motion, tour shimmer, price alerts —
+delight that invites play, the way a trading desk invites touch. Both
+purposes are binding, but bounded, in this order: never at the cost of
+honesty (no fabricated stats, volumes, or counts — a dead feed says so,
+never fakes it), never at the cost of performance (jank kills delight —
+see the tour scroll-hijack lesson), never at the cost of accessibility
+(`prefers-reduced-motion` silences all candy), and never at the cost of
+the doctrine (§4.5 — marketing that needs a dependency is advertising
+for someone else's release cycle).
+
 ---
 
 ## 4. The Rot Report (why we port, not upgrade)

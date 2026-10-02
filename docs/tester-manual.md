@@ -298,7 +298,26 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 3. Confirm the web build works with NO extension installed (wrapper is
    hardening, never a dependency).
 
-## 18. What to send back
+## 18. Prediction markets (`#/prediction`, PMO, probability, portfolio)
+
+1. Open `#/prediction` locked. Expected: Organizations (PMO) section,
+   Active/Expired/My filter, Refresh, lookup, Create buttons, Portfolio
+   with the viewing-as notice — zero console errors.
+2. Filter to Expired, then My, then back to Active; click Refresh.
+   - Expected: lists refilter, loading state shows during rescan, counts
+     cover the scanned range honestly.
+3. Open any market detail: confirm condition/expiry, probability panel
+   (all four formats), Buy-YES/Buy-NO links route to instant-trade.
+   - Expected: no price → honest "unavailable", never 50% by default.
+4. Portfolio: Load with an unlocked testnet wallet holding a PMA.
+   Expected: per-holding PnL in human terms; settle only on settled
+   markets (Review → cancel unless dev orders broadcast).
+5. Asset create: enter a short symbol (≤3) vs a long one (5+).
+   - Expected: fee-tier line names the correct tier (symbol3/symbol4/
+     long_symbol) beside the live fee; sub-asset (`PARENT.CHILD`) and PMO
+     description templates prefill from their buttons.
+
+## 19. What to send back
 
 For every section: PASS/FAIL per numbered step + console-error text +
 screenshots of FAILs + the exact numbers you recorded (§5.8, §11.4,

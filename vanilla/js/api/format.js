@@ -254,6 +254,69 @@ var Format = (function () {
     return { num: (c * (10n ** BigInt(debtPrec))).toString(), den: (d * (10n ** BigInt(collPrec))).toString() };
   }
 
+  /* costForHolding: backing-raw cost basis for a PMA holding from fill totals.
+   * Ports the average-cost shape (paid/received * holding, floored) with
+   * precisions cancelled: costRaw = holdingRaw * paidRaw / receivedRaw, all
+   * three legs RAW digit strings (holding + received in PMA units, paid in
+   * backing units). Zero received (airdrop/transfer, no fills) yields "0"
+   * (zero-cost: the holding is all profit — callers label it, never divide
+   * by zero). Zero holding yields "0". Exact BigInt floor, never float.
+   * Params: holdingRaw, receivedRaw, paidRaw (digit strings, may be "0").
+   * Returns costRaw digit string. Throws on bad (non-digit) inputs. */
+  function costForHolding(holdingRaw, receivedRaw, paidRaw) {
+    var h = _toBigInt(holdingRaw, "holding"), r = _toBigInt(receivedRaw, "received"),
+        p = _toBigInt(paidRaw, "paid");
+    if (h === 0n || r === 0n) return "0";
+    return ((h * p) / r).toString();
+  }
+
+  /* valueFromFeedRaw: backing-raw current value from a settlement/feed raw
+   * pair (precisions cancel, same proof as costForHolding: holdingHuman *
+   * (quoteHuman/baseHuman) in backing units = holdingRaw*quoteRaw/baseRaw).
+   * Ports #4 settlement_price legs (base = PMA, quote = backing per
+   * buildFeed leg convention asset_ops.cpp:178 + asset.cpp:266). Exact
+   * BigInt floor, never float.
+   * Params: holdingRaw, feedBaseRaw (PMA leg), feedQuoteRaw (backing leg),
+   *   all digit strings. Returns currentRaw digit string. Throws on zero
+   *   base or bad inputs. */
+  function valueFromFeedRaw(holdingRaw, feedBaseRaw, feedQuoteRaw) {
+    var h = _toBigInt(holdingRaw, "holding"), b = _toBigInt(feedBaseRaw, "feedBase"),
+        q = _toBigInt(feedQuoteRaw, "feedQuote");
+    if (b === 0n) throw new Error("zero feed base leg");
+    if (h === 0n) return "0";
+    return ((h * q) / b).toString();
+  }
+
+  /* valueFromMidHuman: backing-raw current value from a human mid price
+   * (ticker latest, backing per PMA, e.g. "0.95"). Exact form:
+   * currentRaw = holdingRaw * num * 10^backingPrec / (den * 10^pmaPrec),
+   * where {num, den} = parsePriceRatio(midHuman) (unreduced). Integer-only
+   * BigInt floor, never binary float. Params: holdingRaw digit string,
+   * pmaPrec/backingPrec 0..12, midHuman decimal string. Returns currentRaw
+   * digit string. Throws on bad inputs. */
+  function valueFromMidHuman(holdingRaw, pmaPrec, backingPrec, midHuman) {
+    _assertPrecision(pmaPrec);
+    _assertPrecision(backingPrec);
+    var h = _toBigInt(holdingRaw, "holding");
+    if (h === 0n) return "0";
+    var ratio = parsePriceRatio(midHuman);
+    var num = (h * ratio.num * (10n ** BigInt(backingPrec)));
+    var den = (ratio.den * (10n ** BigInt(pmaPrec)));
+    if (den === 0n) throw new Error("zero price denominator");
+    return (num / den).toString();
+  }
+
+  /* pnlRaw: signed backing-raw unrealised PnL (current - cost - fee, all
+   * backing-raw digit strings; fee defaults "0"). Exact BigInt, may return
+   * a "-" prefixed string for a loss (formatAmount renders it). Params:
+   * currentRaw, costRaw, feeRawOrZero. Returns signed decimal string.
+   * Throws on bad inputs. */
+  function pnlRaw(currentRaw, costRaw, feeRaw) {
+    var c = _toBigInt(currentRaw, "current"), k = _toBigInt(costRaw, "cost");
+    var f = (feeRaw === undefined || feeRaw === null) ? 0n : _toBigInt(feeRaw, "fee");
+    return (c - k - f).toString();
+  }
+
   return {
     formatAmount: formatAmount,
     parseAmount: parseAmount,
@@ -267,7 +330,11 @@ var Format = (function () {
     formatRatioPct2dp: formatRatioPct2dp,
     ratioBelowMcr: ratioBelowMcr,
     ratioBelowMcrPlusHalf: ratioBelowMcrPlusHalf,
-    mcrUnitsToHuman: mcrUnitsToHuman
+    mcrUnitsToHuman: mcrUnitsToHuman,
+    costForHolding: costForHolding,
+    valueFromFeedRaw: valueFromFeedRaw,
+    valueFromMidHuman: valueFromMidHuman,
+    pnlRaw: pnlRaw
   };
 })();
 

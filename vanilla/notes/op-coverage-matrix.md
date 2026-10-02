@@ -46,7 +46,7 @@
 | A27 | `/create-worker` → CreateWorker (:612) | create_worker.astro | `/create-worker` (:152) → PORTED (`create-worker-ui.js` + op-34 serializer, broadcast wired) |
 | A28 | `/help` + 3 nested `:path` routes (:618–633) | forum.astro (docs-adjacent) | `/help/**` (:153) → PORTED (`help-ui.js`: 20-topic index) |
 | A29 | `/htlc` → Htlc showcase (:634) | htlc.astro | `/htlc` (:155) + `/htlc/:id` (:154) → PORTED (slice-11: HTLC 1.16.621–625 lifecycle) |
-| A30 | `/prediction` (+`/:market` per §6) (:635) | — (no astro page; README-level only) | `/prediction` (:156) + `/prediction/:market` (:157) → PORTED (`prediction-ui.js`: PMA scan + detail + desk links) |
+| A30 | `/prediction` (+`/:market` per §6) (:635) | — (no astro page; README-level only) | `/prediction` (:156) + `/prediction/:market` (:157) → PORTED (`prediction-ui.js`: PMA scan + detail + desk links; +2026-10-02 PMO org section/detail + fee-tier display — see slice-10 delta; +2026-10-02 portfolio PnL + op-17 settle + Active/Expired/My + countdown/Refresh — see prediction-portfolio delta) |
 | A31 | `/instant-trade` + `/:marketID` (:639–648) | instant_trade.astro | `/instant-trade` (:158) + `/instant-trade/:marketID` (:159) → PORTED (`instant-trade-ui.js`: simple buy/sell via op-1) |
 | A32 | `/pools` → PoolmartPage (:649) | pools, stake, top-pools, custom_pool_overview, custom_pool_tracker.astro | `/pools` (:161) + `/pools/:id` (:160) + `/swap` (:162) → PORTED (slice-12: ops 59–63/75, lifecycles 1.19.66/67; +2026-09-29 pool provenance map reads-only + typed-account swap preview — pool-graph.js:93, pool-detail-ui.js:975) |
 | A33 | `*` → Page404 (:650) | — | `*` (:169) → PORTED (render404 + dashboard link, router.js:54–60) |
@@ -460,3 +460,41 @@
   §D 7. MISSING (unjustified): still 0. Verification this round:
   `tooling/trollbox-test.js` 75/75, `node --check` clean, `check_rot.py` PASS,
   `check_i18n.py` OK (2793 keys, 3756 sites drift-free).
+
+## PMO + fee-tier delta (2026-10-02) — A30 enrichment, no new ops
+- A30 stays PORTED (same routes, new display paths): `#/prediction` gains the
+  Organizations (PMO) section (parent org assets via `pmo_object` description
+  JSON + scanned-range sub-asset/active/expired tallies, one shared bounded
+  scan); `#/prediction/:market` on an org symbol renders the org detail
+  (identity/governance/attestation + child markets + `#/assets/create?sub=`
+  entry); `#/assets/create` shows the op-10 fee tier by full symbol length
+  beside the live `get_required_fees` fee + PMO-template / sub-prefill
+  entries. No new WS methods (list_assets/get_objects/lookup/get_required_
+  fees/get_global_properties all pre-existing); NO PMO fee discount exists
+  (tier-by-length documented in-app). Vectors `tooling/pmo-fee-tier-test.js`
+  53/53. Detail in `vanilla/notes/slice-10-assets.md` (PMO delta).
+- Counts: §A 33 PORTED / §B 18 PORTED + 1 DEFERRED / §C 22 substantive
+  PORTED + 11 merge-pointers + 0 BUILDING + 2 DEFERRED / §D 7 — unchanged.
+  MISSING (unjustified): still 0.
+
+## Prediction-portfolio delta (2026-10-02) — A30 enrichment, op-17 settle path code-live
+
+- A30 stays PORTED (same routes, new portfolio paths): `#/prediction` gains
+  Active (unexpired+unsettled, closing-soon sort) / Expired (past+unsettled,
+  awaiting resolution) / My (wallet created-or-held) + Open/Settled/All,
+  expiry countdown text (pure time math) + manual Refresh (loading state),
+  and a Portfolio section (balances⋈scan + fill-history avg-cost via
+  `Prediction.costBasisFromFills` + settlement/mid/feed current via
+  `Format.valueFromFeedRaw/valueFromMidHuman` + `Format.pnlRaw`, human terms
+  with raw titles, phone cards) + per-settled-holding op-17 settle
+  (`AssetOps.buildSettle` + `get_required_fees`, unlock-at-sign, named-row
+  confirm, balances re-read proof). Settlement state from #4
+  `settlement_price` null-check (`asset_object.hpp:299`), fund>0
+  corroborating OR. No new WS methods (all pre-existing reads + op-17
+  serializer from slice-10/14). Settle broadcast CODE-LIVE, tester-queued
+  (no holder-fixture spend this round — never fabricated). Vectors
+  `tooling/prediction-portfolio-test.js` 55/55. Detail in
+  `vanilla/notes/prediction-portfolio-2026-10-02.md`.
+- Counts: §A 33 PORTED / §B 18 PORTED + 1 DEFERRED / §C 22 substantive
+  PORTED + 11 merge-pointers + 0 BUILDING + 2 DEFERRED / §D 7 — unchanged.
+  MISSING (unjustified): still 0.
