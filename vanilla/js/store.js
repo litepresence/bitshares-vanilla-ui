@@ -18,8 +18,11 @@ var Store = (function () {
 
   var SETTINGS_KEY = "bts-vanilla-settings-v1";
 
+  /* Default node lists (latency-sorted live at probe time — order here is
+   * fallback only). api.dex.trading added 2026-10-02 after the concurrent
+   * discovery sweep proved it mainnet-fast (0.42s, chain-verified). */
   var DEFAULT_NODES = {
-    mainnet: ["wss://api.bitshares.dev/ws", "wss://dex.iobanker.com/ws", "wss://node.xbts.io/ws", "wss://public.xbts.io/ws", "wss://cloud.xbts.io/ws", "wss://api.bts.mobi/ws"],
+    mainnet: ["wss://api.bitshares.dev/ws", "wss://dex.iobanker.com/ws", "wss://node.xbts.io/ws", "wss://public.xbts.io/ws", "wss://cloud.xbts.io/ws", "wss://api.bts.mobi/ws", "wss://api.dex.trading/ws"],
     testnet: ["wss://testnet.xbts.io/ws", "wss://testnet.dex.trading/"]
   };
 
