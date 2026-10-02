@@ -1824,9 +1824,6 @@
       "pool.pool_history_title",
       "pool.pool_row",
       "pool.prev_btn",
-      "pool.prov_direct",
-      "pool.prov_indirect",
-      "pool.prov_none",
       "pool.quote_failed",
       "pool.quote_row",
       "pool.recv_col",
@@ -2924,7 +2921,14 @@
       "wallet.wallet_manager",
       "wallet.wallet_name",
       "wallet.wallet_name_required_use_letters_digits_dash",
-      "wallet.ways_in"
+      "wallet.ways_in",
+      "pool.map_a_ok",
+      "pool.map_a_hops",
+      "pool.map_a_orphan",
+      "pool.map_pair_ok",
+      "pool.map_pair_reach",
+      "pool.map_pair_orphan",
+      "pool.map_takeover"
     ]
   },
   "nav": {
@@ -5811,9 +5815,13 @@
     "create_stake_hint": ". Create one from the Pools desk (#/pools) Stake form.",
     "zero_supply_hint": " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first.",
     "owned_hint": " Stake both legs in any pool above — owned pools list here.",
-    "prov_direct": "Direct Provenance: this market has established pool connectivity to BTS",
-    "prov_indirect": "Indirect Provenance: this market connects to BTS via pools in {n} hops",
-    "prov_none": "Provenance Warning: this market lacks established pool connectivity to BTS"
+    "map_a_ok": "{s} connects to BTS",
+    "map_a_hops": "{s} {n} hops to BTS",
+    "map_a_orphan": "WARNING: {s} is orphaned!",
+    "map_pair_ok": "{a} connects to {b}",
+    "map_pair_reach": "{a} reaches {b} in {n} hops",
+    "map_pair_orphan": "WARNING: assets are orphaned!",
+    "map_takeover": "WARNING: These assets are orphaned from the liquidity pool network!"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

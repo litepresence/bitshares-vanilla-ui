@@ -440,28 +440,136 @@ var PoolGraph = (function () {
    * "direct"|"indirect"|"none" and hops is the winning hop count
    * (0 when a leg IS BTS, null when none). A leg that is BTS itself counts
    * as direct. Never throws (bad graph -> none). */
-  function provenanceStatus(graph, assetA, assetB) {
-    try {
-      var best = null;
-      [assetA, assetB].forEach(function (id) {
-        if (!id) return;
-        if (id === CORE_ID) {
-          if (best === null || 0 < best) best = 0;
-          return;
-        }
-        var p = findCorePath(graph, id);
-        if (p && Array.isArray(p.hops) && p.hops.length >= 2) {
-          var hops = p.hops.length - 1;
-          if (best === null || hops < best) best = hops;
-        }
-      });
-      if (best === null) return { level: "none", hops: null };
-      if (best <= 1) return { level: "direct", hops: best };
-      return { level: "indirect", hops: best };
-    } catch (e) { return { level: "none", hops: null }; }
-  }
+  /* (provenanceStatus retired 2026-10-02: pair-level verdict superseded by
+   * mapTheme's per-leg verdicts + texts. findCorePath stays — mapTheme,
+   * market-desk, and pool-detail all build on it.) */
 
   /* _cssTok: theme token value or the fallback (headless-safe). */
+
+  /* Map theme (pure, unit-tested): the full owner-spec verdict for one pair.
+   * Legs read green/yellow/red by their OWN BTS status (direct ≤1 hop,
+   * indirect n hops, orphan); BTS always blue; rest grey. Edges: the direct
+   * leg↔leg pool and every pool on either leg's shortest BTS path glow
+   * bold yellow; user highlight wins ties (soft glow); rest thin grey.
+   * Texts: upper-left assetA, upper-right assetB (green connects / yellow
+   * n-hops / red bold orphaned), lower-center pair verdict (green direct /
+   * yellow n-hop reach / red bold orphaned), centered takeover (red bold
+   * 1.5x) ONLY when no edges exist at all — disjoint-but-present maps show
+   * three reds over the visible map instead. A===B collapses the pair
+   * verdict (corners carry it). Symbols resolve from graph nodes, bare ids
+   * stand. Returns {a, b, nodeColors, pathPools, legEdge, texts, takeover}.
+   * Never throws (garbage -> all-orphan theme). */
+  function legStatus(graph, id) {
+    try {
+      if (!id) return { level: "orphan", hops: null };
+      if (String(id) === CORE_ID) return { level: "direct", hops: 0, via: [] };
+      var p = findCorePath(graph, id);
+      if (p && Array.isArray(p.hops) && p.hops.length >= 2) {
+        var hops = p.hops.length - 1;
+        return hops <= 1
+          ? { level: "direct", hops: hops, via: p.via || [] }
+          : { level: "indirect", hops: hops, via: p.via || [] };
+      }
+    } catch (e) { /* orphan below */ }
+    return { level: "orphan", hops: null, via: [] };
+  }
+  function legDistance(graph, fromId, toId) {
+    try {
+      if (!fromId || !toId) return null;
+      if (String(fromId) === String(toId)) return 0;
+      var adj = {};
+      ((graph && graph.edges) || []).forEach(function (e) {
+        if (!e || !e.a || !e.b) return;
+        (adj[e.a] = adj[e.a] || []).push(e.b);
+        (adj[e.b] = adj[e.b] || []).push(e.a);
+      });
+      var seen = {}, q = [{ id: fromId, d: 0 }];
+      seen[fromId] = 1;
+      while (q.length) {
+        var cur = q.shift();
+        var nexts = adj[cur.id] || [];
+        for (var i = 0; i < nexts.length; i++) {
+          if (seen[nexts[i]]) continue;
+          if (String(nexts[i]) === String(toId)) return cur.d + 1;
+          seen[nexts[i]] = 1;
+          q.push({ id: nexts[i], d: cur.d + 1 });
+        }
+      }
+    } catch (e) { /* null below */ }
+    return null;
+  }
+  function mapTheme(graph, assetA, assetB) {
+    var sym = {};
+    try {
+      ((graph && graph.nodes) || []).forEach(function (n) {
+        if (n && n.assetId) sym[n.assetId] = n.sym || n.assetId;
+      });
+    } catch (e) { /* bare ids stand */ }
+    function S(id) { return sym[id] || String(id === undefined || id === null ? "?" : id); }
+    var A = assetA, B = assetB;
+    var stA = legStatus(graph, A), stB = legStatus(graph, B);
+    var edges = (graph && Array.isArray(graph.edges)) ? graph.edges : [];
+    var legEdge = null;
+    if (A && B && String(A) !== String(B)) {
+      for (var i = 0; i < edges.length; i++) {
+        var e = edges[i] || {};
+        if ((String(e.a) === String(A) && String(e.b) === String(B)) ||
+            (String(e.a) === String(B) && String(e.b) === String(A))) {
+          legEdge = e.poolId || null;
+          break;
+        }
+      }
+    }
+    var pathPools = [];
+    [stA, stB].forEach(function (st) {
+      (st.via || []).forEach(function (pid) {
+        if (pid && pathPools.indexOf(pid) === -1) pathPools.push(pid);
+      });
+    });
+    function legText(id, st) {
+      var s = S(id);
+      if (st.level === "direct") {
+        return { text: t("pool.map_a_ok", "{s} connects to BTS").split("{s}").join(s), color: "live", bold: false };
+      }
+      if (st.level === "indirect") {
+        return { text: t("pool.map_a_hops", "{s} {n} hops to BTS").split("{s}").join(s).split("{n}").join(String(st.hops)), color: "warn", bold: false };
+      }
+      return { text: t("pool.map_a_orphan", "WARNING: {s} is orphaned!").split("{s}").join(s), color: "danger", bold: true };
+    }
+    var nodeColors = {};
+    try {
+      Object.keys(sym).forEach(function (id) {
+        if (id === CORE_ID) { nodeColors[id] = "bts"; return; }
+        if (String(id) === String(A)) {
+          nodeColors[id] = stA.level === "direct" ? "pair-good" : (stA.level === "indirect" ? "pair-warn" : "pair-bad");
+          return;
+        }
+        if (String(id) === String(B)) {
+          nodeColors[id] = stB.level === "direct" ? "pair-good" : (stB.level === "indirect" ? "pair-warn" : "pair-bad");
+          return;
+        }
+        nodeColors[id] = "other";
+      });
+    } catch (e) { /* partial map stands */ }
+    var same = !!(A && B && String(A) === String(B));
+    var bottom = null;
+    if (!same) {
+      var dist = legDistance(graph, A, B);
+      if (legEdge) {
+        bottom = { text: t("pool.map_pair_ok", "{a} connects to {b}").split("{a}").join(S(A)).split("{b}").join(S(B)), color: "live", bold: false };
+      } else if (dist !== null && dist !== undefined) {
+        bottom = { text: t("pool.map_pair_reach", "{a} reaches {b} in {n} hops").split("{a}").join(S(A)).split("{b}").join(S(B)).split("{n}").join(String(dist)), color: "warn", bold: false };
+      } else {
+        bottom = { text: t("pool.map_pair_orphan", "WARNING: assets are orphaned!"), color: "danger", bold: true };
+      }
+    }
+    return {
+      a: stA, b: stB, nodeColors: nodeColors, pathPools: pathPools, legEdge: legEdge,
+      left: legText(A, stA), right: legText(B, stB), bottom: bottom,
+      takeover: edges.length === 0,
+      takeoverText: t("pool.map_takeover", "WARNING: These assets are orphaned from the liquidity pool network!")
+    };
+  }
   function _cssTok(name, fallback) {
     try {
       if (typeof getComputedStyle !== "undefined" && typeof document !== "undefined") {
@@ -531,7 +639,7 @@ var PoolGraph = (function () {
     var accent = _cssTok("--accent", "#007bff"), border = _cssTok("--border", "#2a2e39"),
       text = _cssTok("--text", "#c5cbce"), buy = _cssTok("--buy", "#26de81"),
       muted = _cssTok("--muted", "#758696"), warn = _cssTok("--warn", "#fbbc06"),
-      danger = _cssTok("--danger", "#f74745");
+      danger = _cssTok("--danger", "#f74745"), live = _cssTok("--live", "#7bd500");
     var ctx = g.ctx, nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
     var assetA = opts.assetA, assetB = opts.assetB;
     var hi = {};
@@ -542,7 +650,17 @@ var PoolGraph = (function () {
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";
     }
     if (!edges.length) {
-      emptyLine("No pools touch these assets — pick a pair with a pool, or create one at #/pools."); _wire(canvas, {}, [], doc);
+      /* Takeover: truly empty legs — red, bold, 1.5x, centered both ways. */
+      try {
+        ctx.fillStyle = danger; ctx.font = "bold 18px system-ui, sans-serif"; ctx.textAlign = "center";
+        try {
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.85)";
+          ctx.strokeText(t("pool.map_takeover", "WARNING: These assets are orphaned from the liquidity pool network!"), g.w / 2, g.h / 2);
+        } catch (e) { /* halo best-effort */ }
+        ctx.fillText(t("pool.map_takeover", "WARNING: These assets are orphaned from the liquidity pool network!"), g.w / 2, g.h / 2);
+        ctx.textAlign = "left";
+      } catch (e) { emptyLine("No pools touch these assets."); }
+      _wire(canvas, {}, [], doc);
       /* A11y: empty map is not interactive (no tabindex trap) but stays
        * named so the canvas text is exposed. */
       try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", t("pool.map_touch_aria", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools.")); } catch (e) {}
@@ -560,43 +678,56 @@ var PoolGraph = (function () {
     try { canvas._graphBase = base; } catch (e) {}
     try { canvas._graphRepaint = { doc: doc, graph: graph, opts: opts }; } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
-    /* Provenance banner (top line): pair-level BTS connectivity verdict with
-     * traffic-light color — green direct, yellow indirect (+hops), red none.
-     * Same verdict family as pool-detail's DOM provenance line (kept: canvas
-     * text is invisible to screen readers, the DOM line is the accessible
-     * twin). Halo + centered like node labels. */
-    try {
-      var prov = provenanceStatus(graph, assetA, assetB);
-      var pmsg = null, pcol = text;
-      if (prov.level === "direct") {
-        pmsg = t("pool.prov_direct", "Direct Provenance: this market has established pool connectivity to BTS");
-        pcol = buy;
-      } else if (prov.level === "indirect") {
-        pmsg = t("pool.prov_indirect", "Indirect Provenance: this market connects to BTS via pools in {n} hops").split("{n}").join(String(prov.hops));
-        pcol = warn;
-      } else {
-        pmsg = t("pool.prov_none", "Provenance Warning: this market lacks established pool connectivity to BTS");
-        pcol = danger;
-      }
-      if (pmsg) {
-        ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
+    /* Owner-spec map text (supersedes the old top provenance banner +
+     * nodePaintRole/edgePaintRole, removed with their vectors): corner
+     * verdicts per leg, bottom pair verdict, all from one mapTheme call. */
+    var theme = null;
+    try { theme = mapTheme(graph, assetA, assetB); } catch (e) { theme = null; }
+    /* Corner + bottom text painter (haloed like node labels; bold reds). */
+    function cornerText(item, x, align, size) {
+      if (!item || !item.text) return;
+      try {
+        var colormap = { live: live, warn: warn, danger: danger };
+        ctx.font = (item.bold ? "bold " : "") + (size || 12) + "px system-ui, sans-serif";
+        ctx.textAlign = align;
         try {
           ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.85)";
-          ctx.strokeText(pmsg, g.w / 2, 14);
+          ctx.strokeText(item.text, x, item.y);
         } catch (e) { /* halo best-effort */ }
-        ctx.fillStyle = pcol;
-        ctx.fillText(pmsg, g.w / 2, 14);
+        ctx.fillStyle = colormap[item.color] || text;
+        ctx.fillText(item.text, x, item.y);
         ctx.textAlign = "left";
-      }
-    } catch (e) { /* map stands without the banner */ }
+      } catch (e) { /* map stands without this line */ }
+    }
+    if (theme && !theme.takeover) {
+      cornerText({ text: theme.left.text, color: theme.left.color, bold: theme.left.bold, y: 14 }, 8, "left");
+      cornerText({ text: theme.right.text, color: theme.right.color, bold: theme.right.bold, y: 14 }, g.w - 8, "right");
+    }
+    var hits = [];
+    var pathSet = {};
+    try {
+      ((theme && theme.pathPools) || []).forEach(function (pid) { pathSet[String(pid)] = 1; });
+      if (theme && theme.legEdge) pathSet[String(theme.legEdge)] = 1;
+    } catch (e) { /* plain edges stand */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
     edges.forEach(function (e) {
       var p = pos[e.a], q = pos[e.b];
       if (!p || !q) return;
+      /* Owner-spec lines: leg↔leg pool + either leg's BTS path, bold
+       * yellow; user highlight glows instead (soft shadowBlur like the
+       * explorer Live dot — static paint, no pulse loop); rest thin grey. */
       var hot = !!hi[String(e.poolId)];
-      ctx.strokeStyle = hot ? buy : border; ctx.lineWidth = hot ? 2.5 : 1.2;
+      var path = !hot && !!pathSet[String(e.poolId)];
+      ctx.strokeStyle = hot ? buy : (path ? warn : border);
+      ctx.lineWidth = (hot || path) ? 2.5 : 1.2;
+      if (hot) {
+        try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (e) { /* glow best-effort */ }
+      }
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
+      if (hot) {
+        try { ctx.restore(); } catch (e) { /* state stands */ }
+      }
       mids.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, poolId: e.poolId });
     });
     var hits = [];
@@ -606,8 +737,11 @@ var PoolGraph = (function () {
       var p = pos[n.assetId];
       if (!p) return;
       var r = _nodeRadius(deg[n.assetId]); /* degree-sized, pixels only */
-      var isCore = n.assetId === CORE_ID, isL0 = n.assetId === assetA || n.assetId === assetB;
-      ctx.fillStyle = isCore ? buy : (isL0 ? accent : muted);
+      /* Owner-spec nodes (from theme.nodeColors): BTS always theme-blue,
+       * each leg green/yellow/red by its OWN BTS verdict, rest grey. */
+      var ncol = (theme && theme.nodeColors && theme.nodeColors[n.assetId]) || "other";
+      ctx.fillStyle = ncol === "bts" ? accent
+        : (ncol === "pair-good" ? live : (ncol === "pair-warn" ? warn : (ncol === "pair-bad" ? danger : muted)));
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 2 * Math.PI); ctx.fill();
       ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.stroke();
       /* Small label with dark halo (strokeText under fillText) so it reads on any
@@ -624,9 +758,9 @@ var PoolGraph = (function () {
       ctx.textAlign = "left";
       hits.push({ x: p.x, y: p.y, r: r, assetId: n.assetId, sym: symById[n.assetId] });
     });
-    if (!Object.keys(hi).length) {
-      ctx.fillStyle = muted; ctx.font = "11px system-ui, sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("No BTS path — treat pair as unverified.", g.w / 2, g.h - 8); ctx.textAlign = "left";
+    if (theme && theme.bottom) {
+      cornerText({ text: theme.bottom.text, color: theme.bottom.color, bold: theme.bottom.bold, y: g.h - 8 },
+        g.w / 2, "center", 12);
     }
     _wire(canvas, pos, hits.concat(mids.map(function (m) { return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId }; })), doc);
     try { canvas.setAttribute("tabindex", "0"); } catch (e) {}
@@ -638,6 +772,20 @@ var PoolGraph = (function () {
         canvas.setAttribute("aria-label", t("pool.map_core_aria", "Pool map. Press Enter to open the core asset."));
       }
     } catch (e) {}
+    /* Screen-reader twin for the corner verdicts (canvas text is invisible
+     * to assistive tech): refresh the label with this render's verdicts. */
+    try {
+      if (theme && !theme.takeover) {
+        var ariaBits = [];
+        if (theme.left && theme.left.text) ariaBits.push(theme.left.text);
+        if (theme.right && theme.right.text) ariaBits.push(theme.right.text);
+        if (theme.bottom && theme.bottom.text) ariaBits.push(theme.bottom.text);
+        if (ariaBits.length) {
+          canvas.setAttribute("role", "img");
+          canvas.setAttribute("aria-label", ariaBits.join(" "));
+        }
+      }
+    } catch (e) { /* generic label stands */ }
     try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}
     return { empty: false, nodes: hits.length, edges: mids.length };
   }
@@ -759,7 +907,7 @@ var PoolGraph = (function () {
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
-      provenanceStatus: provenanceStatus } };
+      mapTheme: mapTheme } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.PoolGraph === "undefined") { globalThis.PoolGraph = PoolGraph; }

@@ -200,26 +200,79 @@ function ok(cond, name) {
   ok(PG._test.edgeWeight("700000000000000000000") > PG._test.edgeWeight("5"), "bigger pool pulls harder");
   ok(PG._test.edgeWeight(null) > 0 && PG._test.edgeWeight("abc") > 0, "malformed size fails soft positive");
 })();
-// 5e. Pair provenance vs BTS core (banner verdicts).
+// 5e+5f. mapTheme (owner spec, supersedes banner verdicts + role helpers —
+// removed with their vectors, coverage folded here).
 (function () {
-  const PS = PG._test.provenanceStatus;
-  assertR(typeof PS === "function", "provenanceStatus exported");
+  const MT = PG._test.mapTheme;
   function assertR(cond, name) { ok(cond, name); }
-  const g = {
+  assertR(typeof MT === "function", "mapTheme exported");
+  function demo() {
+    return {
+      nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" },
+        { assetId: "1.3.2", sym: "B" }, { assetId: "1.3.9", sym: "X" },
+        { assetId: "1.3.7", sym: "Y" }],
+      edges: [
+        { poolId: "1.19.1", a: "1.3.1", b: "1.3.2", sizeRaw: "10" },
+        { poolId: "1.19.2", a: "1.3.2", b: "1.3.9", sizeRaw: "10" },
+        { poolId: "1.19.3", a: "1.3.9", b: "1.3.0", sizeRaw: "10" }
+      ]
+    };
+  }
+  // Mixed pair: A indirect (3 hops), B indirect (2 hops), direct A-B pool.
+  var m = MT(demo(), "1.3.1", "1.3.2");
+  eq(m.a.level, "indirect", "leg A indirect");
+  eq(m.a.hops, 3, "leg A 3 hops");
+  eq(m.b, { level: "indirect", hops: 2, via: ["1.19.2", "1.19.3"] }, "leg B indirect 2");
+  eq(m.nodeColors, { "1.3.0": "bts", "1.3.1": "pair-warn", "1.3.2": "pair-warn", "1.3.9": "other", "1.3.7": "other" }, "node colors");
+  eq(m.legEdge, "1.19.1", "direct leg-leg pool found");
+  eq(m.pathPools.sort(), ["1.19.1", "1.19.2", "1.19.3"], "BTS path pools collected");
+  eq(m.left, { text: "A 3 hops to BTS", color: "warn", bold: false }, "upper-left yellow");
+  eq(m.right, { text: "B 2 hops to BTS", color: "warn", bold: false }, "upper-right yellow");
+  eq(m.bottom, { text: "A connects to B", color: "live", bold: false }, "lower-center green direct");
+  eq(m.takeover, false, "no takeover with edges");
+  // Direct leg case: pair A against BTS itself.
+  var d = MT(demo(), "1.3.1", "1.3.0");
+  eq(d.b, { level: "direct", hops: 0, via: [] }, "BTS leg direct 0");
+  eq(d.nodeColors["1.3.0"], "bts", "BTS node blue even as a leg");
+  // Green corner: leg paired straight with BTS.
+  var g = MT(demo(), "1.3.9", "1.3.7");
+  eq(g.left, { text: "X connects to BTS", color: "live", bold: false }, "upper-left green direct");
+  // Orphan pair over a disjoint map: three reds + visible map.
+  var g2 = {
+    nodes: [{ assetId: "1.3.7", sym: "Y" }, { assetId: "1.3.8", sym: "Z" },
+      { assetId: "1.3.9", sym: "X" }],
+    edges: [{ poolId: "1.19.9", a: "1.3.9", b: "1.3.8", sizeRaw: "10" }]
+  };
+  var o = MT(g2, "1.3.7", "1.3.8");
+  eq(o.a.level, "orphan", "disjoint leg A orphan");
+  eq(o.nodeColors["1.3.7"], "pair-bad", "orphan leg red");
+  eq(o.left.bold, true, "orphan corner bold");
+  ok(o.left.text.indexOf("WARNING") === 0, "orphan corner warning text");
+  eq(o.bottom.color, "danger", "bottom red without leg path");
+  eq(o.takeover, false, "disjoint edges suppress takeover");
+  // Truly empty legs: takeover.
+  var e = MT({ nodes: [], edges: [] }, "1.3.1", "1.3.2");
+  eq(e.takeover, true, "empty graph takes over");
+  ok(e.takeoverText.indexOf("orphaned from the liquidity pool network") !== -1, "takeover wording");
+  var n = MT(null, "1.3.1", "1.3.2");
+  eq(n.takeover, true, "null graph takes over");
+  eq(n.left.color, "danger", "null graph red corners");
+  // Same-asset view collapses the pair verdict.
+  var s = MT(demo(), "1.3.1", "1.3.1");
+  eq(s.bottom, null, "same asset skips pair line");
+  // Indirect leg-leg reach (no direct pool): yellow middle.
+  var g3 = {
     nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" },
       { assetId: "1.3.2", sym: "B" }, { assetId: "1.3.9", sym: "X" }],
     edges: [
-      { poolId: "1.19.1", a: "1.3.1", b: "1.3.0", sizeRaw: "10" },
-      { poolId: "1.19.2", a: "1.3.2", b: "1.3.9", sizeRaw: "10" },
-      { poolId: "1.19.3", a: "1.3.9", b: "1.3.0", sizeRaw: "10" }
+      { poolId: "1.19.1", a: "1.3.1", b: "1.3.9", sizeRaw: "10" },
+      { poolId: "1.19.2", a: "1.3.9", b: "1.3.2", sizeRaw: "10" }
     ]
   };
-  eq(PS(g, "1.3.1", "1.3.2"), { level: "direct", hops: 1 }, "either leg direct -> direct");
-  eq(PS(g, "1.3.2", "1.3.2"), { level: "indirect", hops: 2 }, "two-hop leg -> indirect 2");
-  eq(PS(g, "1.3.0", "1.3.2"), { level: "direct", hops: 0 }, "BTS leg itself -> direct 0");
-  eq(PS(g, "1.3.7", "1.3.8"), { level: "none", hops: null }, "orphan pair -> none");
-  eq(PS({ nodes: [], edges: [] }, "1.3.1", "1.3.2"), { level: "none", hops: null }, "empty graph -> none");
-  eq(PS(null, "1.3.1", "1.3.2"), { level: "none", hops: null }, "null graph fails soft");
+  var r = MT(g3, "1.3.1", "1.3.2");
+  eq(r.legEdge, null, "no direct pool");
+  eq(r.bottom.color, "warn", "indirect reach is yellow");
+  ok(r.bottom.text.indexOf("2 hops") !== -1, "reach names hop count");
 })();
 (async function () {
   let calls = 0;

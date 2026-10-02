@@ -95,3 +95,26 @@ point); the DOM provenance line stays as the screen-reader twin (canvas text
 is invisible to assistive tech). Vectors +7 (direct/indirect/zero-hop/
 orphan/empty/null). Headless `#/pools/1.19.66`: green Direct banner correct
 (BTS leg), zero console errors.
+
+## Delta 2026-10-02 — fixed map color language (owner spec)
+BTS node always theme-blue (`--accent`); the two viewed legs always
+Live-green (same `--live` as the explorer Live indicator); the leg↔leg pool
+edge green; either leg ↔ BTS edges blue; user highlight still wins ties
+(buy-green); everything else dim context (BTS↔non-leg edges included, only
+the pair's own BTS links glow). Pure `nodePaintRole`/`edgePaintRole`
+(headless-tested role names; drawGraph maps roles to tokens). Vectors 89/89.
+Headless `#/pools/1.19.66`: blue BTS, green HONEST.BTC leg, blue link
+between them, zero console errors.
+
+## Delta 2026-10-02 — owner-spec map language rebuild (corners + takeover)
+Supersedes the banner + first color pass (removed with vectors, noted):
+`mapTheme()` computes legs (green/yellow/red by own BTS hops), node roles
+(BTS blue, legs by verdict, rest grey), path pools (both shortest BTS paths
++ direct leg pool, bold yellow), hot glow (static shadowBlur, no loop),
+corner texts (upper-left A / upper-right B), bottom pair line
+(green/yellow-reach/red), and red 1.5x bold centered takeover ONLY on empty
+edge sets (disjoint maps show 3 reds over the visible map). Screen-reader
+twin: canvas aria-label refreshed with each render's verdicts. Vectors 96
+(rewrote 5e/5f as mapTheme combos: mixed/indirect/orphan/disjoint/empty/
+null/same-asset + determinism/containment/separation). Headless direct
+pair: green corners, green bottom, blue BTS, yellow path edges, zero errors.
