@@ -52,3 +52,36 @@ Plan: `docs/superpowers/plans/2026-09-28-slice-08-voting.md` (Tasks 1–4).
 deps; (b) nothing new depended on (reads via existing chain.js, signing via
 existing tx.js); (c) smallest deletable: worker tab (witness/committee stand).
 `check_rot.py` PASS.
+
+## Delta — 2026-10-02 governance analytics (gov-analytics extension)
+- NEW `vanilla/js/api/gov-analytics.js` — bounded analytics joins + pure
+  rankers (fundingShare/fundingRows/fundingTotal/splitCounts/sampleLabel/
+  biggestBlocks/biggestTxs/buildMatrix + workerFunding/splits/topVoters/
+  proxyMatrix/biggestSample). Tag `index.html` after `explorer-tabs.js`;
+  `globals.d.ts` gains `GovAnalytics` (type-gate only, zero runtime).
+- `vanilla/js/views/vote-ui.js` — "Governance analytics" section under the
+  join entries: splits line (zero new RPCs, from the lists snapshot), worker
+  funding top-10 (pay p5 via Format + share via fundingShare), top-10 voters
+  (get_top_voters, vp as comma ints — NEVER money-formatted), proxy-vote
+  matrix 10×(10W+10C) with ✓/· cells in a scroll region. All fail-open.
+- Method map (#4 wins): get_top_voters(limit) database_api.hpp:313-319 (cap
+  api_limit_get_top_voters=200 application.hpp:63; vanilla 1..20); stats
+  {owner,name,vp_active,is_voting} chain/account_object.hpp:50,52,91,97-98;
+  votes/proxy via ONE batched get_accounts database_api.hpp:287 +
+  account.options.voting_account protocol/account.hpp:48 (1.2.5 sentinel
+  protocol/config.hpp:150). No unbounded scan: full "who-proxies-to-X" would
+  need whole-registry enumeration — matrix is labeled a top-10 sample, never
+  a census. ES refused (doctrine).
+- Unit vectors: `tooling/gov-analytics-test.js` 33/33 green (shares incl.
+  1/3→33.33%, 2/3→66.67%; sorts, totals, splits, sample-label honesty,
+  rankings, matrix cells, caps).
+- Live mainnet (headless, api.bitshares.dev, head #114882090): splits 16
+  active/178 standby/194 witnesses, 11/54/65 committee; funding top
+  "Fund to pay dividend (1.14.35)" 2000000.00000/day; budget 1.00000/day
+  (committee-set 100000 raw vs default 500000/day config.hpp:96 — chain
+  truth, hence >100% shares, honest not absurd); total requested
+  3330003.00000/day; top voter abot 52,800,002,400,000 vp; matrix live ✓/·.
+- Anti-rot (a–c): (a) static + existing reads, runs 2036; (b) one new WS
+  method (get_top_voters, data not code — removable); (c) deletable: matrix
+  (lists + funding stand). check_rot PASS, check_types PASS, check_i18n PASS
+  (plain literals, no new keys).

@@ -394,3 +394,20 @@ the IP exposure up front), live progress, Cancel (partial results kept),
 per-candidate Add reusing the custom path byte-for-byte (same validation +
 storage, zero duplication). Never auto-runs, never auto-adds. 11 i18n keys.
 `tooling/node-discover-test.js` 12/12.
+
+## Delta 2026-10-02 — shell round (pool Exchange context, acting-as, footer link, node ops row)
+Four owner calls, one round. (1) Pool→Exchange context: pool views publish
+their pair (`App.setPoolMarket`, QUOTE_BASE validated — object ids rejected
+so the desk never misroutes); the header Exchange tab swaps to it with a
+`data-nav-exchange` hook (icon/label fallbacks for dynamic hrefs); the
+router clears context off pool/swap/market routes. `validPoolMarket`
+unit-tested (`tooling/app-shell-test.js` 11/11); DOM-proven headless on pool
+1.19.66 (tab href `#/market/BTS_HONEST.BTC`). (2) Acting-as name left of the
+lock: unlocked resolves the wallet account (stale-guarded, fails toward
+locked), otherwise the committee-account default; repaints on shell render +
+lock toggle. (3) Footer status block is now a `#/settings` link (anchor
+keeps id/classes/aria-live; token CSS, no underline). (4) Node ops row:
+Ping All (renamed, es "Probar todos" preserved), Add node (new key — the
+shared Add stays for HTLC/discovery rows), Find nodes, one flex line ≥720px
+stacked below. Headless `#/settings` @1440: all three controls inline,
+username + footer link live, zero console errors.

@@ -28,6 +28,7 @@ const out = args.out || "/tmp/shot.png";
 const theme = args.theme || null;
 const network = args.network || null;
 const noTour = args.notour || null;
+const locale = args.locale || null;
 const waitMs = Number(args.wait || 12000);
 
 const browser = await chromium.launch();
@@ -37,9 +38,9 @@ page.on("console", (msg) => {
   if (msg.type() === "error") errors.push(msg.text().slice(0, 300));
 });
 page.on("pageerror", (err) => errors.push("pageerror: " + String(err).slice(0, 300)));
-if (theme || network || noTour) {
+if (theme || network || noTour || locale) {
   await page.addInitScript(
-    ({ t, n, nodes, notour }) => {
+    ({ t, n, nodes, notour, loc }) => {
       try {
         const raw = localStorage.getItem("bts-vanilla-settings-v1");
         const s = raw ? JSON.parse(raw) : {};
@@ -51,12 +52,14 @@ if (theme || network || noTour) {
         }
         localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
         if (notour) localStorage.setItem("bts-vanilla-tour-dismissed-v1", "1");
+        if (loc) localStorage.setItem("bts-vanilla-locale-v1", loc);
       } catch {}
     },
     {
       t: theme,
       n: network,
       notour: noTour,
+      loc: locale,
       nodes: {
         mainnet: ["wss://api.bitshares.dev/ws"],
         testnet: ["wss://testnet.xbts.io/ws"],

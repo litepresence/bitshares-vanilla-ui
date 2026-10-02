@@ -209,3 +209,133 @@ and Recent blocks slid left. One-line restore, verified headless (both
 panels side-by-side, live rows, zero errors). Process lesson recorded: view
 refactors get their confirming screenshot BEFORE the done-claim, not after —
 no unit suite covers paintTip's DOM assembly, the shooter is the test.
+
+## Delta — 2026-10-02 biggest-in-sample panel (gov-analytics extension)
+- `vanilla/js/views/explorer-blocks.js` — "Largest blocks & transactions"
+  panel at the tip bottom (paintBiggestSample): pure ranking over the tip's
+  OWN rows/bodies (zero new RPCs — same get_dynamic_global_properties +
+  get_block_header_batch + get_block the tip already fetched,
+  database_api.hpp:229/:173/:182); top-5 by tx_count + top-5 txs by op count
+  (body.transactions lengths via Explorer.opsFromBody shape). Label ALWAYS
+  "Largest in last N blocks (#lo–#head) — sample, not all-time" via
+  GovAnalytics.sampleLabel (local fallback identical). N<=50 cap (SAMPLE_MAX).
+- Live mainnet (head #114882091): panel mounts, label honest, rows link to
+  #/block/#tx. Matrix rows: get_block_header_batch(vector<uint32_t>,
+  optional<bool>) :173; get_block(uint32_t) :182; head :229.
+- Anti-rot (a–c): (a) static, no new surface; (b) nothing new depended on
+  (reuses tip rows); (c) deletable: the panel (tip stands). check_rot PASS,
+  check_types PASS. No ES (chain-history only, doctrine).
+
+## Delta 2026-10-02 — explorer readability: sentences, typeahead, share links
+
+Scope: activity-sentence coverage, search typeahead, copy-share-link buttons.
+No new routes, no new WS methods beyond two read-only suggesters, no serializer
+touch (`git diff --name-only` shows no `vanilla/js/tx.js` — op builders unchanged).
+
+1. Reference behavior (file:line; #4 wins conflicts):
+   - Op enum 0–77 + virtual set: `bitshares-core/.../protocol/operations.hpp`
+     (`operations.hpp:56-133`: 4 fill VIRTUAL, 42 settle-cancel VIRTUAL, 44 fba
+     VIRTUAL, 46 execute_bid VIRTUAL, 51 htlc_redeemed VIRTUAL, 53 htlc_refund
+     VIRTUAL, 74 credit_deal_expired VIRTUAL). Third opinion: open-graphene
+     spec `dist/bitshares.open-graphene.json` `operations[0..77]` — same 78
+     names in the same order, no conflicts with #4.
+   - Op field truth (#4): `account.hpp:197-220` (op 7 listing bits),
+     `account.hpp:235-251` (op 8 upgrade flag), `asset_ops.hpp:192-226` (op 10),
+     `:351-382` (op 11), `:513-524` (op 15), `:322-334` (op 16, core precision
+     per `asset_object.hpp:65` + `config.hpp:29-30`), `:267-288` (op 17),
+     `proposal.hpp:119-143` (op 23), `vesting.hpp:101-117` (op 33),
+     `htlc.hpp:45-88/90-117` (ops 49/50), `market.hpp:117-136` (op 77).
+   - Wording spec: `wallet-extension/src/popup/popup.js` 78-op history table
+     ("Account Upgrade" `:1904`, "Order Updated" `:2805`, default `opLabel`
+     fallback) — sentences follow its verbs, never raw JSON.
+   - Typeahead methods: `lookup_accounts(lower,limit)` (`database_api.hpp:357`;
+     #1 `accountApi.js:8` calls it the same way); asset prefix paging is
+     `list_assets` (`database_api.hpp:435`; #1 `AssetActions.js:541`) — there
+     is NO `lookup_assets` on #4, so the asset suggester uses `list_assets`
+     (raw + uppercased prefix, merged by id). `get_recent_transaction_by_id`
+     EXISTS (`database_api.hpp:200`) but returns a location-less tx, so the
+     hash path honest-defers (no block deep link can be built from it).
+2. Vanilla implementation (file:line):
+   - `vanilla/js/views/explorer-blocks.js`: 12 new sentence branches (7/8/10/
+     11/15/16/17/23/33/49/50/77) + `(virtual)` markers on fill + fallback +
+     pills (VIRTUAL_IDX set); `shareRow` helper; share rows in `renderBlock`
+     + `renderTx`; `_test` seam extended with sentenceFor/pillFor/opAccount/
+     orderNum (additive, prior tests untouched).
+   - `vanilla/js/api/explorer.js`: pure `classifySearchInput` (block/object/
+     txhash/text/empty), pure `shareUrl`/`currentShareUrl`, pure
+     `_normSuggestPairs` (fc pair-array vs object-map shapes), read-only
+     `suggestAccounts`/`suggestAssets` (fail-open []).
+   - `vanilla/js/views/explorer-ui.js`: debounced (200ms) listbox typeahead
+     (buttons only, arrows/Enter/Escape, gen-guarded) + submit routing
+     (numeric→`#/block/N`, object→existing routeObject, txhash→honest defer,
+     text→existing search).
+   - `vanilla/js/views/explorer-assets.js` (`renderAsset`) + `vanilla/js/views/
+     account-ui.js` (`showAccount`): copy-share-link rows (clipboard +
+     execCommand fallback, aria-live result, hash links the router resolves).
+   - Money discipline: amounts via amtSpan/amtObj (`Format.formatAmount`
+     internally); op-16 core amount via `Format.formatAmount(raw, 5)`
+     synchronously; zero new `t()` keys (plain literals — check_i18n green
+     with no locale churn).
+3. Manual test + observed result (this sandbox 2026-10-02, live mainnet):
+   - `node tooling/explorer-readability-test.js` 61/61 green (12 new-sentence
+     vectors + virtual/unknown fallbacks + 14 routing vectors incl. ambiguous
+     `1.2.0`→object and `BTS`→text + 4 share-URL + 5 pair-shape vectors).
+   - Prior suites still green: `explorer-ops-test` 16/16,
+     `explorer-blocks-ago-test` 35/35; `node --check` clean on all 5 touched
+     view/api files.
+   - Gates: `check_rot.py` PASS, `check_types.sh` PASS, `check_i18n.py` OK
+     (3077 keys, 3955 call sites drift-free).
+   - Headless `shot.mjs` (PLAYWRIGHT_BROWSERS_PATH set): `#/explorer` @1440 +
+     @390, `#/block/100`, `#/asset/BTS`, theme trio (default/light/dark) —
+     all 6 shots zero console errors; @1440 shows LIVE blocks/activity
+     (api.bitshares.dev, head #114882086, order sentences rendering).
+     Human gate: typeahead feel + share-button copy on device.
+4. Raw→human vectors (from the new test): op-16 `"100000"` p5→`"1.00000
+   (core)"`; op-2 `"1.7.9"`→`"#9"`; op-77 `"1.7.123"`→`"#123"`; percent
+   fields: none displayed (no new percent glue — nothing to misplace).
+5. Theme/viewport: trio shots green (no new CSS — rows reuse
+   `.xplore-share`/muted/button tokens); typeahead listbox stacks (no
+   absolute positioning — 360px safe); share buttons `touchable`/44px.
+6. Module headers: explorer.js + explorer-blocks.js headers extended in place
+   (no new files to header except the test, which carries its own header);
+   no dead text, no TODOs.
+Anti-rot gate: (a) platform APIs only (clipboard/execCommand/DOM timers), runs
+in 10 years; (b) zero new deps — two read-only WS methods already on the
+database api, clipboard is platform; (c) deletable: typeahead (submit path
+unchanged), share rows (headers stand), each sentence branch (fallback covers)
+— kept because activity rows were the unreadable part.
+
+## Avoided explorer features (honest deferrals + chain-data reasoning)
+
+> Not missing — deliberately not built. Each row names the #1 surface, what
+> the chain API actually offers (#4 wins), and why vanilla refuses the rest.
+> Doctrine: chain history only, no ES transport, no unbounded scans.
+
+- Rich account list (`#1 Explorer/Accounts.jsx`): `lookup_accounts` paginates
+  by name prefix (`database_api.hpp:357`) and `get_account_count` gives only
+  the total (`:402`) — there is NO ranked/paged "all accounts" endpoint.
+  A rich list would mean prefix-walking the whole keyspace per page. Avoided:
+  search-by-name + `1.2.x` object links cover lookup; no full-table browse.
+- Per-asset holder lists: NO `get_asset_holders` exists anywhere in
+  `database_api.hpp` (grep: zero hits) — holder data lives behind the
+  history/ES sidecar #1's deployment runs. Vanilla refuses the ES transport
+  (doctrine), so no holder tab. Balances per account remain the honest path.
+- Aggregate volume / market-cap tables: no aggregate endpoint on the chain
+  API — every "top by volume" would require summing unbounded history
+  client-side (violates #6 money discipline at scale + DoS on public nodes).
+  The "Largest in last N blocks" panel above is the bounded honest version
+  (N<=50 tip sample, labeled sample-not-all-time).
+- Blocktime / transaction charts (`#1 Explorer/BlocktimeChart.jsx`,
+  `TransactionChart.jsx`): derived aggregates over long history windows, not
+  chain reads — same unbounded-scan problem. The tip bar strip (20-window,
+  oldest-left) is the bounded replacement.
+- Tx-hash deep links: `get_recent_transaction_by_id` EXISTS
+  (`database_api.hpp:200`) but returns a location-less tx (no block number),
+  so no `#/block/:h/:ix` link can be built from a bare hash. The search box
+  says so honestly and defers instead of guessing a block.
+- Visuals page: refused with 5-point reasoning (recorded in slice-12 delta) —
+  matplotlib-style plotting has no place in a browser wallet; canvas depth +
+  LWC price panes stay, dashboard eye-candy does not.
+- Joins explicitly out per R1e: no explorer↔activity joins, no gateway
+  history panels, no news feed — each would need the ES sidecar or a
+  third-party API as a load-bearing import. Documented, not queued.

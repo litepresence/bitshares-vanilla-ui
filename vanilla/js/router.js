@@ -368,6 +368,17 @@ var Router = (function () {
       params = {};
     }
     if (typeof document !== "undefined") document.title = title;
+    /* Pool-market context hygiene: the header Exchange tab follows pool
+     * pages only. Leaving pools/swap/market clears it (market routes set
+     * their own context implicitly by being the desk). currentPath() yields
+     * "#"-less paths ("/pools/…"). Never throws. */
+    try {
+      if (typeof App !== "undefined" && App && typeof App.setPoolMarket === "function") {
+        if (path !== "/swap" && path.indexOf("/pools") !== 0 && path.indexOf("/market/") !== 0) {
+          App.setPoolMarket(null);
+        }
+      }
+    } catch (e) { /* context stands */ }
     fn(view, params);
     try { a11ySweep(view); } catch (e) { /* paint stands */ }
     /* Candy-2 view-enter restart (tab-switch micro-fade; CSS owns motion). */

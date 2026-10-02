@@ -381,6 +381,15 @@ var VoteUI = (function () {
     updWBtn.addEventListener("click", function () { renderJoinWitness(doc, joinBox, root, st, myGen, true); });
     joinCBtn.addEventListener("click", function () { renderJoinCommittee(doc, joinBox, root, st, myGen); });
 
+    /* Governance analytics (bounded reads only — GovAnalytics): funding
+     * shares, active/standby splits, top voters + proxy-vote matrix. Paints
+     * best-effort below the join entries; every failure renders an honest
+     * dash/unavailable line, never blank, never fatal. Plain literals only
+     * (no new i18n keys — locale dicts outside this change's scope). */
+    var analyticsBox = el(doc, "div", null, "vote-analytics");
+    wrap.appendChild(analyticsBox);
+    renderAnalytics(doc, analyticsBox, st, myGen);
+
     var proxyBox = el(doc, "div", null, "vote-proxy");
     wrap.appendChild(proxyBox);
     var tabsBar = el(doc, "div", null, "vote-tabs");
@@ -879,6 +888,164 @@ var VoteUI = (function () {
       if (myGen !== gen) return;
       line.textContent = t("vote.worker_budget", "Worker budget: —");
     });
+  }
+
+  /* Governance analytics section (GovAnalytics joins — all bounded, see that
+   * file's header for the #4 citations). Renders, in order: active/standby
+   * splits (from the already-loaded lists snapshot — zero new RPCs), worker
+   * funding shares (live workers + 2.0.0 per-day cap), top voters by vp_active
+   * (one get_top_voters, N=10), and the proxy-vote matrix (top-10 voters x
+   * top-10 witnesses + top-10 committee, one batched get_accounts). Voting
+   * power (vp_active) is a unitless uint64 — rendered as a plain integer with
+   * thousands commas, NEVER via Format.formatAmount (that would mislabel it
+   * as core money). Worker pay IS core money (Format p5) and funding % is
+   * GovAnalytics.fundingShare (exact BigInt). Every sub-panel fails open with
+   * an honest line. Plain literals only (no new i18n keys). Params: doc, box
+   * (emptied by nobody — appended once), st (lists snapshot), myGen. */
+  function renderAnalytics(doc, box, st, myGen) {
+    if (typeof GovAnalytics === "undefined" || !GovAnalytics) return;
+    box.appendChild(el(doc, "h2", "Governance analytics"));
+    /* Splits: zero new RPCs (st.lists already carries the active flags). */
+    try {
+      var w = GovAnalytics.splitCounts(st.lists.witnesses);
+      var c = GovAnalytics.splitCounts(st.lists.committee);
+      box.appendChild(el(doc, "p",
+        "Active splits — witnesses: " + w.active + " active / " + w.standby +
+        " standby (" + w.total + " total) · committee: " + c.active +
+        " active / " + c.standby + " standby (" + c.total + " total).", "muted"));
+    } catch (e) { box.appendChild(el(doc, "p", "Active splits unavailable.", "muted")); }
+    /* Worker funding shares (best-effort live join). */
+    var fundP = el(doc, "p", "Worker funding: loading…", "muted");
+    box.appendChild(fundP);
+    GovAnalytics.workerFunding().then(function (fr) {
+      if (myGen !== gen) return;
+      while (fundP.firstChild) fundP.removeChild(fundP.firstChild);
+      var rows = GovAnalytics.fundingRows(fr.workers).slice(0, 10);
+      var head = "Worker funding (pay/day share of " +
+        (fr.budgetRaw ? fundHuman(fr.budgetRaw) + " (core)/day" : "unknown budget") + "):";
+      fundP.textContent = head;
+      if (rows.length === 0) {
+        box.appendChild(el(doc, "p", "No live workers on chain — valid, not an error.", "muted"));
+        return;
+      }
+      var table = doc.createElement("table");
+      table.className = "node-table";
+      var thead = doc.createElement("thead");
+      var hr = doc.createElement("tr");
+      ["Worker", "Pay/day", "Share"].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      thead.appendChild(hr);
+      table.appendChild(thead);
+      var tb = doc.createElement("tbody");
+      rows.forEach(function (r) {
+        var tr = doc.createElement("tr");
+        tr.appendChild(el(doc, "td", (r.name || r.id) + " (" + r.id + ")"));
+        var payHuman;
+        try {
+          payHuman = Format.formatAmount(String((r.extra || {}).daily_pay_raw || "0"), CORE_PRECISION_FALLBACK);
+        } catch (e2) { payHuman = String((r.extra || {}).daily_pay_raw || "0"); }
+        tr.appendChild(el(doc, "td", payHuman));
+        tr.appendChild(el(doc, "td", GovAnalytics.fundingShare((r.extra || {}).daily_pay_raw, fr.budgetRaw)));
+        tb.appendChild(tr);
+      });
+      table.appendChild(tb);
+      /* Insert the table right after the heading line. */
+      if (fundP.nextSibling) box.insertBefore(table, fundP.nextSibling);
+      else box.appendChild(table);
+      var totalHuman;
+      try { totalHuman = Format.formatAmount(fr.totalPayRaw, CORE_PRECISION_FALLBACK); }
+      catch (e3) { totalHuman = fr.totalPayRaw; }
+      var totLine = el(doc, "p",
+        "Total requested: " + totalHuman + " (core)/day" +
+        (fr.budgetRaw ? " (" + GovAnalytics.fundingShare(fr.totalPayRaw, fr.budgetRaw) + " of budget)" : "") +
+        " — top 10 shown.", "muted");
+      if (table.nextSibling) box.insertBefore(totLine, table.nextSibling);
+      else box.appendChild(totLine);
+    }).catch(function (e) {
+      if (myGen !== gen) return;
+      fundP.textContent = "Worker funding unavailable (" +
+        ((e && e.message) || "read failed") + ").";
+    });
+    /* Top voters + proxy-vote matrix (best-effort bounded join). */
+    var topP = el(doc, "p", "Top voters: loading…", "muted");
+    box.appendChild(topP);
+    GovAnalytics.proxyMatrix(10, 10, 10).then(function (mx) {
+      if (myGen !== gen) return;
+      topP.textContent = "Top 10 voters by voting power (get_top_voters — sample, not a full proxy census):";
+      if (mx.voters.length === 0) {
+        box.appendChild(el(doc, "p", "No top voters returned.", "muted"));
+        return;
+      }
+      var vt = doc.createElement("table");
+      vt.className = "node-table";
+      var vh = doc.createElement("thead");
+      var vr = doc.createElement("tr");
+      ["Voter", "Voting power", "Proxy"].forEach(function (h) { vr.appendChild(el(doc, "th", h)); });
+      vh.appendChild(vr);
+      vt.appendChild(vh);
+      var vb = doc.createElement("tbody");
+      mx.voters.forEach(function (v) {
+        var tr = doc.createElement("tr");
+        tr.appendChild(el(doc, "td", v.name + " (" + v.id + ")"));
+        tr.appendChild(el(doc, "td", commas(v.vpRaw)));
+        tr.appendChild(el(doc, "td", v.proxy && v.proxy !== PROXY_SENTINEL ? v.proxy : "—"));
+        vb.appendChild(tr);
+      });
+      vt.appendChild(vb);
+      box.appendChild(vt);
+      /* Matrix: rows = voters, columns = top candidates (W = witness votes,
+       * C = committee votes). "✓" = the voter's on-chain slate contains that
+       * vote id; "·" = absent. Read-only, keyboard-scrollable region. */
+      box.appendChild(el(doc, "p",
+        "Proxy-vote matrix (rows: top-10 voters; columns: top-10 witnesses + top-10 committee by weight) — ✓ means the voter's slate carries that vote.", "muted"));
+      var scroller = doc.createElement("div");
+      scroller.style.overflowX = "auto";
+      var mt = doc.createElement("table");
+      mt.className = "node-table";
+      var mh = doc.createElement("thead");
+      var mhr = doc.createElement("tr");
+      mhr.appendChild(el(doc, "th", "Voter \\ candidate"));
+      var cands = mx.candidates.witness.concat(mx.candidates.committee);
+      cands.forEach(function (cid, i) {
+        var kind = i < mx.candidates.witness.length ? "W" : "C";
+        mhr.appendChild(el(doc, "th", kind + ":" + cid));
+      });
+      mh.appendChild(mhr);
+      mt.appendChild(mh);
+      var mb = doc.createElement("tbody");
+      mx.matrix.forEach(function (row) {
+        var tr = doc.createElement("tr");
+        var who = null;
+        for (var k = 0; k < mx.voters.length; k++) {
+          if (mx.voters[k].id === row.voter) { who = mx.voters[k]; break; }
+        }
+        tr.appendChild(el(doc, "td", (who ? who.name : row.voter)));
+        cands.forEach(function (cid) {
+          tr.appendChild(el(doc, "td", row.cells[cid] ? "✓" : "·"));
+        });
+        mb.appendChild(tr);
+      });
+      mt.appendChild(mb);
+      scroller.appendChild(mt);
+      box.appendChild(scroller);
+    }).catch(function (e) {
+      if (myGen !== gen) return;
+      var m = (e && e.message) || "";
+      topP.textContent = m === "unavailable"
+        ? "Top voters unavailable on this node (no get_top_voters) — switch nodes in Settings to see them."
+        : "Top voters unavailable (" + (m || "read failed") + ").";
+    });
+  }
+
+  /* Thousands commas on a digit string (display only — vp/power counts, never
+   * money; money still formats via Format before reaching here). */
+  function commas(digits) {
+    return String(digits).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  /* Core-money human for the funding heading (Format p5; raw fallback). */
+  function fundHuman(raw) {
+    try { return Format.formatAmount(String(raw), CORE_PRECISION_FALLBACK); }
+    catch (e) { return String(raw); }
   }
 
   /* Labeled text input row for the join forms (xfer-field convention, same

@@ -281,6 +281,10 @@ var MarketDesk = (function () {
       panes: { price: null, oscs: {} },
       paneEls: {}, oscBoxes: {},
       ticker: null, countNote: null, tfBox: null, oscNote: null,
+      /* Grouped book (client-side bucketing, no refetch): groupDec null =
+       * exact levels; else 8/6/4/2 decimals floor via MarketBook.groupBook.
+       * bookRaw caches the last fetched get_order_book pair for repaints. */
+      groupDec: null, bookRaw: null,
       /* Pool-map provenance slice (2-layer BTS-core map, own canvas — never blocks desk). */
       graphWrap: null, graphCanvas: null, graphNote: null, graphData: null
     };
@@ -383,6 +387,44 @@ var MarketDesk = (function () {
     state.strip = strip;
     var spreadLine = el(doc, "p", "", "muted");
     head.appendChild(spreadLine);
+    /* Grouped-book toggle (client-side bucketing of the fetched levels — no
+     * refetch, no new WS method, no ES): Exact or floor to 8/6/4/2 decimals
+     * via MarketBook.groupBook (Format-validated, exact sums). One control in
+     * the head governs BOTH order lists below; the depth bars follow the
+     * grouped rows (renderSplit recomputes depth from them). */
+    try {
+      var groupRow = doc.createElement("div");
+      groupRow.className = "mkt-grouprow";
+      var groupLab = el(doc, "span", t("market.group_label", "Grouping") + " ");
+      groupRow.appendChild(groupLab);
+      var groupSel = doc.createElement("select");
+      groupSel.id = "mkt-book-group";
+      groupSel.setAttribute("aria-label", t("market.group_label", "Grouping"));
+      touchable(groupSel);
+      var offOpt = doc.createElement("option");
+      offOpt.value = "";
+      offOpt.textContent = t("market.group_off", "Exact prices");
+      groupSel.appendChild(offOpt);
+      ["8", "6", "4", "2"].forEach(function (d) {
+        var o = doc.createElement("option");
+        o.value = d;
+        o.textContent = d + " " + t("market.group_decimals", "decimals");
+        groupSel.appendChild(o);
+      });
+      groupSel.addEventListener("change", function () {
+        var v = groupSel.value;
+        state.groupDec = (v === "" || v === null) ? null : parseInt(v, 10);
+        if (!Number.isInteger(state.groupDec)) state.groupDec = null;
+        paintBook(doc, state);
+        try {
+          if (typeof MarketInd !== "undefined" && MarketInd &&
+              typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
+        } catch (e) { /* book stands without the chart */ }
+      });
+      groupRow.appendChild(groupSel);
+      head.appendChild(groupRow);
+      head.appendChild(el(doc, "p", t("market.group_note", "Grouped rows sum base/quote exactly; bucket price is the floor."), "muted"));
+    } catch (e) { /* head works without the grouping toggle */ }
     /* Raw-ticker proof host (triangle-only details, refilled per stats
      * fetch — the 24h dl panel is gone with the stats grid cell). */
     var tickerRaw = doc.createElement("div");
@@ -1189,6 +1231,34 @@ var MarketDesk = (function () {
     } catch (e) { /* deep is best-effort */ }
   }
 
+  /* paintBook: render bids/asks from the cached get_order_book pair.
+   * Applies state.groupDec (null = exact) via MarketBook.groupBook
+   * (client-side floor bucketing — no refetch, no new WS method, no ES) and
+   * paints through MarketBook.renderSplit (depth bars follow the grouped
+   * rows; the returned depth is cached for charts). Grouping faults fall
+   * back to the exact book — the lists never blank. No-op without a cached
+   * pair or assets. Params: (doc, state). Never throws outward. */
+  function paintBook(doc, state) {
+    try {
+      if (!state || !state.bookRaw || !state.assets) return;
+      if (!state.bidsBody || !state.asksBody || !state.spreadLine) return;
+      if (typeof MarketBook === "undefined" || !MarketBook ||
+          typeof MarketBook.renderSplit !== "function") return;
+      var grouped = state.bookRaw;
+      try {
+        if (state.groupDec !== null && state.groupDec !== undefined &&
+            typeof MarketBook.groupBook === "function") {
+          grouped = MarketBook.groupBook(state.bookRaw, state.groupDec);
+        }
+      } catch (e) { grouped = state.bookRaw; /* exact book stands */ }
+      state.bookDepth = MarketBook.renderSplit(doc, state.bidsBody, state.asksBody, {
+        book: grouped, basePrec: state.assets.base.precision, quotePrec: state.assets.quote.precision,
+        baseSymbol: state.assets.base.symbol, quoteSymbol: state.assets.quote.symbol,
+        spreadLine: state.spreadLine, logVol: !!state.depthLogY
+      });
+    } catch (e) { /* book cells keep their previous paint */ }
+  }
+
   /* Fill every section from the chain; sections fail inline, never blank.
    * Strip/timeframe/chart bodies live in market-ind.js (MarketInd.*) — the
    * chain calls and section wiring stay here, exactly as before. */
@@ -1209,11 +1279,8 @@ var MarketDesk = (function () {
      * a row sets BOTH panels' price inputs and focuses the taking side's
      * amount. The book cells stay display-only otherwise. */
     Market.book(b.id, q.id, 50).then(function (book) {
-      state.bookDepth = MarketBook.renderSplit(doc, state.bidsBody, state.asksBody, {
-        book: book, basePrec: b.precision, quotePrec: q.precision,
-        baseSymbol: b.symbol, quoteSymbol: q.symbol, spreadLine: state.spreadLine,
-        logVol: !!state.depthLogY
-      });
+      state.bookRaw = book;
+      paintBook(doc, state);
       MarketInd.maybeDraw(state);
     }).catch(function (e) {
       while (state.bidsBody.firstChild) state.bidsBody.removeChild(state.bidsBody.firstChild);

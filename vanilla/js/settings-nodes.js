@@ -212,7 +212,7 @@ var SettingsNodes = (function () {
     var probeBtn = doc.createElement("button");
     probeBtn.id = "probe-all";
     probeBtn.type = "button";
-    probeBtn.textContent = t("settings.probe_all", "Probe all");
+    probeBtn.textContent = t("settings.probe_all", "Ping all");
 
     var offline = doc.createElement("div");
     offline.id = "offline-panel";
@@ -247,7 +247,7 @@ var SettingsNodes = (function () {
     var btn = doc.createElement("button");
     btn.id = "discover-btn";
     btn.type = "button";
-    btn.textContent = t("settings.discover", "Discover more nodes");
+    btn.textContent = t("settings.discover", "Find nodes");
     wrap.appendChild(btn);
     var cancel = doc.createElement("button");
     cancel.id = "discover-cancel";
@@ -309,7 +309,7 @@ var SettingsNodes = (function () {
     var customAdd = doc.createElement("button");
     customAdd.id = "custom-add";
     customAdd.type = "button";
-    customAdd.textContent = t("settings.add", "Add");
+    customAdd.textContent = t("settings.add_node", "Add node");
     customWrap.appendChild(customAdd);
     var customError = doc.createElement("div");
     customError.id = "custom-error";

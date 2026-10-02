@@ -70,6 +70,44 @@ var App = (function () {
   var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/credit-offer", "#/pools",
     "#/explorer"];
 
+  /* Pool-market context (owner: Exchange tab follows the pool you're
+   * visiting). Pool views publish their pair's QUOTE_BASE market id here;
+   * the header Exchange link swaps to it (falling back to the default).
+   * Transient UI state, never persisted — the router clears it off pool
+   * routes so the tab never goes stale. Never throws. */
+  var poolMarketID = null;
+  /* validPoolMarket: QUOTE_BASE id with real symbols (never 1.2.x-style
+   * object ids — those would misroute the desk). Params: id unknown.
+   * Returns boolean. Pure, unit-tested. */
+  function validPoolMarket(id) {
+    if (typeof id !== "string") return false;
+    var parts = id.toUpperCase().split("_");
+    if (parts.length !== 2) return false;
+    var ok = parts.every(function (p) {
+      return /^[A-Z0-9.]{1,12}$/.test(p) && !/^1\.\d+\.\d+$/.test(p);
+    });
+    return !!ok;
+  }
+  function setPoolMarket(id) {
+    try {
+      poolMarketID = validPoolMarket(id) ? id.toUpperCase() : null;
+    } catch (e) { poolMarketID = null; }
+    refreshExchangeLink();
+  }
+  function poolMarket() { return poolMarketID; }
+  /* refreshExchangeLink: point the header Exchange tab at the pool market
+   * (or back at the default when cleared). Targeted DOM touch — no full
+   * nav rebuild. Never throws (missing nav is a no-op). */
+  function refreshExchangeLink() {
+    try {
+      if (typeof document === "undefined") return;
+      var a = document.querySelector("a[data-nav-exchange]");
+      if (!a) return;
+      a.setAttribute("href", poolMarketID ? "#/market/" + poolMarketID : "#/market/BTS_USD");
+      a.setAttribute("title", poolMarketID ? "#/market/" + poolMarketID : "#/market/BTS_USD");
+    } catch (e) { /* link stands */ }
+  }
+
   /* Nav icons (icon-wiring pass): href -> vendored icon name. Mapping cites
    *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242;
    *   credit uses borrow: #1's deployment-unit asset renders as a blob at
@@ -152,9 +190,15 @@ var App = (function () {
    *   plain text. */
   function buildNavLink(href, iconOK) {
     var a = document.createElement("a");
+    /* Pool-context swap: the header Exchange tab follows the pool market
+     * (setPoolMarket), falling back to the default pair. */
+    if (href === "#/market/BTS_USD" && poolMarketID) href = "#/market/" + poolMarketID;
     a.setAttribute("href", href);
+    if (href.indexOf("#/market/") === 0) a.setAttribute("data-nav-exchange", "true");
+    try { if (href.indexOf("#/market/") === 0) a.setAttribute("title", href); } catch (e) { /* label stands */ }
     var label = navText(href);
-    var icon = NAV_ICONS[href];
+    if (href.indexOf("#/market/") === 0 && label === href) label = t("nav.exchange", "Exchange");
+    var icon = NAV_ICONS[href] || (href.indexOf("#/market/") === 0 ? "trade" : null);
     try {
       if (icon && iconOK) {
         a.appendChild(Icon.img(icon, "nav-icon", ""));
@@ -411,6 +455,7 @@ var App = (function () {
       var toggle = document.getElementById("nav-toggle");
       if (toggle) toggle.setAttribute("aria-label", t("shell.menu", "Menu"));
       paintLock();
+      paintActingAs();
       paintFootActions();
       var nav = document.getElementById("nav");
       if (nav) localizeNav(nav);
@@ -430,6 +475,54 @@ var App = (function () {
     return false;
   }
 
+  /* paintActingAs: username left of the lock (owner call). Unlocked ->
+   * the wallet's own account name; locked (or any failure) -> the
+   * viewing-as default committee-account (principle #9: acting-as defaults
+   * to 1.2.0). Async resolve with a stale-guard (a lock landing mid-flight
+   * keeps the default — fails toward locked, the safe direction). Called
+   * from localizeShell (boot, hashchange, locale) and after lock toggles.
+   * Params: none. Returns nothing. Fails: never throws. */
+  var actingGen = 0;
+  function paintActingAs() {
+    if (typeof document === "undefined") return;
+    var myGen = ++actingGen;
+    var el = document.getElementById("acting-as");
+    if (!el) return;
+    function show(name, title) {
+      if (myGen !== actingGen) return;
+      try {
+        el.textContent = name;
+        el.setAttribute("title", title);
+      } catch (e) { /* name stands */ }
+    }
+    if (!walletUnlockedNow()) {
+      show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+      return;
+    }
+    show("…", t("shell.acting_loading", "Resolving account…"));
+    try {
+      if (typeof Account === "undefined" || !Account ||
+          typeof Account.myAccountId !== "function") {
+        show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+        return;
+      }
+      Account.myAccountId().then(function (id) {
+        if (!id) { show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)")); return; }
+        return Account.resolve(id).then(function (a) {
+          if (!walletUnlockedNow()) {
+            show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+            return;
+          }
+          var name = (a && a.name) ? String(a.name) : String(id);
+          show(name, t("shell.acting_unlocked", "Acting as ") + name);
+        });
+      }).catch(function () {
+        show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+      });
+    } catch (e) {
+      show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+    }
+  }
   /* paintLock: lock affordance next to the hamburger (Header.jsx:663-681).
    *   Unlocked -> vendored unlocked glyph, click locks in place; locked ->
    *   locked glyph linking to #/login. Params: none. Returns nothing. Fails:
@@ -465,6 +558,7 @@ var App = (function () {
         if (typeof Wallet !== "undefined" && Wallet && typeof Wallet.lock === "function") Wallet.lock();
       } catch (e) { /* stays unlocked */ }
       paintLock();
+      paintActingAs();
     });
   }
 
@@ -940,7 +1034,8 @@ var App = (function () {
   /* Classic script: auto-boot in browsers only; require() under node stays side-effect free. */
   if (typeof document !== "undefined") boot();
 
-  return { boot: boot, localizeShell: localizeShell };
+  return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
+    _test: { validPoolMarket: validPoolMarket } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }

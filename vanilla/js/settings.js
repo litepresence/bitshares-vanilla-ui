@@ -57,19 +57,36 @@ var SettingsPage = (function () {
     wrap.appendChild(cards);
 
     var probe = SettingsNodes.buildProbe(doc, t);
-    wrap.appendChild(probe.probeBtn);
-    wrap.appendChild(probe.offline);
     var offline = probe.offline;
 
     var custom = SettingsNodes.buildCustom(doc, t);
-    wrap.appendChild(custom.wrap);
     var customInput = custom.customInput, customAdd = custom.customAdd, customError = custom.customError;
 
     /* Opt-in discovery (explicit button only — never automatic): background
      * sweep with progress + cancel; results are review candidates, Add
      * reuses the custom path above (same validation, same storage). */
     var disc = SettingsNodes.buildDiscover(doc, t);
-    wrap.appendChild(disc.wrap);
+
+    /* Node ops row (owner: one line on desktop): probe-all + custom add +
+     * discover button share a flex row ≥720px and stack below it. The
+     * discover note/progress/results + offline panel stay full-width under
+     * the row (results need the width). */
+    var opsRow = doc.createElement("div");
+    opsRow.className = "node-ops-row";
+    opsRow.appendChild(probe.probeBtn);
+    opsRow.appendChild(custom.wrap);
+    try {
+      var discBtns = doc.createElement("div");
+      discBtns.className = "node-discover-btns";
+      discBtns.appendChild(disc.btn);
+      discBtns.appendChild(disc.cancel);
+      opsRow.appendChild(discBtns);
+    } catch (e) { opsRow.appendChild(disc.btn); }
+    wrap.appendChild(opsRow);
+    wrap.appendChild(probe.offline);
+    wrap.appendChild(disc.note);
+    wrap.appendChild(disc.progress);
+    wrap.appendChild(disc.list);
 
     var theme = SettingsPrefs.buildTheme(doc, settings, t);
     wrap.appendChild(theme.label);

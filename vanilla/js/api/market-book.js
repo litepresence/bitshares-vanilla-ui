@@ -15,7 +15,8 @@
  *   caller-supplied data.
  * Consumes: Market (depth computation only, via global — same as before the
  *   split), MarketOrders.renderTape (optional tape histogram, guarded),
- *   Format not needed (chain-human strings render verbatim).
+ *   Format (grouped-book price validation + base/quote sums ONLY — the
+ *   ungrouped rows still render chain-human strings verbatim).
  * Globals/side effects: DOM under the given parent element only; global
  *   MarketBook only. Exact decimal-string math is a private copy of the
  *   market-ui.js helpers (split/add/sub/half/trim: BigInt + digit loops —
@@ -177,6 +178,175 @@ var MarketBook = (function () {
     } catch (e) {
       return null;
     }
+  }
+
+  /* GROUPED BOOK (desk toggle — client-side price bucketing of the fetched
+   * get_order_book levels; NO new WS method, NO refetch, NO ES).
+   * Bucketing = floor(price, decimals): "1.056"+"1.051" at 2 decimals share
+   * bucket "1.05"; "1.099" at 1 decimal joins "1.0". Floor keeps bids honest
+   * (a grouped bid never claims more than its best leg) and asks
+   * conservative-symmetrical (documented, same rule both sides).
+   * MONEY RULE: all price validation via Format.parsePriceRatio and all
+   * base/quote sums via Format.parseAmount/formatAmount round-trips
+   * (BigInt, never binary float). Number() never touches these paths.
+   * Dust is preserved (sums at the bucket's common scale, never dropped);
+   * empty sides yield [] (same contract as the ungrouped book). */
+
+  /* Offered grouping precisions (null = exact/off, the default). */
+  var GROUP_DECS = [null, 8, 6, 4, 2];
+
+  /* Frac digits of a validated decimal string ("1.50" -> 2, "3" -> 0). */
+  function _fracLen(s) {
+    var i = String(s).indexOf(".");
+    return i === -1 ? 0 : String(s).length - i - 1;
+  }
+
+  /* bucketKey: floor a human price string to `decimals` frac digits.
+   * Params: priceStr (non-negative decimal string), decimals (int 0..8).
+   * Returns the bucket key padded to exactly `decimals` digits ("1.5" at 2
+   * -> "1.50"; "1.056" at 2 -> "1.05"; at 0 -> "1"). Validates the price
+   * through Format.parsePriceRatio (money rule — the throw names the bad
+   * leg). Throws "bad-group" on non-integer/out-of-range decimals. */
+  function bucketKey(priceStr, decimals) {
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 8) throw new Error("bad-group");
+    var s = String(priceStr);
+    if (typeof Format === "undefined" || !Format ||
+        typeof Format.parsePriceRatio !== "function") {
+      throw new Error("format-missing: Format.parsePriceRatio unavailable");
+    }
+    Format.parsePriceRatio(s); /* validation only — the key math below is string ops */
+    var parts = s.split(".");
+    var int = parts[0], frac = parts[1] || "";
+    if (decimals === 0) return int;
+    var cut = frac.slice(0, decimals);
+    while (cut.length < decimals) cut += "0";
+    return int + "." + cut;
+  }
+
+  /* _sumHuman: exact sum of human decimal strings (bucket totals).
+   * Params: strs (array of non-negative decimal strings; bad legs count as
+   *   zero — documented in groupLevels, price discovery stands).
+   * Returns the trimmed decimal string ("0" for empty). Integer/BigInt
+   * string math only: common-scale Format.parseAmount/formatAmount
+   * round-trip while the scale fits Format's 0..12 precision window, manual
+   * BigInt at native scale above it (chain precisions cap at 12, so the
+   * fallback only ever sees exotic price strings — dust-safe either way). */
+  function _sumHuman(strs) {
+    var clean = [];
+    var i, s;
+    for (i = 0; i < strs.length; i++) {
+      s = String(strs[i]);
+      if (/^\d+(?:\.\d+)?$/.test(s)) clean.push(s);
+    }
+    if (clean.length === 0) return "0";
+    var scale = 0;
+    for (i = 0; i < clean.length; i++) {
+      var fl = _fracLen(clean[i]);
+      if (fl > scale) scale = fl;
+    }
+    function trim(s2) { return trimDec(s2); }
+    if (scale <= 12 && typeof Format !== "undefined" && Format &&
+        typeof Format.parseAmount === "function" && typeof Format.formatAmount === "function") {
+      var total = 0n;
+      for (i = 0; i < clean.length; i++) {
+        total += BigInt(Format.parseAmount(clean[i], scale));
+      }
+      return trim(Format.formatAmount(total.toString(), scale));
+    }
+    /* Exotic-scale fallback: pad frac parts manually, add as BigInt. */
+    var tot = 0n;
+    for (i = 0; i < clean.length; i++) {
+      var p = clean[i].split(".");
+      var f = (p[1] || "");
+      while (f.length < scale) f += "0";
+      tot += BigInt(p[0] + f);
+    }
+    var digits = tot.toString();
+    while (digits.length <= scale) digits = "0" + digits;
+    var out = scale === 0 ? digits : digits.slice(0, digits.length - scale) + "." + digits.slice(digits.length - scale);
+    return trim(out);
+  }
+
+  /* _bucketCmp: ascending compare of bucket-key decimal strings via
+   * Format.parsePriceRatio BigInt ratios (never float); unparseable keys
+   * sort last, never throw. */
+  function _bucketCmp(a, b) {
+    try {
+      if (typeof Format === "undefined" || !Format ||
+          typeof Format.parsePriceRatio !== "function") {
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      }
+      var ra = Format.parsePriceRatio(String(a)), rb = Format.parsePriceRatio(String(b));
+      var left = ra.num * rb.den, right = rb.num * ra.den;
+      if (left < right) return -1;
+      if (left > right) return 1;
+      return 0;
+    } catch (e) {
+      var sa = String(a), sb = String(b);
+      if (sa === sb) return 0;
+      return 1; /* junk sinks, never throws */
+    }
+  }
+
+  /** groupLevels: bucket one book side to `decimals` places.
+   * Params: levels (array of {displayPrice|price, base, quote} human-string
+   *   rows — the get_order_book verbatim shapes), decimals (null = exact
+   *   copy, else int 0..8), isBid (boolean: true sorts desc, false asc).
+   * Returns a NEW array of {price, displayPrice, base, quote, _count}
+   * bucket rows (base/quote = exact human sums, price = floor key).
+   * Levels with unparseable prices are SKIPPED (junk row dropped, rest
+   * stand); bad base/quote legs count as zero inside their bucket.
+   * Empty input yields []. Never throws on level data (bad `decimals`
+   * throws "bad-group" — caller-validated select values). */
+  function groupLevels(levels, decimals, isBid) {
+    var list = Array.isArray(levels) ? levels : [];
+    if (decimals === undefined || decimals === null) return list.slice();
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 8) throw new Error("bad-group");
+    var buckets = {};
+    var order = [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var lv = list[i] || {};
+      var px = lv.displayPrice !== undefined && lv.displayPrice !== null ? lv.displayPrice : lv.price;
+      var key;
+      try {
+        key = bucketKey(px, decimals);
+      } catch (e) { continue; /* junk price row dropped, rest stand */ }
+      if (!Object.prototype.hasOwnProperty.call(buckets, key)) {
+        buckets[key] = { price: key, displayPrice: key, bases: [], quotes: [], _count: 0 };
+        order.push(key);
+      }
+      var bk = buckets[key];
+      bk.bases.push(lv.base !== undefined && lv.base !== null ? String(lv.base) : "0");
+      bk.quotes.push(lv.quote !== undefined && lv.quote !== null ? String(lv.quote) : "0");
+      bk._count += 1;
+    }
+    var out = order.map(function (k) {
+      var bk2 = buckets[k];
+      return {
+        price: bk2.price, displayPrice: bk2.displayPrice,
+        base: _sumHuman(bk2.bases), quote: _sumHuman(bk2.quotes),
+        _count: bk2._count
+      };
+    });
+    out.sort(function (x, y) {
+      var c = _bucketCmp(x.price, y.price);
+      return isBid ? -c : c;
+    });
+    return out;
+  }
+
+  /** groupBook: bucket both sides ({bids, asks} -> grouped pair).
+   * Params: book ({bids, asks} level arrays), decimals (null = exact
+   *   copies). Returns {bids, asks}. Empty sides stay []. */
+  function groupBook(book, decimals) {
+    book = book || {};
+    return {
+      bids: groupLevels(Array.isArray(book.bids) ? book.bids : [], decimals, true),
+      asks: groupLevels(Array.isArray(book.asks) ? book.asks : [], decimals, false)
+    };
   }
 
 
@@ -512,7 +682,12 @@ var MarketBook = (function () {
   return {
     renderBook: renderBook,
     renderSplit: renderSplit,
-    renderTrades: renderTrades
+    renderTrades: renderTrades,
+    groupLevels: groupLevels,
+    groupBook: groupBook,
+    bucketKey: bucketKey,
+    GROUP_DECS: GROUP_DECS,
+    _test: { groupLevels: groupLevels, groupBook: groupBook, bucketKey: bucketKey }
   };
 })();
 

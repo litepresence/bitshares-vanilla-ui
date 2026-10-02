@@ -202,6 +202,64 @@ var ExplorerAssets = (function () {
     return a;
   }
 
+  /* Copy-share-link row for the asset view (verbatim twin of the
+   * explorer-blocks.js shareRow — same per-file convention as the
+   * el/touchable copies above, so this file needs no new cross-module
+   * surface). Hash deep links the router already resolves (router.js:
+   * #/asset/:symbol). Clipboard API with an execCommand textarea fallback;
+   * the result reads inline via aria-live, never a dialog. textContent
+   * only. Params: doc, hash ("#/…"). Returns the row div. Never throws. */
+  function shareRow(doc, hash) {
+    var row = el(doc, "div", null, "xplore-share");
+    var btn = touchable(el(doc, "button", "Copy link"));
+    btn.type = "button";
+    var note = el(doc, "span", "", "muted");
+    note.setAttribute("aria-live", "polite");
+    row.appendChild(btn);
+    row.appendChild(el(doc, "span", " "));
+    row.appendChild(note);
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      note.textContent = "Copying…";
+      var url = "";
+      try {
+        if (typeof Explorer !== "undefined" && Explorer &&
+            typeof Explorer.currentShareUrl === "function") {
+          url = Explorer.currentShareUrl(hash);
+        } else if (typeof location !== "undefined" && location.href) {
+          url = location.href.split("#")[0] + hash;
+        } else {
+          url = hash;
+        }
+      } catch (e) { url = hash; }
+      function done(ok) {
+        btn.disabled = false;
+        note.textContent = ok ? "Copied" : "Copy failed — long-press the address bar to copy";
+      }
+      function fallback() {
+        try {
+          var ta = doc.createElement("textarea");
+          ta.value = url;
+          doc.body.appendChild(ta);
+          ta.select();
+          var ok = false;
+          try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+          try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+          done(!!ok);
+        } catch (e) { done(false); }
+      }
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard &&
+            typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+        } else {
+          fallback();
+        }
+      } catch (e) { fallback(); }
+    });
+    return row;
+  }
+
   /* Inline error panel that is never blank: thrown values map to human
    * sentences; unknown shapes fall back to a generic message. */
   function showError(doc, wrap, e, fallback) {
@@ -635,6 +693,7 @@ var ExplorerAssets = (function () {
       marketBtn.title = marketID;
       marketBtn.setAttribute("aria-label", t("explorer.open_preferred_market", "Open preferred market ") + marketID);
       wrap.appendChild(marketBtn);
+      wrap.appendChild(shareRow(doc, "#/asset/" + a.symbol));
       /* Tabs (shared .xplore-tab underline treatment with explorer-ui.js —
        * grey caps, active accent underline; same bar so all tab rows agree).
        * #1 Tabs info/actions (Asset.jsx:2337-2403). */

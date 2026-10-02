@@ -212,6 +212,14 @@ var PoolDetailUI = (function () {
       },
       swaps: [], precA: precOr5(r.prec_a), precB: precOr5(r.prec_b)
     };
+    /* Pool->Exchange context (owner): the header Exchange tab follows this
+     * pool's pair (QUOTE_BASE orientation like the desk). Guarded: symbol
+     * fallbacks may be object ids, which validPoolMarket rejects. */
+    try {
+      if (typeof App !== "undefined" && App && typeof App.setPoolMarket === "function") {
+        App.setPoolMarket(P.assets.quote.symbol + "_" + P.assets.base.symbol);
+      }
+    } catch (e) { /* default market stands */ }
     try { MarketInd.renderIndMenu(doc, menuHost, P); } catch (e) { /* chart works without the menu */ }
     /* Synthetic depth slice (CPMM levels as a cumulative staircase, same
      * visual language as the exchange depth slice): canvas in an osc-sized

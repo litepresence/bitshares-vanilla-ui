@@ -1375,6 +1375,68 @@ var AccountUI = (function () {
     sub.className = "muted";
     sub.textContent = acct.id;
     wrap.appendChild(sub);
+    /* Copy-share-link row (hash deep link the router already resolves:
+     * #/account/:name, router.js). Clipboard API with an execCommand
+     * textarea fallback; the result reads inline via aria-live, never a
+     * dialog. Plain literals only (no new t() keys — check_i18n stays
+     * green); textContent only. Explorer backend is call-time-guarded
+     * (explorer.js loads after this file) — without it the row falls back
+     * to the bare hash, still a working deep link. */
+    (function shareRow() {
+      try {
+        var row = doc.createElement("div");
+        row.className = "xplore-share";
+        var btn = doc.createElement("button");
+        btn.type = "button";
+        btn.textContent = "Copy link";
+        btn.style.minHeight = "44px";
+        var note = doc.createElement("span");
+        note.className = "muted";
+        note.setAttribute("aria-live", "polite");
+        row.appendChild(btn);
+        row.appendChild(doc.createTextNode(" "));
+        row.appendChild(note);
+        var hash = "#/account/" + acct.name;
+        btn.addEventListener("click", function () {
+          btn.disabled = true;
+          note.textContent = "Copying…";
+          var url = hash;
+          try {
+            if (typeof Explorer !== "undefined" && Explorer &&
+                typeof Explorer.currentShareUrl === "function") {
+              url = Explorer.currentShareUrl(hash);
+            } else if (typeof location !== "undefined" && location.href) {
+              url = location.href.split("#")[0] + hash;
+            }
+          } catch (e) { url = hash; }
+          function done(ok) {
+            btn.disabled = false;
+            note.textContent = ok ? "Copied" : "Copy failed — long-press the address bar to copy";
+          }
+          function fallback() {
+            try {
+              var ta = doc.createElement("textarea");
+              ta.value = url;
+              doc.body.appendChild(ta);
+              ta.select();
+              var ok = false;
+              try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+              try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+              done(!!ok);
+            } catch (e) { done(false); }
+          }
+          try {
+            if (typeof navigator !== "undefined" && navigator.clipboard &&
+                typeof navigator.clipboard.writeText === "function") {
+              navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+            } else {
+              fallback();
+            }
+          } catch (e) { fallback(); }
+        });
+        wrap.appendChild(row);
+      } catch (e) { /* header stands without sharing */ }
+    })();
     /* Dense-table scope for the CSS below (smaller padding, tabular numbers
      * — columns untouched). */
     try { wrap.classList.add("acct"); } catch (e) { /* density skips */ }

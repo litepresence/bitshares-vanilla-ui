@@ -17,6 +17,19 @@ body { margin: 0; background: var(--bg); color: var(--text);
   font: 16px/1.45 "Roboto-Regular", "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
   min-height: 56px; background: var(--header-bg); color: var(--header-text); }
+/* Acting account left of the lock (owner): plain header text, ellipsis past
+ * ~180px so long names never push the lock off a phone screen. */
+#acting-as { margin-left: auto; font-size: 0.9rem; max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Node ops row (owner: probe/add/discover share one desktop line, stack on
+ * phones). Note/progress/results/offline stay full-width below the row. */
+.node-ops-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin: 8px 0; }
+.node-ops-row .custom-node { display: flex; gap: 8px; align-items: end; }
+.node-discover-btns { display: flex; gap: 8px; }
+@media (max-width: 719px) {
+  .node-ops-row { flex-direction: column; align-items: stretch; }
+  .node-ops-row .custom-node { flex-wrap: wrap; }
+}
 .brand { color: inherit; font-weight: 700; font-size: 1.1rem; text-decoration: none; }
 /* Footer host = the connectivity signal (#1 parity): node name vivid green
  * (--live: #1 $success-color #7bd500 per themes.css provenance) when
@@ -951,6 +964,9 @@ img, canvas, pre { max-width: 100%; }
 .appfoot-left, .appfoot-right { align-self: center; }
 .appfoot-right { display: flex; flex-direction: column; justify-content: center;
   text-align: right; line-height: 1.35; }
+/* Node-status block links to #/settings (owner): keep body text styling,
+ * not link blue — the position next to REPORT/HELP already reads tappable. */
+a#appfoot-status { text-decoration: none; color: inherit; }
 .appfoot-actions { align-self: stretch; }
 #appfoot .appfoot-actions a { align-self: stretch; }
 
@@ -1214,7 +1230,7 @@ p.muted[aria-live="polite"],
 .xplore-live[data-state="live"] .xplore-live-dot { text-shadow: 0 0 8px var(--live); }
 .appfoot-host[data-state="open"] {
   text-shadow: 0 0 8px var(--live);
-  animation: candy-glow 2.4s ease-in-out infinite;
+  animation: candy-glow 3s ease-in-out infinite;
 }
 @keyframes candy-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
 

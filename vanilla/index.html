@@ -24,6 +24,7 @@
 </div>
 <header class="topbar">
   <a class="brand" href="#/" aria-label="BitShares"><img class="brand-logo" src="assets/logo-ico-blue.png" alt="BitShares" width="40" height="40"></a>
+  <span id="acting-as" title="Acting account">committee-account</span>
   <a id="lock-toggle" href="#/login" aria-label="Unlock">🔒</a>
   <button id="nav-toggle" aria-label="Menu" aria-expanded="false">☰</button>
 </header>
@@ -37,7 +38,7 @@
 <main id="view" aria-live="polite"></main>
 <footer id="appfoot" aria-label="Node status">
   <span class="appfoot-left" id="appfoot-version">BITSHARES · v1.0.0 · <a href="#/help">Disclaimer</a></span>
-  <span class="appfoot-right" id="appfoot-status" aria-live="polite">connecting…</span>
+  <a class="appfoot-right" id="appfoot-status" href="#/settings" aria-label="Node status — open node settings" aria-live="polite">connecting…</a>
   <span class="appfoot-actions"><a id="foot-report" href="https://t.me/bitsharesDEV" target="_blank" rel="noopener">REPORT</a><a id="foot-help" href="#/help">Help</a></span>
 </footer>
 <script src="js/sdk/vendor/noble-classic.js"></script>
@@ -89,6 +90,7 @@
 <script src="js/views/explorer-render.js"></script>
 <script src="js/views/explorer-assets.js"></script>
 <script src="js/api/explorer-tabs.js"></script>
+<script src="js/api/gov-analytics.js"></script>
 <script src="js/views/explorer-ui.js"></script>
 <script src="js/api/asset.js"></script>
 <script src="js/builders/asset-ops.js"></script>

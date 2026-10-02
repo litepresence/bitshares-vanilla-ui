@@ -498,3 +498,20 @@
 - Counts: §A 33 PORTED / §B 18 PORTED + 1 DEFERRED / §C 22 substantive
   PORTED + 11 merge-pointers + 0 BUILDING + 2 DEFERRED / §D 7 — unchanged.
   MISSING (unjustified): still 0.
+
+## Explorer-readability delta (2026-10-02) — sentence/typeahead/share rows
+
+> Enrichment of the PORTED explorer rows (A16/A18/A19, B13/B14) — no status
+> cell changes, no new ops, no count changes. Activity sentences now cover
+> 22 op types (was 10): 0/1/2/3/4/5/6/7/8/10/11/14/15/16/17/19/22/23/33/49/50/77,
+> with honest `(virtual)` markers on 4/42/44/46/51/53/74 per
+> `operations.hpp:56-133` (open-graphene 78-op spec concurs, zero conflicts).
+> Witness/committee/pool/samet/credit/ticket/custom-authority ops keep the
+> generic fallback (spaced name + block link) — full views live in owning
+> slices (A15/A32/C-see-rows). Search typeahead: `lookup_accounts` +
+> `list_assets` prefix paging (#4 `database_api.hpp:357,435`; no
+> `lookup_assets` exists — recorded, not assumed); tx-hash path deferred
+> (`get_recent_transaction_by_id` exists at `:200` but is location-less).
+> Share rows on `#/block/:h`, `#/block/:h/:ix`, `#/account/:name`,
+> `#/asset/:symbol` (router-resolvable hashes only). Counts unchanged: §A 33
+> PORTED / §B 18+1 / §C per above / §D 7 — MISSING (unjustified): still 0.

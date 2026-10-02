@@ -179,9 +179,23 @@ var PoolSwapUI = (function () {
         var row = u.el(doc, "div", null, "xfer-field");
         row.appendChild(u.el(doc, "span", found.rows.length > 1 ? t("pool.pick_multi", "Pool (several exist — pick one): ") : t("pool.pick_single", "Pool: ")));
         row.appendChild(sel); pickBox.appendChild(row);
+        /* Pool->Exchange context (owner): header Exchange tab follows the
+         * selected pool's pair. Reads the already-resolved row symbols —
+         * no extra fetch. Guarded: id fallbacks fail validation upstairs. */
+        var pushMarketHint = function () {
+          try {
+            if (typeof App === "undefined" || !App || typeof App.setPoolMarket !== "function") return;
+            var picked = null, k;
+            for (k = 0; k < found.rows.length; k++) {
+              if (String(found.rows[k].id) === String(sel.value)) { picked = found.rows[k]; break; }
+            }
+            if (picked) App.setPoolMarket(picked.sym_a + "_" + picked.sym_b);
+          } catch (e) { /* default market stands */ }
+        };
+        pushMarketHint();
         var quoteBtn = u.touchable(u.el(doc, "button", t("notify.quote_label", "Quote"))); quoteBtn.type = "button"; pickBox.appendChild(quoteBtn);
         loadPoolHist(sel.value);
-        sel.addEventListener("change", function () { loadPoolHist(sel.value); });
+        sel.addEventListener("change", function () { loadPoolHist(sel.value); pushMarketHint(); });
         quoteBtn.addEventListener("click", function () {
           if (!live(myGen, uiGen)) return;
           quoteFor(doc, u, myGen, uiGen, quoteBox, actionBox, found, sel.value,

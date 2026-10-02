@@ -40,6 +40,7 @@ declare var FeesUI: any;
 declare var Format: any;
 declare var Gateway: any;
 declare var GatewayUI: any;
+declare var GovAnalytics: any;
 declare var HelpUI: any;
 declare var Htlc: any;
 declare var HtlcUI: any;

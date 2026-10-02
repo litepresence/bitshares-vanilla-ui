@@ -57,24 +57,31 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    - Expected: status changes, app reconnects, footer chain code stays the
      8-char mainnet/testnet prefix. If a node is dead, its row says down —
      never a blank screen.
-3. Node health pills (NEW): rows show Good, Stale, Suspect, Forked,
+3. Node health pills: rows show Good, Stale, Suspect, Forked,
    mismatch, Timeout, or Down — not just reachable/unreachable.
    - Hover any row: tooltip shows head age, participation %, irreversible
      lag, chain prefix, and "last good Xm ago" where known.
    - Expected: a fast-but-stale or forked node is labeled, never shown as
      healthy. Record any row whose pill contradicts its tooltip.
-3. Flip the testnet toggle. Expected: node list switches to testnet nodes.
-4. Add a custom node (type any `wss://` URL), then delete it.
+4. Flip the testnet toggle. Expected: node list switches to testnet nodes.
+5. Add a custom node (type any `wss://` URL), then delete it.
    - Expected: it appears, can be selected, can be removed.
-5. Discover more nodes (NEW — explicit button only): click "Discover more
-   nodes", watch progress, then Cancel mid-run.
+6. Button row (desktop 1440px): Ping All + node input/Add node + Find
+   nodes share ONE line; on a 390px phone they stack.
+   - Click "Find nodes", watch progress, then Cancel mid-run.
    - Expected: cancel stops it with partial results kept; completed runs
      list review candidates (URL + health + sources) with per-row Add;
      Add routes through the same custom validation (bad URLs refused);
      nothing is ever added without your click.
-5. Switch theme: Classic → Vanilla light → DEX dark (appearance control).
+7. Header check: the username left of the lock reads committee-account
+   while locked. Footer check: clicking the node/latency/block text opens
+   `#/settings`.
+8. Pool context: open `#/pools/1.19.66`, then click the header Exchange tab.
+   - Expected: lands on that pool's pair market (not the default pair).
+     Go to `#/wallet` and click Exchange again: back to the default pair.
+9. Switch theme: Classic → Vanilla light → DEX dark (appearance control).
    - Expected: whole app re-skins instantly, no reload. Record any unreadable text per theme.
-6. Record: console errors (want none except dead-node probe lines, which
+10. Record: console errors (want none except dead-node probe lines, which
    are normal and the UI must label that node down).
 
 ## 2. Wallet (`#/wallet`, `#/create-wallet-brainkey`, `#/existing-account`, `#/login`)
@@ -317,7 +324,23 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
      long_symbol) beside the live fee; sub-asset (`PARENT.CHILD`) and PMO
      description templates prefill from their buttons.
 
-## 19. What to send back
+## 19. Help (`#/help`)
+
+1. Open `#/help`. Expected: 48 topic links, no English-only note, no
+   mention of any old UI; Documentation section (2 links) and AI Assisted
+   Help (deepwiki link) below the index — all open new tabs.
+2. Open 3 articles (one new: trollbox; one old: backups; glossary).
+   Expected: headings, paragraphs, and bullet lists render as structured
+   text (never one giant block, never a raw `help.topic_*` key id).
+3. Switch to Spanish, reopen `#/help`.
+   - Expected: chrome translates; article bodies honestly remain English
+     (stubs, not machine translation). Switch back.
+4. Scroll to the community directory: Homepage, Code, Explorers, Forum,
+   English Chat (5), Chinese Chat.
+   - Expected: every link present with the exact URL from the list; all
+     open new tabs.
+
+## 20. What to send back
 
 For every section: PASS/FAIL per numbered step + console-error text +
 screenshots of FAILs + the exact numbers you recorded (§5.8, §11.4,

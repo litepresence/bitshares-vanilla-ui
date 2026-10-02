@@ -242,13 +242,25 @@ var ExplorerUI = (function () {
     wrap.appendChild(shellTitle(doc));
     if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
 
-    /* Search: single box, 1.x.y / account / symbol, keyboard-submit. */
+    /* Search: single box, 1.x.y / account / symbol, keyboard-submit.
+     * Typeahead (plain literals only, no new t() keys — check_i18n stays
+     * green): account names via Explorer.suggestAccounts (lookup_accounts,
+     * #4 database_api.hpp:357) + asset symbols via Explorer.suggestAssets
+     * (list_assets prefix paging, database_api.hpp:435 — there is NO
+     * lookup_assets method, #4 wins). Numeric input jumps straight to
+     * #/block/:height; object ids ride the existing routeObject dispatch;
+     * 40-hex tx hashes honest-defer (get_recent_transaction_by_id exists,
+     * database_api.hpp:200, but returns a location-less tx — no block deep
+     * link can be built from it). Suggestions fail open (offline/error
+     * clears the listbox; submit still works). Listbox is buttons only:
+     * tap + arrow-key + Enter/Escape, textContent-only, no hover UI. */
     var form = doc.createElement("form");
     form.className = "xplore-search";
     var input = doc.createElement("input");
     input.type = "search";
     input.setAttribute("placeholder", t("explorer.search_ph", "Search: 1.x.y, account, or asset symbol"));
     input.setAttribute("aria-label", t("explorer.search_aria", "Search blocks, accounts, assets"));
+    input.setAttribute("autocomplete", "off");
     touchable(input);
     input.style.minWidth = "220px";
     form.appendChild(input);
@@ -258,11 +270,124 @@ var ExplorerUI = (function () {
     var msg = el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     wrap.appendChild(form);
+    var suggestBox = el(doc, "div", null, "xplore-suggest");
+    suggestBox.setAttribute("role", "listbox");
+    suggestBox.setAttribute("aria-label", "Search suggestions");
+    wrap.appendChild(suggestBox);
     wrap.appendChild(msg);
+    var sugTimer = null, sugItems = [], sugActive = -1;
+    /* Clear the suggestion listbox (timer-safe, never throws). */
+    function clearSuggest() {
+      sugItems = [];
+      sugActive = -1;
+      try { while (suggestBox.firstChild) suggestBox.removeChild(suggestBox.firstChild); } catch (e) { /* gone */ }
+    }
+    /* Paint one suggestion button (textContent only, touch-sized). */
+    function suggestBtn(label, hash) {
+      var b = touchable(el(doc, "button", label, "xplore-suggest-row"));
+      b.type = "button";
+      b.setAttribute("role", "option");
+      b.setAttribute("aria-selected", "false");
+      b.addEventListener("click", function () {
+        clearSuggest();
+        if (typeof location !== "undefined") location.hash = hash;
+      });
+      return b;
+    }
+    /* Mark the active keyboard row (aria-selected follows focus). */
+    function paintSuggestActive() {
+      for (var si = 0; si < sugItems.length; si++) {
+        try { sugItems[si].setAttribute("aria-selected", si === sugActive ? "true" : "false"); } catch (e) { /* row stands */ }
+      }
+    }
+    /* Debounced typeahead: text-kind input of length ≥1 fires both
+     * suggesters in parallel; anything else clears. Gen-guarded. */
+    function runSuggest() {
+      if (myGen !== gen) return;
+      var q = input.value;
+      var cls = { kind: "text", text: (typeof q === "string" ? q.trim() : "") };
+      try {
+        if (typeof Explorer !== "undefined" && Explorer &&
+            typeof Explorer.classifySearchInput === "function") {
+          cls = Explorer.classifySearchInput(q);
+        }
+      } catch (e) { /* text path below */ }
+      if (cls.kind !== "text" || !cls.text) { clearSuggest(); return; }
+      if (typeof Explorer === "undefined" || !Explorer ||
+          typeof Explorer.suggestAccounts !== "function" ||
+          typeof Explorer.suggestAssets !== "function") return;
+      var snap = myGen;
+      Promise.all([
+        Explorer.suggestAccounts(cls.text, 5).catch(function () { return []; }),
+        Explorer.suggestAssets(cls.text, 5).catch(function () { return []; })
+      ]).then(function (pair) {
+        if (snap !== gen) return;
+        if (input.value !== q) return;
+        clearSuggest();
+        var accs = pair[0] || [], ass = pair[1] || [];
+        accs.slice(0, 5).forEach(function (a) {
+          if (!a || typeof a.name !== "string") return;
+          sugItems.push(suggestBtn(a.name + " (" + a.id + ")",
+            "#/account/" + encodeURIComponent(a.name)));
+        });
+        ass.slice(0, 5).forEach(function (a) {
+          if (!a || typeof a.symbol !== "string") return;
+          sugItems.push(suggestBtn(a.symbol + " (" + a.id + ")",
+            "#/asset/" + encodeURIComponent(a.symbol)));
+        });
+        sugItems = sugItems.slice(0, 8);
+        sugItems.forEach(function (b) { suggestBox.appendChild(b); });
+        paintSuggestActive();
+      });
+    }
+    input.addEventListener("input", function () {
+      try { if (sugTimer !== null) clearTimeout(sugTimer); } catch (e) { /* fallen */ }
+      sugTimer = setTimeout(runSuggest, 200);
+    });
+    input.addEventListener("keydown", function (e) {
+      if (!e || !sugItems.length) {
+        if (e && e.key === "Escape") clearSuggest();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        sugActive = (sugActive + 1) % sugItems.length;
+        paintSuggestActive();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        sugActive = (sugActive - 1 + sugItems.length) % sugItems.length;
+        paintSuggestActive();
+      } else if (e.key === "Enter" && sugActive >= 0 && sugActive < sugItems.length) {
+        e.preventDefault();
+        try { sugItems[sugActive].click(); } catch (err) { /* button stands */ }
+      } else if (e.key === "Escape") {
+        clearSuggest();
+      }
+    });
     form.addEventListener("submit", function (ev) {
       ev.preventDefault();
       msg.textContent = "";
+      clearSuggest();
       var q = input.value;
+      var cls = { kind: "text" };
+      try {
+        if (typeof Explorer !== "undefined" && Explorer &&
+            typeof Explorer.classifySearchInput === "function") {
+          cls = Explorer.classifySearchInput(q);
+        }
+      } catch (e) { cls = { kind: "text" }; }
+      if (cls.kind === "empty") {
+        msg.textContent = "Type a block number, object id, account, or asset symbol.";
+        return;
+      }
+      if (cls.kind === "block") {
+        if (typeof location !== "undefined") location.hash = "#/block/" + cls.height;
+        return;
+      }
+      if (cls.kind === "txhash") {
+        msg.textContent = "Transaction-hash lookup is not supported in this view yet — try a block number, object id, account, or asset symbol.";
+        return;
+      }
       go.disabled = true;
       Explorer.search(q).then(function (res) {
         if (myGen !== gen) return;

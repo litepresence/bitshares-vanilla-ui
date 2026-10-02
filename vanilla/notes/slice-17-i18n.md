@@ -65,3 +65,27 @@ English-first: no rewording, call-site defaults ARE the guarantee.
 ## Anti-rot gate (§4.5): (a) yes — static JSON + one dependency-free module,
 `Intl` is platform; (b) nothing new depended on (fetch is platform);
 (c) smallest deletable: 8 stub dicts (en+es stand). `check_rot.py` PASS.
+
+## Delta 2026-10-02 — help goes multilingual + 48 topics (day-1 feedback)
+Help articles were English string literals with an English-only note (the one
+place the app apologized for itself). Now: 47 topics + glossary (24 new:
+pools, swap, HTLC, credit, trollbox, alerts, settings/nodes, top-ops,
+txbuilder, prediction, PMO, transfer, instant, authorities, vesting, lists,
+airdrop, invoice, proposals, tickets, fees, referrals, favourites, tour),
+every article a keyed lite-markdown block (`# ` headings, `- ` bullets,
+textContent-only render — no HTML anywhere), titles/guides/bodies in all 10
+dicts (en complete; 9 stubs en-identical per convention — real translations
+are translator work, tracked, not pretended). Index drops the old-UI
+comparisons and the English-only note; adds Documentation (docs.bitshares.org,
+docs.bitshares.dev, new-tab noopener) and AI Assisted Help (deepwiki mirror
+link). Design constraint found live: I18n.t lookup() returns strings only,
+so array defaults fall through to the raw key id (caught headless) — dicts
+store joined strings, code defaults join the same way. Headless: index (48
+links, docs + AI sections), article render (headings/paragraphs), es locale
+(chrome translates, article stubs honestly English), zero console errors.
+
+## Delta 2026-10-02 — help link directory (owner: homepage/code/explorers/forum/chats)
+Community sections on the help index (Homepage, Code ×3, Explorers ×3,
+Forum, English Chat ×5, Chinese Chat) as a data-driven keyed block, same
+external-link treatment (new tab + noopener, textContent-only). 20 keys × 10
+dicts. Headless: all sections + links render, zero console errors.

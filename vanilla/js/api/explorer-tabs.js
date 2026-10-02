@@ -203,9 +203,129 @@ var ExplorerTabs = (function () {
   function witnessesTab(doc, body, live) { memberTab(doc, body, live, "witnesses"); }
   function committeeTab(doc, body, live) { memberTab(doc, body, live, "committee"); }
 
-  /* marketsTab: top markets by volume (database get_top_markets, :643).
-   * Symbols resolve fail-open per row (id fallback, row never drops the
-   * volume the chain reported). */
+  /* cmpDec: ascending compare of two human decimal strings via
+   * Format.parsePriceRatio BigInt ratios (money rule — no parseFloat, no
+   * Number on prices). Null/empty/unparseable legs sort LAST (return 1 when
+   * only b is comparable, -1 when only a is, 0 when neither). Never throws.
+   * @param {any} a
+   * @param {any} b
+   * @returns {number} */
+  function cmpDec(a, b) {
+    function ratio(s) {
+      if (s === undefined || s === null) return null;
+      s = String(s);
+      if (!s) return null;
+      try {
+        if (typeof Format === "undefined" || !Format ||
+            typeof Format.parsePriceRatio !== "function") return null;
+        return Format.parsePriceRatio(s);
+      } catch (e) { return null; }
+    }
+    var ra = ratio(a), rb = ratio(b);
+    if (ra === null && rb === null) return 0;
+    if (ra === null) return 1;
+    if (rb === null) return -1;
+    var left, right;
+    try {
+      left = ra.num * rb.den;
+      right = rb.num * ra.den;
+    } catch (e) { return 0; }
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  }
+
+  /** filterMarkets: case-insensitive QUOTE_BASE substring filter.
+   * @param {any[]} rows
+   * @param {any} q
+   * @returns {any[]} */
+  function filterMarkets(rows, q) {
+    var list = Array.isArray(rows) ? rows.slice() : [];
+    var needle = String((q === undefined || q === null) ? "" : q).trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter(function (r) {
+      return String((r && r.id) || "").toLowerCase().indexOf(needle) !== -1;
+    });
+  }
+
+  /* _rankable: true when a human decimal string parses via
+   * Format.parsePriceRatio (money rule — the single validity gate for
+   * sorting). Unparseable legs always sink last, ascending OR descending.
+   * @param {any} s
+   * @returns {boolean} */
+  function _rankable(s) {
+    if (s === undefined || s === null || String(s) === "") return false;
+    try {
+      if (typeof Format === "undefined" || !Format ||
+          typeof Format.parsePriceRatio !== "function") return false;
+      Format.parsePriceRatio(String(s));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /** sortMarkets: NEW sorted array by key (chain order untouched).
+   * Keys: vol_desc (chain default) / vol_asc / price_desc / price_asc /
+   * change_desc / change_asc / market_az. Unknown key keeps chain order.
+   * Unparseable legs sink last in EVERY direction (descending flips values,
+   * never junk). Stable for ties.
+   * @param {any[]} rows
+   * @param {string} key
+   * @returns {any[]} */
+  function sortMarkets(rows, key) {
+    var list = Array.isArray(rows) ? rows.slice() : [];
+    function byVol(r) { return r ? r.baseVol : null; }
+    function byPrice(r) { return r ? r.latest : null; }
+    function byChange(r) { return r ? r.change : null; }
+    /* dirCmp(get, dir): ascending (dir=1) or descending (dir=-1) compare
+     * with junk-last in both directions. */
+    function dirCmp(get, dir) {
+      return function (x, y) {
+        var a = get(x), b = get(y);
+        var pa = _rankable(a), pb = _rankable(b);
+        if (!pa && !pb) return 0;
+        if (!pa) return 1;
+        if (!pb) return -1;
+        return dir * cmpDec(a, b);
+      };
+    }
+    if (key === "vol_asc") {
+      list.sort(dirCmp(byVol, 1));
+    } else if (key === "price_desc") {
+      list.sort(dirCmp(byPrice, -1));
+    } else if (key === "price_asc") {
+      list.sort(dirCmp(byPrice, 1));
+    } else if (key === "change_desc") {
+      list.sort(dirCmp(byChange, -1));
+    } else if (key === "change_asc") {
+      list.sort(dirCmp(byChange, 1));
+    } else if (key === "market_az") {
+      list.sort(function (x, y) {
+        var a = String((x && x.id) || ""), b = String((y && y.id) || "");
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+      });
+    } else if (key === "vol_desc" || !key) {
+      /* Chain already returns reverse base_volume; re-sort to pin the
+       * contract (unparseable volumes sink last instead of floating). */
+      list.sort(dirCmp(byVol, -1));
+    }
+    return list;
+  }
+
+  /* marketsTab: most-active-markets overview (database get_top_markets, :643).
+   * #4 CONTRACT (mapping-chain-calls, #4 wins): get_top_markets(uint32_t
+   *   limit) is EXPERIMENTAL and capped at api_limit_get_top_markets = 100
+   *   (application.hpp:56); it returns vector<market_ticker> sorted by
+   *   reverse base_volume (database_api.hpp:639-646). market_ticker legs are
+   *   HUMAN strings (api_objects.hpp:112-138: latest, lowest_ask/highest_bid
+   *   + sizes, percent_change, base/quote_volume) — rendered verbatim, never
+   *   parsed for display. No new WS methods: this tab calls get_top_markets
+   *   once + the existing per-row Asset.describe symbol join (fail-open per
+   *   row: id fallback, a row never drops the volume the chain reported).
+   *   Filter (QUOTE_BASE substring) + sort (volume desc = chain order,
+   *   price/change/market client-side via cmpDec BigInt compare) run on the
+   *   fetched sample only — the sample stays honestly labeled experimental. */
   function marketsTab(doc, body, live) {
     body.appendChild(el(doc, "p", "Loading top markets…", "muted"));
     Chain.db().then(function (dbId) {
@@ -233,21 +353,85 @@ var ExplorerTabs = (function () {
       });
       return Promise.all(jobs).then(function () {
         if (!live()) return;
-        var tbl = table(doc, ["Market", "Price", "Volume", "Change"]);
-        pend.forEach(function (r) {
-          var tr = doc.createElement("tr");
-          var td = doc.createElement("td");
-          var id = r.quote + "_" + r.base;
-          var a = link(doc, "#/market/" + encodeURIComponent(id), id);
-          td.appendChild(a);
-          tr.appendChild(td);
-          tr.appendChild(el(doc, "td", r.m.latest !== undefined && r.m.latest !== null ? String(r.m.latest) : "—"));
-          tr.appendChild(el(doc, "td", r.m.base_volume !== undefined && r.m.base_volume !== null ? String(r.m.base_volume) : "—"));
-          tr.appendChild(el(doc, "td", r.m.percent_change !== undefined && r.m.percent_change !== null ? String(r.m.percent_change) : "—"));
-          tbl.tbody.appendChild(tr);
+        /* Enriched rows: chain ticker strings verbatim (null where absent). */
+        var enriched = pend.map(function (r) {
+          var m = r.m || {};
+          return {
+            id: r.quote + "_" + r.base,
+            latest: m.latest !== undefined && m.latest !== null ? String(m.latest) : null,
+            bid: m.highest_bid !== undefined && m.highest_bid !== null ? String(m.highest_bid) : null,
+            ask: m.lowest_ask !== undefined && m.lowest_ask !== null ? String(m.lowest_ask) : null,
+            baseVol: m.base_volume !== undefined && m.base_volume !== null ? String(m.base_volume) : null,
+            quoteVol: m.quote_volume !== undefined && m.quote_volume !== null ? String(m.quote_volume) : null,
+            change: m.percent_change !== undefined && m.percent_change !== null ? String(m.percent_change) : null
+          };
         });
+        /* Honest sample label (experimental API, chain-sorted, verbatim). */
+        body.appendChild(el(doc, "p", /** @type {any} */ (t)("explorer.markets_experimental", "Experimental get_top_markets sample — top 20 by base volume, chain-sorted desc; not a full market list. Values are chain human strings verbatim."), "muted"));
+        /* Filter + sort controls (touch-sized, keyboard-native). */
+        var ctl = doc.createElement("div");
+        ctl.className = "xplore-ctl";
+        var filter = doc.createElement("input");
+        filter.type = "search";
+        filter.setAttribute("placeholder", /** @type {any} */ (t)("explorer.markets_filter_ph", "Filter markets…"));
+        filter.setAttribute("aria-label", /** @type {any} */ (t)("explorer.markets_filter_ph", "Filter markets…"));
+        touchable(filter);
+        ctl.appendChild(filter);
+        var sortLab = el(doc, "span", /** @type {any} */ (t)("explorer.markets_sort_label", "Sort") + " ");
+        ctl.appendChild(sortLab);
+        var sortSel = doc.createElement("select");
+        sortSel.setAttribute("aria-label", /** @type {any} */ (t)("explorer.markets_sort_label", "Sort"));
+        touchable(sortSel);
+        [["vol_desc", "explorer.markets_sort_vol_desc", "Volume ↓"],
+         ["vol_asc", "explorer.markets_sort_vol_asc", "Volume ↑"],
+         ["price_desc", "explorer.markets_sort_price_desc", "Price ↓"],
+         ["price_asc", "explorer.markets_sort_price_asc", "Price ↑"],
+         ["change_desc", "explorer.markets_sort_change_desc", "Change ↓"],
+         ["change_asc", "explorer.markets_sort_change_asc", "Change ↑"],
+         ["market_az", "explorer.markets_sort_market_az", "Market A–Z"]].forEach(function (opt) {
+          var o = doc.createElement("option");
+          o.value = opt[0];
+          o.textContent = /** @type {any} */ (t)(opt[1], opt[2]);
+          sortSel.appendChild(o);
+        });
+        ctl.appendChild(sortSel);
+        body.appendChild(ctl);
+        var count = el(doc, "p", "", "muted");
+        count.setAttribute("aria-live", "polite");
+        body.appendChild(count);
+        var tbl = table(doc, ["Market", "Price", "Bid", "Ask", "Vol (base)", "Vol (quote)", "Change"]);
         body.appendChild(tbl.table);
-        body.appendChild(el(doc, "p", t("explorer.thin_summary_top_20_by_volume_full_orde", "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page."), "muted"));
+        var emptyNote = el(doc, "p", /** @type {any} */ (t)("explorer.markets_empty_filter", "No markets match this filter."), "muted");
+        emptyNote.style.display = "none";
+        body.appendChild(emptyNote);
+        /* paint: filter + sort the fetched sample, repaint rows + count. */
+        function paint() {
+          var q = filter.value || "";
+          var key = sortSel.value || "vol_desc";
+          var view = sortMarkets(filterMarkets(enriched, q), key);
+          while (tbl.tbody.firstChild) tbl.tbody.removeChild(tbl.tbody.firstChild);
+          view.forEach(function (r) {
+            var tr = doc.createElement("tr");
+            var td = doc.createElement("td");
+            var a = link(doc, "#/market/" + encodeURIComponent(r.id), r.id);
+            td.appendChild(a);
+            tr.appendChild(td);
+            tr.appendChild(el(doc, "td", r.latest === null ? "—" : r.latest));
+            tr.appendChild(el(doc, "td", r.bid === null ? "—" : r.bid));
+            tr.appendChild(el(doc, "td", r.ask === null ? "—" : r.ask));
+            tr.appendChild(el(doc, "td", r.baseVol === null ? "—" : r.baseVol));
+            tr.appendChild(el(doc, "td", r.quoteVol === null ? "—" : r.quoteVol));
+            tr.appendChild(el(doc, "td", r.change === null ? "—" : r.change));
+            tbl.tbody.appendChild(tr);
+          });
+          emptyNote.style.display = view.length === 0 ? "" : "none";
+          count.textContent = /** @type {any} */ (t)("explorer.markets_showing", "Showing") + " " +
+            view.length + " " + /** @type {any} */ (t)("explorer.markets_of", "of") + " " + enriched.length;
+        }
+        filter.addEventListener("input", paint);
+        sortSel.addEventListener("change", paint);
+        paint();
+        body.appendChild(el(doc, "p", /** @type {any} */ (t)("explorer.thin_summary_top_20_by_volume_full_orde", "Thin summary (top 20 by volume) — full order books, charts and trading live on each market page."), "muted"));
       });
     }).catch(function (e) {
       if (!live()) return;
@@ -278,7 +462,8 @@ var ExplorerTabs = (function () {
   return {
     poolsTab: poolsTab, accountsTab: accountsTab,
     witnessesTab: witnessesTab, committeeTab: committeeTab,
-    marketsTab: marketsTab, feesTab: feesTab
+    marketsTab: marketsTab, feesTab: feesTab,
+    _test: { filterMarkets: filterMarkets, sortMarkets: sortMarkets, cmpDec: cmpDec }
   };
 })();
 

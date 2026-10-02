@@ -22,6 +22,8 @@ var Explorer = (function () {
   var ASSETS_PAGE_MAX = 100; /* rows-per-page ceiling (10/25/50/100 punchlist) */
   var OBJECT_RE = /^([12])\.(\d+)\.(\d+)$/;
   var ASSET_ID_RE = /^1\.3\.\d+$/;
+  var TXHASH_RE = /^[0-9a-fA-F]{40}$/; /* transaction_id_type is ripemd160
+    * (chain.js assertPropsShape: 40 hex, NOT 64 — types.hpp:304) */
 
   /* Op index -> short name, FC_REFLECT order <- operations.hpp:56-133. */
   var OP_NAMES = ["transfer", "limit_order_create", "limit_order_cancel", "call_order_update",
@@ -442,6 +444,133 @@ var Explorer = (function () {
     return entry;
   }
 
+  /* Search-input classifier (pure, offline-testable, no chain calls): maps
+   * raw box text to the route the shell should take. Branch order matters —
+   * first match wins. "1.2.x" stays kind object (the shell's routeObject
+   * redirects those to #/account/:name, 1.3.x to #/asset/:symbol — same
+   * account-first outcome as search(), never a competing answer). A bare
+   * "BTS" or "alice" is kind text: resolution order there is account first,
+   * then asset symbol (search() below) — documented, never guessed in this
+   * helper. A 40-hex string is kind txhash: get_recent_transaction_by_id
+   * EXISTS (#4 database_api.hpp:200) but returns a location-less
+   * signed_transaction (no block coords), so no #/block/:h/:ix deep link
+   * can be built from it — the shell honest-defers that path (see
+   * explorer-ui.js), it never pretends to resolve it.
+   * Params: q (any, stringified + trimmed). Returns {kind, ...}: block
+   * {height}, object {id}, txhash {id}, text {text}, empty {}. Fails: never. */
+  function classifySearchInput(q) {
+    var s = (typeof q === "string") ? q.trim() : String(q === undefined || q === null ? "" : q).trim();
+    if (!s) return { kind: "empty" };
+    if (/^\d+$/.test(s)) {
+      var h = parseInt(s, 10);
+      if (h >= 1) return { kind: "block", height: h };
+      return { kind: "text", text: s };
+    }
+    if (OBJECT_RE.test(s)) return { kind: "object", id: s };
+    if (TXHASH_RE.test(s)) return { kind: "txhash", id: s };
+    return { kind: "text", text: s };
+  }
+
+  /* Absolute share URL for a hash deep link the router already resolves
+   * (router.js: #/block/:height, #/block/:height/:txIndex, #/account/:name,
+   * #/asset/:symbol — every share target below is one of these, never a new
+   * route). Params: base (page origin without hash, may be "" under node),
+   * hash ("#/…"). Returns base + hash. Pure — unit-tested. */
+  function shareUrl(base, hash) {
+    return String(base || "") + String(hash || "");
+  }
+
+  /* Current page origin + hash (the clipboard payload). Params: hash. Returns
+   * the absolute URL string. Fails: never — missing location yields the bare
+   * hash (still a working deep link once pasted after the origin). */
+  function currentShareUrl(hash) {
+    var base = "";
+    try {
+      if (typeof location !== "undefined" && location && typeof location.href === "string") {
+        base = location.href.split("#")[0];
+      }
+    } catch (e) { base = ""; }
+    return shareUrl(base, hash);
+  }
+
+  /* lookup_accounts pair-shape normalizer (pure, unit-tested): the node
+   * answers the #4 map<string,account_id> (database_api.hpp:357-359) over
+   * JSON-RPC as [name, id] PAIRS (same fc map encoding as _asHeader's
+   * [height, header] pairs above); some nodes answer a plain object instead.
+   * Params: raw (anything), limit (cap). Returns [{name, id}] (possibly []).
+   * Fails: never — garbage yields []. */
+  function normSuggestPairs(raw, limit) {
+    var out = [], lim = parseInt(limit, 10);
+    if (!(lim >= 1)) lim = 8;
+    lim = Math.min(lim, 20);
+    try {
+      if (Array.isArray(raw)) {
+        for (var i = 0; i < raw.length && out.length < lim; i++) {
+          var p = raw[i];
+          if (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string") {
+            out.push({ name: p[0], id: p[1] });
+          } else if (p && typeof p === "object" && typeof p.name === "string") {
+            out.push({ name: p.name, id: String(p.id || "") });
+          }
+        }
+      } else if (raw && typeof raw === "object") {
+        var keys = Object.keys(raw);
+        for (var k = 0; k < keys.length && out.length < lim; k++) {
+          if (typeof raw[keys[k]] === "string") out.push({ name: keys[k], id: raw[keys[k]] });
+        }
+      }
+    } catch (e) { /* [] stands */ }
+    return out;
+  }
+
+  /* Account-name typeahead (read-only): lookup_accounts(prefix, limit) per
+   * #4 database_api.hpp:357-359 (lower_bound_name + limit; bitshares-ui's
+   * own accountApi.js:8 calls it the same way). Returns [{name, id}] (possibly
+   * [] on offline/error — the caller fails open, never blocks submit). */
+  function suggestAccounts(prefix, limit) {
+    var p = (typeof prefix === "string") ? prefix : "";
+    var lim = parseInt(limit, 10);
+    if (!(lim >= 1)) lim = 8;
+    lim = Math.min(lim, 20);
+    if (!p) return Promise.resolve([]);
+    return _dbCall("lookup_accounts", [p, lim]).then(function (rows) {
+      return normSuggestPairs(rows, lim);
+    }, function () { return []; });
+  }
+
+  /* Asset-symbol typeahead (read-only): there is NO lookup_assets method on
+   * #4 — the honest pair is list_assets(lower_bound_symbol, limit)
+   * (database_api.hpp:435, prefix paging; bitshares-ui AssetActions.js:541
+   * pages it the same way) for prefix matches, with lookup_asset_symbols
+   * reserved for exact symbols (search() below keeps that). Symbols are
+   * UPPERCASE on chain, so a lowercase prefix would sort past them
+   * (ASCII): both the raw and uppercased prefixes are queried and merged by
+   * id. Returns [{symbol, id}] (possibly []). */
+  function suggestAssets(prefix, limit) {
+    var p = (typeof prefix === "string") ? prefix : "";
+    var lim = parseInt(limit, 10);
+    if (!(lim >= 1)) lim = 8;
+    lim = Math.min(lim, 20);
+    if (!p) return Promise.resolve([]);
+    var variants = [p], up = p.toUpperCase();
+    if (up !== p) variants.push(up);
+    return Promise.all(variants.map(function (v) {
+      return _dbCall("list_assets", [v, lim]).then(function (rows) { return rows || []; },
+        function () { return []; });
+    })).then(function (pages) {
+      var seen = {}, out = [];
+      pages.forEach(function (rows) {
+        (rows || []).forEach(function (a) {
+          if (!a || typeof a.id !== "string" || out.length >= lim) return;
+          if (seen[a.id]) return;
+          seen[a.id] = 1;
+          out.push({ symbol: String(a.symbol || a.id), id: a.id });
+        });
+      });
+      return out;
+    });
+  }
+
   /* Search dispatch: 1.x.y -> object; else account (Account.resolve); else
    * asset symbol (upper/lower variants, no fuzzy lib). Fails
    * "unknown-object"; "not-connected" passes through. */
@@ -477,7 +606,10 @@ var Explorer = (function () {
   return { head: head, recentBlocks: recentBlocks, block: block, tx: tx,
     assetsPage: assetsPage, activeSets: activeSets, btsSupply: btsSupply,
     recentOps: recentOps, opsFromBody: opsFromBody,
-    asset: asset, feeds: feeds, resolveObject: resolveObject, search: search };
+    asset: asset, feeds: feeds, resolveObject: resolveObject, search: search,
+    classifySearchInput: classifySearchInput, shareUrl: shareUrl,
+    currentShareUrl: currentShareUrl, suggestAccounts: suggestAccounts,
+    suggestAssets: suggestAssets, _normSuggestPairs: normSuggestPairs };
 })();
 
 if (typeof module !== "undefined") { module.exports = Explorer; }
