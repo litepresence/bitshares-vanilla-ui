@@ -114,7 +114,91 @@ function ok(cond, name) {
     ok(Math.sqrt(dx * dx + dy * dy) <= rr.outer + 1e-9, "layout inside outer ring " + id);
   });
   const c = PG.layout(g, "1.3.1", "1.3.2", 300, 180);
-  eq(c, pos, "re-layout equality (no drift, no physics)");
+  eq(c, pos, "re-layout equality (no drift, rings stay the seed)");
+})();
+
+// 5d. Deterministic relaxation (networkx IDEA ONLY — same input, same pixels).
+(function () {
+  const R = PG._test.relax;
+  assertR(typeof R === "function", "relax exported");
+  function demo() {
+    return {
+      nodes: [
+        { assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" },
+        { assetId: "1.3.2", sym: "B" }, { assetId: "1.3.9", sym: "X" },
+        { assetId: "1.3.7", sym: "Y" }
+      ],
+      edges: [
+        { poolId: "1.19.1", a: "1.3.1", b: "1.3.2", sizeRaw: "50" },
+        { poolId: "1.19.2", a: "1.3.1", b: "1.3.9", sizeRaw: "60" },
+        { poolId: "1.19.3", a: "1.3.2", b: "1.3.0", sizeRaw: "700000000000000000000" },
+        { poolId: "1.19.4", a: "1.3.9", b: "1.3.7", sizeRaw: "5" }
+      ]
+    };
+  }
+  function assertR(cond, name) { ok(cond, name); }
+  const W = 600, H = 180, OPTS = { assetA: "1.3.1", assetB: "1.3.2" };
+  const g1 = demo();
+  const seed = PG.layout(g1, "1.3.1", "1.3.2", W, H);
+  const p1 = R(g1, seed, W, H, OPTS);
+  const p2 = R(g1, seed, W, H, OPTS);
+  eq(p1, p2, "relax deterministic (same input twice)");
+  // Seed untouched (relax returns a NEW map).
+  ok(seed["1.3.1"].x !== undefined && typeof p1["1.3.1"].x === "number", "seed intact, output numeric");
+  // Coverage: every node placed, finite, no NaN.
+  const ids = Object.keys(p1).sort();
+  eq(ids, ["1.3.0", "1.3.1", "1.3.2", "1.3.7", "1.3.9"], "all nodes placed");
+  ids.forEach(function (id) {
+    ok(isFinite(p1[id].x) && isFinite(p1[id].y), "finite coords " + id);
+  });
+  // Containment: wall-clamped inside the canvas (pad 30).
+  ids.forEach(function (id) {
+    ok(p1[id].x >= 30 && p1[id].x <= W - 30 && p1[id].y >= 30 && p1[id].y <= H - 30,
+      "contained " + id + " (" + Math.round(p1[id].x) + "," + Math.round(p1[id].y) + ")");
+  });
+  // Separation: repulsion opened the coincident seed (rings stack L2 on few slots).
+  function minSep(pos) {
+    const ks = Object.keys(pos);
+    let m = Infinity;
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) {
+      const dx = pos[ks[i]].x - pos[ks[j]].x, dy = pos[ks[i]].y - pos[ks[j]].y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < m) m = d;
+    }
+    return m;
+  }
+  function seedSep() {
+    const ks = Object.keys(seed);
+    let m = Infinity;
+    for (let i = 0; i < ks.length; i++) for (let j = i + 1; j < ks.length; j++) {
+      const dx = seed[ks[i]].x - seed[ks[j]].x, dy = seed[ks[i]].y - seed[ks[j]].y;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if (d < m) m = d;
+    }
+    return m;
+  }
+  ok(minSep(p1) >= 1, "no coincident nodes after relax (min " + minSep(p1).toFixed(1) + "px)");
+  // L0 anchor: the pair stays near center (provenance meaning preserved).
+  [["1.3.1"], ["1.3.2"]].forEach(function ([id]) {
+    const dx = p1[id].x - W / 2, dy = p1[id].y - H / 2;
+    ok(Math.sqrt(dx * dx + dy * dy) <= Math.min(W, H) / 2, "L0 near center " + id);
+  });
+  // Center of mass near canvas center (gravity worked, nothing drifted off).
+  let sx = 0, sy = 0;
+  ids.forEach(function (id) { sx += p1[id].x; sy += p1[id].y; });
+  ok(Math.abs(sx / ids.length - W / 2) < W * 0.25, "center of mass x near middle");
+  ok(Math.abs(sy / ids.length - H / 2) < H * 0.25, "center of mass y near middle");
+  // Degenerate inputs never throw, never NaN.
+  eq(R({ nodes: [], edges: [] }, {}, 600, 180, OPTS), {}, "empty graph -> {}");
+  const solo = R({ nodes: [{ assetId: "1.3.5", sym: "S" }], edges: [] },
+    { "1.3.5": { x: 1, y: 2 } }, 600, 180, OPTS);
+  eq(solo, { "1.3.5": { x: 1, y: 2 } }, "single node passes through");
+  const bad = R({ nodes: [{ assetId: "1.3.5", sym: "S" }], edges: [] }, null, 0, -5, null);
+  ok(bad && typeof bad === "object", "garbage dims fail soft");
+  // Edge weight is log-scaled by digit length (money never touches float).
+  eq(PG._test.edgeWeight("10"), PG._test.edgeWeight("99"), "same magnitude, same weight");
+  ok(PG._test.edgeWeight("700000000000000000000") > PG._test.edgeWeight("5"), "bigger pool pulls harder");
+  ok(PG._test.edgeWeight(null) > 0 && PG._test.edgeWeight("abc") > 0, "malformed size fails soft positive");
 })();
 (async function () {
   let calls = 0;

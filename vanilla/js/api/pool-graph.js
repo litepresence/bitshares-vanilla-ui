@@ -1,14 +1,18 @@
 /* PoolGraph: 2-layer pool-connection provenance map (orphan-pair scam check).
  * Owns: poolsForAsset (one_asset reads), buildGraph (L0=A,B; L1 cap 8 biggest-first;
  *   L2 up to 6 counters limit 3; nodes cap 25), findCorePath (BFS fewest-hops to 1.3.0,
- *   widest-min-edge tiebreak), layout (deterministic layered rings, no physics/random),
+ *   widest-min-edge tiebreak), layout (deterministic layered rings, the relax
+ *   seed), relax (deterministic force-directed settle: repulsion + springs +
+ *   gravity + walls, fixed iterations, zero randomness — networkx IDEA ONLY),
  *   drawGraph (DPR canvas, theme tokens, small halo labels, staggered rings, click
  *   hit-test to #/asset + #/pools, direct node dragging over session-only offsets).
- * NO spring/physics engine anywhere in this file (non-deterministic, untestable — said
- *   once, enforced by vectors): layout() is the deterministic initial arrangement; a drag
- *   writes a plain {dx,dy} into a session-only Map (reset on data refresh) and repaints
- *   through drawGraph. Pointer events cover mouse + touch; touch-action:none applies
- *   only mid-drag so page scroll is untouched otherwise.
+ * Physics here is settled math, not animation: no timers, no random seeds, no
+ *   rAF loop — same graph always settles to the same pixels (vector-proven).
+ *   layout() stays the deterministic seed (and the drag-offset base); relax()
+ *   output feeds drawGraph on both pages. A drag writes a plain {dx,dy} into
+ *   a session Map (reset on data refresh) and repaints through drawGraph.
+ *   Pointer events cover mouse + touch; touch-action:none applies only
+ *   mid-drag so page scroll is untouched otherwise.
  * Consumes: Chain.db/.call (sole socket owner, _dbCall error contract mirrors pool.js);
  *   lookup_asset_symbols for sym join (misses degrade to bare ids). No DOM except the
  *   caller-provided canvas; no signing, no storage, no ES, no networkx. Global PoolGraph only.
@@ -307,6 +311,128 @@ var PoolGraph = (function () {
     return pos;
   }
 
+  /* Deterministic force relaxation (networkx spring_layout IDEA ONLY — same
+   * doctrine as the rings: math ported, never a dependency, never imported).
+   * layout() seeds (rings: pair center, layers outward); relax() settles to a
+   * static equilibrium synchronously at paint time. Fixed RELAX_ITERS,
+   * fixed cooling, index-ordered tiebreaks, zero randomness, zero timers, zero
+   * animation: same graph in -> same pixels out, always (vector-proven —
+   * this is what the old "no physics" note objected to, resolved by making
+   * the physics deterministic rather than by refusing it).
+   * Per iteration, all in CSS pixels (money never touches float — weights
+   * come from raw-digit string lengths, never Number(sizeRaw)):
+   *  - repulsion: every pair, F = k^2/d (Fruchterman-Reingold), displacement
+   *    capped by temperature; d==0 separates along the deterministic
+   *    golden-angle of the pair index (never NaN, never random)
+   *  - springs: per edge toward rest, F = (d^2/k)*w with w = 0.5+digits/18
+   *    from sizeRaw (log-weight: big pools pull harder)
+   *  - gravity: weak center pull, x3 for the L0 pair (anchor: the
+   *    provenance-map meaning — pair stays central, BTS prominent)
+   *  - walls: soft push inside the pad, hard clamp at the end (nothing clips)
+   * Cooling: temp k*0.4 * 0.94^iter. Cost: iters * pairs (150 * <=300 ≈ 1M
+   * simple ops worst case, paint-time once, zero per-frame cost after).
+   * Params: graph, seed ({id:{x,y}} from layout()), w, h (CSS px),
+   *   opts {assetA, assetB} (L0 anchor, optional). Returns a NEW {id:{x,y}}
+   *   (seed untouched). Degenerate graphs return the seed copy. Never throws. */
+  var RELAX_ITERS = 150, RELAX_COOL = 0.94, RELAX_GRAV = 0.03, RELAX_L0_GRAV = 3;
+  function _edgeWeight(sizeRaw) {
+    var digits = 1;
+    try {
+      var s = String(sizeRaw === undefined || sizeRaw === null ? "" : sizeRaw).replace(/^0+/, "");
+      digits = s.length || 1;
+    } catch (e) { digits = 1; }
+    return 0.5 + digits / 18;
+  }
+  function relax(graph, seed, w, h, opts) {
+    var pos = {};
+    try {
+      w = (typeof w === "number" && w > 0) ? w : 300;
+      h = (typeof h === "number" && h > 0) ? h : 180;
+      var ids = Object.keys(seed || {}).sort();
+      if (!ids.length) return {};
+      var i, j;
+      for (i = 0; i < ids.length; i++) {
+        var p0 = (seed && seed[ids[i]]) || {};
+        pos[ids[i]] = { x: (typeof p0.x === "number" && isFinite(p0.x)) ? p0.x : w / 2,
+          y: (typeof p0.y === "number" && isFinite(p0.y)) ? p0.y : h / 2 };
+      }
+      var n = ids.length;
+      if (n < 2) return pos;
+      var o = (opts && typeof opts === "object") ? opts : {};
+      var inL0 = {};
+      if (o.assetA) inL0[o.assetA] = 1;
+      if (o.assetB) inL0[o.assetB] = 1;
+      var deg = {};
+      var edges = [];
+      ((graph && graph.edges) || []).forEach(function (e) {
+        if (!e || !pos[e.a] || !pos[e.b] || e.a === e.b) return;
+        deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1;
+        edges.push({ a: e.a, b: e.b, w: _edgeWeight(e.sizeRaw) });
+      });
+      var rad = {};
+      ids.forEach(function (id) { rad[id] = _nodeRadius(deg[id] || 0); });
+      var k = 0.5 * Math.sqrt((w * h) / n);
+      if (!(k >= 24)) k = 24;
+      if (!(k <= 60)) k = 60;
+      var cx = w / 2, cy = h / 2, PAD = EDGE_PAD;
+      var temp = k * 0.4;
+      function clampX(x, r) { return x < PAD + r ? PAD + r : (x > w - PAD - r ? w - PAD - r : x); }
+      function clampY(y, r) { return y < PAD + r ? PAD + r : (y > h - PAD - r ? h - PAD - r : y); }
+      for (var iter = 0; iter < RELAX_ITERS; iter++) {
+        var dx = {}, dy = {}, id;
+        for (i = 0; i < n; i++) { dx[ids[i]] = 0; dy[ids[i]] = 0; }
+        /* Repulsion, canonical pair order (deterministic). */
+        for (i = 0; i < n; i++) {
+          for (j = i + 1; j < n; j++) {
+            var a = ids[i], b = ids[j];
+            var ddx = pos[a].x - pos[b].x, ddy = pos[a].y - pos[b].y;
+            var d = Math.sqrt(ddx * ddx + ddy * ddy), ux, uy;
+            if (d > 0.01) { ux = ddx / d; uy = ddy / d; }
+            else { var ang = ((i * 7 + j) * 2.399963); ux = Math.cos(ang); uy = Math.sin(ang); d = 0.01; }
+            var fr = (k * k) / d;
+            dx[a] += ux * fr; dy[a] += uy * fr;
+            dx[b] -= ux * fr; dy[b] -= uy * fr;
+          }
+        }
+        /* Springs along edges (log-weighted), then center gravity. */
+        for (i = 0; i < edges.length; i++) {
+          var e = edges[i];
+          var ex = pos[e.a].x - pos[e.b].x, ey = pos[e.a].y - pos[e.b].y;
+          var ed = Math.sqrt(ex * ex + ey * ey) || 0.01;
+          var fa = (ed * ed / k) * e.w / ed;
+          dx[e.a] -= ex * fa; dy[e.a] -= ey * fa;
+          dx[e.b] += ex * fa; dy[e.b] += ey * fa;
+        }
+        for (i = 0; i < n; i++) {
+          var id2 = ids[i];
+          var pull = RELAX_GRAV * (inL0[id2] ? RELAX_L0_GRAV : 1);
+          dx[id2] += (cx - pos[id2].x) * pull;
+          dy[id2] += (cy - pos[id2].y) * pull;
+        }
+        /* Move simultaneously, capped by temperature; walls clamp. */
+        for (i = 0; i < n; i++) {
+          var id3 = ids[i];
+          var mx = dx[id3], my = dy[id3];
+          var ml = Math.sqrt(mx * mx + my * my);
+          if (ml > temp && ml > 0) { mx = mx / ml * temp; my = my / ml * temp; }
+          pos[id3].x = clampX(pos[id3].x + mx, rad[id3]);
+          pos[id3].y = clampY(pos[id3].y + my, rad[id3]);
+        }
+        temp *= RELAX_COOL;
+      }
+      return pos;
+    } catch (e) {
+      /* Settle failure returns the seed copy (rings still draw) — a broken
+       * relax must never blank the map. */
+      try {
+        var fb = {};
+        Object.keys(seed || {}).forEach(function (id) {
+          fb[id] = { x: seed[id].x, y: seed[id].y };
+        });
+        return fb;
+      } catch (x) { return {}; }
+    }
+  }
   /* _cssTok: theme token value or the fallback (headless-safe). */
   function _cssTok(name, fallback) {
     try {
@@ -393,7 +519,8 @@ var PoolGraph = (function () {
       try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", t("pool.map_touch_aria", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools.")); } catch (e) {}
       return { empty: true };
     }
-    var base = layout(graph, assetA, assetB, g.w, g.h);
+    var base = relax(graph, layout(graph, assetA, assetB, g.w, g.h),
+      g.w, g.h, { assetA: assetA, assetB: assetB });
     var offs = _offsetsFor(canvas, graph, assetA, assetB);
     var pos = {};
     Object.keys(base).forEach(function (id) {
@@ -573,7 +700,7 @@ var PoolGraph = (function () {
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
-      nodeRadius: _nodeRadius, ringRadii: _ringRadii } };
+      nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.PoolGraph === "undefined") { globalThis.PoolGraph = PoolGraph; }

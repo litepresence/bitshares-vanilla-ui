@@ -68,3 +68,18 @@ DEX-UX ES-candle transport REFUSED (chain history only, grep-gated).
 ## Anti-rot gate (§4.5): (a) yes — static + existing Tx/Chain reuse, ES refused;
 (b) nothing new depended on; (c) smallest deletable: swap page (pools desk
 stands). `check_rot.py` PASS.
+
+## Delta 2026-10-02 — deterministic force relaxation for the pool map (owner: networkx-like physics on canvas)
+`layout()` rings were correct but rigid. New `relax()` settles the seed to a
+static equilibrium synchronously at paint: Coulomb repulsion (all pairs) +
+log-weighted springs (weight from raw-digit length — money never touches
+float) + weak center gravity (3x for the L0 pair anchor) + wall soft-push and
+hard clamp. Fixed 150 iterations, fixed cooling, golden-angle d==0 splits,
+zero randomness/timers/animation: same graph always settles to the same
+pixels. `drawGraph` (both pages) feeds `relax(layout(...))`; drag offsets,
+hit-testing, labels, radii, and `_rings` (label stagger) untouched. Vectors
+43→68 (determinism, containment, separation, L0-near-center, center-of-mass,
+degenerate-input softness, weight ordering). Headless `#/pools/1.19.66`:
+organic spread, pair central with highlighted edge, labels readable, zero
+console errors. Tune next (only on owner call): repulsion/cooling/wall
+constants, spring weight curve.
