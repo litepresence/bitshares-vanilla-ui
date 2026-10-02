@@ -369,7 +369,11 @@ var ExplorerBlocks = (function () {
    * (caller dashes the cell instead). TIME DIRECTION: input arrays are
    * newest-first, but bars draw oldest-left/newest-right (chart convention:
    * back-in-time reads leftward, newest enters at right and history marches
-   * left on each head — drawing newest-first leftward read backwards). */
+   * left on each head — drawing newest-first leftward read backwards).
+   * TRACKABILITY: chain intervals are near-uniform (~3s), so a 1-slot shift
+   * of packed same-height bars is invisible (aperture problem). Bars keep a
+   * 4px gutter and callers cap the window, so each head-step marches
+   * visibly leftward. */
   function drawBars(canvas, intervals) {
     try {
       var ctx = canvas.getContext("2d");
@@ -384,11 +388,12 @@ var ExplorerBlocks = (function () {
         var css = getComputedStyle(document.documentElement).getPropertyValue("--accent");
         if (css && css.trim()) color = css.trim();
       } catch (e) { /* named fallback stands */ }
-      var bw = Math.max(2, Math.floor(W / intervals.length) - 2);
+      var GAP = 4;
+      var bw = Math.max(2, Math.floor((W - GAP * (intervals.length - 1)) / intervals.length));
       for (i = 0; i < intervals.length; i++) {
         var h = Math.max(2, Math.round(intervals[i] / max * (H - 4)));
         ctx.fillStyle = color;
-        ctx.fillRect((intervals.length - 1 - i) * (bw + 2), H - h, bw, h);
+        ctx.fillRect((intervals.length - 1 - i) * (bw + GAP), H - h, bw, h);
       }
     } catch (e) { /* blank strip stands — the numeric cells carry the data */ }
   }
@@ -949,7 +954,7 @@ var ExplorerBlocks = (function () {
           var s2 = fmtSupply(sup.stealth_raw, sup.precision, sup.symbol || "BTS");
           if (s2 !== null) { cStl.val.textContent = s2; cStl.val.title = String(sup.stealth_raw); }
         }
-        var ivals = stripIntervals();
+        var ivals = stripIntervals().slice(0, 20);
         while (cBt.val.firstChild) cBt.val.removeChild(cBt.val.firstChild);
         if (ivals.length > 0) {
           var cv = doc.createElement("canvas");

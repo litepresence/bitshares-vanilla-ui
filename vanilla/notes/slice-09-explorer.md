@@ -191,3 +191,13 @@ Anti-rot: (a) platform timers + canvas + existing push feed; (b) zero new
 deps, one token, one additive field; (c) deletable: activity refresh
 (panel keeps its initial window), UTC parse (local parse stands with clamp),
 row cap (table grows again — kept because the leak was real).
+
+## Addendum — 3.0s reference line (owner: see above/under deviations, then removed)
+
+Live-measured mainnet: 29/29 consecutive intervals exactly 3.0s (1s stamp
+resolution + DPoS metronome — uniformity is real data, verified live, not a
+plot bug). A 1px line shipped briefly, then removed same session (owner
+call): with 1-second resolution, above/under-3.0 deviations cannot actually
+resolve, so the line marked precision the data does not have. Bars +
+gutters + direction carry the strip alone; removal was pure deletion (no
+dead code, no leftover token — `--flash` stays for row flashes).
