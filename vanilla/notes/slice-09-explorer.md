@@ -201,3 +201,11 @@ call): with 1-second resolution, above/under-3.0 deviations cannot actually
 resolve, so the line marked precision the data does not have. Bars +
 gutters + direction carry the strip alone; removal was pure deletion (no
 dead code, no leftover token — `--flash` stays for row flashes).
+
+## Follow-up — dropped appendChild on the activity panel (owner-caught)
+The activity-live refactor extracted row painting into `paintActivity` but
+dropped the `split.appendChild(actPanel)` line, so the panel never mounted
+and Recent blocks slid left. One-line restore, verified headless (both
+panels side-by-side, live rows, zero errors). Process lesson recorded: view
+refactors get their confirming screenshot BEFORE the done-claim, not after —
+no unit suite covers paintTip's DOM assembly, the shooter is the test.

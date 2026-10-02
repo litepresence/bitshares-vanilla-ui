@@ -1038,6 +1038,7 @@ var ExplorerBlocks = (function () {
           }
         } catch (e) { /* panel keeps prior rows */ }
       }
+      split.appendChild(actPanel);
       var blkPanel = el(doc, "div", null, "xplore-panel");
       blkPanel.appendChild(el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
       var shown = rows.slice(0, TABLE_ROWS);
