@@ -3090,7 +3090,11 @@
       "wallet.wallet_manager",
       "wallet.wallet_name",
       "wallet.wallet_name_required_use_letters_digits_dash",
-      "wallet.ways_in"
+      "wallet.ways_in",
+      "asset.holders_title",
+      "asset.holders_account",
+      "asset.holders_balance",
+      "asset.holders_unavailable"
     ]
   },
   "nav": {
@@ -6008,7 +6012,11 @@
     "fee_no_pmo_discount": "No PMO discount: the create fee follows the full symbol length.",
     "prefill_pmo": "Prefill PMO template",
     "pmo_template_hint": "PMO template filled — complete the identity and governance fields.",
-    "sub_symbol_hint": "Dotted symbol: keep the parent prefix and dot."
+    "sub_symbol_hint": "Dotted symbol: keep the parent prefix and dot.",
+    "holders_title": "Top holders",
+    "holders_account": "Account",
+    "holders_balance": "Balance",
+    "holders_unavailable": "Top holders unavailable — the community index is off or unreachable; check Settings."
   },
   "pool": {
     "a_to_b_col": "A→B out (raw)",

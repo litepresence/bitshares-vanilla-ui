@@ -4,7 +4,8 @@
  *   mergeDeep (chain-wins overlap merge, cap slice). No DOM, no signing.
  * Consumes: Chain.history/.call (single chain-facing module), Format.formatPrice
  *   /.formatAmount (BigInt money math only). Side effects: WS calls + one
- *   HTTPS POST to the community ES endpoint (adapter: any failure falls back
+ *   HTTPS POST to the community ES endpoint via HistoryCap.esSearch (the
+ *   ONLY raw-ES seam: pref-gated, index-allowlisted; any failure falls back
  *   to chain, never throws outward except bad ids / bad bucket / bad count).
  *   Global MarketFills only.
  * Provenance (PORT THE MATH, never import):
@@ -31,7 +32,9 @@ var MarketFills = (function () {
   "use strict";
 
   /* Community ES endpoint (moved from es.bts.mobi 2026-09-28).
-   * DATA, not dependency: unreachable/slow/blocked => chain fallback. */
+   * DATA, not dependency: unreachable/slow/blocked => chain fallback.
+   * INFORMATIONAL since the HistoryCap migration: HistoryCap.esSearch owns
+   * the host (ES_BASE) and builds this same URL; kept exported for compat. */
   var ES_URL = "https://es.bitshares.dev/bitshares-*/_search";
   var ES_TIMEOUT_MS = 15000;
   var ES_SIZE = 500;
@@ -128,59 +131,77 @@ var MarketFills = (function () {
     } catch (e) { return null; }
   }
 
+  /* HistoryCap seam (the ONLY raw-ES path — direct fetch here is FORBIDDEN
+   * by the centralization rule). Classic-script global in the browser
+   * (typeof-guarded, load-order agnostic — index.html loads this file BEFORE
+   * history-cap.js); lazy require() under node so unit tests resolve the same
+   * seam with no global preload. Missing everywhere => null, and esFills
+   * rejects to the chain path (never a direct fetch). */
+  /* _historyCap: the HistoryCap seam (single ES gateway). Browser: the
+   *   classic-script global (call-time lookup — load order agnostic).
+   *   Node suites: globalThis.HistoryCap preloaded by the test harness.
+   *   No require() here: checkJs runs browser libs (TS2591), and shipped
+   *   code must not know about module loaders. Null => caller goes chain. */
+  function _historyCap() {
+    try {
+      if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.esSearch === "function") return HistoryCap;
+    } catch (e) {}
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.HistoryCap && typeof globalThis.HistoryCap.esSearch === "function") return globalThis.HistoryCap;
+    } catch (e) {}
+    return null;
+  }
+
+  /* esOn: community-ES pref gate. False => user disabled ES (skip ES
+   * entirely). Missing HistoryCap reads as ON here — esFills then rejects
+   * via _historyCap and the caller still lands on chain (fail closed). */
+  function _esOn() {
+    try {
+      var HC = _historyCap();
+      if (HC && typeof HC.esAllowed === "function") return HC.esAllowed() !== false;
+    } catch (e) {}
+    return true;
+  }
+
   /* ES adapter: up to `limit` recent fills, newest first (capped at 1000 —
    * the deep-candle window is 200 buckets). Capped search_after pagination:
    * 500/page, max 2 pages = 1000 raw events; strict leg guards apply per
    * stops early when a page returns <500 raw hits or the want is reached.
-   * 15s TOTAL budget across pages (one deadline, not per page). Rejects
-   * on ANY failure (network/CORS/timeout/shape) — the caller falls back
-   * to chain. */
+   * 15s TOTAL budget across pages (one deadline — each page gets the
+   * REMAINDER via esSearch opts). Transport is HistoryCap.esSearch; the
+   * query bodies are the byte-identical esQuery DSL below. Rejects on ANY
+   * failure (es-disabled/es-unavailable/shape/missing seam) — the caller
+   * falls back to chain. */
   function esFills(baseId, quoteId, limit) {
     assertMarketIds(baseId, quoteId);
     var want = limit === undefined ? ES_SIZE : Math.floor(limit);
     if (!(want >= 1)) want = ES_SIZE;
     if (want > ES_MAX_EVENTS) want = ES_MAX_EVENTS;
     return new Promise(function (resolve, reject) {
-      var ctrl = null, timer = null, done = false;
+      var done = false;
       var deadline = Date.now() + ES_TIMEOUT_MS;
       function fail(e) {
         if (done) return; done = true;
-        try { clearTimeout(timer); } catch (x) {}
-        try { if (ctrl) ctrl.abort(); } catch (x) {}
-        reject(e);
+        reject(e instanceof Error ? e : new Error("es-unavailable"));
       }
       function finish(out) {
         if (done) return; done = true;
-        try { clearTimeout(timer); } catch (x) {}
         resolve({ fills: out, source: "es" });
       }
       try {
-        if (typeof fetch !== "function") { reject(new Error("no fetch")); return; }
-        timer = setTimeout(function () { fail(new Error("es timeout")); }, ES_TIMEOUT_MS);
+        var HC = _historyCap();
+        if (!HC) { fail(new Error("no history-cap")); return; }
         var out = [];
         var searchAfter = null;
         var pages = 0;
         function fetchPage() {
           if (done) return;
           if (pages >= ES_MAX_PAGES || out.length >= want) { finish(out); return; }
-          if (Date.now() >= deadline) { fail(new Error("es timeout")); return; }
+          var remain = deadline - Date.now();
+          if (remain <= 0) { fail(new Error("es timeout")); return; }
           var q = esQuery(baseId, quoteId, searchAfter);
-          try {
-            if (typeof AbortController === "function") ctrl = new AbortController();
-            else ctrl = null;
-          } catch (x) { ctrl = null; }
-          var opts = {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(q)
-          };
-          if (ctrl) opts.signal = ctrl.signal;
-          fetch(ES_URL, opts).then(function (resp) {
-            if (done) return null;
-            if (!resp || !resp.ok) { fail(new Error("es status " + (resp && resp.status))); return null; }
-            return resp.json();
-          }).then(function (data) {
+          HC.esSearch("bitshares-*", q, { timeoutMs: remain }).then(function (data) {
             if (done) return;
-            if (Date.now() >= deadline && out.length === 0) { fail(new Error("es timeout")); return; }
             var hits = (data && data.hits && data.hits.hits) || [];
             for (var i = 0; i < hits.length && out.length < want; i++) {
               var f = esFill(hits[i], baseId, quoteId);
@@ -240,14 +261,16 @@ var MarketFills = (function () {
 
   /* fillsForMarket: mainnet tries ES first (empty ES page goes chain — the
    * community index is mainnet-only); any non-mainnet network goes chain
-   * directly. Returns {fills (newest first), source}. Never rejects except
-   * bad ids / both paths down. */
+   * directly, as does pref-off (esEnabled false skips ES entirely — the
+   * chain label below already covers it, no new copy). Returns {fills
+   * (newest first), source}. Never rejects except bad ids / both paths down. */
   function fillsForMarket(baseId, quoteId, limit, opts) {
     assertMarketIds(baseId, quoteId);
     opts = opts || {};
     var lim = limit === undefined ? 100 : limit;
     function chain() { return chainFills(baseId, quoteId, lim); }
     if (opts.network && opts.network !== "mainnet") return chain();
+    if (!_esOn()) return chain();
     return esFills(baseId, quoteId, lim).then(function (res) {
       if (res.fills.length) return res;
       return chain();

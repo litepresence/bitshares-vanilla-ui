@@ -342,6 +342,39 @@ var ExplorerAssets = (function () {
     return scroller;
   }
 
+  /* _parseHolders: ES objects-balance _search JSON -> [{owner, balance}].
+   * OBSERVED shape (live curl 2026-10-02 against es.bitshares.dev): hits.hits[i]
+   * ._source = {id "2.5.x", asset_type "1.3.x", balance <raw int, JSON number>,
+   * maintenance_flag bool, owner_ "1.2.x" (trailing underscore), object_id,
+   * block_time, block_number}. No account names and no asset precision ride
+   * in the hits (precision comes from the asset object at the call site, names
+   * resolve via ExplorerRender.accountLink) — astro-ui's
+   * TopAssetHolders.ts:30-37 is the query-shape hint only, not the row shape.
+   * Balances stay digit-strings for Format.formatAmount (never Number math).
+   * Shape-tolerant: anything missing -> []. Never throws.
+   * @param {any} esJson parsed ES _search response
+   * @returns {Array<{owner:string,balance:string}>} rows in hit (rank) order */
+  function _parseHolders(esJson) {
+    try {
+      var hits = esJson && esJson.hits && esJson.hits.hits;
+      if (!Array.isArray(hits)) return [];
+      var out = [];
+      for (var i = 0; i < hits.length; i++) {
+        var src = hits[i] && hits[i]._source;
+        if (!src || typeof src !== "object") continue;
+        if (typeof src.owner_ !== "string" || !ACCT_RE.test(src.owner_)) continue;
+        var bal = src.balance;
+        if (typeof bal === "number") {
+          if (!isFinite(bal)) continue;
+          bal = String(Math.floor(bal));
+        }
+        if (typeof bal !== "string" || !/^\d+$/.test(bal)) continue;
+        out.push({ owner: src.owner_, balance: bal });
+      }
+      return out;
+    } catch (e) { return []; }
+  }
+
 
   /* Assets tab: filterable/sortable table (Symbol, Issuer, Supply human +
    *   Market link) with lower-bound paging (Next/Prev stack, Reference #18
@@ -818,6 +851,85 @@ var ExplorerAssets = (function () {
       humanRowInto(dl2, t("explorer.accumulated_fees", "Accumulated fees"), dyn.accumulated_fees);
       coreRowInto(dl2, t("explorer.fee_pool", "Fee pool"), dyn.fee_pool);
       infoBox.appendChild(descBox);
+      /* Top-holders panel (ES objects-balance via HistoryCap.esSearch — WS has
+       * no holder endpoint, sweep-proven -32601 everywhere). Query shape mirrors
+       * astro-ui TopAssetHolders.ts:30-37 (match on asset_type, balance desc,
+       * size 25); rows parsed by _parseHolders against the OBSERVED shape.
+       * Owner cells reuse ExplorerRender.accountLink (id now, name when the
+       * resolve lands — same helper as the issuer row above); balances go
+       * through Format.formatAmount with this asset's precision (raw in
+       * title). Gated: HistoryCap missing, esAllowed() false, or esSearch
+       * reject -> keyed one-line notice + HistoryNotice settings link.
+       * Never blank, never throws. */
+      (function holdersSection() {
+        var box = el(doc, "div", null, "xplore-holders");
+        infoBox.appendChild(box);
+        box.appendChild(el(doc, "h3", t("asset.holders_title", "Top holders")));
+        var listBox = el(doc, "div", null, "xplore-holders-list");
+        box.appendChild(listBox);
+        showStatus(doc, listBox, t("explorer.loading_prefix", "Loading ") + t("asset.holders_title", "Top holders") + "…");
+        /* holdersUnavailable: keyed one-line notice + Settings action link.
+         * WHY helper: three failure paths (pref off, missing seam, ES reject)
+         * share this honest panel; display-only, never throws. No params. */
+        function holdersUnavailable() {
+          while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+          listBox.appendChild(el(doc, "p",
+            t("asset.holders_unavailable", "Top holders unavailable — the community index is off or unreachable; check Settings."), "muted"));
+          try {
+            if (typeof HistoryNotice !== "undefined" && HistoryNotice &&
+                typeof HistoryNotice.actionLink === "function") {
+              var link = HistoryNotice.actionLink(doc, t, "settings");
+              if (link) listBox.appendChild(link);
+            }
+          } catch (e2) { /* notice stands without the link */ }
+        }
+        try {
+          if (typeof HistoryCap === "undefined" || !HistoryCap ||
+              typeof HistoryCap.esAllowed !== "function" ||
+              typeof HistoryCap.esSearch !== "function" || !HistoryCap.esAllowed()) {
+            holdersUnavailable();
+            return;
+          }
+          var body = { query: { bool: { must: [{ match: { asset_type: { query: a.id } } }] } },
+            track_total_hits: false, size: 25, sort: [{ balance: { order: "desc" } }] };
+          HistoryCap.esSearch("objects-balance", body).then(function (esJson) {
+            if (!isCurrent(myGen)) return;
+            var rows = _parseHolders(esJson);
+            while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+            if (rows.length === 0) { holdersUnavailable(); return; }
+            var scroller = el(doc, "div", null, "xplore-scroll");
+            scroller.style.overflowX = "auto";
+            var table = doc.createElement("table");
+            table.className = "node-table";
+            var thead = doc.createElement("thead");
+            var hr = doc.createElement("tr");
+            hr.appendChild(el(doc, "th", t("asset.holders_account", "Account")));
+            hr.appendChild(el(doc, "th", t("asset.holders_balance", "Balance")));
+            thead.appendChild(hr);
+            table.appendChild(thead);
+            var tb = doc.createElement("tbody");
+            rows.forEach(function (r) {
+              var tr = doc.createElement("tr");
+              var tdA = doc.createElement("td");
+              tdA.appendChild(ExplorerRender.accountLink(doc, r.owner, myGen));
+              tr.appendChild(tdA);
+              var tdB = doc.createElement("td");
+              try {
+                tdB.textContent = Format.formatAmount(r.balance, prec);
+                tdB.title = r.balance;
+              } catch (e) { tdB.textContent = r.balance; }
+              tr.appendChild(tdB);
+              tb.appendChild(tr);
+            });
+            table.appendChild(tb);
+            scroller.appendChild(table);
+            listBox.appendChild(scroller);
+          }).catch(function () {
+            if (!isCurrent(myGen)) return;
+            holdersUnavailable();
+          });
+        } catch (e) { holdersUnavailable(); }
+      })();
       /* ACTIONS tab: market/transfer links + live fee-pool FUND form (op 16).
        * RESOLVED (was deferred): funding now signs locally via AssetOps +
        * Tx like the asset-manage flows (review + unlock-at-sign + pool-delta
@@ -1115,7 +1227,7 @@ var ExplorerAssets = (function () {
     assetsTab: assetsTab,
     renderAsset: renderAsset,
     feedsTab: feedsTab,
-    _test: { pctHundredths: pctHundredths, ratio1000: ratio1000, lifetimeText: lifetimeText }
+    _test: { pctHundredths: pctHundredths, ratio1000: ratio1000, lifetimeText: lifetimeText, parseHolders: _parseHolders }
   };
 })();
 

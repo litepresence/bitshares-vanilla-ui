@@ -7,6 +7,8 @@ globalThis.Format = require("/workspace/vanilla/js/api/format.js");
 globalThis.Chain = { call: () => Promise.reject(new Error("no chain in vectors")) };
 globalThis.Asset = { describe: () => Promise.reject(new Error("no chain")) };
 globalThis.Pool = require("/workspace/vanilla/js/api/pool.js");
+/* HistoryCap seam preload (Phase 4b migration — see market-fills-test.js). */
+globalThis.HistoryCap = require("/workspace/vanilla/js/api/history-cap.js");
 const PH = require("/workspace/vanilla/js/api/pool-history.js");
 
 let pass = 0, fail = 0;

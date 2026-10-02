@@ -4,8 +4,10 @@
  *   levels in MarketBook level shape). No DOM, no signing, no storage.
  * Consumes: Chain (db/history/call), Pool.history (chain fallback rows),
  *   Asset.describe (precisions), Format (human strings only). Side effects:
- *   WS calls + one HTTPS POST to the community ES endpoint (adapter: any
- *   failure falls back to chain, never throws outward except "bad pool id").
+ *   WS calls + one HTTPS POST to the community ES endpoint via
+ *   HistoryCap.esSearch (the ONLY raw-ES seam: pref-gated,
+ *   index-allowlisted; any failure falls back to chain, never throws
+ *   outward except "bad pool id").
  *   Global PoolHistory only.
  * Refs: #5 kibana_queries.py:kibana_swaps (op-63 swap query) +
  *   kibana.py:parse_price_history (paid/received orientation) +
@@ -22,7 +24,9 @@ var PoolHistory = (function () {
 
   /* ES endpoint (moved from es.bts.mobi 2026-09-28, 301 -> es.bitshares.dev).
    * Community infra, treated as DATA (node-list class): unreachable/slow/
-   * blocked => chain fallback. Never load-bearing. */
+   * blocked => chain fallback. Never load-bearing.
+   * INFORMATIONAL since the HistoryCap migration: HistoryCap.esSearch owns
+   * the host (ES_BASE) and builds this same URL; kept exported for compat. */
   var ES_URL = "https://es.bitshares.dev/bitshares-*/_search";
   var ES_TIMEOUT_MS = 15000;
   var ES_SIZE = 500;
@@ -99,53 +103,71 @@ var PoolHistory = (function () {
     } catch (e) { return null; }
   }
 
+  /* HistoryCap seam (the ONLY raw-ES path — direct fetch here is FORBIDDEN
+   * by the centralization rule). Classic-script global in the browser
+   * (typeof-guarded, load-order agnostic); globalThis preload in node
+   * suites (no require() — checkJs runs browser libs, TS2591). Missing
+   * everywhere => null, and esSwaps rejects to the chain path. */
+  function _historyCap() {
+    try {
+      if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.esSearch === "function") return HistoryCap;
+    } catch (e) {}
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.HistoryCap && typeof globalThis.HistoryCap.esSearch === "function") return globalThis.HistoryCap;
+    } catch (e) {}
+    return null;
+  }
+
+  /* esOn: community-ES pref gate. False => user disabled ES (skip ES
+   * entirely). Missing HistoryCap reads as ON here — esSwaps then rejects
+   * via _historyCap and the caller still lands on chain (fail closed). */
+  function _esOn() {
+    try {
+      var HC = _historyCap();
+      if (HC && typeof HC.esAllowed === "function") return HC.esAllowed() !== false;
+    } catch (e) {}
+    return true;
+  }
+
   /* ES adapter: up to `limit` recent swaps, newest first (capped at 1000).
    * Capped search_after pagination: 500/page, max 2 pages = 1000 raw
    * events; strict pool guards apply per page (esSwap); stops early when
    * a page returns <500 raw hits or the want is reached. 15s TOTAL budget
-   * across pages (one deadline, not per page). Rejects on ANY failure
-   * (network/CORS/timeout/shape) — the caller falls back to chain. */
+   * across pages (one deadline — each page gets the REMAINDER via esSearch
+   * opts). Transport is HistoryCap.esSearch; the query bodies are the
+   * byte-identical esQuery DSL below. Rejects on ANY failure
+   * (es-disabled/es-unavailable/shape/missing seam) — the caller falls
+   * back to chain. */
   function esSwaps(poolId, limit) {
     assertPoolId(poolId);
     var want = limit === undefined ? ES_SIZE : Math.floor(limit);
     if (!(want >= 1)) want = ES_SIZE;
     if (want > ES_MAX_EVENTS) want = ES_MAX_EVENTS;
     return new Promise(function (resolve, reject) {
-      var ctrl = null, timer = null, done = false;
+      var done = false;
       var deadline = Date.now() + ES_TIMEOUT_MS;
-      function fail(e) { if (done) return; done = true; try { clearTimeout(timer); } catch (x) {} try { if (ctrl) ctrl.abort(); } catch (x) {} reject(e); }
+      function fail(e) {
+        if (done) return; done = true;
+        reject(e instanceof Error ? e : new Error("es-unavailable"));
+      }
       function finish(out) {
         if (done) return; done = true;
-        try { clearTimeout(timer); } catch (x) {}
         resolve({ swaps: out, source: "es" });
       }
       try {
-        if (typeof fetch !== "function") { reject(new Error("no fetch")); return; }
-        timer = setTimeout(function () { fail(new Error("es timeout")); }, ES_TIMEOUT_MS);
+        var HC = _historyCap();
+        if (!HC) { fail(new Error("no history-cap")); return; }
         var out = [];
         var searchAfter = null;
         var pages = 0;
         function fetchPage() {
           if (done) return;
           if (pages >= ES_MAX_PAGES || out.length >= want) { finish(out); return; }
-          if (Date.now() >= deadline) { fail(new Error("es timeout")); return; }
+          var remain = deadline - Date.now();
+          if (remain <= 0) { fail(new Error("es timeout")); return; }
           var q = esQuery(poolId, searchAfter);
-          try {
-            if (typeof AbortController === "function") ctrl = new AbortController();
-            else ctrl = null;
-          } catch (x) { ctrl = null; }
-          var opts = {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(q)
-          };
-          if (ctrl) opts.signal = ctrl.signal;
-          fetch(ES_URL, opts).then(function (resp) {
-            if (done) return null;
-            if (!resp || !resp.ok) { fail(new Error("es status " + (resp && resp.status))); return null; }
-            return resp.json();
-          }).then(function (data) {
+          HC.esSearch("bitshares-*", q, { timeoutMs: remain }).then(function (data) {
             if (done) return;
-            if (Date.now() >= deadline && out.length === 0) { fail(new Error("es timeout")); return; }
             var hits = (data && data.hits && data.hits.hits) || [];
             for (var i = 0; i < hits.length && out.length < want; i++) {
               var sw = esSwap(hits[i], poolId);
@@ -216,7 +238,8 @@ var PoolHistory = (function () {
 
   /* swapsForPool: mainnet tries ES first (empty ES page or non-mainnet
    * network goes chain — the community index is mainnet-only, proven
-   * 2026-09-28). Chain fallback is authoritative. opts {network, legA,
+   * 2026-09-28; pref-off (esEnabled false) skips ES entirely — the chain
+   * label below already covers it, no new copy). Chain fallback is authoritative. opts {network, legA,
    * legB}: leg filter applies to BOTH sources. Returns {swaps (newest
    * first), source}. Never rejects except bad pool id / both paths down. */
   function swapsForPool(poolId, limit, opts) {
@@ -231,6 +254,7 @@ var PoolHistory = (function () {
       });
     }
     if (opts.network && opts.network !== "mainnet") return chain();
+    if (!_esOn()) return chain();
     return esSwaps(poolId, lim).then(function (res) {
       res.swaps = legs(res.swaps);
       if (res.swaps.length) return res;

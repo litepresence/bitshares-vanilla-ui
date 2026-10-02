@@ -4,6 +4,9 @@
 "use strict";
 globalThis.Format = require("/workspace/vanilla/js/api/format.js");
 globalThis.Chain = { call: function () { return Promise.reject(new Error("no chain in vectors")); } };
+/* HistoryCap seam preload (Phase 4b migration: esFills routes through the
+ * central gateway; esAllowed() fails open without Store, fetch stays stubbed). */
+globalThis.HistoryCap = require("/workspace/vanilla/js/api/history-cap.js");
 var MF = require("/workspace/vanilla/js/api/market-fills-history.js");
 var pass = 0, fail = 0;
 function eq(got, want, name) {
