@@ -169,7 +169,7 @@ var MarketCandles = (function () {
    * Fails: "history-unavailable" when the history api is missing;
    *   "bad-bucket"/"bad-count" on invalid timeframe args. */
   async function candles(baseId, quoteId, bucketSec, count) {
-    if (count === undefined) count = 200;
+    if (count === undefined) count = 2000;
     count = Math.floor(count);
     if (!(count >= 1)) throw new Error("bad-count");
     var nums = await timeframes(); // throws history-unavailable
@@ -302,11 +302,14 @@ var MarketCandles = (function () {
     }
     /* Deep backfill, lazy (2026-10-01 audit): merge the background ES buckets
      * fetched by deepen() UNDER fresh chain authority (chain wins every
-     * overlap, same mergeDeep rule as before). Synchronous cache read — this
-     * function never waits on the network, so first candles paint at chain
-     * speed (~50ms) and deepen visibly the chart when ES lands. Mainnet only
-     * (the community index is mainnet-only); empty cache = chain-only with
-     * deep=false, never a throw. */
+     * overlap, same mergeDeep rule as before). The merge cap is the
+     * REQUESTED count (not a fixed 2000): changing the candle window
+     * re-windows the merged output instead of reusing a stale span.
+     * Synchronous cache read — this function never waits on the network,
+     * so first candles paint at chain speed (~50ms) and deepen visibly the
+     * chart when ES lands. Mainnet only (the community index is
+     * mainnet-only); empty cache = chain-only with deep=false, never
+     * a throw. */
     var deep = false;
     try {
       var dkey = baseId + "|" + quoteId + "|" + bucket;
@@ -314,7 +317,7 @@ var MarketCandles = (function () {
         Array.isArray(_deepCache.esBuckets) && _deepCache.esBuckets.length > 0 &&
         typeof MarketFills !== "undefined" && MarketFills &&
         typeof MarketFills.mergeDeep === "function") {
-        out = MarketFills.mergeDeep(out, _deepCache.esBuckets, 2000);
+        out = MarketFills.mergeDeep(out, _deepCache.esBuckets, count);
         closes = out.map(function (e) {
           var n = Number(e && e.close);
           return isNaN(n) ? null : n; // pixels only, not money
@@ -329,7 +332,7 @@ var MarketCandles = (function () {
    *   desk calls this ONCE per pair+bucket after the chain-first paint; the
    *   next candles() call merges the result under fresh chain authority).
    * ES want is 1000 fills (2 pages max, ~1.4MB worst, typically 1 page —
-   *   measured 2026-10-01); the 200-bucket window needs far fewer. Mainnet
+   *   measured 2026-10-01); the 2000-bucket window needs far fewer. Mainnet
    *   only (community index is mainnet-only); any failure or empty ES page
    *   resolves null and the desk keeps its chain-only paint — never rejects,
    *   never throws outward (bad bucket still throws like candles()).

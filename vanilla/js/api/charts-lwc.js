@@ -224,6 +224,36 @@ var ChartsLwc = (function () {
     } catch (e) { /* headless host */ }
   }
 
+  /* Zoom memory: capture the visible logical range of a live handle's
+   * chart before a rebuild destroys it. Params: handle (previous draw
+   * handle). Returns {from, to} or null. Never throws. */
+  function savedRange(handle) {
+    try {
+      if (handle && handle.chart && handle.chart.timeScale &&
+          typeof handle.chart.timeScale().getVisibleLogicalRange === "function") {
+        var r = handle.chart.timeScale().getVisibleLogicalRange();
+        if (r && isFinite(r.from) && isFinite(r.to) && r.to > r.from) {
+          return { from: r.from, to: r.to };
+        }
+      }
+    } catch (e) { /* no memory */ }
+    return null;
+  }
+
+  /* Restore a captured range onto a fresh chart after setData (zoom stops
+   * resetting on every repaint: toggles, theme, resize, live-tip refresh).
+   * No-op when nothing was captured or the chart rejects it (fresh
+   * fit-content stands). Never throws. */
+  function restoreRange(chart, range) {
+    if (!range) return;
+    try {
+      if (chart && chart.timeScale &&
+          typeof chart.timeScale().setVisibleLogicalRange === "function") {
+        chart.timeScale().setVisibleLogicalRange(range);
+      }
+    } catch (e) { /* fresh fit stands */ }
+  }
+
   /* market.js buckets -> LWC candle rows. Number()/Math.floor here are
    * CHART-PIXEL inputs only (Global Constraints): OHLC human strings become
    * coordinates; epoch slot math is time, not money. Malformed bars are
@@ -272,6 +302,7 @@ var ChartsLwc = (function () {
     opts = opts || {};
     var handle = { kind: "none", chart: null };
     if (!hostEl) return handle;
+    var keep = savedRange(opts.previous);
     clearHost(hostEl, opts.previous);
     var colors = paneColors(opts.colors);
     var bars = toLwcCandles(opts.candles);
@@ -333,6 +364,7 @@ var ChartsLwc = (function () {
       });
       line.setData(lineData(times, ov.values));
     }
+    restoreRange(chart, keep);
     handle.kind = "lwc";
     handle.chart = chart;
     return handle;
@@ -351,6 +383,7 @@ var ChartsLwc = (function () {
     opts = opts || {};
     var handle = { kind: "none", chart: null };
     if (!hostEl) return handle;
+    var keep = savedRange(opts.previous);
     clearHost(hostEl, opts.previous);
     var colors = paneColors(opts.colors);
     var times = Array.isArray(opts.times) ? opts.times : [];
@@ -459,6 +492,7 @@ var ChartsLwc = (function () {
         ls.setData(lineData(times, s.values));
       }
     }
+    restoreRange(chart, keep);
     handle.kind = "lwc";
     handle.chart = chart;
     return handle;
@@ -534,7 +568,8 @@ var ChartsLwc = (function () {
     drawOscPane: drawOscPane,
     removePane: removePane,
     linkTimeScales: linkTimeScales,
-    hasLightweight: hasLightweight
+    hasLightweight: hasLightweight,
+    _test: { savedRange: savedRange, restoreRange: restoreRange }
   };
 })();
 

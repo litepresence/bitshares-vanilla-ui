@@ -62,3 +62,43 @@ irror), replaced by LWC+canvas.
 ## Anti-rot gate (§4.5): (a) yes — static files, no services; (b) LWC vendored
 (byte-copy + license + hash), removable → canvas fallback covers all panes;
 (c) smallest deletable: osc module (base 14 indicators remain). `check_rot.py` PASS.
+
+## Delta 2026-10-02 — zoom memory, tip generation guard, candle window 2000 (day-1 chart feedback)
+
+Owner reports: exchange chart updates flaky (pool chart fine) + zoom resets
+every few seconds in the LWC widget. Root causes, all verified in code:
+
+1. **Zoom reset: every repaint destroyed the chart.** `drawPricePane`/
+   `drawOscPane` ran `clearHost` (chart.remove()) + fresh createChart +
+   setData on EVERY call — checkbox toggles, theme switches, resizes, and
+   each 3.5s live-tip refresh. A fresh chart always opens fit-to-content,
+   so zoom could never survive. Fix: capture `getVisibleLogicalRange()`
+   before teardown, `setVisibleLogicalRange()` after setData (guarded;
+   fresh fit stands on reject). The existing cross-pane mesh already
+   tolerates the echo (shared-flag design) — each pane restores its own
+   identical range, mesh intact.
+2. **Flaky paints: overlapping tip/full/deepen responses with no recency
+   rule.** The 3.5s poll, push-debounced refresh, and ES-deepen completion
+   could resolve out of order; oldest-wins flickered the chart (thin pairs
+   with slow history nodes suffered most — pools looked fine because their
+   tape path differs). Fix: `state.tipSeq` generation shared by tips,
+   initial fill, and deepen completion — only the newest paints. Plus the
+   deepen key is now pair+bucket+COUNT (a count edit used to reuse a
+   stale-window ES merge) and the merge cap is the requested count (was a
+   hardcoded 2000 while the window said 200).
+3. **Candle window input (owner: default 2000, exchange + pools).** One
+   shared `MarketInd` number input (1–5000, persisted per profile) beside
+   the timeframe radios; all three fetch sites already read the single
+   `CANDLE_COUNT` source (export-refresh included — the export is a
+   load-time primitive copy). `candles()` default + dead-path fallbacks
+   200 → 2000. Invalid entries revert with an honest inline note.
+
+Verification: `chart-zoom-test.js` 21/21 (range capture/restore incl.
+degenerate/null/chart-throwing paths; count boundaries); `node --check`
+×5; types PASS; rot PASS; i18n OK (2 keys × 10); headless `#/market/BTS_CNY`
+@1440: "2000 × 1h candles · deep · live", input rendered with value, zero
+console errors. Zoom-hold across a live refresh stays a human check (stills
+cannot show retained zoom — but rebuild-destroy is gone by construction).
+Anti-rot: (a) platform timers + vendored LWC only; (b) zero new deps (one
+localStorage key, two locale keys); (c) deletable: input (2000 default
+stands), seq guard (paints race again — kept because the flake was real).

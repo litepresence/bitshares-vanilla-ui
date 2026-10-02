@@ -31,7 +31,29 @@ var MarketInd = (function () {
   /* Timeframe choices intersect the live bucket list (slice-07 Task 4).
    * Labels mirror the common trading shorthand. */
   var PREF_BUCKETS = [300, 900, 1800, 3600, 14400, 86400];
-  var CANDLE_COUNT = 200;
+  /* Candle window (shared by exchange + pools — one input, one source).
+   * Persisted per profile; validated 1..5000; default 2000. All three
+   * fetch sites (initial fill, live tip, deepen re-query) read this var —
+   * never a literal — so the input moves every path at once. */
+  var COUNT_KEY = "bts-vanilla-candle-count-v1";
+  var COUNT_MIN = 1, COUNT_MAX = 5000, COUNT_DEFAULT = 2000;
+  function loadCount() {
+    try {
+      if (typeof localStorage === "undefined") return COUNT_DEFAULT;
+      var v = parseInt(localStorage.getItem(COUNT_KEY), 10);
+      if (v >= COUNT_MIN && v <= COUNT_MAX) return v;
+    } catch (e) { /* default stands */ }
+    return COUNT_DEFAULT;
+  }
+  var CANDLE_COUNT = loadCount();
+
+  /* Validated candle count (pure, unit-tested): integer 1..5000 or null.
+   * Params: v (anything). The change handler and the tests share this. */
+  function validCount(v) {
+    var n = parseInt(v, 10);
+    if (n >= COUNT_MIN && n <= COUNT_MAX) return n;
+    return null;
+  }
 
   /* Stacked sub-pane order (Task 4b + parity round): checkbox order IS pane
    * order. Base six first (legacy default checks preserved), then Tulip
@@ -712,6 +734,56 @@ var MarketInd = (function () {
     }
   }
 
+  /* Candle-count input beside the timeframe radios (shared by exchange +
+   * pools — both desks call this next to paintTimeframes). Number input
+   * 1..5000, persisted; a valid change updates CANDLE_COUNT + the note and
+   * fires onCount (the desk's refill); an invalid entry reverts with an
+   * honest inline note. Params: doc, state, onCount. Never throws. */
+  function paintCountInput(doc, state, onCount) {
+    try {
+      var host = state.countNote && state.countNote.parentNode ? state.countNote.parentNode : null;
+      if (!host || !state.countNote) return;
+      if (host.querySelector && host.querySelector(".mkt-count-input")) return; // idempotent
+      var lab = doc.createElement("label");
+      lab.className = "mkt-count-lab";
+      lab.textContent = t("market_ind.candle_count", "Candles") + " ";
+      var inp = doc.createElement("input");
+      inp.type = "number";
+      inp.className = "mkt-count-input";
+      inp.min = String(COUNT_MIN);
+      inp.max = String(COUNT_MAX);
+      inp.value = String(CANDLE_COUNT);
+      inp.setAttribute("inputmode", "numeric");
+      inp.setAttribute("aria-label", t("market_ind.candle_count", "Candles"));
+      touchable(inp);
+      lab.appendChild(inp);
+      try {
+        host.insertBefore(lab, state.countNote.nextSibling);
+      } catch (e) { host.appendChild(lab); }
+      inp.addEventListener("change", function () {
+        var v = validCount(inp.value);
+        if (v === null) {
+          inp.value = String(CANDLE_COUNT);
+          try {
+            state.countNote.textContent = t("market_ind.count_range", "Enter 1–5000 candles.");
+          } catch (e) { /* note stands */ }
+          return;
+        }
+        CANDLE_COUNT = v;
+        /* The exported CANDLE_COUNT is a load-time primitive copy (see the
+         * return block) — refresh it too, or the three desk readers keep
+         * the stale value while this var moves on. Guarded: headless/test
+         * globals may lack MarketInd. */
+        try { if (typeof MarketInd !== "undefined" && MarketInd) MarketInd.CANDLE_COUNT = v; } catch (e) { /* module var stands */ }
+        try {
+          if (typeof localStorage !== "undefined") localStorage.setItem(COUNT_KEY, String(v));
+        } catch (e) { /* session-only count */ }
+        paintCountNote(state);
+        try { if (typeof onCount === "function") onCount(); } catch (e) { /* refill carries errors */ }
+      });
+    } catch (e) { /* radios + note stand without the input */ }
+  }
+
   /* Rebuild the timeframe radios from the reconciled live bucket list. */
   function paintTimeframes(doc, state, onBucket) {
     while (state.tfBox.firstChild) state.tfBox.removeChild(state.tfBox.firstChild);
@@ -1197,12 +1269,14 @@ var MarketInd = (function () {
     renderStrip: renderStrip,
     paintCountNote: paintCountNote,
     paintTimeframes: paintTimeframes,
+    paintCountInput: paintCountInput,
     renderIndMenu: renderIndMenu,
     /* Shared read-only constants for the desk: bucket shortlist + candle
      * count (fill reconciliation) and pane order + indicator lookup (desk
      * checkbox wiring must match drawCharts pane order — single source). */
     PREF_BUCKETS: PREF_BUCKETS,
     CANDLE_COUNT: CANDLE_COUNT,
+    _test: { validCount: validCount },
     OSC_ORDER: OSC_ORDER,
     OVERLAY_DEFS: OVERLAY_DEFS,
     OVERLAY_SPECS: OVERLAY_SPECS,

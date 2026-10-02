@@ -320,6 +320,14 @@ var PoolDetailUI = (function () {
         rebucket();
         deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
       });
+      if (typeof MarketInd.paintCountInput === "function") {
+        MarketInd.paintCountInput(doc, P, function () {
+          if (!live(myGen, uiGen)) return;
+          P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+          rebucket();
+          deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+        });
+      }
     } catch (e) { /* default bucket stands */ }
     rebucket();
     deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
@@ -435,6 +443,14 @@ var PoolDetailUI = (function () {
               rebucket();
               deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
             });
+            if (typeof MarketInd.paintCountInput === "function") {
+              MarketInd.paintCountInput(doc, P, function () {
+                if (!live(myGen, uiGen)) return;
+                P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+                rebucket();
+                deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+              });
+            }
           } catch (e) { /* default bucket stands */ }
           try {
             if (histHook && typeof histHook.setTape === "function") histHook.setTape(P.swaps, "es");

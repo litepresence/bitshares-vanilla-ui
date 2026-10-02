@@ -153,6 +153,11 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    rejection, nothing rests.
 7. Indicators: enable RSI + MACD + Volume. Expected: stacked sub-panes with
    independent scales + volume pane; indicators render on candles.
+8. Zoom hold (NEW): zoom into a time range on the price chart, wait 15s
+   through live refreshes.
+   - Expected: zoom stays put (no reset to full view). Then change the
+     Candles input (e.g. 2000 → 500): chart refetches and repaints at the
+     new window; invalid entries (0, 99999, text) revert with a note.
 8. Settlement strip (MPAs): for a smartcoin market, confirm a feed price
    AND a settlement-estimate price both show (estimate differs from feed
    by the offset — record both numbers).

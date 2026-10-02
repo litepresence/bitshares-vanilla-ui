@@ -2899,7 +2899,9 @@
     "vwap_no_volume": "No bucket volume — VWAP needs fills in this session.",
     "vwap_session": "Session VWAP",
     "vwap_skipped": "empty slots skipped",
-    "vwap_unavailable": "VWAP unavailable (bucket math or asset precisions missing)."
+    "vwap_unavailable": "VWAP unavailable (bucket math or asset precisions missing).",
+    "candle_count": "Candles",
+    "count_range": "Enter 1–5000 candles."
   },
   "txbuilder": {
     "title": "Transaction Builder",

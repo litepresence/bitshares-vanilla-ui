@@ -815,11 +815,16 @@ var MarketDesk = (function () {
         }
         /* refreshTip: re-fetch tip candles + ticker, repaint chart + strip.
          * Skips while a full fill is in flight. Failures silent (poll/live
-         * retry covers). */
+         * retry covers). Generation guard on state.tipSeq (shared with
+         * full-fill and deepen paints below): overlapping poll/push/full
+         * responses paint only when still latest — a slow older fetch must
+         * never overwrite a newer paint (the flaky-chart fix). */
         function refreshTip() {
           if (!deskAlive()) return;
           if (state.loading) return;
-          var count = 200;
+          state.tipSeq = (state.tipSeq || 0) + 1;
+          var seq = state.tipSeq;
+          var count = 2000;
           try {
             if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) {
               count = MarketInd.CANDLE_COUNT;
@@ -827,7 +832,7 @@ var MarketDesk = (function () {
           } catch (e) { /* default stands */ }
           try {
             Market.candles(b.id, q.id, state.bucket, count).then(function (c) {
-              if (!deskAlive()) return;
+              if (!deskAlive() || seq !== state.tipSeq) return;
               state.candles = c;
               try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
               try {
@@ -1129,27 +1134,34 @@ var MarketDesk = (function () {
    * nothing. Never throws outward. */
   function deepenOnce(state, b, q) {
     try {
-      var key = b.id + "|" + q.id + "|" + state.bucket;
+      /* Count-aware key: changing the candle window must re-deepen (the old
+       * pair+bucket key reused a stale-window ES merge after count edits). */
+      var deepCount = 2000;
+      try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) deepCount = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
+      var key = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
       if (state.deepKey === key || state._deepFlight === key) return;
       if (typeof Market === "undefined" || !Market || typeof Market.deepen !== "function") return;
       state._deepFlight = key;
       Market.deepen(b.id, q.id, state.bucket).then(function (d) {
         if (state._deepFlight === key) state._deepFlight = null;
         if (!d) return;
-        var nowKey = b.id + "|" + q.id + "|" + state.bucket;
-        if (nowKey !== key) return; // bucket/pair moved on mid-flight
+        var nowKey = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
+        if (nowKey !== key) return; // bucket/pair/count moved on mid-flight
         try {
           if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
         } catch (e) { /* headless: keep going */ }
         state.deepKey = key;
-        var count = 200;
+        var count = 2000;
         try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) count = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
         Market.candles(b.id, q.id, state.bucket, count).then(function (c2) {
-          var k2 = b.id + "|" + q.id + "|" + state.bucket;
+          var k2 = b.id + "|" + q.id + "|" + state.bucket + "|" + count;
           if (k2 !== key) return;
           try {
             if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
           } catch (e) { /* headless: keep going */ }
+          /* Newest paint wins (see refreshTip): deepen completion invalidates
+           * older in-flight tips before its own synchronous paint. */
+          try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
           state.candles = c2;
           try { state.deep = !!(c2 && c2.deep); } catch (err) { state.deep = false; }
           try { MarketInd.maybeDraw(state); } catch (err) { /* chart best-effort */ }
@@ -1255,6 +1267,11 @@ var MarketDesk = (function () {
         }
         state.liveBuckets = avail;
         MarketInd.paintTimeframes(doc, state, function () { fill(state); });
+        try {
+          if (typeof MarketInd.paintCountInput === "function") {
+            MarketInd.paintCountInput(doc, state, function () { fill(state); });
+          }
+        } catch (e) { /* radios + note stand without the input */ }
       }).catch(function () {
         while (state.tfBox.firstChild) state.tfBox.removeChild(state.tfBox.firstChild);
         state.tfBox.appendChild(el(doc, "span", t("market.fail_timeframes", "Timeframes unavailable on this node."), "muted"));
@@ -1265,6 +1282,8 @@ var MarketDesk = (function () {
     MarketInd.paintCountNote(state);
 
     Market.candles(b.id, q.id, state.bucket, MarketInd.CANDLE_COUNT).then(function (c) {
+      /* Newest paint wins: invalidate older in-flight tips before painting. */
+      try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
       state.candles = c;
       try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
       MarketInd.maybeDraw(state);
