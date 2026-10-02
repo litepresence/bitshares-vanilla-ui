@@ -113,10 +113,39 @@ var SettingsPrefs = (function () {
     return { label: localeLabel, select: localeSelect, error: localeError, currentLocale: currentLocale };
   }
 
+  /* Community-history (ElasticSearch) switch + third-party disclaimer
+   * (Phase 3). DOM owned here; the change handler lives in settings.js
+   * (persists esEnabled — views read it live, no reconnect needed).
+   * Params: doc, settings (for the checked seed), t. Returns
+   *   {wrap, checkbox}. Never throws. */
+  function buildHistory(doc, settings, t) {
+    var wrap = doc.createElement("div");
+    wrap.id = "es-block";
+    var title = doc.createElement("h2");
+    title.textContent = t("settings.es_title", "Community history index");
+    wrap.appendChild(title);
+    var label = doc.createElement("label");
+    var box = doc.createElement("input");
+    box.type = "checkbox";
+    box.id = "es-toggle";
+    try { box.checked = !(settings && settings.esEnabled === false); }
+    catch (e) { box.checked = true; }
+    try { box.style.minHeight = "44px"; } catch (e) { /* label taps anyway */ }
+    label.appendChild(box);
+    label.appendChild(doc.createTextNode(" " + t("settings.es_toggle", "Enable community history (ElasticSearch)")));
+    wrap.appendChild(label);
+    var note = doc.createElement("p");
+    note.className = "muted";
+    note.textContent = t("settings.es_note", "Run by the community, not by this wallet — questions: t.me/bitsharesDEV. Turn off to use chain history only.");
+    wrap.appendChild(note);
+    return { wrap: wrap, checkbox: box };
+  }
+
   return {
     buildNetwork: buildNetwork,
     buildTheme: buildTheme,
-    buildLocale: buildLocale
+    buildLocale: buildLocale,
+    buildHistory: buildHistory
   };
 })();
 

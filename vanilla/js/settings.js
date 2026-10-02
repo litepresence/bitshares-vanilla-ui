@@ -29,8 +29,9 @@ var SettingsPage = (function () {
 
   /* Route entry: compose node + preference sections, wire events, probe.
    * Params: rootEl (router #view child, cleared first). Sections append in
-   *   old-UI order: title, network, node table + cards, probe + offline,
-   *   custom, theme, locale. Fails: never (probe errors paint per-row). */
+   *   old-UI order: title, network, node table + cards (with history pills),
+   *   probe + offline, custom, testnet note (testnet only), community-history
+   *   switch, theme, locale. Fails: never (probe errors paint per-row). */
   function render(rootEl) {
     var doc = rootEl.ownerDocument;
     var settings = Store.loadSettings();
@@ -87,6 +88,25 @@ var SettingsPage = (function () {
     wrap.appendChild(disc.note);
     wrap.appendChild(disc.progress);
     wrap.appendChild(disc.list);
+
+    /* Testnet honesty (Phase 3): node history works on testnet, but the
+     * community index covers mainnet only — index-powered surfaces stay
+     * unavailable there (sweep 2026-10-02: both testnet nodes serve the
+     * history api id; ES has no testnet data). Plain p.muted, no banner
+     * chrome — the shell owns the one global warn-banner. */
+    if (settings.network === "testnet") {
+      var testnetNote = doc.createElement("p");
+      testnetNote.className = "muted";
+      testnetNote.setAttribute("aria-live", "polite");
+      testnetNote.textContent = t("settings.testnet_hist", "Testnet: node history works here, but the community index covers mainnet only — index-powered features are unavailable.");
+      wrap.appendChild(testnetNote);
+    }
+
+    /* Community-history switch (Phase 3): persists esEnabled; views read it
+     * live via HistoryCap.esAllowed — no reconnect, no re-render needed. */
+    var hist = SettingsPrefs.buildHistory(doc, settings, t);
+    wrap.appendChild(hist.wrap);
+    var esBox = hist.checkbox;
 
     var theme = SettingsPrefs.buildTheme(doc, settings, t);
     wrap.appendChild(theme.label);
@@ -243,6 +263,13 @@ var SettingsPage = (function () {
       if (typeof document !== "undefined" && document.documentElement) {
         document.documentElement.setAttribute("data-theme", t);
       }
+    });
+
+    // Events: community-history toggle (persist only — views read esAllowed
+    // live on next history call, so no reconnect or re-render is needed).
+    esBox.addEventListener("change", function () {
+      try { Store.saveSettings({esEnabled: esBox.checked === true}); }
+      catch (e) { /* pref write failed — box keeps user pick, next load reseeds */ }
     });
 
     /* Events: locale select. Full router re-render on switch (ambiguity D:

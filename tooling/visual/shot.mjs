@@ -69,6 +69,20 @@ if (theme || network || noTour || locale) {
 }
 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 await page.waitForTimeout(waitMs);
+/* Optional tab-gated capture: --click TEXT clicks the first button whose
+ * trimmed uppercase text matches, then waits again (AFK rounds need shots
+ * of tab content like account HISTORY without a human hand). Never throws
+ * the run — a missing button just shoots the unclicked page. */
+if (args.click) {
+  try {
+    await page.evaluate((want) => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const b = btns.find((x) => (x.textContent || "").trim().toUpperCase() === String(want).toUpperCase());
+      if (b) b.click();
+    }, args.click);
+    await page.waitForTimeout(Math.min(waitMs, 10000));
+  } catch (e) { /* unclicked shot stands */ }
+}
 await page.screenshot({ path: out });
 console.log(JSON.stringify({ out, width, height, theme, consoleErrors: errors }));
 await browser.close();

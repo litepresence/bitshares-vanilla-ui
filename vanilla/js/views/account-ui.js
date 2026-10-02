@@ -1504,6 +1504,28 @@ var AccountUI = (function () {
     histLoading.className = "muted";
     histLoading.textContent = t("account.loading_history", "Loading history…");
     histSection.appendChild(histLoading);
+    /* History op-type filter: a select row above the list. "all" reuses the
+     * existing historyPaged path (Account.history, unchanged default); "0"
+     * and "4" fetch Account.opsFiltered(id, [type], 20) (transfer-only /
+     * fill-only, the astro-ui DexLiveOrderBook use). Labels reuse existing
+     * i18n keys only — no dedicated "All activity" key exists, so All
+     * renders as t("market.kind_all"). Unclassed native select + 44px
+     * inline floor (no select precedent on this page; history-notice.js
+     * actionLink pattern). No new CSS. */
+    var histFilter = doc.createElement("select");
+    histFilter.setAttribute("aria-label", t("account.history_title", "History"));
+    histFilter.style.minHeight = "44px";
+    [["all", t("market.kind_all", "All")],
+     ["0", t("transfer.title", "Transfer")],
+     ["4", t("account.op_fill", "Fill order")]].forEach(function (pair) {
+      var opt = doc.createElement("option");
+      opt.value = pair[0];
+      opt.textContent = pair[1];
+      histFilter.appendChild(opt);
+    });
+    histSection.appendChild(histFilter);
+    var histBody = doc.createElement("div");
+    histSection.appendChild(histBody);
     wrap.appendChild(histSection);
 
     var memSection = doc.createElement("section");
@@ -1594,32 +1616,66 @@ var AccountUI = (function () {
       showError(doc, eqSection, e, "Could not replay equity.");
     });
 
-    Account.history(acct.id, 20).then(function (rows) {
-      histSection.removeChild(histLoading);
-      renderHistory(doc, histSection, rows);
-      /* Slice-16 (F1b): pulled history watcher on the existing fetch.
-       * First-entry diff per plan; a notify fault never breaks history. */
-      try {
-        if (typeof NotifyHost !== "undefined" && NotifyHost &&
-            typeof NotifyHost.mountToasts === "function") {
-          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
+    /**
+     * Load one history-filter mode into the history body container.
+     * "all" calls Account.history (the pre-existing historyPaged path);
+     * "0"/"4" call Account.opsFiltered with the single op type
+     * (transfer-only / fill-only). Rows render through renderHistory and
+     * failures through showError, so the history-unavailable mapping keeps
+     * its Round-1 Settings link in every mode. The pulled fill/transfer
+     * watcher runs on "all" only: filtered first-ids are not the global
+     * baseline and must not reset it.
+     * @param {string} mode "all", "0", or "4" (the select's value).
+     * @returns {void} Async; never throws (errors render inline).
+     */
+    function loadHist(mode) {
+      if (histLoading.parentNode === histSection) histSection.removeChild(histLoading);
+      while (histBody.firstChild) histBody.removeChild(histBody.firstChild);
+      var fetching = doc.createElement("p");
+      fetching.className = "muted";
+      fetching.textContent = t("account.loading_history", "Loading history…");
+      histBody.appendChild(fetching);
+      var p;
+      if (mode === "0" || mode === "4") {
+        if (typeof Account.opsFiltered === "function") {
+          p = Account.opsFiltered(acct.id, [parseInt(mode, 10)], 20);
+        } else {
+          p = Promise.reject(new Error("history-unavailable"));
         }
-        if (typeof NotifyRules !== "undefined" && NotifyRules &&
-            typeof NotifyRules.checkHistory === "function") {
+      } else {
+        p = Account.history(acct.id, 20);
+      }
+      Promise.resolve(p).then(function (rows) {
+        if (fetching.parentNode === histBody) histBody.removeChild(fetching);
+        renderHistory(doc, histBody, rows);
+        /* Slice-16 (F1b): pulled history watcher on the existing fetch.
+         * First-entry diff per plan; a notify fault never breaks history. */
+        if (mode === "all") {
           try {
-            var prev = Object.prototype.hasOwnProperty.call(_histFirst, acct.id)
-              ? _histFirst[acct.id] : null;
-            var res = NotifyRules.checkHistory(prev, rows, { watchAccounts: [acct.id] });
-            if (res && res.firstId !== undefined && res.firstId !== null) {
-              _histFirst[acct.id] = String(res.firstId);
+            if (typeof NotifyHost !== "undefined" && NotifyHost &&
+                typeof NotifyHost.mountToasts === "function") {
+              try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
             }
-          } catch (e) { /* watcher sleeps, never breaks the view */ }
+            if (typeof NotifyRules !== "undefined" && NotifyRules &&
+                typeof NotifyRules.checkHistory === "function") {
+              try {
+                var prev = Object.prototype.hasOwnProperty.call(_histFirst, acct.id)
+                  ? _histFirst[acct.id] : null;
+                var res = NotifyRules.checkHistory(prev, rows, { watchAccounts: [acct.id] });
+                if (res && res.firstId !== undefined && res.firstId !== null) {
+                  _histFirst[acct.id] = String(res.firstId);
+                }
+              } catch (e) { /* watcher sleeps, never breaks the view */ }
+            }
+          } catch (e) { /* notify optional here */ }
         }
-      } catch (e) { /* notify optional here */ }
-    }).catch(function (e) {
-      histSection.removeChild(histLoading);
-      showError(doc, histSection, e, t("account.err_history", "History unavailable on this node."));
-    });
+      }).catch(function (e) {
+        if (fetching.parentNode === histBody) histBody.removeChild(fetching);
+        showError(doc, histBody, e, t("account.err_history", "History unavailable on this node."));
+      });
+    }
+    histFilter.addEventListener("change", function () { loadHist(histFilter.value); });
+    loadHist("all");
 
     /* Public read: any account's open orders render with NO login (#1 shows
      * them for every viewed account; only cancel requires ownership, and

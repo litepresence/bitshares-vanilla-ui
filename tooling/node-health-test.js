@@ -91,4 +91,15 @@ for (var i = 0; i < 20; i++) T.pushSample("wss://c", { ms: i, status: "GOOD" });
 eq(T.readHist()["wss://c"].length, 12, "history capped at 12");
 delete global.localStorage;
 
+/* histInfo — pure pill content (Phase 3). Leading space + parens wrap keyed
+ * labels in code (layout owns the separator, keys stay clean). */
+function tk(k, d) { return d; }
+eq(SN._test.histInfo(tk, true).text, " (History)", "true -> ' (History)'");
+eq(SN._test.histInfo(tk, false).text, " (No history)", "false -> ' (No history)'");
+eq(SN._test.histInfo(tk, null).text, "", "null -> empty, never '?'");
+eq(SN._test.histInfo(tk, undefined).text, "", "undefined -> empty");
+eq(SN._test.histInfo(tk, true).cls, "node-history yes", "yes class");
+eq(SN._test.histInfo(tk, false).cls, "node-history no", "no class");
+eq(SN._test.histInfo(null, true).text, "", "throwing t -> empty, never throws");
+
 console.log("node-health-test: " + passed + " passed, 0 failed");

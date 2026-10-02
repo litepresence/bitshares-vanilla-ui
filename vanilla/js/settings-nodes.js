@@ -138,8 +138,16 @@ var SettingsNodes = (function () {
       tr.appendChild(tdLat);
 
       var tdSt = doc.createElement("td");
-      tdSt.className = "node-status";
-      tdSt.textContent = t("settings.pending", "…");
+      var stSpan = doc.createElement("span");
+      stSpan.className = "node-status";
+      stSpan.textContent = t("settings.pending", "…");
+      tdSt.appendChild(stSpan);
+      /* History pill (Phase 3): second span in the Status cell — painted by
+       * paintHistory from HistoryCap (snapshot at build, live after probe).
+       * setRow's .node-status lookup is unaffected (class moved to the span). */
+      var histSpan = doc.createElement("span");
+      histSpan.className = "node-history";
+      tdSt.appendChild(histSpan);
       tr.appendChild(tdSt);
 
       var tdAct = doc.createElement("td");
@@ -154,6 +162,7 @@ var SettingsNodes = (function () {
       tr.appendChild(tdAct);
 
       tbody.appendChild(tr);
+      paintHistory(tr, url, t);
     });
     return { table: table, tbody: tbody };
   }
@@ -184,6 +193,10 @@ var SettingsNodes = (function () {
       stSpan.textContent = t("settings.pending", "…");
       card.appendChild(stSpan);
 
+      var histSpan = doc.createElement("span");
+      histSpan.className = "node-history";
+      card.appendChild(histSpan);
+
       var selBtn = doc.createElement("button");
       selBtn.type = "button";
       selBtn.className = "node-select";
@@ -201,6 +214,7 @@ var SettingsNodes = (function () {
       }
 
       cards.appendChild(card);
+      paintHistory(card, url, t);
     });
     return cards;
   }
@@ -394,6 +408,51 @@ var SettingsNodes = (function () {
     return (m < 1) ? "just now" : (m + "m ago");
   }
 
+  /* histInfo: pure history-pill content (unit-tested). Params: t, h (the
+   *   true/false/null from HistoryCap.nodeHistory). Returns {text, cls}:
+   *   leading space + parens wrap the keyed label in code (batch-2b glue
+   *   precedent — keys stay clean "History"/"No history", layout owns the
+   *   separator); unknown renders "" (nothing shown, never a "?").
+   *   Never throws. */
+  function histInfo(t, h) {
+    try {
+      if (h === true) return {text: " (" + t("settings.hist_yes", "History") + ")", cls: "node-history yes"};
+      if (h === false) return {text: " (" + t("settings.hist_no", "No history") + ")", cls: "node-history no"};
+    } catch (e) { /* empty below */ }
+    return {text: "", cls: "node-history"};
+  }
+
+  /* paintHistory: paint the .node-history span in a row + its mirrored card.
+   * Params: row (tr or null), url, t. Reads HistoryCap live-then-snapshot
+   * (guarded — absent HistoryCap paints unknown, never throws). Called at
+   * build (snapshot truth) and after every probe (live truth). Fails: never. */
+  function paintHistory(row, url, t) {
+    var info = histInfo(t, null);
+    try {
+      if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.nodeHistory === "function") {
+        info = histInfo(t, HistoryCap.nodeHistory(url));
+      }
+    } catch (e) { /* unknown stands */ }
+    function one(node) {
+      try {
+        if (!node || typeof node.querySelector !== "function") return;
+        var s = node.querySelector(".node-history");
+        if (s) { s.textContent = info.text; s.className = info.cls; }
+      } catch (e) { /* this node stands */ }
+    }
+    one(row);
+    try {
+      var doc = row && row.ownerDocument ? row.ownerDocument : null;
+      if (!doc || typeof doc.querySelectorAll !== "function") return;
+      var cards = doc.querySelectorAll(".node-card");
+      for (var c = 0; c < cards.length; c++) {
+        var cu = null;
+        try { cu = cards[c].getAttribute("data-url"); } catch (ce) { cu = null; }
+        if (cu === url) one(cards[c]);
+      }
+    } catch (e) { /* row paint stands */ }
+  }
+
   /* Sequential health probe over the node list (one socket at a time —
    * parallel probes race the shared Chain socket). Rows paint connecting →
    * a taxonomy pill (GOOD/STALE/SUSPECT/FORKED/mismatch/TIMEOUT/DOWN —
@@ -441,6 +500,14 @@ var SettingsNodes = (function () {
           pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
           setRow(row, r.latencyMs + "ms", "mismatch " + prefix, "down",
             detailText(r, prefix, "wrong chain for this network"));
+          /* History truth is recorded even for mismatches (the probe found
+           * it) — the row is unselectable anyway, the pill stays honest. */
+          try {
+            if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
+              HistoryCap.update(url, r.hasHistory === true);
+            }
+          } catch (capErr) { /* snapshot stands */ }
+          paintHistory(row, url, t);
         } else {
           var v = { status: "GOOD", detail: "ok" };
           try {
@@ -469,6 +536,13 @@ var SettingsNodes = (function () {
           }
           setRow(row, r.latencyMs + "ms", (v.status === "GOOD") ? prefix : (pill + " · " + prefix),
             id, detailText(r, prefix, extra));
+          /* Live history truth overwrites the snapshot (Phase-1 matrix). */
+          try {
+            if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
+              HistoryCap.update(url, r.hasHistory === true);
+            }
+          } catch (capErr) { /* snapshot stands */ }
+          paintHistory(row, url, t);
         }
       }).catch(function (e) {
         var timeout = !!(e && typeof e.message === "string" && e.message.indexOf("timeout") !== -1);
@@ -479,6 +553,9 @@ var SettingsNodes = (function () {
         setRow(row, t("settings.dash", "—"),
           timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"),
           "down", extra || undefined);
+        /* No probe data — snapshot (or unknown) stands, still repaint so a
+         * retried-then-failed row never shows a stale live pill. */
+        paintHistory(row, url, t);
       }).then(function () { i++; next(); });
     }
     next();
@@ -508,7 +585,7 @@ var SettingsNodes = (function () {
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo }
   };
 })();
 
