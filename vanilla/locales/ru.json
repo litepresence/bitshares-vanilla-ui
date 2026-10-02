@@ -892,7 +892,8 @@
     "state_live": "Live",
     "state_stale": "Stale",
     "state_stalled": "Stalled",
-    "state_paused": "Paused"
+    "state_paused": "Paused",
+    "history_down": "History unavailable on this node — switch nodes in Settings to see recent activity."
   },
   "gateway": {
     "title": "Deposit / Withdraw",

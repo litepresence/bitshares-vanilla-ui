@@ -836,11 +836,15 @@ var ExplorerBlocks = (function () {
     }
     /* Activity rows (re)paint: clears the list host and renders up to 12
      * op rows (pill + sentence, async amount fills fail open per row).
-     * Empty (not error) states explain instead of blanking. Never throws. */
-    function paintActivity(doc, host, list, myGen) {
+     * Empty (not error) states explain instead of blanking — and a dead
+     * history API says so explicitly (historyDown) instead of mimicking a
+     * quiet chain. Never throws. */
+    function paintActivity(doc, host, list, myGen, historyDown) {
       try { while (host.firstChild) host.removeChild(host.firstChild); } catch (e) { return; }
       if (!list || list.length === 0) {
-        host.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive."), "muted"));
+        host.appendChild(el(doc, "p", historyDown
+          ? t("explorer.history_down", "History unavailable on this node — switch nodes in Settings to see recent activity.")
+          : (t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive.")), "muted"));
         return;
       }
       list.slice(0, 12).forEach(function (op) {
@@ -858,7 +862,7 @@ var ExplorerBlocks = (function () {
      * dash; unreadable reads stay dashes, never guesses. Panel headers are
      * plain divs like the original's block-content-header, so the page keeps
      * exactly one h1 (the shell title, visually folded away in explorer-ui). */
-    function paintTip(rows, hd, sets, sup, ops) {
+    function paintTip(rows, hd, sets, sup, ops, historyDown) {
       while (body.firstChild) body.removeChild(body.firstChild);
       var topBox = { top: rows[0].height };
       var liveEl = el(doc, "p", null, "xplore-live");
@@ -1028,13 +1032,13 @@ var ExplorerBlocks = (function () {
       var actOps = Array.isArray(ops) ? ops.slice(0, 12) : [];
       var actList = doc.createElement("div");
       actPanel.appendChild(actList);
-      paintActivity(doc, actList, actOps, myGen);
+      paintActivity(doc, actList, actOps, myGen, historyDown);
       function refreshActivity(fresh) {
         if (!isCurrent(myGen)) return;
         try {
           if (Array.isArray(fresh) && fresh.length) {
             actOps = fresh.concat(actOps).slice(0, 12);
-            paintActivity(doc, actList, actOps, myGen);
+            paintActivity(doc, actList, actOps, myGen, historyDown);
           }
         } catch (e) { /* panel keeps prior rows */ }
       }
@@ -1140,10 +1144,17 @@ var ExplorerBlocks = (function () {
           if (r && r.body && typeof r.height === "number") preBodies[r.height] = r.body;
         });
       } catch (e) { preBodies = {}; }
-      var pOps = (typeof Explorer.recentOps === "function") ? failOpen(Explorer.recentOps(12, 8, preBodies), []) : Promise.resolve([]);
+      /* History outage is tracked, not swallowed: an empty feed from a
+       * dead history API must read as "unavailable", never as a quiet
+       * chain. The flag settles before Promise.all resolves, so paintTip
+       * always sees its final value. */
+      var historyDown = false;
+      var pOps = (typeof Explorer.recentOps === "function") ? Explorer.recentOps(12, 8, preBodies).then(function (r) {
+        return r;
+      }, function () { historyDown = true; return []; }) : Promise.resolve([]);
       Promise.all([pHd, pSets, pSup, pOps]).then(function (res) {
         if (!isCurrent(myGen)) return;
-        paintTip(rows, res[0], res[1], res[2], res[3]);
+        paintTip(rows, res[0], res[1], res[2], res[3], historyDown);
       });
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
