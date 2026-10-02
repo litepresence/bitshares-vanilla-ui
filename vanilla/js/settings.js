@@ -65,6 +65,12 @@ var SettingsPage = (function () {
     wrap.appendChild(custom.wrap);
     var customInput = custom.customInput, customAdd = custom.customAdd, customError = custom.customError;
 
+    /* Opt-in discovery (explicit button only — never automatic): background
+     * sweep with progress + cancel; results are review candidates, Add
+     * reuses the custom path above (same validation, same storage). */
+    var disc = SettingsNodes.buildDiscover(doc, t);
+    wrap.appendChild(disc.wrap);
+
     var theme = SettingsPrefs.buildTheme(doc, settings, t);
     wrap.appendChild(theme.label);
     var themeSelect = theme.select;
@@ -139,6 +145,63 @@ var SettingsPage = (function () {
       Store.saveSettings({customNodes: customs});
       render(rootEl);
     });
+
+    // Events: discovery run + cancel (guarded: engine absent = button dead-ends honestly)
+    (function () {
+      var running = false, cancelled = false;
+      disc.btn.addEventListener("click", function () {
+        if (running) return;
+        if (typeof NodeDiscover === "undefined" || !NodeDiscover || typeof NodeDiscover.run !== "function") {
+          disc.progress.textContent = t("settings.discover_unavailable", "Discovery unavailable in this build.");
+          return;
+        }
+        running = true; cancelled = false;
+        disc.btn.disabled = true;
+        disc.cancel.hidden = false;
+        while (disc.list.firstChild) disc.list.removeChild(disc.list.firstChild);
+        var cur = Store.loadSettings();
+        var known = {
+          mainnet: (Store.DEFAULT_NODES && Store.DEFAULT_NODES.mainnet) || [],
+          testnet: (Store.DEFAULT_NODES && Store.DEFAULT_NODES.testnet) || [],
+          customs: Array.isArray(cur.customNodes) ? cur.customNodes : []
+        };
+        NodeDiscover.run({
+          known: known,
+          isCancelled: function () { return cancelled; },
+          onProgress: function (m) {
+            try {
+              var s = String(m);
+              if (s === "repos") s = t("settings.discover_searching", "Searching GitHub…");
+              else if (s === "repo") s = t("settings.discover_reading", "Reading node lists…");
+              else if (s === "probe") s = t("settings.discover_probing", "Probing candidates…");
+              else if (/^\d+\/\d+$/.test(s)) s = t("settings.discover_checking", "Checking") + " " + s;
+              disc.progress.textContent = s;
+            } catch (e) { /* progress stands */ }
+          }
+        }).then(function (rows) {
+          running = false;
+          try { disc.btn.disabled = false; disc.cancel.hidden = true; } catch (e) {}
+          try {
+            while (disc.list.firstChild) disc.list.removeChild(disc.list.firstChild);
+            if (!rows || !rows.length) {
+              disc.progress.textContent = t("settings.discover_none", "No new nodes found — the curated list stands.");
+              return;
+            }
+            disc.progress.textContent = t("settings.discover_found", "Candidates for review (nothing added yet):");
+            rows.forEach(function (row) {
+              disc.list.appendChild(SettingsNodes.discoverRow(doc, t, row, function (url) {
+                try { customInput.value = url; customAdd.click(); } catch (e) { /* custom path carries it */ }
+              }));
+            });
+          } catch (e) { /* results stand */ }
+        });
+      });
+      disc.cancel.addEventListener("click", function () {
+        cancelled = true;
+        try { disc.progress.textContent = t("settings.discover_cancelled", "Cancelled — partial results kept."); } catch (e) {}
+        try { disc.btn.disabled = false; disc.cancel.hidden = true; } catch (e) {}
+      });
+    })();
 
     // Events: custom remove (table + cards)
     Array.prototype.forEach.call(wrap.querySelectorAll(".node-remove"), function (b) {

@@ -27,6 +27,7 @@ const height = Number(args.height || 900);
 const out = args.out || "/tmp/shot.png";
 const theme = args.theme || null;
 const network = args.network || null;
+const noTour = args.notour || null;
 const waitMs = Number(args.wait || 12000);
 
 const browser = await chromium.launch();
@@ -36,9 +37,9 @@ page.on("console", (msg) => {
   if (msg.type() === "error") errors.push(msg.text().slice(0, 300));
 });
 page.on("pageerror", (err) => errors.push("pageerror: " + String(err).slice(0, 300)));
-if (theme || network) {
+if (theme || network || noTour) {
   await page.addInitScript(
-    ({ t, n, nodes }) => {
+    ({ t, n, nodes, notour }) => {
       try {
         const raw = localStorage.getItem("bts-vanilla-settings-v1");
         const s = raw ? JSON.parse(raw) : {};
@@ -49,11 +50,13 @@ if (theme || network) {
           if (list.length) s.activeNode = list[0];
         }
         localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
+        if (notour) localStorage.setItem("bts-vanilla-tour-dismissed-v1", "1");
       } catch {}
     },
     {
       t: theme,
       n: network,
+      notour: noTour,
       nodes: {
         mainnet: ["wss://api.bitshares.dev/ws"],
         testnet: ["wss://testnet.xbts.io/ws"],

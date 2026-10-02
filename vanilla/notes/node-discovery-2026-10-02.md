@@ -1,9 +1,8 @@
 # Node discovery sweep 2026-10-02 (repo search → extract → probe)
 
-Method: `tooling/discover-repos.py` (new — GitHub repo search `q=bitshares`,
-top-60 by name-score, 10 candidate config paths each via raw fetch, wss://
-extraction) → `latencyTEST.py` concurrent sweep (upgraded: ThreadPoolExecutor
-25 workers, same bucket taxonomy) → targeted `ping_one` re-probe.
+Method: `tooling/discover-repos.py` (kept — the reusable scheduled pipeline)
+plus a one-night concurrent sweep of the Python tester (removed 2026-10-02
+after porting; `ping_one` taxonomy lives on in `Chain.classifyHealth`):
 
 ## Sources hit (4 repos with node lists)
 

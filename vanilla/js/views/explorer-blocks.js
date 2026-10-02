@@ -79,6 +79,40 @@ var ExplorerBlocks = (function () {
     return sec.toFixed(1) + " " + t("explorer.ago_many_suffix", "seconds ago");
   }
 
+  /* Chain timestamps are UTC ("2026-10-01T21:30:00", usually naive = no Z
+   * or offset). Date() parses naive stamps as LOCAL time, so west-of-UTC
+   * viewers get future times and the age clamp pins "0.0" forever — the
+   * stuck-stopwatch bug. Only strict ISO T-shapes are accepted (naive reads
+   * as UTC); anything else yields null, never a guessed local parse.
+   * Returns epoch ms or null (never throws). Unit-tested. */
+  function parseChainTime(s) {
+    if (typeof s !== "string" || !s) return null;
+    try {
+      var m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?)(Z|[+-]\d{2}:?\d{2})?$/.exec(s);
+      if (!m) return null;
+      var ms = new Date(m[1] + (m[2] || "Z")).getTime();
+      return isFinite(ms) ? ms : null;
+    } catch (e) { return null; }
+  }
+
+  /* Freshness states (pure, unit-tested): the live line is a 4-state
+   * signal, not binary. A head every ~3s reads Live; a gap past one
+   * missed slot reads Stale (amber); past the stall line reads Stalled
+   * (red); a closed socket reads Paused (muted — updates genuinely
+   * stopped, not merely slow). Params: ageMs (Date.now()-newestTs),
+   * open (socket). Returns "live"|"stale"|"stalled"|"paused". Top-level
+   * (like agoTextAt) so the _test seam and the per-route closures share
+   * one copy. */
+  var STALE_MS = 6000;
+  var STALL_MS = 15000;
+  function freshState(ageMs, open) {
+    if (!open) return "paused";
+    if (!(ageMs >= 0) || !isFinite(ageMs)) return "live";
+    if (ageMs > STALL_MS) return "stalled";
+    if (ageMs > STALE_MS) return "stale";
+    return "live";
+  }
+
   /* Account-id shape (data copy of the explorer-ui.js regex — slice-3
    * account route target; logic lives in explorer-assets.js). */
   var ACCT_RE = /^1\.2\.\d+$/;
@@ -332,7 +366,10 @@ var ExplorerBlocks = (function () {
    * the theme --accent token live (ref-ui blue reads teal like the
    * original); the "teal" fallback is a named color so no hex literal ever
    * lands in slice JS (audit check 5). Empty input leaves the canvas blank
-   * (caller dashes the cell instead). */
+   * (caller dashes the cell instead). TIME DIRECTION: input arrays are
+   * newest-first, but bars draw oldest-left/newest-right (chart convention:
+   * back-in-time reads leftward, newest enters at right and history marches
+   * left on each head — drawing newest-first leftward read backwards). */
   function drawBars(canvas, intervals) {
     try {
       var ctx = canvas.getContext("2d");
@@ -351,7 +388,7 @@ var ExplorerBlocks = (function () {
       for (i = 0; i < intervals.length; i++) {
         var h = Math.max(2, Math.round(intervals[i] / max * (H - 4)));
         ctx.fillStyle = color;
-        ctx.fillRect(i * (bw + 2), H - h, bw, h);
+        ctx.fillRect((intervals.length - 1 - i) * (bw + 2), H - h, bw, h);
       }
     } catch (e) { /* blank strip stands — the numeric cells carry the data */ }
   }
@@ -665,27 +702,36 @@ var ExplorerBlocks = (function () {
       } catch (e) { /* fallback below */ }
       return null;
     }
-    /* Paint the live indicator: green "Live • Block #N" when open, muted
-     * "Paused • Block #N" otherwise. Params: liveEl, headNum. Never blank. */
+    /* Paint the live indicator: flashing dot + one word, no block number
+     * (the head already shows in the strip, stats, and table below — the
+     * old line duplicated it). Params: liveEl, headNum (accepted, ignored;
+     * kept so the six existing call sites need no edit). Never blank. */
     function paintLive(liveEl, headNum) {
       if (!liveEl) return;
+      void headNum;
       var ch = chainHead();
       var open = !!(ch && ch.state === "open");
-      var n = (typeof headNum === "number" && headNum > 0) ? headNum
-        : (ch && typeof ch.head === "number" && ch.head > 0 ? ch.head : null);
-      var shown = (n !== null) ? "#" + commas(n) : "";
-      var label = n !== null
-        ? (open ? t("explorer.live_prefix", "Live • Block #") + commas(n)
-          : t("explorer.paused_prefix", "Paused • Block #") + commas(n))
-        : (open ? t("explorer.live_prefix", "Live • Block #").replace(/ ?#$/, "")
-          : t("explorer.paused_prefix", "Paused • Block #").replace(/ ?#$/, ""));
-      void shown;
-      while (liveEl.firstChild) liveEl.removeChild(liveEl.firstChild);
-      var dot = el(doc, "span", "●", "xplore-live-dot");
-      dot.setAttribute("aria-hidden", "true");
-      liveEl.appendChild(dot);
-      liveEl.appendChild(el(doc, "span", " " + label));
-      liveEl.setAttribute("data-state", open ? "live" : "paused");
+      paintFresh(liveEl, open ? "live" : "paused");
+    }
+    /* Paint a freshness state: dot + word in the state's color. The word
+     * rides xplore-live-text (+25% size); the dot is 1.25rem (+25%).
+     * Params: liveEl, state (freshState word). Never blank, never throws. */
+    function paintFresh(liveEl, state) {
+      if (!liveEl) return;
+      try {
+        var words = {
+          live: t("explorer.state_live", "Live"),
+          stale: t("explorer.state_stale", "Stale"),
+          stalled: t("explorer.state_stalled", "Stalled"),
+          paused: t("explorer.state_paused", "Paused")
+        };
+        while (liveEl.firstChild) liveEl.removeChild(liveEl.firstChild);
+        var dot = el(doc, "span", "●", "xplore-live-dot");
+        dot.setAttribute("aria-hidden", "true");
+        liveEl.appendChild(dot);
+        liveEl.appendChild(el(doc, "span", " " + (words[state] || words.live), "xplore-live-text"));
+        liveEl.setAttribute("data-state", state || "live");
+      } catch (e) { /* prior paint stands */ }
     }
     /* One normalized row -> <tr> (same cells as the initial table:
      * "#1,234,567" height link, locale-time date, witness link, tx count). */
@@ -747,6 +793,14 @@ var ExplorerBlocks = (function () {
             tr.className = "xplore-flash";
             if (tbody.firstChild) tbody.insertBefore(tr, tbody.firstChild);
             else tbody.appendChild(tr);
+            /* Cap live rows at 30 (old-UI maxBlocks parity): heads prepend
+             * forever, so trim from the bottom — unbounded tbody growth is
+             * a slow leak that also drags scroll performance. */
+            try {
+              while (tbody.rows && tbody.rows.length > 30 && tbody.lastChild) {
+                tbody.removeChild(tbody.lastChild);
+              }
+            } catch (e) { /* table stands */ }
             if (b.height > topBox.top) {
               topBox.top = b.height;
               paintLive(liveEl, topBox.top);
@@ -775,6 +829,24 @@ var ExplorerBlocks = (function () {
       try { now = Date.now(); } catch (e) { now = newestTs; }
       return agoTextAt(now, newestTs);
     }
+    /* Activity rows (re)paint: clears the list host and renders up to 12
+     * op rows (pill + sentence, async amount fills fail open per row).
+     * Empty (not error) states explain instead of blanking. Never throws. */
+    function paintActivity(doc, host, list, myGen) {
+      try { while (host.firstChild) host.removeChild(host.firstChild); } catch (e) { return; }
+      if (!list || list.length === 0) {
+        host.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive."), "muted"));
+        return;
+      }
+      list.slice(0, 12).forEach(function (op) {
+        try {
+          var row = el(doc, "div", null, "xplore-act-row");
+          row.appendChild(pillFor(doc, op));
+          row.appendChild(sentenceFor(doc, op, myGen));
+          host.appendChild(row);
+        } catch (e) { /* row skipped, rest stand */ }
+      });
+    }
     /* Tip stats strip + two-column activity/blocks layout (original
      * Blocks.jsx:305-504 stat rows + 507-602 activity/blocks pair — concepts
      * only: no React, no perfect-scrollbar). Every cell starts as an honest
@@ -789,12 +861,12 @@ var ExplorerBlocks = (function () {
       body.appendChild(liveEl);
       paintLive(liveEl, topBox.top);
 
-      /* Newest-first stat rows (timestamps parsed once; unparseable stamps
-       * yield null and simply contribute no interval — never guessed). */
+      /* Newest-first stat rows (chain stamps parsed as UTC via
+       * parseChainTime — naive stamps parsed local skew future and pin the
+       * age at 0.0; unparseable stamps yield null and simply contribute no
+       * interval — never guessed). */
       var data = rows.map(function (r) {
-        var ms = null;
-        try { var v = new Date(r.timestamp).getTime(); if (isFinite(v)) ms = v; } catch (e) { ms = null; }
-        return { height: r.height, ts: ms, txs: (typeof r.tx_count === "number" ? r.tx_count : null) };
+        return { height: r.height, ts: parseChainTime(r.timestamp), txs: (typeof r.tx_count === "number" ? r.tx_count : null) };
       });
       function stripIntervals() {
         var out = [];
@@ -828,9 +900,10 @@ var ExplorerBlocks = (function () {
       });
       body.appendChild(statsBox);
 
-      /* Stall UI (honest, never frozen-looking): when the head stops
-       * advancing for >15s the live line flips to paused and a Retry button
-       * appears (re-runs the tip load). Cleared by the next head. */
+      /* Stall UI (honest, never frozen-looking): the freshness line owns
+       * the label (paintFresh in the ticker below); ensureStall only adds
+       * the Retry button once it appears (re-runs the tip load). Cleared
+       * by the next head. */
       var retryBtn = null;
       function clearStall() {
         if (retryBtn && retryBtn.parentNode) {
@@ -838,20 +911,18 @@ var ExplorerBlocks = (function () {
         }
         retryBtn = null;
       }
-      function ensureStall(top) {
+      function ensureStall() {
         if (retryBtn) return;
         try {
-          paintLive(liveEl, top);
-          if (liveEl) liveEl.setAttribute("data-state", "paused");
-        } catch (e) { /* label stands */ }
-        retryBtn = touchable(el(doc, "button", t("explorer.retry", "Retry")));
-        retryBtn.type = "button";
-        retryBtn.addEventListener("click", function () {
-          stopLive();
-          while (body.firstChild) body.removeChild(body.firstChild);
-          blocksTab(doc, body, root, myGen, null);
-        });
-        body.insertBefore(retryBtn, statsBox.nextSibling);
+          retryBtn = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+          retryBtn.type = "button";
+          retryBtn.addEventListener("click", function () {
+            stopLive();
+            while (body.firstChild) body.removeChild(body.firstChild);
+            blocksTab(doc, body, root, myGen, null);
+          });
+          body.insertBefore(retryBtn, statsBox.nextSibling);
+        } catch (e) { /* label stands without retry */ }
       }
 
       var newestTs = { ts: (typeof data[0].ts === "number" ? data[0].ts : Date.now()) };
@@ -916,20 +987,25 @@ var ExplorerBlocks = (function () {
       }
       repaint();
       /* Freshness ticker (~150ms): the LAST BLOCK cell counts up in tenths
-       * until the next head arrives, and trips the stall UI past 15s without
-       * a head. No new polling — tip updates stay push-driven via the Store
-       * connection feed; this only repaints cLast.val.textContent in place
-       * (other stat cells repaint on push only). Reuses tr.xplore-flash +
-       * xplore-bump as-is, no new keyframes. Gen-guarded self-clear;
-       * stopLive clears on leave; >15000ms stall branch untouched. */
+       * until the next head arrives, and the live line walks Live (green)
+       * -> Stale past one missed slot (amber) -> Stalled past the stall
+       * line (red, + Retry). No new polling — tip updates stay push-driven
+       * via the Store connection feed; this repaints the label + live line
+       * in place (other stat cells repaint on push only). Gen-guarded
+       * self-clear; stopLive clears on leave. */
       try {
         clearStatTick();
         statTimer = setInterval(function () {
           if (!isCurrent(myGen)) { clearStatTick(); return; }
           try { cLast.val.textContent = agoText(newestTs.ts); } catch (e) { /* next tick */ }
           try {
-            var stalled = (Date.now() - newestTs.ts) > 15000;
-            if (stalled) ensureStall(headNum);
+            var ch = chainHead();
+            var open = !!(ch && ch.state === "open");
+            var age = 0;
+            try { age = Date.now() - newestTs.ts; } catch (e) { age = 0; }
+            var state = freshState(age, open);
+            paintFresh(liveEl, state);
+            if (state === "stalled" || state === "paused") ensureStall();
             else clearStall();
           } catch (e) { /* next tick */ }
         }, 150);
@@ -940,17 +1016,23 @@ var ExplorerBlocks = (function () {
       var actPanel = el(doc, "div", null, "xplore-panel");
       actPanel.appendChild(el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
       actPanel.appendChild(el(doc, "div", t("explorer.info_h", "INFO"), "xplore-subh"));
-      if (!ops || ops.length === 0) {
-        actPanel.appendChild(el(doc, "p", t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive."), "muted"));
-      } else {
-        (ops || []).slice(0, 12).forEach(function (op) {
-          var row = el(doc, "div", null, "xplore-act-row");
-          row.appendChild(pillFor(doc, op));
-          row.appendChild(sentenceFor(doc, op, myGen));
-          actPanel.appendChild(row);
-        });
+      /* Live activity list: starts as the initial recentOps window, then
+       * every new head prepends its own ops (ZERO new RPCs — the body was
+       * already fetched for the table) capped at 12. Previously the panel
+       * painted once and went stale while blocks kept arriving. */
+      var actOps = Array.isArray(ops) ? ops.slice(0, 12) : [];
+      var actList = doc.createElement("div");
+      actPanel.appendChild(actList);
+      paintActivity(doc, actList, actOps, myGen);
+      function refreshActivity(fresh) {
+        if (!isCurrent(myGen)) return;
+        try {
+          if (Array.isArray(fresh) && fresh.length) {
+            actOps = fresh.concat(actOps).slice(0, 12);
+            paintActivity(doc, actList, actOps, myGen);
+          }
+        } catch (e) { /* panel keeps prior rows */ }
       }
-      split.appendChild(actPanel);
       var blkPanel = el(doc, "div", null, "xplore-panel");
       blkPanel.appendChild(el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
       var shown = rows.slice(0, TABLE_ROWS);
@@ -979,15 +1061,27 @@ var ExplorerBlocks = (function () {
         body.appendChild(older);
       }
       if (tbody) startLive(tbody, liveEl, topBox, function (b) {
-        var ms = null;
-        try { var v = new Date(b.timestamp).getTime(); if (isFinite(v)) ms = v; } catch (e) { ms = null; }
+        var ms = parseChainTime(b.timestamp);
         headNum = b.height;
-        data.unshift({ height: b.height, ts: ms, txs: b.tx_count });
+        data.unshift({ height: b.height, ts: (ms !== null ? ms : Date.now()), txs: b.tx_count });
         if (data.length > TIP_ROWS) data.length = TIP_ROWS;
-        if (ms !== null) newestTs.ts = ms;
-        else newestTs.ts = Date.now();
+        /* Stopwatch rule: the age counts from local head-ARRIVAL, not the
+         * chain stamp. Witness clocks run fast and naive stamps parse
+         * timezone-shifted, either of which lands newestTs in the future and
+         * pins the label at 0.0 via the clamp (the stuck-stopwatch bug).
+         * Receipt time always counts 0.0 -> ~3.0s to the next head. */
+        newestTs.ts = Date.now();
         clearStall();
         bumpLive(liveEl);
+        /* Live activity: feed this head's ops (fields intact via block().raw)
+         * into the panel — no extra fetch. Guarded: older api without
+         * opsFromBody simply skips (panel keeps the initial window). */
+        try {
+          if (typeof Explorer !== "undefined" && Explorer &&
+              typeof Explorer.opsFromBody === "function") {
+            refreshActivity(Explorer.opsFromBody(b.height, b.raw));
+          }
+        } catch (e) { /* panel keeps prior rows */ }
         repaint();
       });
     }
@@ -1255,7 +1349,7 @@ var ExplorerBlocks = (function () {
     blocksTab: blocksTab,
     renderBlock: renderBlock,
     renderTx: renderTx,
-    _test: { agoTextAt: agoTextAt }
+    _test: { agoTextAt: agoTextAt, parseChainTime: parseChainTime, freshState: freshState }
   };
 })();
 

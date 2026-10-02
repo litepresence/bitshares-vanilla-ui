@@ -1134,14 +1134,24 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
 .xplore-scroll table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 .xplore-live { display: flex; align-items: center; gap: 8px; margin: 8px 0;
   font-weight: 700; min-height: 44px; }
+/* Live word runs +25% (owner call): the dot and the word are the whole
+ * line now that the duplicated block number is gone. */
+.xplore-live-text { font-size: 1.25em; }
 .xplore-live[data-state="live"] { color: var(--live); }
+.xplore-live[data-state="stale"] { color: var(--warn); }
+.xplore-live[data-state="stalled"] { color: var(--danger); }
 .xplore-live[data-state="paused"] { color: var(--muted); }
-.xplore-live-dot { font-size: 1rem; line-height: 1; }
+.xplore-live-dot { font-size: 1.25rem; line-height: 1; }
 .xplore-live[data-state="live"] .xplore-live-dot { color: var(--live);
   animation: xplore-pulse 1.6s ease-in-out infinite; }
+/* Stale/stalled dots pulse too (attention states); paused stays flat. */
+.xplore-live[data-state="stale"] .xplore-live-dot { color: var(--warn);
+  animation: xplore-pulse 1.6s ease-in-out infinite; }
+.xplore-live[data-state="stalled"] .xplore-live-dot { color: var(--danger);
+  animation: xplore-pulse 1.0s ease-in-out infinite; }
 .xplore-live[data-state="paused"] .xplore-live-dot { color: var(--muted); }
-@keyframes xplore-flash { from { background-color: var(--live); } to { background-color: transparent; } }
-tr.xplore-flash { animation: xplore-flash 1.2s ease-out 1; }
+@keyframes xplore-flash { from { background-color: var(--flash, #6b6b6b); } to { background-color: transparent; } }
+tr.xplore-flash { animation: xplore-flash 1.25s ease-out 1; }
 @keyframes xplore-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 @keyframes xplore-bump { 0% { transform: scale(1); } 30% { transform: scale(1.04); } 100% { transform: scale(1); } }
 .xplore-live.xplore-bump { animation: xplore-bump 0.45s ease-out 1; }

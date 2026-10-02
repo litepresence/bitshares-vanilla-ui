@@ -189,8 +189,92 @@ var Chain = (function () {
     } catch (e) { /* user Retry remains */ }
   }
 
-  /* Probe: latency + chain ID on a throwaway socket. Never touches the shared
-     connection, emits no status — safe to run for every node in a list. */
+  /* Witness participation from a recent_slots_filled value (chain-native
+   * fork signal, after latencyTEST.py: bitcount/128*100). The field is
+   * uint128: nodes may answer a decimal string (exact, BigInt-counted), a
+   * safe number (bit-counted with precision noted), or anything else
+   * (null — never guessed). Params: v (unknown). Returns 0-100 or null. */
+  function participationPct(v) {
+    try {
+      var s = null;
+      if (typeof v === "string" && /^[0-9]+$/.test(v)) s = v;
+      else if (typeof v === "number" && Number.isSafeInteger(v) && v >= 0) {
+        var n = 0, x = v;
+        while (x > 0) { n += x % 2; x = Math.floor(x / 2); }
+        return Math.min(100, (n / 128) * 100);
+      } else return null;
+      var big = BigInt(s);
+      var bits = 0;
+      while (big > BigInt(0)) { bits += Number(big % BigInt(2)); big = big / BigInt(2); }
+      return Math.min(100, (bits / 128) * 100);
+    } catch (e) { return null; }
+  }
+
+  /* Health verdict for one reached node (pure, unit-tested). Thresholds are
+   * adapted from latencyTEST.py (whose <100 bar is too strict for the
+   * 128-slot rolling window — healthy nodes wobble): GOOD ≥ 95,
+   * SUSPECT 80–95 or irreversible lag > 30, FORKED < 80 (or lag > 100 with
+   * soft participation), STALE when the head is older than latency + 10s
+   * (the script's rule), WRONG-CHAIN on chain mismatch. Lag bands are set
+   * from mainnet observation (2026-10-01: healthy nodes sit at lag ~12, so
+   * the first draft's >10 line flagged the whole network — recalibrated).
+   * Null health inputs (props call failed but chain-id answered) verdict
+   * GOOD with unknown details — the node IS up; only the enrichment is
+   * missing. Params: an object {latencyMs, chainOk, headAgeS, participation,
+   * irrevLag} (numbers or null/undefined, chainOk boolean). Returns
+   * {status, detail}. */
+  function classifyHealth(h) {
+    var hh = h && typeof h === "object" ? h : {};
+    if (!hh.chainOk) return { status: "WRONG-CHAIN", detail: "chain-id mismatch" };
+    var age = (typeof hh.headAgeS === "number" && isFinite(hh.headAgeS)) ? hh.headAgeS : null;
+    var part = (typeof hh.participation === "number" && isFinite(hh.participation)) ? hh.participation : null;
+    var lag = (typeof hh.irrevLag === "number" && isFinite(hh.irrevLag)) ? hh.irrevLag : null;
+    var lat = (typeof hh.latencyMs === "number" && isFinite(hh.latencyMs)) ? hh.latencyMs : 0;
+    if (age !== null && age > lat / 1000 + 10) return { status: "STALE", detail: "head old" };
+    if (part !== null && part < 80) return { status: "FORKED", detail: "participation low" };
+    if (lag !== null && lag > 100 && (part === null || part < 95)) {
+      return { status: "FORKED", detail: "irreversible lagging" };
+    }
+    if ((part !== null && part < 95) || (lag !== null && lag > 30)) {
+      return { status: "SUSPECT", detail: "watch" };
+    }
+    return { status: "GOOD", detail: "ok" };
+  }
+
+  /* Probe enrichment (pure, unit-tested): raw dynamic globals + chain id +
+   * measured latency -> probe result. headAgeS from the UTC head time
+   * (naive stamps read as UTC — same trap documented in explorer-blocks.js
+   * parseChainTime; anything unparseable yields null age, never guessed).
+   * participation via participationPct; irrevLag = head - last_irreversible
+   * (null unless both are safe ints). Never throws. */
+  function enrichProbe(chainId, props, latencyMs) {
+    var out = { chainId: chainId || null, latencyMs: latencyMs,
+      headBlock: null, headAgeS: null, participation: null, irrevLag: null };
+    try {
+      if (!props || typeof props !== "object") return out;
+      if (Number.isSafeInteger(props.head_block_number) && props.head_block_number > 0) {
+        out.headBlock = props.head_block_number;
+      }
+      if (typeof props.time === "string" && props.time) {
+        var m = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?)(Z|[+-]\d{2}:?\d{2})?$/.exec(props.time);
+        if (m) {
+          var ms = new Date(m[1] + (m[2] || "Z")).getTime();
+          if (isFinite(ms)) out.headAgeS = Math.max(0, (Date.now() - ms) / 1000);
+        }
+      }
+      out.participation = participationPct(props.recent_slots_filled);
+      if (Number.isSafeInteger(props.head_block_number) &&
+          Number.isSafeInteger(props.last_irreversible_block_num)) {
+        out.irrevLag = props.head_block_number - props.last_irreversible_block_num;
+      }
+    } catch (e) { /* partial result stands */ }
+    return out;
+  }
+
+  /* Probe: latency + chain ID + health signals on a throwaway socket. Never
+     touches the shared connection, emits no status — safe to run for every
+     node in a list. Resolves enrichProbe() results (chainId, latencyMs,
+     headBlock, headAgeS, participation, irrevLag). */
   function probe(url, timeoutMs) {
     timeoutMs = timeoutMs || 6000;
     var t0 = Date.now();
@@ -213,12 +297,21 @@ var Chain = (function () {
       guard = setTimeout(function () { fail(new Error("probe connect timeout")); }, timeoutMs);
       sock.onopen = function () {
         send(1, "login", ["", ""]).then(function () { return send(1, "database", []); }).then(function (dbId) {
-          return send(dbId, "get_chain_id", []);
-        }).then(function (chainId) {
+          return send(dbId, "get_chain_id", []).then(function (chainId) {
+            /* Enrichment (one extra call, same socket): dynamic globals for
+             * head age + participation + irreversible lag (latencyTEST.py
+             * signals, chain-native). Fail-soft: if the props call dies but
+             * chain-id answered, the node is UP with unknown health details
+             * (classifier verdicts GOOD — only the enrichment is missing). */
+            return send(dbId, "get_dynamic_global_properties", []).then(function (g) {
+              return { chainId: chainId, props: (g && typeof g === "object") ? g : null };
+            }, function () { return { chainId: chainId, props: null }; });
+          });
+        }).then(function (r) {
           if (done) return; done = true; clearTimeout(guard);
           var latencyMs = Date.now() - t0;
           try { sock.close(); } catch (e) {}
-          resolve({chainId: chainId, latencyMs: latencyMs});
+          resolve(enrichProbe(r.chainId, r.props, latencyMs));
         }).catch(fail);
       };
       sock.onmessage = function (ev) {
@@ -439,6 +532,6 @@ var Chain = (function () {
     } catch (e) { /* best-effort only */ }
     return Promise.resolve();
   }
-  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, custom: custom, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, status: function () { return lastStatus; }};
+  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, custom: custom, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, participationPct: participationPct, classifyHealth: classifyHealth, enrichProbe: enrichProbe, status: function () { return lastStatus; }};
 })();
 if (typeof module !== "undefined") { module.exports = Chain; }

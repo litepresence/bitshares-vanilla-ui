@@ -268,8 +268,35 @@ var Explorer = (function () {
     return out;
   }
 
+  /* Op rows from ONE block body (pure shaping, no chain calls): the same
+   * extraction recentOps runs per height, factored so the live tip can feed
+   * new heads into the activity panel with ZERO new RPCs (the body was
+   * already fetched for the table). Params: height (number), transactions
+   * (raw block.transactions array or falsy). Returns [{block, tx, op,
+   * type_idx, type_name, virtual, fields}], capped internally at 20 rows.
+   * Gaps/malformed shapes yield [] — never throws. Unit-tested. */
+  function opsFromBody(height, transactions) {
+    var out = [];
+    try {
+      var txs = Array.isArray(transactions) ? transactions : [];
+      for (var ti = 0; ti < txs.length && out.length < 20; ti++) {
+        var ops = (txs[ti] && Array.isArray(txs[ti].operations)) ? txs[ti].operations : [];
+        for (var oi = 0; oi < ops.length && out.length < 20; oi++) {
+          var o = ops[oi];
+          var ref = _opRef(Array.isArray(o) ? o[0] : o.type);
+          out.push({ block: height, tx: ti, op: oi,
+            type_idx: ref.type_idx, type_name: ref.type_name, virtual: ref.virtual,
+            fields: Array.isArray(o) ? o[1] : o });
+        }
+      }
+    } catch (e) { /* [] stands */ }
+    return out;
+  }
+
   /* Full block with per-tx op rows (height attached client-side, #1 :39
-   * pattern). Fails "unknown-block" on null/node error (never crash). */
+   * pattern). Fails "unknown-block" on null/node error (never crash).
+   * Carries `raw` (original transactions array) so live consumers can run
+   * opsFromBody with no second fetch. */
   async function block(height) {
     var h = parseInt(height, 10);
     if (!(h >= 1)) throw new Error("unknown-block");
@@ -281,7 +308,7 @@ var Explorer = (function () {
     if (!b) throw new Error("unknown-block");
     var txs = Array.isArray(b.transactions) ? b.transactions : [];
     return { height: h, timestamp: b.timestamp || "", witness_account_id: b.witness || "",
-      tx_count: txs.length,
+      tx_count: txs.length, raw: txs,
       transactions: txs.map(function (t, i) {
         var ops = Array.isArray(t.operations) ? t.operations : [];
         return { index: i, op_count: ops.length,
@@ -449,7 +476,7 @@ var Explorer = (function () {
 
   return { head: head, recentBlocks: recentBlocks, block: block, tx: tx,
     assetsPage: assetsPage, activeSets: activeSets, btsSupply: btsSupply,
-    recentOps: recentOps,
+    recentOps: recentOps, opsFromBody: opsFromBody,
     asset: asset, feeds: feeds, resolveObject: resolveObject, search: search };
 })();
 

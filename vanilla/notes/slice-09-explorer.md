@@ -155,3 +155,39 @@ future/NaN→`"0.0"`.
 Anti-rot gate: (a) static + existing push feed, runs in 10 years; (b) zero new
 deps (no new interval source, no keyframes, no keys); (c) deletable: the
 tenths (integer label stands alone — kept because liveness flash is the point).
+
+## Delta 2026-10-01 — bars direction, neutral flash, stopwatch age, live activity (day-1 feedback)
+
+Owner reports, all verified in code before fixing:
+
+1. **Bar strips ran backwards.** `drawBars` plotted newest-first arrays leftward,
+   so each head shifted history right (newest bar at left). Chart convention is
+   time-leftward-to-right: now oldest-left/newest-right (single-point fix in
+   `drawBars`, both strips), history marches left on each head.
+2. **Row flash color.** New rows flashed theme `--live` green (reads as a status
+   glow). Old UI flashes neutral `#6b6b6b` → transparent 1.25s. New `--flash`
+   token in all three themes (byte-identical parity value, documented) drives
+   `xplore-flash` (1.25s); green stays on the live dot/line only. Also capped
+   the live tbody at 30 rows (old-UI `maxBlocks` parity — it grew unbounded).
+3. **Age pinned at 0.0.** Chain stamps are UTC and usually naive; `Date()`
+   parses naive stamps as LOCAL, so west-of-UTC viewers got future times and
+   the clamp pinned the label. Two-layer fix: strict `parseChainTime` (naive
+   reads as UTC, anything else → null, never guessed) for stored rows, and
+   the live age now counts from local head-ARRIVAL (`Date.now()` in `onNew`)
+   — a true stopwatch 0.0 → ~3.0s per head regardless of witness-clock games.
+4. **Activity went stale.** The panel painted once from the initial `recentOps`
+   window. Now each head feeds its own ops via new `Explorer.opsFromBody`
+   (pure shaping factored from `recentOps`, ZERO new RPCs — the body was
+   already fetched for the table), prepended and capped at 12 with a panel
+   repaint. `block()` carries additive `raw` for this; nothing else changes.
+
+Verification: `explorer-blocks-ago-test` 22/22 + new `explorer-ops-test`
+16/16; `node --check` clean; types clean; rot + i18n green (no new copy);
+headless `#/explorer` @1440 twice 20s apart, zero console errors — "2.8" then
+"0.1 SECONDS AGO" across heads 114857166→178 (stopwatch proven live),
+newest row visibly flashing, tall bars on the strip's right edge.
+Human gate: flash feel + stopwatch glide on device.
+Anti-rot: (a) platform timers + canvas + existing push feed; (b) zero new
+deps, one token, one additive field; (c) deletable: activity refresh
+(panel keeps its initial window), UTC parse (local parse stands with clamp),
+row cap (table grows again — kept because the leak was real).

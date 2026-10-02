@@ -57,6 +57,12 @@
    * up); vanilla-ui-theme #1DA866 (== its --buy, kept from the previous
    * light block — already tuned for light surfaces). */
   --live: #7bd500;
+  /* --flash: new-row flash (old-UI parity: bitshares-ui flashed entering
+   * rows #6b6b6b -> transparent over 1.25s; byte-identical value here so the
+   * manner matches, not just the motion). Neutral mid-gray reads on dark
+   * and light grounds alike — deliberately NOT --live (green reads as a
+   * status glow, which is what reporters flagged). */
+  --flash: #6b6b6b;
 --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
   --plot-bg: #1e1e1e;
   /* --panel-deep: alternating-row stripe (pools + credit open-offers tables).
@@ -121,6 +127,8 @@
    * (5.90 on cream, 6.37 on white). */
   --buy: #0E7A4A; --sell: #B8452F; --warn: #C8961E; --danger: #D35A41;
   --live: #0E7A4A;
+  /* --flash: same old-UI #6b6b6b row flash as ref-ui-theme (parity value). */
+  --flash: #6b6b6b;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
   --plot-bg: #ffffff;
   /* --panel-deep: warm stripe between cream ground --bg #FAF6EA and the
@@ -205,6 +213,8 @@
   --accent: #007bff; --accent-text: #ffffff; --button-bg: #007bff;
   --buy: #26de81; --sell: #ff231f; --warn: #fbbc06; --danger: #f74745;
   --live: #26de81;
+  /* --flash: same old-UI #6b6b6b row flash as ref-ui-theme (parity value). */
+  --flash: #6b6b6b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #ffffff;
   /* --panel-deep: Crypo nav-strip surface #1c2030 (style.css:1869/.market-pairs
    * .nav, :1883/.heading, :1914/.market-history .nav). DEVIATION recorded:

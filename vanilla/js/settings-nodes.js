@@ -56,19 +56,24 @@ var SettingsNodes = (function () {
 
   /* Paint one table row AND its mirrored phone card with the same
    * latency/status text. Status is tracked as a canonical id on data-status
-   * (up|connecting|down); the visible text may be translated (settings.
+   * (up|connecting|down plus health ids stale|suspect|forked — the offline
+   * panel treats anything-not-up as unusable EXCEPT it only shows when every
+   * row is exactly "down"; the visible text may be translated (settings.
    * connecting/down are load-bearing Spanish in es mode) so
    * paintOfflineIfAllDown compares the id below, never the translated text.
    * Params: row (tr, may be null — no-op except the card lookup needs its
-   *   data-url), latencyText/statusText strings, statusId ("up"|"connecting"|
-   *   "down", optional). Fails: never (missing cells are skipped). */
-  function setRow(row, latencyText, statusText, statusId) {
+   *   data-url), latencyText/statusText strings, statusId (canonical,
+   *   optional), titleText (tooltip, optional — clears stale titles when
+   *   omitted). Fails: never (missing cells are skipped). */
+  function setRow(row, latencyText, statusText, statusId, titleText) {
     if (row) {
       var lat = row.querySelector(".latency");
       var st = row.querySelector(".node-status");
       if (lat) lat.textContent = latencyText;
       if (st) st.textContent = statusText;
       if (statusId) row.setAttribute("data-status", statusId);
+      if (titleText) row.setAttribute("title", titleText);
+      else { try { row.removeAttribute("title"); } catch (titleErr) { /* keeps prior */ } }
     }
     var url = null;
     try { url = row ? row.getAttribute("data-url") : null; } catch (attrErr) { url = null; }
@@ -84,6 +89,8 @@ var SettingsNodes = (function () {
         if (cLat) cLat.textContent = latencyText;
         if (cSt) cSt.textContent = statusText;
         if (statusId) card.setAttribute("data-status", statusId);
+        if (titleText) card.setAttribute("title", titleText);
+        else { try { card.removeAttribute("title"); } catch (ctErr) { /* keeps prior */ } }
       }
     }
   }
@@ -221,9 +228,75 @@ var SettingsNodes = (function () {
     return { probeBtn: probeBtn, offline: offline, retryBtn: retryBtn };
   }
 
-  /* Custom-node add block: wss:// input + Add + inline error line.
-   * Validation + wiring stay in settings.js. Params: doc, t. Returns:
-   *   {wrap, customInput, customAdd, customError}. */
+  /* textContent-only element helper (user/chain strings never reach HTML).
+   * Params: doc, tag string, text (or null), cls (optional). Returns Element. */
+  function el(doc, tag, text, cls) {
+    var n = doc.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined && text !== null) n.textContent = text;
+    return n;
+  }
+
+  /* Opt-in discovery block: button + privacy note + progress + results.
+   * Running/cancel/result-fill wiring stays in settings.js (it owns the
+   * custom-add path the per-row Add buttons reuse). Params: doc, t.
+   * Returns {wrap, btn, cancel, progress, list, note}. */
+  function buildDiscover(doc, t) {
+    var wrap = doc.createElement("div");
+    wrap.className = "node-discover";
+    var btn = doc.createElement("button");
+    btn.id = "discover-btn";
+    btn.type = "button";
+    btn.textContent = t("settings.discover", "Discover more nodes");
+    wrap.appendChild(btn);
+    var cancel = doc.createElement("button");
+    cancel.id = "discover-cancel";
+    cancel.type = "button";
+    cancel.textContent = t("settings.discover_cancel", "Cancel");
+    cancel.hidden = true;
+    wrap.appendChild(cancel);
+    var note = el(doc, "p",
+      t("settings.discover_note", "Optional: searches GitHub for node lists, then probes what it finds. GitHub and probed nodes see your network address. Results are candidates for your review — nothing is added automatically."), "muted");
+    wrap.appendChild(note);
+    var progress = doc.createElement("p");
+    progress.className = "muted";
+    progress.setAttribute("aria-live", "polite");
+    wrap.appendChild(progress);
+    var list = doc.createElement("div");
+    list.className = "node-discover-list";
+    wrap.appendChild(list);
+    return { wrap: wrap, btn: btn, cancel: cancel, progress: progress, list: list, note: note };
+  }
+
+  /* One candidate row: url + health pill + source repos + Add button.
+   * Params: doc, t, row ({url, sources[], latencyMs, status}), onAdd(url).
+   * Returns the row element. Never throws. */
+  function discoverRow(doc, t, row, onAdd) {
+    var d = doc.createElement("div");
+    d.className = "node-discover-row";
+    var url = doc.createElement("div");
+    url.textContent = row.url;
+    d.appendChild(url);
+    var meta = doc.createElement("div");
+    meta.className = "muted";
+    var bits = [];
+    try {
+      bits.push((row.latencyMs === null || row.latencyMs === undefined) ? "—" : (row.latencyMs + "ms"));
+      bits.push(row.status || "DOWN");
+      if (row.sources && row.sources.length) bits.push(row.sources.slice(0, 2).join(", "));
+    } catch (e) { /* url stands alone */ }
+    meta.textContent = bits.join(" · ");
+    d.appendChild(meta);
+    var add = doc.createElement("button");
+    add.type = "button";
+    add.textContent = t("settings.add", "Add");
+    try { add.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+    add.addEventListener("click", function () {
+      try { onAdd(row.url); } catch (e) { /* custom path carries the error */ }
+    });
+    d.appendChild(add);
+    return d;
+  }
   function buildCustom(doc, t) {
     var customWrap = doc.createElement("div");
     customWrap.className = "custom-node";
@@ -260,13 +333,92 @@ var SettingsNodes = (function () {
     offline.hidden = !allDown;
   }
 
-  /* Sequential latency probe over the node list (one socket at a time —
+  /* Probe history (latencyTEST.py round-history idea, collapsed to data):
+   * last HIST_MAX snapshots per node URL in localStorage
+   * ({t, ms, age, part, status}), pruned to 7 days on read. Feeds the
+   * "last good" line in row tooltips. Never throws; storage failure means
+   * no history, never a broken table. */
+  var HIST_KEY = "bts-vanilla-node-health-v1";
+  var HIST_MAX = 12;
+  var HIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+  function readHist() {
+    try {
+      if (typeof localStorage === "undefined") return {};
+      var raw = localStorage.getItem(HIST_KEY);
+      if (!raw) return {};
+      var d = JSON.parse(raw);
+      return (d && typeof d === "object") ? d : {};
+    } catch (e) { return {}; }
+  }
+  function pushSample(url, sample) {
+    if (typeof url !== "string" || !url) return;
+    try {
+      if (typeof localStorage === "undefined") return;
+      var d = readHist();
+      var list = Array.isArray(d[url]) ? d[url] : [];
+      list.push({ t: Date.now(),
+        ms: (sample && typeof sample.ms === "number") ? sample.ms : null,
+        age: (sample && typeof sample.age === "number") ? sample.age : null,
+        part: (sample && typeof sample.part === "number") ? sample.part : null,
+        status: (sample && typeof sample.status === "string") ? sample.status : "down" });
+      var cutoff = Date.now() - HIST_TTL_MS;
+      list = list.filter(function (s) { return s && typeof s.t === "number" && s.t >= cutoff; });
+      if (list.length > HIST_MAX) list = list.slice(list.length - HIST_MAX);
+      d[url] = list;
+      var urls = Object.keys(d);
+      if (urls.length > 60) {
+        urls.slice(0, urls.length - 60).forEach(function (k) { delete d[k]; });
+      }
+      localStorage.setItem(HIST_KEY, JSON.stringify(d));
+    } catch (e) { /* history best-effort */ }
+  }
+  /* Newest GOOD sample for a URL, or null. Params: url string.
+   * Returns {t, ms} or null. Never throws. */
+  function lastGood(url) {
+    try {
+      var list = readHist()[url];
+      if (!Array.isArray(list)) return null;
+      for (var i = list.length - 1; i >= 0; i--) {
+        if (list[i] && list[i].status === "GOOD" && typeof list[i].t === "number") {
+          return { t: list[i].t, ms: list[i].ms };
+        }
+      }
+    } catch (e) { /* null below */ }
+    return null;
+  }
+  /* Minutes-since text for a last-good stamp (whole minutes, floor).
+   * Params: t epoch ms (or null). Returns e.g. "5m ago" or null. */
+  function agoMinutes(t) {
+    if (!(typeof t === "number" && isFinite(t))) return null;
+    var m = Math.floor(Math.max(0, Date.now() - t) / 60000);
+    return (m < 1) ? "just now" : (m + "m ago");
+  }
+
+  /* Sequential health probe over the node list (one socket at a time —
    * parallel probes race the shared Chain socket). Rows paint connecting →
-   * up (chain-id prefix + ms) or down; the offline panel refreshes at the
-   * end. Params: nodes (URL list), tbody (rows looked up by data-url),
+   * a taxonomy pill (GOOD/STALE/SUSPECT/FORKED/mismatch/TIMEOUT/DOWN —
+   * latencyTEST.py buckets, thresholds documented in Chain.classifyHealth)
+   * with a tooltip of head age, participation, irreversible lag, chain
+   * prefix and last-good; list order is preserved (latency sort untouched).
+   * Params: nodes (URL list), tbody (rows looked up by data-url),
    *   offline (panel), t (status strings). Fails: never (per-row catch). */
   function probeAll(nodes, tbody, offline, t) {
     var i = 0;
+    /* Detail tooltip for a reached node (single source for row + card).
+     * Params: r (enriched probe result), prefix (chain8), extra (last-good
+     * line or ""). Returns a short multi-fact string. Never throws. */
+    function detailText(r, prefix, extra) {
+      var bits = [];
+      try {
+        if (r && typeof r.headBlock === "number") bits.push("head " + r.headBlock);
+        bits.push("age " + ((r && typeof r.headAgeS === "number") ? r.headAgeS.toFixed(1) + "s" : "—"));
+        bits.push("participation " + ((r && typeof r.participation === "number") ? r.participation.toFixed(1) + "%" : "—"));
+        bits.push("irreversible lag " + ((r && typeof r.irrevLag === "number") ? r.irrevLag : "—"));
+        bits.push("chain " + (prefix || "—"));
+        if (extra) bits.push(extra);
+      } catch (e) { /* partial bits stand */ }
+      return bits.join(" · ");
+    }
     /* Next pending row: paint connecting, probe, paint the outcome, step.
      * Ends by repainting the offline panel (paintOfflineIfAllDown). */
     function next() {
@@ -286,12 +438,47 @@ var SettingsNodes = (function () {
         var prefix = "";
         try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
         if (mismatch) {
-          setRow(row, r.latencyMs + "ms", "mismatch " + prefix, "down");
+          pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
+          setRow(row, r.latencyMs + "ms", "mismatch " + prefix, "down",
+            detailText(r, prefix, "wrong chain for this network"));
         } else {
-          setRow(row, r.latencyMs + "ms", prefix, "up");
+          var v = { status: "GOOD", detail: "ok" };
+          try {
+            if (typeof Chain !== "undefined" && Chain && typeof Chain.classifyHealth === "function") {
+              v = Chain.classifyHealth({ latencyMs: r.latencyMs, chainOk: true,
+                headAgeS: r.headAgeS, participation: r.participation, irrevLag: r.irrevLag });
+            }
+          } catch (clErr) { v = { status: "GOOD", detail: "ok" }; }
+          pushSample(url, { ms: r.latencyMs, age: r.headAgeS, part: r.participation, status: v.status });
+          var pill = {
+            "GOOD": t("settings.node_good", "Good"),
+            "STALE": t("settings.node_stale", "Stale"),
+            "SUSPECT": t("settings.node_suspect", "Suspect"),
+            "FORKED": t("settings.node_forked", "Forked"),
+            "WRONG-CHAIN": "mismatch " + prefix
+          }[v.status] || t("settings.node_good", "Good");
+          var id = (v.status === "GOOD") ? "up"
+            : (v.status === "STALE") ? "stale"
+            : (v.status === "SUSPECT") ? "suspect"
+            : (v.status === "FORKED") ? "forked" : "up";
+          var lg = lastGood(url);
+          var extra = "";
+          if (v.status !== "GOOD" && lg) {
+            var ago = agoMinutes(lg.t);
+            if (ago) extra = "last good " + ago;
+          }
+          setRow(row, r.latencyMs + "ms", (v.status === "GOOD") ? prefix : (pill + " · " + prefix),
+            id, detailText(r, prefix, extra));
         }
-      }).catch(function () {
-        setRow(row, t("settings.dash", "—"), t("settings.down", "down"), "down");
+      }).catch(function (e) {
+        var timeout = !!(e && typeof e.message === "string" && e.message.indexOf("timeout") !== -1);
+        pushSample(url, { ms: null, status: timeout ? "TIMEOUT" : "DOWN" });
+        var lg = lastGood(url);
+        var extra = "";
+        if (lg) { var ago = agoMinutes(lg.t); if (ago) extra = "last good " + ago; }
+        setRow(row, t("settings.dash", "—"),
+          timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"),
+          "down", extra || undefined);
       }).then(function () { i++; next(); });
     }
     next();
@@ -316,9 +503,12 @@ var SettingsNodes = (function () {
     buildNodeCards: buildNodeCards,
     buildProbe: buildProbe,
     buildCustom: buildCustom,
+    buildDiscover: buildDiscover,
+    discoverRow: discoverRow,
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
-    selectNode: selectNode
+    selectNode: selectNode,
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes }
   };
 })();
 

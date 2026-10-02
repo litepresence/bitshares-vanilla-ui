@@ -110,3 +110,4 @@ declare var I18n: any;
 declare var chrome: any;
 declare var browser: any;
 declare var Buffer: any;
+declare var NodeDiscover: any;

@@ -28,3 +28,6 @@ extension-wrapper/dist/
 build/
 
 tooling/typecheck/node_modules/
+
+# Python bytecode (regenerated, never committed).
+__pycache__/

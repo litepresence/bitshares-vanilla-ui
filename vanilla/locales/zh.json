@@ -41,7 +41,23 @@
     "theme_classic": "Classic",
     "theme_vanilla_light": "Vanilla light",
     "theme_dex_dark": "DEX dark",
-    "err_long": "URL too long: 256 characters maximum."
+    "err_long": "URL too long: 256 characters maximum.",
+    "node_good": "Good",
+    "node_stale": "Stale",
+    "node_suspect": "Suspect",
+    "node_forked": "Forked",
+    "node_timeout": "Timeout",
+    "discover": "Discover more nodes",
+    "discover_cancel": "Cancel",
+    "discover_note": "Optional: searches GitHub for node lists, then probes what it finds. GitHub and probed nodes see your network address. Results are candidates for your review — nothing is added automatically.",
+    "discover_unavailable": "Discovery unavailable in this build.",
+    "discover_none": "No new nodes found — the curated list stands.",
+    "discover_found": "Candidates for review (nothing added yet):",
+    "discover_cancelled": "Cancelled — partial results kept.",
+    "discover_searching": "Searching GitHub…",
+    "discover_reading": "Reading node lists…",
+    "discover_probing": "Probing candidates…",
+    "discover_checking": "Checking"
   },
   "shell": {
     "brand": "BitShares",
@@ -872,7 +888,11 @@
     "ops_hint": " Nothing was enclosed — valid, not an error.",
     "fields_hint": " The object carries no displayable properties.",
     "no_pools_found": "No pools found — create one from the Pools desk (#/pools) Stake form.",
-    "no_accounts_found": "No accounts found — check the name prefix, or register a new name at Create Account (#/create-account)."
+    "no_accounts_found": "No accounts found — check the name prefix, or register a new name at Create Account (#/create-account).",
+    "state_live": "Live",
+    "state_stale": "Stale",
+    "state_stalled": "Stalled",
+    "state_paused": "Paused"
   },
   "gateway": {
     "title": "Deposit / Withdraw",

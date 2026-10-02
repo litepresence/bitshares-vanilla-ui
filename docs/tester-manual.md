@@ -57,9 +57,21 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    - Expected: status changes, app reconnects, footer chain code stays the
      8-char mainnet/testnet prefix. If a node is dead, its row says down —
      never a blank screen.
+3. Node health pills (NEW): rows show Good, Stale, Suspect, Forked,
+   mismatch, Timeout, or Down — not just reachable/unreachable.
+   - Hover any row: tooltip shows head age, participation %, irreversible
+     lag, chain prefix, and "last good Xm ago" where known.
+   - Expected: a fast-but-stale or forked node is labeled, never shown as
+     healthy. Record any row whose pill contradicts its tooltip.
 3. Flip the testnet toggle. Expected: node list switches to testnet nodes.
 4. Add a custom node (type any `wss://` URL), then delete it.
    - Expected: it appears, can be selected, can be removed.
+5. Discover more nodes (NEW — explicit button only): click "Discover more
+   nodes", watch progress, then Cancel mid-run.
+   - Expected: cancel stops it with partial results kept; completed runs
+     list review candidates (URL + health + sources) with per-row Add;
+     Add routes through the same custom validation (bad URLs refused);
+     nothing is ever added without your click.
 5. Switch theme: Classic → Vanilla light → DEX dark (appearance control).
    - Expected: whole app re-skins instantly, no reload. Record any unreadable text per theme.
 6. Record: console errors (want none except dead-node probe lines, which

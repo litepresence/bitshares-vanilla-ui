@@ -358,3 +358,39 @@ Anti-rot: (a) static DOM + one `Store.subscribe` + 6 read-only db calls —
 ten-year safe; (b) zero new deps (no new script tags, no CDN, no build);
 (c) deletable subset: the landing subscription (page still paints static +
 fail-open fills, just without auto-refill).
+
+## Delta 2026-10-01 — node health beyond reachability (latencyTEST.py signals)
+
+Reference: the owner's 2019 WTFPL utility (removed 2026-10-02 after porting —
+logic now lives in `Chain.probe`/`classifyHealth`/`participationPct` plus
+the opt-in `NodeDiscover` engine) measured per node: handshake latency, chain-id,
+head age, witness participation (`recent_slots_filled` bitcount), and a
+STALE/FORKED/WRONG-CHAIN/DOWN/TIMEOUT taxonomy — all from calls the app
+already makes. No geolocation (explicit owner call — third-party leaks +
+rate limits + https mixed-content; refused, documented).
+
+Vanilla implementation: `Chain.probe` throws one extra
+`get_dynamic_global_properties` on its throwaway socket (fail-soft: props
+failure with answered chain-id verdicts GOOD with unknown details) and
+resolves `{chainId, latencyMs, headBlock, headAgeS, participation,
+irrevLag}`; pure `participationPct` (BigInt-exact for uint128 strings) +
+`classifyHealth` (GOOD ≥95 / SUSPECT 80–95 or lag>10 / FORKED <80 or
+lag>20-with-soft-part / STALE past latency+10s / WRONG-CHAIN mismatch;
+thresholds adapted — the script's <100 bar is too strict for the rolling
+window) + `enrichProbe`. `probeAll` paints taxonomy pills with tooltips
+(head age, participation, lag, prefix, last-good) and stores the last 12
+snapshots/node (7-day prune) for "last good Xm ago". List order preserved
+(latency sort untouched); offline panel semantics unchanged (only all-"down"
+shows it). `tooling/node-health-test.js` 36/36.
+
+## Delta 2026-10-02 — opt-in background discovery (owner: button, never automatic)
+
+`NodeDiscover.run` (`vanilla/js/api/node-discover.js`): GitHub repo search
+-> top-12 config sweep (40-fetch budget) -> wss:// extraction -> dedupe vs
+known -> sequential Chain.probe + classifyHealth per fresh candidate, all
+cancellable via `isCancelled`, all fail-open. UI (`buildDiscover` +
+`discoverRow` + settings.js wiring): Discover button, privacy note (states
+the IP exposure up front), live progress, Cancel (partial results kept),
+per-candidate Add reusing the custom path byte-for-byte (same validation +
+storage, zero duplication). Never auto-runs, never auto-adds. 11 i18n keys.
+`tooling/node-discover-test.js` 12/12.
