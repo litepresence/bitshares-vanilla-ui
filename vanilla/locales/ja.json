@@ -779,6 +779,7 @@
     "th_witness": "Witness",
     "time_row": "Time",
     "tx_expired": "Transaction hash lookup covers recent transactions only — this one is expired or unknown.",
+    "tx_not_found": "Transaction not found on this node or the community index.",
     "tx_prefix": "Tx ",
     "tx_title_prefix": "Transaction ",
     "txs_row": "Transactions",

@@ -83,7 +83,45 @@ if (args.click) {
     await page.waitForTimeout(Math.min(waitMs, 10000));
   } catch (e) { /* unclicked shot stands */ }
 }
+/* Optional search proof: --type TEXT --into PLACEHOLDER types into the first
+ * text input whose placeholder contains INTO (or the first text input), then
+ * presses Enter and waits again (AFK rounds prove search routing headlessly).
+ * Never throws the run — a missing input just shoots the untyped page. */
+if (args.type) {
+  try {
+    const needle = (args.into || "").toLowerCase();
+    var typedEcho = "";
+    try {
+      typedEcho = await page.evaluate(({ text, nd }) => {
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), input[type="search"]'));
+        const vis = inputs.filter((x) => { try { return x.offsetParent !== null; } catch (e) { return false; } });
+        const pool = vis.length ? vis : inputs;
+        const el = (nd && pool.find((x) => ((x.getAttribute("placeholder") || "").toLowerCase().indexOf(nd) !== -1))) || pool[0];
+        if (el) { el.focus(); el.value = String(text); el.dispatchEvent(new Event("input", { bubbles: true })); return String(el.value).slice(0, 12) + "@" + String(el.getAttribute("placeholder") || "").slice(0, 20); }
+        return "NO-EL(n=" + inputs.length + ",v=" + vis.length + ")";
+      }, { text: args.type, nd: needle });
+    } catch (e) { typedEcho = "EVAL-THREW:" + String(e && e.message || e).slice(0, 120); }
+    globalThis.__typedEcho = typedEcho;
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(1500);
+    /* Form-submit fallback: some handlers listen to the submit button only —
+     * click it in the same form without clearing the typed value. */
+    await page.evaluate(() => {
+      const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type]), input[type="search"]'));
+      const vis = inputs.filter((x) => { try { return x.offsetParent !== null; } catch (e) { return false; } });
+      const pool = vis.length ? vis : inputs;
+      const el = pool.find((x) => x && x.value) || pool[0];
+      const form = el && el.form;
+      const btn = form && form.querySelector('button[type="submit"]');
+      if (btn) btn.click();
+    });
+    await page.waitForTimeout(Math.min(waitMs, 10000));
+  } catch (e) { /* untyped shot stands */ }
+}
 await page.screenshot({ path: out });
-console.log(JSON.stringify({ out, width, height, theme, consoleErrors: errors }));
+/* Final hash: proves --click/--type interactions routed (log-only). */
+let finalHash = "";
+try { finalHash = await page.evaluate(() => String(location.hash || "")); } catch (e) { /* hash stands empty */ }
+console.log(JSON.stringify({ out, width, height, theme, hash: finalHash, typed: (typeof globalThis.__typedEcho === "string" ? globalThis.__typedEcho : ""), consoleErrors: errors }));
 await browser.close();
 if (errors.length) process.exitCode = 2;

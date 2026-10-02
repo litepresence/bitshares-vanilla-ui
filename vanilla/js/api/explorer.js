@@ -451,11 +451,9 @@ var Explorer = (function () {
    * account-first outcome as search(), never a competing answer). A bare
    * "BTS" or "alice" is kind text: resolution order there is account first,
    * then asset symbol (search() below) — documented, never guessed in this
-   * helper. A 40-hex string is kind txhash: get_recent_transaction_by_id
-   * EXISTS (#4 database_api.hpp:200) but returns a location-less
-   * signed_transaction (no block coords), so no #/block/:h/:ix deep link
-   * can be built from it — the shell honest-defers that path (see
-   * explorer-ui.js), it never pretends to resolve it.
+   * helper. A 40-hex string is kind txhash, resolved by resolveTxHash()
+   * below (ES block context first, WS location-less fallback — never a
+   * guessed block).
    * Params: q (any, stringified + trimmed). Returns {kind, ...}: block
    * {height}, object {id}, txhash {id}, text {text}, empty {}. Fails: never. */
   function classifySearchInput(q) {
@@ -603,13 +601,155 @@ var Explorer = (function () {
     throw new Error("unknown-object");
   }
 
+  /* 40-hex ripemd160 validation (pure, unit-tested): transaction_id_type is
+   * ripemd160 (chain.js assertPropsShape: 40 hex, NOT 64 — types.hpp:304).
+   * Strict: no trim, no case fold here — callers normalize first. Params: s
+   * (any). Returns boolean. Fails: never. */
+  function _isTxHash(s) {
+    return typeof s === "string" && TXHASH_RE.test(s);
+  }
+
+  /* ES query cascade for one hash (pure, unit-tested — exact DSL including
+   * fire order). OBSERVED live 2026-10-02 (curl POST
+   * es.bitshares.dev/bitshares-index/_search, trx 393704b7d1e84fa54f5e983c5e980
+   * f22edb31dd4 in block 114884983): block context lives at
+   * _source.block_data.{block_num,block_time,trx_id} with the tx index at
+   * _source.operation_history.trx_in_block — the bare `trx_id[.keyword]`
+   * term/match shapes return ZERO hits on this mapping, so the observed
+   * block_data shapes lead. The astro-UI trio (Explorer.ts:231-235, bare
+   * trx_id fields) rides last as forward-compat in case the mapping ever
+   * flattens. Every body is bounded (size 5, never match_all). Params: hash
+   * (normalized 40-hex string). Returns [{index, body}] in fire order.
+   * Fails: never. */
+  function _txHashQueries(hash) {
+    var h = String(hash);
+    return [
+      { index: "bitshares-*", body: { query: { term: { "block_data.trx_id.keyword": h } }, size: 5 } },
+      { index: "bitshares-*", body: { query: { term: { "block_data.trx_id": h } }, size: 5 } },
+      { index: "bitshares-*", body: { query: { match: { "block_data.trx_id": h } }, size: 5 } },
+      { index: "bitshares-*", body: { query: { term: { "trx_id.keyword": h } }, size: 5 } },
+      { index: "bitshares-*", body: { query: { term: { trx_id: h } }, size: 5 } },
+      { index: "bitshares-*", body: { query: { match: { trx_id: h } }, size: 5 } }
+    ];
+  }
+
+  /* Block-coord extractor for one ES hit (pure, unit-tested): returns
+   * {block, index} or null. OBSERVED fields (see _txHashQueries):
+   * block_data.block_num + operation_history.trx_in_block; top-level
+   * block_num / block_number / trx_in_block accepted defensively. Guards:
+   * block integer >= 1, index integer >= 0 — anything else is null, never a
+   * guessed link. Params: hit (ES hit or bare _source). Fails: never. */
+  function _txHashBlock(hit) {
+    try {
+      var src = (hit && hit._source) ? hit._source : null;
+      if (!src && hit && hit.block_data) src = hit;
+      if (!src || typeof src !== "object") return null;
+      var bd = (src.block_data && typeof src.block_data === "object") ? src.block_data : {};
+      var oh = (src.operation_history && typeof src.operation_history === "object")
+        ? src.operation_history : {};
+      var b = bd.block_num;
+      if (!(b >= 1) || Math.floor(b) !== b) {
+        b = src.block_num;
+        if (!(b >= 1) || Math.floor(b) !== b) {
+          b = src.block_number;
+          if (!(b >= 1) || Math.floor(b) !== b) return null;
+        }
+      }
+      var ix = oh.trx_in_block;
+      if (!(ix >= 0) || Math.floor(ix) !== ix) {
+        ix = src.trx_in_block;
+        if (!(ix >= 0) || Math.floor(ix) !== ix) return null;
+      }
+      return { block: b, index: ix };
+    } catch (e) { return null; }
+  }
+
+  /* HistoryCap seam (market-fills-history.js _historyCap pattern): the ONLY
+   * raw-ES gateway is HistoryCap.esSearch — this module never fetches. Null
+   * when the seam is absent (caller goes WS). Never throws. */
+  function _historyCap() {
+    try {
+      if (typeof HistoryCap !== "undefined" && HistoryCap &&
+        typeof HistoryCap.esSearch === "function") return HistoryCap;
+    } catch (e) { /* globalThis below */ }
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.HistoryCap &&
+        typeof globalThis.HistoryCap.esSearch === "function") return globalThis.HistoryCap;
+    } catch (e2) { /* null below */ }
+    return null;
+  }
+
+  /* One recent tx by id (WS fallback — location-less by chain design:
+   * get_recent_transaction_by_id returns optional<signed_transaction> (#4
+   * database_api.hpp:200, "not known != not included"), NO block coords.
+   * Normalized like tx() ({ops, signatures}) so the view renders it with no
+   * block link. Fails "tx-expired-or-unknown" on null/node error/bad input
+   * (the views already map that key); "not-connected" passes through. */
+  async function recentTxById(hash) {
+    var h = (typeof hash === "string") ? hash.trim().toLowerCase() : "";
+    if (!_isTxHash(h)) throw new Error("tx-expired-or-unknown");
+    var t;
+    try { t = await _dbCall("get_recent_transaction_by_id", [h]); } catch (e) {
+      if (e && e.message === "not-connected") throw e;
+      throw new Error("tx-expired-or-unknown");
+    }
+    if (!t) throw new Error("tx-expired-or-unknown");
+    var ops = Array.isArray(t.operations) ? t.operations : [];
+    return { hash: h, block: null, index: null,
+      ops: ops.map(function (o) {
+        var ref = _opRef(Array.isArray(o) ? o[0] : o.type);
+        return { type_idx: ref.type_idx, type_name: ref.type_name, virtual: ref.virtual,
+          fields: Array.isArray(o) ? o[1] : o };
+      }),
+      signatures: Array.isArray(t.signatures) ? t.signatures.slice() : [] };
+  }
+
+  /* Bare-hash resolution (never throws — every path resolves to a renderable
+   * state the submit handler paints):
+   *   {status:"block", block, index} — ES hit WITH block context (deep link);
+   *   {status:"tx", tx} — WS location-less tx (render WITHOUT a block link);
+   *   {status:"not-found"} — neither knew it (keyed notice + settings link);
+   *   {status:"offline"} — socket cold (offline panel);
+   *   {status:"invalid"} — not 40-hex (same notice as not-found).
+   * The ES cascade stops at the first hit carrying block coords; any
+   * esSearch reject (es-disabled/es-unavailable) drops straight to the WS
+   * fallback — further ES tries would fail the same way. */
+  async function resolveTxHash(hash) {
+    var h = (typeof hash === "string") ? hash.trim().toLowerCase() : "";
+    if (!_isTxHash(h)) return { status: "invalid", hash: String(hash || "") };
+    var HC = _historyCap();
+    if (HC) {
+      var bodies = _txHashQueries(h), i, k;
+      for (i = 0; i < bodies.length; i++) {
+        var data = null;
+        try { data = await HC.esSearch(bodies[i].index, bodies[i].body); }
+        catch (e) { break; }
+        var hits = (data && data.hits && data.hits.hits) || [];
+        for (k = 0; k < hits.length; k++) {
+          var loc = _txHashBlock(hits[k]);
+          if (loc) return { status: "block", block: loc.block, index: loc.index, hash: h };
+        }
+      }
+    }
+    try {
+      var t = await recentTxById(h);
+      return { status: "tx", hash: h, tx: t };
+    } catch (e) {
+      if (e && e.message === "not-connected") return { status: "offline", hash: h };
+      return { status: "not-found", hash: h };
+    }
+  }
+
   return { head: head, recentBlocks: recentBlocks, block: block, tx: tx,
     assetsPage: assetsPage, activeSets: activeSets, btsSupply: btsSupply,
     recentOps: recentOps, opsFromBody: opsFromBody,
     asset: asset, feeds: feeds, resolveObject: resolveObject, search: search,
     classifySearchInput: classifySearchInput, shareUrl: shareUrl,
     currentShareUrl: currentShareUrl, suggestAccounts: suggestAccounts,
-    suggestAssets: suggestAssets, _normSuggestPairs: normSuggestPairs };
+    suggestAssets: suggestAssets, _normSuggestPairs: normSuggestPairs,
+    recentTxById: recentTxById, resolveTxHash: resolveTxHash,
+    _isTxHash: _isTxHash, _txHashQueries: _txHashQueries,
+    _txHashBlock: _txHashBlock };
 })();
 
 if (typeof module !== "undefined") { module.exports = Explorer; }

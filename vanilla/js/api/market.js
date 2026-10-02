@@ -280,6 +280,42 @@ var Market = (function () {
     return null;
   }
 
+  /* Normalize one raw fill row to the trades() envelope (factored so
+   * trades() and tradesDeep() share ONE normalizer — never two).
+   * Returns {raw, time, displayPrice, baseAmount, quoteAmount}; price/amounts
+   * are base-per-quote human strings via BigInt math, null when the row shape
+   * is unmappable (see header ambiguity (a)). time prefers row.time /
+   * row.block_time (fill_history shape) with row.date as the last fallback
+   * (market_trade shape, api_objects.hpp:149-159) — fill rows carry
+   * block_time so trades() vectors are unchanged by the fallback. */
+  function _fillRow(row, baseId, quoteId, precs) {
+    row = row || {};
+    var pair = _fillPair(row, baseId, quoteId);
+    var dp = null, ba = null, qa = null;
+    if (pair) {
+      try {
+        dp = Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES);
+        ba = Format.formatAmount(pair.rawB, precs[baseId]);
+        qa = Format.formatAmount(pair.rawQ, precs[quoteId]);
+      } catch (e) { dp = null; ba = null; qa = null; /* zero-quote etc. is a dash, never a whole-history reject */ }
+    }
+    return {
+      raw: row,
+      time: row.time || row.block_time || row.date || null,
+      displayPrice: dp,
+      baseAmount: ba,
+      quoteAmount: qa
+    };
+  }
+
+  /* Map raw fill rows to the trades() envelope via _fillRow (pure). */
+  function _normalizeFills(rows, baseId, quoteId, precs) {
+    var out = [];
+    var i;
+    for (i = 0; i < rows.length; i++) out.push(_fillRow(rows[i], baseId, quoteId, precs));
+    return out;
+  }
+
   /* Recent fills (history get_fill_order_history(a, b, limit), api.hpp:212 —
    * history api via Chain.history(), params (base, quote) like #1).
    * Empty histories are VALID ([]). displayPrice/baseAmount/quoteAmount are
@@ -303,28 +339,93 @@ var Market = (function () {
     if (!Array.isArray(rows) || rows.length === 0) return [];
     _needPriceMath();
     var precs = await _precisions([baseId, quoteId]);
-    var out = [];
-    var i;
-    for (i = 0; i < rows.length; i++) {
-      var row = rows[i] || {};
-      var pair = _fillPair(row, baseId, quoteId);
-      var dp = null, ba = null, qa = null;
-      if (pair) {
-        try {
-          dp = Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES);
-          ba = Format.formatAmount(pair.rawB, precs[baseId]);
-          qa = Format.formatAmount(pair.rawQ, precs[quoteId]);
-        } catch (e) { dp = null; ba = null; qa = null; /* zero-quote etc. is a dash, never a whole-history reject */ }
-      }
-      out.push({
-        raw: row,
-        time: row.time || row.block_time || null,
-        displayPrice: dp,
-        baseAmount: ba,
-        quoteAmount: qa
-      });
+    return _normalizeFills(rows, baseId, quoteId, precs);
+  }
+
+  /* Deep fill archive: time-windowed walk over database get_trade_history
+   * (database_api.hpp:662-664 — VERIFIED signature:
+   *   vector<market_trade> get_trade_history(const string& base,
+   *     const string& quote, fc::time_point_sec start, fc::time_point_sec stop,
+   *     uint32_t limit = ...), range [stop, start], most-recent-first.
+   * C++ names are (start, stop) but start is the LATEST bound; WS arg order
+   * is [base, quote, latestISO, earliestISO, limit] — live wins conflicts:
+   * astro DexLiveOrderBook.ts:86 sends [baseId, quoteId, now, oneMonthAgo, 50]
+   * and MarketTradeHistory.ts:138 sends [base, quote, now, oneMonthAgo, 50].
+   * Unlike get_fill_order_history (no cursor — trades() above), this method
+   * pages by TIME WINDOW, so walking disjoint day windows backward from now
+   * is the honest fill archive. WS-only by design: time-window paging needs
+   * no ES index, so no ES path exists here (MarketFills stays the ES route
+   * for candle backfill; this stays the chain route for fill rows).
+   * Params: baseId, quoteId asset ids; opts {days (default 7, integer >= 1),
+   *   limit (default 100, integer >= 1, per-window cap)}.
+   * Walk: up to min(days, 8) disjoint 1-day windows, newest first; stops
+   * early on a short page (rows < limit) or an empty/non-array page.
+   * Returns the SAME fill-row envelope as trades() via the shared
+   * _normalizeFills (market_trade rows carry human price/amount/value/type
+   * strings + date but no fill_price, so displayPrice is null and time falls
+   * back to row.date — the envelope shape is identical, never a second
+   * normalizer). Merged newest-first, deduped by raw-row JSON (first/newest
+   * wins). Empty result is VALID ([]) — callers render the existing
+   * market.no_price_history key. Fails: "history-unavailable" when the db api
+   * itself is missing (Chain.db() rejects) or a window call rejects
+   * (history-plugin-disabled node — same contract family as trades()). */
+  var TRADE_DEEP_MAX_CALLS = 8;
+  var TRADE_DEEP_DAY_MS = 86400000;
+
+  /* "YYYY-MM-DDTHH:MM:SS" UTC (astro slice(0,19) convention, no ms/Z —
+   * the chain takes UTC with no timezone offsets, hpp:657). */
+  function _windowISO(ms) {
+    return new Date(ms).toISOString().slice(0, 19);
+  }
+
+  async function tradesDeep(baseId, quoteId, opts) {
+    opts = opts || {};
+    var days = opts.days === undefined ? 7 : opts.days;
+    var perPage = opts.limit === undefined ? 100 : opts.limit;
+    if (!Number.isInteger(days) || days < 1) throw new Error("bad days (integer >= 1)");
+    if (!Number.isInteger(perPage) || perPage < 1) throw new Error("bad limit (integer >= 1)");
+    var pages = Math.min(days, TRADE_DEEP_MAX_CALLS);
+    var dbId;
+    try {
+      dbId = await Chain.db();
+    } catch (e) {
+      throw new Error("history-unavailable");
     }
-    return out;
+    var nowMs = Date.now();
+    var merged = [];
+    var seen = {};
+    var i;
+    for (i = 0; i < pages; i++) {
+      var winEnd = nowMs - i * TRADE_DEEP_DAY_MS;
+      var winStart = winEnd - TRADE_DEEP_DAY_MS;
+      var rows;
+      try {
+        rows = await Chain.call(dbId, "get_trade_history",
+          [baseId, quoteId, _windowISO(winEnd), _windowISO(winStart), perPage]);
+      } catch (e) {
+        throw new Error("history-unavailable");
+      }
+      if (!Array.isArray(rows) || rows.length === 0) break;
+      var j;
+      for (j = 0; j < rows.length; j++) {
+        var key;
+        try {
+          key = JSON.stringify(rows[j]);
+        } catch (e) {
+          key = null;
+        }
+        if (key !== null) {
+          if (Object.prototype.hasOwnProperty.call(seen, key)) continue;
+          seen[key] = true;
+        }
+        merged.push(rows[j]);
+      }
+      if (rows.length < perPage) break;
+    }
+    if (merged.length === 0) return [];
+    _needPriceMath();
+    var precs = await _precisions([baseId, quoteId]);
+    return _normalizeFills(merged, baseId, quoteId, precs);
   }
 
   /* 24h ticker (database get_ticker(base, quote), database_api.hpp:618).
@@ -439,6 +540,7 @@ var Market = (function () {
     book: book,
     depth: depth,
     trades: trades,
+    tradesDeep: tradesDeep,
     stats: stats,
     candles: candles,
     deepen: deepen,

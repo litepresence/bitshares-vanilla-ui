@@ -242,18 +242,19 @@ var ExplorerUI = (function () {
     wrap.appendChild(shellTitle(doc));
     if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
 
-    /* Search: single box, 1.x.y / account / symbol, keyboard-submit.
-     * Typeahead (plain literals only, no new t() keys — check_i18n stays
-     * green): account names via Explorer.suggestAccounts (lookup_accounts,
-     * #4 database_api.hpp:357) + asset symbols via Explorer.suggestAssets
-     * (list_assets prefix paging, database_api.hpp:435 — there is NO
-     * lookup_assets method, #4 wins). Numeric input jumps straight to
-     * #/block/:height; object ids ride the existing routeObject dispatch;
-     * 40-hex tx hashes honest-defer (get_recent_transaction_by_id exists,
-     * database_api.hpp:200, but returns a location-less tx — no block deep
-     * link can be built from it). Suggestions fail open (offline/error
-     * clears the listbox; submit still works). Listbox is buttons only:
-     * tap + arrow-key + Enter/Escape, textContent-only, no hover UI. */
+    /* Search: single box, 1.x.y / account / symbol / tx hash,
+     * keyboard-submit. Typeahead (plain literals only, no new t() keys —
+     * check_i18n stays green): account names via Explorer.suggestAccounts
+     * (lookup_accounts, #4 database_api.hpp:357) + asset symbols via
+     * Explorer.suggestAssets (list_assets prefix paging,
+     * database_api.hpp:435 — there is NO lookup_assets method, #4 wins).
+     * Numeric input jumps straight to #/block/:height; object ids ride the
+     * existing routeObject dispatch; 40-hex tx hashes resolve via
+     * Explorer.resolveTxHash (ES block_data.trx_id context first, WS
+     * location-less fallback — never a guessed block). Suggestions fail
+     * open (offline/error clears the listbox; submit still works). Listbox
+     * is buttons only: tap + arrow-key + Enter/Escape, textContent-only,
+     * no hover UI. */
     var form = doc.createElement("form");
     form.className = "xplore-search";
     var input = doc.createElement("input");
@@ -275,6 +276,16 @@ var ExplorerUI = (function () {
     suggestBox.setAttribute("aria-label", "Search suggestions");
     wrap.appendChild(suggestBox);
     wrap.appendChild(msg);
+    /* Hash-path result host (txhash submit only): the WS location-less panel
+     * and the keyed not-found notice paint here, never in msg (msg stays
+     * the text-search error slot). Cleared on every submit. */
+    var hashBox = el(doc, "div", null, "xplore-hash");
+    hashBox.setAttribute("aria-live", "polite");
+    wrap.appendChild(hashBox);
+    /* Clear the hash-path host (never throws — a detached host is a no-op). */
+    function clearHashBox() {
+      try { while (hashBox.firstChild) hashBox.removeChild(hashBox.firstChild); } catch (e) { /* host gone */ }
+    }
     var sugTimer = null, sugItems = [], sugActive = -1;
     /* Clear the suggestion listbox (timer-safe, never throws). */
     function clearSuggest() {
@@ -368,6 +379,7 @@ var ExplorerUI = (function () {
       ev.preventDefault();
       msg.textContent = "";
       clearSuggest();
+      clearHashBox();
       var q = input.value;
       var cls = { kind: "text" };
       try {
@@ -385,7 +397,52 @@ var ExplorerUI = (function () {
         return;
       }
       if (cls.kind === "txhash") {
-        msg.textContent = "Transaction-hash lookup is not supported in this view yet — try a block number, object id, account, or asset symbol.";
+        /* Phase 6.1 hash path (phase-06-es-design.md #1): ES block context
+         * -> #/block/:h/:ix (ExplorerBlocks.renderTx reused unchanged, block
+         * link included); WS location-less tx -> inline panel WITHOUT a
+         * block link (never guessed); neither -> keyed notice + Settings
+         * link. resolveTxHash never rejects; the trailing catch is
+         * belt-and-braces. Gen-guarded like the text path below. */
+        go.disabled = true;
+        showStatus(doc, hashBox, t("explorer.loading_tx", "Loading transaction…"));
+        Explorer.resolveTxHash(cls.id).then(function (res) {
+          if (myGen !== gen) return;
+          go.disabled = false;
+          if (res && res.status === "block") {
+            if (typeof location !== "undefined") {
+              location.hash = "#/block/" + res.block + "/" + res.index;
+            }
+            return;
+          }
+          if (res && res.status === "tx" && res.tx) {
+            paintTxHash(doc, hashBox, myGen, root, want, res.hash, res.tx);
+            return;
+          }
+          if (res && res.status === "offline") {
+            clearHashBox();
+            showError(doc, hashBox, new Error("not-connected"),
+              t("explorer.offline_short", "Network unavailable."));
+            return;
+          }
+          clearHashBox();
+          var box = el(doc, "div", null, "error");
+          box.setAttribute("aria-live", "polite");
+          box.textContent = t("explorer.tx_not_found",
+            "Transaction not found on this node or the community index.");
+          hashBox.appendChild(box);
+          try {
+            if (typeof HistoryNotice !== "undefined" && HistoryNotice &&
+                typeof HistoryNotice.actionLink === "function") {
+              var link = HistoryNotice.actionLink(doc, t, "settings");
+              if (link) hashBox.appendChild(link);
+            }
+          } catch (e2) { /* notice stands without the link */ }
+        }).catch(function (e) {
+          if (myGen !== gen) return;
+          go.disabled = false;
+          clearHashBox();
+          showError(doc, hashBox, e, t("explorer.unexpected", "Unexpected error"));
+        });
         return;
       }
       go.disabled = true;
@@ -495,6 +552,53 @@ var ExplorerUI = (function () {
       } else {
         showError(doc, body, t("explorer.unexpected", "Unexpected error"));
       }
+    }
+  }
+
+  /* Location-less tx panel (hash path only): the WS fallback returns the
+   * tx WITHOUT block coords (chain design, database_api.hpp:200), so this
+   * panel carries NO block link — only the existing unknown-block honesty
+   * note (never a guessed deep link). Op rows reuse ExplorerAssets.opSection
+   * via the same lazy-global guard explorer-blocks.js uses; signatures reuse
+   * the existing prefix key. Params: doc, host, myGen, root, tab, hash,
+   * tx (Explorer.recentTxById shape). Never throws. */
+  function paintTxHash(doc, host, myGen, root, tab, hash, tx) {
+    try { while (host.firstChild) host.removeChild(host.firstChild); } catch (e) { return; }
+    try {
+      host.appendChild(el(doc, "h2",
+        t("explorer.tx_title_prefix", "Transaction ") + hash));
+      host.appendChild(el(doc, "p", t("explorer.unknown_block", "Unknown block."), "muted"));
+      var ctx = { gen: myGen, root: root, tab: tab };
+      var ops = (tx && Array.isArray(tx.ops)) ? tx.ops : [];
+      if (ops.length === 0) {
+        host.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") +
+          t("explorer.ops_hint", " Nothing was enclosed — valid, not an error."), "muted"));
+      }
+      ops.forEach(function (op, k) {
+        var label = t("explorer.op_prefix", "Op ") + k;
+        try {
+          if (typeof ExplorerAssets !== "undefined" && ExplorerAssets &&
+              typeof ExplorerAssets.opSection === "function") {
+            host.appendChild(ExplorerAssets.opSection(doc, op, ctx, label));
+            return;
+          }
+        } catch (e) { /* fallback below */ }
+        host.appendChild(el(doc, "p",
+          t("explorer.op_unavailable", "Operation view unavailable."), "muted"));
+      });
+      var sigs = (tx && Array.isArray(tx.signatures)) ? tx.signatures : [];
+      if (sigs.length > 0) {
+        host.appendChild(el(doc, "h3",
+          t("explorer.signatures_prefix", "Signatures (") + sigs.length + ")"));
+        var ul = doc.createElement("ul");
+        sigs.forEach(function (sig) {
+          ul.appendChild(el(doc, "li", String(sig), "muted"));
+        });
+        host.appendChild(ul);
+      }
+    } catch (e) {
+      try { showError(doc, host, e, t("explorer.unexpected", "Unexpected error")); }
+      catch (e2) { /* panel stands */ }
     }
   }
 
