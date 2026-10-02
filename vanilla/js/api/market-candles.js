@@ -194,11 +194,28 @@ var MarketCandles = (function () {
     } catch (e) {
       throw new Error("history-unavailable");
     }
-    var rows;
+    /* Paginated fetch (2026-10-02 fix): nodes cap get_market_history at 200
+     * buckets per call and serve oldest-first — one wide-window call used to
+     * return only the OLDEST 200 slots (2022/23 on BTS_CNY daily), so new
+     * data never arrived. Walk backward from the tip in 200-slot chunks
+     * (bounded: ceil(count/200)+1 calls, 25 max) and stitch by slot; sparse
+     * markets simply yield fewer rows, pruned/history nodes yield what they
+     * have. bySlot keying dedupes chunk overlaps for free. */
+    var rows = [];
     try {
-      rows = await Chain.call(histId, "get_market_history", [baseId, quoteId, bucket, startISO, endISO]);
+      var chunks = Math.min(25, Math.ceil(count / 200) + 1);
+      for (var k = 0; k < chunks; k++) {
+        var chunkEnd = endSlotSec - k * 200 * bucket;
+        if (chunkEnd < startSlotSec) break;
+        var chunkStart = chunkEnd - (200 - 1) * bucket;
+        if (chunkStart < startSlotSec) chunkStart = startSlotSec;
+        var page = await Chain.call(histId, "get_market_history",
+          [baseId, quoteId, bucket, _slotISO(chunkStart), _slotISO(chunkEnd + bucket)]);
+        if (Array.isArray(page) && page.length > 0) rows = rows.concat(page);
+      }
     } catch (e) {
-      throw new Error("history-unavailable");
+      if (rows.length === 0) throw new Error("history-unavailable");
+      /* partial window stands — pruned nodes give what they have */
     }
     var bySlot = {};
     var i;
@@ -422,10 +439,35 @@ var MarketCandles = (function () {
     return { num: num.toString(), den: den.toString(), human: human, per: per, skipped: skipped };
   }
 
+  /* mergeWindows: tip-sized fresh fetch into the painted window (pure).
+   * Fresh rows win overlaps (they are newer by construction), output sorted
+   * ascending and sliced to the last `cap`. Keyed on timeMs like mergeDeep
+   * (which stays the ES backfill path — this one is chain-vs-chain).
+   * Params: oldBuckets, freshBuckets (candle entries or falsy), cap number.
+   * Returns the merged array (possibly []). Never throws. Unit-tested. */
+  function mergeWindows(oldBuckets, freshBuckets, cap) {
+    try {
+      var n = Math.floor(cap);
+      if (!(n >= 1)) return [];
+      var byMs = {};
+      (Array.isArray(oldBuckets) ? oldBuckets : []).forEach(function (e) {
+        if (e && typeof e.timeMs === "number") byMs[e.timeMs] = e;
+      });
+      (Array.isArray(freshBuckets) ? freshBuckets : []).forEach(function (e) {
+        if (e && typeof e.timeMs === "number") byMs[e.timeMs] = e;
+      });
+      var keys = Object.keys(byMs).map(Number).sort(function (a, b) { return a - b; });
+      var out = keys.map(function (k) { return byMs[k]; });
+      if (out.length > n) out = out.slice(out.length - n);
+      return out;
+    } catch (e) { return []; }
+  }
+
   return {
     timeframes: timeframes,
     candles: candles,
     deepen: deepen,
+    mergeWindows: mergeWindows,
     vwap: vwap
   };
 })();

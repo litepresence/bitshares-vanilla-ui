@@ -824,16 +824,30 @@ var MarketDesk = (function () {
           if (state.loading) return;
           state.tipSeq = (state.tipSeq || 0) + 1;
           var seq = state.tipSeq;
+          /* Tip window is small by design (2026-10-02 fix): the full count
+           * now paginates server-side (up to 25 RPCs at count 5000), which
+           * a 3.5s poll must never pay. 60 fresh slots merged into the
+           * painted window carry the tip; full fills repaint whole windows. */
           var count = 2000;
+          var TIP_COUNT = 60;
           try {
             if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) {
               count = MarketInd.CANDLE_COUNT;
             }
           } catch (e) { /* default stands */ }
           try {
-            Market.candles(b.id, q.id, state.bucket, count).then(function (c) {
+            Market.candles(b.id, q.id, state.bucket, TIP_COUNT).then(function (c) {
               if (!deskAlive() || seq !== state.tipSeq) return;
-              state.candles = c;
+              var merged = (c && c.buckets) || [];
+              try {
+                if (typeof MarketCandles !== "undefined" && MarketCandles &&
+                    typeof MarketCandles.mergeWindows === "function") {
+                  merged = MarketCandles.mergeWindows(
+                    state.candles && state.candles.buckets, c.buckets, count);
+                }
+              } catch (e) { /* fresh tip stands alone */ }
+              state.candles = { bucket: state.bucket, start: null, end: null,
+                buckets: merged, closes: [], deep: state.deep };
               try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
               try {
                 if (typeof MarketInd !== "undefined" && MarketInd &&

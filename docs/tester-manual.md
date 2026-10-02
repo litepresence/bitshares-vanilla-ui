@@ -158,6 +158,10 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    - Expected: zoom stays put (no reset to full view). Then change the
      Candles input (e.g. 2000 → 500): chart refetches and repaints at the
      new window; invalid entries (0, 99999, text) revert with a note.
+9. Deep history (NEW): switch to 1D timeframe on BTS/CNY, wait for load.
+   - Expected: candles reach back years (not just 2022/23), newest candle
+     is current; hourly shows dense recent history. Record oldest/newest
+     visible dates.
 8. Settlement strip (MPAs): for a smartcoin market, confirm a feed price
    AND a settlement-estimate price both show (estimate differs from feed
    by the offset — record both numbers).

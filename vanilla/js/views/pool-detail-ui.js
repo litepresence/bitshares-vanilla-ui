@@ -291,6 +291,13 @@ var PoolDetailUI = (function () {
           buckets = MarketFills.mergeDeep(chainBuckets, P.esBuckets, 2000);
         }
       } catch (e) { buckets = chainBuckets; }
+      /* Candle window (shared input): pools build from the swap tape, so
+       * the count applies as a trailing slice, not a fetch window. */
+      try {
+        var pn = 2000;
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) pn = MarketInd.CANDLE_COUNT;
+        if (Array.isArray(buckets) && buckets.length > pn) buckets = buckets.slice(buckets.length - pn);
+      } catch (e) { /* full tape stands */ }
       P.candles = { buckets: buckets };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {

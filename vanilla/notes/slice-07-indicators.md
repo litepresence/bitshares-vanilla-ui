@@ -102,3 +102,22 @@ cannot show retained zoom — but rebuild-destroy is gone by construction).
 Anti-rot: (a) platform timers + vendored LWC only; (b) zero new deps (one
 localStorage key, two locale keys); (c) deletable: input (2000 default
 stands), seq guard (paints race again — kept because the flake was real).
+
+## Delta 2026-10-02 — chain pagination (the 200-bucket cap fix)
+Owner report: daily candles showed 2022/23 only, hourly sparse, no deep
+history on high-volume BTS_CNY. Live-measured root cause (not guessed):
+`get_market_history` caps at 200 buckets oldest-first — the node answered
+our 2020→now daily window with exactly 200 rows (2022-08-18→2023-04-03),
+so new data never arrived. (This also implicates the 200→2000 default
+change: at 200 the window fit the cap and looked fine.) ES index verified
+ALIVE and current (`bitshares-2026-10` index, fresh fills) — the chain cap
+was the sole culprit. Fix: `candles()` walks backward from the tip in
+200-slot chunks (bounded ceil(count/200)+1, 25 max), stitching by slot;
+pruned nodes yield what they have (partial window stands, never throws).
+Tip path fetches a 60-slot window merged into the painted state via new
+pure `mergeWindows` (fresh wins, cap kept) instead of paying up to 25 RPCs
+per 3.5s poll. Pool `rebucket` applies the shared count as a trailing
+slice (its tape path never had a window). Vectors: pagination proven
+offline against a faithful oldest-first-200 stub (500-slot window fully
+covered, newest fresh — was 2022 before the fix); mergeWindows 10/10.
+Suite 36/36; headless `#/market/BTS_CNY` renders fresh candles, zero errors.
