@@ -945,6 +945,12 @@ var PoolDetailUI = (function () {
         }).catch(function (e) {
           if (!live(g1, g2)) return;
           u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
+          try {
+            if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+              var typedHistLink = HistoryNotice.actionLink(doc, t, "settings");
+              if (typedHistLink) listBox.appendChild(typedHistLink);
+            }
+          } catch (e2) { /* error panel stands without the link */ }
         });
       }
       viewBtn.addEventListener("click", loadTyped);
@@ -970,6 +976,12 @@ var PoolDetailUI = (function () {
       }).catch(function (e) {
         if (!live(g1, g2)) return;
         u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
+        try {
+          if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+            var myHistLink = HistoryNotice.actionLink(doc, t, "settings");
+            if (myHistLink) listBox.appendChild(myHistLink);
+          }
+        } catch (e2) { /* error panel stands without the link */ }
       });
     }
   }

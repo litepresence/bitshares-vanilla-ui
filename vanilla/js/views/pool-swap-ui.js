@@ -147,6 +147,12 @@ var PoolSwapUI = (function () {
       }).catch(function (e) {
         if (!live(myGen, uiGen)) return;
         u.clearBox(poolBody); u.showError(doc, poolBody, e, t("pool.history_failed", "Could not load pool history."));
+        try {
+          if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+            var histLink = HistoryNotice.actionLink(doc, t, "settings");
+            if (histLink) poolBody.appendChild(histLink);
+          }
+        } catch (e2) { /* error panel stands without the link */ }
       });
       if (histTab === "my") loadMyPoolHist(doc, u, myGen, uiGen, myPoolBody, poolId);
       else { u.clearBox(myPoolBody); myPoolBody.appendChild(u.el(doc, "p", t("pool.find_pool_hint", "Find a pool to see your swaps."), "muted")); }
@@ -299,6 +305,12 @@ var PoolSwapUI = (function () {
       }).catch(function (e) {
         if (!live(myGen, uiGen)) return;
         u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
+        try {
+          if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+            var typedHistLink = HistoryNotice.actionLink(doc, t, "settings");
+            if (typedHistLink) listBox.appendChild(typedHistLink);
+          }
+        } catch (e2) { /* error panel stands without the link */ }
       });
     }
     viewBtn.addEventListener("click", loadTyped);
@@ -324,6 +336,12 @@ var PoolSwapUI = (function () {
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return;
       u.clearBox(listBox); u.showError(doc, listBox, e, t("pool.my_history_failed", "Could not load your swaps."));
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          var myHistLink = HistoryNotice.actionLink(doc, t, "settings");
+          if (myHistLink) listBox.appendChild(myHistLink);
+        }
+      } catch (e2) { /* error panel stands without the link */ }
     });
   }
   function slipOk(s) { /* slippage gate: 0.1-5% human, string math only */

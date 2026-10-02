@@ -3209,5 +3209,9 @@
     "final_t": "Ready when you are.",
     "final_cta": "Create a wallet",
     "hero_sub2": "Nothing but fresh vanilla html/js/css in between."
+  },
+  "notice": {
+    "open_settings": "Open Settings",
+    "open_help": "Open help"
   }
 }

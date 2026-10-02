@@ -1037,6 +1037,14 @@ var ExplorerBlocks = (function () {
         host.appendChild(el(doc, "p", historyDown
           ? t("explorer.history_down", "History unavailable on this node — switch nodes in Settings to see recent activity.")
           : (t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive.")), "muted"));
+        if (historyDown) {
+          try {
+            if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+              var link = HistoryNotice.actionLink(doc, t, "settings");
+              if (link) host.appendChild(link);
+            }
+          } catch (e2) { /* text mention stands without the anchor */ }
+        }
         return;
       }
       list.slice(0, 12).forEach(function (op) {

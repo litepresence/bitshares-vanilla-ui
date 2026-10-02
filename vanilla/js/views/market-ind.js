@@ -133,6 +133,25 @@ var MarketInd = (function () {
     return b + "s";
   }
 
+  /* reconcileBuckets: live bucket list -> picker order (pure, unit-tested).
+   * Preferred shortlist first (trader-familiar order), then any live extras
+   * the node offers beyond PREF (60s, weekly 604800 — dropped before, never
+   * again) appended ascending. Params: live (array-ish of seconds).
+   * Returns a fresh array (possibly empty — caller falls back to raw live).
+   * Never throws; non-numeric entries ignored. */
+  function reconcileBuckets(live) {
+    try {
+      var nums = (Array.isArray(live) ? live : []).filter(function (b) {
+        return typeof b === "number" && isFinite(b) && b > 0;
+      });
+      var out = PREF_BUCKETS.filter(function (x) { return nums.indexOf(x) !== -1; });
+      nums.sort(function (a, b) { return a - b; }).forEach(function (x) {
+        if (out.indexOf(x) === -1) out.push(x);
+      });
+      return out;
+    } catch (e) { return []; }
+  }
+
   /* Read a theme token for chart frames (theme-aware: callers pass these into
    * MarketCharts; never hardcode theme colors here). Headless -> fallback. */
   function readVar(name, fallback) {
@@ -1276,6 +1295,8 @@ var MarketInd = (function () {
      * checkbox wiring must match drawCharts pane order — single source). */
     PREF_BUCKETS: PREF_BUCKETS,
     CANDLE_COUNT: CANDLE_COUNT,
+    reconcileBuckets: reconcileBuckets,
+    bucketLabel: bucketLabel,
     _test: { validCount: validCount },
     OSC_ORDER: OSC_ORDER,
     OVERLAY_DEFS: OVERLAY_DEFS,

@@ -65,6 +65,17 @@ eq(M.validCount(""), null, "empty rejected");
 eq(M.validCount(null), null, "null rejected");
 eq(M.validCount(2.5), 2, "parseInt truncation (matches input behavior)");
 
+/* reconcileBuckets — preferred shortlist first, live extras appended (A3:
+ * sweep proved nodes differ: 60s + weekly 604800 must survive, never drop). */
+eqDeep(MarketInd.reconcileBuckets([60, 300, 900, 1800, 3600, 14400, 86400, 604800]),
+  [300, 900, 1800, 3600, 14400, 86400, 60, 604800], "full weekly list: PREF order, extras appended");
+eqDeep(MarketInd.reconcileBuckets([60, 300, 900, 1800, 3600, 14400, 86400]),
+  [300, 900, 1800, 3600, 14400, 86400, 60], "testnet-shaped list keeps 60s");
+eqDeep(MarketInd.reconcileBuckets([900, 3600]), [900, 3600], "sparse subset passes through");
+eqDeep(MarketInd.reconcileBuckets([]), [], "empty stays empty (caller falls back to raw live)");
+eqDeep(MarketInd.reconcileBuckets(null), [], "null never throws");
+eqDeep(MarketInd.reconcileBuckets(["x", -5, 300]), [300], "garbage entries ignored");
+
 /* mergeWindows — tip-sized fresh into painted window (fresh wins, cap kept). */
 (function () {
   function bar(ms, close) { return { timeMs: ms, close: close }; }

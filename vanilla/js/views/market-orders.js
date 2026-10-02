@@ -79,10 +79,16 @@ var MarketOrders = (function () {
     return network() === "testnet" ? "USD_TEST" : "BTS_CNY";
   }
 
-  /* Inline error panel (aria-live); chain error shapes map to sentences. */
+  /* Inline error panel (aria-live); chain error shapes map to sentences.
+   * History fallback keeps its byte-identical message key and gains a linked
+   * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
     var err = el(doc, "div", null, "error");
     err.setAttribute("aria-live", "polite");
+    var raw = (e && typeof e.message === "string" && e.message)
+      ? e.message
+      : String(e || fallback || "");
+    var isHist = raw.indexOf("history-unavailable") !== -1;
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
@@ -101,6 +107,14 @@ var MarketOrders = (function () {
     }
     err.textContent = msg;
     wrap.appendChild(err);
+    if (isHist) {
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          var link = HistoryNotice.actionLink(doc, t, "settings");
+          if (link) wrap.appendChild(link);
+        }
+      } catch (e2) { /* error panel stands without the link */ }
+    }
     return err;
   }
 

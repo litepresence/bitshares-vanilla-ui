@@ -72,15 +72,28 @@ var DashboardUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
   }
 
-  /* Inline error panel, never blank: any thrown value maps to a sentence. */
+  /* Inline error panel, never blank: any thrown value maps to a sentence.
+   * History fallback keeps its byte-identical message key and gains a linked
+   * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
+    var raw = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "");
+    var isHist = raw.indexOf("history-unavailable") !== -1;
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
     else if (msg.indexOf("history-unavailable") !== -1) msg = t("account.err_history", "History unavailable on this node.");
     else if (msg.indexOf("bad-asset-shape") !== -1) msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("transfer.unknown_account", "Unknown account.");
     var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    err.setAttribute("aria-live", "polite"); wrap.appendChild(err);
+    if (isHist) {
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          var link = HistoryNotice.actionLink(doc, t, "settings");
+          if (link) wrap.appendChild(link);
+        }
+      } catch (e2) { /* error panel stands without the link */ }
+    }
+    return err;
   }
 
   /* Internal link paragraph (href + text pairs, tap-sized links). */

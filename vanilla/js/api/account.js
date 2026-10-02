@@ -237,6 +237,115 @@ var Account = (function () {
     return { pages: pages, rows: flat, truncated: truncated };
   }
 
+  /* Node cap for get_account_history_operations (reference #4 ground truth:
+   * api.hpp:146-152 limit param; default cap application.hpp:49
+   * api_limit_get_account_history_operations = 100). */
+  var OPS_LIMIT_MAX = 100, OPS_LIMIT_DEFAULT = 20;
+
+  /* Build the WS params for get_account_history_operations, one arg array per
+   * op type (pure: no network, no globals — the unit-test seam).
+   * Verified signature (all three sources agree, 2026-10-02):
+   *   #4 api.hpp:146-152 [account_name_or_id, operation_type:int64,
+   *     start:1.11.x, stop:1.11.x, limit] (start BEFORE stop — the reverse of
+   *     get_account_history's [account, stop, limit, start], api.hpp:89-94);
+   *   astro-ui DexLiveOrderBook.ts:92-98 + MarketTradeHistory.ts:142-148
+   *     [accountId, 4, "1.11.0", "1.11.0", 50] (single int type);
+   *   live sweep tooling/history-probe.mjs:385 ["1.2.0", 0, "1.11.0",
+   *     "1.11.0", 1] → ok on all 9 nodes.
+   * The sibling get_account_history_by_operations (api.hpp:128-133) takes a
+   * flat_set of types in ONE call, but the live sweep never probed it, so the
+   * verified singular method + one call per type wins (live beats header).
+   * Params: accountId non-empty string (name or 1.2.N — the method accepts
+   *   both); opTypes non-empty array of safe ints (0 = transfer,
+   *   1 = limit_order_create, 4 = fill_order, ...); limit per-type max rows
+   *   (default 20, floored, clamped 1-100 to the node cap); start most-recent
+   *   cursor "1.11.N" (default FIRST_HISTORY_OP = genesis page); stop stays
+   *   FIRST_HISTORY_OP (earliest — mirrors history()).
+   * Returns: array of [accountId, opType, start, stop, limit] arrays, one per
+   *   op type in input order.
+   * Fails: Error("bad-args") on any malformed input (never partial output).
+   *   "bad-args" is a code prefix for callers to map — never displayed raw. */
+  function _opsArgs(accountId, opTypes, limit, start) {
+    if (typeof accountId !== "string" || !accountId) throw new Error("bad-args");
+    if (!Array.isArray(opTypes) || opTypes.length === 0) throw new Error("bad-args");
+    var i;
+    for (i = 0; i < opTypes.length; i++) {
+      if (!Number.isSafeInteger(opTypes[i])) throw new Error("bad-args");
+    }
+    var lim = (limit === undefined || limit === null) ? OPS_LIMIT_DEFAULT : limit;
+    if (typeof lim !== "number" || !isFinite(lim)) throw new Error("bad-args");
+    lim = Math.floor(lim);
+    if (lim < 1) lim = 1;
+    if (lim > OPS_LIMIT_MAX) lim = OPS_LIMIT_MAX;
+    var st = (start === undefined || start === null) ? FIRST_HISTORY_OP : start;
+    if (typeof st !== "string" || !HIST_ID_RE.test(st)) throw new Error("bad-args");
+    var out = [];
+    for (i = 0; i < opTypes.length; i++) {
+      out.push([accountId, opTypes[i], st, FIRST_HISTORY_OP, lim]);
+    }
+    return out;
+  }
+
+  /* Numeric 1.11.N sequence of a filtered-ops row for the newest-first merge
+   * (same unwrap/id helpers as historyPaged: objects carry .id, pair-shaped
+   * rows tolerated). Returns the sequence int, or -1 when the row carries no
+   * recognizable id (sorts last — never drops data). */
+  function _opsSeq(r) {
+    var id = _histRowId(r, _unwrapHist(r));
+    if (!id) return -1;
+    var n = parseInt(id.slice(5), 10);
+    return Number.isSafeInteger(n) ? n : -1;
+  }
+
+  /* Fetch account history filtered by operation type (transfer-only lists,
+   * fill-only trade views — the astro-ui DexLiveOrderBook.ts:92-98 use).
+   * One get_account_history_operations call per op type (the method takes a
+   * SINGLE int64 type, api.hpp:146-152), merged newest-first by 1.11.N id.
+   * Single round only, no multi-page walk: K type-streams would need K
+   * parallel start-cursors plus a merge — unbounded cost for a filter view;
+   * callers needing depth use historyPaged(). Per-type limit = the clamped
+   * limit (node cap 100), so multi-type results hold up to K*limit rows.
+   * Params: accountId non-empty string; opTypes non-empty array of safe
+   *   ints; limit per-type max (default 20, clamped 1-100 — see _opsArgs).
+   * Returns: Promise of the raw row array, newest first — same envelope as
+   *   history() (operation_history_objects; rows without a parseable 1.11 id
+   *   sort last, preserved).
+   * Fails: Error("bad-args") on malformed args (pre-network, from _opsArgs);
+   *   Error("history-unavailable") when the history api is missing, any call
+   *   rejects, or any per-type result is a non-array shape — the SAME catch
+   *   mapping as history() (nullish per-type results count as [], mirroring
+   *   _historyPage's `rows || []`). Codes are caller-mapped, never displayed. */
+  async function opsFiltered(accountId, opTypes, limit) {
+    var argSets = _opsArgs(accountId, opTypes, limit);
+    var histId;
+    try {
+      histId = await _histId();
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    var results;
+    try {
+      results = await Promise.all(argSets.map(function (a) {
+        return Chain.call(histId, "get_account_history_operations", a);
+      }));
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    var merged = [], i, k;
+    for (i = 0; i < results.length; i++) {
+      var rows = results[i];
+      if (rows === null || rows === undefined) continue;
+      if (!Array.isArray(rows)) throw new Error("history-unavailable");
+      for (k = 0; k < rows.length; k++) merged.push(rows[k]);
+    }
+    var decorated = merged.map(function (r, idx) { return { r: r, i: idx, s: _opsSeq(r) }; });
+    decorated.sort(function (a, b) {
+      if (a.s !== b.s) return b.s - a.s;
+      return a.i - b.i;
+    });
+    return decorated.map(function (d) { return d.r; });
+  }
+
   /* One signed raw-integer leg into the per-asset accumulator.
    * Params: acc {assetId: {total: bigint, per: {seriesIdx: bigint}}},
    * assetId string, raw digit string, sign +1n|-1n, seriesIdx chronological
@@ -465,6 +574,8 @@ var Account = (function () {
     balances: balances,
     history: history,
     historyPaged: historyPaged,
+    opsFiltered: opsFiltered,
+    _opsArgs: _opsArgs,
     replayEquity: replayEquity,
     equity: equity,
     openOrders: openOrders,

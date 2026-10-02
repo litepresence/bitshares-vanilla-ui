@@ -138,10 +138,16 @@ var MarketDesk = (function () {
     } catch (e) { /* private mode: desk still works, just not remembered */ }
   }
 
-  /* Inline error panel (aria-live); chain error shapes map to sentences. */
+  /* Inline error panel (aria-live); chain error shapes map to sentences.
+   * History fallback keeps its byte-identical message key and gains a linked
+   * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
     var err = el(doc, "div", null, "error");
     err.setAttribute("aria-live", "polite");
+    var raw = (e && typeof e.message === "string" && e.message)
+      ? e.message
+      : String(e || fallback || "");
+    var isHist = raw.indexOf("history-unavailable") !== -1;
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
@@ -160,6 +166,14 @@ var MarketDesk = (function () {
     }
     err.textContent = msg;
     wrap.appendChild(err);
+    if (isHist) {
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          var link = HistoryNotice.actionLink(doc, t, "settings");
+          if (link) wrap.appendChild(link);
+        }
+      } catch (e2) { /* error panel stands without the link */ }
+    }
     return err;
   }
 
@@ -1336,12 +1350,15 @@ var MarketDesk = (function () {
       done();
     });
 
-    /* Timeframe radios (once per desk): intersect the preferred buckets with
-     * the live list; reconcile the default 3600 when the node lacks it. */
+    /* Timeframe radios (once per desk): preferred shortlist first, then any
+     * live extras the node offers (60s, weekly — reconcileBuckets, never a
+     * silent drop); reconcile the default 3600 when the node lacks it. */
     if (!state.tfInit) {
       state.tfInit = true;
       Market.timeframes().then(function (live) {
-        var avail = MarketInd.PREF_BUCKETS.filter(function (x) { return live.indexOf(x) !== -1; });
+        var avail = (typeof MarketInd.reconcileBuckets === "function")
+          ? MarketInd.reconcileBuckets(live)
+          : MarketInd.PREF_BUCKETS.filter(function (x) { return live.indexOf(x) !== -1; });
         if (avail.length === 0) avail = (live || []).slice();
         if (avail.indexOf(state.bucket) === -1 && avail.length > 0) {
           state.bucket = avail[0];
