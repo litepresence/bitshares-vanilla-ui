@@ -433,6 +433,34 @@ var PoolGraph = (function () {
       } catch (x) { return {}; }
     }
   }
+  /* Pair provenance vs BTS core (pure, unit-tested): direct = either leg
+   * paired straight with BTS (1 hop); indirect = shortest connecting path
+   * via pools (min hops of both legs); none = neither leg reaches BTS.
+   * Params: graph, assetA, assetB. Returns {level, hops} where level is
+   * "direct"|"indirect"|"none" and hops is the winning hop count
+   * (0 when a leg IS BTS, null when none). A leg that is BTS itself counts
+   * as direct. Never throws (bad graph -> none). */
+  function provenanceStatus(graph, assetA, assetB) {
+    try {
+      var best = null;
+      [assetA, assetB].forEach(function (id) {
+        if (!id) return;
+        if (id === CORE_ID) {
+          if (best === null || 0 < best) best = 0;
+          return;
+        }
+        var p = findCorePath(graph, id);
+        if (p && Array.isArray(p.hops) && p.hops.length >= 2) {
+          var hops = p.hops.length - 1;
+          if (best === null || hops < best) best = hops;
+        }
+      });
+      if (best === null) return { level: "none", hops: null };
+      if (best <= 1) return { level: "direct", hops: best };
+      return { level: "indirect", hops: best };
+    } catch (e) { return { level: "none", hops: null }; }
+  }
+
   /* _cssTok: theme token value or the fallback (headless-safe). */
   function _cssTok(name, fallback) {
     try {
@@ -502,7 +530,8 @@ var PoolGraph = (function () {
     if (!g) return null;
     var accent = _cssTok("--accent", "#007bff"), border = _cssTok("--border", "#2a2e39"),
       text = _cssTok("--text", "#c5cbce"), buy = _cssTok("--buy", "#26de81"),
-      muted = _cssTok("--muted", "#758696");
+      muted = _cssTok("--muted", "#758696"), warn = _cssTok("--warn", "#fbbc06"),
+      danger = _cssTok("--danger", "#f74745");
     var ctx = g.ctx, nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
     var assetA = opts.assetA, assetB = opts.assetB;
     var hi = {};
@@ -531,6 +560,35 @@ var PoolGraph = (function () {
     try { canvas._graphBase = base; } catch (e) {}
     try { canvas._graphRepaint = { doc: doc, graph: graph, opts: opts }; } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
+    /* Provenance banner (top line): pair-level BTS connectivity verdict with
+     * traffic-light color — green direct, yellow indirect (+hops), red none.
+     * Same verdict family as pool-detail's DOM provenance line (kept: canvas
+     * text is invisible to screen readers, the DOM line is the accessible
+     * twin). Halo + centered like node labels. */
+    try {
+      var prov = provenanceStatus(graph, assetA, assetB);
+      var pmsg = null, pcol = text;
+      if (prov.level === "direct") {
+        pmsg = t("pool.prov_direct", "Direct Provenance: this market has established pool connectivity to BTS");
+        pcol = buy;
+      } else if (prov.level === "indirect") {
+        pmsg = t("pool.prov_indirect", "Indirect Provenance: this market connects to BTS via pools in {n} hops").split("{n}").join(String(prov.hops));
+        pcol = warn;
+      } else {
+        pmsg = t("pool.prov_none", "Provenance Warning: this market lacks established pool connectivity to BTS");
+        pcol = danger;
+      }
+      if (pmsg) {
+        ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
+        try {
+          ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,0.85)";
+          ctx.strokeText(pmsg, g.w / 2, 14);
+        } catch (e) { /* halo best-effort */ }
+        ctx.fillStyle = pcol;
+        ctx.fillText(pmsg, g.w / 2, 14);
+        ctx.textAlign = "left";
+      }
+    } catch (e) { /* map stands without the banner */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
     edges.forEach(function (e) {
@@ -700,7 +758,8 @@ var PoolGraph = (function () {
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
-      nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight } };
+      nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
+      provenanceStatus: provenanceStatus } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.PoolGraph === "undefined") { globalThis.PoolGraph = PoolGraph; }

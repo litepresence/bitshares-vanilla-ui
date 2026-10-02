@@ -2890,7 +2890,10 @@
     "events_hint": " Deposits, withdrawals, and exchanges in this pool list here once they happen.",
     "create_stake_hint": ". Create one from the Pools desk (#/pools) Stake form.",
     "zero_supply_hint": " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first.",
-    "owned_hint": " Stake both legs in any pool above — owned pools list here."
+    "owned_hint": " Stake both legs in any pool above — owned pools list here.",
+    "prov_direct": "Direct Provenance: this market has established pool connectivity to BTS",
+    "prov_indirect": "Indirect Provenance: this market connects to BTS via pools in {n} hops",
+    "prov_none": "Provenance Warning: this market lacks established pool connectivity to BTS"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

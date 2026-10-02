@@ -200,6 +200,27 @@ function ok(cond, name) {
   ok(PG._test.edgeWeight("700000000000000000000") > PG._test.edgeWeight("5"), "bigger pool pulls harder");
   ok(PG._test.edgeWeight(null) > 0 && PG._test.edgeWeight("abc") > 0, "malformed size fails soft positive");
 })();
+// 5e. Pair provenance vs BTS core (banner verdicts).
+(function () {
+  const PS = PG._test.provenanceStatus;
+  assertR(typeof PS === "function", "provenanceStatus exported");
+  function assertR(cond, name) { ok(cond, name); }
+  const g = {
+    nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" },
+      { assetId: "1.3.2", sym: "B" }, { assetId: "1.3.9", sym: "X" }],
+    edges: [
+      { poolId: "1.19.1", a: "1.3.1", b: "1.3.0", sizeRaw: "10" },
+      { poolId: "1.19.2", a: "1.3.2", b: "1.3.9", sizeRaw: "10" },
+      { poolId: "1.19.3", a: "1.3.9", b: "1.3.0", sizeRaw: "10" }
+    ]
+  };
+  eq(PS(g, "1.3.1", "1.3.2"), { level: "direct", hops: 1 }, "either leg direct -> direct");
+  eq(PS(g, "1.3.2", "1.3.2"), { level: "indirect", hops: 2 }, "two-hop leg -> indirect 2");
+  eq(PS(g, "1.3.0", "1.3.2"), { level: "direct", hops: 0 }, "BTS leg itself -> direct 0");
+  eq(PS(g, "1.3.7", "1.3.8"), { level: "none", hops: null }, "orphan pair -> none");
+  eq(PS({ nodes: [], edges: [] }, "1.3.1", "1.3.2"), { level: "none", hops: null }, "empty graph -> none");
+  eq(PS(null, "1.3.1", "1.3.2"), { level: "none", hops: null }, "null graph fails soft");
+})();
 (async function () {
   let calls = 0;
   const poolsByAsset = {};

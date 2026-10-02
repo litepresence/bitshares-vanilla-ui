@@ -83,3 +83,15 @@ degenerate-input softness, weight ordering). Headless `#/pools/1.19.66`:
 organic spread, pair central with highlighted edge, labels readable, zero
 console errors. Tune next (only on owner call): repulsion/cooling/wall
 constants, spring weight curve.
+
+## Delta 2026-10-02 — provenance banner on the pool map (owner wording, polished)
+`provenanceStatus(graph, assetA, assetB)` (pure, `_test`-exported): direct if
+either leg pairs straight with BTS (or IS BTS — 0 hops), else shortest-path
+hops via `findCorePath`, else none. `drawGraph` paints one top line —
+green Direct / yellow Indirect (+hops, `{n}` interpolated locally since the
+`t()` fallback path cannot interpolate) / red Warning — using --buy/--warn/
+--danger tokens with the standard halo. Both pages inherit it (single wiring
+point); the DOM provenance line stays as the screen-reader twin (canvas text
+is invisible to assistive tech). Vectors +7 (direct/indirect/zero-hop/
+orphan/empty/null). Headless `#/pools/1.19.66`: green Direct banner correct
+(BTS leg), zero console errors.
