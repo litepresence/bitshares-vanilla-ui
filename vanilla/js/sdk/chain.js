@@ -1,6 +1,7 @@
 /* Chain: sole WebSocket owner for all node traffic (principle: one chain module).
  * Owns: the shared socket (ws/pending/nextId), status (lastStatus), api-id
- *   caches (_dbId/_historyId/_netId), connect/probe/call/disconnect/db/history/net,
+ *   caches (_dbId/_historyId/_netId) + the _historyOk flag (hasHistory() for
+ *   the active connection), connect/probe/call/disconnect/db/history/net,
  *   plus keepalive (block-push feed tracking the ~3s tip with zero extra RPC,
  *   20s heartbeat refreshing RTT latency as backup) and capped same-node
  *   auto-reconnect. Status fans out via Store.emitConnection (the footer is
@@ -77,7 +78,7 @@ var Chain = (function () {
    *   fresh ones) — a stale cache would address the new connection wrongly.
    *   The market-notice handler dies with it too (server-side subscriptions
    *   do not survive reconnect — the route resubscribes). */
-  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; _customId = null; marketCb = null; _dbPending = null; _historyPending = null; _netPending = null; _customPending = null; }
+  function resetApiIds() { _dbId = null; _historyId = null; _netId = null; _customId = null; _historyOk = false; marketCb = null; _dbPending = null; _historyPending = null; _netPending = null; _customPending = null; }
 
   /* blockNumberFromId: graphene block ids lead with the 4-byte big-endian
    * block number (astro-ui BlocksLive parity). Returns the number or null. */
@@ -246,10 +247,14 @@ var Chain = (function () {
    * (naive stamps read as UTC — same trap documented in explorer-blocks.js
    * parseChainTime; anything unparseable yields null age, never guessed).
    * participation via participationPct; irrevLag = head - last_irreversible
-   * (null unless both are safe ints). Never throws. */
-  function enrichProbe(chainId, props, latencyMs) {
+   * (null unless both are safe ints). hasHistory answers "does this node
+   * serve the history api" (probe's fail-soft history check via extra;
+   * extra is optional — omitted means unknown, reported false, so old
+   * 3-arg callers keep working). Never throws. */
+  function enrichProbe(chainId, props, latencyMs, extra) {
     var out = { chainId: chainId || null, latencyMs: latencyMs,
-      headBlock: null, headAgeS: null, participation: null, irrevLag: null };
+      headBlock: null, headAgeS: null, participation: null, irrevLag: null,
+      hasHistory: !!(extra && extra.hasHistory === true) };
     try {
       if (!props || typeof props !== "object") return out;
       if (Number.isSafeInteger(props.head_block_number) && props.head_block_number > 0) {
@@ -274,12 +279,13 @@ var Chain = (function () {
   /* Probe: latency + chain ID + health signals on a throwaway socket. Never
      touches the shared connection, emits no status — safe to run for every
      node in a list. Resolves enrichProbe() results (chainId, latencyMs,
-     headBlock, headAgeS, participation, irrevLag). */
+     headBlock, headAgeS, participation, irrevLag, hasHistory). */
   function probe(url, timeoutMs) {
     timeoutMs = timeoutMs || 6000;
     var t0 = Date.now();
     return new Promise(function (resolve, reject) {
       var sock, ids = 1, waiting = {}, done = false, guard;
+      var pendingR = null, softMode = false;
       function fail(e) { if (done) return; done = true; clearTimeout(guard); try { sock.close(); } catch (err) {} reject(e); }
       /* send: one JSON-RPC "call" on the probe's throwaway socket (mirrors
        *   call() but uses the probe-local id map). Params: apiId, method,
@@ -295,6 +301,29 @@ var Chain = (function () {
       }
       try { sock = new WebSocket(url); } catch (e) { reject(e); return; }
       guard = setTimeout(function () { fail(new Error("probe connect timeout")); }, timeoutMs);
+      /* softHistory: fail-soft "history" api-id check on the probe socket
+       * (Phase-1 history tracking). Unlike send(), NEVER fails the probe:
+       * any error/timeout/close resolves false (node reachable but
+       * history-less — the 2026-10-02 sweep proved most nodes answer, so
+       * absence is data, not noise). Resolves true only on a numeric api
+       * id. Own sub-budget (half the probe timeout, min 1.5s) so a hung
+       * history plugin can't eat the whole probe window; rides the shared
+       * waiting map with soft:true so onmessage routes it around fail(). */
+      function softHistory() {
+        return new Promise(function (res) {
+          var settled = false, id = ids++;
+          function fin(v) {
+            if (settled) return; settled = true;
+            try { clearTimeout(timer); } catch (e) { /* timer gone */ }
+            delete waiting[id];
+            res(v);
+          }
+          var timer = setTimeout(function () { fin(false); }, Math.max(1500, Math.floor(timeoutMs / 2)));
+          waiting[id] = {soft: true, resolve: function (v) { fin(typeof v === "number"); }, reject: function () { fin(false); }, timer: timer};
+          try { sock.send(JSON.stringify({id: id, method: "call", params: [1, "history", []]})); }
+          catch (e) { fin(false); }
+        });
+      }
       sock.onopen = function () {
         send(1, "login", ["", ""]).then(function () { return send(1, "database", []); }).then(function (dbId) {
           return send(dbId, "get_chain_id", []).then(function (chainId) {
@@ -308,10 +337,13 @@ var Chain = (function () {
             }, function () { return { chainId: chainId, props: null }; });
           });
         }).then(function (r) {
-          if (done) return; done = true; clearTimeout(guard);
-          var latencyMs = Date.now() - t0;
-          try { sock.close(); } catch (e) {}
-          resolve(enrichProbe(r.chainId, r.props, latencyMs));
+          pendingR = r; softMode = true;
+          return softHistory().then(function (h) {
+            if (done) return; done = true; clearTimeout(guard);
+            var latencyMs = Date.now() - t0;
+            try { sock.close(); } catch (e) {}
+            resolve(enrichProbe(r.chainId, r.props, latencyMs, {hasHistory: h}));
+          });
         }).catch(fail);
       };
       sock.onmessage = function (ev) {
@@ -325,10 +357,23 @@ var Chain = (function () {
         var msg; try { msg = JSON.parse(ev.data); } catch (e) { return; }
         if (msg.id !== undefined && waiting[msg.id]) {
           var p = waiting[msg.id]; delete waiting[msg.id]; clearTimeout(p.timer);
-          if (msg.error) fail(new Error(JSON.stringify(msg.error))); else p.resolve(msg.result);
+          if (p.soft) { try { p.resolve(msg.error ? null : msg.result); } catch (e) { /* soft resolve never throws */ } }
+          else if (msg.error) fail(new Error(JSON.stringify(msg.error))); else p.resolve(msg.result);
         }
       };
-      sock.onclose = function () { if (!done) fail(new Error("probe socket closed")); };
+      sock.onclose = function () {
+        if (done) return;
+        /* Close during the soft history phase still means UP (chain-id +
+         * props already answered) — resolve history-less instead of failing
+         * a reachable node. pendingR is set before softMode flips, so a
+         * close here always has props to shape. */
+        if (softMode && pendingR) {
+          done = true; clearTimeout(guard);
+          resolve(enrichProbe(pendingR.chainId, pendingR.props, Date.now() - t0, {hasHistory: false}));
+          return;
+        }
+        fail(new Error("probe socket closed"));
+      };
       sock.onerror = function () { /* onclose carries the failure */ };
     });
   }
@@ -464,18 +509,26 @@ var Chain = (function () {
     }, function (e) { _dbPending = null; throw e; });
     return _dbPending;
   }
-  var _historyId = null, _historyPending = null;
+  var _historyId = null, _historyPending = null, _historyOk = false;
   /* history: cached "history" api id (mirrors db(), same in-flight dedupe).
    * Params: none. Returns a Promise for the numeric api id. Fails: rejects
-   *   when not connected or on call timeout (via call()). */
+   *   when not connected or on call timeout (via call()). Side effect:
+   *   records _historyOk (read via hasHistory()) — true once an id resolves
+   *   on this connection, false on any failure; resetApiIds clears it with
+   *   the socket. */
   function history() {
     if (_historyId !== null) return Promise.resolve(_historyId);
     if (_historyPending) return _historyPending;
     _historyPending = call(1, "history", []).then(function (id) {
-      _historyId = id; _historyPending = null; return id;
-    }, function (e) { _historyPending = null; throw e; });
+      _historyId = id; _historyOk = true; _historyPending = null; return id;
+    }, function (e) { _historyOk = false; _historyPending = null; throw e; });
     return _historyPending;
   }
+  /* hasHistory: does the ACTIVE connection serve the history api. Params:
+   *   none. Returns boolean (false when disconnected, never resolved, or
+   *   the node answered -32601). Sync on purpose — views gate history calls
+   *   without awaiting. Never throws. */
+  function hasHistory() { return _historyOk === true; }
   /* Network-broadcast api id (mirrors db(), same in-flight dedupe): cached
    * after first login. Added for slice-04-transfer Task 2; used by
    * Tx.broadcast. */
@@ -532,6 +585,6 @@ var Chain = (function () {
     } catch (e) { /* best-effort only */ }
     return Promise.resolve();
   }
-  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, net: net, custom: custom, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, participationPct: participationPct, classifyHealth: classifyHealth, enrichProbe: enrichProbe, status: function () { return lastStatus; }};
+  return {connect: connect, probe: probe, call: call, disconnect: disconnect, db: db, history: history, hasHistory: hasHistory, net: net, custom: custom, subscribeMarket: subscribeMarket, unsubscribeMarket: unsubscribeMarket, participationPct: participationPct, classifyHealth: classifyHealth, enrichProbe: enrichProbe, status: function () { return lastStatus; }};
 })();
 if (typeof module !== "undefined") { module.exports = Chain; }

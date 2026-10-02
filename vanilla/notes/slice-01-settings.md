@@ -411,3 +411,33 @@ Ping All (renamed, es "Probar todos" preserved), Add node (new key — the
 shared Add stays for HTLC/discovery rows), Find nodes, one flex line ≥720px
 stacked below. Headless `#/settings` @1440: all three controls inline,
 username + footer link live, zero console errors.
+
+## Delta 2026-10-02 — Phase 1 history capability layer (probe flag + pref + gates)
+Chain now knows which nodes serve history. (1) `Chain.probe()` issues a
+fail-soft `call(1,"history",[])` on the throwaway socket after props
+(`sdk/chain.js` softHistory: own sub-budget, soft:true routing around
+fail(), close-mid-soft resolves history-less instead of failing a reachable
+node); `enrichProbe()` gains optional 4th `extra` (`hasHistory`, default
+false — old 3-arg callers untouched). (2) `Chain.hasHistory()` memoizes the
+active connection (`_historyOk`, cleared with the socket in resetApiIds).
+(3) `Store` envelope gains 6th key `esEnabled` (default ON per owner ruling;
+pre-Phase-1 envelopes upgrade open — only explicit false opts out).
+(4) New `api/history-cap.js`: canonical ES_BASE (help-listed
+`https://es.bitshares.dev`; kibana host UI-only, never fetched), ES_INDEXES
+allowlist, dated HIST_SNAPSHOT from
+`tooling/history-capabilities-2026-10-02.json` (9/9 true) + live `update()`
+wins, `nodeHistory/historyHere/esAllowed/esLastOk/esAvailable` predicates,
+and `esSearch` — the only raw-ES fetch seam (disabled/bad-index/unavailable
+error contract, outcomes recorded). NOTE: market-fills-history.js +
+pool-history.js keep their own ES_URL+fetch until Phase 4 migrates them; no
+new direct ES fetches meanwhile. Zero user-facing strings (no locale churn —
+check_i18n green unchanged). Tests: `tooling/history-cap-test.js` 30/30
+(gating asserts inline — fetch fires synchronously, so bypass would show in
+the counter; record-cache legs sequenced, never raced) + 5 new
+node-health vectors (backward compat + true/false/empty-extra). Gates:
+check_types PASS, check_rot PASS (no new transport yet — esSearch unfired
+until Phase 4; §4.5(b) exception lands with first fired call, not before).
+Anti-rot: (a) platform only (WS/fetch/localStorage); (b) nothing new depended
+on (snapshot is data, refresh is probe); (c) deletable: history-cap (callers
+fall back to Chain.history fail-soft), esEnabled key (reads as ON), probe
+flag (pill reads snapshot) — kept because every later phase reads them.

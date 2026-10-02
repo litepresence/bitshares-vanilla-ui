@@ -97,7 +97,8 @@ var Store = (function () {
     api.backend = b;
   }
 
-  /* baseSettings: fresh defaults (mainnet + first node + ref-ui-theme + en).
+  /* baseSettings: fresh defaults (mainnet + first node + ref-ui-theme + en +
+   *   ElasticSearch ON per owner ruling — community history is a main feature).
    *   Params: none. Returns a new settings object. Fails: never (pure). */
   function baseSettings() {
     return {
@@ -105,7 +106,8 @@ var Store = (function () {
       activeNode: DEFAULT_NODES.mainnet[0],
       customNodes: [],
       theme: "ref-ui-theme",
-      locale: "en"
+      locale: "en",
+      esEnabled: true
     };
   }
 
@@ -147,13 +149,18 @@ var Store = (function () {
     var fallbackNode = network === "testnet" ? DEFAULT_NODES.testnet[0] : DEFAULT_NODES.mainnet[0];
     var activeNode = (typeof stored.activeNode === "string" && stored.activeNode) ? stored.activeNode : fallbackNode;
     var locale = (typeof stored.locale === "string" && stored.locale) ? stored.locale : base.locale;
-    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale };
+    /* esEnabled: pre-Phase-1 envelopes lack the key — default ON (owner ruling
+     * 2026-10-02: community ES is a main feature). Only an explicit false
+     * opts out, so old wallets gain history illumination, never lose it. */
+    var esEnabled = (stored.esEnabled === false) ? false : true;
+    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale, esEnabled: esEnabled };
   }
 
   /* saveSettings: merges a patch onto current settings, persists + emits.
-   *   Params: patch (object, optional — only known string/array fields apply).
-   *   Returns the merged settings object. Fails: never throws — blocked/full
-   *   storage still emits the in-memory value. */
+   *   Params: patch (object, optional — only known fields apply: strings,
+   *   string arrays, and the esEnabled boolean). Returns the merged settings
+   *   object. Fails: never throws — blocked/full storage still emits the
+   *   in-memory value. */
   function saveSettings(patch) {
     var current = loadSettings();
     var next = {
@@ -161,7 +168,8 @@ var Store = (function () {
       activeNode: current.activeNode,
       customNodes: current.customNodes,
       theme: current.theme,
-      locale: current.locale
+      locale: current.locale,
+      esEnabled: current.esEnabled
     };
     if (patch && typeof patch === "object") {
       if (typeof patch.network === "string") next.network = patch.network;
@@ -169,6 +177,7 @@ var Store = (function () {
       if (Array.isArray(patch.customNodes)) next.customNodes = patch.customNodes;
       if (typeof patch.theme === "string") next.theme = patch.theme;
       if (typeof patch.locale === "string") next.locale = patch.locale;
+      if (typeof patch.esEnabled === "boolean") next.esEnabled = patch.esEnabled;
     }
     try {
       _store().set(SETTINGS_KEY, JSON.stringify(next));

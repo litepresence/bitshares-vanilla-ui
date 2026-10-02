@@ -57,6 +57,16 @@ eq(e2.participation, 100, "part parsed");
 eq(e2.irrevLag, 5, "lag = head - irreversible");
 eq(typeof e2.headAgeS === "number" && e2.headAgeS >= 0, true, "age non-negative number");
 
+/* enrichProbe hasHistory (Phase 1): optional 4th param, old 3-arg shape false. */
+eq(e.hasHistory, false, "omitted extra -> hasHistory false (backward compat)");
+eq(e2.hasHistory, false, "omitted extra -> false on full props too");
+var e3 = Chain.enrichProbe("abc", null, 10, {hasHistory: true});
+eq(e3.hasHistory, true, "extra.hasHistory true passes");
+var e4 = Chain.enrichProbe("abc", null, 10, {hasHistory: false});
+eq(e4.hasHistory, false, "extra.hasHistory false passes");
+var e5 = Chain.enrichProbe("abc", null, 10, {});
+eq(e5.hasHistory, false, "empty extra -> false, never guessed");
+
 /* SettingsNodes history — in-memory localStorage stub. */
 var store = {};
 global.localStorage = {
