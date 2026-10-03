@@ -32,6 +32,8 @@ declare var CreditUI: any;
 declare var Crypto: any;
 declare var DashboardUI: any;
 declare var DebitUI: any;
+declare var EsLab: any;
+declare var EsLabUI: any;
 declare var Explorer: any;
 declare var ExplorerAssets: any;
 declare var ExplorerBlocks: any;

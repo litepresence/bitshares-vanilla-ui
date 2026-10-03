@@ -252,6 +252,7 @@ var Router = (function () {
     { path: "/ops", title: "Top Operations", render: function (root) { OpsUI.renderOps(root); } },
     { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
     { path: "/api-lab", title: "API Lab", render: function (root) { ApiLabUI.renderLab(root); } },
+    { path: "/es-lab", title: "ES Lab", render: function (root) { EsLabUI.renderLab(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 

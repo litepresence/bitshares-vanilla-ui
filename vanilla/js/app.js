@@ -58,7 +58,7 @@ var App = (function () {
       "#/credit-offer", "#/direct-debit", "#/spotlight", "#/tickets", "#/airdrop",
       "#/htlc", "#/prediction"] },
     { heading: "Explore", hrefs: ["#/explorer", "#/assets", "#/assets/create",
-      "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/top-ops", "#/news"] },
+      "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/top-ops", "#/api-lab", "#/es-lab", "#/news"] },
     { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/trollbox", "#/help"] }
   ];
 
@@ -173,6 +173,8 @@ var App = (function () {
       case "#/assets/feed": return t("assets_feed.title", "Publish Feed");
       case "#/fees": return t("fees.network_fees", "Network fees");
       case "#/ops": return "Top Operations";
+      case "#/api-lab": return "API Lab";
+      case "#/es-lab": return t("eslab.title", "ES Lab");
       case "#/top-ops": return t("topops.title", "Top Operations");
       case "#/news": return t("news.news", "News");
       case "#/settings": return t("nav.settings", "Settings");
