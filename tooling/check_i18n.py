@@ -43,6 +43,17 @@ T_CALL_RE = re.compile(
 )
 
 
+def js_unescape(s):
+    """Decode a JS double-quoted literal to its runtime value (\\n, \\t,
+    \\uXXXX, \\" — the old two-replace chain missed \\n, which hid the
+    literal-\\n vs real-newline drift class, see misc.invoice_lines_placeholder).
+    Falls back to the legacy replaces for JS-only escapes like \\'."""
+    try:
+        return json.loads('"' + s + '"')
+    except ValueError:
+        return s.replace('\\"', '"').replace("\\\\", "\\")
+
+
 def flatten(d, prefix=""):
     out = {}
     for k, v in d.items():
@@ -132,8 +143,8 @@ def main():
             continue
         for m in T_CALL_RE.finditer(src):
             calls += 1
-            key = m.group("key").replace('\\"', '"').replace("\\\\", "\\")
-            dflt = m.group("dflt").replace('\\"', '"').replace("\\\\", "\\")
+            key = js_unescape(m.group("key"))
+            dflt = js_unescape(m.group("dflt"))
             if key not in en_flat:
                 problems.append("%s: t() key %r not in en.json" % (os.path.basename(path), key))
             elif dflt != en_flat[key]:

@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "Yetki satırı ekle (desteklenmiyor)",
     "one_key_auth_row_is_supported_here_key_ab": "Burada tek anahtar-yetki satırı desteklenir (yukarıdaki anahtar + eşik). Bu formda çoklu anahtar, hesap veya adres satırları oluşturulmaz.",
     "only_one_key_auth_row_is_supported_extra_": "Yalnızca tek anahtar-yetki satırı desteklenir — ek yetki satırları yeni serileştiriciler gerektirir.",
-    "invoice_lines_placeholder": "kahve|1.5\\nkek|2"
+    "invoice_lines_placeholder": "kahve|1.5\nkek|2"
   },
   "notify": {
     "title": "Fiyat Uyarıları",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "Biletler oy ağırlığı için fon kilitler. Silme işlemi yoktur, her bilet satırı kalıcıdır.",
     "unchanged": "değişmeden",
     "viewing_as": "committee-account (1.2.0) olarak görüntüleniyor — kendiniz olarak işlem için kilidi açın.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "Hesap",
@@ -6459,7 +6459,7 @@
     "dialog_hint": "Herkese açık veri — kilit açmaya gerek yok. Herhangi bir hesap adı veya 1.2.N kimliği yazın.",
     "dialog_label": "Hesap adı ",
     "dialog_open": "Bu hesap olarak görüntüle",
-    "dialog_placeholder": "account-name",
+    "dialog_placeholder": "hesap-adı",
     "dialog_reset": "committee-account sıfırla",
     "dialog_title": "Hesap olarak görüntüle",
     "header_default": "committee-account olarak görüntüleniyor (kilitli)",

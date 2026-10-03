@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "Add auth row (unsupported)",
     "one_key_auth_row_is_supported_here_key_ab": "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form.",
     "only_one_key_auth_row_is_supported_extra_": "Only one key-auth row is supported — extra authority rows need new serializers.",
-    "invoice_lines_placeholder": "coffee|1.5\\ncake|2"
+    "invoice_lines_placeholder": "coffee|1.5\ncake|2"
   },
   "notify": {
     "title": "Price Alerts",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "Tickets lock funds for vote weight. There is no delete operation, so every ticket row is permanent.",
     "unchanged": "unchanged",
     "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "Account",

@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "認証行を追加（未対応）",
     "one_key_auth_row_is_supported_here_key_ab": "ここではキー認証行を1行のみ対応しています（上記のキー + しきい値）。複数のキー行、アカウント行、アドレス行はこのフォームでは構築できません。",
     "only_one_key_auth_row_is_supported_extra_": "キー認証行は1行のみ対応しています — 追加の権限行には新しいシリアライザが必要です。",
-    "invoice_lines_placeholder": "コーヒー|1.5\\nケーキ|2"
+    "invoice_lines_placeholder": "コーヒー|1.5\nケーキ|2"
   },
   "notify": {
     "title": "価格アラート",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "チケットは投票ウェイトのために資金をロックします。削除操作がないため、すべてのチケット行は永久的です。",
     "unchanged": "変更なし",
     "viewing_as": "committee-account（1.2.0）として閲覧中 — ご自身として操作するにはアンロックしてください。",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "アカウント",

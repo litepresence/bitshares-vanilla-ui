@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "Ajouter une ligne d’autorisation (non pris en charge)",
     "one_key_auth_row_is_supported_here_key_ab": "Une seule ligne d’autorisation par clé est prise en charge ici (clé ci-dessus + seuil). Les lignes multiples par clé, compte ou adresse ne sont pas construites dans ce formulaire.",
     "only_one_key_auth_row_is_supported_extra_": "Une seule ligne d’autorisation par clé est prise en charge — les lignes d’autorité supplémentaires exigent de nouveaux sérialiseurs.",
-    "invoice_lines_placeholder": "café|1.5\\ngâteau|2"
+    "invoice_lines_placeholder": "café|1.5\ngâteau|2"
   },
   "notify": {
     "title": "Alertes de prix",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "Les tickets verrouillent des fonds pour le poids de vote. Il n'existe aucune opération de suppression, donc chaque ligne de ticket est permanente.",
     "unchanged": "inchangé",
     "viewing_as": "Affichage en tant que committee-account (1.2.0) — déverrouillez pour agir vous-même.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "Compte",

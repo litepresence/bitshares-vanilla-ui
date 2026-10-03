@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "添加授权行（不受支持）",
     "one_key_auth_row_is_supported_here_key_ab": "此处仅支持一行密钥授权（上方密钥 + 阈值）。此表单不支持多个密钥、账户或地址行。",
     "only_one_key_auth_row_is_supported_extra_": "仅支持一行密钥授权 — 额外的权限行需要新的序列化器。",
-    "invoice_lines_placeholder": "咖啡|1.5\\n蛋糕|2"
+    "invoice_lines_placeholder": "咖啡|1.5\n蛋糕|2"
   },
   "notify": {
     "title": "价格提醒",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "票据将资金锁定为投票权重。不存在删除操作，因此每条票据记录都是永久的。",
     "unchanged": "未更改",
     "viewing_as": "当前查看身份为 committee-account（1.2.0） — 请解锁以使用您自己的身份操作。",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "账户",
@@ -6456,18 +6456,18 @@
     "top_voters_note": "按投票权排名的前 10 位投票者（get_top_voters——抽样，非完整代理普查）："
   },
   "viewing": {
-    "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
-    "dialog_label": "Account name ",
-    "dialog_open": "View as this account",
+    "dialog_hint": "公开数据——无需解锁。请输入任意账户名或 1.2.N id。",
+    "dialog_label": "账户名 ",
+    "dialog_open": "以此账户身份查看",
     "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
-    "dialog_title": "View as account",
-    "header_default": "Viewing as committee-account (locked)",
-    "header_locked": "Viewing as %(name)s (locked) — tap to change",
-    "header_unlocked": "Acting as %(name)s",
-    "network_error": "Network unavailable. Check Settings → Nodes and retry.",
-    "notice_locked": "Viewing as %(name)s (%(id)s) — unlock to act as yourself.",
-    "unknown_account": "Unknown account name."
+    "dialog_reset": "重置为 committee-account",
+    "dialog_title": "以账户身份查看",
+    "header_default": "当前查看身份为 committee-account（已锁定）",
+    "header_locked": "当前查看身份为 %(name)s（已锁定） — 点击可更改",
+    "header_unlocked": "正以 %(name)s 身份操作",
+    "network_error": "网络不可用。请检查“设置 → 节点”并重试。",
+    "notice_locked": "正以 %(name)s（%(id)s）身份查看 — 解锁后以您本人身份操作。",
+    "unknown_account": "未知账户名。"
   },
   "asset": {
     "acting_field": "操作账户（名称或 1.2.N）",

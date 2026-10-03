@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "Добавить строку авторизации (не поддерживается)",
     "one_key_auth_row_is_supported_here_key_ab": "Здесь поддерживается одна строка key-auth (ключ выше + порог). Несколько строк ключей, аккаунтов или адресов в этой форме не строятся.",
     "only_one_key_auth_row_is_supported_extra_": "Поддерживается только одна строка key-auth — для дополнительных строк полномочий нужны новые сериализаторы.",
-    "invoice_lines_placeholder": "кофе|1.5\\nторт|2"
+    "invoice_lines_placeholder": "кофе|1.5\nторт|2"
   },
   "notify": {
     "title": "Ценовые оповещения",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "Тикеты блокируют средства для веса голоса. Операции удаления нет, поэтому каждая строка тикета постоянна.",
     "unchanged": "без изменений",
     "viewing_as": "Просмотр как committee-account (1.2.0) — разблокируйте, чтобы действовать как вы.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "Аккаунт",
@@ -6456,18 +6456,18 @@
     "top_voters_note": "Топ-10 голосующих по силе голоса (get_top_voters — выборка, не полная перепись прокси):"
   },
   "viewing": {
-    "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
-    "dialog_label": "Account name ",
-    "dialog_open": "View as this account",
-    "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
-    "dialog_title": "View as account",
-    "header_default": "Viewing as committee-account (locked)",
-    "header_locked": "Viewing as %(name)s (locked) — tap to change",
-    "header_unlocked": "Acting as %(name)s",
-    "network_error": "Network unavailable. Check Settings → Nodes and retry.",
-    "notice_locked": "Viewing as %(name)s (%(id)s) — unlock to act as yourself.",
-    "unknown_account": "Unknown account name."
+    "dialog_hint": "Публичные данные — разблокировка не нужна. Введите любое имя аккаунта или id 1.2.N.",
+    "dialog_label": "Имя аккаунта ",
+    "dialog_open": "Смотреть как этот аккаунт",
+    "dialog_placeholder": "имя-аккаунта",
+    "dialog_reset": "Сбросить к committee-account",
+    "dialog_title": "Просмотр как аккаунт",
+    "header_default": "Просмотр как committee-account (заблокирован)",
+    "header_locked": "Просмотр как %(name)s (заблокирован) — нажмите, чтобы изменить",
+    "header_unlocked": "Действуете как %(name)s",
+    "network_error": "Сеть недоступна. Проверьте Настройки → Ноды и повторите.",
+    "notice_locked": "Просмотр как %(name)s (%(id)s) — разблокируйте, чтобы действовать от своего имени.",
+    "unknown_account": "Неизвестное имя аккаунта."
   },
   "asset": {
     "acting_field": "Действующий аккаунт (имя или 1.2.N)",

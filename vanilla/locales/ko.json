@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "인증 행 추가(지원되지 않음)",
     "one_key_auth_row_is_supported_here_key_ab": "여기서는 하나의 키 인증 행만 지원됩니다(위의 키 + 임계값). 여러 키, 계정 또는 주소 행은 이 양식에서 구성되지 않습니다.",
     "only_one_key_auth_row_is_supported_extra_": "하나의 키 인증 행만 지원됩니다 — 추가 권한 행에는 새 serializer가 필요합니다.",
-    "invoice_lines_placeholder": "coffee|1.5\\ncake|2"
+    "invoice_lines_placeholder": "coffee|1.5\ncake|2"
   },
   "notify": {
     "title": "가격 알림",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "티켓은 투표 가중치를 위해 자금을 잠급니다. 삭제 오퍼레이션이 없으므로 모든 티켓 행은 영구적입니다.",
     "unchanged": "변경 없음",
     "viewing_as": "committee-account(1.2.0)으로 보는 중 — 본인으로 행동하려면 잠금을 해제하십시오.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "계정",
@@ -6456,18 +6456,18 @@
     "top_voters_note": "투표 가중치 기준 상위 10인(get_top_voters — 전체 프록시 조사가 아닌 표본):"
   },
   "viewing": {
-    "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
-    "dialog_label": "Account name ",
-    "dialog_open": "View as this account",
+    "dialog_hint": "공개 데이터입니다 — 잠금 해제 없이 조회합니다. 아무 계정 이름이나 1.2.N id를 입력하십시오.",
+    "dialog_label": "계정 이름 ",
+    "dialog_open": "이 계정으로 보기",
     "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
-    "dialog_title": "View as account",
-    "header_default": "Viewing as committee-account (locked)",
-    "header_locked": "Viewing as %(name)s (locked) — tap to change",
-    "header_unlocked": "Acting as %(name)s",
-    "network_error": "Network unavailable. Check Settings → Nodes and retry.",
-    "notice_locked": "Viewing as %(name)s (%(id)s) — unlock to act as yourself.",
-    "unknown_account": "Unknown account name."
+    "dialog_reset": "committee-account으로 재설정",
+    "dialog_title": "계정으로 보기",
+    "header_default": "committee-account으로 보기 중 (잠김)",
+    "header_locked": "%(name)s(으)로 보기 중 (잠김) — 변경하려면 탭하세요",
+    "header_unlocked": "%(name)s(으)로 활동 중",
+    "network_error": "네트워크를 사용할 수 없습니다. 설정 → 노드를 확인한 뒤 다시 시도하십시오.",
+    "notice_locked": "%(name)s (%(id)s)로 보는 중입니다 — 본인으로 작업하려면 잠금을 해제하십시오.",
+    "unknown_account": "알 수 없는 계정 이름입니다."
   },
   "asset": {
     "acting_field": "수행 계정(이름 또는 1.2.N)",

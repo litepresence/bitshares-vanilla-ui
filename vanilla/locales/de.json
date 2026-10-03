@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "Auth-Zeile hinzufügen (nicht unterstützt)",
     "one_key_auth_row_is_supported_here_key_ab": "Hier wird eine Schlüssel-Auth-Zeile unterstützt (Schlüssel oben + Schwelle). Mehrere Schlüssel-, Konto- oder Adresszeilen werden in diesem Formular nicht abgebildet.",
     "only_one_key_auth_row_is_supported_extra_": "Nur eine Schlüssel-Auth-Zeile wird unterstützt — zusätzliche Authority-Zeilen erfordern neue Serializer.",
-    "invoice_lines_placeholder": "Kaffee|1.5\\nKuchen|2"
+    "invoice_lines_placeholder": "Kaffee|1.5\nKuchen|2"
   },
   "notify": {
     "title": "Preisalarme",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "Tickets sperren Gelder für Stimmgewicht. Es gibt keine Löschoperation, daher ist jede Ticketzeile dauerhaft.",
     "unchanged": "unverändert",
     "viewing_as": "Ansicht als committee-account (1.2.0) — zum Handeln als Sie selbst entsperren.",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "Konto",
@@ -6456,18 +6456,18 @@
     "top_voters_note": "Top-10-Wähler nach Stimmkraft (get_top_voters — Stichprobe, keine volle Proxy-Zählung):"
   },
   "viewing": {
-    "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
+    "dialog_hint": "Öffentliche Daten — kein Entsperren nötig. Geben Sie einen beliebigen Kontonamen oder eine 1.2.N id ein.",
     "dialog_label": "Kontoname ",
-    "dialog_open": "View as this account",
-    "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
-    "dialog_title": "View as account",
-    "header_default": "Viewing as committee-account (locked)",
-    "header_locked": "Viewing as %(name)s (locked) — tap to change",
-    "header_unlocked": "Acting as %(name)s",
+    "dialog_open": "Als dieses Konto ansehen",
+    "dialog_placeholder": "kontoname",
+    "dialog_reset": "Zurück zu committee-account",
+    "dialog_title": "Ansicht als Konto",
+    "header_default": "Ansicht als committee-account (gesperrt)",
+    "header_locked": "Ansicht als %(name)s (gesperrt) — zum Ändern tippen",
+    "header_unlocked": "Handeln als %(name)s",
     "network_error": "Netzwerk nicht verfügbar. Prüfen Sie Einstellungen → Knoten und versuchen Sie es erneut.",
-    "notice_locked": "Viewing as %(name)s (%(id)s) — unlock to act as yourself.",
-    "unknown_account": "Unknown account name."
+    "notice_locked": "Ansicht als %(name)s (%(id)s) — entsperren Sie, um als Sie selbst zu handeln.",
+    "unknown_account": "Unbekannter Kontoname."
   },
   "asset": {
     "acting_field": "Handelndes Konto (Name oder 1.2.N)",

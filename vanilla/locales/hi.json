@@ -4913,7 +4913,7 @@
     "add_auth_row_unsupported": "प्राधिकरण पंक्ति जोड़ें (असमर्थित)",
     "one_key_auth_row_is_supported_here_key_ab": "यहाँ एक कुंजी-प्राधिकरण पंक्ति समर्थित है (ऊपर कुंजी + थ्रेशोल्ड)। एकाधिक कुंजी, खाता या पता पंक्तियाँ इस फ़ॉर्म में नहीं बनतीं।",
     "only_one_key_auth_row_is_supported_extra_": "केवल एक कुंजी-प्राधिकरण पंक्ति समर्थित है — अतिरिक्त प्राधिकरण पंक्तियों के लिए नए सीरियलाइज़र चाहिए।",
-    "invoice_lines_placeholder": "coffee|1.5\\ncake|2"
+    "invoice_lines_placeholder": "coffee|1.5\ncake|2"
   },
   "notify": {
     "title": "मूल्य अलर्ट",
@@ -6332,7 +6332,7 @@
     "tickets_lock_funds_for_vote_weight_there_is_n": "टिकट वोट वेट के लिए फ़ंड लॉक करते हैं। कोई डिलीट ऑपरेशन नहीं है, इसलिए प्रत्येक टिकट पंक्ति स्थायी है।",
     "unchanged": "अपरिवर्तित",
     "viewing_as": "committee-account (1.2.0) के रूप में देख रहे हैं — स्वयं के रूप में कार्य हेतु अनलॉक करें।",
-    "airdrop_example_ph": "alice,10\\nbob,2.5"
+    "airdrop_example_ph": "alice,10\nbob,2.5"
   },
   "vote": {
     "account_row": "खाता",
@@ -6456,18 +6456,18 @@
     "top_voters_note": "वोटिंग शक्ति द्वारा शीर्ष 10 मतदाता (get_top_voters — नमूना, पूर्ण प्रॉक्सी जनगणना नहीं):"
   },
   "viewing": {
-    "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
-    "dialog_label": "Account name ",
-    "dialog_open": "View as this account",
+    "dialog_hint": "सार्वजनिक डेटा — अनलॉक की आवश्यकता नहीं। कोई भी खाता नाम या 1.2.N id डालें।",
+    "dialog_label": "खाता नाम ",
+    "dialog_open": "इस खाते के रूप में देखें",
     "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
-    "dialog_title": "View as account",
-    "header_default": "Viewing as committee-account (locked)",
-    "header_locked": "Viewing as %(name)s (locked) — tap to change",
-    "header_unlocked": "Acting as %(name)s",
-    "network_error": "Network unavailable. Check Settings → Nodes and retry.",
-    "notice_locked": "Viewing as %(name)s (%(id)s) — unlock to act as yourself.",
-    "unknown_account": "Unknown account name."
+    "dialog_reset": "committee-account पर रीसेट करें",
+    "dialog_title": "खाते के रूप में देखें",
+    "header_default": "committee-account (लॉक) के रूप में देख रहे हैं",
+    "header_locked": "%(name)s (लॉक) के रूप में देख रहे हैं — बदलने के लिए टैप करें",
+    "header_unlocked": "%(name)s के रूप में कार्य कर रहे हैं",
+    "network_error": "नेटवर्क उपलब्ध नहीं। सेटिंग्स → नोड्स जाँचें और पुनः प्रयास करें।",
+    "notice_locked": "%(name)s (%(id)s) के रूप में देख रहे हैं — स्वयं के रूप में कार्य करने के लिए अनलॉक करें।",
+    "unknown_account": "अज्ञात खाता नाम।"
   },
   "asset": {
     "acting_field": "कार्यवाहक खाता (नाम या 1.2.N)",
