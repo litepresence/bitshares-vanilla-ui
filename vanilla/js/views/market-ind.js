@@ -871,19 +871,19 @@ var MarketInd = (function () {
 
   /* Draw price + ALL live stacked sub-panes (Task 4b — the SAME redraw path
    * serves checkbox toggles, x removes, theme switches and resizes: callers
-   * never fork it). Volume is ALWAYS first: its own histogram sub-pane on an
-   * independent scale, never overlaid on price (one scale per pane). Every
-   * other checked key in OSC_ORDER owns one wrapper (.mkt-osc-pane: title +
-   * x button + chart body); the Volume pane has no x button and its menu box
-   * is locked on. Unchecking everything else leaves just Volume — the
-   * container is never childless while candles exist. */
+   * never fork it). Volume is its own histogram sub-pane on an independent
+   * scale when checked, never overlaid on price (one scale per pane). Every
+   * checked key in OSC_ORDER owns one wrapper (.mkt-osc-pane: title +
+   * x button + chart body). Defaults are all-off (price + pool map only) —
+   * the container may hold just the pool-map slice, or nothing at all when
+   * every plot is off — never a blank box. */
   function drawCharts(state) {
     if (!state.chartData) return;
     var d = state.chartData;
     var doc = state.doc;
-    /* Volume always has its own pane (never overlaid, never removable). */
+    /* No forced panes: every oscillator (incl. Volume) is opt-in via the
+     * Indicators pulldown. Missing state.osc still normalizes to {}. */
     if (!state.osc) state.osc = {};
-    state.osc.volume = true;
     var C = themeChartColors();
     var frame = { paneBg: C.paneBg, grid: C.grid, text: C.text };
     try {
@@ -951,8 +951,7 @@ var MarketInd = (function () {
           var head = doc.createElement("div");
           head.className = "mkt-osc-head";
           head.appendChild(el(doc, "span", label, "mkt-osc-title"));
-          /* Volume is always on — no x button (unchecking is impossible). */
-          if (key !== "volume") {
+          /* Every pane (incl. Volume) gets an x that unchecks its menu box. */
           var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
           x.type = "button";
           x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " pane");
@@ -964,7 +963,6 @@ var MarketInd = (function () {
             drawCharts(state);
           });
           head.appendChild(x);
-          }
           wrap.appendChild(head);
           var body = doc.createElement("div");
           body.className = "mkt-osc-body";
@@ -991,8 +989,8 @@ var MarketInd = (function () {
       }
     } catch (e) { /* pane failure must not break the desk */ }
     /* Depth slice: toggleable like every non-price plot. Off detaches the
-     * wrap (draw skipped); on draws + pins at stack index 1 (right after
-     * the always-on Volume pane). Desks without a depth slice skip this. */
+     * wrap (draw skipped); on draws + pins at stack index 1 (after Volume
+     * when it is on). Desks without a depth slice skip this. */
     try {
       if (state.showDepth === false) {
         if (state.depthWrap && state.depthWrap.parentNode) {
@@ -1011,10 +1009,10 @@ var MarketInd = (function () {
     } catch (e) { /* canvas failure must not break the desk */ }
     /* Depth slice position: the depth canvas lives in the charts stack as an
      * osc-sized slice (state.depthWrap, owned by the desk) and must sit
-     * second — right after the always-on Volume pane, before any oscillator
-     * panes. The osc loop above re-appends panes in OSC_ORDER, so pin the
-     * wrap at index 1 here (index 0 is Volume; a missing Volume just puts
-     * depth first, never lost). Desks without a depth slice skip this. */
+     * second — after Volume when it is on, before any oscillator panes.
+     * The osc loop above re-appends panes in OSC_ORDER, so pin the wrap at
+     * index 1 here (index 0 is Volume when present; a missing Volume just
+     * puts depth first, never lost). Desks without a depth slice skip this. */
     try {
       if (state.depthWrap && state.showDepth !== false && state.oscHost) {
         if (state.depthWrap.parentNode !== state.oscHost) {
@@ -1231,12 +1229,9 @@ var MarketInd = (function () {
         box.type = "checkbox";
         box.checked = !!store[key];
         box.setAttribute("aria-label", label + (kind === "over" ? " overlay" : " pane"));
-        if (kind === "osc" && key === "volume") {
-          /* Volume always has its own pane — locked on, not a choice. */
-          box.checked = true;
-          box.disabled = true;
-          lab.title = label + " always shows in its own pane";
-        } else if (kind === "osc" && !ind(key)) {
+        /* Volume needs no indicator fn (raw baseVolume bars) — never gated
+         * on ind(). Every other oscillator disables when its fn is missing. */
+        if (kind === "osc" && key !== "volume" && !ind(key)) {
           box.disabled = true;
           lab.title = label + " unavailable in this build";
         }

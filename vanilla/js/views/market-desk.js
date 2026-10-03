@@ -278,20 +278,23 @@ var MarketDesk = (function () {
       assets: null, loading: false, redraw: null,
       /* Slice-07 Task 4 chart state: bucket default 3600 reconciled with the
        * live list on first fill; logScale is a pure priceScale mode switch
-       * (no refetch); overlays default to the pre-slice look (SMA10+EMA50). */
+       * (no refetch); overlays default OFF (price + pool map only — every
+       * overlay stays available in the Indicators pulldown). */
       bucket: 3600, tfInit: false, logScale: false,
       /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice + pool map.
-       * Only the price pane is always on; depth + pool map default on, VWAP off. */
-      showVwap: false, showDepth: true, showPoolMap: true,
+       * Only the price pane is always on; pool map defaults on, depth + VWAP
+       * default off (all three stay toggleable in the Indicators pulldown). */
+      showVwap: false, showDepth: false, showPoolMap: true,
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
       depthLogX: true, depthLogY: true,
-      over: { sma: [{ p: 10 }], ema: [{ p: 50 }] },
-      /* Task 4b stacked panes: one checkbox per key below; MACD stays on by
-       * default to preserve the Task-4 look. panes.oscs maps key -> pane
-       * handle from drawOscPane; paneEls maps key -> {wrap, body} DOM nodes.
-       * oscBoxes maps key -> checkbox input (x buttons uncheck through it). */
-      osc: { volume: true, rsi: false, macd: true, stoch: false, atr: false, fisher: false },
+      over: {},
+      /* Stacked panes: every oscillator defaults OFF (price + pool map only).
+       * Each key in MarketInd.OSC_ORDER stays available via the Indicators
+       * pulldown; panes.oscs maps key -> pane handle from drawOscPane;
+       * paneEls maps key -> {wrap, body} DOM nodes; oscBoxes maps key ->
+       * checkbox input (x buttons uncheck through it). */
+      osc: {},
       panes: { price: null, oscs: {} },
       paneEls: {}, oscBoxes: {},
       ticker: null, countNote: null, tfBox: null, oscNote: null,

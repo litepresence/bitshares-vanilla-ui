@@ -199,9 +199,12 @@ var PoolDetailUI = (function () {
     plots.appendChild(oscNote);
     var P = {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
-      over: { sma: [{ p: 10 }], ema: [{ p: 50 }] }, osc: { volume: true }, oscBoxes: {}, panes: {}, paneEls: {},
+      /* Minimal defaults (owner): price + pool map only. Every overlay,
+       * oscillator, and the depth/VWAP plots stay available in the
+       * Indicators pulldown — all default off. */
+      over: {}, osc: {}, oscBoxes: {}, panes: {}, paneEls: {},
       /* Toggleable plots (menu "Plots" group): only price is always on. */
-      showVwap: false, showDepth: true, showPoolMap: true,
+      showVwap: false, showDepth: false, showPoolMap: true,
       candles: { buckets: [] }, tfBox: tfBox, countNote: countNote,
       priceHost: priceHost, oscHost: oscHost, oscNote: oscNote,
       depthCanvas: null, graphWrap: null, graphCanvas: null, graphNote: null, graphData: null,
