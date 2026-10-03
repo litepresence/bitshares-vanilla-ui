@@ -25,6 +25,13 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHUNKS = ["a", "b", "c", "d"]
 
+# Deliberate empties (auditor-confirmed): the translation is complete WITHOUT
+# this fragment — the sibling fragment carries the whole meaning and any
+# filler would duplicate it. The join site tolerates "" (plain +).
+#   gateway.coins_failed_prefix (ko): suffix " 코인을 불러올 수 없습니다."
+#     already says "could not load the coins" — prefix correctly empty.
+EXCEPT_EMPTY = {"gateway.coins_failed_prefix"}
+
 
 def flat(d, prefix=""):
     out = {}
@@ -67,7 +74,7 @@ def main():
                 if full not in en_flat:
                     print("chunk %s: extra key %r (not in en)" % (ch, full))
                     return 1
-                if not isinstance(v, str) or not v.strip():
+                if (not isinstance(v, str) or not v.strip()) and full not in EXCEPT_EMPTY:
                     print("chunk %s: empty value for %r" % (ch, full))
                     return 1
                 got[full] = v

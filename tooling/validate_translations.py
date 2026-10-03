@@ -70,6 +70,11 @@ VERBATIM_KEYS = {
 
 SHOW_MAX = 20
 
+# Deliberate empties (see tooling/merge_translations.py EXCEPT_EMPTY): the
+# translation is complete without this fragment; the sibling fragment carries
+# the whole meaning. Exempt from check 5 only — all other checks still apply.
+EXCEPT_EMPTY = {"gateway.coins_failed_prefix"}
+
 
 def flatten(d, prefix=""):
     out = {}
@@ -194,7 +199,7 @@ def validate(code):
         if got_val.strip() == "":
             en_val = en_flat[key]
             en_empty = isinstance(en_val, str) and en_val.strip() == ""
-            if not en_empty:
+            if not en_empty and key not in EXCEPT_EMPTY:
                 empty_bad.append(
                     "%s: empty/whitespace-only in %s but en is %r"
                     % (key, code, _short(en_val))
