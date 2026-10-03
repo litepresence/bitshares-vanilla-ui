@@ -39,7 +39,19 @@ VANILLA_SESSIONS = [
     "ses_efe1fdb60ffeai253BNzFFV1qN",  # Implementing Bitshares vanilla UI issue #1
 ]
 
-# Sessions reviewed and deliberately excluded (not vanilla-UI creation).
+# Individual user prompts reviewed and excluded: off-topic core-protocol
+# upgrade chat (protocols H/G release, oracle/smartcoin/ACCS/true-stealth
+# rollout, truestealth readme, nemotron 3-protocol audit) that leaked into
+# the vanilla session ses_f0901d45... (doc entries #272, #278, #294, #295,
+# #300, #314 at time of removal).
+EXCLUDE_MESSAGE_IDS = frozenset({
+    "msg_0f9a7626c0013CeOIC6wCwe31K",
+    "msg_0f9efbb51001EQbF77KefGe5wQ",
+    "msg_0fa471521001x9yB6tLbkSFtgg",
+    "msg_0fa4a8884001AyvC0pkMubgVOP",
+    "msg_0fa5ade27001hJ4Aon9yvAdNcE",
+    "msg_0fc5d62d10014uzxVwoxTxF3SM",
+})
 EXCLUDED = [
     ("ses_f2745d476ffeQH07PvAI66TkHC", "pre-vanilla worktree/RECOVERY review"),
     ("ses_f25cc2b08ffeHMwztXWazEmCdh", "EPUB scripting"),
@@ -86,6 +98,8 @@ def main() -> None:
             (sid,),
         )
         for mid, mtc in cur.fetchall():
+            if mid in EXCLUDE_MESSAGE_IDS:
+                continue
             cur.execute("SELECT data FROM message WHERE id=?", (mid,))
             row = cur.fetchone()
             if not row:

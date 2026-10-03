@@ -2,7 +2,7 @@
 
 Every verbatim user prompt that created the vanilla UI, collated chronologically across all opencode sessions. Times are UTC.
 
-Generated 2026-10-03 13:19 UTC from opencode.db: 419 prompts across 14 sessions. 1505 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
+Generated 2026-10-03 17:51 UTC from opencode.db: 413 prompts across 14 sessions. 1505 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
 
 ## Sessions included
 
@@ -1704,25 +1704,19 @@ commit
 
 ---
 
-### #272 — 2026-10-01 22:48 UTC — Current project state and upcoming objectives
-
-ok how best to commit everything and prepare for public release of the two new protocols H and G?
-
----
-
-### #273 — 2026-10-01 23:31 UTC — Current project state and upcoming objectives
+### #272 — 2026-10-01 23:31 UTC — Current project state and upcoming objectives
 
 hmm seems there are upstream elements that need to be merged.  handle first please.
 
 ---
 
-### #274 — 2026-10-01 23:42 UTC — Current project state and upcoming objectives
+### #273 — 2026-10-01 23:42 UTC — Current project state and upcoming objectives
 
 on explore/blockchain tab trx/block scrolling bars seems to be scrolling backwards?  usually we think of back in time is to the left; the bars are moving right which is odd.  the "recent blocks" table still is not flashing in the same manner as the old bitshares reference-ui.  please explore that code to get a sense of why the table background is doing a glowing pulse thing that seems to flash with lighter color once per block.  the "last block" seconds ago just constantly reads 0.0 instead of counting up since the last block; generally speaking it "should" be counting roughly up to 3.0 seconds before the next block arrives... but right now its just stale at "0.0 seconds ago".  it should work like a stopwatch.
 
 ---
 
-### #275 — 2026-10-01 23:47 UTC — Current project state and upcoming objectives
+### #274 — 2026-10-01 23:47 UTC — Current project state and upcoming objectives
 
 also "recent blocks" seems to update each block but the "recent activity" is stale
 
@@ -1730,337 +1724,307 @@ also "recent blocks" seems to update each block but the "recent activity" is sta
 
 ## 2026-10-02
 
-### #276 — 2026-10-02 00:01 UTC — Current project state and upcoming objectives
+### #275 — 2026-10-02 00:01 UTC — Current project state and upcoming objectives
 
 the flashing green light and where its says Live <blocknum>... I would prefer that to not have the block number as we already have that data just below there on the page.   it can just have the flashing green light  and the green "Live" text.   can even increase both size of the dot and the text by 25%.  but I'm curious... what does it say after a block has not arrived for more than 3 seconds?  does at some point it flash yellow and say stale?  eventually flash red and say disconnected?
 
 ---
 
-### #277 — 2026-10-02 00:02 UTC — Current project state and upcoming objectives
+### #276 — 2026-10-02 00:02 UTC — Current project state and upcoming objectives
 
 continue
 
 ---
 
-### #278 — 2026-10-02 00:07 UTC — Current project state and upcoming objectives
-
-do we have a comprehensive project readme that explains the new oracle, the new smartcoin mechanics, the new accs mechanics, the new true stealth, and clear junior dev friendly how to build and test the 2 new features independently and/or together as one upgrade?  is all of our code well commented, docstrings, method descriptions,  and generally junior dev review friendly?  is the whole repo cleaned up and ready for publication.  I would like to share the agentic workspace as well so all the skills and mission statement and other meta goes with the package.
-
----
-
-### #279 — 2026-10-02 00:14 UTC — Current project state and upcoming objectives
+### #277 — 2026-10-02 00:14 UTC — Current project state and upcoming objectives
 
 I added a python file to the workspace. review it and consider what we can learn about node health testing and maintaining blockchain connectivity that we might apply to our app and potentially improve the node health table beyond just is the node reachable.   does it have history?  what other node health can we discern? .
 
 ---
 
-### #280 — 2026-10-02 00:16 UTC — Current project state and upcoming objectives
+### #278 — 2026-10-02 00:16 UTC — Current project state and upcoming objectives
 
 also, can this help us to discern the locations of our nodes? https://github.com/litepresence/Geolocation
 
 ---
 
-### #281 — 2026-10-02 00:46 UTC — Current project state and upcoming objectives
+### #279 — 2026-10-02 00:46 UTC — Current project state and upcoming objectives
 
 please test the geolocate endpoints and let me know if they're still valid
 
 ---
 
-### #282 — 2026-10-02 00:48 UTC — Current project state and upcoming objectives
+### #280 — 2026-10-02 00:48 UTC — Current project state and upcoming objectives
 
 we're just going to avoid the geolocate.  everything else perform as suggested.
 
 ---
 
-### #283 — 2026-10-02 00:59 UTC — Current project state and upcoming objectives
+### #281 — 2026-10-02 00:59 UTC — Current project state and upcoming objectives
 
 run the latency testing python script and see if it discovers any nodes we don't know about
 
 ---
 
-### #284 — 2026-10-02 01:03 UTC — Current project state and upcoming objectives
+### #282 — 2026-10-02 01:03 UTC — Current project state and upcoming objectives
 
 I found you the nodes list; its another py file.   it also has repos with nodes.   see if you can upgrade the latency tester to test nodes concurrently.  then run it.
 
 ---
 
-### #285 — 2026-10-02 01:05 UTC — Current project state and upcoming objectives
+### #283 — 2026-10-02 01:05 UTC — Current project state and upcoming objectives
 
 the astro ui repo probably has a very well maintained nodes list
 
 ---
 
-### #286 — 2026-10-02 01:11 UTC — Current project state and upcoming objectives
+### #284 — 2026-10-02 01:11 UTC — Current project state and upcoming objectives
 
 yes add it to our list and scour github for other potential new nodes in "foreign" communities; turkish, china, russia, etc. also generally look for any potentially new projects at github that might have bitshares nodes.   is there any way to discover such repos on github that we could script into that py file?  in other words it discovers repos that might have nodes, it discovers nodes that are in those repos, then it latency tests?   is there any way to add that workflow to when when our user first connect to the static vanilla-ui ?
 
 ---
 
-### #287 — 2026-10-02 01:21 UTC — Current project state and upcoming objectives
+### #285 — 2026-10-02 01:21 UTC — Current project state and upcoming objectives
 
 is there any way to run it in the background so it does not delay the app?
 
 ---
 
-### #288 — 2026-10-02 01:23 UTC — Current project state and upcoming objectives
+### #286 — 2026-10-02 01:23 UTC — Current project state and upcoming objectives
 
 yes a button in nodes settings page is good plan.  implement.
 
 ---
 
-### #289 — 2026-10-02 01:31 UTC — Current project state and upcoming objectives
+### #287 — 2026-10-02 01:31 UTC — Current project state and upcoming objectives
 
 commit and prepare me to push
 
 ---
 
-### #290 — 2026-10-02 01:32 UTC — Current project state and upcoming objectives
+### #288 — 2026-10-02 01:32 UTC — Current project state and upcoming objectives
 
 we can delete the latency testing python scripts and node lists now that we've taken the logic for our own app.
 
 ---
 
-### #291 — 2026-10-02 01:35 UTC — Current project state and upcoming objectives
+### #289 — 2026-10-02 01:35 UTC — Current project state and upcoming objectives
 
 on explore/blockchain... can we put some space between the blocks on blocktime plot so that they appear to move to the left as it animates.... because right now they're all the same size and there's no apparent movement
 
 ---
 
-### #292 — 2026-10-02 01:36 UTC — Current project state and upcoming objectives
+### #290 — 2026-10-02 01:36 UTC — Current project state and upcoming objectives
 
 also are blocks really that exactly uniform in timing? or is there more variability and its not plotting correctly
 
 ---
 
-### #293 — 2026-10-02 01:37 UTC — Current project state and upcoming objectives
+### #291 — 2026-10-02 01:37 UTC — Current project state and upcoming objectives
 
 can we put a thin contrasting color line at 3 on that plot so we can see when they're slightly above/under 3?
 
 ---
 
-### #294 — 2026-10-02 01:42 UTC — Current project state and upcoming objectives
-
-should we drop this as two repos maybe not to confuse the rollout to community?  help me consider
-
----
-
-### #295 — 2026-10-02 01:46 UTC — Current project state and upcoming objectives
-
-1) two repos 2) how does bitshares-true-stealth and bitshares-cryptoeconomic-mpas-and-accs sound?  3) yes I want the workspace to be fully transparent in both if possible.
-
----
-
-### #296 — 2026-10-02 01:50 UTC — Current project state and upcoming objectives
+### #292 — 2026-10-02 01:50 UTC — Current project state and upcoming objectives
 
 ok.  then since there's 1 second resolution we can remove the thin 3 second line.
 
 ---
 
-### #297 — 2026-10-02 01:52 UTC — Current project state and upcoming objectives
+### #293 — 2026-10-02 01:52 UTC — Current project state and upcoming objectives
 
 ok green light
 
 ---
 
-### #298 — 2026-10-02 01:52 UTC — Current project state and upcoming objectives
+### #294 — 2026-10-02 01:52 UTC — Current project state and upcoming objectives
 
 prepare for push
 
 ---
 
-### #299 — 2026-10-02 02:01 UTC — Current project state and upcoming objectives
+### #295 — 2026-10-02 02:01 UTC — Current project state and upcoming objectives
 
 "recent activity" on explore/blockchain disappeared and "recent blocks" moved left into its place
 
 ---
 
-### #300 — 2026-10-02 02:04 UTC — Current project state and upcoming objectives
-
-improve the readme for truestealth to include a reasoned recommendation to increase transfer fee to subsidize the  decrease blind (truestealth) transfer fee to less than transfer fee
-
----
-
-### #301 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
+### #296 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
 
 commit
 
 ---
 
-### #302 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
+### #297 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
 
 continue
 
 ---
 
-### #303 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
+### #298 — 2026-10-02 02:05 UTC — Current project state and upcoming objectives
 
 continue commiting so I can push again
 
 ---
 
-### #304 — 2026-10-02 02:07 UTC — Current project state and upcoming objectives
+### #299 — 2026-10-02 02:07 UTC — Current project state and upcoming objectives
 
 try again
 
 ---
 
-### #305 — 2026-10-02 02:09 UTC — Current project state and upcoming objectives
+### #300 — 2026-10-02 02:09 UTC — Current project state and upcoming objectives
 
 I committed manually and pushed.  still no activity table
 
 ---
 
-### #306 — 2026-10-02 02:12 UTC — Current project state and upcoming objectives
+### #301 — 2026-10-02 02:12 UTC — Current project state and upcoming objectives
 
 re upload the hosted files?  why does git push not do that?
 
 ---
 
-### #307 — 2026-10-02 02:13 UTC — Current project state and upcoming objectives
+### #302 — 2026-10-02 02:13 UTC — Current project state and upcoming objectives
 
 its on github pages with custom domain
 
 ---
 
-### #308 — 2026-10-02 02:14 UTC — Current project state and upcoming objectives
+### #303 — 2026-10-02 02:14 UTC — Current project state and upcoming objectives
 
 when I pushed it says I have to pull before I can push
 
 ---
 
-### #309 — 2026-10-02 02:17 UTC — Current project state and upcoming objectives
+### #304 — 2026-10-02 02:17 UTC — Current project state and upcoming objectives
 
 I still see no "recent activity" table on explore/blockchain page on my github page after push
 
 ---
 
-### #310 — 2026-10-02 02:21 UTC — Current project state and upcoming objectives
+### #305 — 2026-10-02 02:21 UTC — Current project state and upcoming objectives
 
 commit and I'll push again
 
 ---
 
-### #311 — 2026-10-02 02:32 UTC — Current project state and upcoming objectives
+### #306 — 2026-10-02 02:32 UTC — Current project state and upcoming objectives
 
 there's something flaky with the 3 part elastic search, node query, and block operation listener that supposed to update exchange price chart.  the pool price chart seems to work.  please investigate.   there's also something flaky about the zoom level in the price charts... it seems to reset ever few seconds back to how it was even after I repeatedly zoom into a time period in the tradingview light widget
 
 ---
 
-### #312 — 2026-10-02 02:33 UTC — Current project state and upcoming objectives
+### #307 — 2026-10-02 02:33 UTC — Current project state and upcoming objectives
 
 also I'd like an ability to input the number of candles and have it default to 2000 on both exchange and pools
 
 ---
 
-### #313 — 2026-10-02 11:23 UTC — Current project state and upcoming objectives
+### #308 — 2026-10-02 11:23 UTC — Current project state and upcoming objectives
 
 commit so I can push
 
 ---
 
-### #314 — 2026-10-02 11:26 UTC — Current project state and upcoming objectives
-
-welcome to the project; this is the first time as "nemotron 3 ultra" that you're seeing this project.  I want you to perform a comprehensive audit using all relevant workspace skills ( you may need to create some skills of your own to be fully comprehensive) use director skill to get json response from batch dispatch parallelism subagents.  your only job is to fully audit our 3 protocols and provide recommendations as nemotron 3 to the repair agent.  make no actual repairs; just produce a review document
-
----
-
-### #315 — 2026-10-02 11:28 UTC — Current project state and upcoming objectives
+### #309 — 2026-10-02 11:28 UTC — Current project state and upcoming objectives
 
 check the workspace skills folder
 
 ---
 
-### #316 — 2026-10-02 12:32 UTC — Current project state and upcoming objectives
+### #310 — 2026-10-02 12:32 UTC — Current project state and upcoming objectives
 
 continue
 
 ---
 
-### #317 — 2026-10-02 12:35 UTC — Current project state and upcoming objectives
+### #311 — 2026-10-02 12:35 UTC — Current project state and upcoming objectives
 
 hmm now on exchange plots I'm seeing old data circa 2022/2023 but no new data on for example daily candles and hourly candles still look sparse and don't show deep history.  I'm on a high volume BTS_CNY market that should have data.
 
 ---
 
-### #318 — 2026-10-02 12:43 UTC — Current project state and upcoming objectives
+### #312 — 2026-10-02 12:43 UTC — Current project state and upcoming objectives
 
 commit so I can push
 
 ---
 
-### #319 — 2026-10-02 12:53 UTC — Current project state and upcoming objectives
+### #313 — 2026-10-02 12:53 UTC — Current project state and upcoming objectives
 
 ok in our pool map plot on both the exchange page and the pool page... can we implement some "physics" so the nodes have a sense of gravity / repulsion both from one another and from the edge of the plot so they start in the middle then fill out the plot space?  kind of like when you implement a networkx in python... but here I think we're in a canvas.
 
 ---
 
-### #320 — 2026-10-02 13:12 UTC — Current project state and upcoming objectives
+### #314 — 2026-10-02 13:12 UTC — Current project state and upcoming objectives
 
 I'll go with your recommendations and see what we get, then revise from there if necessary
 
 ---
 
-### #321 — 2026-10-02 13:18 UTC — Current project state and upcoming objectives
+### #315 — 2026-10-02 13:18 UTC — Current project state and upcoming objectives
 
 commit so I can push
 
 ---
 
-### #322 — 2026-10-02 13:19 UTC — Current project state and upcoming objectives
+### #316 — 2026-10-02 13:19 UTC — Current project state and upcoming objectives
 
 you can delete those two... I took them after I pushed but before the github hosted page had a chance to update
 
 ---
 
-### #323 — 2026-10-02 13:30 UTC — Current project state and upcoming objectives
+### #317 — 2026-10-02 13:30 UTC — Current project state and upcoming objectives
 
 compile the comprehensive report
 
 ---
 
-### #324 — 2026-10-02 13:49 UTC — Current project state and upcoming objectives
+### #318 — 2026-10-02 13:49 UTC — Current project state and upcoming objectives
 
 ok the pool mapping tool works well.  is there any way we can get a text overlay on that plot that says something like... and I'll allow you to phrase this better but in green text  "Direct Provenence: This market has established pool connectivity to BTS" if either of the two tokens have a direct pool link back to BTS core token. vs yellow text "Indirect Provenance: This market connects to BTS via pools in <n> hops" vs red text "Provenence Warning: This market lacks established pool connectivity BTS" if they have no link back to BTS core token.
 
 ---
 
-### #325 — 2026-10-02 13:54 UTC — Current project state and upcoming objectives
+### #319 — 2026-10-02 13:54 UTC — Current project state and upcoming objectives
 
 commit
 
 ---
 
-### #326 — 2026-10-02 14:11 UTC — Current project state and upcoming objectives
+### #320 — 2026-10-02 14:11 UTC — Current project state and upcoming objectives
 
 in the provenance plot I would prefer if BTS was always Blue.  The two tokens should always be the same green as is used in the "Live" indicator on explore/blockchain.  the connecting lines between the two tokens should always been green and the connecting lines between either of the two and BTS should always be blue.
 
 ---
 
-### #327 — 2026-10-02 14:21 UTC — Current project state and upcoming objectives
+### #321 — 2026-10-02 14:21 UTC — Current project state and upcoming objectives
 
 are there any features we implement from this app? https://github.com/BTS-CM/pma
 
 ---
 
-### #328 — 2026-10-02 14:26 UTC — Current project state and upcoming objectives
+### #322 — 2026-10-02 14:26 UTC — Current project state and upcoming objectives
 
 ok do repairs and fill in all the gaps worth filling.  build it.
 
 ---
 
-### #329 — 2026-10-02 14:28 UTC — Current project state and upcoming objectives
+### #323 — 2026-10-02 14:28 UTC — Current project state and upcoming objectives
 
 also when you're done give me a full reasoning as to why you chose not to implement visuals.   Remember part of the purpose of this ui is "marketing material / addictive busy box" make sure that notion is part of AGENTS.md
 
 ---
 
-### #330 — 2026-10-02 16:47 UTC — Current project state and upcoming objectives
+### #324 — 2026-10-02 16:47 UTC — Current project state and upcoming objectives
 
 commit
 
 ---
 
-### #331 — 2026-10-02 17:27 UTC — Current project state and upcoming objectives
+### #325 — 2026-10-02 17:27 UTC — Current project state and upcoming objectives
 
 ok lets go back and talk about that green / yellow / red text on the pool map and the gray text below the map with hops.  I want to rebuild all of the coloring, text and logic on both the exchange and pool pages as follows: Here's the plan...
 
@@ -2115,55 +2079,55 @@ ok lets go back and talk about that green / yellow / red text on the pool map an
 
 ---
 
-### #332 — 2026-10-02 17:31 UTC — Current project state and upcoming objectives
+### #326 — 2026-10-02 17:31 UTC — Current project state and upcoming objectives
 
 1) yes full shortest path 2) yes I had not considered the yellow case, nice! 3) centered takeover only for truly empty legs in the other cases where there are disjointed edges but no legleg and no legbts then that can be 3 red warnings upper corners and center while showing that disjointed network map 4) can we use a soft glow on user highlight instead like the glow on the dot next to "Live" on the explore/blockchain page?
 
 ---
 
-### #333 — 2026-10-02 17:32 UTC — Current project state and upcoming objectives
+### #327 — 2026-10-02 17:32 UTC — Current project state and upcoming objectives
 
 build it.  sounds perfect.  its kind of complicated so audit your work when you're done to make sure its right then commit
 
 ---
 
-### #334 — 2026-10-02 17:45 UTC — Current project state and upcoming objectives
+### #328 — 2026-10-02 17:45 UTC — Current project state and upcoming objectives
 
 commit
 
 ---
 
-### #335 — 2026-10-02 18:03 UTC — Current project state and upcoming objectives
+### #329 — 2026-10-02 18:03 UTC — Current project state and upcoming objectives
 
 upper right to the left of the lock symbol should be the user name; default is committee-account.   lower right where there is text showing the node you're connected to, the latency, and blocknumber... if you click on any of that text it should bring you to the nodes settings page
 
 ---
 
-### #336 — 2026-10-02 18:04 UTC — Current project state and upcoming objectives
+### #330 — 2026-10-02 18:04 UTC — Current project state and upcoming objectives
 
 when you're viewing a pool swap page and you click the exchange tab it should bring you to the market with the same two pairs as the pool you were just visiting
 
 ---
 
-### #337 — 2026-10-02 18:08 UTC — Current project state and upcoming objectives
+### #331 — 2026-10-02 18:08 UTC — Current project state and upcoming objectives
 
 on the setting page where you have nodes table then below it there are 3 buttons; one to add a node, probe all, and discover nodes... on mobile it might be alright to have that huge probe all button but on a desktop all three of those inputs/buttons should be on one line.   and "probe all" lets make "ping all";  buttons text should read "ping all" "add node" "find nodes"
 
 ---
 
-### #338 — 2026-10-02 19:55 UTC — Current project state and upcoming objectives
+### #332 — 2026-10-02 19:55 UTC — Current project state and upcoming objectives
 
 then on help page... it says its english only... I think we can do better and allow that to have multilingual support.   also consider all the features we've added beyond what the old reference ui had  and craft comprehensive  help topic coverage.   also no need to be apologitic or even mention the old ui... users don't need to know that... just provide the help.  then below the help pages I would like a second section of Documentation and the links to docs.bitshares.org, docs.bitshares.dev,
 
 ---
 
-### #339 — 2026-10-02 19:57 UTC — Current project state and upcoming objectives
+### #333 — 2026-10-02 19:57 UTC — Current project state and upcoming objectives
 
 then below Documentation, "AI Assisted Help" and add a link for deepwiki.com/bitshares/bitshares-vanilla-ui
 
 ---
 
-### #340 — 2026-10-02 20:23 UTC — Current project state and upcoming objectives
+### #334 — 2026-10-02 20:23 UTC — Current project state and upcoming objectives
 
 then below AI Assisted Help add Homepage:
 
@@ -2199,103 +2163,103 @@ t.me/BitsharesDEXcn
 
 ---
 
-### #341 — 2026-10-02 20:30 UTC — Current project state and upcoming objectives
+### #335 — 2026-10-02 20:30 UTC — Current project state and upcoming objectives
 
 some more repos that I want you to thoroughly review and let me know if there are any features they have that we don't have that we could implement in our wallet; these are data/visualization explorers not ops... but all of it is relevant ot our cause: https://github.com/bitshares/open-explorer https://github.com/bitshares/bitshares.network https://github.com/squidKid-deluxe/bitshares-networks
 
 ---
 
-### #342 — 2026-10-02 20:31 UTC — Current project state and upcoming objectives
+### #336 — 2026-10-02 20:31 UTC — Current project state and upcoming objectives
 
 some may require elastic search instead of just node support but that is ok; we can depend on elastic; fallback with a notice that elastic search is unavailable
 
 ---
 
-### #343 — 2026-10-02 20:34 UTC — Current project state and upcoming objectives
+### #337 — 2026-10-02 20:34 UTC — Current project state and upcoming objectives
 
 if there are any features you're avoiding please enumerate when you're done with clear reasoning.  but my outlook is if they could get the data on their explorers we should be able to get it and display it in our wallet.
 
 ---
 
-### #344 — 2026-10-02 20:36 UTC — Current project state and upcoming objectives
+### #338 — 2026-10-02 20:36 UTC — Current project state and upcoming objectives
 
 on the help page also add a link for elastic, a core dev maintains them at  es.bitshares.dev / kibana.bitshares.dev
 
 ---
 
-### #345 — 2026-10-02 20:41 UTC — Current project state and upcoming objectives
+### #339 — 2026-10-02 20:41 UTC — Current project state and upcoming objectives
 
 where the node we're connected to in the bottom right of the app is in glowing green text can we make that glow have a 3 second pulse to it where it glows brighter / dimmer in a cycle that mimics the blocktime; does not need to be actually tied to the blocktime just give it a 3 second pulse period.
 
 ---
 
-### #346 — 2026-10-02 21:19 UTC — Current project state and upcoming objectives
+### #340 — 2026-10-02 21:19 UTC — Current project state and upcoming objectives
 
 continue
 
 ---
 
-### #347 — 2026-10-02 21:21 UTC — Current project state and upcoming objectives
+### #341 — 2026-10-02 21:21 UTC — Current project state and upcoming objectives
 
 continue
 
 ---
 
-### #348 — 2026-10-02 21:24 UTC — Current project state and upcoming objectives
+### #342 — 2026-10-02 21:24 UTC — Current project state and upcoming objectives
 
 teach me about the avoided explorer features
 
 ---
 
-### #349 — 2026-10-02 21:26 UTC — Current project state and upcoming objectives
+### #343 — 2026-10-02 21:26 UTC — Current project state and upcoming objectives
 
 how many of these could we implement if we accept elastic search as a baseline allowance.  bitshares has had elastic search for nearly all of its history and its supported by the core dev team.  .
 
 ---
 
-### #350 — 2026-10-02 21:37 UTC — Current project state and upcoming objectives
+### #344 — 2026-10-02 21:37 UTC — Current project state and upcoming objectives
 
 yes we also need to keep track of which nodes have history when we ping nodes on startup and during ping nodes process; I think we already do that.   get as much as we can from history api; make sure we're fully displaying everything that we can from history api... its a key feature of the blockchain that this ui should illuminate.   also es is to be supported as a main feature of our "community" it has always been there.  now... any feature that requires "history_api" or es should have a disclaimer on that page regarding availablility only on history api enabled public api nodes or in the case of kibana the notice should be something to the effect of "this feature depends upon 3rd party elastic search" and we'll always use the es that's listed in the help section.   on testnet anything requiring es will not work; need to handle gracefully and if history api is not available on node selected there should be a notice the data is not there and suggest to switch nodes and link to settings page.   in settings page it should be more clear which nodes have history and there is other data we're polling to determine node health.  that should all be displayed.   just take the philosophy of provide everything available, disclose 3rd party, fail gracefully, and offer a path to reconcile unavailable features.   maybe in settings page we should have a switch to enable / disable elastic search and a short notice that its run by third party for more info contact t.me/bitsharesDEV.   the fallback should always be instructions to return to the settings paget to switch to history node or enable es.   the settings page should provide the data as to which nodes have history and a disclaimer about es.
 
 ---
 
-### #351 — 2026-10-02 21:42 UTC — Current project state and upcoming objectives
+### #345 — 2026-10-02 21:42 UTC — Current project state and upcoming objectives
 
 perfect.  make it happen.  put all steps in a sidebar todo list and get busy with subagents
 
 ---
 
-### #352 — 2026-10-02 21:44 UTC — Current project state and upcoming objectives
+### #346 — 2026-10-02 21:44 UTC — Current project state and upcoming objectives
 
 Phase 6: Write a design document for most impactful features that could be added to the wallet/explorer via elastic search.   add to todo.
 
 ---
 
-### #353 — 2026-10-02 21:47 UTC — Current project state and upcoming objectives
+### #347 — 2026-10-02 21:47 UTC — Current project state and upcoming objectives
 
 Phase 7: Write a design document for most impactful features that could be added to the wallet/explorer via history api; also document any impactful features that could be added just from the primary public node api that we have not yet implemented.  add to todo list.  Then get busy on Phase 1
 
 ---
 
-### #354 — 2026-10-02 22:26 UTC — Current project state and upcoming objectives
+### #348 — 2026-10-02 22:26 UTC — Current project state and upcoming objectives
 
 review afk-keep-rolling skill.  I'm going to be at work for a while and I won't be around to check on you.   implement 1-5 and the impactful features discovered by 6 and 7.   I'll be away.  Keep rolling.  Add a tail invariant to your todo as a reminder.
 
 ---
 
-### #355 — 2026-10-02 22:45 UTC — Why TypeScript was rejected from stack
+### #349 — 2026-10-02 22:45 UTC — Why TypeScript was rejected from stack
 
 enumerate all reasons why typescript is unnecessary and against the ethos of this stack and review git history with regard to how anything that ts actually provides to this stack has been mitigated with tsc and jsdoc and other methods. create a markdown document that explains why we have chosen not to use typescript and be honest about any shortcomings that has caused if any
 
 ---
 
-### #356 — 2026-10-02 22:50 UTC — Why TypeScript was rejected from stack
+### #350 — 2026-10-02 22:50 UTC — Why TypeScript was rejected from stack
 
 impove to define the three gate questions more clearly in ##1
 
 ---
 
-### #357 — 2026-10-02 23:52 UTC — Current project state and upcoming objectives
+### #351 — 2026-10-02 23:52 UTC — Current project state and upcoming objectives
 
 continue
 
@@ -2303,373 +2267,373 @@ continue
 
 ## 2026-10-03
 
-### #358 — 2026-10-03 00:22 UTC — Current project state and upcoming objectives
+### #352 — 2026-10-03 00:22 UTC — Current project state and upcoming objectives
 
 hmm so what about the known deferrals?  talk them out with me.
 
 ---
 
-### #359 — 2026-10-03 00:24 UTC — Current project state and upcoming objectives
+### #353 — 2026-10-03 00:24 UTC — Current project state and upcoming objectives
 
 I'll run with your recommendations.  Everything is green light.  Go ahead and implement anything that was deferred but still makes sense to implement
 
 ---
 
-### #360 — 2026-10-03 01:06 UTC — Current project state and upcoming objectives
+### #354 — 2026-10-03 01:06 UTC — Current project state and upcoming objectives
 
 everything is fully committed?
 
 ---
 
-### #361 — 2026-10-03 01:09 UTC — Current project state and upcoming objectives
+### #355 — 2026-10-03 01:09 UTC — Current project state and upcoming objectives
 
 we've implemented a lot of features today that were not in the bitshares-ui original reference.   scan github.com/bitshares user and explore all their repos for more ideas; there are scores of projects in there since this is a 2014 blockchain.   let me know if you find anything worth considering.   use subagents and batch-dispatch-parallelism to efficiently read and categorize what your subs find.   have a director skill require json recommendations.
 
 ---
 
-### #362 — 2026-10-03 01:20 UTC — Current project state and upcoming objectives
+### #356 — 2026-10-03 01:20 UTC — Current project state and upcoming objectives
 
 go ahead and build the top 5
 
 ---
 
-### #363 — 2026-10-03 01:20 UTC — Swagger UI-style explorer API probing page
+### #357 — 2026-10-03 01:20 UTC — Swagger UI-style explorer API probing page
 
 what do you think of a page in our wallet/explorer that has a "swagger ui" feel and allows you to probe a public api node with input boxes and pulldowns.
 
 ---
 
-### #364 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
+### #358 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
 
 B
 
 ---
 
-### #365 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
+### #359 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
 
 looks golden
 
 ---
 
-### #366 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
+### #360 — 2026-10-03 01:25 UTC — Swagger UI-style explorer API probing page
 
 yes golden
 
 ---
 
-### #367 — 2026-10-03 01:26 UTC — Swagger UI-style explorer API probing page
+### #361 — 2026-10-03 01:26 UTC — Swagger UI-style explorer API probing page
 
 yes perfect
 
 ---
 
-### #368 — 2026-10-03 01:26 UTC — Swagger UI-style explorer API probing page
+### #362 — 2026-10-03 01:26 UTC — Swagger UI-style explorer API probing page
 
 yes but it should have also some kind of warning that pops up regarding the fact that this is an advanced use case and please confirm you understand you know what you're doing
 
 ---
 
-### #369 — 2026-10-03 01:28 UTC — Swagger UI-style explorer API probing page
+### #363 — 2026-10-03 01:28 UTC — Swagger UI-style explorer API probing page
 
 yes spec out, create build todo list, then get busy.  I'm going to be afk for a bit again.  just keep rolling through completion of our new "swagger" like interface
 
 ---
 
-### #370 — 2026-10-03 01:40 UTC — Swagger UI-style explorer API probing page
+### #364 — 2026-10-03 01:40 UTC — Swagger UI-style explorer API probing page
 
 continue building the api lab
 
 ---
 
-### #371 — 2026-10-03 01:41 UTC — Reviewing api-lab build work
+### #365 — 2026-10-03 01:41 UTC — Reviewing api-lab build work
 
 another agent has been busy building an api-lab, review their work and tell me about it
 
 ---
 
-### #372 — 2026-10-03 01:43 UTC — Reviewing api-lab build work
+### #366 — 2026-10-03 01:43 UTC — Reviewing api-lab build work
 
 add a document to the workspace to call the other agent out on issues you uncovered.
 
 ---
 
-### #373 — 2026-10-03 01:45 UTC — Reviewing api-lab build work
+### #367 — 2026-10-03 01:45 UTC — Reviewing api-lab build work
 
 now... I want you to spec out an elastic search es-lab-ui browser with a similar swagger feel.  doable?
 
 ---
 
-### #374 — 2026-10-03 01:52 UTC — Reviewing api-lab build work
+### #368 — 2026-10-03 01:52 UTC — Reviewing api-lab build work
 
 go ahead and build.  this should not be a partial build; full masterclass.  excellent coverage.  ux that blows away the "
 
 ---
 
-### #375 — 2026-10-03 01:52 UTC — Reviewing api-lab build work
+### #369 — 2026-10-03 01:52 UTC — Reviewing api-lab build work
 
 blows away the "kibana" experience
 
 ---
 
-### #376 — 2026-10-03 01:54 UTC — Reviewing api-lab build work
+### #370 — 2026-10-03 01:54 UTC — Reviewing api-lab build work
 
 I'm going to be away from the keyboard.   just keep rolling.  use todo tail invariant as per afk-keep-rolling workspace/skills to finish the task without further interruption and I'll review the finished product upon return.  mimic the styling cues of the api explorer that was just built in git history.
 
 ---
 
-### #377 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
+### #371 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
 
 you can commit everything; even work that is not yours.
 
 ---
 
-### #378 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
+### #372 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
 
 you can also make any repairs that you specified in the api-lab review
 
 ---
 
-### #379 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
+### #373 — 2026-10-03 02:45 UTC — Reviewing api-lab build work
 
 then commit again.
 
 ---
 
-### #380 — 2026-10-03 02:48 UTC — Burger menu headings to styled TOC pages
+### #374 — 2026-10-03 02:48 UTC — Burger menu headings to styled TOC pages
 
 ok the burger menu in our app... I think it needs to be reduced to just the main headings.   then each heading needs to go to its own well formatted table of contents page with links.  those contents pages need to be better stylized.
 
 ---
 
-### #381 — 2026-10-03 02:52 UTC — Burger menu headings to styled TOC pages
+### #375 — 2026-10-03 02:52 UTC — Burger menu headings to styled TOC pages
 
 I go with your recommended approach.  make sure our burger menu is a comprehensive site map.   also... check over our help section and make sure all the new features we've added are fully documented.
 
 ---
 
-### #382 — 2026-10-03 02:53 UTC — Burger menu headings to styled TOC pages
+### #376 — 2026-10-03 02:53 UTC — Burger menu headings to styled TOC pages
 
 you have my approval to spec it out and complete the full masterful build.  put everything you need to do into the side bar todo list and get busy.  spec is pre approved.  I'm going to sleep for the evening.  please just keep rolling .  review afk-keep-rolling workspace/skills for details on setting up a tail invariant.  Good night.
 
 ---
 
-### #383 — 2026-10-03 03:18 UTC — Burger menu headings to styled TOC pages
+### #377 — 2026-10-03 03:18 UTC — Burger menu headings to styled TOC pages
 
 ok now the help and report buttons on the bottom of the page.  currently help goes to a full awesome list of help topics, docs and community links.  I want that split into two pages... one docs/help topics... the other community links and I want "report" to link to the community links page instead of @bitsharesdev.  help will then just link to the help/docs
 
 ---
 
-### #384 — 2026-10-03 03:25 UTC — Burger menu headings to styled TOC pages
+### #378 — 2026-10-03 03:25 UTC — Burger menu headings to styled TOC pages
 
 create an about page that explains the design philosophy of the wallet in a marketing oriented way
 
 ---
 
-### #385 — 2026-10-03 03:26 UTC — Burger menu headings to styled TOC pages
+### #379 — 2026-10-03 03:26 UTC — Burger menu headings to styled TOC pages
 
 then make sure everything is commited so I can push
 
 ---
 
-### #386 — 2026-10-03 03:27 UTC — Burger menu headings to styled TOC pages
+### #380 — 2026-10-03 03:27 UTC — Burger menu headings to styled TOC pages
 
 finish up and commit again
 
 ---
 
-### #387 — 2026-10-03 03:29 UTC — Burger menu headings to styled TOC pages
+### #381 — 2026-10-03 03:29 UTC — Burger menu headings to styled TOC pages
 
 make multilingual support our 10th guiding principle and make sure among those we currently support, russian, chinese, hindi, korean, japanese, and turkish are also supported.  multilingual must be comprehensive through the app.
 
 ---
 
-### #388 — 2026-10-03 03:35 UTC — Burger menu headings to styled TOC pages
+### #382 — 2026-10-03 03:35 UTC — Burger menu headings to styled TOC pages
 
 you have my approval to spec it out and complete the full masterful build.  put everything you need to do into the side bar todo list and get busy.  spec is pre approved.  I'm going to sleep for the evening.  please just keep rolling .  review afk-keep-rolling workspace/skills for details on setting up a tail invariant.  Good night.
 
 ---
 
-### #389 — 2026-10-03 03:51 UTC — Burger menu headings to styled TOC pages
+### #383 — 2026-10-03 03:51 UTC — Burger menu headings to styled TOC pages
 
 continue
 
 ---
 
-### #390 — 2026-10-03 10:23 UTC — Burger menu headings to styled TOC pages
+### #384 — 2026-10-03 10:23 UTC — Burger menu headings to styled TOC pages
 
 continue
 
 ---
 
-### #391 — 2026-10-03 10:50 UTC — Burger menu headings to styled TOC pages
+### #385 — 2026-10-03 10:50 UTC — Burger menu headings to styled TOC pages
 
 rate limit resolved.  continue.
 
 ---
 
-### #392 — 2026-10-03 10:59 UTC — Changing top page signed-in user display
+### #386 — 2026-10-03 10:59 UTC — Changing top page signed-in user display
 
 when I look up user account how do I actually change the user I'm "not signed in as" on the top of the page from committe-account to something else not signed in?
 
 ---
 
-### #393 — 2026-10-03 11:01 UTC — Changing top page signed-in user display
+### #387 — 2026-10-03 11:01 UTC — Changing top page signed-in user display
 
 no that's not right. the ux should be that I'm able to still be locked and acting as any account; just defaulting to committee-account not signed in... but I should be able to also pick another non signed in account at will.
 
 ---
 
-### #394 — 2026-10-03 11:04 UTC — Changing top page signed-in user display
+### #388 — 2026-10-03 11:04 UTC — Changing top page signed-in user display
 
 yes build it
 
 ---
 
-### #395 — 2026-10-03 11:04 UTC — Changing top page signed-in user display
+### #389 — 2026-10-03 11:04 UTC — Changing top page signed-in user display
 
 make sure multilingual is complete in anything you build; guiding principle 10
 
 ---
 
-### #396 — 2026-10-03 11:40 UTC — Swagger UI-style explorer API probing page
+### #390 — 2026-10-03 11:40 UTC — Swagger UI-style explorer API probing page
 
 rate limit resolved.  continue.
 
 ---
 
-### #397 — 2026-10-03 11:40 UTC — Swagger UI-style explorer API probing page
+### #391 — 2026-10-03 11:40 UTC — Swagger UI-style explorer API probing page
 
 I'm back.  Please complete the api lab
 
 ---
 
-### #398 — 2026-10-03 11:40 UTC — Burger menu headings to styled TOC pages
+### #392 — 2026-10-03 11:40 UTC — Burger menu headings to styled TOC pages
 
 rate limit resolved.  continue.
 
 ---
 
-### #399 — 2026-10-03 11:41 UTC — Changing top page signed-in user display
+### #393 — 2026-10-03 11:41 UTC — Changing top page signed-in user display
 
 rate limit resolved.  continue.
 
 ---
 
-### #400 — 2026-10-03 12:04 UTC — Checking commits ready for push
+### #394 — 2026-10-03 12:04 UTC — Checking commits ready for push
 
 is everything fully committed and ready for push?
 
 ---
 
-### #401 — 2026-10-03 12:05 UTC — Checking commits ready for push
+### #395 — 2026-10-03 12:05 UTC — Checking commits ready for push
 
 overview of features landed last night
 
 ---
 
-### #402 — 2026-10-03 12:11 UTC — API lab and ES lab template review
+### #396 — 2026-10-03 12:11 UTC — API lab and ES lab template review
 
 review the api lab and es lab.  are there more templates we should add?
 
 ---
 
-### #403 — 2026-10-03 12:12 UTC — API lab and ES lab template review
+### #397 — 2026-10-03 12:12 UTC — API lab and ES lab template review
 
 build it.  comprehensive coverage.
 
 ---
 
-### #404 — 2026-10-03 12:16 UTC — Price plot pool mapper default setup
+### #398 — 2026-10-03 12:16 UTC — Price plot pool mapper default setup
 
 review the exchange and pool trading desks.   I want just the price plot and the pool mapper plot defaulted to on... the rest should be off but available in the indicators pulldown.
 
 ---
 
-### #405 — 2026-10-03 12:22 UTC — Price plot pool mapper default setup
+### #399 — 2026-10-03 12:22 UTC — Price plot pool mapper default setup
 
 ok sometimes the app loses connection; like I'm in pools page and then it says lost connection and there's a retry button but it does nothing.  Why can't we just reattempt a handshake and if that fails then instead of "retry button" have a "settings" button that actually goes to the nodes page.
 
 ---
 
-### #406 — 2026-10-03 12:23 UTC — Price plot pool mapper default setup
+### #400 — 2026-10-03 12:23 UTC — Price plot pool mapper default setup
 
 on any loss of connectivity it almost always means we just need to handshake again; that should be automated behavior
 
 ---
 
-### #407 — 2026-10-03 12:25 UTC — Price plot pool mapper default setup
+### #401 — 2026-10-03 12:25 UTC — Price plot pool mapper default setup
 
 not just in the pools page... reattempting handshake should always be default behavior and if that repeatedly fails then we should offer the user a button to go to settings and a suggestion to switch nodes.  make sure this behavior is not an issue elsewhere... users interpret connectivity issues as buggy software.
 
 ---
 
-### #408 — 2026-10-03 12:35 UTC — Price plot pool mapper default setup
+### #402 — 2026-10-03 12:35 UTC — Price plot pool mapper default setup
 
 is everything committed?
 
 ---
 
-### #409 — 2026-10-03 12:39 UTC — Price plot pool mapper default setup
+### #403 — 2026-10-03 12:39 UTC — Price plot pool mapper default setup
 
 split commit
 
 ---
 
-### #410 — 2026-10-03 12:46 UTC — Price plot pool mapper default setup
+### #404 — 2026-10-03 12:46 UTC — Price plot pool mapper default setup
 
 did we ever accomplish the browser extension signing that prevents xss attack?
 
 ---
 
-### #411 — 2026-10-03 12:46 UTC — Price plot pool mapper default setup
+### #405 — 2026-10-03 12:46 UTC — Price plot pool mapper default setup
 
 spec out the upgrade
 
 ---
 
-### #412 — 2026-10-03 12:56 UTC — Price plot pool mapper default setup
+### #406 — 2026-10-03 12:56 UTC — Price plot pool mapper default setup
 
 1) yes A 2) yes as recommended 3) yes existing.   I have another question... does it make sense to have in browsers vs via extension option for signing on the settings page and have a warning for in browser?
 
 ---
 
-### #413 — 2026-10-03 13:00 UTC — Price plot pool mapper default setup
+### #407 — 2026-10-03 13:00 UTC — Price plot pool mapper default setup
 
 auto prefer extension when detected. settings only.  settings page should also have some info not just on downsides of in browser but maybe we also need a guidance page on installing the extension on various browswers so the path forward to better security is clear.
 
 ---
 
-### #414 — 2026-10-03 13:02 UTC — Price plot pool mapper default setup
+### #408 — 2026-10-03 13:02 UTC — Price plot pool mapper default setup
 
 maybe we should replace that lock with a new icon / indicator that demonstrates extension signing?  help me consider this ux
 
 ---
 
-### #415 — 2026-10-03 13:03 UTC — Price plot pool mapper default setup
+### #409 — 2026-10-03 13:03 UTC — Price plot pool mapper default setup
 
 yes I like the shield and lock indicators.
 
 ---
 
-### #416 — 2026-10-03 13:03 UTC — Price plot pool mapper default setup
+### #410 — 2026-10-03 13:03 UTC — Price plot pool mapper default setup
 
 build it.  you have full authorization to complete the upgrade.
 
 ---
 
-### #417 — 2026-10-03 13:04 UTC — Price plot pool mapper default setup
+### #411 — 2026-10-03 13:04 UTC — Price plot pool mapper default setup
 
 all 8 phases are approved
 
 ---
 
-### #418 — 2026-10-03 13:05 UTC — Price plot pool mapper default setup
+### #412 — 2026-10-03 13:05 UTC — Price plot pool mapper default setup
 
 use workspace/skills/afk-keep-rolling to complete the 8 steps while I'm away.  just keep rolling until complete or I return.
 
 ---
 
-### #419 — 2026-10-03 13:07 UTC — Implementing Bitshares vanilla UI issue #1
+### #413 — 2026-10-03 13:07 UTC — Implementing Bitshares vanilla UI issue #1
 
 https://github.com/litepresence/bitshares-vanilla-ui/issues/1 review this issue and implement a solution
 
