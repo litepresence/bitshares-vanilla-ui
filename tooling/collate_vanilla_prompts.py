@@ -1,15 +1,19 @@
-"""Collate the user's vanilla-UI prompts across opencode sessions into one doc.
+"""Collate the user's vanilla-UI prompts across opencode sessions into two docs.
 
-What it does: for a fixed list of /workspace main-session IDs (human sessions
-only, never @general subagent workers), reads every user-role message's
-verbatim text parts and writes them time-ordered to docs/vanilla-ui-prompts.md.
+Outputs (same numbering in both, so #N is the same prompt in each file):
+- docs/vanilla-ui-prompts.md: verbatim user prompts only, time-ordered.
+- docs/vanilla-ui-dialog.md: each prompt followed by the assistant's reply
+  text (final visible response only -- no reasoning/tool-call internals),
+  forming a readable user/assistant dialog.
 
-Read-only against opencode.db (uri mode=ro). All lookups are indexed
-(session by id, message by session_id, part by message_id) -- never a
-full-table scan, never a write/VACUUM while opencode is live.
+Source: fixed list of /workspace main-session IDs (human sessions only,
+never @general subagent workers). Read-only against opencode.db
+(uri mode=ro). All lookups are indexed (session by id, message by
+session_id, part by message_id) -- never a full-table scan, never a
+write/VACUUM while opencode is live.
 
 Usage: python3 tooling/collate_vanilla_prompts.py
-Rerun is idempotent (rewrites the doc).
+Rerun is idempotent (rewrites both docs).
 """
 
 import datetime
@@ -18,6 +22,7 @@ import sqlite3
 
 DB = "file:/root/.local/share/opencode/opencode.db?mode=ro"
 OUT = "/workspace/docs/vanilla-ui-prompts.md"
+OUT_DIALOG = "/workspace/docs/vanilla-ui-dialog.md"
 
 # Human sessions that created bitshares-vanilla-ui (excludes translation,
 # EPUB/OCR, oracle-design, protocol-audit, and all subagent worker sessions).
@@ -75,6 +80,23 @@ def utc(ms: int) -> str:
     ).strftime("%Y-%m-%d %H:%M UTC")
 
 
+def _text_parts(cur: sqlite3.Cursor, message_id: str) -> list[str]:
+    """Verbatim non-empty text parts of one message, in stored order."""
+    cur.execute(
+        "SELECT data FROM part WHERE message_id=? ORDER BY time_created",
+        (message_id,),
+    )
+    texts = []
+    for (pdata,) in cur.fetchall():
+        try:
+            pj = json.loads(pdata)
+        except ValueError:
+            continue
+        if pj.get("type") == "text" and pj.get("text", "").strip():
+            texts.append(pj["text"])
+    return texts
+
+
 def main() -> None:
     db = sqlite3.connect(DB, uri=True, timeout=30)
     cur = db.cursor()
@@ -90,14 +112,16 @@ def main() -> None:
         row = cur.fetchone()
         titles[sid] = row[0] if row else sid
 
-    prompts: list[tuple[int, str, str, str]] = []  # (time, sid, mid, text)
+    prompts: list[tuple[int, str, str, str, str]] = []  # (time, sid, mid, user, reply)
     for sid in sessions:
         cur.execute(
             "SELECT id, time_created FROM message "
             "WHERE session_id=? ORDER BY time_created",
             (sid,),
         )
-        for mid, mtc in cur.fetchall():
+        ordered = cur.fetchall()
+        roles: dict[str, str] = {}
+        for mid, _mtc in ordered:
             if mid in EXCLUDE_MESSAGE_IDS:
                 continue
             cur.execute("SELECT data FROM message WHERE id=?", (mid,))
@@ -105,25 +129,25 @@ def main() -> None:
             if not row:
                 continue
             try:
-                role = json.loads(row[0]).get("role")
+                roles[mid] = json.loads(row[0]).get("role", "")
             except (ValueError, AttributeError):
                 continue
-            if role != "user":
+        user_times = [(mid, mtc) for mid, mtc in ordered
+                      if roles.get(mid) == "user"]
+        for idx, (mid, mtc) in enumerate(user_times):
+            texts = _text_parts(cur, mid)
+            if not texts:
                 continue
-            cur.execute(
-                "SELECT data FROM part WHERE message_id=? ORDER BY time_created",
-                (mid,),
-            )
-            texts = []
-            for (pdata,) in cur.fetchall():
-                try:
-                    pj = json.loads(pdata)
-                except ValueError:
+            end = user_times[idx + 1][1] if idx + 1 < len(user_times) else 10**18
+            reply_chunks = []
+            for amid, amtc in ordered:
+                if not (mtc < amtc < end):
                     continue
-                if pj.get("type") == "text" and pj.get("text", "").strip():
-                    texts.append(pj["text"])
-            if texts:
-                prompts.append((mtc, sid, mid, "\n".join(texts)))
+                if roles.get(amid) != "assistant":
+                    continue
+                reply_chunks.extend(_text_parts(cur, amid))
+            prompts.append((mtc, sid, mid, "\n".join(texts),
+                            "\n\n".join(reply_chunks)))
 
     prompts.sort(key=lambda p: p[0])
 
@@ -158,7 +182,7 @@ def main() -> None:
     lines.append("")
 
     current_day = ""
-    for i, (mtc, sid, mid, text) in enumerate(prompts, 1):
+    for i, (mtc, sid, mid, text, _reply) in enumerate(prompts, 1):
         day = utc(mtc)[:10]
         if day != current_day:
             current_day = day
@@ -176,6 +200,56 @@ def main() -> None:
 
     chars = sum(len(p[3]) for p in prompts)
     print(f"wrote {OUT}: {len(prompts)} prompts, {chars} chars")
+
+    dlines = []
+    dlines.append("# bitshares-vanilla-ui — dialog history")
+    dlines.append("")
+    dlines.append(
+        "The vanilla-UI build as a user/assistant dialog: each verbatim user "
+        "prompt followed by the assistant's reply text (the final visible "
+        "response only -- no reasoning or tool-call internals). Numbering "
+        "matches docs/vanilla-ui-prompts.md exactly. Times are UTC."
+    )
+    dlines.append("")
+    dlines.append(
+        f"Generated {utc(int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000))} "
+        f"from opencode.db: {len(prompts)} exchanges across {len(sessions)} sessions."
+    )
+    dlines.append("")
+    dlines.append("---")
+    dlines.append("")
+
+    current_day = ""
+    n_replied = 0
+    for i, (mtc, sid, _mid, text, reply) in enumerate(prompts, 1):
+        day = utc(mtc)[:10]
+        if day != current_day:
+            current_day = day
+            dlines.append(f"## {day}")
+            dlines.append("")
+        dlines.append(f"### #{i} — {utc(mtc)} — {titles[sid]}")
+        dlines.append("")
+        dlines.append("**You:**")
+        dlines.append("")
+        dlines.append(text.strip())
+        dlines.append("")
+        dlines.append("**Assistant:**")
+        dlines.append("")
+        if reply.strip():
+            dlines.append(reply.strip())
+            n_replied += 1
+        else:
+            dlines.append("*(no reply recorded -- next prompt followed immediately)*")
+        dlines.append("")
+        dlines.append("---")
+        dlines.append("")
+
+    with open(OUT_DIALOG, "w", encoding="utf-8") as f:
+        f.write("\n".join(dlines))
+
+    rchars = sum(len(p[4]) for p in prompts)
+    print(f"wrote {OUT_DIALOG}: {len(prompts)} exchanges, "
+          f"{n_replied} with reply, {rchars} reply chars")
 
 
 if __name__ == "__main__":
