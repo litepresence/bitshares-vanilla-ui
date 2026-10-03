@@ -441,3 +441,26 @@ Anti-rot: (a) platform only (WS/fetch/localStorage); (b) nothing new depended
 on (snapshot is data, refresh is probe); (c) deletable: history-cap (callers
 fall back to Chain.history fail-soft), esEnabled key (reads as ON), probe
 flag (pill reads snapshot) — kept because every later phase reads them.
+
+## Delta 2026-10-03 — view-as multilingual completion + verification (Task 5)
+Tasks 1–4 reviewed clean (ViewingAs state, header picker, dashboard/accounts
+reuse, 18-file form sweep); Task 5 is audit-only and needed zero code fixes.
+(1) Drift gate: `python3 tooling/check_i18n.py` →
+`OK: 12 dicts key-complete (3497 keys); allowlists exact; stubs honest;
+4287 t() call sites drift-free.` (2) Hardcoded-string sweep over
+`api/viewing-as.js`, `app.js`, `views/{accounts,account,dashboard}-ui.js` →
+no output; wider `vanilla/js` sweep likewise clean (only `t("…")` call
+sites). (3) Placeholder-verbatim: no new non-`viewing.*` interpolations added
+by this plan (`transfer-confirm.js:188`, `barter-ui.js:229` predate it —
+HEAD's barter touch uses `viewing.notice_locked` only); `%(name)s`/`%(id)s`
+byte-verbatim in all 12 locales for `header_locked`/`header_unlocked`/
+`notice_locked` (fr/ja/tr translated + audited, 8 stubs honestly English).
+(4) Rot PASS (`vanilla/ is dependency-free and static-servable`); types PASS
+(`checkJs, no emit`); headless trio `#/accounts` 360px+1440px ×
+ref-ui/vanilla-ui/dex-ux themes — 6/6 captured, zero console errors
+(`/tmp/viewas-{360,1440}-*.png`); keyboard: picker is a native `<button>`
+(tabindex 0), headless `focus()` lands, click opens the `View as account`
+dialog with focus in the input (`dialog_hint` keyed string shown);
+reduced-motion passes by construction (viewing-as adds no animation;
+global `prefers-reduced-motion` guard in `app.css:1118` zeroes transitions).
+Step-5 commit skipped: no fixes were needed, so no empty commit.
