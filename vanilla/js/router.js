@@ -1,6 +1,8 @@
 /* Router: hash router rendering §6 routes into #view. No dependencies.
  * Owns: the §6 route table, pattern matching (matchPattern/match), render
- *   dispatch + 404/home/market shells. Consumes: view globals by feature
+ *   dispatch + 404/home/market shells, hash query parsing (query() for view
+ *   workers reading #/path?k=v — e.g. the invoice pre-fill). Consumes: view
+ *   globals by feature
  *   (MarketUI/AccountUI/etc, guarded — placeholder when absent), I18n.t for
  *   shell strings (guarded fallback), window.location.hash. Side effects: DOM
  *   under the given #view element + document.title, hashchange listener on
@@ -249,6 +251,7 @@ var Router = (function () {
     { path: "/top-ops", title: "Top Operations", render: function (root) { TopOpsUI.renderTopOps(root); } },
     { path: "/ops", title: "Top Operations", render: function (root) { OpsUI.renderOps(root); } },
     { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
+    { path: "/api-lab", title: "API Lab", render: function (root) { ApiLabUI.renderLab(root); } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 
@@ -322,6 +325,35 @@ var Router = (function () {
     if (path.length > 1 && path.charAt(path.length - 1) === "/") path = path.slice(0, -1);
     if (path.charAt(0) !== "/") path = "/" + path;
     return path;
+  }
+
+  /* query: decoded query params of the current hash (e.g. #/invoice?to=a
+   *   reads {to:"a"}). Owns: hash query parsing for view workers — the
+   *   invoice pre-fill reads this (BitsharesURI.open navigates, the view
+   *   owns validation/render). Params: none. Returns a plain object
+   *   (possibly {}). Fails: never throws — bad % escapes fall back to raw
+   *   text, duplicate keys last-win, a missing hash yields {}. */
+  function query() {
+    var hash = "";
+    if (typeof window !== "undefined" && window.location && typeof window.location.hash === "string") {
+      hash = window.location.hash;
+    }
+    var qi = hash.indexOf("?");
+    if (qi === -1) return {};
+    var out = {};
+    var parts = hash.slice(qi + 1).split("&");
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      var eq = parts[i].indexOf("=");
+      var rk = eq === -1 ? parts[i] : parts[i].slice(0, eq);
+      var rv = eq === -1 ? "" : parts[i].slice(eq + 1);
+      var k, v;
+      try { k = decodeURIComponent(rk); } catch (e) { k = rk; }
+      try { v = decodeURIComponent(rv); } catch (e2) { v = rv; }
+      if (!k) continue;
+      out[k] = v;
+    }
+    return out;
   }
 
   /* a11ySweep: post-render accessibility backstop (a11y audit 2026-09-30).
@@ -422,7 +454,7 @@ var Router = (function () {
     render();
   }
 
-  return { start: start, routes: routes, match: match, placeholder: placeholder };
+  return { start: start, routes: routes, match: match, placeholder: placeholder, query: query };
 })();
 
 /* Expose the single Router global to Node for headless smoke tests (no-op in browsers). */
