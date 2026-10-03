@@ -3535,6 +3535,29 @@
     "all_pages": "All pages",
     "section_more": "More",
     "p_community": "Community",
-    "d_community": "Chats, forums, explorers, and code."
+    "d_community": "Chats, forums, explorers, and code.",
+    "p_about": "About",
+    "d_about": "What this wallet is and why it is built this way."
+  },
+  "about": {
+    "hero_title": "BitShares, in your browser. Nothing to install.",
+    "hero_lede": "A complete wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser.",
+    "cta_trade": "Open the exchange",
+    "cta_guides": "Read the guides",
+    "s1_title": "Your keys never leave this browser",
+    "s1_body": "Accounts live in an encrypted vault on your device, and every transaction is signed locally before broadcast. The nodes you connect to never see your secrets — which is also why backups are yours alone: lose the brainkey and nobody can recover your funds.",
+    "s2_title": "A real exchange, not a screenshot",
+    "s2_body": "Order books, liquidity pools, swaps, borrowing, credit, prediction markets, and voting all settle on-chain. What you see is the chain itself — books you can trade against, not pictures of books.",
+    "s3_title": "Built to outlive its builders",
+    "s3_body": "The wallet it replaces died under a hundred stale packages and a toolchain nobody can reproduce. This one depends on nothing with a release cycle: no framework, no package manager, no build step. If everyone walks away for ten years, it still runs in a browser.",
+    "s4_title": "Familiar, but alive",
+    "s4_body": "Returning users feel at home instantly — the same pages, panels, and words as the classic wallet — while balances, books, and connection status update live in place. Fast forgiving search everywhere, three themes, and layouts that work from a 360px phone to a 4K trading desk.",
+    "s5_title": "Numbers you can trust",
+    "s5_body": "The chain speaks integers; you never see them. Every amount sits at its asset's decimals, every percent at its true value, and every fee is previewed from the live chain before you sign — never estimated, never guessed.",
+    "s6_title": "Honest limits",
+    "s6_body": "Gateways are custodians holding your outside coins — read their terms as the custody deal it is. The history index is run by the community, not by this wallet. Some features have no testnet data by nature, and there is no in-app news feed by decision. Where this wallet cannot know, it says so instead of guessing.",
+    "links_title": "Go further",
+    "link_source": "Source code",
+    "link": "About"
   }
 }

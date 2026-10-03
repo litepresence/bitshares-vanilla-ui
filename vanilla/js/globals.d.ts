@@ -6,6 +6,7 @@
  * Removal: delete this file + the gate if TypeScript ever becomes
  * unobtainable (the app runs without it).
  */
+declare var AboutUI: any;
 declare var Account: any;
 declare var AccountUI: any;
 declare var AccountsUI: any;

@@ -25,7 +25,7 @@ global.I18n = { t: function (k, d) { return d; } };
 var fs = require("fs");
 var MenuUI = require(%s);
 var HelpUI = require(%s);
-var out = { menu: {}, help: {}, account: {} };
+var out = { menu: {}, help: {}, account: {}, about: {} };
 MenuUI.SECTIONS.forEach(function (s) {
   out.menu[s.titleKey.replace(/^menu\./, "")] = s.titleDefault;
   out.menu[s.blurbKey.replace(/^menu\./, "")] = s.blurbDefault;
@@ -36,7 +36,7 @@ MenuUI.SECTIONS.forEach(function (s) {
 });
 function inline(file, prefix) {
   var src = fs.readFileSync(file, "utf8");
-  var re = /t\(\s*"((?:menu|account|help)\.[a-z_0-9]+)"\s*,\s*"((?:[^"\\\n]|\\.)*)"\s*[,)]/g;
+  var re = /t\(\s*"((?:menu|account|help|about)\.[a-z_0-9]+)"\s*,\s*"((?:[^"\\\n]|\\.)*)"\s*[,)]/g;
   var m;
   while ((m = re.exec(src)) !== null) {
     var key = m[1], val = m[2];
@@ -51,6 +51,8 @@ inline(%s, "menu");
 inline(%s, "menu");
 inline(%s, "menu");
 inline(%s, "help");
+inline(%s, "about");
+inline(%s, "about");
 inline(%s, "account");
 HelpUI.TOPICS.forEach(function (row) {
   out.help["topic_" + row[0] + "_title"] = row[1];
@@ -65,6 +67,8 @@ console.log(JSON.stringify(out));
     json.dumps(os.path.join(JS, "app.js")),
     json.dumps(os.path.join(JS, "views", "help-ui.js")),
     json.dumps(os.path.join(JS, "views", "help-ui.js")),
+    json.dumps(os.path.join(JS, "views", "about-ui.js")),
+    json.dumps(os.path.join(JS, "app.js")),
     json.dumps(os.path.join(JS, "views", "account-ui.js")),
 )
 
@@ -90,6 +94,7 @@ def main():
         len(batch["menu"]), len(batch["help"]), len(batch["account"])))
     assert len(batch["menu"]) > 100, "menu dump too small — regex broke?"
     assert len(batch["help"]) == 61 * 3 + 3, "help dump must cover 61 topics x3 + 3 community keys"
+    assert len(batch["about"]) == 19, "about dump must cover 19 page keys"
 
     for code in sorted(os.listdir(LOCALES)):
         if not code.endswith(".json"):
@@ -112,6 +117,11 @@ def main():
         for k, v in batch["account"].items():
             if acc.get(k) != v:
                 acc[k] = v
+                changed += 1
+        abt = data.setdefault("about", {})
+        for k, v in batch["about"].items():
+            if abt.get(k) != v:
+                abt[k] = v
                 changed += 1
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)

@@ -228,6 +228,10 @@ var Router = (function () {
     { path: "/create-wallet-brainkey", title: "Create Wallet (Brainkey)", render: function (root, params) { WalletUI.renderCreate(root, params); } },
     { path: "/existing-account", title: "Existing Account", render: function (root, params) { WalletUI.renderImport(root, params); } },
     { path: "/create-worker", title: "Create Worker", render: function (root) { CreateWorkerUI.renderCreateWorker(root); } },
+    { path: "/about", title: "About", render: function (root) {
+      if (typeof AboutUI !== "undefined" && AboutUI && typeof AboutUI.renderAbout === "function") { AboutUI.renderAbout(root); return; }
+      placeholder("About")(root);
+    } },
     { path: "/community", title: "Community", render: function (root) {
       if (typeof HelpUI !== "undefined" && HelpUI && typeof HelpUI.renderCommunity === "function") { HelpUI.renderCommunity(root); return; }
       placeholder("Community")(root);

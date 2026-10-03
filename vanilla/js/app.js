@@ -409,9 +409,9 @@ var App = (function () {
     });
   }
 
-  /* paintFootActions: footer REPORT + HELP buttons (Footer.jsx:666-699
-   *   introjs-launcher pair). REPORT is an internal link to the Community
-   *   page (help/community split 2026-10-04 — was an external t.me invite);
+  /* paintFootActions: footer REPORT + ABOUT + HELP buttons
+   *   (Footer.jsx:666-699 introjs-launcher pair + about spec 2026-10-04).
+   *   REPORT is an internal link to the Community page; ABOUT to #/about;
    *   HELP reuses the help key and routes to the docs index (#/help,
    *   router.js /help/** -> HelpUI.renderHelp — verified present). Never throws. */
   function paintFootActions() {
@@ -419,6 +419,8 @@ var App = (function () {
     try {
       var report = document.getElementById("foot-report");
       if (report) report.textContent = t("shell.report", "REPORT");
+      var about = document.getElementById("foot-about");
+      if (about) about.textContent = t("about.link", "About");
       var help = document.getElementById("foot-help");
       if (help) help.textContent = t("help.help", "Help");
     } catch (e) { /* static skeleton stands */ }

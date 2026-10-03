@@ -13,11 +13,11 @@ eq(MenuUI.SECTIONS.length, 6, "six sections");
 eq(MenuUI._test.sectionSlugs().join(","), "wallet,trade,earn,govern,explore,labs", "slug order");
 var all = [];
 MenuUI.SECTIONS.forEach(function (s) { s.links.forEach(function (l) { all.push(l.href); }); });
-eq(all.length, 52, "52 listed pages");
+eq(all.length, 53, "53 listed pages");
 eq(new Set(all).size, all.length, "no href listed twice (single-home)");
 ["#/", "#/transfer", "#/market/BTS_USD", "#/samet", "#/barter", "#/spotlight",
  "#/direct-debit", "#/api-lab", "#/es-lab", "#/txbuilder", "#/ops", "#/top-ops",
- "#/registration", "#/voting", "#/fees", "#/news", "#/community"].forEach(function (h) {
+ "#/registration", "#/voting", "#/fees", "#/news", "#/community", "#/about"].forEach(function (h) {
   ok(all.indexOf(h) !== -1, h + " listed");
 });
 eq(MenuUI._test.findSection("earn").links.length, 7, "earn has 7 links");
