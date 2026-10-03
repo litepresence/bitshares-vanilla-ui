@@ -892,19 +892,11 @@ tooling/visual/shot.mjs         ← OPTIONAL visual-iteration aid (headless Chro
                                     browser pass stays the gate. Needs
                                     PLAYWRIGHT_BROWSERS_PATH=.browsers in that dir.
 ```
-
-### Phase 2 — Design the vanilla skeleton
-
-- `vanilla/index.html`, `vanilla/css/app.css`, `vanilla/js/{router,store,chain,ui}.js`
-- Hash router covering all §6 routes (stubs OK), settings/node switcher working
-  against a public testnet node, no styling beyond readability.
-- Decide crypto vendoring (see §3 build-principle 4 + §5.5) and document per-file provenance.
-
 ### Phase 3 — Vertical slices (one at a time, testnet-verified)
 
 Binding order: `/workspace/SLICES.md`. Each slice: spec → implement →
 testnet check → parity note. Do not start slice N+1 until slice N passes its
-checklist. Parity = §2.6 (both references + responsiveness).
+checklist. Parity = the §2 objectives paragraph (both references + responsiveness).
 
 ---
 
@@ -1043,5 +1035,4 @@ are binding and this section is history.
 
 ---
 
-*Last updated: 2026-09-27. Reference HEADs: bitshares-ui `79f8cca` (develop), astro-ui `5037d61` (main), wallet-extension `ebb7451` (master), bitshares-core `fe7000c` (develop, sparse). Binding slice order: `/workspace/SLICES.md`. Next action:
-slice 7 (indicators + candles + desk restyle) — build in progress.*
+*Last updated: 2026-10-03. Reference HEADs: bitshares-ui `79f8cca` (develop), astro-ui `5037d61` (main), wallet-extension `ebb7451` (master), bitshares-core `fe7000c` (develop, sparse). Binding slice order: `/workspace/SLICES.md`. Next action: see SLICES.md.*
