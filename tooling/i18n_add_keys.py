@@ -159,6 +159,9 @@ BATCHES = [
         "eslab.link_copied": "Shareable link ready (also in the address bar after Run).",
         "eslab.mainnet_only": "Community index covers mainnet only — testnet accounts and new objects may be missing.",
         "eslab.no_result": "No result yet — fill the boxes and press Run.",
+        "eslab.no_rows": "0 rows — the index returned nothing for this query.",
+        "eslab.no_socket": "Wallet is offline — connect a node in Settings to resolve account names (or type a 1.2.x id).",
+        "eslab.prec_unknown": "Precision unknown — raw integer.",
         "eslab.raw_body": "Query body JSON",
         "eslab.raw_dsl": "Raw query JSON (mirrors the boxes)",
         "eslab.raw_index": "Index",
@@ -177,6 +180,13 @@ BATCHES = [
         "eslab.title": "ES Lab",
         "eslab.unavailable_notice": "Index unreachable. Check your connection and retry, or review Settings.",
         "eslab.unknown_account": "Unknown account — use a 1.2.x id or check spelling.",
+    }),
+    # Follow-up keys for existing trees (the None batch above only
+    # bootstraps fresh namespaces — anchored insert for live dicts).
+    ("eslab", "no_result", {
+        "eslab.no_rows": "0 rows — the index returned nothing for this query.",
+        "eslab.no_socket": "Wallet is offline — connect a node in Settings to resolve account names (or type a 1.2.x id).",
+        "eslab.prec_unknown": "Precision unknown — raw integer.",
     }),
 ]
 

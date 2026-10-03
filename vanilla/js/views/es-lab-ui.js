@@ -1,12 +1,13 @@
 /* EsLabUI: the #/es-lab community-index browser desk (Swagger feel, retro skin).
  * Owns: DOM for #/es-lab — template pulldown (optgroups per catalog group)
  *   + search, curated boxes, raw-DSL mirror (both directions via
- *   EsLab.fromBody), Run/Reset/Copy-link, result pane (Task 6 fills the
- *   parsed tables + honest panels), in-session history, deep-link read/write
- *   via Router.query + replaceState (no re-render), account-name resolution
- *   at Run (EsLab.resolveAccount — reads only, never gates the desk).
- * Consumes: EsLab (catalog/build/parse/run — transport is HistoryCap
- *   inside, the ONLY ES path), HistoryCap.esAllowed/esAvailable
+ *   EsLab.fromBody), Run/Reset/Copy-link, result pane (raw <pre> here +
+ *   parsed tables/honest panels via EsLabResults), in-session history,
+ *   deep-link read/write via Router.query + replaceState (no re-render),
+ *   account-name resolution at Run (EsLab.resolveAccount — reads only,
+ *   never gates the desk).
+ * Consumes: EsLab (catalog/build/fromBody — shapes), EsLabRun (resolve +
+ *   run/runPaged — transport is HistoryCap inside, the ONLY ES path), HistoryCap.esAllowed/esAvailable
  *   (pref gate + reachability strip), Router.query (deep link),
  *   I18n.t (verbatim en defaults, slice-17 precedent).
  * Globals/side effects: DOM under the router root only; global EsLabUI;
@@ -219,6 +220,7 @@ var EsLabUI = (function () {
     var entry = startEntry;
     var inputEls = [];
     var rawBox = null, rawIndexSel = null, resultPre = null, hintP = null, histBox = null;
+    var tablesBox = null;
     var rawOverride = false; /* raw edited since last curated sync — Run sends it verbatim */
 
     /* renderForm: template card body for the current entry. */
@@ -313,6 +315,9 @@ var EsLabUI = (function () {
       btnRow.appendChild(runB); btnRow.appendChild(resetB); btnRow.appendChild(copyB);
       card.appendChild(btnRow);
 
+      tablesBox = el(doc, "div", null, null);
+      card.appendChild(tablesBox);
+
       resultPre = el(doc, "pre", t("eslab.no_result", "No result yet — fill the boxes and press Run."), null);
       try { resultPre.style.whiteSpace = "pre-wrap"; resultPre.style.wordBreak = "break-word"; } catch (e) { /* stands */ }
       card.appendChild(resultPre);
@@ -361,14 +366,28 @@ var EsLabUI = (function () {
       rawOverride = false;
     }
 
-    /* showResult: STUB for Task 5 — raw <pre> only. Task 6 adds parsed
-     * tables, hint lines and honest panels. Params: outcome, isNote. */
+    /* showResult: raw <pre> always + parsed tables/honest panels via
+     * EsLabResults (missing renderer degrades to raw-only — the stub
+     * contract). Params: outcome {ok, kind, rows, json/raw, error,
+     * precMap}, isNote. */
     function showResult(outcome, isNote) {
       if (!resultPre) return;
       try {
-        resultPre.textContent = JSON.stringify(outcome.ok ? outcome.raw : { error: (outcome.error && outcome.error.message) || String(outcome.error) }, null, 2);
-      } catch (e) { resultPre.textContent = String(outcome.raw || outcome.error); }
-      if (hintP && !isNote) hintP.textContent = "";
+        resultPre.textContent = JSON.stringify(outcome.ok ?
+          (outcome.json === undefined ? outcome.raw : outcome.json) :
+          { error: (outcome.error && outcome.error.message) || String(outcome.error) }, null, 2);
+      } catch (e) { resultPre.textContent = String(outcome.json || outcome.raw || outcome.error); }
+      if (tablesBox) { while (tablesBox.firstChild) tablesBox.removeChild(tablesBox.firstChild); }
+      if (!isNote) {
+        try {
+          if (typeof EsLabResults !== "undefined" && EsLabResults &&
+              typeof EsLabResults.render === "function" && tablesBox) {
+            EsLabResults.render(doc, tablesBox, entry, outcome, { precMap: outcome.precMap || null,
+              onRetry: function () { if (myGen === gen) onRun(); },
+              setHint: function (s) { if (hintP) hintP.textContent = s; } });
+          }
+        } catch (e) { /* raw pre above still stands */ }
+      } else if (hintP) { hintP.textContent = ""; }
       paintStrip();
     }
 
@@ -427,7 +446,7 @@ var EsLabUI = (function () {
       if (ai !== -1 && vals[ai] && !ACCOUNT_RE.test(vals[ai])) {
         var note = el(doc, "p", t("eslab.resolving", "Resolving account name…"), "muted");
         note.setAttribute("aria-live", "polite"); card.appendChild(note);
-        EsLab.resolveAccount(vals[ai]).then(function (id) {
+        EsLabRun.resolveAccount(vals[ai]).then(function (id) {
           if (myGen !== gen) return;
           try { note.remove(); } catch (e) { /* stands */ }
           vals[ai] = id;
@@ -473,23 +492,47 @@ var EsLabUI = (function () {
       return 1000;
     }
 
+    /* withPrecisions: desk-side wrapper (gen-safety + fail-soft at the call
+     * site). The lookup itself is EsLabRun.precMap (socket reads live in
+     * the run layer). Params: vals, rows, done(precMap). Never throws. */
+    function withPrecisions(vals, rows, done) {
+      function empty() { try { done({}); } catch (e) { /* stands */ } }
+      if (kindOf(entry.key) !== "holders") { empty(); return; }
+      var P = null;
+      try {
+        P = (typeof EsLabRun !== "undefined" && EsLabRun &&
+          typeof EsLabRun.precMap === "function") ? EsLabRun.precMap(entry.key, vals, rows) : null;
+      } catch (e) { P = null; }
+      if (!P) { empty(); return; }
+      P.then(function (map) {
+        if (myGen !== gen) return;
+        try { done(map || {}); } catch (e) { /* stands */ }
+      }, function () {
+        if (myGen !== gen) return;
+        empty();
+      });
+    }
+
     /* doRun: template run (paged for row kinds, single for agg) + deep-link
      * the URL (replaceState: no re-render) + history push. */
     function doRun(vals) {
       var running = el(doc, "p", t("eslab.running", "Running…"), "muted");
       running.setAttribute("aria-live", "polite"); card.appendChild(running);
       var call = (entry.kind === "agg") ?
-        EsLab.run(entry.key, vals, {}) :
-        EsLab.runPaged(entry.key, vals, { want: wantFor(vals) });
-      call.then(function (rows) {
+        EsLabRun.run(entry.key, vals, {}) :
+        EsLabRun.runPaged(entry.key, vals, { want: wantFor(vals) });
+      call.then(function (res) {
         if (myGen !== gen) return;
         try { running.remove(); } catch (e) { /* stands */ }
-        showResult({ ok: true, rows: rows, raw: rows }, false);
-        try {
-          var wh = (typeof window !== "undefined") ? window.history : null;
-          if (wh && wh.replaceState) wh.replaceState(null, "", deepLinkFor(entry.key, vals));
-        } catch (e) { /* URL stands */ }
-        pushHistory(entry.title || entry.key, entry.key, vals.slice());
+        withPrecisions(vals, res.rows, function (precMap) {
+          if (myGen !== gen) return;
+          showResult({ ok: true, kind: entry.kind, rows: res.rows, json: res.json, precMap: precMap }, false);
+          try {
+            var wh = (typeof window !== "undefined") ? window.history : null;
+            if (wh && wh.replaceState) wh.replaceState(null, "", deepLinkFor(entry.key, vals));
+          } catch (e) { /* URL stands */ }
+          pushHistory(entry.title || entry.key, entry.key, vals.slice());
+        });
       }).catch(function (e) {
         if (myGen !== gen) return;
         try { running.remove(); } catch (e2) { /* stands */ }
@@ -515,7 +558,7 @@ var EsLabUI = (function () {
       HC.esSearch(index, body, { timeoutMs: 15000 }).then(function (json) {
         if (myGen !== gen) return;
         try { running.remove(); } catch (e) { /* stands */ }
-        showResult({ ok: true, rows: null, raw: json }, false);
+        showResult({ ok: true, kind: "raw", rows: null, json: json }, false);
         try {
           var wh = (typeof window !== "undefined") ? window.history : null;
           if (wh && wh.replaceState) wh.replaceState(null, "", deepLinkFor(RAW_KEY, vals));

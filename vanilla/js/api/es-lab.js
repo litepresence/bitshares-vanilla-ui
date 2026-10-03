@@ -1,11 +1,12 @@
 /* EsLab: curated Elasticsearch query catalog for the #/es-lab index browser.
  * Owns: the query-template catalog (index/fields per entry), body builders
- *   (curated strings -> ES Query-DSL bodies), response parsers (ES JSON ->
- *   display rows), and run()/runPaged() — the only call paths the desk uses.
+ *   (curated strings -> ES Query-DSL bodies), the reverse mapper
+ *   (fromBody: ES body -> curated values for the raw mirror), and response
+ *   parsers (ES JSON -> display rows). Execution (resolveAccount/run/
+ *   runPaged) lives in es-lab-run.js — shapes here, transport there.
  *   No DOM, no signing, no key material, no fetch of its own.
- * Consumes: HistoryCap.esSearch (the ONLY ES transport — pref-gated,
- *   index-allowlisted, timed; vanilla/js/api/history-cap.js), Explorer.opName
- *   (agg bucket ids -> display names), Format.pct1 (agg shares).
+ * Consumes: Explorer.opName (agg bucket ids -> display names),
+ *   Format.pct1 (agg shares).
  * Globals/side effects: exposes global EsLab only.
  * Created by: es-lab design 2026-10-03 (api-lab twin), AFK build.
  *
@@ -193,6 +194,62 @@ var EsLab = (function () {
     return { index: tpl.index, body: body };
   }
 
+  /* fromBody: ES body -> curated values (raw-mirror reverse direction).
+   * Params: tpl (entry), body (parsed JSON object). Returns the values
+   * string array aligned with tpl.fields, or null when the body does not
+   * match the template shape (the desk then keeps it as a raw override).
+   * Fails: never throws. */
+  function fromBody(tpl, body) {
+    try {
+      if (!tpl || !body || typeof body !== "object") return null;
+      var q = body.query && body.query.bool;
+      if (tpl.key === "holders-by-asset") {
+        var m = q && q.must && q.must[0] && q.must[0].match && q.must[0].match.asset_type;
+        if (!m || typeof m.query !== "string") return null;
+        return [m.query, String(body.size || "")];
+      }
+      if (tpl.key === "balances-by-account") {
+        var o = q && q.must && q.must[0] && q.must[0].match && q.must[0].match.owner_;
+        if (!o || typeof o.query !== "string") return null;
+        return [o.query, String(body.size || "")];
+      }
+      if (tpl.key === "fills-by-market") {
+        var fm = q && q.must;
+        if (!Array.isArray(fm) || !fm[1] || !fm[1].multi_match || !fm[2] || !fm[2].multi_match) return null;
+        return [String(fm[1].multi_match.query || ""), String(fm[2].multi_match.query || "")];
+      }
+      if (tpl.key === "pool-swaps") {
+        var pm = q && q.must;
+        if (!Array.isArray(pm) || !pm[1] || !pm[1].multi_match) return null;
+        return [String(pm[1].multi_match.query || "")];
+      }
+      if (tpl.key === "top-ops-agg") {
+        var r = q && q.filter && q.filter[0] && q.filter[0].range &&
+          q.filter[0].range["block_data.block_time"];
+        var g = r && r.gte;
+        var mt = (typeof g === "string" && /^now-(\d+)h$/.test(g)) ? /^now-(\d+)h$/.exec(g) : null;
+        if (!mt) return null;
+        return [String(Math.round(parseInt(mt[1], 10) / 24))];
+      }
+      if (tpl.key === "ops-by-account") {
+        var am = q && q.must;
+        if (!Array.isArray(am) || !am[0] || !am[0].term || typeof am[0].term["account_history.account"] !== "string") return null;
+        var at = (am[1] && am[1].match && am[1].match.operation_type !== undefined) ?
+          String(am[1].match.operation_type) : "";
+        return [am[0].term["account_history.account"], at, String(body.size || "")];
+      }
+      if (tpl.key === "block-range") {
+        var fl = q && q.filter;
+        if (!Array.isArray(fl) || !fl[0] || !fl[0].range || !fl[0].range["block_data.block_num"]) return null;
+        var bn = fl[0].range["block_data.block_num"];
+        var bt = (fl[1] && fl[1].match && fl[1].match.operation_type !== undefined) ?
+          String(fl[1].match.operation_type) : "";
+        return [String(bn.gte), String(bn.lte), bt];
+      }
+    } catch (e) { return null; }
+    return null;
+  }
+
   /* opName: template-local alias for Explorer.opName (stub-safe).
    * Params: id. Returns the display name. Fails: never. */
   function opName(id) {
@@ -234,7 +291,7 @@ var EsLab = (function () {
         var owner = s.owner_ || "";
         if (!owner) continue;
         var bal = (s.balance === undefined || s.balance === null) ? "0" : String(s.balance);
-        out.push({ owner: owner, balance: bal });
+        out.push({ owner: owner, balance: bal, asset: s.asset_type || null });
       }
       return out;
     }
@@ -268,90 +325,10 @@ var EsLab = (function () {
     return "0.0%";
   }
 
-  /* run: execute one template once (first page). Params: tplKey, values,
-   * opts {timeoutMs}. Returns a Promise for the parsed rows. Fails: rejects
-   * es-bad-key, coerce errors, or the HistoryCap errors (es-disabled /
-   * es-unavailable / es-timeout). */
-  function run(tplKey, values, opts) {
-    var tpl = byKey(tplKey);
-    if (!tpl) return Promise.reject(new Error("es-bad-key: " + tplKey));
-    var req;
-    try { req = build(tpl, values); } catch (e) { return Promise.reject(e); }
-    var timeoutMs = (opts && typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ?
-      opts.timeoutMs : ES_TIMEOUT_MS;
-    return HistoryCap.esSearch(req.index, req.body, { timeoutMs: timeoutMs }).then(function (json) {
-      return parse(tpl, json);
-    });
-  }
-
-  /* resolveAccount: display input -> exact 1.2.x id for term queries.
-   * Params: nameOrId string (id passes through; names resolve via Chain.db
-   *   get_account_by_name, the api-lab lookup). Returns a Promise for the id.
-   *   Fails: rejects "missing: account" (blank) or "unknown account: <name>"
-   *   (no Chain in unit tests reads as unknown — fail closed). */
-  function resolveAccount(nameOrId) {
-    var v = String(nameOrId === undefined || nameOrId === null ? "" : nameOrId);
-    if (/^1\.2\.\d+$/.test(v)) return Promise.resolve(v);
-    if (!v.length) return Promise.reject(new Error("missing: account"));
-    try {
-      if (typeof Chain !== "undefined" && Chain && typeof Chain.db === "function") {
-        return Chain.db("get_account_by_name", [v]).then(function (a) {
-          if (a && a.id) return a.id;
-          throw new Error("unknown account: " + v);
-        });
-      }
-    } catch (e) { /* reject below */ }
-    return Promise.reject(new Error("unknown account: " + v));
-  }
-
-  /* runPaged: search_after walk with the adapter caps (500/page, max 2 pages,
-   * 15s TOTAL deadline — market-fills-history.js:168-211 pattern). Params:
-   * tplKey, values, opts {want, timeoutMs}. Returns a Promise for the
-   * concatenated parsed rows (capped at min(want, 1000)). Fails: rejects
-   * es-bad-key, coerce errors, es-no-page (agg kind has no hits to walk),
-   * es-timeout (deadline lapsed), or the HistoryCap errors. Never fires
-   * match_all: every paged template carries a filter term by construction. */
-  function runPaged(tplKey, values, opts) {
-    var tpl = byKey(tplKey);
-    if (!tpl) return Promise.reject(new Error("es-bad-key: " + tplKey));
-    if (tpl.kind !== "ops" && tpl.kind !== "holders") {
-      return Promise.reject(new Error("es-no-page: " + tplKey));
-    }
-    var req;
-    try { req = build(tpl, values); } catch (e) { return Promise.reject(e); }
-    var want = (opts && typeof opts.want === "number" && opts.want > 0) ?
-      Math.min(opts.want, ES_SIZE * ES_MAX_PAGES) : ES_SIZE * ES_MAX_PAGES;
-    var budget = (opts && typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ?
-      opts.timeoutMs : ES_TIMEOUT_MS;
-    var deadline = Date.now() + budget;
-    var out = [];
-    var pages = 0;
-    function page(searchAfter) {
-      var body = req.body;
-      if (searchAfter) body.search_after = searchAfter;
-      else if (body.search_after) delete body.search_after;
-      var remain = deadline - Date.now();
-      if (remain <= 0) return Promise.reject(new Error("es-timeout"));
-      return HistoryCap.esSearch(req.index, body, { timeoutMs: remain }).then(function (json) {
-        var rows = parse(tpl, json);
-        for (var i = 0; i < rows.length && out.length < want; i++) out.push(rows[i]);
-        pages++;
-        var hits = json && json.hits && json.hits.hits;
-        var pageSize = req.body.size || ES_SIZE;
-        var last = (hits && hits.length) ? hits[hits.length - 1] : null;
-        if (!last || !last.sort || hits.length < pageSize ||
-            pages >= ES_MAX_PAGES || out.length >= want) return out;
-        return page(last.sort);
-      });
-    }
-    return page(null);
-  }
-
   return { GROUPS: GROUPS, TEMPLATES: TEMPLATES, ES_SIZE: ES_SIZE,
     ES_MAX_PAGES: ES_MAX_PAGES, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     byKey: byKey, coerce: coerce, filled: filled, build: build, parse: parse,
-    resolveAccount: resolveAccount,
-    run: run, runPaged: runPaged };
+    fromBody: fromBody, opName: opName, pct: pct };
 })();
 
 if (typeof module !== "undefined") { module.exports = EsLab; }
