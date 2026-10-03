@@ -25,6 +25,12 @@
       "run_at": "document_start"
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/inpage.js"],
+      "matches": ["https://*/*"]
+    }
+  ],
   "action": {
     "default_title": "BitShares Vanilla Wallet",
     "default_icon": {

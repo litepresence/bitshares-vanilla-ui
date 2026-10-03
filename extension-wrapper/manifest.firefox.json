@@ -21,6 +21,14 @@
     "page": "background/firefox.html",
     "persistent": false
   },
+  "content_scripts": [
+    {
+      "matches": ["https://*/*"],
+      "js": ["content/inject.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": ["content/inpage.js"],
   "browser_action": {
     "default_title": "BitShares Vanilla Wallet",
     "default_icon": {

@@ -238,13 +238,49 @@ var OP_NAMES = {
     return out;
   }
 
+  /* collectAccountIds: walk an op body for whole-value 1.2.x account ids.
+   * Only exact whole-string matches count (a memo merely containing "1.2.3"
+   * as a substring is NOT an account reference). Pure, never throws. */
+  function collectAccountIds(body) {
+    var out = [], seen = {};
+    try {
+      (function walk(v) {
+        if (typeof v === "string") {
+          if (/^1\.2\.\d+$/.test(v) && !seen[v]) { seen[v] = 1; out.push(v); }
+          return;
+        }
+        if (!v || typeof v !== "object") return;
+        if (Array.isArray(v)) { for (var i = 0; i < v.length; i++) walk(v[i]); return; }
+        var ks = Object.keys(v);
+        for (var k = 0; k < ks.length; k++) walk(v[ks[k]]);
+      })(body);
+    } catch (e) { /* partial list stands */ }
+    return out;
+  }
+
   /* humanizeAmounts: attach display strings to amount shapes in an op body.
-   * Params: body (op data), meta {id->{symbol,precision}}. Returns a fields
-   * array [{k, v}] where amount shapes render "1.5000 BTS (raw 150000)" and
-   * fee renders likewise; nested objects/arrays render exact JSON; scalars
-   * render verbatim. Never throws (worst case: everything raw). */
+   * Params: body (op data), meta {assets: {id->{symbol,precision}},
+   *   accounts: {id->name|null}}. Amount shapes render "1.5000 BTS (raw
+   *   150000)"; whole-value account ids with a resolved name render
+   *   "name (1.2.x)" with the id always kept (unresolved ids render bare —
+   *   never blank, never a guessed name); nested objects/arrays render exact
+   *   JSON; scalars render verbatim. Never throws. */
   function humanizeFields(body, meta) {
     var fields = [];
+    var assets = null, accounts = null;
+    try {
+      if (meta && typeof meta === "object") {
+        /* Legacy shape (bare assets map, pre-account-resolution callers
+         * and unit tests) still works: a map without .assets is assets. */
+        if (meta.assets && typeof meta.assets === "object") {
+          assets = meta.assets;
+          accounts = (meta.accounts && typeof meta.accounts === "object") ? meta.accounts : {};
+        } else {
+          assets = meta;
+          accounts = {};
+        }
+      }
+    } catch (e) { assets = null; accounts = {}; }
     try {
       var keys = (body && typeof body === "object" && !Array.isArray(body)) ? Object.keys(body) : [];
       keys.forEach(function (k) {
@@ -252,8 +288,8 @@ var OP_NAMES = {
         try {
           if (v && typeof v === "object" && !Array.isArray(v) &&
               typeof v.asset_id === "string" && v.amount !== undefined &&
-              meta && meta[v.asset_id]) {
-            var m = meta[v.asset_id];
+              assets && assets[v.asset_id]) {
+            var m = assets[v.asset_id];
             var disp = v.amount;
             try {
               if (typeof Format !== "undefined" && Format && typeof Format.formatAmount === "function" &&
@@ -262,6 +298,9 @@ var OP_NAMES = {
               }
             } catch (e) { disp = String(v.amount); }
             fields.push({ k: k, v: disp + " (raw " + String(v.amount) + ")" });
+          } else if (typeof v === "string" && /^1\.2\.\d+$/.test(v) &&
+                     accounts && typeof accounts[v] === "string" && accounts[v]) {
+            fields.push({ k: k, v: accounts[v] + " (" + v + ")" });
           } else if (v && typeof v === "object") {
             fields.push({ k: k, v: JSON.stringify(v) });
           } else {
@@ -273,44 +312,56 @@ var OP_NAMES = {
     return fields;
   }
 
-  /* enrichUnsigned: resolve asset metadata for every amount shape in the
-   * unsigned tx and build the approval-ready structure:
-   * {ops: [{id, name, fields}], feeAssetNote}. Requires the SW Chain open
-   * (ensureChain first). Unknown assets render raw, never blank. */
+  /* enrichUnsigned: resolve asset metadata (precisions/symbols) and account
+   * names for every amount shape and account id in the unsigned tx, and
+   * build the approval-ready structure {ops: [{id, name, fields}]}.
+   * Requires the SW Chain open (ensureChain first). Unknown assets/accounts
+   * render raw, never blank. */
   function enrichUnsigned(unsigned) {
-    var ids = [], seen = {};
+    var assetIds = [], aseen = {};
+    var acctIds = [], cseen = {};
     (unsigned.operations || []).forEach(function (op) {
       collectAssetIds(op[1]).forEach(function (id) {
-        if (!seen[id]) { seen[id] = 1; ids.push(id); }
+        if (!aseen[id]) { aseen[id] = 1; assetIds.push(id); }
+      });
+      collectAccountIds(op[1]).forEach(function (id) {
+        if (!cseen[id]) { cseen[id] = 1; acctIds.push(id); }
       });
     });
-    function metaFor(list) {
-      var meta = {};
-      (list || []).forEach(function (a) {
-        if (a && typeof a.id === "string") {
-          meta[a.id] = {
-            symbol: (typeof a.symbol === "string" && a.symbol) ? a.symbol : a.id,
-            precision: (typeof a.precision === "number") ? a.precision : null
-          };
-        }
-      });
-      return meta;
-    }
-    function build(meta) {
+    function build(assets, accounts) {
+      var meta = { assets: assets, accounts: accounts };
       return {
         ops: (unsigned.operations || []).map(function (op) {
           return { id: op[0], name: opName(op[0]), fields: humanizeFields(op[1], meta) };
         })
       };
     }
-    if (!ids.length) return Promise.resolve(build({}));
-    var dbId = null;
+    var dbId = null, assets = {};
+    function withAccounts() {
+      if (!acctIds.length) return Promise.resolve(build(assets, {}));
+      return Chain.call(dbId, "get_accounts", [acctIds]).then(function (rows) {
+        var accounts = {};
+        (rows || []).forEach(function (a) {
+          if (a && typeof a.id === "string" && typeof a.name === "string") accounts[a.id] = a.name;
+        });
+        return build(assets, accounts);
+      }).catch(function () { return build(assets, {}); });
+    }
     return Chain.db().then(function (id) {
       dbId = id;
-      return Chain.call(dbId, "get_objects", [ids]);
+      if (!assetIds.length) return [];
+      return Chain.call(dbId, "get_objects", [assetIds]);
     }).then(function (rows) {
-      return build(metaFor(rows));
-    }).catch(function () { return build({}); });
+      (rows || []).forEach(function (a) {
+        if (a && typeof a.id === "string") {
+          assets[a.id] = {
+            symbol: (typeof a.symbol === "string" && a.symbol) ? a.symbol : a.id,
+            precision: (typeof a.precision === "number") ? a.precision : null
+          };
+        }
+      });
+      return withAccounts();
+    }).catch(function () { return build(assets, {}); });
   }
 
   /* swBroadcast: ack-based broadcast from the SW (no history-poll inclusion
@@ -600,7 +651,10 @@ var OP_NAMES = {
           return SessionVault.sessionSet(o).catch(function () {});
         }).then(function () {
           armDeadline(id);
-          return openApproval(id).then(function () { return { intentId: id }; });
+          return openApproval(id).then(function (tabId) {
+            noteApprovalTab(id, tabId);
+            return { intentId: id };
+          });
         });
       });
     });
@@ -812,6 +866,7 @@ var OP_NAMES = {
     readSettings: readSettings,
     ensureChain: ensureChain,
     collectAssetIds: collectAssetIds,
+    collectAccountIds: collectAccountIds,
     humanizeFields: humanizeFields,
     enrichUnsigned: enrichUnsigned,
     swBroadcast: swBroadcast,

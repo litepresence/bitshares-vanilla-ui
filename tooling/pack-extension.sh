@@ -16,10 +16,11 @@ mkdir -p "$DIST/chromium" "$DIST/firefox"
 for target in chromium firefox; do
   D="$DIST/$target"
   cp -r "$VANILLA"/. "$D"/
-  mkdir -p "$D/adapter" "$D/background" "$D/content" "$D/icons"
+  mkdir -p "$D/adapter" "$D/background" "$D/content" "$D/icons" "$D/approval"
   cp "$SRC/adapter/storage.js" "$SRC/adapter/bridge.js" "$D/adapter/"
   cp "$SRC/content/inject.js" "$D/content/"
-  cp "$SRC/background/sw.js" "$D/background/"
+  cp "$SRC/background/sw.js" "$SRC/background/session.js" "$SRC/background/gate.js" "$D/background/"
+  cp "$SRC/approval/approval.html" "$SRC/approval/approval.js" "$D/approval/"
   cp "$SRC/icons/"*.png "$D/icons/"
   if [ "$target" = "chromium" ]; then
     cp "$SRC/manifest.json" "$D/manifest.json"
