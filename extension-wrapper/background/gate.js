@@ -696,7 +696,13 @@ var OP_NAMES = {
       return Tx.sign(txObj, keys.active.wif);
     }).then(function (signed) {
       return swBroadcast(signed).then(function (ack) {
-        var proof = { via: ack.via, headBefore: ack.headBefore, intentId: intent.id };
+        /* Proof carries the signed tx (wallet-self callers feed their
+         * existing prove/result paths with it; dApps may verify inclusion
+         * via history). Inclusion itself is verified by the caller like any
+         * client — the SW attests broadcast acceptance only (see
+         * swBroadcast). */
+        var proof = { via: ack.via, headBefore: ack.headBefore,
+          intentId: intent.id, signedTx: signed };
         var done = function () {
           return settleIntent(intent.id, { status: "approved", proof: proof }).then(function () {
             return proof;
@@ -799,6 +805,13 @@ var OP_NAMES = {
           });
           return true;
         }
+        if (type === "vb-intent-status") {
+          var qe = (msg.payload && typeof msg.payload === "object") ? msg.payload : {};
+          getIntent(qe.intentId).then(function (it) {
+            reply(true, { status: it.status, proof: it.proof, error: it.error });
+          }, function (e) { reply(false, null, (e && e.message) || String(e)); });
+          return true;
+        }
         return false;
       }
       /* dApp relay calls (content script attached the origin). */
@@ -823,6 +836,18 @@ var OP_NAMES = {
             label: p2.label, chainId: p2.chainId, remember: p2.remember },
           { walletSelf: false }).then(function (r) { reply(true, r); },
           function (e) { reply(false, null, (e && e.message) || String(e)); });
+        return true;
+      }
+      /* Intent-status poll (MV3-safe proof delivery: the SW cannot hold a
+       * reply channel open across human approval time — suspension would
+       * kill it. Callers get {intentId} immediately, then poll here every
+       * ~2s until status leaves "pending". Journal reads only; safe for
+       * relay callers (ids are unguessable, requester-created). */
+      if (type === "vb-intent-status") {
+        var q = (msg.payload && typeof msg.payload === "object") ? msg.payload : {};
+        getIntent(q.intentId).then(function (it) {
+          reply(true, { status: it.status, proof: it.proof, error: it.error });
+        }, function (e) { reply(false, null, (e && e.message) || String(e)); });
         return true;
       }
       return false;

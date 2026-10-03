@@ -77,6 +77,30 @@
     });
   }
 
+  /* pollIntent: MV3-safe proof delivery — the SW cannot hold a reply
+   * channel open across human approval time (suspension kills it), so the
+   * request resolves {intentId} now and the proof is polled here (~2s,
+   * ~90s ceiling). Resolves the SW proof; rejects on deny/timeout. */
+  function pollIntent(intentId) {
+    var tries = 0;
+    return new Promise(function (resolve, reject) {
+      function tick() {
+        tries++;
+        callRelay("vb-intent-status", { intentId: intentId }).then(function (st) {
+          if (!st || typeof st.status !== "string") throw new Error("bad intent status");
+          if (st.status === "approved") { resolve(st.proof || { intentId: intentId }); return; }
+          if (st.status === "denied") {
+            reject(new Error(st.error ? String(st.error) : "request denied"));
+            return;
+          }
+          if (tries >= 45) { reject(new Error("approval timeout: no decision in 90s")); return; }
+          setTimeout(tick, 2000);
+        }).catch(reject);
+      }
+      tick();
+    });
+  }
+
   /* requestSignature: full approval gate. Params: {unsigned, accountId,
    *   chainId (the dApp's claimed chain — SW verifies vs wallet active),
    *   label?}. Resolves the SW broadcast proof; rejects on deny/timeout/
@@ -90,6 +114,11 @@
       accountId: req.accountId || null,
       chainId: req.chainId || null,
       label: (typeof req.label === "string" && req.label) ? String(req.label).slice(0, 120) : ""
+    }).then(function (r) {
+      if (!r || typeof r.intentId !== "string" || !r.intentId) {
+        throw new Error("bad sign request reply");
+      }
+      return pollIntent(r.intentId);
     });
   }
 

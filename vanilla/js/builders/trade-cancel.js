@@ -128,6 +128,14 @@ var TradeCancel = (function () {
       via = "broadcast_transaction";
       await Chain.call(netId, "broadcast_transaction", [signed]);
     }
+    return proveTx(prove, via);
+  }
+
+  /* Prove-only tail of sendTx (Tier 2 delegation: the SW already broadcast
+   * behind approval, so delegated callers prove here without re-sending).
+   * Params: prove (caller poll fn), via (broadcast path label, SW proof via
+   * when delegated). Resolves {found, head, via} like sendTx. */
+  async function proveTx(prove, via) {
     var deadline = Date.now() + PROVE_TIMEOUT_MS;
     while (Date.now() < deadline) {
       var found = null;
@@ -228,7 +236,7 @@ var TradeCancel = (function () {
       var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
       var seller = (order.seller && String(order.seller)) || null;
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) {
+      if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
         box.removeChild(status);
         showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
         backBtn.disabled = false;
@@ -252,9 +260,16 @@ var TradeCancel = (function () {
             });
           });
         }).then(function (R) {
-          return Tx.sign(R.unsigned, wif).then(function (signed) {
+          return Tx.signRouted(R.unsigned, wif, {}).then(function (r) {
+            if (r.delegated) {
+              /* Extension mode: SW signed + broadcast behind approval. */
+              status.textContent = t("trade.s2", "Broadcasting cancel…");
+              return proveTx(proveGone(myId, [id]), r.proof.via + "+extension").then(function (res) {
+                return { res: res, R: R };
+              });
+            }
             status.textContent = t("trade.s2", "Broadcasting cancel…");
-            return sendTx(signed, proveGone(myId, [id])).then(function (res) {
+            return sendTx(r.signed, proveGone(myId, [id])).then(function (res) {
               return { res: res, R: R };
             });
           });
@@ -338,7 +353,7 @@ var TradeCancel = (function () {
         goBtn.disabled = true;
         var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-        if (!wif) {
+        if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
           box.removeChild(status);
           showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
           backBtn.disabled = false;
@@ -362,8 +377,14 @@ var TradeCancel = (function () {
             });
           }).then(function (R) {
             status.textContent = t("trade.broadcast_cancel_all_prefix", "Broadcasting cancel-all (") + humanFee(R.feeRaw, R.meta) + " fee)…";
-            return Tx.sign(R.unsigned, wif).then(function (signed) {
-              return sendTx(signed, proveGone(myId, ids)).then(function (res) {
+            return Tx.signRouted(R.unsigned, wif, {}).then(function (r) {
+              if (r.delegated) {
+                /* Extension mode: SW signed + broadcast behind approval. */
+                return proveTx(proveGone(myId, ids), r.proof.via + "+extension").then(function (res) {
+                  return { res: res, R: R };
+                });
+              }
+              return sendTx(r.signed, proveGone(myId, ids)).then(function (res) {
                 return { res: res, R: R };
               });
             });

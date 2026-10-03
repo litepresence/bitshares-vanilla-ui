@@ -384,11 +384,68 @@ var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : 
     return { blockNum: found.blockNum, trxInBlock: found.trxInBlock, via: via + "+history-poll" };
   }
 
+  /* signRouted: mode-aware signing dispatch (Tier 2 wallet-as-dApp seam).
+   * Browser mode (default, or no extension channel): Tx.sign exactly as
+   * today -> {delegated:false, signed}. The WIF requirement is unchanged
+   * (views keep their wallet-locked gates untouched).
+   * Extension mode (Store signing pin "extension", or "auto" with a
+   * channel): the WIF is IGNORED (page memory never signs) and the unsigned
+   * tx goes through the SW approval gate, which signs AND broadcasts ->
+   * {delegated:true, signed, proof}. Callers skip their local broadcast
+   * when delegated and feed proof into their existing prove/result paths.
+   * meta {label?} (short human context for the approval page; the account
+   *   is display-derived SW-side, wallet-self always prompts). Rejects
+   * verbatim (denials read as normal flow errors downstream). */
+  async function signRouted(unsigned, wif, meta) {
+    var mode = "browser";
+    try {
+      if (typeof SignMode !== "undefined" && SignMode &&
+          typeof SignMode.effectiveMode === "function") {
+        mode = SignMode.effectiveMode();
+      }
+    } catch (e) { mode = "browser"; }
+    if (mode !== "extension") {
+      var signed = await Tx.sign(unsigned, wif);
+      return { delegated: false, signed: signed };
+    }
+    var label = "";
+    try {
+      if (meta && typeof meta.label === "string") label = String(meta.label).slice(0, 120);
+    } catch (e) { label = ""; }
+    var proof;
+    try {
+      proof = await SignMode.requestWalletSignature(unsigned, label);
+    } catch (e) { throw e; }
+    if (!proof || !proof.signedTx || !Array.isArray(proof.signedTx.operations)) {
+      throw new Error("extension signing returned no signed transaction");
+    }
+    return { delegated: true, signed: proof.signedTx, proof: proof };
+  }
+
+  /* wifOk: wallet-locked gate predicate for sendAndProve callers. A present
+   * WIF always passes; a missing WIF passes ONLY in extension mode (the SW
+   * approval gate authenticates there — the approval page prompts for the
+   * password when its session is locked). Views keep their own unlock
+   * prompts; this only stops the API layer from misreporting a routable
+   * request as wallet-locked. Never throws. */
+  function wifOk(wif) {
+    try {
+      if (typeof wif === "string" && wif) return true;
+      if (typeof SignMode !== "undefined" && SignMode &&
+          typeof SignMode.effectiveMode === "function") {
+        return SignMode.effectiveMode() === "extension";
+      }
+    } catch (e) { /* false below */ }
+    return false;
+  }
+
   Tx.fee = fee;
   Tx.feeMulti = feeMulti;
   Tx.buildTx = buildTx;
   Tx.buildTransfer = buildTransfer;
   Tx.sign = sign;
+  Tx.signRouted = signRouted;
+  Tx.wifOk = wifOk;
   Tx.broadcast = broadcast;
   if (typeof globalThis !== "undefined") { globalThis.Tx = Tx; }
 })();

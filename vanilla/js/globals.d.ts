@@ -97,6 +97,7 @@ declare var SametUI: any;
 declare var SettingsNodes: any;
 declare var SettingsPage: any;
 declare var SettingsPrefs: any;
+declare var SignMode: any;
 declare var Store: any;
 declare var TicketUI: any;
 declare var TopOpsUI: any;

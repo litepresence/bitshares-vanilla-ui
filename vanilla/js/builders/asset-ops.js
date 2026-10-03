@@ -467,13 +467,20 @@ var AssetOps = (function () {
    * rebroadcast. Fails "wallet-locked" / "tx-unavailable" / "not-connected". */
   async function sendAndProve(signedTx, wif, proveFn) {
     if (!signedTx || !Array.isArray(signedTx.operations) || !signedTx.operations.length) throw new Error("signedTx has no operations");
-    if (typeof wif !== "string" || !wif) throw new Error("wallet-locked");
+    if (!Tx.wifOk(wif)) throw new Error("wallet-locked");
     if (typeof proveFn !== "function") throw new Error("proveFn must be a function");
-    if (typeof Tx === "undefined" || !Tx.sign) throw new Error("tx-unavailable");
-    var txSigned = await Tx.sign(signedTx, wif);
+    if (typeof Tx === "undefined" || !Tx.signRouted) throw new Error("tx-unavailable");
+    var routed = await Tx.signRouted(signedTx, wif, {});
+    var txSigned = routed.signed;
+    var via;
+    if (routed.delegated) {
+      /* Extension mode: the SW signed + broadcast behind approval — skip
+       * the local broadcast; the prove loop below runs unchanged. */
+      via = ((routed.proof && routed.proof.via) ? routed.proof.via : "extension") + "+extension";
+    } else {
     var netId;
     try { netId = await Chain.net(); } catch (e) { throw new Error("not-connected"); }
-    var via = "broadcast_transaction_with_callback";
+    via = "broadcast_transaction_with_callback";
     var callbackId = (Math.random() * 4294967296) >>> 0;
     try {
       await Chain.call(netId, "broadcast_transaction_with_callback", [callbackId, txSigned]);
@@ -483,6 +490,7 @@ var AssetOps = (function () {
         e2.sendRejected = true;
         throw e2;
       }
+    }
     }
     var deadline = Date.now() + PROVE_TIMEOUT_MS;
     for (;;) {

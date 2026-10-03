@@ -815,11 +815,19 @@ var VoteUI = (function () {
    * sendRejected=true so the caller can apply the retry rule. */
   async function sendAndProve(st, signed, intendedOptions) {
     var signWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-    if (!signWIF) throw new Error("wallet-locked");
-    var txSigned = await Tx.sign(signed, signWIF);
+    if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(signWIF) : !signWIF) {
+      throw new Error("wallet-locked");
+    }
+    var routed = await Tx.signRouted(signed, signWIF, {});
+    var txSigned = routed.signed;
+    var via;
+    if (routed.delegated) {
+      /* Extension mode: the SW signed + broadcast behind approval. */
+      via = ((routed.proof && routed.proof.via) ? routed.proof.via : "extension") + "+extension";
+    } else {
     var netId = await Chain.net();
     var callbackId = (Math.random() * 4294967296) >>> 0;
-    var via = "broadcast_transaction_with_callback";
+    via = "broadcast_transaction_with_callback";
     try {
       await Chain.call(netId, "broadcast_transaction_with_callback", [callbackId, txSigned]);
     } catch (e) {
@@ -833,6 +841,7 @@ var VoteUI = (function () {
         e2.sendRejected = true;
         throw e2;
       }
+    }
     }
     var deadline = Date.now() + PROVE_TIMEOUT_MS;
     while (Date.now() < deadline) {
@@ -1302,17 +1311,27 @@ var VoteUI = (function () {
    * 20/29 for basic accounts) surface inline with the node's own message.
    * Returns {blockNum, via, obj} where blockNum is the observed head block. */
   async function sendJoinAndProve(spec, wif, onStep) {
+    if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
+      throw new Error("wallet-locked");
+    }
     var unsigned = await Tx.buildTx([[spec.opId, spec.opData]]);
-    var txSigned = await Tx.sign(unsigned, wif);
+    var routed = await Tx.signRouted(unsigned, wif, {});
+    var txSigned = routed.signed;
     onStep(t("vote.broadcasting", "Broadcasting…"));
+    var via;
+    if (routed.delegated) {
+      /* Extension mode: the SW signed + broadcast behind approval. */
+      via = ((routed.proof && routed.proof.via) ? routed.proof.via : "extension") + "+extension";
+    } else {
     var netId = await Chain.net();
     var callbackId = (Math.random() * 4294967296) >>> 0;
-    var via = "broadcast_transaction_with_callback";
+    via = "broadcast_transaction_with_callback";
     try {
       await Chain.call(netId, "broadcast_transaction_with_callback", [callbackId, txSigned]);
     } catch (e) {
       via = "broadcast_transaction";
       await Chain.call(netId, "broadcast_transaction", [txSigned]);
+    }
     }
     var wantUrl = spec.kind === "witness"
       ? (spec.isUpdate ? spec.opData.new_url : spec.opData.url)

@@ -445,21 +445,25 @@ var TransferConfirm = (function () {
       sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!activeWIF) {
+      if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(activeWIF) : !activeWIF) {
         wrap.removeChild(status);
         showError(doc, wrap, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
       Promise.resolve()
-        .then(function () { return Tx.sign(ctx.unsigned, activeWIF); })
-        .then(function (signed) {
+        .then(function () { return Tx.signRouted(ctx.unsigned, activeWIF, {}); })
+        .then(function (r) {
           status.textContent = t("transfer.s1", "Broadcasting…");
-          return Tx.broadcast(signed);
+          /* Extension mode: the SW already broadcast behind approval. */
+          if (r.delegated) return { proof: r.proof, viaDelegated: true, signed: r.signed };
+          return Tx.broadcast(r.signed).then(function (proof) {
+            return { proof: proof, viaDelegated: false, signed: r.signed };
+          });
         })
-        .then(function (proof) {
+        .then(function (out) {
           clearRoot(root);
-          showResult(doc, makeWrap(doc, root), from, ctx, null, proof);
+          showResult(doc, makeWrap(doc, root), from, ctx, null, out.proof);
         })
         .catch(function (e) {
           var msg = (e && e.message) ? e.message : t("confirm.broadcast_failed", "Broadcast failed");
