@@ -1376,3 +1376,10 @@ p.muted[aria-live="polite"],
   .pulse-grid { grid-template-columns: repeat(6, 1fr); }
   .prod-grid { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* Build-dialog archive (about): search row + roomy collapsible rows. */
+.bd-search { display: flex; flex-wrap: wrap; gap: 8px; max-width: 640px; margin: 8px 0; }
+.bd-search input { flex: 1 1 200px; min-height: 44px; }
+.bd-search button { min-height: 44px; min-width: 44px; }
+.bd-details summary { min-height: 44px; padding: 10px 4px; cursor: pointer; }
+.bd-day { margin-top: 16px; }
