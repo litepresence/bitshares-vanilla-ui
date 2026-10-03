@@ -410,8 +410,9 @@ var App = (function () {
   }
 
   /* paintFootActions: footer REPORT + HELP buttons (Footer.jsx:666-699
-   *   introjs-launcher pair). REPORT is an external invite link (no locale);
-   *   HELP reuses the help key and routes to the onboard-docs index (#/help,
+   *   introjs-launcher pair). REPORT is an internal link to the Community
+   *   page (help/community split 2026-10-04 — was an external t.me invite);
+   *   HELP reuses the help key and routes to the docs index (#/help,
    *   router.js /help/** -> HelpUI.renderHelp — verified present). Never throws. */
   function paintFootActions() {
     if (typeof document === "undefined") return;

@@ -2269,7 +2269,10 @@
     "topic_news_body": "# No in-app feed, by decision\nThis wallet ships no news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. No fetch is attempted, so there is no spinner and no fetch-error panel.\n# Staying current instead\nThe connection line on the News page is always live, and project discussion happens in the linked community chats under Help.",
     "topic_uris_title": "Payment requests and exports",
     "topic_uris_text": "BitShares links that prefill payments, plus CSV history export.",
-    "topic_uris_body": "# Links that prefill payments\nBitShares URIs (bitshares:…) pack a payment request — recipient, asset, amount, memo — into a shareable link. Opening one prefills the transfer or invoice form; only review and sign remain.\n# Verify before signing\nLinks can lie about who they pay: check the recipient name yourself. The wallet never signs from a link alone.\n# CSV history export\nAccount history exports to CoinTracking-compatible CSV for taxes and records. Amounts export as display decimals with symbols; dates stay empty rather than guessed."
+    "topic_uris_body": "# Links that prefill payments\nBitShares URIs (bitshares:…) pack a payment request — recipient, asset, amount, memo — into a shareable link. Opening one prefills the transfer or invoice form; only review and sign remain.\n# Verify before signing\nLinks can lie about who they pay: check the recipient name yourself. The wallet never signs from a link alone.\n# CSV history export\nAccount history exports to CoinTracking-compatible CSV for taxes and records. Amounts export as display decimals with symbols; dates stay empty rather than guessed.",
+    "community_hint": "Chats, forums, and explorers live on the Community page: ",
+    "community_title": "Community",
+    "community_intro": "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."
   },
   "instant": {
     "amount": "Amount",
@@ -3530,6 +3533,8 @@
     "intro": "Every page in the wallet, grouped by job. Pick a section to see its pages.",
     "unknown_section": "No menu section with that name. Pick one below.",
     "all_pages": "All pages",
-    "section_more": "More"
+    "section_more": "More",
+    "p_community": "Community",
+    "d_community": "Chats, forums, explorers, and code."
   }
 }

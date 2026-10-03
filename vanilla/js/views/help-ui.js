@@ -1,5 +1,7 @@
-/* help-ui.js — help index + full topic articles.
- * Owns: /help/** (index at /help, one article view per topic key). Topic list
+/* help-ui.js — help index + full topic articles + community page.
+ * Owns: /help/** (index at /help, one article view per topic key) and
+ *   /community (the community link directory, split out 2026-10-04 —
+ *   footer REPORT target). Topic list
  *   is curated for this wallet (61 topics: wallet basics plus every feature
  *   this app ships — pools, HTLC, credit, samet, barter, spotlight, debit,
  *   trollbox, alerts, prediction/PMO, builder, labs, charts, dashboard,
@@ -791,6 +793,15 @@ var HelpUI = (function () {
     wrap.appendChild(el(doc, "h1", t("help.help", "Help")));
     wrap.appendChild(el(doc, "p", t("help.index_intro", "Short guides for every part of the wallet, each opening into a full article."), "muted"));
     paintIndexList(doc, wrap);
+    /* Pointer to the Community page (help/community split 2026-10-04):
+     * chats, forums, and explorers live there now, not here. */
+    var hint = el(doc, "p", null, "muted");
+    hint.appendChild(doc.createTextNode(t("help.community_hint", "Chats, forums, and explorers live on the Community page: ")));
+    var link = doc.createElement("a");
+    link.setAttribute("href", "#/community");
+    link.textContent = t("help.community_title", "Community");
+    hint.appendChild(link);
+    wrap.appendChild(hint);
     /* Documentation: chain-level references beyond this wallet. External
      * links open a new tab (target _blank + noopener); textContent-only. */
     wrap.appendChild(el(doc, "h2", t("help.documentation", "Documentation")));
@@ -814,8 +825,30 @@ var HelpUI = (function () {
     try { aia.target = "_blank"; aia.rel = "noopener"; } catch (e) { /* same-tab fallback */ }
     aili.appendChild(aia); aiul.appendChild(aili);
     wrap.appendChild(aiul);
-    /* Community link directory: data-driven sections, same external-link
-     * treatment throughout (new tab + noopener, textContent-only). */
+  }
+
+  /* renderCommunity: #/community — the community link directory that used to
+   * live at the bottom of #/help (split 2026-10-04; REPORT footer target).
+   * Same external-link treatment throughout (new tab + noopener,
+   * textContent-only). Params: root (element). Returns nothing. */
+  function renderCommunity(root) {
+    if (!root) return;
+    var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
+    if (!doc) return;
+    clearRoot(root);
+    var wrap = makeWrap(doc, root);
+    wrap.appendChild(el(doc, "h1", t("help.community_title", "Community")));
+    wrap.appendChild(el(doc, "p", t("help.community_intro", "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."), "muted"));
+    paintCommunityDir(doc, wrap);
+    var back = el(doc, "p", null, "muted"), b = doc.createElement("a");
+    b.href = "#/help"; b.textContent = t("help.help", "Help");
+    back.appendChild(b); wrap.appendChild(back);
+  }
+
+  /* paintCommunityDir: the link directory (Homepage/Code/Explorers/Elastic/
+   * Forum/English+Chinese chats). Shared by renderCommunity only.
+   * Params: doc, wrap. Returns nothing. Never throws. */
+  function paintCommunityDir(doc, wrap) {
     /** @type {any} */
     var SECTIONS = [
       ["help.homepage", "Homepage", [
@@ -932,7 +965,7 @@ var HelpUI = (function () {
     } catch (e) { return ""; }
   }
 
-  return { renderHelp: renderHelp, TOPICS: TOPICS,
+  return { renderHelp: renderHelp, renderCommunity: renderCommunity, TOPICS: TOPICS,
     _test: { topicBody: topicBody, GROUPS: GROUPS } };
 })();
 

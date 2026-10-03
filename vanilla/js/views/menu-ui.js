@@ -44,7 +44,8 @@ var MenuUI = (function () {
   }
 
   /* SECTIONS: the sitemap. Binding order per the menu-sitemap design spec
-   * (§3): wallet 14, trade 9, earn 7, govern 4, explore 9, labs 8 = 51.
+   * (§3) plus the Community card (help/community split 2026-10-04):
+   * wallet 14, trade 9, earn 7, govern 4, explore 9, labs 9 = 52.
    * Icons are icon.js KNOWN names (decorative <img>, never load-bearing).
    * Detail routes (/pools/:id, /asset/:symbol, …) are never listed — their
    * list parents link onward, as in #1. */
@@ -128,6 +129,7 @@ var MenuUI = (function () {
         { href: "#/favourites", icon: "fi-star", titleKey: "menu.p_favourites", titleDefault: "Favourites", blurbKey: "menu.d_favourites", blurbDefault: "Pinned markets, assets, and accounts." },
         { href: "#/alerts", icon: "alarm", titleKey: "menu.p_alerts", titleDefault: "Price Alerts", blurbKey: "menu.d_alerts", blurbDefault: "Get notified when a market crosses your price." },
         { href: "#/help", icon: "question-circle", titleKey: "menu.p_help", titleDefault: "Help", blurbKey: "menu.d_help", blurbDefault: "Guides for every part of the wallet." },
+        { href: "#/community", icon: "people", titleKey: "menu.p_community", titleDefault: "Community", blurbKey: "menu.d_community", blurbDefault: "Chats, forums, explorers, and code." },
         { href: "#/settings", icon: "cog", titleKey: "menu.p_settings", titleDefault: "Settings", blurbKey: "menu.d_settings", blurbDefault: "Nodes, themes, language, and housekeeping." }
       ] }
   ];
