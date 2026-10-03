@@ -213,7 +213,7 @@ var AccountsUI = (function () {
       });
     });
     var resetLine = el(doc, "p", null, "muted");
-    var resetBtn = el(doc, "button", t("viewing.dialog_reset", "Reset to committee-account"));
+    var resetBtn = touchable(el(doc, "button", t("viewing.dialog_reset", "Reset to committee-account")));
     resetBtn.type = "button"; resetLine.appendChild(resetBtn);
     wrap.appendChild(resetLine);
     resetBtn.addEventListener("click", function () {
