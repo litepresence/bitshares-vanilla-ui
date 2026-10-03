@@ -82,3 +82,17 @@ is still PENDING. This document exists so the findings don't evaporate.
 F2 is yours to fix (two lines). F1 is already fixed by someone else — don't
 repeat the pattern. F3 is slice-18's problem, already recorded. F4 refreshes
 itself when the browser pass lands.
+
+## Resolution (repair round, 2026-10-03, per owner order)
+
+- **F1 — resolved, no action.** Verified: 25 `apilab.*` keys in `en.json`
+  (+ stubs), `check_i18n` drift-free over 4123 call sites. Backfill held.
+- **F2 — FIXED.** `api-lab-ui.js:200` now reads
+  `ApiLab.byMethod("get_account_by_name", "database") || ApiLab.METHODS[0]`
+  (key lookup, index fallback). Behavior-proofed headlessly (`byMethod`
+  resolves `get_account_by_name`/`database`); `node --check` + `check_types`
+  green.
+- **F3 — open, still slice-18's.** Unchanged.
+- **F4 — refreshed.** Gate symptom wording in `api-lab.md` §7(b) updated to
+  current tool output (rot: dev-only `globals.d.ts` note; types: tree-wide
+  PASS). Full refresh still rides with the tester browser pass.

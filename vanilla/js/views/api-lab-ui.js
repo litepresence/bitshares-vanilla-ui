@@ -197,7 +197,7 @@ var ApiLabUI = (function () {
         } catch (e) { startVals = null; }
       }
     }
-    if (!startEntry) startEntry = ApiLab.METHODS[7]; /* get_account_by_name */
+    if (!startEntry) startEntry = ApiLab.byMethod("get_account_by_name", "database") || ApiLab.METHODS[0];
 
     /* Method pulldown with group optgroups + filter box. */
     var pickRow = el(doc, "p", null, null);
