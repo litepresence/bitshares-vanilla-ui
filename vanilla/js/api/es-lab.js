@@ -68,6 +68,26 @@ var EsLab = (function () {
       desc: "Largest balances of one asset, descending. Same query the asset page panel sends.",
       sourceRef: "astro-ui TopAssetHolders.ts:28-37",
       fields: [F("asset", "string", { example: "1.3.0", hint: "Asset id (1.3.x)." }),
+        F("limit", "uint", { example: "25", max: 100 })] },
+    { key: "ops-by-account", group: "Operations", kind: "ops", index: "bitshares-*",
+      title: "Account operations",
+      desc: "Everything one account touched, newest first — exact id match (names resolve to ids at Run).",
+      sourceRef: "live probe 2026-10-03: term account_history.account (exact, verified vs es.bitshares.dev)",
+      fields: [F("account", "string", { example: "1.2.0", hint: "Account id (1.2.x) or name." }),
+        F("type", "string", { required: false, example: "0", hint: "Op id 0-77, blank = all." }),
+        F("limit", "uint", { example: "10", max: 100 })] },
+    { key: "block-range", group: "Operations", kind: "ops", index: "bitshares-*",
+      title: "Block range",
+      desc: "Every indexed op between two block heights, ascending — the chain-scan you cannot do over WS.",
+      sourceRef: "live probe 2026-10-03: range block_data.block_num (verified vs es.bitshares.dev)",
+      fields: [F("from", "uint", { example: "100916767" }),
+        F("to", "uint", { example: "100916768" }),
+        F("type", "string", { required: false, example: "", hint: "Op id 0-77, blank = all." })] },
+    { key: "balances-by-account", group: "Holders & balances", kind: "holders", index: "objects-balance",
+      title: "Account balances",
+      desc: "Every balance object one account holds (one row per asset).",
+      sourceRef: "live probe 2026-10-03: match owner_ (verified vs es.bitshares.dev)",
+      fields: [F("account", "string", { example: "1.2.0", hint: "Account id (1.2.x) or name." }),
         F("limit", "uint", { example: "25", max: 100 })] }
   ];
 
@@ -138,6 +158,35 @@ var EsLab = (function () {
         query: { bool: { filter: [{ range: { "block_data.block_time":
           { gte: "now-" + hours + "h", lte: "now" } } }] } },
         aggs: { by_op_type: { terms: { field: "operation_type", size: 200 } } } };
+     } else if (tpl.key === "ops-by-account") {
+      if (!/^1\.2\.\d+$/.test(v[0])) throw new Error("bad account id: account (resolve names first)");
+      /** @type {Array<Object>} */
+      var must = [{ term: { "account_history.account": v[0] } }];
+      if (v[1] && v[1].length) {
+        if (!/^[0-9]+$/.test(v[1])) throw new Error("bad op type: type");
+        must.push({ match: { operation_type: v[1] } });
+      }
+      body = { sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
+        size: Math.min(parseInt(v[2] || "10", 10), 100),
+        _source: ["account_history", "operation_history", "operation_type", "block_data"],
+        query: { bool: { must: must } } };
+    } else if (tpl.key === "block-range") {
+      /** @type {Array<Object>} */
+      var filter = [{ range: { "block_data.block_num":
+        { gte: parseInt(v[0], 10), lte: parseInt(v[1], 10) } } }];
+      if (v[2] && v[2].length) {
+        if (!/^[0-9]+$/.test(v[2])) throw new Error("bad op type: type");
+        filter.push({ match: { operation_type: v[2] } });
+      }
+      body = { sort: [{ "block_data.block_time": { order: "asc", unmapped_type: "boolean" } }],
+        size: ES_SIZE,
+        _source: ["account_history", "operation_history", "operation_type", "block_data"],
+        query: { bool: { filter: filter } } };
+    } else if (tpl.key === "balances-by-account") {
+      if (!/^1\.2\.\d+$/.test(v[0])) throw new Error("bad account id: account (resolve names first)");
+      body = { query: { bool: { must: [{ match: { owner_: { query: v[0] } } }] } },
+        track_total_hits: false, size: parseInt(v[1] || "25", 10),
+        sort: [{ balance: { order: "desc" } }] };
     } else {
       throw new Error("es-bad-key: " + tpl.key);
     }
@@ -235,15 +284,73 @@ var EsLab = (function () {
     });
   }
 
-  /* runPaged: search_after walk with the adapter caps (Task 3 fills the
-   * loop; single-page run() above stays for agg + small lookups). */
+  /* resolveAccount: display input -> exact 1.2.x id for term queries.
+   * Params: nameOrId string (id passes through; names resolve via Chain.db
+   *   get_account_by_name, the api-lab lookup). Returns a Promise for the id.
+   *   Fails: rejects "missing: account" (blank) or "unknown account: <name>"
+   *   (no Chain in unit tests reads as unknown — fail closed). */
+  function resolveAccount(nameOrId) {
+    var v = String(nameOrId === undefined || nameOrId === null ? "" : nameOrId);
+    if (/^1\.2\.\d+$/.test(v)) return Promise.resolve(v);
+    if (!v.length) return Promise.reject(new Error("missing: account"));
+    try {
+      if (typeof Chain !== "undefined" && Chain && typeof Chain.db === "function") {
+        return Chain.db("get_account_by_name", [v]).then(function (a) {
+          if (a && a.id) return a.id;
+          throw new Error("unknown account: " + v);
+        });
+      }
+    } catch (e) { /* reject below */ }
+    return Promise.reject(new Error("unknown account: " + v));
+  }
+
+  /* runPaged: search_after walk with the adapter caps (500/page, max 2 pages,
+   * 15s TOTAL deadline — market-fills-history.js:168-211 pattern). Params:
+   * tplKey, values, opts {want, timeoutMs}. Returns a Promise for the
+   * concatenated parsed rows (capped at min(want, 1000)). Fails: rejects
+   * es-bad-key, coerce errors, es-no-page (agg kind has no hits to walk),
+   * es-timeout (deadline lapsed), or the HistoryCap errors. Never fires
+   * match_all: every paged template carries a filter term by construction. */
   function runPaged(tplKey, values, opts) {
-    return Promise.reject(new Error("es-todo-paged"));
+    var tpl = byKey(tplKey);
+    if (!tpl) return Promise.reject(new Error("es-bad-key: " + tplKey));
+    if (tpl.kind !== "ops" && tpl.kind !== "holders") {
+      return Promise.reject(new Error("es-no-page: " + tplKey));
+    }
+    var req;
+    try { req = build(tpl, values); } catch (e) { return Promise.reject(e); }
+    var want = (opts && typeof opts.want === "number" && opts.want > 0) ?
+      Math.min(opts.want, ES_SIZE * ES_MAX_PAGES) : ES_SIZE * ES_MAX_PAGES;
+    var budget = (opts && typeof opts.timeoutMs === "number" && opts.timeoutMs > 0) ?
+      opts.timeoutMs : ES_TIMEOUT_MS;
+    var deadline = Date.now() + budget;
+    var out = [];
+    var pages = 0;
+    function page(searchAfter) {
+      var body = req.body;
+      if (searchAfter) body.search_after = searchAfter;
+      else if (body.search_after) delete body.search_after;
+      var remain = deadline - Date.now();
+      if (remain <= 0) return Promise.reject(new Error("es-timeout"));
+      return HistoryCap.esSearch(req.index, body, { timeoutMs: remain }).then(function (json) {
+        var rows = parse(tpl, json);
+        for (var i = 0; i < rows.length && out.length < want; i++) out.push(rows[i]);
+        pages++;
+        var hits = json && json.hits && json.hits.hits;
+        var pageSize = req.body.size || ES_SIZE;
+        var last = (hits && hits.length) ? hits[hits.length - 1] : null;
+        if (!last || !last.sort || hits.length < pageSize ||
+            pages >= ES_MAX_PAGES || out.length >= want) return out;
+        return page(last.sort);
+      });
+    }
+    return page(null);
   }
 
   return { GROUPS: GROUPS, TEMPLATES: TEMPLATES, ES_SIZE: ES_SIZE,
     ES_MAX_PAGES: ES_MAX_PAGES, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     byKey: byKey, coerce: coerce, filled: filled, build: build, parse: parse,
+    resolveAccount: resolveAccount,
     run: run, runPaged: runPaged };
 })();
 
