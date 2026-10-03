@@ -78,6 +78,10 @@ Spec: `docs/superpowers/specs/2026-10-03-api-lab-design.md` (Option B, approved)
 - Both files open with module headers (owns/consumes/globals/refs); every
   non-trivial function has params/return/failure docs. No TODO/FIXME, no
   commented-out code, no `eval` (grep-verified).
+- Known debt: `api-lab-ui.js` is 478 lines (over the ~400 split-candidate
+  line in §3.7). Left whole deliberately — a split would thread desk state
+  across files untestable without the tester browser pass; recorded for the
+  slice-18 readability pass.
 
 ## 7. Anti-rot gate (AGENTS.md §4.5)
 
