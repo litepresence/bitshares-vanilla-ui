@@ -296,7 +296,24 @@ var MiscUI = (function () {
     if (inv.amount !== undefined) return [{ label: "", amount: String(inv.amount) }];
     return [];
   }
-  /* Route entry: #/invoice/:data — parse view + pay deep-link + create tab. */
+  /* Route entry: #/invoice/:data — parse view + pay deep-link + create tab.
+   * CHECKOUT CONTRACT (bitshares-pay survey verdict ADAPT, zero backend): a
+   *   second worker builds the bitshares: parser against this same contract, so
+   *   THIS side is exact — renderInvoice reads #/invoice?to=&asset=&amount=
+   *   &memo= query pairs (URL-decoded; amount stays a HUMAN string, converted
+   *   only via Format at display/match time; invalid params -> honest inline
+   *   note, never throw). Empty query = pre-existing behavior, unchanged.
+   * QR VERDICT (deferred, 2026-10-03): a hand-rolled QR encoder is a
+   *   Reed-Solomon project — NOT written here; no sub-15KB licensed QR lib is
+   *   vendored (a new third-party surface for one view fails the §4.5 boring
+   *   rule), so checkout ships text-payload (copyable URL) + printable view
+   *   with the same honest no-QR wording as gateway-ui.js. Paid-watcher polls
+   *   Account.history on the `to` account on load + on re-check tap ONLY
+   *   (never set_subscribe, never auto) for a matching inbound op-0 (same
+   *   asset id + raw amount via Format.parseAmount + memo substring on the
+   *   visible memo field); incoming transfers are irreversible once in a block,
+   *   so state is simply paid/unpaid (no confirmation counting). No
+   *   auto-refund, no custody — survey REJECT stands. */
   function renderInvoice(root, data) {
     if (!root) return;
     var ui = entry(root);
@@ -305,6 +322,40 @@ var MiscUI = (function () {
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
+    /* Checkout query reader (this function owns the contract — router.js
+     * currentPath() strips queries, so the hash is re-read here). Returns the
+     * raw string map (possibly empty). Never throws: bad escapes keep raw. */
+    function readQuery() {
+      var q = {};
+      try {
+        var h = (typeof window !== "undefined" && window.location && typeof window.location.hash === "string") ? window.location.hash : "";
+        var qi = h.indexOf("?");
+        if (qi === -1) return q;
+        h.slice(qi + 1).split("&").forEach(function (pair) {
+          if (!pair) return;
+          var eq = pair.indexOf("="), k = eq === -1 ? pair : pair.slice(0, eq), v = eq === -1 ? "" : pair.slice(eq + 1);
+          try { k = decodeURIComponent(k.replace(/\+/g, " ")); } catch (e) { /* raw stands */ }
+          try { v = decodeURIComponent(v.replace(/\+/g, " ")); } catch (e2) { /* raw stands */ }
+          if (k && !Object.prototype.hasOwnProperty.call(q, k)) q[k] = v;
+        });
+      } catch (e) { /* empty stands */ }
+      return q;
+    }
+    /* shareHash: the exact contract string the bitshares: parser mirrors. */
+    function shareHash(to, asset, amount, memo) {
+      return "#/invoice?to=" + encodeURIComponent(to) + "&asset=" + encodeURIComponent(asset) +
+        "&amount=" + encodeURIComponent(amount) + "&memo=" + encodeURIComponent(memo);
+    }
+    var AMOUNT_RE = /^\d+(\.\d+)?$/;
+    var qp = readQuery();
+    var qTo = String(qp.to || "").trim(), qAsset = String(qp.asset || "").trim();
+    var qAmount = String(qp.amount || "").trim(), qMemo = String(qp.memo || "");
+    var hasQuery = !!(qTo || qAsset || qAmount || qMemo);
+    var amountOk = AMOUNT_RE.test(qAmount);
+    var queryOk = !!(qTo && qAsset && qAmount && amountOk);
+    /* Create-form refs (declared early: the checkout panel's copy button reads
+     * live form values at tap time, after the fields below exist). */
+    var cT = null, cA = null, cN = null, area = null;
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
     if (data) {
       try {
@@ -335,16 +386,33 @@ var MiscUI = (function () {
         a.setAttribute("href", "#/invoice/" + sample); ctx.wrap.appendChild(a);
         ctx.wrap.appendChild(ui.el(doc, "p", t("misc.foreign_compressed_invoice_urls_from_the_old", "Foreign (compressed) invoice URLs from the old UI cannot be parsed — only links created below."), "muted"));
       }
+    } else if (hasQuery) {
+      /* Query IS data: a checkout request summary (amount shown as-given —
+       * human string, zero conversion here). Validity is flagged below, and
+       * the paid-watcher + share row follow the create form. */
+      ctx.wrap.appendChild(ui.confirmList(doc, [
+        [t("misc.recipient", "Recipient"), qTo || t("misc.none", "none")],
+        [t("misc.asset", "Asset"), qAsset || t("misc.none", "none")],
+        [t("misc.amount", "Amount"), qAmount || t("misc.none", "none")],
+        [t("misc.note", "Note"), qMemo || t("misc.none", "none")]]));
+      if (!qTo || !qAsset || !qAmount) {
+        ctx.wrap.appendChild(ui.el(doc, "p",
+          t("misc.invoice_query_missing", "This invoice link is missing “to”, “asset” or “amount” — complete the form below and share a fresh link."), "error"));
+      } else if (!amountOk) {
+        ctx.wrap.appendChild(ui.el(doc, "p",
+          t("misc.invoice_query_bad_amount", "Amount “%(amount)s” is not a plain decimal — correct it below.", { amount: qAmount }), "error"));
+      }
     } else {
       ctx.wrap.appendChild(ui.el(doc, "p", t("misc.no_invoice_data_in_the_url_create_one_below", "No invoice data in the URL — create one below."), "muted"));
     }
     ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.create_invoice", "Create invoice")));
-    var cT = ui.field(doc, t("misc.recipient", "Recipient"), { placeholder: t("misc.account_name", "account name") });
-    var cA = ui.field(doc, t("misc.asset", "Asset"), { placeholder: "BTS", value: "BTS" });
-    var cN = ui.field(doc, t("misc.note_optional", "Note (optional)"), { placeholder: "" });
+    cT = ui.field(doc, t("misc.recipient", "Recipient"), { placeholder: t("misc.account_name", "account name"), value: qTo });
+    cA = ui.field(doc, t("misc.asset", "Asset"), { placeholder: "BTS", value: qAsset || "BTS" });
+    cN = ui.field(doc, t("misc.note_optional", "Note (optional)"), { placeholder: "", value: qMemo });
     ctx.wrap.appendChild(cT.row); ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cN.row);
-    var area = doc.createElement("textarea");
+    area = doc.createElement("textarea");
     area.setAttribute("placeholder", "coffee|1.5\ncake|2"); area.setAttribute("rows", "4");
+    if (qAmount || qMemo) area.value = qAmount ? (qMemo ? qMemo + "|" + qAmount : qAmount) : "";
     ui.touchable(area); area.style.width = "100%"; ctx.wrap.appendChild(area);
     var mk = ui.touchable(ui.el(doc, "button", t("misc.make_invoice_link", "Make invoice link"))); mk.type = "button"; ctx.wrap.appendChild(mk);
     var o2 = ui.el(doc, "div"); ctx.wrap.appendChild(o2);
@@ -368,6 +436,143 @@ var MiscUI = (function () {
         ui.touchable(ta); ta.style.width = "100%"; o2.appendChild(ta);
       } catch (e) { ui.showError(doc, o2, e, t("misc.could_not_create_the_invoice", "Could not create the invoice.")); }
     });
+    /* Checkout extras (query links only — empty query keeps prior behavior).
+     * Paid-watcher: one Account.history read on load + one per re-check tap
+     * (no timers, no subscribe daemon). Share row: live form values rebuilt
+     * into the contract URL at tap time; clipboard with execCommand fallback
+     * (explorer-assets.js shareRow precedent), aria-live result. */
+    if (hasQuery) {
+      ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.checkout_request", "Checkout request")));
+      if (queryOk) {
+        var wantEl = ui.el(doc, "p", "", "muted"); wantEl.setAttribute("aria-live", "polite"); ctx.wrap.appendChild(wantEl);
+        var stateEl = ui.el(doc, "p", t("misc.checking_payment", "Checking payment…"), "muted");
+        stateEl.setAttribute("aria-live", "polite"); ctx.wrap.appendChild(stateEl);
+        var reBtn = ui.touchable(ui.el(doc, "button", t("misc.recheck_payment", "Re-check payment")));
+        reBtn.type = "button"; ctx.wrap.appendChild(reBtn);
+        /* One paid check: resolve the `to` account, describe the asset, then
+         * Format-only human->raw for the match, then scan recent history for
+         * the inbound op-0 (pair-or-object rows, tx-send.js
+         * pollHistoryForTransfer precedent). Honest lines only; never throws. */
+        async function checkPaid() {
+          if (!live(myGen, uiGen)) return;
+          reBtn.disabled = true;
+          stateEl.textContent = t("misc.checking_payment", "Checking payment…");
+          try {
+            var acct = await Account.resolve(qTo);
+            var info = await Asset.describe(qAsset);
+            var expectedRaw = Format.parseAmount(qAmount, info.precision);
+            wantEl.textContent = t("misc.invoice_expecting", "Expecting %(amount)s to %(to)s%(memo)s.",
+              { amount: Format.formatAmount(expectedRaw, info.precision) + " " + info.symbol,
+                to: acct.name + " (" + acct.id + ")",
+                memo: qMemo ? " — memo contains “" + qMemo + "”" : "" });
+            var rows = await Account.history(acct.id, 100);
+            var list = Array.isArray(rows) ? rows : [], found = null, i;
+            for (i = 0; i < list.length; i++) {
+              var entry = (list[i] && list[i][1]) || list[i];
+              if (!entry || !Array.isArray(entry.op) || entry.op[0] !== 0) continue;
+              var d = entry.op[1] || {};
+              if (String(d.to) !== String(acct.id)) continue;
+              var got = d.amount || {};
+              if (String(got.asset_id) !== String(info.id)) continue;
+              if (String(got.amount) !== String(expectedRaw)) continue;
+              if (qMemo) {
+                var hay = typeof d.memo === "string" ? d.memo : JSON.stringify(d.memo || "");
+                if (hay.indexOf(qMemo) === -1) continue;
+              }
+              found = entry; break;
+            }
+            if (!live(myGen, uiGen)) return;
+            if (found) {
+              stateEl.textContent = t("misc.invoice_paid",
+                "Paid — matching inbound transfer found (block %(block)s).", { block: String(found.block_num || "?") });
+            } else {
+              stateEl.textContent = t("misc.invoice_unpaid",
+                "Unpaid — no matching inbound transfer in the last %(n)s history events.", { n: String(list.length) });
+            }
+          } catch (e) {
+            if (!live(myGen, uiGen)) return;
+            var m = String((e && e.message) || e);
+            if (m.indexOf("unknown-account") !== -1) m = t("misc.invoice_unknown_account", "unknown account “%(to)s”.", { to: qTo });
+            else if (m.indexOf("unknown-asset") !== -1) m = t("misc.invoice_unknown_asset", "unknown asset “%(asset)s”.", { asset: qAsset });
+            else if (m.indexOf("history-unavailable") !== -1) m = t("misc.invoice_history_unavailable", "payment history is unavailable — check Settings → Nodes and retry.");
+            stateEl.textContent = t("misc.invoice_check_failed", "Could not check payment: %(msg)s", { msg: m });
+          }
+          if (live(myGen, uiGen)) reBtn.disabled = false;
+        }
+        reBtn.addEventListener("click", function () { checkPaid(); });
+        if (qMemo) ctx.wrap.appendChild(ui.el(doc, "p",
+          t("misc.invoice_memo_note", "Memo matching is a substring on the visible memo field — encrypted memos only match on asset + amount."), "muted"));
+        checkPaid();
+      }
+      ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.shareable_link", "Shareable link")));
+      var shareTa = doc.createElement("textarea");
+      shareTa.value = shareHash(qTo, qAsset || "BTS", qAmount, qMemo);
+      shareTa.setAttribute("rows", "3"); shareTa.readOnly = true;
+      ui.touchable(shareTa); shareTa.style.width = "100%"; ctx.wrap.appendChild(shareTa);
+      var copyBtn = ui.touchable(ui.el(doc, "button", t("misc.copy_link", "Copy link"))); copyBtn.type = "button";
+      var printBtn = ui.touchable(ui.el(doc, "button", t("misc.print", "Print"))); printBtn.type = "button";
+      var shareNote = ui.el(doc, "span", "", "muted"); shareNote.setAttribute("aria-live", "polite");
+      ctx.wrap.appendChild(copyBtn); ctx.wrap.appendChild(doc.createTextNode(" ")); ctx.wrap.appendChild(printBtn);
+      ctx.wrap.appendChild(doc.createTextNode(" ")); ctx.wrap.appendChild(shareNote);
+      /* First amount line of the live create form ("label|amount" or bare) —
+       * the share URL always reflects what the form holds at tap time. */
+      function firstFormAmount() {
+        try {
+          var found = "";
+          String(area.value).split("\n").forEach(function (ln) {
+            if (found) return;
+            var line = ln.trim();
+            if (!line) return;
+            var parts = line.split("|"), a = (parts.length > 1 ? parts[1] : parts[0]).trim();
+            if (a) found = a;
+          });
+          return found;
+        } catch (e) { return ""; }
+      }
+      copyBtn.addEventListener("click", function () {
+        if (!live(myGen, uiGen)) return;
+        var to = cT.input.value.trim(), asset = cA.input.value.trim() || "BTS";
+        var memo = cN.input.value.trim(), amt = firstFormAmount();
+        if (!to || !amt) {
+          shareNote.textContent = t("misc.share_needs_to_amount", "A shareable link needs a recipient and at least one amount line.");
+          return;
+        }
+        var hash = shareHash(to, asset, amt, memo), url = hash;
+        try {
+          if (typeof location !== "undefined" && location.href) url = location.href.split("#")[0] + hash;
+        } catch (e) { url = hash; }
+        shareTa.value = url;
+        copyBtn.disabled = true;
+        shareNote.textContent = t("misc.copying", "Copying…");
+        function done(ok) {
+          if (!live(myGen, uiGen)) return;
+          copyBtn.disabled = false;
+          shareNote.textContent = ok ? t("misc.copied", "Copied")
+            : t("misc.copy_failed_select_manually", "Copy failed — select the link manually");
+        }
+        function fallback() {
+          try {
+            var ta = doc.createElement("textarea");
+            ta.value = url; doc.body.appendChild(ta); ta.select();
+            var ok = false;
+            try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+            try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+            done(!!ok);
+          } catch (e) { done(false); }
+        }
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard &&
+              typeof navigator.clipboard.writeText === "function") {
+            navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+          } else fallback();
+        } catch (e) { fallback(); }
+      });
+      printBtn.addEventListener("click", function () {
+        try { if (typeof window !== "undefined" && typeof window.print === "function") window.print(); } catch (e) { /* dialog stands */ }
+      });
+      ctx.wrap.appendChild(ui.el(doc, "p",
+        t("misc.invoice_no_qr", "No QR code is shown: a hand-rolled QR encoder is a Reed-Solomon project with no small licensed library vendored — copy or print the link instead."), "muted"));
+    }
   }
 
   return { renderAuthorities: renderAuthorities, renderLists: renderLists, renderInvoice: renderInvoice };

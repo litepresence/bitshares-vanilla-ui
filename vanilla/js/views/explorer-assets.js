@@ -42,11 +42,25 @@ var ExplorerAssets = (function () {
    * Dynamic sentences keep their code structure (batch-2b precedent): only
    * complete static literals are wrapped, values and punctuation glue stay
    * raw, so every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
+    var s = dflt;
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") {
+        var probe = I18n.t(key, dflt, vars);
+        if (typeof probe === "string" && probe.indexOf("%(") === -1) return probe;
+        if (typeof probe === "string") s = probe;
+      }
     } catch (e) { /* default below */ }
-    return dflt;
+    /* Split/join fallback (pool-graph precedent): fills %(name)s from vars
+     * when I18n is absent or left placeholders behind. Never throws. */
+    try {
+      if (vars && typeof vars === "object") {
+        s = String(s).replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m;
+        });
+      }
+    } catch (e) { s = dflt; }
+    return s;
   }
 
 
@@ -1115,6 +1129,169 @@ var ExplorerAssets = (function () {
           feedBox.appendChild(el(doc, "p", t("explorer.no_feeds", "No live feeds published.") + t("explorer.feeds_hint", " Feeds appear once publishers publish for an asset."), "muted"));
           return;
         }
+        /* Feed health strip (survey verdict ADAPT: witness-monitor
+         * pricefeed.js publisher math — CER ~= settlement price * premium,
+         * MCR/MSSR x1000 ratios, per-asset isolated failures, stale =
+         * publication time + lifetime). Read-only math over the
+         * already-fetched bitasset join (bitObj, via Explorer.asset's
+         * get_objects) + the feeds() row (f): NO new chain calls — any
+         * missing field renders "—" with its raw title, never guessed,
+         * never fabricated. Reference: #1 Asset.jsx:738-748 (MCR/MSSR
+         * /1000), Asset.jsx:1668-1679 (stale filter pubtime + lifetime,
+         * feeds[][0] publisher / [][1][0] timestamp); chain truth
+         * asset_object.hpp:268 (feeds map publisher -> [time, feed]),
+         * :274 (current_feed_publication_time = oldest factored feed). */
+        (function feedHealth() {
+          var bo = bitObj || {};
+          var cur = (bo.current_feed && typeof bo.current_feed === "object") ? bo.current_feed : null;
+          var health = el(doc, "div", null, "xplore-feed-health");
+          /* Badge: LIVE / STALE / AGE UNKNOWN. The "No live feeds" empty
+           * state above owns the missing-feed case — this badge only ages
+           * an existing settlement price, never invents one. */
+          var pubRaw = (typeof bo.current_feed_publication_time === "string")
+            ? bo.current_feed_publication_time : null;
+          var lifeRaw = (f.feed_lifetime_sec !== null && f.feed_lifetime_sec !== undefined)
+            ? f.feed_lifetime_sec : (bo.options && bo.options.feed_lifetime_sec);
+          var pubMs = NaN;
+          try { pubMs = pubRaw ? Date.parse(/Z$/.test(pubRaw) ? pubRaw : pubRaw + "Z") : NaN; }
+          catch (e) { pubMs = NaN; }
+          var lifeOk = /^\d+$/.test(String((lifeRaw === undefined || lifeRaw === null) ? "" : lifeRaw));
+          var badge = el(doc, "p", null, null);
+          var strong = doc.createElement("strong");
+          if (isFinite(pubMs) && lifeOk) {
+            var fresh = Date.now() < pubMs + parseInt(String(lifeRaw), 10) * 1000;
+            strong.textContent = fresh
+              ? t("explorer.feed_badge_live", "LIVE")
+              : t("explorer.feed_badge_stale", "STALE — feed expired");
+            badge.title = t("explorer.feed_badge_title", "oldest factored feed %(pub)s; lifetime %(life)ss", { pub: String(pubRaw), life: String(lifeRaw) });
+            if (!fresh) badge.className = "error";
+          } else {
+            strong.textContent = t("explorer.feed_badge_unknown", "FEED AGE UNKNOWN");
+            badge.title = t("explorer.feed_badge_unknown_title", "publication time or lifetime missing");
+          }
+          badge.appendChild(strong);
+          health.appendChild(badge);
+          var hdl = el(doc, "dl", null, "xplore-fields");
+          health.appendChild(hdl);
+          /* rowInto: dt + dd with human text + raw title (dash-on-missing
+           * contract shared with humanRowInto above). Params term, human,
+           * rawTitle; never throws. */
+          function rowInto(term, human, rawTitle) {
+            hdl.appendChild(el(doc, "dt", term));
+            var dd = el(doc, "dd", human);
+            if (rawTitle !== undefined && rawTitle !== null) dd.title = String(rawTitle);
+            hdl.appendChild(dd);
+          }
+          /* cerPremiumBps: CER-vs-settlement premium in hundredths of a
+           * percent (800 = +8.00%), exact BigInt ratio math. Leg precisions
+           * resolve from already-fetched ids only (own asset id -> prec,
+           * settlement quote id -> f.quote_precision); anything
+           * unresolvable -> null (caller renders "—"). Never float.
+           * @param {any} cer core_exchange_rate price object (or null)
+           * @param {any} settle settlement price object (or null)
+           * @returns {bigint|null} signed premium bps, or null when missing */
+          function cerPremiumBps(cer, settle) {
+            try {
+              if (!cer || !settle || !cer.base || !cer.quote || !settle.base || !settle.quote) return null;
+              var sqId = settle.quote.asset_id;
+              var ids = [cer.base.asset_id, cer.quote.asset_id, settle.base.asset_id, settle.quote.asset_id];
+              var amts = [cer.base.amount, cer.quote.amount, settle.base.amount, settle.quote.amount];
+              var precs = [];
+              for (var i = 0; i < 4; i++) {
+                if (typeof ids[i] !== "string") return null;
+                if (ids[i] === a.id) precs.push(prec);
+                else if (typeof sqId === "string" && ids[i] === sqId &&
+                  f.quote_precision !== null && f.quote_precision !== undefined) precs.push(f.quote_precision);
+                else return null;
+                if (!/^\d+$/.test(String(amts[i]))) return null;
+                if (!Number.isInteger(precs[i]) || precs[i] < 0 || precs[i] > 18) return null;
+              }
+              var cB = BigInt(String(amts[0])), cQ = BigInt(String(amts[1]));
+              var sB = BigInt(String(amts[2])), sQ = BigInt(String(amts[3]));
+              if (cQ === 0n || sB === 0n || sQ === 0n) return null;
+              /* ratio = cerReal/setReal = cB*10^p1*sQ*10^p2 / cQ*10^p0*sB*10^p3 */
+              function p10(n) { var r = 1n; for (var k = 0; k < n; k++) r *= 10n; return r; }
+              var rn = cB * p10(precs[1]) * sQ * p10(precs[2]);
+              var rd = cQ * p10(precs[0]) * sB * p10(precs[3]);
+              if (rd === 0n) return null;
+              var diff = rn - rd;
+              var neg = diff < 0n, absD = neg ? -diff : diff;
+              var qq = (absD * 10000n) / rd, rem = (absD * 10000n) % rd;
+              if (rem * 2n >= rd) qq += 1n; /* half-up at the bps digit */
+              return neg ? -qq : qq;
+            } catch (e) { return null; }
+          }
+          /* Signed bps -> "+8.00%" / "-0.25%"; BigInt math, never float. */
+          function fmtBps(bps) {
+            var neg = bps < 0n, m = neg ? -bps : bps;
+            return (neg ? "-" : "+") + (m / 100n).toString() + "." +
+              (m % 100n).toString().padStart(2, "0") + "%";
+          }
+          var cer = cur ? cur.core_exchange_rate : null;
+          var bps = cerPremiumBps(cer, f.settlement_raw);
+          if (bps === null) {
+            rowInto(t("explorer.feed_cer_premium", "CER premium (publisher-rule estimate)"), "—",
+              cer ? t("explorer.feed_cer_uncomputable", "core_exchange_rate present but premium not computable from fetched legs")
+                : t("explorer.feed_cer_missing", "core_exchange_rate missing"));
+          } else {
+            rowInto(t("explorer.feed_cer_premium", "CER premium (publisher-rule estimate)"), fmtBps(bps),
+              t("explorer.feed_cer_title", "cer base %(cb)s / quote %(cq)s vs settle base %(sb)s / quote %(sq)s",
+                { cb: String(cer.base.amount), cq: String(cer.quote.amount), sb: String(f.settlement_raw.base.amount), sq: String(f.settlement_raw.quote.amount) }));
+          }
+          /* MCR / MSSR via the file-local ratio1000 (same #1 /1000
+           * convention as the fieldRow pair below — strip is the summary). */
+          function ratioOrDash(v) {
+            if (v === null || v === undefined || !/^\d+$/.test(String(v))) return null;
+            try { return ratio1000(String(v)); } catch (e) { return null; }
+          }
+          var mcrH = ratioOrDash(f.mcr), mssrH = ratioOrDash(f.mssr_hundredths);
+          rowInto(t("explorer.feed_mcr_mssr", "MCR / MSSR"),
+            (mcrH === null && mssrH === null) ? "—" : ((mcrH || "—") + " / " + (mssrH || "—")),
+            t("explorer.feed_mcr_mssr_title", "mcr %(mcr)s; mssr %(mssr)s", { mcr: String(f.mcr), mssr: String(f.mssr_hundredths) }));
+          /* ageText: chain UTC timestamp ms -> "5 hours ago", reusing
+           * lifetimeText's existing explorer.*_unit keys (wall-clock
+           * only, never money). */
+          function ageText(ms) {
+            var s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+            return lifetimeText(String(s)) + t("explorer.feed_ago_suffix", " ago");
+          }
+          hdl.appendChild(el(doc, "dt", t("explorer.feed_last_update", "Last update")));
+          var luDd = doc.createElement("dd");
+          if (isFinite(pubMs)) { luDd.textContent = ageText(pubMs); luDd.title = String(pubRaw); }
+          else { luDd.textContent = "—"; luDd.title = t("explorer.feed_pubtime_missing", "current_feed_publication_time missing"); }
+          hdl.appendChild(luDd);
+          /* feeds map: chain flat_map serializes as [[pubId, [ts, feed]]]
+           * pairs (#1 Asset.jsx:1665); tolerate a plain-object shape too.
+           * Latest = max timestamp; count = valid publisher entries. */
+          var entries = [];
+          try {
+            var fm = bo.feeds;
+            if (Array.isArray(fm)) entries = fm;
+            else if (fm && typeof fm === "object") {
+              entries = Object.keys(fm).map(function (k) { return [k, fm[k]]; });
+            }
+          } catch (e) { entries = []; }
+          var count = 0, latestId = null, latestMs = NaN, latestRaw = null;
+          entries.forEach(function (en) {
+            var pid = en && en[0], ts = en && en[1] && en[1][0];
+            if (typeof pid !== "string" || !ACCT_RE.test(pid)) return;
+            count++;
+            var ms = NaN;
+            try { ms = (typeof ts === "string") ? Date.parse(/Z$/.test(ts) ? ts : ts + "Z") : NaN; }
+            catch (e2) { ms = NaN; }
+            if (isFinite(ms) && !(ms <= latestMs)) { latestMs = ms; latestId = pid; latestRaw = ts; }
+          });
+          hdl.appendChild(el(doc, "dt", t("explorer.feed_publishers", "Publishers")));
+          var pubDd = doc.createElement("dd");
+          if (count > 0 && latestId) {
+            pubDd.appendChild(doc.createTextNode(String(count) + " — latest "));
+            pubDd.appendChild(ExplorerRender.accountLink(doc, latestId, myGen));
+            if (isFinite(latestMs)) pubDd.appendChild(doc.createTextNode(" (" + ageText(latestMs) + ")"));
+            pubDd.title = t("explorer.feed_publisher_title", "%(id)s @ %(ts)s", { id: String(latestId), ts: String(latestRaw) });
+          } else { pubDd.textContent = "—"; pubDd.title = t("explorer.feed_feeds_missing", "feeds missing"); }
+          hdl.appendChild(pubDd);
+          feedBox.appendChild(health);
+        })();
         var fdl = el(doc, "dl", null, "xplore-fields");
         function priceRow(term, pair) {
           fdl.appendChild(el(doc, "dt", term));

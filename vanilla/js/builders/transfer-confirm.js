@@ -29,7 +29,12 @@
  * path, tx.js) is satisfied without inventing a new wire shape.
  * Confirm rows follow #3's op-0 table
  * (wallet-extension/src/popup/popup.js:5717-5722): From / To / Amount /
- * Memo, plus Fee and Network.
+ * Memo, plus Fee and Network. Layout follows the Beet confirm-dialog survey
+ * verdict (ADOPT org-survey-2026-10-03 §ADOPT-2): header context line
+ * (wallet account + chain prefix + network) + one card per op (title +
+ * human rows + per-card raw drill-down). No receipt-toggle (out of scope);
+ * no sign-only button (follow-up — needs export UI, not trivially safe).
+ * Close is fail-closed: Back never signs (see showConfirm).
  * Fee is looked up IN THE TRANSFER ASSET (feeAssetId = assetId): one asset
  * lookup, fee displays in the same symbol the user typed. Tx.fee supports
  * any fee asset; the node answers the equivalent fee.
@@ -249,13 +254,42 @@ var TransferConfirm = (function () {
     };
   }
 
-  /* Confirm screen. Row order follows #3's op-0 table (popup.js:5717-5722):
+  /* Confirm screen (Beet card layout per the header note: header context
+   * line + one card per op with title + human rows + per-card raw
+   * drill-down). Row order follows #3's op-0 table (popup.js:5717-5722):
    * From / To / Amount / Memo, plus Fee and Network. Fee shows the human
    * amount with the raw integer in title (same convention as balances).
-   * Back leaves via onBack (the form file's re-render closure) — this file
-   * never reaches back into transfer-ui.js. */
+   * The header names the signing context honestly — wallet account + chain
+   * prefix + network (we have no dApp origin to name). Back is the
+   * fail-closed close: it never signs and never leaves anything pending —
+   * it only re-renders the form via onBack (form-route fallback when no
+   * closure was given). This file builds op 0 only, so the pager reads 1/1
+   * (the slot multi-op pagination would use). Back leaves via onBack (the
+   * form file's re-render closure) — this file never reaches back into
+   * transfer-ui.js. */
   function showConfirm(doc, wrap, root, from, ctx, onBack) {
     wrap.appendChild(el(doc, "h1", t("confirm.title", "Confirm transfer")));
+    /* (1) header context line — existing keys only: confirm.from names the
+     * wallet account, txbuilder.chain_prefix the chain, confirm.network
+     * the network (" · " is punctuation, not a label). */
+    wrap.appendChild(el(doc, "p",
+      t("confirm.from", "From") + " " + from.name + " (" + from.id + ") · " +
+      t("txbuilder.chain_prefix", "Chain: ") + (ctx.chainPrefix || "unknown") + " · " +
+      t("confirm.network", "Network") + " " + ctx.network, "muted"));
+
+    /* (2) one card per op (a single op here — title + pager slot + rows).
+     * The row() builder below is unchanged; only the structure around it
+     * is new. */
+    var ops = (ctx.unsigned && ctx.unsigned.operations) || [];
+    var pair = ops[0] || [0, {}];
+    var opId = pair[0];
+    var card = el(doc, "section", null, "op-card");
+    /* Title reuses the existing op-name key; the (op N) index is chain data
+     * (same "(op …)" shape as txbuilder.added_body_tpl), not a new label. */
+    card.appendChild(el(doc, "h2", t("proposal.op_0", "transfer") + " (op " + opId + ")"));
+    /* Pager slot: pure position data (multi-op pagination is a follow-up —
+     * this file builds op 0 only, so this reads 1/1). */
+    card.appendChild(el(doc, "div", "1/" + ops.length, "muted"));
     var list = el(doc, "dl", null, "xfer-confirm");
 
     function row(term, text, title) {
@@ -276,11 +310,31 @@ var TransferConfirm = (function () {
     var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
     row(t("confirm.fee", "Fee"), feeHuman, String(ctx.fee.amount));
     row(t("confirm.network", "Network"), ctx.network);
-    /* H1: the chain under review — check this prefix against the footer
-     * before signing (plain literal label: display-only, no new i18n key). */
-    row("Chain ID", ctx.chainPrefix || "unknown");
+    /* Chain row keeps the visible prefix the sign-time re-pin checks against
+     * (term reuses txbuilder.chain_prefix — the old literal "Chain ID" is
+     * gone, same value shown). */
+    row(t("txbuilder.chain_prefix", "Chain: "), ctx.chainPrefix || "unknown");
 
-    wrap.appendChild(list);
+    card.appendChild(list);
+
+    /* (3) per-card raw drill-down (existing .raw family, moved inside the
+     * card so the bytes sit next to the rows they describe; shows this
+     * card's op pair — equivalent info to the old whole-operations dump). */
+    var detOp = doc.createElement("details");
+    detOp.className = "raw";
+    var sumOp = doc.createElement("summary");
+    /* A11y delta 2026-10-01: empty summary showed only a triangle to sighted
+     * keyboard users — visible text mirrors the aria-label (proposal-ui
+     * rawJson precedent), reusing the same key so check_i18n stays green. */
+    sumOp.textContent = t("confirm.op_json_label", "Show unsigned operation JSON");
+    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
+    detOp.appendChild(sumOp);
+    var preOp = doc.createElement("pre");
+    try { preOp.textContent = JSON.stringify(pair, null, 2); }
+    catch (e) { preOp.textContent = String(pair); }
+    detOp.appendChild(preOp);
+    card.appendChild(detOp);
+    wrap.appendChild(card);
 
     /* H3: blocking suspicious-fee warning + explicit ack checkbox. The
      * Sign & Send handler below refuses to sign until the box is ticked —
@@ -301,23 +355,8 @@ var TransferConfirm = (function () {
       wrap.appendChild(ackRow);
     }
 
-    /* The exact operation about to be signed (no secrets: unsigned, fee
-     * filled). Review bytes before Sign & Send. */
-    var detOp = doc.createElement("details");
-    detOp.className = "raw";
-    var sumOp = doc.createElement("summary");
-    /* A11y delta 2026-10-01: empty summary showed only a triangle to sighted
-     * keyboard users — visible text mirrors the aria-label (proposal-ui
-     * rawJson precedent), reusing the same key so check_i18n stays green. */
-    sumOp.textContent = t("confirm.op_json_label", "Show unsigned operation JSON");
-    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
-    detOp.appendChild(sumOp);
-    var preOp = doc.createElement("pre");
-    try { preOp.textContent = JSON.stringify(ctx.unsigned.operations, null, 2); }
-    catch (e) { preOp.textContent = String(ctx.unsigned && ctx.unsigned.operations); }
-    detOp.appendChild(preOp);
-    wrap.appendChild(detOp);
-
+    /* Buttons: Back is the fail-closed close (never signs — proof in the
+     * handler below); Sign & Send is the only path that signs. */
     var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
     backBtn.id = "xfer-back";
     backBtn.type = "button";
@@ -327,8 +366,19 @@ var TransferConfirm = (function () {
     sendBtn.type = "button";
     wrap.appendChild(sendBtn);
 
+    /* Fail-closed close proof: this handler is the ONLY thing Back does —
+     * it never touches Tx.sign/broadcast, never resolves anything, leaves
+     * no promise behind (review already settled before showConfirm ran).
+     * Closing = reject: the unsigned ctx is dropped with the DOM. The
+     * form-route fallback covers a missing onBack closure (previously a
+     * dead button with no way out); mid-sign both buttons stay disabled
+     * so the user cannot abandon the promise chain into an ambiguous
+     * state from here (browser-chrome navigation away still drops only the
+     * result screen — a broadcast already sent cannot be unsent, same as
+     * before, and nothing here auto-signs on close). */
     backBtn.addEventListener("click", function () {
-      if (typeof onBack === "function") onBack();
+      if (typeof onBack === "function") { onBack(); return; }
+      try { location.hash = "#/transfer"; } catch (e) { /* no nav */ }
     });
 
     /* TxBuilder outlet (additive): queue this unsigned transfer without

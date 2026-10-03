@@ -1500,6 +1500,74 @@ var AccountUI = (function () {
     var histH = doc.createElement("h2");
     histH.textContent = t("account.history_title", "History");
     histSection.appendChild(histH);
+    /* History CSV export (org-survey 2026-10-03 ADOPT-1: 11-column
+     * CoinTracking shape via HistoryExport.rowsToCsv — raw per-fill rows,
+     * grouping is a follow-up). The button carries the English literal on
+     * purpose: no account.export_csv key exists in vanilla/locales/*.json
+     * and this file cannot mint one (check_i18n gate) — the next i18n batch
+     * mints account.export_csv. Wiring only: HistoryExport + Asset resolve
+     * at call time (backend-missing and empty-history fail soft through the
+     * existing showError path, never blank, never throwing). */
+    var histRowsCache = [];
+    var histExportBtn = doc.createElement("button");
+    histExportBtn.type = "button";
+    histExportBtn.style.minHeight = "44px";
+    histExportBtn.textContent = t("account.export_csv", "Export CSV");
+    histSection.appendChild(histExportBtn);
+    histExportBtn.addEventListener("click", function () {
+      if (!histRowsCache || histRowsCache.length === 0) {
+        var noneMsg = t("account.s3", "No recent activity.");
+        showError(doc, histBody, new Error(noneMsg), noneMsg);
+        return;
+      }
+      var HE = null;
+      try {
+        /* globalThis-bracket (not bare `typeof HistoryExport`): the type
+         * gate's globals.d.ts has no HistoryExport line and this file
+         * cannot mint one — bare references fail checkJs, brackets pass. */
+        HE = (typeof globalThis !== "undefined" && globalThis["HistoryExport"]) || null;
+      } catch (e) { HE = null; }
+      if (!HE) {
+        showError(doc, histBody, new Error("history-export backend missing"),
+          t("account.err_history", "History unavailable on this node."));
+        return;
+      }
+      var ids = [];
+      try { ids = HE.collectAssetIds(histRowsCache); } catch (e) { ids = []; }
+      /* Finish an export with a resolved asset map (missing precisions fall
+       * back to raw digits inside rowsToCsv — never a blank download). */
+      function finishExport(assetMap) {
+        var csv = "";
+        try {
+          csv = HE.rowsToCsv(histRowsCache, { accountId: acct.id, assets: assetMap || {} });
+        } catch (e) {
+          showError(doc, histBody, e, t("account.err_history", "History unavailable on this node."));
+          return;
+        }
+        var fname = "history.csv";
+        try { fname = HE.defaultFilename(acct.name); } catch (e) { fname = "history.csv"; }
+        var ok = false;
+        try { ok = HE.downloadCsv(fname, csv); } catch (e) { ok = false; }
+        if (!ok) {
+          showError(doc, histBody, new Error("export-download-unavailable"),
+            t("account.err_history", "History unavailable on this node."));
+        }
+      }
+      var useAsset = null;
+      try {
+        if (typeof Asset !== "undefined" && Asset && typeof Asset.describe === "function") useAsset = Asset;
+      } catch (e) { useAsset = null; }
+      if (!useAsset || !ids || ids.length === 0) { finishExport({}); return; }
+      var bounded = ids.slice(0, 50);
+      var built = {};
+      Promise.all(bounded.map(function (aid) {
+        return Promise.resolve().then(function () { return useAsset.describe(aid); }).then(function (a) {
+          if (a && typeof a.precision === "number") built[a.id || aid] = { symbol: a.symbol || aid, precision: a.precision };
+        }).catch(function () { /* miss falls back to raw id inside rowsToCsv */ });
+      })).then(function () { finishExport(built); }).catch(function (e) {
+        showError(doc, histBody, e, t("account.err_history", "History unavailable on this node."));
+      });
+    });
     var histLoading = doc.createElement("p");
     histLoading.className = "muted";
     histLoading.textContent = t("account.loading_history", "Loading history…");
@@ -1647,6 +1715,7 @@ var AccountUI = (function () {
       }
       Promise.resolve(p).then(function (rows) {
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
+        histRowsCache = Array.isArray(rows) ? rows : [];
         renderHistory(doc, histBody, rows);
         /* Slice-16 (F1b): pulled history watcher on the existing fetch.
          * First-entry diff per plan; a notify fault never breaks history. */
