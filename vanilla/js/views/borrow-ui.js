@@ -293,7 +293,7 @@ var BorrowUI = (function () {
         try { crTitle = "MCR " + Format.mcrUnitsToHuman(p._mcr) + "%"; } catch (e) { crTitle = null; }
       }
       [[p.call_id], [c.text, c.raw], [d.text, d.raw], [tcr]].forEach(function (x) {
-        var td = el(doc, "td", x[0]); if (x[1]) td.title = "raw " + x[1]; tr.appendChild(td); });
+        var td = el(doc, "td", x[0]); if (x[1]) td.title = t("account.raw_prefix", "raw ") + x[1]; tr.appendChild(td); });
       var tdCr = el(doc, "td", cr);
       if (crTitle) tdCr.title = crTitle;
       if (p._cr && p._cr.belowMcr) tdCr.className = "cr-danger";
@@ -812,7 +812,7 @@ var BorrowUI = (function () {
         ? Format.formatAmount(R.fundRaw, R.backingPrec) : R.fundRaw;
       var fundLine = el(doc, "p", "Settlement fund for " + R.asset.symbol + ": " + fundHuman +
         ((typeof R.backingPrec === "number") ? " (backing " + R.backingId + ")" : " (raw " + R.fundRaw + ")"));
-      fundLine.title = "raw " + R.fundRaw;
+      fundLine.title = t("account.raw_prefix", "raw ") + R.fundRaw;
       box.appendChild(fundLine);
       box.appendChild(bidsTable(doc, R.bids, R));
       if (R.fundRaw === "0") {
@@ -855,11 +855,11 @@ var BorrowUI = (function () {
       var inv = b.additional_collateral || {}, debt = b.debt_covered || {};
       var c = doc.createElement("td");
       c.textContent = Format.formatAmount(String(inv.amount), R.backingPrec);
-      c.title = "raw " + String(inv.amount);
+      c.title = t("account.raw_prefix", "raw ") + String(inv.amount);
       tr.appendChild(c);
       var d = doc.createElement("td");
       d.textContent = Format.formatAmount(String(debt.amount), R.debtPrec);
-      d.title = "raw " + String(debt.amount);
+      d.title = t("account.raw_prefix", "raw ") + String(debt.amount);
       tr.appendChild(d);
       tbody.appendChild(tr);
     });

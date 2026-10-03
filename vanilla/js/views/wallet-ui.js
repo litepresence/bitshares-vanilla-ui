@@ -322,12 +322,12 @@ var WalletUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     var h1 = doc.createElement("h1");
-    h1.textContent = "Wallet";
+    h1.textContent = t("wallet.title", "Wallet");
     wrap.appendChild(h1);
 
     if (backendMissing()) {
       var missing = makeError(doc);
-      missing.textContent = "Wallet backend missing: js/wallet.js failed to load.";
+      missing.textContent = t("wallet.s1", "Wallet backend missing: js/wallet.js failed to load.");
       wrap.appendChild(missing);
       return;
     }
@@ -337,14 +337,14 @@ var WalletUI = (function () {
     if (Wallet.isUnlocked()) {
       Wallet.touch();
       var open = doc.createElement("p");
-      open.textContent = "Wallet is unlocked.";
+      open.textContent = t("wallet.s2", "Wallet is unlocked.");
       wrap.appendChild(open);
       wrap.appendChild(pubkeyList(doc, Wallet.keys || {}));
       /* Public keys only — WIFs and the brainkey NEVER enter a raw block. */
       var detKeys = doc.createElement("details");
       detKeys.className = "raw";
       var sumKeys = doc.createElement("summary");
-      sumKeys.setAttribute("aria-label", "Show public keys JSON");
+      sumKeys.setAttribute("aria-label", t("wallet.show_public_keys_json", "Show public keys JSON"));
       detKeys.appendChild(sumKeys);
       var preKeys = doc.createElement("pre");
       try {
@@ -388,7 +388,7 @@ var WalletUI = (function () {
       } catch (e) { /* lock callback is best-effort; the button still locks */ }
     } else {
       var locked = doc.createElement("p");
-      locked.textContent = "Wallet is locked. Enter your password to unlock.";
+      locked.textContent = t("wallet.s3", "Wallet is locked. Enter your password to unlock.");
       wrap.appendChild(locked);
       wrap.appendChild(labeledRow(doc, "Password", passwordField(doc, "wallet-password")));
       var unlockBtn = actionButton(doc, "wallet-unlock", "Unlock");
@@ -437,24 +437,23 @@ var WalletUI = (function () {
       ["#/help/backups", "How backups work"]
     ]));
     var h1 = doc.createElement("h1");
-    h1.textContent = "Create Wallet (Brainkey)";
+    h1.textContent = t("wallet.s4", "Create Wallet (Brainkey)");
     wrap.appendChild(h1);
 
     if (backendMissing() || typeof Crypto === "undefined") {
       var missing = makeError(doc);
-      missing.textContent = "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.";
+      missing.textContent = t("wallet.s5", "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.");
       wrap.appendChild(missing);
       return;
     }
 
     var hint = doc.createElement("p");
-    hint.textContent = "Write down your brainkey and keep it safe. " +
-      "Anyone with it can spend your funds.";
+    hint.textContent = t("wallet.write_down_brainkey_keep_safe", "Write down your brainkey and keep it safe. Anyone with it can spend your funds.");
     wrap.appendChild(hint);
 
     var customMode = false;
     var bkArea = brainkeyField(doc, "create-brainkey", true);
-    bkArea.placeholder = "Generating brainkey…";
+    bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…");
     bkArea.style.width = "100%";
     wrap.appendChild(fieldRow(doc, t("wallet.brainkey", "Brainkey"), bkArea));
     var bkHint = doc.createElement("p");
@@ -482,7 +481,7 @@ var WalletUI = (function () {
     check.id = "create-written";
     check.type = "checkbox";
     checkLabel.appendChild(check);
-    checkLabel.appendChild(doc.createTextNode(" I wrote it down"));
+    checkLabel.appendChild(doc.createTextNode(t("wallet.wrote_it_down", " I wrote it down")));
     checkRow.appendChild(checkLabel);
     wrap.appendChild(checkRow);
 
@@ -533,7 +532,7 @@ var WalletUI = (function () {
       err.textContent = "";
       customMode = false;
       bkArea.readOnly = true;
-      bkArea.placeholder = "Generating brainkey…";
+      bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…");
       customBtn.style.display = "";
     /* TYPE NOTE: the global Crypto object collides with DOM lib's Crypto
      * interface (constructor type), so suggestBrainkey reads back missing;
@@ -578,7 +577,7 @@ var WalletUI = (function () {
       var pw = pwInput ? pwInput.value : "";
       var confirm = confirmInput ? confirmInput.value : "";
       if (!check.checked) {
-        err.textContent = "Confirm you wrote the brainkey down first.";
+        err.textContent = t("wallet.s6", "Confirm you wrote the brainkey down first.");
         return;
       }
       if (customMode && String(bk || "").length < 50) {
@@ -586,7 +585,7 @@ var WalletUI = (function () {
         return;
       }
       if (!pw) {
-        err.textContent = "Password required: enter a non-empty password.";
+        err.textContent = t("wallet.s7", "Password required: enter a non-empty password.");
         return;
       }
       if (pw.length < 8) {
@@ -594,7 +593,7 @@ var WalletUI = (function () {
         return;
       }
       if (pw !== confirm) {
-        err.textContent = "Passwords do not match.";
+        err.textContent = t("wallet.passwords_do_not_match", "Passwords do not match.");
         return;
       }
       var walletName = nameInput ? nameInput.value : "default";
@@ -617,7 +616,7 @@ var WalletUI = (function () {
           clearRoot(root);
           var done = makeWrap(doc, root);
           var h2 = doc.createElement("h2");
-          h2.textContent = "Wallet created — back it up";
+          h2.textContent = t("wallet.wallet_created_back_it_up", "Wallet created — back it up");
           done.appendChild(h2);
           var saved = brainkeyField(doc, "create-backup-text", true);
           saved.value = bk;
@@ -626,7 +625,7 @@ var WalletUI = (function () {
           done.appendChild(pubkeyList(doc, keys || {}));
           var toWallet = doc.createElement("a");
           toWallet.href = "#/wallet";
-          toWallet.textContent = "Go to wallet manager";
+          toWallet.textContent = t("wallet.go_to_wallet_manager", "Go to wallet manager");
           done.appendChild(toWallet);
           done.appendChild(helpPara(doc, [
             ["#/help/backups", "How backups work"]
@@ -714,25 +713,24 @@ var WalletUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     var h1 = doc.createElement("h1");
-    h1.textContent = "Import Existing Account";
+    h1.textContent = t("wallet.import_existing_account", "Import Existing Account");
     wrap.appendChild(h1);
 
     if (backendMissing() || typeof Crypto === "undefined") {
       var missing = makeError(doc);
-      missing.textContent = "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.";
+      missing.textContent = t("wallet.s5", "Wallet backend missing: js/crypto.js or js/wallet.js failed to load.");
       wrap.appendChild(missing);
       return;
     }
 
     var hint = doc.createElement("p");
-    hint.textContent = "Enter your brainkey. It is checked against the chain " +
-      "before anything is saved.";
+    hint.textContent = t("wallet.enter_brainkey_checked_chain", "Enter your brainkey. It is checked against the chain before anything is saved.");
     wrap.appendChild(hint);
 
     wrap.appendChild(existingOptions(doc));
 
     var bkArea = brainkeyField(doc, "import-brainkey", false);
-    bkArea.placeholder = "brainkey words…";
+    bkArea.placeholder = t("wallet.brainkey_words_placeholder", "brainkey words…");
     wrap.appendChild(bkArea);
     wrap.appendChild(labeledRow(doc, "Password", passwordField(doc, "import-password")));
     var importBtn = actionButton(doc, "import-do", "Verify and import");
@@ -748,11 +746,11 @@ var WalletUI = (function () {
       var pwInput = /** @type {any} */ (doc.getElementById("import-password"));
       var pw = pwInput ? pwInput.value : "";
       if (!pw) {
-        err.textContent = "Password required: enter a non-empty password.";
+        err.textContent = t("wallet.s7", "Password required: enter a non-empty password.");
         return;
       }
       importBtn.disabled = true;
-      importBtn.textContent = "Checking chain…";
+      importBtn.textContent = t("wallet.checking_chain", "Checking chain…");
       Promise.resolve()
         .then(function () { return Wallet.importBrainkey(bk, pw); })
         .then(function (keys) {
@@ -761,19 +759,19 @@ var WalletUI = (function () {
           clearRoot(root);
           var done = makeWrap(doc, root);
           var h2 = doc.createElement("h2");
-          h2.textContent = "Account found — wallet imported";
+          h2.textContent = t("wallet.account_found_wallet_imported", "Account found — wallet imported");
           done.appendChild(h2);
           done.appendChild(pubkeyList(doc, keys || {}));
           var toWallet = doc.createElement("a");
           toWallet.href = "#/wallet";
-          toWallet.textContent = "Go to wallet manager";
+          toWallet.textContent = t("wallet.go_to_wallet_manager", "Go to wallet manager");
           done.appendChild(toWallet);
         })
         .catch(function (e) {
           if (pwInput) pwInput.value = "";
           pw = null;
           importBtn.disabled = false;
-          importBtn.textContent = "Verify and import";
+          importBtn.textContent = t("wallet.verify_and_import", "Verify and import");
           setError(err, e);
         });
     });

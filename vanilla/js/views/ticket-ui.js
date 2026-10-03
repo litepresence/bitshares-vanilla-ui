@@ -224,7 +224,7 @@ var TicketUI = (function () {
     var fS = ui.field(doc, t("ticket.asset", "Asset"), { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fI.row); ctx.wrap.appendChild(fS.row);
     var area = doc.createElement("textarea");
-    area.setAttribute("placeholder", "alice,10\nbob,2.5"); area.setAttribute("rows", "6");
+    area.setAttribute("placeholder", t("ticket.airdrop_example_ph", "alice,10\nbob,2.5")); area.setAttribute("rows", "6");
     ui.touchable(area); area.style.width = "100%"; ctx.wrap.appendChild(area);
     var prev = ui.touchable(ui.el(doc, "button", t("ticket.preview_batches", "Preview batches"))); prev.type = "button"; ctx.wrap.appendChild(prev);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);

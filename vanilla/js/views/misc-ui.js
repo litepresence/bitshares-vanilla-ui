@@ -411,7 +411,7 @@ var MiscUI = (function () {
     cN = ui.field(doc, t("misc.note_optional", "Note (optional)"), { placeholder: "", value: qMemo });
     ctx.wrap.appendChild(cT.row); ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cN.row);
     area = doc.createElement("textarea");
-    area.setAttribute("placeholder", "coffee|1.5\ncake|2"); area.setAttribute("rows", "4");
+    area.setAttribute("placeholder", t("misc.invoice_lines_placeholder", "coffee|1.5\ncake|2")); area.setAttribute("rows", "4");
     if (qAmount || qMemo) area.value = qAmount ? (qMemo ? qMemo + "|" + qAmount : qAmount) : "";
     ui.touchable(area); area.style.width = "100%"; ctx.wrap.appendChild(area);
     var mk = ui.touchable(ui.el(doc, "button", t("misc.make_invoice_link", "Make invoice link"))); mk.type = "button"; ctx.wrap.appendChild(mk);

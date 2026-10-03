@@ -588,7 +588,7 @@ var App = (function () {
       var l1 = line("appfoot-line1");
       if (host) l1.appendChild(span(host, "appfoot-host", "closed"));
       else if (state && state !== "unknown") l1.appendChild(span(state, "appfoot-host", "closed"));
-      else l1.appendChild(doc.createTextNode("connecting…"));
+      else l1.appendChild(doc.createTextNode(t("shell.badge_initial", "connecting…")));
       foot.appendChild(l1);
       var l2 = line("appfoot-line2");
       if (host && state && state !== "unknown") l2.appendChild(span(state, "appfoot-telemetry", null));
@@ -625,10 +625,10 @@ var App = (function () {
       }
       while (left.firstChild) left.removeChild(left.firstChild);
       var doc = left.ownerDocument || document;
-      left.appendChild(doc.createTextNode("BITSHARES" + hash + " • v1.0.0 • "));
+      left.appendChild(doc.createTextNode(t("shell.footer_brand", "BITSHARES") + hash + " • v1.0.0 • "));
       var a = doc.createElement("a");
       a.setAttribute("href", "#/help");
-      a.textContent = "Disclaimer";
+      a.textContent = t("help.topic_disclaimer_title", "Disclaimer");
       left.appendChild(a);
     } catch (e) { /* static skeleton stands */ }
   }

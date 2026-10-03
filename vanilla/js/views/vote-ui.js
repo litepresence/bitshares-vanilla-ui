@@ -962,7 +962,7 @@ var VoteUI = (function () {
       else box.appendChild(totLine);
     }).catch(function (e) {
       if (myGen !== gen) return;
-      fundP.textContent = "Worker funding unavailable (" +
+      fundP.textContent = t("vote.funding_unavailable_prefix", "Worker funding unavailable (") +
         ((e && e.message) || "read failed") + ").";
     });
     /* Top voters + proxy-vote matrix (best-effort bounded join). */
@@ -970,7 +970,7 @@ var VoteUI = (function () {
     box.appendChild(topP);
     GovAnalytics.proxyMatrix(10, 10, 10).then(function (mx) {
       if (myGen !== gen) return;
-      topP.textContent = "Top 10 voters by voting power (get_top_voters — sample, not a full proxy census):";
+      topP.textContent = t("vote.top_voters_note", "Top 10 voters by voting power (get_top_voters — sample, not a full proxy census):");
       if (mx.voters.length === 0) {
         box.appendChild(el(doc, "p", "No top voters returned.", "muted"));
         return;

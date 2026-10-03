@@ -225,7 +225,7 @@ var BarterUI = (function () {
           check.disabled = false;
           if (res && myGen === gen) {
             lastPreview = res; propose.disabled = false;
-            propose.title = "Enclose both sides as transfer ops in one proposal (fee-payer = " + res.A.acct.name + ").";
+            propose.title = t("barter.propose_encloses_both", "Enclose both sides as transfer ops in one proposal (fee-payer = %(name)s).", { name: res.A.acct.name });
           }
         })
         .catch(function (e) {

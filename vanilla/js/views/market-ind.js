@@ -955,7 +955,7 @@ var MarketInd = (function () {
           if (key !== "volume") {
           var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
           x.type = "button";
-          x.setAttribute("aria-label", "Remove " + label + " pane");
+          x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " pane");
           /* forEach scope gives each closure its own key — no IIFE needed. */
           x.addEventListener("click", function () {
             state.osc[key] = false;
@@ -1122,7 +1122,7 @@ var MarketInd = (function () {
       row.appendChild(el(doc, "span", label));
       var add = touchable(el(doc, "button", "＋"));
       add.type = "button";
-      add.setAttribute("aria-label", "Add " + label + " overlay");
+      add.setAttribute("aria-label", t("settings.add", "Add") + " " + label + " overlay");
       add.addEventListener("click", function () {
         state.over[key].push({ p: spec.param.def });
         paintChips();
@@ -1162,7 +1162,7 @@ var MarketInd = (function () {
           chip.appendChild(num);
           var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
           x.type = "button";
-          x.setAttribute("aria-label", "Remove " + label + " " + num.value);
+          x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " " + num.value);
           x.addEventListener("click", function () {
             state.over[key].splice(i, 1);
             paintChips();

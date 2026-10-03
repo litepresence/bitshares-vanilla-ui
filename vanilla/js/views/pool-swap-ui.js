@@ -382,7 +382,7 @@ var PoolSwapUI = (function () {
       quoteBox.appendChild(u.el(doc, "p",
         "Quote: " + sellHuman + " " + found.sell.symbol + " → ~" + recvHuman + " " + found.buy.symbol +
         " (min, " + slipHuman + "% slip). Impact " + (Q.q.impact_bp / 100) + "%.", "muted"));
-      quoteBox.lastChild.title = "quote raw " + Q.q.out_raw + "; min raw " + Q.minRaw;
+      quoteBox.lastChild.title = t("swap.quote_raw_prefix", "quote raw ") + Q.q.out_raw + t("swap.min_raw_suffix", "; min raw ") + Q.minRaw;
       var perLeg = u.el(doc, "p", "Pool legs: " + (Q.r.sym_a || Q.r.asset_a_id) + " / " + (Q.r.sym_b || Q.r.asset_b_id) +
         " — market fees apply per asset settings; pool taker " + Pool.pctUnitsToHuman(Q.r.taker_units) + "%.", "muted");
       quoteBox.appendChild(perLeg);

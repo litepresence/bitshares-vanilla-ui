@@ -344,14 +344,14 @@ var PoolUI = (function () {
       var tdX = doc.createElement("td");
       var xl = el(doc, "a", "⇄", "pools-xlink");
       xl.setAttribute("href", "#/pools/" + r.id);
-      xl.setAttribute("aria-label", "Swap in pool " + r.id);
+      xl.setAttribute("aria-label", t("pool.swap_title", "Swap in pool") + " " + r.id);
       xl.title = t("pool.swap_title_attr", "Swap in this pool");
       tdX.appendChild(xl); tr.appendChild(tdX);
       var tdS = doc.createElement("td"); tdS.appendChild(assetLink(doc, r.sym_share)); tr.appendChild(tdS);
       var tdA = doc.createElement("td"); tdA.appendChild(assetLink(doc, r.sym_a)); tr.appendChild(tdA);
-      var cA = el(doc, "td", aA.text, "num"); cA.title = "raw " + aA.raw; tr.appendChild(cA);
+      var cA = el(doc, "td", aA.text, "num"); cA.title = t("account.raw_prefix", "raw ") + aA.raw; tr.appendChild(cA);
       var tdB = doc.createElement("td"); tdB.appendChild(assetLink(doc, r.sym_b)); tr.appendChild(tdB);
-      var cB = el(doc, "td", aB.text, "num"); cB.title = "raw " + aB.raw; tr.appendChild(cB);
+      var cB = el(doc, "td", aB.text, "num"); cB.title = t("account.raw_prefix", "raw ") + aB.raw; tr.appendChild(cB);
       tr.appendChild(el(doc, "td", pctText(r.taker_units), "num"));
       tr.appendChild(el(doc, "td", pctText(r.withdrawal_units), "num"));
       tbody.appendChild(tr);

@@ -127,7 +127,7 @@ var ProposalUI = (function () {
     var list = el(doc, "dl", null, "confirm");
     rows.forEach(function (r) {
       list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = "raw: " + r[2]; list.appendChild(dd);
+      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = t("proposal.raw_prefix", "raw: ") + r[2]; list.appendChild(dd);
     });
     return list;
   }
@@ -153,7 +153,7 @@ var ProposalUI = (function () {
     rows.forEach(function (r) {
       var tr = doc.createElement("tr"), card = el(doc, "div", null, "node-card");
       r.cells.forEach(function (c, i) {
-        var td = el(doc, "td", c.text); if (c.raw) td.title = "raw: " + c.raw;
+        var td = el(doc, "td", c.text); if (c.raw) td.title = t("proposal.raw_prefix", "raw: ") + c.raw;
         if (i === 0 && r.href) { td.innerHTML = ""; var a = doc.createElement("a"); a.setAttribute("href", r.href); a.textContent = c.text; td.appendChild(a); }
         tr.appendChild(td);
       });
@@ -569,7 +569,7 @@ var ProposalUI = (function () {
      * i18n batch can key it). Same for the authority select below. */
     try { kindSel.setAttribute("aria-label", t("proposal.inner_type_aria", "Inner operation type")); } catch (e) { /* options stand */ }
     Object.keys(INNER_DEFS).forEach(function (k) {
-      var o = doc.createElement("option"); o.value = k; o.textContent = "Inner op: " + k; kindSel.appendChild(o);
+      var o = doc.createElement("option"); o.value = k; o.textContent = t("proposal.inner_op_prefix", "Inner op: ") + k; kindSel.appendChild(o);
     });
     ctx.wrap.appendChild(kindSel);
     var innerBox = el(doc, "div"), addedBox = el(doc, "div"), inners = [];

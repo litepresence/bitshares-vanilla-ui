@@ -462,8 +462,8 @@ var MarketBook = (function () {
       try {
         tr.setAttribute("tabindex", "0");
         tr.setAttribute("role", "button");
-        tr.setAttribute("aria-label", "Fill price " + String(texts[0]));
-        tr.title = "Fill price";
+        tr.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(texts[0]));
+        tr.title = t("market_book.fill_price", "Fill price");
       } catch (e) { /* rows render unclickable */ }
       texts.forEach(function (text, ci) {
         var td = doc.createElement("td");
@@ -517,8 +517,8 @@ var MarketBook = (function () {
         try {
           cardEl.setAttribute("tabindex", "0");
           cardEl.setAttribute("role", "button");
-          cardEl.setAttribute("aria-label", "Fill price " + String(priceText));
-          cardEl.title = "Fill price";
+          cardEl.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(priceText));
+          cardEl.title = t("market_book.fill_price", "Fill price");
           cardEl.addEventListener("click", go);
           cardEl.addEventListener("keydown", function (ev) {
             if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
@@ -555,10 +555,10 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = "Spread " + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
+      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       try {
-        ctx.spreadLine.title = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+        ctx.spreadLine.title = t("market_book.spread_prefix", "Spread ") + sm.spread + " · Midpoint " + sm.mid +
           " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       } catch (e) { /* text stands */ }
     } else {
@@ -594,10 +594,10 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = "Spread " + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
+      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       try {
-        ctx.spreadLine.title = "Spread " + sm.spread + " · Midpoint " + sm.mid +
+        ctx.spreadLine.title = t("market_book.spread_prefix", "Spread ") + sm.spread + " · Midpoint " + sm.mid +
           " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       } catch (e) { /* text stands */ }
     } else {

@@ -601,7 +601,7 @@ var AccountUI = (function () {
       });
       if (bts && any) {
         total.textContent = t("account.total", "Total ≈ ") + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
-        total.title = "raw " + sum.toString();
+        total.title = t("account.raw_prefix", "raw ") + sum.toString();
       } else {
         total.textContent = t("account.total_value_unavailable_no_bts_prices_yet", "Total value unavailable (no BTS prices yet).");
         total.title = "";
@@ -675,12 +675,12 @@ var AccountUI = (function () {
         var collCell = doc.createElement("td");
         collCell.textContent = (r.coll_prec !== null && r.coll_prec !== undefined)
           ? fmtRaw(r.coll_raw, r.coll_prec) + " " + r.coll_sym : String(r.coll_raw) + " (" + r.coll_id + ")";
-        collCell.title = "raw " + String(r.coll_raw);
+        collCell.title = t("account.raw_prefix", "raw ") + String(r.coll_raw);
         tr.appendChild(collCell);
         var debtCell = doc.createElement("td");
         debtCell.textContent = (r.debt_prec !== null && r.debt_prec !== undefined)
           ? fmtRaw(r.debt_raw, r.debt_prec) + " " + r.debt_sym : String(r.debt_raw) + " (" + r.debt_id + ")";
-        debtCell.title = "raw " + String(r.debt_raw);
+        debtCell.title = t("account.raw_prefix", "raw ") + String(r.debt_raw);
         tr.appendChild(debtCell);
         var borCell = doc.createElement("td");
         borCell.textContent = r.borrower;
@@ -761,12 +761,12 @@ var AccountUI = (function () {
           var curCell = doc.createElement("td");
           curCell.textContent = (r.prec !== null && r.prec !== undefined)
             ? fmtRaw(r.current_raw, r.prec) : String(r.current_raw);
-          curCell.title = "raw " + String(r.current_raw);
+          curCell.title = t("account.raw_prefix", "raw ") + String(r.current_raw);
           tr.appendChild(curCell);
           var totCell = doc.createElement("td");
           totCell.textContent = (r.prec !== null && r.prec !== undefined)
             ? fmtRaw(r.total_raw, r.prec) : String(r.total_raw);
-          totCell.title = "raw " + String(r.total_raw);
+          totCell.title = t("account.raw_prefix", "raw ") + String(r.total_raw);
           tr.appendChild(totCell);
           var rateCell = doc.createElement("td");
           var rateH = null;
@@ -1069,16 +1069,16 @@ var AccountUI = (function () {
     det.className = "plot acct-equity";
     det.setAttribute("open", "");
     var sum = doc.createElement("summary");
-    sum.setAttribute("aria-label", "Equity sparkline plot");
+    sum.setAttribute("aria-label", t("account.equity_sparkline_plot", "Equity sparkline plot"));
     sum.style.minHeight = "44px";
-    sum.textContent = "Equity sparkline";
+    sum.textContent = t("account.equity_sparkline", "Equity sparkline");
     det.appendChild(sum);
     section.appendChild(det);
     var colors = [cssVar("--buy", "#6ba583"), cssVar("--sell", "#e3745b"), cssVar("--accent", "#1ec3fa")];
     eq.assets.slice(0, 3).forEach(function (a, idx) {
       var label = doc.createElement("div");
       label.textContent = a.symbol + ": " + equityHuman(a);
-      label.title = "raw " + a.total_raw;
+      label.title = t("account.raw_prefix", "raw ") + a.total_raw;
       det.appendChild(label);
       var canvas = doc.createElement("canvas");
       canvas.className = "mkt-canvas";
@@ -1110,7 +1110,7 @@ var AccountUI = (function () {
       tr.appendChild(symCell);
       var netCell = doc.createElement("td");
       netCell.textContent = equityHuman(a);
-      netCell.title = "raw " + a.total_raw;
+      netCell.title = t("account.raw_prefix", "raw ") + a.total_raw;
       tr.appendChild(netCell);
       tbody.appendChild(tr);
     });
@@ -1409,8 +1409,8 @@ var AccountUI = (function () {
     /* Copy-share-link row (hash deep link the router already resolves:
      * #/account/:name, router.js). Clipboard API with an execCommand
      * textarea fallback; the result reads inline via aria-live, never a
-     * dialog. Plain literals only (no new t() keys — check_i18n stays
-     * green); textContent only. Explorer backend is call-time-guarded
+     * dialog. Button/status labels via t() (misc.copy_link/misc.copying,
+     * centrally merged); result textContent only. Explorer backend is call-time-guarded
      * (explorer.js loads after this file) — without it the row falls back
      * to the bare hash, still a working deep link. */
     (function shareRow() {
@@ -1419,7 +1419,7 @@ var AccountUI = (function () {
         row.className = "xplore-share";
         var btn = doc.createElement("button");
         btn.type = "button";
-        btn.textContent = "Copy link";
+        btn.textContent = t("misc.copy_link", "Copy link");
         btn.style.minHeight = "44px";
         var note = doc.createElement("span");
         note.className = "muted";
@@ -1430,7 +1430,7 @@ var AccountUI = (function () {
         var hash = "#/account/" + acct.name;
         btn.addEventListener("click", function () {
           btn.disabled = true;
-          note.textContent = "Copying…";
+          note.textContent = t("misc.copying", "Copying…");
           var url = hash;
           try {
             if (typeof Explorer !== "undefined" && Explorer &&
@@ -1654,7 +1654,7 @@ var AccountUI = (function () {
     eqSection.appendChild(eqH);
     var eqLoading = doc.createElement("p");
     eqLoading.className = "muted";
-    eqLoading.textContent = "Replaying recent history…";
+    eqLoading.textContent = t("account.replaying_recent_history", "Replaying recent history…");
     eqSection.appendChild(eqLoading);
     wrap.appendChild(eqSection);
 

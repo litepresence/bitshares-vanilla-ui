@@ -604,8 +604,8 @@ var PredictionUI = (function () {
     var note = el(doc, "p", "", "muted"); wrap.appendChild(note);
     var createP = el(doc, "p", "", "muted"); wrap.appendChild(createP);
     var ca = doc.createElement("a"); ca.href = "#/assets/create"; ca.textContent = t("prediction.create_one_under_assets_create_pma_tab", "Create one under Assets → Create (PMA tab)");
-    createP.textContent = "No market you expected? The scan covers the first " + (SCAN_PAGES * PAGE_SIZE) +
-      " assets — use the lookup box above, or ";
+    createP.textContent = t("prediction.scan_prefix", "No market you expected? The scan covers the first ") + (SCAN_PAGES * PAGE_SIZE) +
+      t("prediction.scan_suffix", " assets — use the lookup box above, or ");
     createP.appendChild(ca); createP.appendChild(doc.createTextNode("."));
 
     var cache = { rows: [], orgs: [], scanned: 0, truncated: false };
@@ -913,7 +913,7 @@ var PredictionUI = (function () {
           function moneyCell(human, raw, sym) {
             var td = doc.createElement("td");
             td.textContent = (human === null || human === undefined) ? "—" : human;
-            if (raw !== null && raw !== undefined) td.title = "raw " + raw;
+            if (raw !== null && raw !== undefined) td.title = t("account.raw_prefix", "raw ") + raw;
             return td;
           }
           var balHuman = null;
@@ -937,7 +937,7 @@ var PredictionUI = (function () {
             pnlTd = doc.createElement("td");
             var prefix = (pnlRawS && pnlRawS.charAt(0) === "-") ? "" : "+";
             pnlTd.textContent = prefix + pnlHuman;
-            pnlTd.title = "raw " + pnlRawS;
+            pnlTd.title = t("account.raw_prefix", "raw ") + pnlRawS;
             try {
               if (pnlRawS && pnlRawS.charAt(0) === "-") pnlTd.className = "cr-danger";
               else pnlTd.className = "cr-safe";
@@ -1108,9 +1108,9 @@ var PredictionUI = (function () {
       }
       table.appendChild(tbody);
       orgTableWrap.appendChild(table);
-      orgNote.textContent = "Scanned " + cache.scanned + " assets, found " + (cache.orgs || []).length +
-        " organization" + ((cache.orgs || []).length === 1 ? "" : "s") +
-        (cache.truncated ? " (scan bound reached — lookup finds the rest)." : ".");
+      orgNote.textContent = t("prediction.org_scanned_prefix", "Scanned ") + cache.scanned + t("prediction.org_found_mid", " assets, found ") + (cache.orgs || []).length +
+        t("prediction.org_unit", " organization") + ((cache.orgs || []).length === 1 ? "" : "s") +
+        (cache.truncated ? t("prediction.scan_bound_suffix", " (scan bound reached — lookup finds the rest).") : ".");
     }
     /* Per-asset enrichment from clean reads only (dash otherwise): house =
      * issuer name via Account.resolve, confidence/likelihood = get_ticker
@@ -1594,7 +1594,7 @@ var PredictionUI = (function () {
             info.symbol + " / " + backSym + " market. You trade from the desk — nothing here signs.", "muted"));
           var desk = doc.createElement("a");
           desk.href = "#/market/" + encodeURIComponent(info.symbol) + "_" + encodeURIComponent(backSym);
-          desk.textContent = "Open " + info.symbol + " / " + backSym + " desk";
+          desk.textContent = t("account.open_prefix", "Open ") + info.symbol + " / " + backSym + t("prediction.desk_suffix", " desk");
           touchable(desk); wrap.appendChild(desk);
           var more = el(doc, "p", "", "muted"); wrap.appendChild(more);
           var a1 = doc.createElement("a"); a1.href = "#/asset/" + encodeURIComponent(info.symbol);

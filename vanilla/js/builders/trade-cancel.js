@@ -361,7 +361,7 @@ var TradeCancel = (function () {
               });
             });
           }).then(function (R) {
-            status.textContent = "Broadcasting cancel-all (" + humanFee(R.feeRaw, R.meta) + " fee)…";
+            status.textContent = t("trade.broadcast_cancel_all_prefix", "Broadcasting cancel-all (") + humanFee(R.feeRaw, R.meta) + " fee)…";
             return Tx.sign(R.unsigned, wif).then(function (signed) {
               return sendTx(signed, proveGone(myId, ids)).then(function (res) {
                 return { res: res, R: R };

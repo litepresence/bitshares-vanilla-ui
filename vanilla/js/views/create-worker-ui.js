@@ -415,7 +415,7 @@ var CreateWorkerUI = (function () {
           " (" + done.res.via + ").", "muted"));
         var a = doc.createElement("a");
         a.href = "#/account/" + encodeURIComponent(R.ownerName);
-        a.textContent = "Open " + R.ownerName; touchable(a); box.appendChild(a);
+        a.textContent = t("account.open_prefix", "Open ") + R.ownerName; touchable(a); box.appendChild(a);
       }).catch(function (e) {
         if (myGen !== gen) return;
         var msg = (e && e.message) ? e.message : String(e || t("createworker.send_failed", "Send failed."));

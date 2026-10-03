@@ -187,9 +187,9 @@ var AssetFeedUI = (function () {
       var dl = el(d, "dl", null, "xplore-fields");
       if (cur && cur.settlement_price) {
         dl.appendChild(el(d, "dt", t("explorer.th_settlement", "Settlement"))); var sd = el(d, "dd", feedPrice(cur.settlement_price, info.precision, backingPrec));
-        sd.title = "base " + cur.settlement_price.base.amount + " / quote " + cur.settlement_price.quote.amount; dl.appendChild(sd);
+        sd.title = t("explorer.price_base", "base ") + cur.settlement_price.base.amount + t("explorer.price_quote", " / quote ") + cur.settlement_price.quote.amount; dl.appendChild(sd);
         dl.appendChild(el(d, "dt", t("asset.cer_row", "CER"))); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
-        cd.title = "base " + cur.core_exchange_rate.base.amount + " / quote " + cur.core_exchange_rate.quote.amount; dl.appendChild(cd);
+        cd.title = t("explorer.price_base", "base ") + cur.core_exchange_rate.base.amount + t("explorer.price_quote", " / quote ") + cur.core_exchange_rate.quote.amount; dl.appendChild(cd);
       } else body.appendChild(el(d, "p", t("asset.no_live_feed", "No live feed published yet.") + t("asset.feed_hint", " Feeds appear once publishers publish for this asset."), "muted"));
       dl.appendChild(el(d, "dt", t("asset.mcr_row", "MCR"))); var m1 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mcr) + "%"); m1.title = String(info.bitasset.mcr); dl.appendChild(m1);
       dl.appendChild(el(d, "dt", t("explorer.th_mssr", "MSSR"))); var m2 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mssr) + "%"); m2.title = String(info.bitasset.mssr); dl.appendChild(m2);

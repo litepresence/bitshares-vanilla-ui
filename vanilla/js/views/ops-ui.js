@@ -264,10 +264,10 @@ var OpsUI = (function () {
       "muted"));
     var form = doc.createElement("form");
     var lab = doc.createElement("label");
-    lab.textContent = "Blocks sampled (1–" + MAX_N + "): ";
+    lab.textContent = t("ops.blocks_sampled_prefix", "Blocks sampled (1–") + MAX_N + "): ";
     var num = doc.createElement("input");
     num.type = "number"; num.min = "1"; num.max = String(MAX_N); num.value = String(lastN);
-    num.setAttribute("aria-label", "Blocks sampled");
+    num.setAttribute("aria-label", t("ops.blocks_sampled_aria", "Blocks sampled"));
     touchable(num); num.style.maxWidth = "120px";
     lab.appendChild(num); form.appendChild(lab);
     var apply = touchable(el(doc, "button", "Apply"));
@@ -308,7 +308,7 @@ var OpsUI = (function () {
       renderTable(doc, wrap, counts, total);
       var more = el(doc, "p", null, "muted");
       var a = doc.createElement("a");
-      a.href = "#/explorer"; a.textContent = "Back to Explorer";
+      a.href = "#/explorer"; a.textContent = t("topops.back", "Back to Explorer");
       touchable(a); a.style.display = "inline-block";
       more.appendChild(a); wrap.appendChild(more);
     }).catch(function (e) {

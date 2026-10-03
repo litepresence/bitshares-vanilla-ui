@@ -65,7 +65,9 @@
     "discover_probing": "Probing candidates…",
     "discover_checking": "Checking",
     "add_node": "Add node",
-    "age_s": "%(n)ss"
+    "age_s": "%(n)ss",
+    "language_label": "Language ",
+    "locale_unavailable": "Locale unavailable offline — showing English."
   },
   "shell": {
     "brand": "BitShares",
@@ -89,7 +91,8 @@
     "chart_aria": "Chart plot. Tabular data follows.",
     "acting_default": "Viewing as committee-account (locked)",
     "acting_loading": "Resolving account…",
-    "acting_unlocked": "Acting as "
+    "acting_unlocked": "Acting as ",
+    "footer_brand": "BITSHARES"
   },
   "dashboard": {
     "welcome": "Welcome to BitShares",
@@ -98,7 +101,8 @@
     "restore_prefix": "Optionally, ",
     "full_balances_suffix": " — full balances",
     "top_holdings_for_the_watched_account_": "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page.",
-    "strip_hint": " No markets are configured for this strip — open any market from the picker."
+    "strip_hint": " No markets are configured for this strip — open any market from the picker.",
+    "locale_unavailable": "Locale unavailable offline — showing English."
   },
   "account": {
     "title": "Account",
@@ -221,7 +225,10 @@
     "orders_hint": " Place one from the trade form on a market page — open orders list here until filled or cancelled.",
     "activity_hint": " Transfers, orders, and fills list here once they happen.",
     "unfollow": "Unfollow",
-    "follow": "Follow"
+    "follow": "Follow",
+    "equity_sparkline_plot": "Equity sparkline plot",
+    "equity_sparkline": "Equity sparkline",
+    "replaying_recent_history": "Replaying recent history…"
   },
   "assets_feed": {
     "title": "Publish Feed",
@@ -318,7 +325,8 @@
     "side_b_fee_asset_mid": "; Side B fee asset: ",
     "side_fees_due_now_escrow_custodian_path": "Side fees: due now (escrow custodian path — legs route via escrow).",
     "side_fees_when_proposal_executes_no_escr": "Side fees: when proposal executes (no escrow — enclosed transfers pay on execution).",
-    "total_fees_prefix": "Total fees: "
+    "total_fees_prefix": "Total fees: ",
+    "propose_encloses_both": "Enclose both sides as transfer ops in one proposal (fee-payer = %(name)s)."
   },
   "borrow": {
     "title": "Borrow",
@@ -681,7 +689,11 @@
     "tile_instant_desc": "Simple buy/sell view.",
     "tile_prediction_desc": "Prediction markets.",
     "giver_hint": " Create one from the New / update permission form below.",
-    "recipient_hint": " Ask the granter to add one from the Direct Debit form."
+    "recipient_hint": " Ask the granter to add one from the Direct Debit form.",
+    "placed_prefix": "placed (head #",
+    "verify_fills_suffix": "; verify fills on #/market).",
+    "failed_prefix": "failed: ",
+    "retry_suffix": " — check state before retrying."
   },
   "explorer_assets": {
     "title": "Asset",
@@ -942,7 +954,11 @@
     "markets_sort_price_asc": "Price ↑",
     "markets_sort_change_desc": "Change ↓",
     "markets_sort_change_asc": "Change ↑",
-    "markets_sort_market_az": "Market A–Z"
+    "markets_sort_market_az": "Market A–Z",
+    "accounts_prefix_ph": "Account name prefix…",
+    "accounts_search_aria": "Search accounts by name prefix",
+    "search_suggestions_aria": "Search suggestions",
+    "search_empty_hint": "Type a block number, object id, account, or asset symbol."
   },
   "gateway": {
     "title": "Deposit / Withdraw",
@@ -1114,14 +1130,17 @@
     "sent_received_mid": ") · Received (",
     "showing_prefix": "Showing ",
     "to": "To",
-    "create_hint": " Create one from the New HTLC form below — sent and received contracts list here."
+    "create_hint": " Create one from the New HTLC form below — sent and received contracts list here.",
+    "hash_match_prefix": "Hash match ✓ ("
   },
   "market_book": {
     "title": "Exchange",
     "s1": "Spread — (empty book side)",
     "depth_plot": "Depth staircase",
     "depth_plot_label": "Cumulative depth staircase plot",
-    "no_depth_plot": "No depth data — the book is empty on both sides."
+    "no_depth_plot": "No depth data — the book is empty on both sides.",
+    "fill_price": "Fill price",
+    "spread_prefix": "Spread "
   },
   "market_charts": {
     "title": "Exchange"
@@ -1266,7 +1285,17 @@
     "group_label": "Grouping",
     "group_off": "Exact prices",
     "group_decimals": "decimals",
-    "group_note": "Grouped rows sum base/quote exactly; bucket price is the floor."
+    "group_note": "Grouped rows sum base/quote exactly; bucket price is the floor.",
+    "updated_prefix": "Updated ",
+    "loading_pool_map": "Loading pool map…",
+    "pool_map_unavailable_script": "Pool map unavailable (script load failed).",
+    "pool_map_unavailable_offline": "Pool map unavailable (offline).",
+    "no_bts_path": "No BTS path — treat pair as unverified.",
+    "bts_provenance_prefix": "BTS provenance: ",
+    "favorite_prefix": "Favorite ",
+    "direct_placeholder_prefix": "QUOTE_BASE, e.g. ",
+    "use_quote_base_prefix": "Use QUOTE_BASE with two different symbols (e.g. ",
+    "unknown_market_prefix": "Unknown market: "
   },
   "misc": {
     "title": "Invoice",
@@ -1385,7 +1414,8 @@
     "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
     "add_auth_row_unsupported": "Add auth row (unsupported)",
     "one_key_auth_row_is_supported_here_key_ab": "One key-auth row is supported here (key above + threshold). Multiple key, account or address rows are not built in this form.",
-    "only_one_key_auth_row_is_supported_extra_": "Only one key-auth row is supported — extra authority rows need new serializers."
+    "only_one_key_auth_row_is_supported_extra_": "Only one key-auth row is supported — extra authority rows need new serializers.",
+    "invoice_lines_placeholder": "coffee|1.5\\ncake|2"
   },
   "notify": {
     "title": "Price Alerts",
@@ -1437,10 +1467,19 @@
     "s1": "No pool history yet.",
     "s2": "Pool history unavailable (chain-only; no external index).",
     "s3": "Withdrawal fee: keep",
-    "s4": "Withdrawal fee: set 0 (only allowed change)"
+    "s4": "Withdrawal fee: set 0 (only allowed change)",
+    "pool_map": "Pool map",
+    "pool_curve_plot": "Pool x y k curve plot",
+    "pool_curve": "Pool curve (x·y=k)",
+    "pool_map_unavailable_script": "Pool map unavailable (script load failed).",
+    "pool_map_unavailable_offline": "Pool map unavailable (offline).",
+    "no_bts_path_unverified": "No BTS path — treat pair as unverified.",
+    "bts_provenance_prefix": "BTS provenance: "
   },
   "swap": {
-    "title": "Swap"
+    "title": "Swap",
+    "quote_raw_prefix": "quote raw ",
+    "min_raw_suffix": "; min raw "
   },
   "pools": {
     "title": "Liquidity Pools",
@@ -1608,7 +1647,8 @@
     "lowest_ask_lives_in_the_order_book_above": "Lowest ask lives in the order book above — click an ask row to fill the price.",
     "borrow_margin_link": "Borrow (margin)",
     "borrow_margin_title": "Open a margin position on the borrow desk",
-    "chain_hint": "Chain validates balances and fees on broadcast."
+    "chain_hint": "Chain validates balances and fees on broadcast.",
+    "broadcast_cancel_all_prefix": "Broadcasting cancel-all ("
   },
   "transfer": {
     "title": "Transfer",
@@ -1821,7 +1861,19 @@
     "console_unnamed": "unnamed",
     "option_backup_types": "Backup types",
     "option_wallet_types": "Wallet types",
-    "console_hint": " Create one (#/create-wallet-brainkey) or import an existing account (#/existing-account) — links below."
+    "console_hint": " Create one (#/create-wallet-brainkey) or import an existing account (#/existing-account) — links below.",
+    "show_public_keys_json": "Show public keys JSON",
+    "write_down_brainkey_keep_safe": "Write down your brainkey and keep it safe. Anyone with it can spend your funds.",
+    "wrote_it_down": " I wrote it down",
+    "passwords_do_not_match": "Passwords do not match.",
+    "wallet_created_back_it_up": "Wallet created — back it up",
+    "go_to_wallet_manager": "Go to wallet manager",
+    "import_existing_account": "Import Existing Account",
+    "enter_brainkey_checked_chain": "Enter your brainkey. It is checked against the chain before anything is saved.",
+    "brainkey_words_placeholder": "brainkey words…",
+    "checking_chain": "Checking chain…",
+    "account_found_wallet_imported": "Account found — wallet imported",
+    "verify_and_import": "Verify and import"
   },
   "auth": {
     "a_local_wallet_creates_a_brainkey_on_this_dev": "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password.",
@@ -1908,7 +1960,8 @@
     "to": "To",
     "transfer_failed": "Transfer failed.",
     "view_account": "View account ",
-    "fee_hint": " Check the fee before signing — tick the box and click Sign & Send again to proceed."
+    "fee_hint": " Check the fee before signing — tick the box and click Sign & Send again to proceed.",
+    "fee_ack": " I understand this fee is unusually high."
   },
   "createaccount": {
     "a_fresh_brainkey_is_generated_for_the_new_acc": "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys.",
@@ -2504,7 +2557,14 @@
     "could_not_prepare_settle": "Could not prepare the settle.",
     "could_not_load_portfolio": "Could not load the portfolio.",
     "settle_broadcast": "Settle broadcast.",
-    "balance": "Balance"
+    "balance": "Balance",
+    "scan_prefix": "No market you expected? The scan covers the first ",
+    "scan_suffix": " assets — use the lookup box above, or ",
+    "org_scanned_prefix": "Scanned ",
+    "org_found_mid": " assets, found ",
+    "org_unit": " organization",
+    "scan_bound_suffix": " (scan bound reached — lookup finds the rest).",
+    "desk_suffix": " desk"
   },
   "proposal": {
     "account": "Account",
@@ -2686,7 +2746,9 @@
     "create_hint": " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below.",
     "empty_hint": " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N).",
     "inner_type_aria": "Inner operation type",
-    "enclosed_op_mid": " enclosed op "
+    "enclosed_op_mid": " enclosed op ",
+    "raw_prefix": "raw: ",
+    "inner_op_prefix": "Inner op: "
   },
   "referrals": {
     "account": "Account ",
@@ -2771,7 +2833,8 @@
     "tickets_cannot_be_deleted_no_delete_op_exists": "Tickets cannot be deleted (no delete op exists) — rows above are permanent.",
     "tickets_lock_funds_for_vote_weight_there_is_n": "Tickets lock funds for vote weight. There is no delete operation, so every ticket row is permanent.",
     "unchanged": "unchanged",
-    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself."
+    "viewing_as": "Viewing as committee-account (1.2.0) — unlock to act as yourself.",
+    "airdrop_example_ph": "alice,10\\nbob,2.5"
   },
   "vote": {
     "account_row": "Account",
@@ -2890,7 +2953,9 @@
     "hide_legacy_label": " Hide legacy proposals (always on — expired workers are excluded at fetch)",
     "hide_legacy_title": "Worker lists come from get_all_workers(false); expired rows never arrive.",
     "clear_search_hint": " Clear the search to see the full list.",
-    "empty_hint": " Entries appear when the chain carries them — workers are proposed from #/create-worker."
+    "empty_hint": " Entries appear when the chain carries them — workers are proposed from #/create-worker.",
+    "funding_unavailable_prefix": "Worker funding unavailable (",
+    "top_voters_note": "Top 10 voters by voting power (get_top_voters — sample, not a full proxy census):"
   },
   "asset": {
     "acting_field": "Acting account (name or 1.2.N)",
@@ -3200,7 +3265,9 @@
     "unlock_memo_hint": "Unlock to include the encrypted memo"
   },
   "ops": {
-    "no_ops_hint": "No operations in the sampled blocks — widen the sample or retry at the chain tip."
+    "no_ops_hint": "No operations in the sampled blocks — widen the sample or retry at the chain tip.",
+    "blocks_sampled_prefix": "Blocks sampled (1–",
+    "blocks_sampled_aria": "Blocks sampled"
   },
   "tour": {
     "s1_title": "Welcome to BitShares Vanilla",

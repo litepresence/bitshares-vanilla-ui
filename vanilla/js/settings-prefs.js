@@ -74,17 +74,15 @@ var SettingsPrefs = (function () {
    * (Reference #8). Option labels are the Reference-#7 display names;
    * stub locales (10) are suffixed " — in English" (honest marking) and
    * render English via the t() fallback chain. The visible "Language "
-   * label stays a hardcoded English literal (no dict key exists for it;
-   * converting it would churn all 12 dicts — queued for a later per-view
-   * batch with its Task-1-style key). The failure line in the settings.js
-   * handler is likewise hardcoded: the ambiguity-E wording, shown only
-   * when the dict fetch fails.
-   * Params: doc, t (unused today — kept so the signature matches the other
+   * label is keyed via t("settings.language_label") so all 12 dicts carry
+   * it; the failure line in the settings.js handler is likewise keyed
+   * (settings.locale_unavailable) — shown only when the dict fetch fails.
+   * Params: doc, t (passed in from settings.js, same shape as the other
    *   builders). Returns: {label, select, error, currentLocale} where
    *   currentLocale is the I18n tag the select reflects ("en" fallback). */
   function buildLocale(doc, t) {
     var localeLabel = doc.createElement("label");
-    localeLabel.textContent = "Language ";
+    localeLabel.textContent = t("settings.language_label", "Language ");
     var localeSelect = doc.createElement("select");
     localeSelect.id = "locale-select";
     var localeNames = {};

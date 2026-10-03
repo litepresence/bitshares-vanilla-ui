@@ -78,8 +78,8 @@ var PoolDetailUI = (function () {
     var r = joined || row;
     var aA = u.amtText(r.balance_a_raw, r.asset_a_id, r.prec_a === undefined ? null : r.prec_a, r.sym_a);
     var aB = u.amtText(r.balance_b_raw, r.asset_b_id, r.prec_b === undefined ? null : r.prec_b, r.sym_b);
-    strip.appendChild(u.el(doc, "span", "Balance A: " + aA.text)); strip.lastChild.title = "raw " + aA.raw;
-    strip.appendChild(u.el(doc, "span", "Balance B: " + aB.text)); strip.lastChild.title = "raw " + aB.raw;
+    strip.appendChild(u.el(doc, "span", "Balance A: " + aA.text)); strip.lastChild.title = t("account.raw_prefix", "raw ") + aA.raw;
+    strip.appendChild(u.el(doc, "span", "Balance B: " + aB.text)); strip.lastChild.title = t("account.raw_prefix", "raw ") + aB.raw;
     strip.appendChild(u.el(doc, "span", "Taker: " + u.pctText(r.taker_units)));
     strip.appendChild(u.el(doc, "span", "Withdrawal: " + u.pctText(r.withdrawal_units)));
     strip.appendChild(u.el(doc, "span", "Share: " + (r.sym_share || r.share_id)));
@@ -256,7 +256,7 @@ var PoolDetailUI = (function () {
       graphHead.className = "mkt-osc-head";
       var graphTitle = doc.createElement("span");
       graphTitle.className = "mkt-osc-title";
-      graphTitle.textContent = "Pool map";
+      graphTitle.textContent = t("pool_detail.pool_map", "Pool map");
       graphHead.appendChild(graphTitle);
       graphWrap.appendChild(graphHead);
       var graphCanvas = doc.createElement("canvas");
@@ -548,9 +548,9 @@ var PoolDetailUI = (function () {
     det.className = "plot pool-curve";
     det.setAttribute("open", "");
     var sum = doc.createElement("summary");
-    sum.setAttribute("aria-label", "Pool x y k curve plot");
+    sum.setAttribute("aria-label", t("pool_detail.pool_curve_plot", "Pool x y k curve plot"));
     u.touchable(sum);
-    sum.textContent = "Pool curve (x·y=k)";
+    sum.textContent = t("pool_detail.pool_curve", "Pool curve (x·y=k)");
     det.appendChild(sum);
     var canvas = doc.createElement("canvas");
     canvas.className = "mkt-canvas";
@@ -1162,7 +1162,7 @@ var PoolDetailUI = (function () {
     if (!P.graphWrap || !P.graphCanvas || !P.graphNote) return;
     _ensurePoolGraph(function (ok) {
       if (!live(myGen, uiGen)) return;
-      if (!ok) { try { P.graphNote.textContent = "Pool map unavailable (script load failed)."; } catch (e) {} return; }
+      if (!ok) { try { P.graphNote.textContent = t("pool_detail.pool_map_unavailable_script", "Pool map unavailable (script load failed)."); } catch (e) {} return; }
       var pA = r.asset_a_id, pB = r.asset_b_id;
       try {
         PoolGraph.buildGraph(pA, pB, { depth: 2, cap: 25 }).then(function (g) {
@@ -1177,7 +1177,7 @@ var PoolDetailUI = (function () {
           if (!live(myGen, uiGen)) return;
           var m = String((e && e.message) || e || "");
           try {
-            if (m.indexOf("not-connected") !== -1) P.graphNote.textContent = "Pool map unavailable (offline).";
+            if (m.indexOf("not-connected") !== -1) P.graphNote.textContent = t("pool_detail.pool_map_unavailable_offline", "Pool map unavailable (offline).");
             else P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
           } catch (x) {}
         });
@@ -1199,12 +1199,12 @@ var PoolDetailUI = (function () {
         { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
       var n = (gd.graph.edges || []).length;
       if (!n) P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-      else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = "No BTS path — treat pair as unverified.";
+      else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = t("pool_detail.no_bts_path_unverified", "No BTS path — treat pair as unverified.");
       else {
         var bits = [];
         if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
         if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        P.graphNote.textContent = "BTS provenance: " + bits.join(" · ") + ".";
+        P.graphNote.textContent = t("pool_detail.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ".";
       }
     } catch (e) { /* canvas best-effort */ }
   }

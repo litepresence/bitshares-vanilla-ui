@@ -1345,7 +1345,7 @@ var MarketDesk = (function () {
     var done = function () {
       state.loading = false;
       try {
-        state.updated.textContent = "Updated " + new Date().toLocaleTimeString();
+        state.updated.textContent = t("market.updated_prefix", "Updated ") + new Date().toLocaleTimeString();
       } catch (e) { state.updated.textContent = ""; }
     };
 
@@ -1528,11 +1528,11 @@ var MarketDesk = (function () {
     if (!state.graphWrap || !state.graphCanvas || !state.graphNote) return;
     if (!state.assets) return;
     var q = state.assets.quote, b = state.assets.base, myId = state.id;
-    try { state.graphNote.textContent = "Loading pool map…"; } catch (e) {}
+    try { state.graphNote.textContent = t("market.loading_pool_map", "Loading pool map…"); } catch (e) {}
     ensurePoolGraph(function (ok) {
       if (!deskAlive(state) || state.id !== myId) return;
       if (!ok) {
-        try { state.graphNote.textContent = "Pool map unavailable (script load failed)."; } catch (e) {}
+        try { state.graphNote.textContent = t("market.pool_map_unavailable_script", "Pool map unavailable (script load failed)."); } catch (e) {}
         return;
       }
       var pA, pB;
@@ -1553,7 +1553,7 @@ var MarketDesk = (function () {
           if (!deskAlive(state) || state.id !== myId) return;
           var m = String((e && e.message) || e || "");
           try {
-            if (m.indexOf("not-connected") !== -1) state.graphNote.textContent = "Pool map unavailable (offline).";
+            if (m.indexOf("not-connected") !== -1) state.graphNote.textContent = t("market.pool_map_unavailable_offline", "Pool map unavailable (offline).");
             else state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
           } catch (x) {}
         });
@@ -1699,12 +1699,12 @@ var MarketDesk = (function () {
         { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
       var n = (gd.graph.edges || []).length;
       if (!n) state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-      else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = "No BTS path — treat pair as unverified.";
+      else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = t("market.no_bts_path", "No BTS path — treat pair as unverified.");
       else {
         var bits = [];
         if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
         if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        state.graphNote.textContent = "BTS provenance: " + bits.join(" · ") + ".";
+        state.graphNote.textContent = t("market.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ".";
       }
     } catch (e) { /* canvas best-effort */ }
   }

@@ -1097,7 +1097,7 @@ var TransferUI = (function () {
       var pwRow = el(doc, "div", null, "xfer-field");
       var pw = doc.createElement("input");
       pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
-      pw.setAttribute("aria-label", "Password"); touchable(pw); pwRow.appendChild(pw);
+      pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
       var ub = touchable(el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
       ub.type = "button"; pwRow.appendChild(ub);
       box.appendChild(pwRow);
@@ -1282,7 +1282,7 @@ var TransferUI = (function () {
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
-    sumOp.setAttribute("aria-label", "Show unsigned operation JSON");
+    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
     detOp.appendChild(sumOp);
     var preOp = doc.createElement("pre");
     try { preOp.textContent = JSON.stringify(built.pair, null, 2); }
@@ -1481,7 +1481,7 @@ var TransferUI = (function () {
       var pwRow = el(doc, "div", null, "xfer-field");
       var pw = doc.createElement("input");
       pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
-      pw.setAttribute("aria-label", "Password"); touchable(pw); pwRow.appendChild(pw);
+      pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
       var ub = touchable(el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
       ub.type = "button"; pwRow.appendChild(ub);
       box.appendChild(pwRow);

@@ -364,7 +364,7 @@ var CreateAccountUI = (function () {
     var out = el(doc, "div"); wrap.appendChild(out);
     var acctP = el(doc, "p", null, "muted"), acctA = doc.createElement("a");
     acctA.href = "#/account/" + encodeURIComponent(reg.name);
-    acctA.textContent = "Open " + reg.name;
+    acctA.textContent = t("account.open_prefix", "Open ") + reg.name;
     acctP.appendChild(acctA); wrap.appendChild(acctP);
     saveBtn.addEventListener("click", function () {
       setFieldError(pwF, ""); out.innerHTML = "";

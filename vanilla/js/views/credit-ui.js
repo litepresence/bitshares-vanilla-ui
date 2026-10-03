@@ -166,7 +166,7 @@ var CreditUI = (function () {
     rows.forEach(function (r) {
       var tr = doc.createElement("tr");
       r.cells.forEach(function (c) {
-        var td = el(doc, "td", c.text); if (c.raw) td.title = "raw " + c.raw; tr.appendChild(td); });
+        var td = el(doc, "td", c.text); if (c.raw) td.title = t("account.raw_prefix", "raw ") + c.raw; tr.appendChild(td); });
       if (r.href) { var td = doc.createElement("td");
         var a = el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); td.appendChild(a); tr.appendChild(td); }
       tbody.appendChild(tr);
@@ -330,10 +330,10 @@ var CreditUI = (function () {
       tr.appendChild(el(doc, "td", o.id));
       tr.appendChild(el(doc, "td", o.sym || o.asset_id));
       tr.appendChild(el(doc, "td", o.owner));
-      var c1 = el(doc, "td", tot.text); if (tot.raw) c1.title = "raw " + tot.raw; tr.appendChild(c1);
-      var c2 = el(doc, "td", avail.text); if (avail.raw) c2.title = "raw " + avail.raw; tr.appendChild(c2);
-      var c3 = el(doc, "td", min.text); if (min.raw) c3.title = "raw " + min.raw; tr.appendChild(c3);
-      var c4 = el(doc, "td", rt.text); if (rt.raw) c4.title = "raw " + rt.raw; tr.appendChild(c4);
+      var c1 = el(doc, "td", tot.text); if (tot.raw) c1.title = t("account.raw_prefix", "raw ") + tot.raw; tr.appendChild(c1);
+      var c2 = el(doc, "td", avail.text); if (avail.raw) c2.title = t("account.raw_prefix", "raw ") + avail.raw; tr.appendChild(c2);
+      var c3 = el(doc, "td", min.text); if (min.raw) c3.title = t("account.raw_prefix", "raw ") + min.raw; tr.appendChild(c3);
+      var c4 = el(doc, "td", rt.text); if (rt.raw) c4.title = t("account.raw_prefix", "raw ") + rt.raw; tr.appendChild(c4);
       tr.appendChild(el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
       tr.appendChild(el(doc, "td", exp));
       tr.appendChild(el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));

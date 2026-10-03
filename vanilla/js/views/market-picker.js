@@ -479,7 +479,7 @@ var MarketPicker = (function () {
         }
         star.type = "button";
         star.setAttribute("aria-pressed", fav ? "true" : "false");
-        star.setAttribute("aria-label", "Favorite " + id);
+        star.setAttribute("aria-label", t("market.favorite_prefix", "Favorite ") + id);
         star.addEventListener("click", function () {
           favs = toggleFav(loadFavs(), id);
           paint(search.value);
@@ -563,7 +563,7 @@ var MarketPicker = (function () {
     var go = doc.createElement("input");
     go.id = "mkt-direct-input";
     go.type = "text";
-    go.setAttribute("placeholder", "QUOTE_BASE, e.g. " + defaultMarket());
+    go.setAttribute("placeholder", t("market.direct_placeholder_prefix", "QUOTE_BASE, e.g. ") + defaultMarket());
     go.setAttribute("aria-label", t("market.direct_label", "Open market QUOTE_BASE directly"));
     go.setAttribute("autocapitalize", "characters");
     go.setAttribute("spellcheck", "false");
@@ -587,7 +587,7 @@ var MarketPicker = (function () {
       try {
         pair = Market.parseId(typed);
       } catch (e) {
-        ferr.textContent = "Use QUOTE_BASE with two different symbols (e.g. " + defaultMarket() + ").";
+        ferr.textContent = t("market.use_quote_base_prefix", "Use QUOTE_BASE with two different symbols (e.g. ") + defaultMarket() + ").";
         ferr.style.display = "";
         return;
       }
@@ -599,7 +599,7 @@ var MarketPicker = (function () {
         }
       }).catch(function () {
         btn.disabled = false;
-        ferr.textContent = "Unknown market: " + typed + ".";
+        ferr.textContent = t("market.unknown_market_prefix", "Unknown market: ") + typed + ".";
         ferr.style.display = "";
       });
     });

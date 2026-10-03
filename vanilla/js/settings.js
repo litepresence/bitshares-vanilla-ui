@@ -283,13 +283,13 @@ var SettingsPage = (function () {
       var code = localeSelect.value;
       localeError.textContent = "";
       if (typeof I18n === "undefined" || !I18n || typeof I18n.setLocale !== "function") {
-        localeError.textContent = "Locale unavailable offline — showing English.";
+        localeError.textContent = t("settings.locale_unavailable", "Locale unavailable offline — showing English.");
         try { localeSelect.value = currentLocale; } catch (e) { /* select keeps user pick */ }
         return;
       }
       I18n.setLocale(code).then(function (r) {
         if (!r || !r.ok) {
-          localeError.textContent = "Locale unavailable offline — showing English.";
+          localeError.textContent = t("settings.locale_unavailable", "Locale unavailable offline — showing English.");
           try { localeSelect.value = I18n.locale(); } catch (e) { /* select keeps user pick */ }
           return;
         }

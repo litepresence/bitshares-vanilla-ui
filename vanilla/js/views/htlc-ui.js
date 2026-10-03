@@ -338,7 +338,7 @@ var HtlcUI = (function () {
         fromTd.title = String(r.from_id || "");
         var toTd = el(doc, "td", String(r.to_id || "—"));
         toTd.title = String(r.to_id || "");
-        var ac = el(doc, "td", a.text); ac.title = "raw " + a.raw;
+        var ac = el(doc, "td", a.text); ac.title = t("account.raw_prefix", "raw ") + a.raw;
         var hc = el(doc, "td", r.algo + " — " + shortHash(r.hash_hex)); hc.title = r.hash_hex;
         try { exp = Htlc.formatDateTime(r.expiration_iso); } catch (e) { exp = String(r.expiration_iso || "unknown"); }
         link = el(doc, "a", t("credit.open", "Open")); link.setAttribute("href", "#/htlc/" + r.id);
@@ -470,7 +470,7 @@ var HtlcUI = (function () {
           if (myGen !== gen) return;
           lastOk = Array.from(new TextEncoder().encode(inp.value),
             function (b) { return (b < 16 ? "0" : "") + b.toString(16); }).join("");
-          match.textContent = "Hash match ✓ (" + r.size + " bytes)"; match.className = "xfer-ok"; reviewBtn.disabled = false;
+          match.textContent = t("htlc.hash_match_prefix", "Hash match ✓ (") + r.size + " bytes)"; match.className = "xfer-ok"; reviewBtn.disabled = false;
         }).catch(function () {
           if (myGen !== gen) return;
           lastOk = ""; match.textContent = t("htlc.s5", "No match — the node would reject this preimage."); match.className = "error";

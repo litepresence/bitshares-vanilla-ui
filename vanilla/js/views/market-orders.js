@@ -663,7 +663,7 @@ var MarketOrders = (function () {
   function cancelButton(doc, order, assets, cancelBox, rerender) {
     var b = touchable(el(doc, "button", t("trade.cancel_button", "Cancel")));
     b.type = "button";
-    b.setAttribute("aria-label", "Cancel order " + String(order.id));
+    b.setAttribute("aria-label", t("explorer.pill_cancel", "Cancel order") + " " + String(order.id));
     b.addEventListener("click", function () {
       TradeUI.orderCancelBox(doc, cancelBox, order, assets, rerender);
     });

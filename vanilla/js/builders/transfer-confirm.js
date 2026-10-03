@@ -351,7 +351,7 @@ var TransferConfirm = (function () {
       feeAckBox.id = "xfer-fee-ack";
       touchable(feeAckBox);
       ackRow.appendChild(feeAckBox);
-      ackRow.appendChild(doc.createTextNode(" I understand this fee is unusually high."));
+      ackRow.appendChild(doc.createTextNode(t("confirm.fee_ack", " I understand this fee is unusually high.")));
       wrap.appendChild(ackRow);
     }
 

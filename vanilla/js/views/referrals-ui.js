@@ -251,7 +251,7 @@ var ReferralsUI = (function () {
     function row(term, raw, human, note) {
       dl.appendChild(el(doc, "dt", term));
       var dd = el(doc, "dd", human);
-      dd.title = "raw " + String(raw) + (note ? " — " + note : "");
+      dd.title = t("account.raw_prefix", "raw ") + String(raw) + (note ? " — " + note : "");
       dl.appendChild(dd);
     }
     if (acct.network_fee_percentage !== undefined)
@@ -292,7 +292,7 @@ var ReferralsUI = (function () {
             human = Format.formatAmount(raw, prec);
         } catch (e) { human = raw; }
         var dd = el(doc, "dd", human);
-        dd.title = "raw " + raw;
+        dd.title = t("account.raw_prefix", "raw ") + raw;
         dl.appendChild(dd);
       });
       box.appendChild(dl);
@@ -324,7 +324,7 @@ var ReferralsUI = (function () {
         li.textContent = v && v.id
           ? v.id + (bal ? " · " + String(bal.amount) + " of " + bal.asset_id : "")
           : JSON.stringify(v);
-        if (bal && bal.amount !== undefined) li.title = "raw " + String(bal.amount);
+        if (bal && bal.amount !== undefined) li.title = t("account.raw_prefix", "raw ") + String(bal.amount);
         ul.appendChild(li);
       });
       box.appendChild(ul);

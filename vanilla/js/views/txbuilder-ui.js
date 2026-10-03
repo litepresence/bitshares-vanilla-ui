@@ -119,14 +119,14 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
      * live so SR users hear the quote without moving focus. */
     try { feeOut.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     /* #6: raw fee integers live in the title only — screen text stays human. */
-    try { if (st.fees) feeOut.title = "raw " + st.fees.totalRaw + " " + (st.feeAssetId || ""); } catch (e) { /* text stands */ }
+    try { if (st.fees) feeOut.title = t("account.raw_prefix", "raw ") + st.fees.totalRaw + " " + (st.feeAssetId || ""); } catch (e) { /* text stands */ }
     feeBtn.addEventListener("click", async function () {
       feeBtn.disabled = true;
       try {
         var f = await TxBuilder.feeAll();
         var fst = TxBuilder.state();
         feeOut.textContent = t("txbuilder.total_prefix", "Total ") + f.totalDisplay;
-        try { feeOut.title = "raw " + f.totalRaw + " " + (fst.feeAssetId || ""); } catch (te) { /* text stands */ }
+        try { feeOut.title = t("account.raw_prefix", "raw ") + f.totalRaw + " " + (fst.feeAssetId || ""); } catch (te) { /* text stands */ }
       }
       catch (e) { feeOut.textContent = t("txbuilder.fee_error_prefix", "Fee error: ") + String((e && e.message) || e); }
       feeBtn.disabled = false;

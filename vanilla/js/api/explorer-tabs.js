@@ -119,8 +119,8 @@ var ExplorerTabs = (function () {
     var form = doc.createElement("form");
     var input = doc.createElement("input");
     input.type = "search";
-    input.setAttribute("placeholder", "Account name prefix…");
-    input.setAttribute("aria-label", "Search accounts by name prefix");
+    input.setAttribute("placeholder", t("explorer.accounts_prefix_ph", "Account name prefix…"));
+    input.setAttribute("aria-label", t("explorer.accounts_search_aria", "Search accounts by name prefix"));
     touchable(input);
     form.appendChild(input);
     var go = touchable(el(doc, "button", "Search"));

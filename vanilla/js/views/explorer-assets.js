@@ -234,7 +234,7 @@ var ExplorerAssets = (function () {
     row.appendChild(note);
     btn.addEventListener("click", function () {
       btn.disabled = true;
-      note.textContent = "Copying…";
+      note.textContent = t("misc.copying", "Copying…");
       var url = "";
       try {
         if (typeof Explorer !== "undefined" && Explorer &&
@@ -1302,7 +1302,7 @@ var ExplorerAssets = (function () {
             try {
               dd.textContent = Format.formatPrice(String(pair.base.amount), f.base_precision,
                 String(pair.quote.amount), f.quote_precision, PRICE_PLACES);
-              dd.title = "base " + pair.base.amount + " / quote " + pair.quote.amount;
+              dd.title = t("explorer.price_base", "base ") + pair.base.amount + " / quote " + pair.quote.amount;
             } catch (e) { dd.textContent = t("explorer.unavailable", "unavailable"); }
           }
           fdl.appendChild(dd);

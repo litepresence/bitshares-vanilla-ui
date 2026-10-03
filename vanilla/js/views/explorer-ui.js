@@ -273,7 +273,7 @@ var ExplorerUI = (function () {
     wrap.appendChild(form);
     var suggestBox = el(doc, "div", null, "xplore-suggest");
     suggestBox.setAttribute("role", "listbox");
-    suggestBox.setAttribute("aria-label", "Search suggestions");
+    suggestBox.setAttribute("aria-label", t("explorer.search_suggestions_aria", "Search suggestions"));
     wrap.appendChild(suggestBox);
     wrap.appendChild(msg);
     /* Hash-path result host (txhash submit only): the WS location-less panel
@@ -389,7 +389,7 @@ var ExplorerUI = (function () {
         }
       } catch (e) { cls = { kind: "text" }; }
       if (cls.kind === "empty") {
-        msg.textContent = "Type a block number, object id, account, or asset symbol.";
+        msg.textContent = t("explorer.search_empty_hint", "Type a block number, object id, account, or asset symbol.");
         return;
       }
       if (cls.kind === "block") {

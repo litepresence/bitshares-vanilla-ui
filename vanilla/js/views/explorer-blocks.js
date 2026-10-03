@@ -244,7 +244,7 @@ var ExplorerBlocks = (function () {
     row.appendChild(note);
     btn.addEventListener("click", function () {
       btn.disabled = true;
-      note.textContent = "Copying…";
+      note.textContent = t("misc.copying", "Copying…");
       var url = "";
       try {
         if (typeof Explorer !== "undefined" && Explorer &&

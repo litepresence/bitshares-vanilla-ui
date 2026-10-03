@@ -417,12 +417,12 @@ var DashboardUI = (function () {
           var code = loc.select.value;
           loc.error.textContent = "";
           if (typeof I18n === "undefined" || !I18n || typeof I18n.setLocale !== "function") {
-            loc.error.textContent = "Locale unavailable offline — showing English.";
+            loc.error.textContent = t("dashboard.locale_unavailable", "Locale unavailable offline — showing English.");
             return;
           }
           I18n.setLocale(code).then(function (r) {
             if (!r || !r.ok) {
-              loc.error.textContent = "Locale unavailable offline — showing English.";
+              loc.error.textContent = t("dashboard.locale_unavailable", "Locale unavailable offline — showing English.");
               try { loc.select.value = I18n.locale(); } catch (e) { /* keeps pick */ }
               return;
             }

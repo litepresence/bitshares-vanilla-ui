@@ -93,7 +93,7 @@ var DebitUI = (function () {
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var l = u.amtText(r.limit_raw, r.asset_id, r.precision), period, tr = doc.createElement("tr");
-      var limCell = u.el(doc, "td", l.text); limCell.title = "raw " + l.raw;
+      var limCell = u.el(doc, "td", l.text); limCell.title = t("account.raw_prefix", "raw ") + l.raw;
       try { period = Htlc.formatDuration(r.period_sec); } catch (e) { period = String(r.period_sec) + " s"; }
       tr.appendChild(u.el(doc, "td", r.id));
       tr.appendChild(u.el(doc, "td", side === "giver" ? r.to_id : r.from_id));
@@ -316,9 +316,9 @@ var DebitUI = (function () {
           var tr = doc.createElement("tr"), cell;
           tr.appendChild(u.el(doc, "td", String(i + 1)));
           cell = u.el(doc, "td", Format.formatAmount(o.sellRaw, R.sell.precision) + " " + R.sell.symbol);
-          cell.title = "raw " + o.sellRaw; tr.appendChild(cell);
+          cell.title = t("account.raw_prefix", "raw ") + o.sellRaw; tr.appendChild(cell);
           cell = u.el(doc, "td", Format.formatAmount(o.recvRaw, R.recv.precision) + " " + R.recv.symbol);
-          cell.title = "raw " + o.recvRaw; tr.appendChild(cell);
+          cell.title = t("account.raw_prefix", "raw ") + o.recvRaw; tr.appendChild(cell);
           tr.appendChild(u.el(doc, "td", Format.formatAmount((o.priceNum * (10n ** 8n) / o.priceDen).toString(), 8)));
           var stCell = u.el(doc, "td", t("debit.not_placed", "not placed"), "muted"); tr.appendChild(stCell);
           tbody.appendChild(tr);
@@ -344,10 +344,10 @@ var DebitUI = (function () {
                 try { return (await u.headBlock()) > 0 ? { head: true } : null; } catch (e) { return null; }
               });
             }).then(async function (res) {
-              stCell.textContent = "placed (head #" + String(await u.headBlock()) + " via " + res.via + "; verify fills on #/market).";
+              stCell.textContent = t("debit.placed_prefix", "placed (head #") + String(await u.headBlock()) + t("gateway.via", " via ") + res.via + t("debit.verify_fills_suffix", "; verify fills on #/market).");
               stCell.className = "xfer-ok";
             }).catch(function (e) {
-              stCell.textContent = "failed: " + String((e && e.message) || e) + " — check state before retrying.";
+              stCell.textContent = t("debit.failed_prefix", "failed: ") + String((e && e.message) || e) + t("debit.retry_suffix", " — check state before retrying.");
               stCell.className = "error"; btn.disabled = false;
             });
           });

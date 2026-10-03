@@ -128,7 +128,7 @@ var FavouritesUI = (function () {
     if (sub) li.appendChild(el(doc, "span", " " + sub, "muted"));
     var rm = touchable(el(doc, "button", t("favourites.remove", "Remove")));
     rm.type = "button";
-    rm.setAttribute("aria-label", "Remove " + label);
+    rm.setAttribute("aria-label", t("favourites.remove", "Remove") + " " + label);
     rm.addEventListener("click", onRemove);
     li.appendChild(rm);
     ul.appendChild(li);
