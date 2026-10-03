@@ -26,6 +26,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 | 16 | Notifications + alerts | ✅ built (engine wired, CSS, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 17 | i18n foundations | ✅ built (en+es+8 stubs, switcher, batch-1 en-identical, Store envelope; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 18 | Final readability pass | 🔨 (oversize list inventoried — see below; audit then fixes) |
+| 19 | Principle #10 + 11-language program | 🔨 in progress (AGENTS.md #10 landed; hi+pt plumbed; 136 unkeyed strings keyed; ru/zh/hi/ko/ja/tr/fr/de/it/pt/es fully translated + audited + validator-green; spec `docs/superpowers/specs/2026-10-04-multilingual-design.md`; browser pass ⏳) |
 | — | Extension-wrapper adapter Tier 1 (repackage+harden; Tier 2 gate follow-up) | 🔨 in v1 scope since 2026-09-28 (owner call) |
 
 ## Sub-objectives per slice
