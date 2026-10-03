@@ -87,7 +87,8 @@ def main():
         if m.get("version") != 1:
             problems.append("%s _meta.version != 1" % code)
         allow = m.get("translated") or []
-        if code == "es":
+        is_full = (set(allow) == en_keys)
+        if code == "es" and not is_full:
             if m.get("untranslated") is not False:
                 problems.append("es.json _meta.untranslated must be false")
             if set(allow) - en_keys:

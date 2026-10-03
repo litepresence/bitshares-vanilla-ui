@@ -11,10 +11,13 @@ vanilla/locales/<lang>.json.
   (_meta.untranslated=true, translated=[]) — for inspection only.
 - Full merge flips _meta to {version:1, untranslated:false,
   translated:sorted(all keys)} and runs validate_translations.py.
+- --overlay <base.json>: start from an existing dict (es-remainder wave)
+  instead of en — keeps already-verified values, overlays chunk values for
+  the rest. Allowlist handling is identical (full on completion).
 
 Extra keys (not in en) are always an error. Stdlib only.
 
-Usage: python3 tooling/merge_translations.py <lang> [--partial]
+Usage: python3 tooling/merge_translations.py <lang> [--partial] [--overlay <base.json>]
 """
 import io
 import json
@@ -51,6 +54,9 @@ def main():
         print("usage: merge_translations.py <lang> [--partial]")
         return 2
     lang, partial = sys.argv[1], "--partial" in sys.argv
+    overlay = None
+    if "--overlay" in sys.argv:
+        overlay = sys.argv[sys.argv.index("--overlay") + 1]
     with io.open(os.path.join(HERE, "..", "vanilla", "locales", "en.json"),
                  encoding="utf-8") as f:
         en = json.load(f)
@@ -79,7 +85,16 @@ def main():
                     return 1
                 got[full] = v
     missing = sorted(set(en_flat) - set(got))
-    out = json.loads(json.dumps(en))  # deep copy of structure
+    if overlay:
+        with io.open(overlay, encoding="utf-8") as f:
+            out = json.load(f)
+        base_flat = flat(out)
+        for full in en_flat:
+            if full not in got and base_flat.get(full) != en_flat[full]:
+                got[full] = base_flat[full]  # already-verified base value kept
+        missing = sorted(set(en_flat) - set(got))
+    else:
+        out = json.loads(json.dumps(en))  # deep copy of structure
     for full in en_flat:
         sec, sub = full.split(".", 1)
         out[sec][sub] = got.get(full, en_flat[full])

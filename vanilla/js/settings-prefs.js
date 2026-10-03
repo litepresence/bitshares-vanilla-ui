@@ -90,10 +90,11 @@ var SettingsPrefs = (function () {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.names === "function") localeNames = I18n.names();
     } catch (e) { localeNames = {}; }
     var localeCodes = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"];
-    /* Wave-1a translated (ru/zh/hi) show unsuffixed; remaining stubs keep
-     * the honest suffix. Each landed wave shrinks this list (wave 2 empties
-     * it). es is partial-by-design and has never been suffixed. */
-    var stubCodes = ["de", "fr", "it", "ja", "ko", "pt", "tr"];
+    /* Wave-2 complete: all 11 non-en dicts fully translated — no stubs left,
+     * no suffixes. Kept as an empty list (not deleted) so a future partial
+     * language has a marked place to land. es was partial-by-design and has
+     * never been suffixed. */
+    var stubCodes = [];
     var currentLocale = "en";
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.locale === "function") currentLocale = I18n.locale();
