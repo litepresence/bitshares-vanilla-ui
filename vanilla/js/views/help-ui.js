@@ -69,6 +69,7 @@ var HelpUI = (function () {
     ["trollbox", "Trollbox chat", "On-chain public chat rooms, paid per kilobyte like any transaction.", "#/trollbox"],
     ["alerts", "Price alerts", "Get notified when a market crosses a price you set.", "#/alerts"],
     ["settings", "Settings and nodes", "Pick API nodes by live health, switch themes and language.", "#/settings"],
+    ["history-index", "Community history index", "Node history vs the community index: what works where, and how to reconcile gaps.", "#/settings"],
     ["topops", "Top operations", "Which chain operations run hottest, counted from recent blocks.", "#/top-ops"],
     ["txbuilder", "Transaction builder", "Compose several operations into one transaction and sign once.", "#/txbuilder"],
     ["prediction", "Prediction markets", "YES/NO shares on real-world outcomes with live probabilities.", "#/prediction"],
@@ -460,6 +461,17 @@ var HelpUI = (function () {
       "Refresh re-runs the window. Testnet works here, unlike the old stats pages that were mainnet-only.",
       "# Reading it",
       "A healthy chain shows transfers and order flow on top with governance and maintenance underneath. Spikes in exotic types deserve a look in the explorer."
+    ],
+    "history-index": [
+      "# Two histories, two jobs",
+      "Node history comes from the public API node you picked: account activity, fills, market candles, settlement and order reads. The Settings table marks every node with a History pill from a live probe — pick a History node for history features.",
+      "The community index is a third-party ElasticSearch (es.bitshares.dev) that adds what no node serves: top asset holders, transaction lookup by hash, and deeper archives. It is run by the community, not by this wallet — questions go to t.me/bitsharesDEV.",
+      "# When something is missing",
+      "A panel that needs history you don't have says so and links back to Settings: switch to a History node, or turn the community index on. Nothing here ever shows a blank panel or a guessed number.",
+      "# Testnet limits",
+      "Node history works on testnet, but the community index covers mainnet only — index-powered features (holders, hash lookup) are unavailable on testnet by data, not by bug.",
+      "# The switch",
+      "Settings holds the community-index toggle (on by default). Turn it off and every index surface falls back to chain history or an honest notice — your call, reversible any time."
     ],
     "txbuilder": [
       "# Several operations, one signature round",

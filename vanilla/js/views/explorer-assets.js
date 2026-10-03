@@ -894,36 +894,46 @@ var ExplorerAssets = (function () {
             track_total_hits: false, size: 25, sort: [{ balance: { order: "desc" } }] };
           HistoryCap.esSearch("objects-balance", body).then(function (esJson) {
             if (!isCurrent(myGen)) return;
-            var rows = _parseHolders(esJson);
-            while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
-            if (rows.length === 0) { holdersUnavailable(); return; }
-            var scroller = el(doc, "div", null, "xplore-scroll");
-            scroller.style.overflowX = "auto";
-            var table = doc.createElement("table");
-            table.className = "node-table";
-            var thead = doc.createElement("thead");
-            var hr = doc.createElement("tr");
-            hr.appendChild(el(doc, "th", t("asset.holders_account", "Account")));
-            hr.appendChild(el(doc, "th", t("asset.holders_balance", "Balance")));
-            thead.appendChild(hr);
-            table.appendChild(thead);
-            var tb = doc.createElement("tbody");
-            rows.forEach(function (r) {
-              var tr = doc.createElement("tr");
-              var tdA = doc.createElement("td");
-              tdA.appendChild(ExplorerRender.accountLink(doc, r.owner, myGen));
-              tr.appendChild(tdA);
-              var tdB = doc.createElement("td");
-              try {
-                tdB.textContent = Format.formatAmount(r.balance, prec);
-                tdB.title = r.balance;
-              } catch (e) { tdB.textContent = r.balance; }
-              tr.appendChild(tdB);
-              tb.appendChild(tr);
-            });
-            table.appendChild(tb);
-            scroller.appendChild(table);
-            listBox.appendChild(scroller);
+            /* Belt-and-braces (AFK R5): everything after the clear() below
+             * must land SOMETHING — any unexpected throw (future edits,
+             * transient shapes) falls through to the honest notice, never a
+             * silently empty box (unhandled rejections are invisible to the
+             * headless shooter, so fail-soft here instead of upstream). */
+            try {
+              var rows = _parseHolders(esJson);
+              while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+              if (rows.length === 0) { holdersUnavailable(); return; }
+              var scroller = el(doc, "div", null, "xplore-scroll");
+              scroller.style.overflowX = "auto";
+              var table = doc.createElement("table");
+              table.className = "node-table";
+              var thead = doc.createElement("thead");
+              var hr = doc.createElement("tr");
+              hr.appendChild(el(doc, "th", t("asset.holders_account", "Account")));
+              hr.appendChild(el(doc, "th", t("asset.holders_balance", "Balance")));
+              thead.appendChild(hr);
+              table.appendChild(thead);
+              var tb = doc.createElement("tbody");
+              rows.forEach(function (r) {
+                var tr = doc.createElement("tr");
+                var tdA = doc.createElement("td");
+                tdA.appendChild(ExplorerRender.accountLink(doc, r.owner, myGen));
+                tr.appendChild(tdA);
+                var tdB = doc.createElement("td");
+                try {
+                  tdB.textContent = Format.formatAmount(r.balance, prec);
+                  tdB.title = r.balance;
+                } catch (e) { tdB.textContent = r.balance; }
+                tr.appendChild(tdB);
+                tb.appendChild(tr);
+              });
+              table.appendChild(tb);
+              scroller.appendChild(table);
+              listBox.appendChild(scroller);
+            } catch (e) {
+              if (!isCurrent(myGen)) return;
+              holdersUnavailable();
+            }
           }).catch(function () {
             if (!isCurrent(myGen)) return;
             holdersUnavailable();

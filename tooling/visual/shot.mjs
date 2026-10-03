@@ -38,6 +38,12 @@ page.on("console", (msg) => {
   if (msg.type() === "error") errors.push(msg.text().slice(0, 300));
 });
 page.on("pageerror", (err) => errors.push("pageerror: " + String(err).slice(0, 300)));
+/* Unhandled rejections are invisible otherwise (AFK R5 lesson: a cleared
+ * list box + a rejected render promise = a silently empty panel the gate
+ * never sees). Guarded: old playwright-core may lack the event. */
+try {
+  page.on("unhandledrejection", (reason) => errors.push("unhandled: " + String(reason).slice(0, 300)));
+} catch (e) { /* pageerror coverage stands */ }
 if (theme || network || noTour || locale) {
   await page.addInitScript(
     ({ t, n, nodes, notour, loc }) => {

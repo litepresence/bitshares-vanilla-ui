@@ -534,6 +534,99 @@ var Market = (function () {
     return list;
   }
 
+  /* My open force-settlement requests for ANY account id (Phase 7 B4).
+   * database get_settle_orders_by_account(account, start_1.4.x, limit),
+   * database_api.hpp:569-571 — VERIFIED signature:
+   *   vector<force_settlement_object> get_settle_orders_by_account(
+   *     const std::string& account_name_or_id,
+   *     force_settlement_id_type start, uint32_t limit)const.
+   * ARITY NOTE (decided, logged): unlike market-wide get_settle_orders
+   * (asset, limit) (hpp:558, two args — R1e settleOrders above mirrors it),
+   * the by-account variant takes THREE args: start is a REQUIRED
+   * force-settlement cursor ("objects before this ID are skipped"), not
+   * optional. First page passes "1.4.0" (genesis: nothing skipped).
+   * No call site exists in any reference (grep 2026-10-02: zero hits in
+   * astro-ui/src, bitshares-ui/app, wallet-extension/src); closest
+   * chain-call precedent is astro FullSmartcoin.ts:62
+   * get_settle_orders [assetID, 100]. Live cursor behavior NEEDS-PROBE
+   * (sweep proved only the db id resolves on all nodes).
+   * WS-only by design: single database-api read, no ES index involved —
+   * no ES path exists here (same doctrine as tradesDeep above).
+   * Params: accountId "1.2.N" string; limit integer 1-300 (default 100,
+   * same ceiling as settleOrders — api_limit_get_settle_orders = 300,
+   * application.hpp:70).
+   * Returns the RAW force_settlement_object array (SAME envelope as
+   * settleOrders — readers reuse sortSettles; market-orders.js R1e tab).
+   * Empty/non-array is VALID ([]). Fails: "bad-args" pre-network on
+   * malformed id or limit (zero WS calls); "history-unavailable" when
+   * Chain.db() or the call rejects (B1 contract family — callers render
+   * the notice inline, never blank). */
+  async function mySettlements(accountId, limit) {
+    if (typeof accountId !== "string" || !/^1\.2\.\d+$/.test(accountId)) throw new Error("bad-args");
+    if (limit === undefined || limit === null) limit = 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 300) throw new Error("bad-args");
+    var dbId;
+    try {
+      dbId = await Chain.db();
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    var rows;
+    try {
+      rows = await Chain.call(dbId, "get_settle_orders_by_account", [accountId, "1.4.0", limit]);
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    if (!Array.isArray(rows)) return [];
+    return rows;
+  }
+
+  /* Open limit orders for ANY account id (Phase 7 B5 backend, first page).
+   * database get_limit_orders_by_account(account, limit, start_id?),
+   * database_api.hpp:495-498 — VERIFIED signature:
+   *   vector<limit_order_object> get_limit_orders_by_account(
+   *     const string& account_name_or_id,
+   *     const optional<uint32_t>& limit = ...,
+   *     const optional<limit_order_id_type>& start_id = ...).
+   * SCOPE NOTE (decided, logged): B5's design names
+   * get_account_limit_orders(account, base, quote, limit, ...) (hpp:524-529,
+   * wallet.hpp:188-193) — that method REQUIRES base+quote, so the assigned
+   * (accountId, limit) signature cannot serve it (wrong arity; live wins).
+   * This ships the all-markets first page via get_limit_orders_by_account
+   * (SAME call astro makes: AccountLimitOrders.ts:45 [accountID, API_LIMIT];
+   * cursor page :84-88 [accountID, API_LIMIT, startId]); the desk's
+   * "this-market" filter stays a future-UI client-side filter over this
+   * shape (or a follow-up wrapper with base/quote args). Zero call sites
+   * for get_account_limit_orders exist in any reference (grep 2026-10-02).
+   * WS-only by design (same doctrine as above; no ES path).
+   * Params: accountId "1.2.N"; limit integer 1-101 (default 100;
+   * api_limit_get_limit_orders_by_account = 101, application.hpp:65).
+   * Returns the RAW limit_order_object array (SAME envelope as myOrders —
+   * market-orders.js desk tab, trade-cancel.js, account-ui.js open-orders
+   * render consume that shape; no normalizer overlap — _fillRow is
+   * fill-specific, so no helper was factored).
+   * Empty/non-array is VALID ([]). Fails: "bad-args" pre-network (zero WS
+   * calls); "history-unavailable" on db/call reject. */
+  async function myLimitOrders(accountId, limit) {
+    if (typeof accountId !== "string" || !/^1\.2\.\d+$/.test(accountId)) throw new Error("bad-args");
+    if (limit === undefined || limit === null) limit = 100;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 101) throw new Error("bad-args");
+    var dbId;
+    try {
+      dbId = await Chain.db();
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    var rows;
+    try {
+      rows = await Chain.call(dbId, "get_limit_orders_by_account", [accountId, limit]);
+    } catch (e) {
+      throw new Error("history-unavailable");
+    }
+    if (!Array.isArray(rows)) return [];
+    return rows;
+  }
+
   return {
     parseId: parseId,
     assets: assets,
@@ -547,7 +640,9 @@ var Market = (function () {
     timeframes: timeframes,
     myOrders: myOrders,
     settleOrders: settleOrders,
-    sortSettles: sortSettles
+    sortSettles: sortSettles,
+    mySettlements: mySettlements,
+    myLimitOrders: myLimitOrders
   };
 })();
 

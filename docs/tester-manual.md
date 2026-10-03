@@ -79,10 +79,19 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 8. Pool context: open `#/pools/1.19.66`, then click the header Exchange tab.
    - Expected: lands on that pool's pair market (not the default pair).
      Go to `#/wallet` and click Exchange again: back to the default pair.
-9. Switch theme: Classic → Vanilla light → DEX dark (appearance control).
-   - Expected: whole app re-skins instantly, no reload. Record any unreadable text per theme.
-10. Record: console errors (want none except dead-node probe lines, which
-   are normal and the UI must label that node down).
+ 9. Switch theme: Classic → Vanilla light → DEX dark (appearance control).
+    - Expected: whole app re-skins instantly, no reload. Record any unreadable text per theme.
+ 10. Record: console errors (want none except dead-node probe lines, which
+    are normal and the UI must label that node down).
+ 11. History pills (NEW): every reachable row shows `(History)` or
+     `(No history)` in its Status cell (from the live probe, not a guess).
+     - Unreachable rows show no pill — correct, there was nothing to probe.
+ 12. Community index switch (NEW): scroll to "Community history index".
+     - Expected: checked ON by default; note names it community-run with
+       t.me/bitsharesDEV contact. Uncheck → ES surfaces fall back (holders
+       panel explains itself, fills use chain). Re-check restores.
+ 13. Testnet banner (NEW): flip to testnet — a note says node history works
+     but the community index is mainnet-only. (True: index has no testnet data.)
 
 ## 2. Wallet (`#/wallet`, `#/create-wallet-brainkey`, `#/existing-account`, `#/login`)
 
@@ -123,10 +132,15 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 3. Open your testnet account page. Check: Balances tab, Open orders,
    History, Margin Positions / Credit Management reads (may be empty —
    empty panels must EXPLAIN, never blank).
-4. If the account has a margin position: confirm a collateral-ratio number
-   shows with a danger/warning/safe treatment. Record the value.
-5. Phone width: tables must stack or scroll sideways with the first column
-   sticky — record PASS/FAIL.
+ 4. If the account has a margin position: confirm a collateral-ratio number
+    shows with a danger/warning/safe treatment. Record the value.
+ 5. Phone width: tables must stack or scroll sideways with the first column
+    sticky — record PASS/FAIL.
+ 6. History filter (NEW): open the History tab — a dropdown reads All.
+    Switch to Transfer, then "Fill order".
+    - Expected: list re-renders through the same rows (same wording); All
+      shows everything again. On a history-less node the panel names the
+      problem AND links to `#/settings` (click it — lands on Settings).
 
 ## 4. Transfer (`#/transfer`)
 
@@ -199,10 +213,19 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 4. Open `#/top-ops`. Expected: a table (type/name/count/share) + donut
    chart labeled "last 200 blocks on <node>", Refresh button re-runs it.
    Works on testnet (unlike the old stats page which was mainnet-only).
-5. Block age (NEW — decimal timer): on the Blocks tab, watch the latest
-   block's age line for 10 seconds.
-   - Expected: it ticks in tenths (`2.3 seconds ago`-style) and resets on
-     each new block. No full-page flicker — only the age text changes.
+ 5. Block age (NEW — decimal timer): on the Blocks tab, watch the latest
+    block's age line for 10 seconds.
+    - Expected: it ticks in tenths (`2.3 seconds ago`-style) and resets on
+      each new block. No full-page flicker — only the age text changes.
+ 6. Hash search (NEW): paste a 64-hex transaction id into the explorer
+    search box, Enter.
+    - Expected: lands on `#/block/<height>/<index>` with the op breakdown
+      (block link at top). A bogus hash → "not found" notice + Settings
+      link, never a guessed block.
+ 7. Top holders (NEW): open `#/asset/BTS`, scroll to Top holders.
+    - Expected: named accounts with human balances (never raw integers).
+      With the community index OFF (Settings), the panel explains itself
+      instead of going blank.
 
 ## 8. Assets (`#/assets`, `#/assets/create`, `#/asset/<symbol>`)
 
@@ -326,12 +349,16 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 
 ## 19. Help (`#/help`)
 
-1. Open `#/help`. Expected: 48 topic links, no English-only note, no
-   mention of any old UI; Documentation section (2 links) and AI Assisted
-   Help (deepwiki link) below the index — all open new tabs.
-2. Open 3 articles (one new: trollbox; one old: backups; glossary).
-   Expected: headings, paragraphs, and bullet lists render as structured
-   text (never one giant block, never a raw `help.topic_*` key id).
+ 1. Open `#/help`. Expected: 49 topic links (new: Community history index),
+    no English-only note, no mention of any old UI; Documentation section
+    (2 links) and AI Assisted Help (deepwiki link) below the index — all
+    open new tabs.
+ 2. Open 3 articles (one new: trollbox; one old: backups; glossary).
+    Expected: headings, paragraphs, and bullet lists render as structured
+    text (never one giant block, never a raw `help.topic_*` key id).
+ 2b. Open "Community history index" (NEW).
+    Expected: two-histories explanation, third-party notice with
+    t.me/bitsharesDEV, testnet limits, the Settings switch pointer.
 3. Switch to Spanish, reopen `#/help`.
    - Expected: chrome translates; article bodies honestly remain English
      (stubs, not machine translation). Switch back.
