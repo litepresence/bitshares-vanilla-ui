@@ -24,7 +24,7 @@ global.EsLab = require("../vanilla/js/api/es-lab.js");
 var EsLab = global.EsLab;
 var EsLabRun = require("../vanilla/js/api/es-lab-run.js");
 
-eq(EsLab.TEMPLATES.length, 7, "seven templates total");
+eq(EsLab.TEMPLATES.length, 13, "thirteen templates total");
 var t = EsLab.byKey("holders-by-asset");
 eq(t.index, "objects-balance", "holders index");
 var built = EsLab.build(t, ["1.3.0", "25"]);
@@ -58,6 +58,39 @@ eq(rt("top-ops-agg", ["7"]), ["7"], "agg round-trip");
 eq(rt("ops-by-account", ["1.2.0", "", "10"]), ["1.2.0", "", "10"], "account round-trip");
 eq(rt("block-range", ["100", "200", ""]), ["100", "200", ""], "range round-trip");
 eq(rt("balances-by-account", ["1.2.5", "25"]), ["1.2.5", "25"], "balances round-trip");
+eq(rt("tx-by-id", ["abc123"]), ["abc123"], "tx round-trip");
+eq(rt("ops-by-type", ["0", "30", "10"]), ["0", "30", "10"], "ops-by-type round-trip");
+eq(rt("top-pools", ["30", "20"]), ["30", "20"], "top-pools round-trip");
+eq(rt("top-markets", ["30"]), ["30"], "top-markets round-trip");
+eq(rt("donors-to-account", ["1.2.0", "1.3.0", "30", "20"]), ["1.2.0", "1.3.0", "30", "20"], "donors round-trip");
+eq(rt("lifetime-upgrades", ["30", "20"]), ["30", "20"], "ltm round-trip");
+var txb = EsLab.build(EsLab.byKey("tx-by-id"), ["abc123"]);
+eq(txb.body.query.term["trx_id.keyword"], "abc123", "tx term body");
+var obt = EsLab.build(EsLab.byKey("ops-by-type"), ["0", "30", "10"]);
+eq(obt.body.query.bool.filter[0].term.operation_type, 0, "ops-by-type term int");
+var tpb = EsLab.build(EsLab.byKey("top-pools"), ["30", "20"]);
+eq(tpb.body.aggs.by_pool.terms.size, 20, "pools agg size");
+var tmb = EsLab.build(EsLab.byKey("top-markets"), ["30"]);
+eq(Array.isArray(tmb.body.aggs.by_pair.composite.sources), true, "markets composite");
+var dnb = EsLab.build(EsLab.byKey("donors-to-account"), ["1.2.0", "1.3.0", "30", "20"]);
+eq(dnb.body.aggs.by_donor.terms.size, 20, "donors agg size");
+var ltb = EsLab.build(EsLab.byKey("lifetime-upgrades"), ["30", "20"]);
+eq(ltb.body.aggs.by_account.terms.size, 20, "ltm agg size");
+var poolRows = EsLab.parse(EsLab.byKey("top-pools"),
+  { aggregations: { by_pool: { buckets: [{ key: "1.19.0", doc_count: 5 }, { key: "1.19.1", doc_count: 3 }] } } });
+eq(poolRows[0], { type: "1.19.0", name: "1.19.0", count: 5, share: "62.5%" }, "pools parse");
+var mktRows = EsLab.parse(EsLab.byKey("top-markets"),
+  { aggregations: { by_pair: { buckets: [
+    { key: { pays: "1.3.121", receives: "1.3.0" }, doc_count: 4 },
+    { key: { pays: "1.3.0", receives: "1.3.121" }, doc_count: 6 }] } } });
+eq(mktRows.length, 1, "markets merge both legs");
+eq(mktRows[0].count, 10, "markets summed");
+var donRows = EsLab.parse(EsLab.byKey("donors-to-account"),
+  { aggregations: { by_donor: { buckets: [{ key: "1.2.5", doc_count: 2, total_sent: { value: 1000 } }] } } });
+eq(donRows[0].total, "1000", "donors total raw");
+var ltmRows = EsLab.parse(EsLab.byKey("lifetime-upgrades"),
+  { aggregations: { by_account: { buckets: [{ key: "1.2.9", doc_count: 1 }] } } });
+eq(ltmRows[0].type, "1.2.9", "ltm parse");
 eq(EsLab.fromBody(EsLab.byKey("holders-by-asset"), {}), null, "foreign body -> null");
 eq(EsLab.fromBody(null, {}), null, "null template -> null");
 // runPaged honors caps with stubbed HistoryCap pages:

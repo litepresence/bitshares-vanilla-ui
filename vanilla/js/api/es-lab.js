@@ -9,6 +9,8 @@
  *   Format.pct1 (agg shares).
  * Globals/side effects: exposes global EsLab only.
  * Created by: es-lab design 2026-10-03 (api-lab twin), AFK build.
+ * Extended: 2026-10-03 comprehensive coverage (tx-by-id, ops-by-type,
+ *   top-pools / top-markets / donors / lifetime rankings).
  *
  * CALL TRUTH (every body below is verbatim from a recorded source):
  * - holders-by-asset: astro TopAssetHolders.ts:28-37 (match asset_type,
@@ -20,14 +22,26 @@
  *   multi_match, same envelope).
  * - top-ops-agg: astro TopOperations.ts:47-64 (size 0 + block_time range
  *   filter + terms agg on operation_type).
+ * - tx-by-id: astro Explorer.ts:232 (term trx_id.keyword, size 5).
+ * - ops-by-type: TopOperations range shape + term operation_type (size N).
+ * - top-pools: astro TopPoolSwaps.ts:53-72 (term op-63 + range + terms
+ *   agg on operation_history.op_object.pool.keyword).
+ * - top-markets: astro TopActiveMarkets.ts:72-93 (term op-4 + range +
+ *   composite agg on pays/receives asset_id.keyword, merged in parse).
+ * - donors-to-account: astro TopDonators.ts:74-104 minus the script
+ *   filter (public ES pain; must_not self-transfer kept) + terms on
+ *   from.keyword with sum sub-agg on amount_.amount.
+ * - lifetime-upgrades: astro TopLifetimeMembers.ts:58-78 (term op-8 +
+ *   term upgrade_to_lifetime_member true + range + terms on
+ *   account_to_upgrade.keyword).
  * MONEY DISCIPLINE (#6): balances/amounts stay strings here; the VIEW adds
  *   human hints via Format — this file formats nothing except agg shares
- *   (counts, never money).
+ *   (counts, never money). Donor totals stay raw strings.
  */
 var EsLab = (function () {
   "use strict";
 
-  var GROUPS = ["Operations", "Holders & balances"];
+  var GROUPS = ["Operations", "Holders & balances", "Rankings"];
 
   /* ES_SIZE/ES_MAX_PAGES/ES_TIMEOUT_MS: pagination caps, verbatim from the
    * market-fills adapter (api/market-fills-history.js:41-50: 500/page, max 2
@@ -35,6 +49,10 @@ var EsLab = (function () {
   var ES_SIZE = 500;
   var ES_MAX_PAGES = 2;
   var ES_TIMEOUT_MS = 15000;
+
+  /* TOP_MARKETS_CAP: post-merge row cap for the composite pair ranking
+   * (astro default limit 20; composite pages 1000 keys before merging). */
+  var TOP_MARKETS_CAP = 20;
 
   /* F: one field descriptor. Params: name, type, o (optional extras:
    * required, example, hint, max). Returns the descriptor. Fails: never. */
@@ -59,6 +77,19 @@ var EsLab = (function () {
       desc: "Liquidity-pool exchange ops (type 63) for one pool id, newest first.",
       sourceRef: "vanilla/js/api/pool-history.js:65-72",
       fields: [F("pool", "string", { example: "1.19.66", hint: "Pool id, text-matched." })] },
+    { key: "tx-by-id", group: "Operations", kind: "ops", index: "bitshares-*",
+      title: "Transaction by id",
+      desc: "Indexed ops for one transaction id (exact keyword match).",
+      sourceRef: "astro-ui Explorer.ts:232",
+      fields: [F("trxid", "string", { example: "9b3ed9b6d2656687ec49f8ff4ce023f9c5436e58",
+        hint: "40-hex transaction id." })] },
+    { key: "ops-by-type", group: "Operations", kind: "ops", index: "bitshares-*",
+      title: "Operations by type",
+      desc: "Newest ops of one type over a rolling day window (chain-scan you cannot do over WS).",
+      sourceRef: "astro-ui TopOperations.ts:47-64 (range shape)",
+      fields: [F("type", "string", { example: "0", hint: "Op id 0-77." }),
+        F("days", "uint", { example: "30", max: 90, hint: "Lookback window, days." }),
+        F("limit", "uint", { example: "10", max: 100 })] },
     { key: "top-ops-agg", group: "Operations", kind: "agg", index: "bitshares-*",
       title: "Top operations",
       desc: "Count of ops by type over a rolling day window (aggregation — no per-op rows).",
@@ -89,7 +120,32 @@ var EsLab = (function () {
       desc: "Every balance object one account holds (one row per asset).",
       sourceRef: "live probe 2026-10-03: match owner_ (verified vs es.bitshares.dev)",
       fields: [F("account", "string", { example: "1.2.0", hint: "Account id (1.2.x) or name." }),
-        F("limit", "uint", { example: "25", max: 100 })] }
+        F("limit", "uint", { example: "25", max: 100 })] },
+    { key: "top-pools", group: "Rankings", kind: "agg", index: "bitshares-*",
+      title: "Top pools",
+      desc: "Pools ranked by swap count over a rolling day window.",
+      sourceRef: "astro-ui TopPoolSwaps.ts:53-72",
+      fields: [F("days", "uint", { example: "30", max: 90, hint: "Lookback window, days." }),
+        F("limit", "uint", { example: "20", max: 100 })] },
+    { key: "top-markets", group: "Rankings", kind: "agg", index: "bitshares-*",
+      title: "Top markets",
+      desc: "Asset pairs ranked by fill count over a rolling day window (both legs merged, top 20).",
+      sourceRef: "astro-ui TopActiveMarkets.ts:72-93",
+      fields: [F("days", "uint", { example: "30", max: 90, hint: "Lookback window, days." })] },
+    { key: "donors-to-account", group: "Rankings", kind: "agg", index: "bitshares-*",
+      title: "Top donors",
+      desc: "Accounts that sent the most of one asset TO a target (self-transfers excluded, ranked by total sent).",
+      sourceRef: "astro-ui TopDonators.ts:74-104 (script filter omitted)",
+      fields: [F("account", "string", { example: "1.2.0", hint: "Recipient id (1.2.x) or name." }),
+        F("asset", "string", { example: "1.3.0", hint: "Asset id (1.3.x)." }),
+        F("days", "uint", { example: "30", max: 90 }),
+        F("limit", "uint", { example: "20", max: 100 })] },
+    { key: "lifetime-upgrades", group: "Rankings", kind: "agg", index: "bitshares-*",
+      title: "Lifetime upgrades",
+      desc: "Accounts that upgraded to lifetime member over a rolling day window.",
+      sourceRef: "astro-ui TopLifetimeMembers.ts:58-78",
+      fields: [F("days", "uint", { example: "30", max: 90, hint: "Lookback window, days." }),
+        F("limit", "uint", { example: "20", max: 100 })] }
   ];
 
   /* byKey: find one template by key. Params: key string. Returns the entry
@@ -127,6 +183,26 @@ var EsLab = (function () {
     try { coerce(tpl, values); return true; } catch (e) { return false; }
   }
 
+  /* hoursFor: days string -> lookback hours (>= 1). Params: daysStr. */
+  function hoursFor(daysStr) {
+    return Math.max(1, parseInt(daysStr || "30", 10) * 24);
+  }
+
+  /* rangeTime: block_time range filter for N days. Params: daysStr.
+   * Returns the ES range object. Fails: never. */
+  function rangeTime(daysStr) {
+    var hours = hoursFor(daysStr);
+    return { gte: "now-" + hours + "h", lte: "now" };
+  }
+
+  /* opsEnvelope: shared shape for per-op hit lists (sort + capped _source).
+   * Params: size. Returns the envelope fields. Fails: never. */
+  function opsEnvelope(size) {
+    return { sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
+      size: size,
+      _source: ["account_history", "operation_history", "operation_type", "block_data"] };
+  }
+
   /* build: curated strings -> {index, body}. Params: tpl (entry), values
    * (string array). Returns the transport-ready pair. Fails: throws the
    * coerce errors, or es-bad-key for a null tpl. */
@@ -153,8 +229,19 @@ var EsLab = (function () {
         query: { bool: { must: [
           { match: { operation_type: "63" } },
           { multi_match: { type: "best_fields", query: v[0], lenient: true } } ] } } };
+    } else if (tpl.key === "tx-by-id") {
+      var tx = opsEnvelope(5);
+      tx.query = { term: { "trx_id.keyword": v[0] } };
+      body = tx;
+    } else if (tpl.key === "ops-by-type") {
+      if (!/^[0-9]+$/.test(v[0])) throw new Error("bad op type: type");
+      var ob = opsEnvelope(Math.min(parseInt(v[2] || "10", 10), 100));
+      ob.query = { bool: { filter: [
+        { term: { operation_type: parseInt(v[0], 10) } },
+        { range: { "block_data.block_time": rangeTime(v[1]) } } ] } };
+      body = ob;
     } else if (tpl.key === "top-ops-agg") {
-      var hours = Math.max(1, parseInt(v[0] || "30", 10) * 24);
+      var hours = hoursFor(v[0]);
       body = { size: 0,
         query: { bool: { filter: [{ range: { "block_data.block_time":
           { gte: "now-" + hours + "h", lte: "now" } } }] } },
@@ -188,6 +275,47 @@ var EsLab = (function () {
       body = { query: { bool: { must: [{ match: { owner_: { query: v[0] } } }] } },
         track_total_hits: false, size: parseInt(v[1] || "25", 10),
         sort: [{ balance: { order: "desc" } }] };
+    } else if (tpl.key === "top-pools") {
+      body = { size: 0,
+        query: { bool: { filter: [
+          { term: { operation_type: 63 } },
+          { range: { "block_data.block_time": rangeTime(v[0]) } } ] } },
+        aggs: { by_pool: { terms: { field: "operation_history.op_object.pool.keyword",
+          size: Math.min(parseInt(v[1] || "20", 10), 100),
+          order: { _count: "desc" } } } } };
+    } else if (tpl.key === "top-markets") {
+      body = { size: 0,
+        query: { bool: { filter: [
+          { term: { operation_type: 4 } },
+          { range: { "block_data.block_time": rangeTime(v[0]) } } ] } },
+        aggs: { by_pair: { composite: { size: 1000, sources: [
+          { pays: { terms: { field: "operation_history.op_object.pays.asset_id.keyword" } } },
+          { receives: { terms: { field: "operation_history.op_object.receives.asset_id.keyword" } } } ] } } } };
+    } else if (tpl.key === "donors-to-account") {
+      if (!/^1\.2\.\d+$/.test(v[0])) throw new Error("bad account id: account (resolve names first)");
+      if (!/^1\.3\.\d+$/.test(v[1])) throw new Error("bad asset id: asset");
+      body = { size: 0,
+        query: { bool: { filter: [
+          { term: { operation_type: 0 } },
+          { term: { "operation_history.op_object.to.keyword": v[0] } },
+          { term: { "operation_history.op_object.amount_.asset_id.keyword": v[1] } },
+          { range: { "block_data.block_time": rangeTime(v[2]) } } ],
+          must_not: [
+            { term: { "operation_history.op_object.from.keyword": v[0] } } ] } },
+        aggs: { by_donor: { terms: { field: "operation_history.op_object.from.keyword",
+          size: Math.min(parseInt(v[3] || "20", 10), 100),
+          order: { total_sent: "desc" } },
+          aggs: { total_sent: { sum: { field: "operation_history.op_object.amount_.amount" } } } } } };
+    } else if (tpl.key === "lifetime-upgrades") {
+      body = { size: 0,
+        query: { bool: { filter: [
+          { term: { operation_type: 8 } },
+          { term: { "operation_history.op_object.upgrade_to_lifetime_member": true } },
+          { range: { "block_data.block_time": rangeTime(v[0]) } } ] } },
+        aggs: { by_account: { terms: {
+          field: "operation_history.op_object.account_to_upgrade.keyword",
+          size: Math.min(parseInt(v[1] || "20", 10), 100),
+          order: { _count: "desc" } } } } };
     } else {
       throw new Error("es-bad-key: " + tpl.key);
     }
@@ -223,6 +351,22 @@ var EsLab = (function () {
         if (!Array.isArray(pm) || !pm[1] || !pm[1].multi_match) return null;
         return [String(pm[1].multi_match.query || "")];
       }
+      if (tpl.key === "tx-by-id") {
+        var tt = body.query && body.query.term && body.query.term["trx_id.keyword"];
+        if (typeof tt !== "string" || !tt.length) return null;
+        return [tt];
+      }
+      if (tpl.key === "ops-by-type") {
+        var of = q && q.filter;
+        if (!Array.isArray(of) || !of[0] || !of[0].term ||
+            of[0].term.operation_type === undefined) return null;
+        var ot = String(of[0].term.operation_type);
+        var orr = of[1] && of[1].range && of[1].range["block_data.block_time"];
+        var og = orr && orr.gte;
+        var omt = (typeof og === "string" && /^now-(\d+)h$/.test(og)) ? /^now-(\d+)h$/.exec(og) : null;
+        if (!omt) return null;
+        return [ot, String(Math.round(parseInt(omt[1], 10) / 24)), String(body.size || "")];
+      }
       if (tpl.key === "top-ops-agg") {
         var r = q && q.filter && q.filter[0] && q.filter[0].range &&
           q.filter[0].range["block_data.block_time"];
@@ -230,6 +374,56 @@ var EsLab = (function () {
         var mt = (typeof g === "string" && /^now-(\d+)h$/.test(g)) ? /^now-(\d+)h$/.exec(g) : null;
         if (!mt) return null;
         return [String(Math.round(parseInt(mt[1], 10) / 24))];
+      }
+      if (tpl.key === "top-pools") {
+        var pf = q && q.filter;
+        if (!Array.isArray(pf) || !pf[1] || !pf[1].range ||
+            !pf[1].range["block_data.block_time"]) return null;
+        var pg = pf[1].range["block_data.block_time"].gte;
+        var pmt = (typeof pg === "string" && /^now-(\d+)h$/.test(pg)) ? /^now-(\d+)h$/.exec(pg) : null;
+        if (!pmt) return null;
+        var psz = body.aggs && body.aggs.by_pool && body.aggs.by_pool.terms &&
+          body.aggs.by_pool.terms.size;
+        if (psz === undefined) return null;
+        return [String(Math.round(parseInt(pmt[1], 10) / 24)), String(psz)];
+      }
+      if (tpl.key === "top-markets") {
+        var mf = q && q.filter;
+        if (!Array.isArray(mf) || !mf[1] || !mf[1].range ||
+            !mf[1].range["block_data.block_time"]) return null;
+        var mg = mf[1].range["block_data.block_time"].gte;
+        var mmt = (typeof mg === "string" && /^now-(\d+)h$/.test(mg)) ? /^now-(\d+)h$/.exec(mg) : null;
+        if (!mmt) return null;
+        if (!body.aggs || !body.aggs.by_pair || !body.aggs.by_pair.composite) return null;
+        return [String(Math.round(parseInt(mmt[1], 10) / 24))];
+      }
+      if (tpl.key === "donors-to-account") {
+        var df = q && q.filter;
+        if (!Array.isArray(df) || !df[1] || !df[1].term ||
+            typeof df[1].term["operation_history.op_object.to.keyword"] !== "string") return null;
+        var to = df[1].term["operation_history.op_object.to.keyword"];
+        var da = df[2] && df[2].term && df[2].term["operation_history.op_object.amount_.asset_id.keyword"];
+        if (typeof da !== "string") return null;
+        var dr = df[3] && df[3].range && df[3].range["block_data.block_time"];
+        var dg = dr && dr.gte;
+        var dmt = (typeof dg === "string" && /^now-(\d+)h$/.test(dg)) ? /^now-(\d+)h$/.exec(dg) : null;
+        if (!dmt) return null;
+        var dsz = body.aggs && body.aggs.by_donor && body.aggs.by_donor.terms &&
+          body.aggs.by_donor.terms.size;
+        if (dsz === undefined) return null;
+        return [to, da, String(Math.round(parseInt(dmt[1], 10) / 24)), String(dsz)];
+      }
+      if (tpl.key === "lifetime-upgrades") {
+        var lf = q && q.filter;
+        if (!Array.isArray(lf) || !lf[2] || !lf[2].range ||
+            !lf[2].range["block_data.block_time"]) return null;
+        var lg = lf[2].range["block_data.block_time"].gte;
+        var lmt = (typeof lg === "string" && /^now-(\d+)h$/.test(lg)) ? /^now-(\d+)h$/.exec(lg) : null;
+        if (!lmt) return null;
+        var lsz = body.aggs && body.aggs.by_account && body.aggs.by_account.terms &&
+          body.aggs.by_account.terms.size;
+        if (lsz === undefined) return null;
+        return [String(Math.round(parseInt(lmt[1], 10) / 24)), String(lsz)];
       }
       if (tpl.key === "ops-by-account") {
         var am = q && q.must;
@@ -276,6 +470,34 @@ var EsLab = (function () {
     });
   }
 
+  /* pairKey: canonical unordered pair key (both legs merged — astro
+   * TopActiveMarkets pairKey). Params: a, b strings. Returns "x|y" sorted. */
+  function pairKey(a, b) {
+    return [String(a), String(b)].sort().join("|");
+  }
+
+  /* parseAggBuckets: generic terms-agg buckets -> rows. Params: buckets
+   * array, labelOf (key -> display string). Returns rows
+   * {type, name, count, share} (+ total when present). Fails: never
+   * (empty in, empty out). */
+  function parseAggBuckets(buckets, labelOf) {
+    var total = 0, j;
+    for (j = 0; j < buckets.length; j++) total += (buckets[j].doc_count || 0);
+    var rows = [];
+    for (j = 0; j < buckets.length; j++) {
+      var b = buckets[j];
+      if (!b.doc_count) continue;
+      var row = { type: b.key, name: labelOf ? labelOf(b.key) : String(b.key),
+        count: b.doc_count, share: pct(b.doc_count, total) };
+      if (b.total_sent && b.total_sent.value !== undefined && b.total_sent.value !== null) {
+        row.total = String(b.total_sent.value);
+      }
+      rows.push(row);
+    }
+    rows.sort(function (a, b2) { return b2.count - a.count; });
+    return rows;
+  }
+
   /* parse: ES JSON -> display rows. Params: tpl (entry), json (parsed ES
    * response). Returns a row array (shape depends on tpl.kind). Fails:
    * throws es-shape on unexpected envelopes — the desk renders it as an
@@ -296,19 +518,54 @@ var EsLab = (function () {
       return out;
     }
     if (tpl.kind === "agg") {
-      var buckets = json && json.aggregations && json.aggregations.by_op_type &&
-        json.aggregations.by_op_type.buckets;
-      if (!Array.isArray(buckets)) throw new Error("es-shape: aggregations missing");
-      var total = 0, j;
-      for (j = 0; j < buckets.length; j++) total += (buckets[j].doc_count || 0);
-      var rows = [];
-      for (j = 0; j < buckets.length; j++) {
-        if (!buckets[j].doc_count) continue;
-        rows.push({ type: buckets[j].key, name: opName(buckets[j].key),
-          count: buckets[j].doc_count, share: pct(buckets[j].doc_count, total) });
+      var aggs = (json && json.aggregations) || {};
+      if (aggs.by_op_type && Array.isArray(aggs.by_op_type.buckets)) {
+        var buckets = aggs.by_op_type.buckets;
+        var total = 0, j;
+        for (j = 0; j < buckets.length; j++) total += (buckets[j].doc_count || 0);
+        var rows = [];
+        for (j = 0; j < buckets.length; j++) {
+          if (!buckets[j].doc_count) continue;
+          rows.push({ type: buckets[j].key, name: opName(buckets[j].key),
+            count: buckets[j].doc_count, share: pct(buckets[j].doc_count, total) });
+        }
+        rows.sort(function (a, b) { return b.count - a.count; });
+        return rows;
       }
-      rows.sort(function (a, b) { return b.count - a.count; });
-      return rows;
+      if (aggs.by_pool && Array.isArray(aggs.by_pool.buckets)) {
+        return parseAggBuckets(aggs.by_pool.buckets, function (k) { return String(k); });
+      }
+      if (aggs.by_donor && Array.isArray(aggs.by_donor.buckets)) {
+        return parseAggBuckets(aggs.by_donor.buckets, function (k) { return String(k); });
+      }
+      if (aggs.by_account && Array.isArray(aggs.by_account.buckets)) {
+        return parseAggBuckets(aggs.by_account.buckets, function (k) { return String(k); });
+      }
+      if (aggs.by_pair && Array.isArray(aggs.by_pair.buckets)) {
+        var merged = {};
+        var order = [];
+        aggs.by_pair.buckets.forEach(function (b) {
+          var pays = b.key && b.key.pays;
+          var receives = b.key && b.key.receives;
+          if (!pays || !receives) return;
+          var key = pairKey(pays, receives);
+          if (!merged[key]) {
+            var parts = [String(pays), String(receives)].sort();
+            merged[key] = { base: parts[0], quote: parts[1], count: 0 };
+            order.push(key);
+          }
+          merged[key].count += (b.doc_count || 0);
+        });
+        var all = order.map(function (k) { return merged[k]; });
+        var grand = 0, m;
+        for (m = 0; m < all.length; m++) grand += all[m].count;
+        all.sort(function (a, b) { return b.count - a.count; });
+        return all.slice(0, TOP_MARKETS_CAP).map(function (e) {
+          return { type: e.base + "|" + e.quote, name: e.base + " / " + e.quote,
+            count: e.count, share: pct(e.count, grand), base: e.base, quote: e.quote };
+        });
+      }
+      throw new Error("es-shape: aggregations missing");
     }
     if (tpl.kind === "ops") return parseOpsHits(json);
     throw new Error("es-bad-key: " + tpl.key);
@@ -327,6 +584,7 @@ var EsLab = (function () {
 
   return { GROUPS: GROUPS, TEMPLATES: TEMPLATES, ES_SIZE: ES_SIZE,
     ES_MAX_PAGES: ES_MAX_PAGES, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
+    TOP_MARKETS_CAP: TOP_MARKETS_CAP,
     byKey: byKey, coerce: coerce, filled: filled, build: build, parse: parse,
     fromBody: fromBody, opName: opName, pct: pct };
 })();

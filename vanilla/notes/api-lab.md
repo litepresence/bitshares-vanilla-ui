@@ -95,3 +95,33 @@ Spec: `docs/superpowers/specs/2026-10-03-api-lab-design.md` (Option B, approved)
 - (c) Smallest deletable subset: the Debug probe + broadcast entry could go
   and reads still work — kept because the owner explicitly asked for full
   surface with honest failures; each is tier-gated so deletion stays trivial.
+
+## 8. Comprehensive-coverage round (2026-10-03, owner order "build it")
+
+- Catalog `vanilla/js/api/api-lab.js`: 29 → 120 methods, 4 → 8 groups
+  (+Block/Asset/Orders/Custom). Tier 1: `get_full_accounts`, `get_trade_history`
+  (+by_sequence), `get_24_volume`, positions (`get_limit_orders_by_account`,
+  `get_account_limit_orders`, `get_call_orders[_by_account]`,
+  `get_settle_orders[_by_account]`, `get_margin_positions`,
+  `get_collateral_bids`), `list_assets`, `get_assets_by_issuer`,
+  `get_proposed_transactions`, witness/committee lookup+count+by_account,
+  history (`by_time`, `by_operations`, `operations`, `block_operation_history`,
+  `block_operations_by_time`, `fill_order_history`, `market_history[_buckets]`,
+  `liquidity_pool_history[_by_sequence]`). Tier 2: full pool family
+  (list/get/by_asset_a/b/one/both/share/owner), HTLC family,
+  tickets, credit offer/deal family, Same-T family, vesting + withdraw
+  permissions. Tier 3: id resolvers, key/account references, block headers,
+  tx-hex + signature helpers, `lookup_vote_ids`, `get_blinded_balances`,
+  `get_next_object_id`, chain/global properties, `get_potential_peers`,
+  `get_blocks` (block login), asset `get_asset_holders[_count]` + all,
+  orders `get_tracked_groups` + `grouped_limit_orders`, custom
+  `get_storage_info`. Every entry cites #4 header line in the file header.
+- Coerce: new `int` type (sequence ids); optional blanks → `null` (node's
+  omitted sentinel; was `0`/`false`/`""`). Desk `api-lab-ui.js`: optional
+  bools get a blank option, `int` uses numeric keyboard, hints added for
+  balances/volume/fills/market-history/full-accounts/asset-holders.
+- Tests: node --check clean; coerce vectors (full-accounts null,
+  by_sequence int, get_blocks, storage-info all-null) observed. No broadcast
+  fired. Gates: `check_rot.py` PASS, `check_types.sh` PASS.
+- Debt: catalog file now ~700 lines of data (split-candidate by count, one
+  purpose — recorded for slice-18, same standing debt as before).

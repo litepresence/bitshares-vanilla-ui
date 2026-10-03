@@ -117,3 +117,26 @@ Plan: `docs/superpowers/plans/2026-10-03-es-lab.md` (7 tasks, all executed).
   full-featured (casual + power + dev); each deletes to one entry + one
   branch. `EsLabResults` could fold back into the desk shell — kept split
   per §3.7 (it is the split the shell's size demanded).
+
+## 8. Comprehensive-coverage round (2026-10-03, owner order "build it")
+
+- Catalog `vanilla/js/api/es-lab.js`: 7 → 13 templates, +Rankings group.
+  New: `tx-by-id` (term trx_id.keyword, Explorer.ts:232), `ops-by-type`
+  (term op + day-range + size), `top-pools` (TopPoolSwaps.ts:53-72 verbatim),
+  `top-markets` (TopActiveMarkets.ts:72-93 verbatim; composite merged in
+  parse, both legs canonicalised, top 20), `donors-to-account`
+  (TopDonators.ts:74-104 minus the script filter + must_not self; terms on
+  from.keyword with sum sub-agg, totals stay raw strings), `lifetime-upgrades`
+  (TopLifetimeMembers.ts:58-78 verbatim). Closes the spec's promised
+  tx-lookup + ops-by-type gap.
+- Parse: generic terms-agg path (by_pool/by_donor/by_account) + composite
+  by_pair merge; donor rows carry raw `total`. Results `es-lab-results.js`:
+  agg table gains a Total (raw) column when present + donor hint
+  (`eslab.hint_donors`, new locale key — English in all dicts until
+  translators verify, `check_i18n` green at 3498 keys).
+- Tests: `tooling/es-lab-test.js` 32 → 49 passed (bodies, round-trips,
+  pool/market/donor/ltm parses); `es-lab-ui-test.js` 10 passed;
+  node --check clean. Gates: `check_rot.py` PASS, `check_types.sh` PASS,
+  `check_i18n.py` PASS.
+- Live vectors for the new bodies: PENDING-tester (same gate as the rest —
+  unit + headless shapes proven, ES live-fire needs the human browser pass).

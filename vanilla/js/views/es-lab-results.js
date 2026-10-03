@@ -35,7 +35,8 @@ var EsLabResults = (function () {
   var HINTS = {
     ops: ["eslab.hint_ops", "Times are block times (UTC); type ids map via the operation table."],
     holders: ["eslab.hint_holders", "Balances are raw integers — divide by the asset precision."],
-    agg: ["eslab.hint_agg", "Counts over the window; shares are exact integer-math percents."]
+    agg: ["eslab.hint_agg", "Counts over the window; shares are exact integer-math percents."],
+    donors: ["eslab.hint_donors", "Counts over the window; totals are raw integers — divide by the asset precision."]
   };
   var GENERIC_HINT = ["eslab.hint_generic", "Raw index JSON below, untouched. Balances are raw integers — divide by asset precision; percent fields are hundredths of a percent (2000 = 20%)."];
 
@@ -188,16 +189,24 @@ var EsLabResults = (function () {
         return;
       }
       if (kind === "agg") {
-        var at = table(doc, ["Type", "Count", "Share"]);
+        var hasTotal = rows.some(function (r) { return r && r.total !== undefined; });
+        var heads = hasTotal ? ["Type", "Count", "Share", "Total (raw)"] : ["Type", "Count", "Share"];
+        var at = table(doc, heads);
         rows.forEach(function (r) {
           var tr = doc.createElement("tr");
           tr.appendChild(el(doc, "td", (r.name || "?") + " (" + r.type + ")", null));
           tr.appendChild(el(doc, "td", String(r.count), null));
           tr.appendChild(el(doc, "td", r.share, null));
+          if (hasTotal) {
+            var tdT = doc.createElement("td");
+            tdT.textContent = (r.total === undefined ? "—" : String(r.total));
+            if (r.total !== undefined) tdT.title = String(r.total);
+            tr.appendChild(tdT);
+          }
           at.tbody.appendChild(tr);
         });
         box.appendChild(at.wrap);
-        hint(HINTS.agg);
+        hint(hasTotal ? HINTS.donors : HINTS.agg);
         return;
       }
       hint(GENERIC_HINT);
