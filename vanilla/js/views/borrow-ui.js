@@ -134,8 +134,30 @@ var BorrowUI = (function () {
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       wrap.appendChild(el(doc, "p", t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      var bstat = el(doc, "p", "", "muted");
+      try { bstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      wrap.appendChild(bstat);
+      var brow = el(doc, "div", null, "pools-offline-row");
+      wrap.appendChild(brow);
       var b = touchable(el(doc, "button", t("borrow.retry", "Retry"))); b.type = "button";
-      b.addEventListener("click", retry); wrap.appendChild(b);
+      brow.appendChild(b);
+      var boff = null;
+      try { boff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { boff = null; }
+      if (boff && typeof boff.wire === "function") {
+        try { boff.wire(b, bstat, retry, t); } catch (e) { b.addEventListener("click", retry); }
+      } else {
+        b.addEventListener("click", retry);
+      }
+      var blink = null;
+      if (boff && typeof boff.settingsLink === "function") {
+        try { blink = boff.settingsLink(doc, t); } catch (e) { blink = null; }
+      }
+      if (!blink) {
+        blink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        try { blink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        touchable(blink);
+      }
+      brow.appendChild(blink);
       try {
         var h = (typeof location !== "undefined" && location.hash) || "", done = false;
         subs.push(Store.subscribe("connection", function (st) {
@@ -144,6 +166,7 @@ var BorrowUI = (function () {
             if (typeof location === "undefined" || location.hash === h) retry(); }
         }));
       } catch (e) { /* manual Retry remains */ }
+      try { if (boff && typeof boff.ensure === "function") boff.ensure(); } catch (e) { /* manual Retry remains */ }
       return null;
     }
     /* PUBLIC-FIRST: no wallet gate here — positions/fund/bids render locked. */

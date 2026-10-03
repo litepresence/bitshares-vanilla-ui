@@ -285,8 +285,34 @@ var FeesUI = (function () {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
       wrap.appendChild(el(doc, "p", t("fees.connecting_to_network", "Connecting to network…"), "muted"));
+      var fstat = el(doc, "p", "", "muted");
+      try { fstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      wrap.appendChild(fstat);
+      var frow = el(doc, "div", null, "pools-offline-row");
+      wrap.appendChild(frow);
       var retry = touchable(el(doc, "button", t("fees.retry", "Retry")));
-      retry.type = "button"; wrap.appendChild(retry);
+      retry.type = "button"; frow.appendChild(retry);
+      var foff = null;
+      try { foff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { foff = null; }
+      var frender = function () {
+        if (!settled) { settled = true; try { off(); } catch (e) {} }
+        if (myGen === gen) renderFees(root);
+      };
+      if (foff && typeof foff.wire === "function") {
+        try { foff.wire(retry, fstat, frender, t); } catch (e) { retry.addEventListener("click", frender); }
+      } else {
+        retry.addEventListener("click", frender);
+      }
+      var flink = null;
+      if (foff && typeof foff.settingsLink === "function") {
+        try { flink = foff.settingsLink(doc, t); } catch (e) { flink = null; }
+      }
+      if (!flink) {
+        flink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        try { flink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        touchable(flink);
+      }
+      frow.appendChild(flink);
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = function () {};
       if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -298,10 +324,10 @@ var FeesUI = (function () {
           }
         });
       }
-      retry.addEventListener("click", function () {
-        if (!settled) { settled = true; try { off(); } catch (e) {} }
-        if (myGen === gen) renderFees(root);
-      });
+      /* Automated handshake on entry (shared Offline helper owns the throttle).
+       * The Retry button is wired via Offline.wire above (handshake-first);
+       * its frender settles this wait the same way the old handler did. */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       var timer = setTimeout(function () {
         if (settled || myGen !== gen) return;
         settled = true; try { off(); } catch (e) {}

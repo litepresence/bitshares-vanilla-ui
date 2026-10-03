@@ -98,8 +98,37 @@ var AccountsUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        failWrap.appendChild(el(doc, "h1", t("account.manager_title", "Accounts")));
+        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var acstat = el(doc, "p", "", "muted");
+        try { acstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(acstat);
+        var acrow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(acrow);
+        var acretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        acretry.type = "button";
+        acrow.appendChild(acretry);
+        var acoff = null;
+        try { acoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { acoff = null; }
+        if (acoff && typeof acoff.wire === "function") {
+          try { acoff.wire(acretry, acstat, function () { renderAccounts(root); }, t); } catch (e) { acretry.addEventListener("click", function () { renderAccounts(root); }); }
+        } else {
+          acretry.addEventListener("click", function () { renderAccounts(root); });
+        }
+        var aclink = null;
+        if (acoff && typeof acoff.settingsLink === "function") {
+          try { aclink = acoff.settingsLink(doc, t); } catch (e) { aclink = null; }
+        }
+        if (!aclink) {
+          aclink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { aclink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(aclink);
+        }
+        acrow.appendChild(aclink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     paintAccounts(doc, root, myGen);

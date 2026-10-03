@@ -41,9 +41,17 @@ var ApiLabUI = (function () {
    * the reader how to read it. Unknown shapes get the generic line. */
   var HINTS = {
     get_account_balances: "Amounts are raw integers — divide by the asset precision (BTS: 5).",
+    get_named_account_balances: "Amounts are raw integers — divide by the asset precision.",
+    get_vested_balances: "Amounts are raw integers — divide by the asset precision.",
     get_required_fees: "Fees are raw integers in the fee asset — divide by its precision.",
     get_ticker: "Prices are raw ratios — see base/quote precisions.",
+    get_24_volume: "Volumes are raw ratios — see base/quote precisions.",
     get_order_book: "Order amounts/prices are raw integers — see asset precisions.",
+    get_trade_history: "Fill amounts/prices are raw integers — see asset precisions.",
+    get_fill_order_history: "Fill amounts are raw integers — see asset precisions.",
+    get_market_history: "OHLCV open/high/low/close/volume are raw integers — see asset precisions.",
+    get_full_accounts: "Bundle carries raw balances, orders, and proposals — amounts are integers.",
+    get_asset_holders: "Balances are raw integers — divide by the asset precision.",
     get_dynamic_global_properties: "Head block + chain time; participation is a bitmask share.",
     get_account_history: "History entries carry raw op payloads — amounts are integers."
   };
@@ -75,8 +83,34 @@ var ApiLabUI = (function () {
         Chain.status().state === "open") return false;
     var p = el(doc, "p", t("apilab.connecting", "Connecting to network…"), "muted");
     p.setAttribute("aria-live", "polite"); wrap.appendChild(p);
+    var astat = el(doc, "p", "", "muted");
+    try { astat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(astat);
+    var arow = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(arow);
     var retry = touchable(el(doc, "button", t("apilab.retry", "Retry")));
-    retry.type = "button"; wrap.appendChild(retry);
+    retry.type = "button"; arow.appendChild(retry);
+    var aoff = null;
+    try { aoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { aoff = null; }
+    var arerun = function () {
+      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } clearTimeout(timer); }
+      if (myGen === gen) rerun();
+    };
+    if (aoff && typeof aoff.wire === "function") {
+      try { aoff.wire(retry, astat, arerun, t); } catch (e) { retry.addEventListener("click", arerun); }
+    } else {
+      retry.addEventListener("click", arerun);
+    }
+    var alink = null;
+    if (aoff && typeof aoff.settingsLink === "function") {
+      try { alink = aoff.settingsLink(doc, t); } catch (e) { alink = null; }
+    }
+    if (!alink) {
+      alink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { alink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(alink);
+    }
+    arow.appendChild(alink);
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
       off = Store.subscribe("connection", function (st) {
@@ -92,10 +126,9 @@ var ApiLabUI = (function () {
       if (settled || myGen !== gen) return;
       settled = true; try { off(); } catch (e) { /* gone */ }
     }, CONNECT_TIMEOUT_MS);
-    retry.addEventListener("click", function () {
-      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } clearTimeout(timer); }
-      if (myGen === gen) rerun();
-    });
+    /* Automated handshake on entry (shared Offline helper owns the throttle;
+     * Retry is wired via Offline.wire above). */
+    try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
 
@@ -251,10 +284,14 @@ var ApiLabUI = (function () {
         var inp;
         if (p.type === "bool") {
           inp = doc.createElement("select");
+          if (!p.required) {
+            var bo = doc.createElement("option"); bo.value = ""; bo.textContent = "—";
+            inp.appendChild(bo);
+          }
           var to = doc.createElement("option"); to.value = "true"; to.textContent = "true";
           var fo = doc.createElement("option"); fo.value = "false"; fo.textContent = "false";
           inp.appendChild(to); inp.appendChild(fo);
-          inp.value = (prefill && prefill[i]) || p.example || "false";
+          inp.value = (prefill && prefill[i]) || p.example || (p.required ? "false" : "");
         } else if (p.type === "json" || p.type === "strlist") {
           inp = doc.createElement("textarea");
           inp.rows = 3;
@@ -262,7 +299,7 @@ var ApiLabUI = (function () {
         } else {
           inp = doc.createElement("input");
           inp.type = "text";
-          if (p.type === "uint") { try { inp.inputMode = "numeric"; } catch (e) { /* stands */ } }
+          if (p.type === "uint" || p.type === "int") { try { inp.inputMode = "numeric"; } catch (e) { /* stands */ } }
           inp.placeholder = p.example || "";
           inp.value = (prefill && prefill[i] !== undefined) ? prefill[i] : "";
           if (!inp.value && p.example && (entry.method === "get_account_by_name" || entry.method === "get_chain_id")) inp.value = p.example;

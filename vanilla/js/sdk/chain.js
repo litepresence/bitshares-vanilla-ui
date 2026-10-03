@@ -171,14 +171,18 @@ var Chain = (function () {
   }
 
   /* scheduleReconnect: same-node redial with capped backoff after an
-   * UNEXPECTED close (manual disconnects never redial). Gives up after the
-   * delay list is spent — the footer stays "closed" and the user picks a
-   * node (failover), instead of hammering a dead endpoint forever. */
+   * UNEXPECTED close (manual disconnects never redial). The backoff caps at
+   * the last delay and retries indefinitely — a dropped socket almost always
+   * heals with a fresh login->database handshake, and users read a stuck
+   * "closed" footer as buggy software. The footer carries each attempt via
+   * the connecting state; the user picks another node (failover) whenever
+   * the active one stays down. */
   function scheduleReconnect() {
     if (manualClose || !lastUrl) return;
     var delays = (lastOpts && lastOpts.reconnectDelays) || RECONNECT_DELAYS;
-    if (reconnectTries >= delays.length) return;
-    var wait = delays[reconnectTries++];
+    if (!delays.length) return;
+    var wait = delays[Math.min(reconnectTries, delays.length - 1)];
+    reconnectTries++;
     clearReconnect();
     try {
       reconnectTimer = setTimeout(function () {

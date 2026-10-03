@@ -84,15 +84,38 @@ var ProposalUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
-  function offlineBox(doc, wrap, retryFn) { /* Retry panel: copy depends on
+  function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
-    * the network is down). */
+    * the network is down). Retry handshakes via the shared Offline helper
+    * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(el(doc, "p", open
       ? t("proposal.retry_load", "Retry loading.")
       : t("proposal.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var status = el(doc, "p", "", "muted");
+    try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(status);
+    var row = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(row);
     var b = touchable(el(doc, "button", t("proposal.retry", "Retry"))); b.type = "button";
-    b.addEventListener("click", retryFn); wrap.appendChild(b);
+    row.appendChild(b);
+    var off = null;
+    try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
+    if (off && typeof off.wire === "function") {
+      try { off.wire(b, status, retryFn, t); } catch (e) { b.addEventListener("click", retryFn); }
+    } else {
+      b.addEventListener("click", retryFn);
+    }
+    var link = null;
+    if (off && typeof off.settingsLink === "function") {
+      try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
+    }
+    if (!link) {
+      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(link);
+    }
+    row.appendChild(link);
   }
   function dropSubs() { subs.forEach(function (off) { try { off(); } catch (e) {} }); subs = []; }
   /* Gate a route: backend globals + online (panel+Retry+auto-retry). PUBLIC
@@ -116,6 +139,7 @@ var ProposalUI = (function () {
             if (typeof location === "undefined" || location.hash === h) retry(); }
         }));
       } catch (e) { /* manual Retry remains */ }
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ }
       return null;
     }
     /* No unlock gate here: public chain data renders locked; signing gates

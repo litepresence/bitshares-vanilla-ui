@@ -203,8 +203,32 @@ var TopOpsUI = (function () {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
     showStatus(doc, wrap, t("topops.loading", "Reading the last 200 blocks…"));
+    var tostat = showStatus(doc, wrap, "");
+    var torow = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(torow);
     var retry = touchable(el(doc, "button", t("topops.retry", "Retry")));
-    retry.type = "button"; wrap.appendChild(retry);
+    retry.type = "button"; torow.appendChild(retry);
+    var tooff = null;
+    try { tooff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { tooff = null; }
+    var torerun = function () {
+      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } clearTimeout(timer); }
+      if (myGen === gen) rerun();
+    };
+    if (tooff && typeof tooff.wire === "function") {
+      try { tooff.wire(retry, tostat, torerun, t); } catch (e) { retry.addEventListener("click", torerun); }
+    } else {
+      retry.addEventListener("click", torerun);
+    }
+    var tolink = null;
+    if (tooff && typeof tooff.settingsLink === "function") {
+      try { tolink = tooff.settingsLink(doc, t); } catch (e) { tolink = null; }
+    }
+    if (!tolink) {
+      tolink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { tolink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(tolink);
+    }
+    torow.appendChild(tolink);
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -221,10 +245,9 @@ var TopOpsUI = (function () {
       if (settled || myGen !== gen) return;
       settled = true; try { off(); } catch (e) { /* listener already gone */ }
     }, CONNECT_TIMEOUT_MS);
-    retry.addEventListener("click", function () {
-      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } clearTimeout(timer); }
-      if (myGen === gen) rerun();
-    });
+    /* Automated handshake on entry (shared Offline helper owns the throttle;
+     * Retry is wired via Offline.wire above). */
+    try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
 

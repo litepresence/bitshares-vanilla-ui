@@ -292,8 +292,36 @@ var TransferUI = (function () {
         if (settled) return; settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var tstat = el(doc, "p", "", "muted");
+        try { tstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(tstat);
+        var trow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(trow);
+        var tryBtn = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        tryBtn.type = "button";
+        trow.appendChild(tryBtn);
+        var toff = null;
+        try { toff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { toff = null; }
+        if (toff && typeof toff.wire === "function") {
+          try { toff.wire(tryBtn, tstat, function () { renderTransfer(root, prefillTo); }, t); } catch (e) { tryBtn.addEventListener("click", function () { renderTransfer(root, prefillTo); }); }
+        } else {
+          tryBtn.addEventListener("click", function () { renderTransfer(root, prefillTo); });
+        }
+        var tlink = null;
+        if (toff && typeof toff.settingsLink === "function") {
+          try { tlink = toff.settingsLink(doc, t); } catch (e) { tlink = null; }
+        }
+        if (!tlink) {
+          tlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { tlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(tlink);
+        }
+        trow.appendChild(tlink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
 

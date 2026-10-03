@@ -135,8 +135,37 @@ var CreateWorkerUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("createworker.network_unavailable", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        failWrap.appendChild(el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+        showError(doc, failWrap, new Error("not connected"), t("createworker.network_unavailable", "Network unavailable."));
+        var cwstat = el(doc, "p", "", "muted");
+        try { cwstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(cwstat);
+        var cwrow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(cwrow);
+        var cwretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        cwretry.type = "button";
+        cwrow.appendChild(cwretry);
+        var cwoff = null;
+        try { cwoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { cwoff = null; }
+        if (cwoff && typeof cwoff.wire === "function") {
+          try { cwoff.wire(cwretry, cwstat, function () { renderCreateWorker(root); }, t); } catch (e) { cwretry.addEventListener("click", function () { renderCreateWorker(root); }); }
+        } else {
+          cwretry.addEventListener("click", function () { renderCreateWorker(root); });
+        }
+        var cwlink = null;
+        if (cwoff && typeof cwoff.settingsLink === "function") {
+          try { cwlink = cwoff.settingsLink(doc, t); } catch (e) { cwlink = null; }
+        }
+        if (!cwlink) {
+          cwlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { cwlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(cwlink);
+        }
+        cwrow.appendChild(cwlink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     paintForm(doc, root, myGen, { owner: "", begin: "", end: "", pay: "", name: "", url: "", kind: "refund", days: "" });

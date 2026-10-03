@@ -1889,7 +1889,39 @@ var AccountUI = (function () {
         clearRoot(root);
         var failed = makeWrap(doc, root);
         showError(doc, failed, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var astat = doc.createElement("p");
+        astat.className = "muted";
+        try { astat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failed.appendChild(astat);
+        var arow = doc.createElement("div");
+        arow.className = "pools-offline-row";
+        failed.appendChild(arow);
+        var abtn = doc.createElement("button");
+        abtn.type = "button";
+        abtn.textContent = t("fees.retry", "Retry");
+        try { abtn.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+        arow.appendChild(abtn);
+        var aoff = null;
+        try { aoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { aoff = null; }
+        if (aoff && typeof aoff.wire === "function") {
+          try { aoff.wire(abtn, astat, function () { renderAccount(root, name); }, t); } catch (e) { abtn.addEventListener("click", function () { renderAccount(root, name); }); }
+        } else {
+          abtn.addEventListener("click", function () { renderAccount(root, name); });
+        }
+        var alink = null;
+        if (aoff && typeof aoff.settingsLink === "function") {
+          try { alink = aoff.settingsLink(doc, t); } catch (e) { alink = null; }
+        }
+        if (!alink) {
+          alink = doc.createElement("a");
+          alink.textContent = t("notice.open_settings", "Open Settings");
+          try { alink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          try { alink.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+        }
+        arow.appendChild(alink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
 

@@ -112,6 +112,32 @@ var ReferralsUI = (function () {
     }
     if (Chain.status().state !== "open") {
       wrap.appendChild(el(doc, "p", t("referrals.connecting_to_network", "Connecting to network…"), "muted"));
+      var rstat = el(doc, "p", "", "muted");
+      try { rstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      wrap.appendChild(rstat);
+      var rrow = el(doc, "div", null, "pools-offline-row");
+      wrap.appendChild(rrow);
+      var rtry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+      rtry.type = "button";
+      rrow.appendChild(rtry);
+      var roff = null;
+      try { roff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { roff = null; }
+      var rrender = function () { renderReferrals(root); };
+      if (roff && typeof roff.wire === "function") {
+        try { roff.wire(rtry, rstat, rrender, t); } catch (e) { rtry.addEventListener("click", rrender); }
+      } else {
+        rtry.addEventListener("click", rrender);
+      }
+      var rlink = null;
+      if (roff && typeof roff.settingsLink === "function") {
+        try { rlink = roff.settingsLink(doc, t); } catch (e) { rlink = null; }
+      }
+      if (!rlink) {
+        rlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        try { rlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        touchable(rlink);
+      }
+      rrow.appendChild(rlink);
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = function () {};
       if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -127,6 +153,8 @@ var ReferralsUI = (function () {
         if (settled || myGen !== gen) return;
         settled = true; try { off(); } catch (e) {}
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     var row = el(doc, "div", null, "xfer-field");

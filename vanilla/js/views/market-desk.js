@@ -251,6 +251,10 @@ var MarketDesk = (function () {
           if (typeof location === "undefined" || location.hash === hashAtEntry) renderMarket(root, id);
         }
       });
+      /* Automated handshake on entry (shared Offline helper owns the
+       * throttle — a dropped socket heals without waiting for the 15s
+       * timeout or Chain's 30s background tick). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait below covers */ }
       var timer = setTimeout(function () {
         if (settled) return; settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
@@ -258,11 +262,32 @@ var MarketDesk = (function () {
         var failed = makeWrap(doc, root);
         failed.appendChild(el(doc, "h1", t("market.title", "Exchange")));
         showError(doc, failed, new Error("not connected"), t("market.err_offline_short", "Network unavailable."));
+        var mstat = el(doc, "p", "", "muted");
+        try { mstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failed.appendChild(mstat);
+        var mrow = el(doc, "div", null, "pools-offline-row");
+        failed.appendChild(mrow);
         var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
         retry.id = "mkt-retry";
         retry.type = "button";
-        retry.addEventListener("click", function () { renderMarket(root, id); });
-        failed.appendChild(retry);
+        mrow.appendChild(retry);
+        var moff = null;
+        try { moff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { moff = null; }
+        if (moff && typeof moff.wire === "function") {
+          try { moff.wire(retry, mstat, function () { renderMarket(root, id); }, t); } catch (e) { retry.addEventListener("click", function () { renderMarket(root, id); }); }
+        } else {
+          retry.addEventListener("click", function () { renderMarket(root, id); });
+        }
+        var mlink = null;
+        if (moff && typeof moff.settingsLink === "function") {
+          try { mlink = moff.settingsLink(doc, t); } catch (e) { mlink = null; }
+        }
+        if (!mlink) {
+          mlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { mlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(mlink);
+        }
+        mrow.appendChild(mlink);
       }, 15000);
       return;
     }

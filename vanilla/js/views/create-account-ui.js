@@ -126,8 +126,37 @@ var CreateAccountUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        failWrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
+        showError(doc, failWrap, new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
+        var castat = el(doc, "p", "", "muted");
+        try { castat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(castat);
+        var carow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(carow);
+        var caretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        caretry.type = "button";
+        carow.appendChild(caretry);
+        var caoff = null;
+        try { caoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { caoff = null; }
+        if (caoff && typeof caoff.wire === "function") {
+          try { caoff.wire(caretry, castat, function () { renderCreateAccount(root); }, t); } catch (e) { caretry.addEventListener("click", function () { renderCreateAccount(root); }); }
+        } else {
+          caretry.addEventListener("click", function () { renderCreateAccount(root); });
+        }
+        var calink = null;
+        if (caoff && typeof caoff.settingsLink === "function") {
+          try { calink = caoff.settingsLink(doc, t); } catch (e) { calink = null; }
+        }
+        if (!calink) {
+          calink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { calink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(calink);
+        }
+        carow.appendChild(calink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     paintForm(doc, root, myGen, { name: "", checked: null, takenId: null, brainkey: "" });

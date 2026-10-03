@@ -67,7 +67,31 @@ var AssetManageUI = (function () {
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
     w.appendChild(el(d, "h1", t("assets.title", "Assets"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
-    var b = touch(el(d, "button", t("fees.retry", "Retry"))); b.type = "button"; w.appendChild(b);
+    var cstat = el(d, "p", "", "muted");
+    try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    w.appendChild(cstat);
+    var crow = el(d, "div", null, "pools-offline-row");
+    w.appendChild(crow);
+    var b = touch(el(d, "button", t("fees.retry", "Retry"))); b.type = "button"; crow.appendChild(b);
+    var coff = null;
+    try { coff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { coff = null; }
+    var crerun = function () {
+      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } } rerun(); };
+    if (coff && typeof coff.wire === "function") {
+      try { coff.wire(b, cstat, crerun, t); } catch (e) { b.addEventListener("click", crerun); }
+    } else {
+      b.addEventListener("click", crerun);
+    }
+    var clink = null;
+    if (coff && typeof coff.settingsLink === "function") {
+      try { clink = coff.settingsLink(d, t); } catch (e) { clink = null; }
+    }
+    if (!clink) {
+      clink = el(d, "a", t("notice.open_settings", "Open Settings"));
+      try { clink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touch(clink);
+    }
+    crow.appendChild(clink);
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
@@ -77,8 +101,7 @@ var AssetManageUI = (function () {
           if (typeof location === "undefined" || location.hash === hashAtEntry) rerun(); }
       });
     }
-    b.addEventListener("click", function () {
-      if (!settled) { settled = true; try { off(); } catch (e) { /* gone */ } } rerun(); });
+    try { if (coff && typeof coff.ensure === "function") coff.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
   /* field: labeled input row. */

@@ -376,8 +376,37 @@ var InstantTradeUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        failWrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+        showError(doc, failWrap, new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
+        var istat = el(doc, "p", "", "muted");
+        try { istat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(istat);
+        var irow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(irow);
+        var iretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        iretry.type = "button";
+        irow.appendChild(iretry);
+        var ioff = null;
+        try { ioff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { ioff = null; }
+        if (ioff && typeof ioff.wire === "function") {
+          try { ioff.wire(iretry, istat, function () { renderInstant(root, marketID); }, t); } catch (e) { iretry.addEventListener("click", function () { renderInstant(root, marketID); }); }
+        } else {
+          iretry.addEventListener("click", function () { renderInstant(root, marketID); });
+        }
+        var ilink = null;
+        if (ioff && typeof ioff.settingsLink === "function") {
+          try { ilink = ioff.settingsLink(doc, t); } catch (e) { ilink = null; }
+        }
+        if (!ilink) {
+          ilink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { ilink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(ilink);
+        }
+        irow.appendChild(ilink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     var init = { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", M: null, pairErr: "" };

@@ -286,6 +286,8 @@ var DashboardUI = (function () {
             try { off(); } catch (e) { /* unsubscribed */ }
             /* Fail-open: the static shell + "—" cells stand; no error panel. */
           }, CONNECT_TIMEOUT_MS);
+          /* Automated handshake so the live cells fill without a click. */
+          try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* refill subscription above still attempts */ }
         } else {
           try { clearTickMisses(); } catch (e) { /* opportunistic only */ }
         }
@@ -314,8 +316,37 @@ var DashboardUI = (function () {
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
-        showError(doc, makeWrap(doc, root), new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var failWrap = makeWrap(doc, root);
+        failWrap.appendChild(el(doc, "h1", t("shell.dashboard", "Dashboard")));
+        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        var dstat = el(doc, "p", "", "muted");
+        try { dstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failWrap.appendChild(dstat);
+        var drow = el(doc, "div", null, "pools-offline-row");
+        failWrap.appendChild(drow);
+        var dtry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        dtry.type = "button";
+        drow.appendChild(dtry);
+        var doff = null;
+        try { doff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { doff = null; }
+        if (doff && typeof doff.wire === "function") {
+          try { doff.wire(dtry, dstat, function () { renderDashboard(root); }, t); } catch (e) { dtry.addEventListener("click", function () { renderDashboard(root); }); }
+        } else {
+          dtry.addEventListener("click", function () { renderDashboard(root); });
+        }
+        var dlink = null;
+        if (doff && typeof doff.settingsLink === "function") {
+          try { dlink = doff.settingsLink(doc, t); } catch (e) { dlink = null; }
+        }
+        if (!dlink) {
+          dlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { dlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(dlink);
+        }
+        drow.appendChild(dlink);
       }, CONNECT_TIMEOUT_MS);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     paintDashboard(doc, root, myGen);

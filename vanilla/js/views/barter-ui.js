@@ -149,10 +149,33 @@ var BarterUI = (function () {
     if (miss.length) { showError(doc, wrap, "Barter backend missing: " + miss.join(", ") + " failed to load."); return; }
     if (Chain.status().state !== "open") {
       wrap.appendChild(el(doc, "p", t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      var bastat = el(doc, "p", "", "muted");
+      try { bastat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      wrap.appendChild(bastat);
+      var barow = el(doc, "div", null, "pools-offline-row");
+      wrap.appendChild(barow);
       var retry = touchable(el(doc, "button", t("barter.retry", "Retry"))); retry.type = "button";
-      retry.addEventListener("click", function () { if (myGen === gen) renderBarter(root); });
-      wrap.appendChild(retry);
-      autoRetryOnOpen(myGen, function () { renderBarter(root); }, function () { return myGen === gen; });
+      barow.appendChild(retry);
+      var baoff = null;
+      try { baoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { baoff = null; }
+      var barender = function () { if (myGen === gen) renderBarter(root); };
+      if (baoff && typeof baoff.wire === "function") {
+        try { baoff.wire(retry, bastat, barender, t); } catch (e) { retry.addEventListener("click", barender); }
+      } else {
+        retry.addEventListener("click", barender);
+      }
+      var balink = null;
+      if (baoff && typeof baoff.settingsLink === "function") {
+        try { balink = baoff.settingsLink(doc, t); } catch (e) { balink = null; }
+      }
+      if (!balink) {
+        balink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        try { balink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        touchable(balink);
+      }
+      barow.appendChild(balink);
+      autoRetryOnOpen(myGen, barender, function () { return myGen === gen; });
+      try { if (baoff && typeof baoff.ensure === "function") baoff.ensure(); } catch (e) { /* manual Retry remains */ }
       return;
     }
     /* PUBLIC-FIRST: no wallet gate — form + preview render locked. */

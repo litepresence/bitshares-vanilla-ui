@@ -54,15 +54,38 @@ var HtlcUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
-  function offlineBox(doc, wrap, retryFn) { /* Retry panel: copy depends on
+  function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
-    * the network is down). */
+    * the network is down). Retry handshakes via the shared Offline helper
+    * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(el(doc, "p", open
       ? t("htlc.retry_load", "Retry loading.")
       : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var status = el(doc, "p", "", "muted");
+    try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(status);
+    var row = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(row);
     var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
-    b.addEventListener("click", retryFn); wrap.appendChild(b);
+    row.appendChild(b);
+    var off = null;
+    try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
+    if (off && typeof off.wire === "function") {
+      try { off.wire(b, status, retryFn, t); } catch (e) { b.addEventListener("click", retryFn); }
+    } else {
+      b.addEventListener("click", retryFn);
+    }
+    var link = null;
+    if (off && typeof off.settingsLink === "function") {
+      try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
+    }
+    if (!link) {
+      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(link);
+    }
+    row.appendChild(link);
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet, verified live 2026-09-28). Reads stay
@@ -130,7 +153,7 @@ var HtlcUI = (function () {
     var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
-    if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetryOnOpen(myGen, retry); return null; }
+    if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetryOnOpen(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function routeFail(root, title, e, fallback, retry) { /* shared load-failure page */

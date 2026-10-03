@@ -59,15 +59,75 @@ var PoolUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
-  function offlineBox(doc, wrap, retryFn) { /* Retry panel: copy depends on
+  /* Offline backend: the shared Offline helper (js/api/offline.js) owns the
+   * handshake, failure counts, and Settings link. Present when loaded;
+   * absent (script load failure) falls back to the plain re-render below so
+   * the panel never goes dead. */
+  function offlineBackend() {
+    try {
+      if (typeof Offline !== "undefined" && Offline) return Offline;
+    } catch (e) { /* fallback below */ }
+    return null;
+  }
+  function offlineState() {
+    var off = offlineBackend();
+    if (off && typeof off.state === "function") {
+      try { return off.state(); } catch (e) { /* unknown below */ }
+    }
+    try {
+      if (typeof Chain !== "undefined" && Chain && Chain.status) return Chain.status().state || "unknown";
+    } catch (e) { /* unknown below */ }
+    return "unknown";
+  }
+  function offlineEnsure() {
+    var off = offlineBackend();
+    if (off && typeof off.ensure === "function") {
+      try { off.ensure(); } catch (e) { /* manual Retry remains */ }
+      return;
+    }
+  }
+  function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
-    * the network is down). */
-    var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
+    * the network is down). Retry handshakes via the shared Offline helper
+    * (old behavior only re-rendered, so a dropped socket left the button
+    * dead); Open Settings links to #/settings for node failover. A
+    * background autoRetry subscription (routeReady) still re-renders on any
+    * "open" event, so a successful handshake paints via both paths
+    * harmlessly. */
+    var open = offlineState() === "open";
     wrap.appendChild(el(doc, "p", open
       ? t("pool.retry_load", "Retry loading.")
       : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var status = el(doc, "p", "", "muted");
+    try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(status);
+    var row = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(row);
     var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
-    b.addEventListener("click", retryFn); wrap.appendChild(b);
+    row.appendChild(b);
+    var off = offlineBackend();
+    if (off && typeof off.wire === "function") {
+      try { off.wire(b, status, retryFn, t); } catch (e) { b.addEventListener("click", retryFn); }
+    } else {
+      b.addEventListener("click", retryFn);
+    }
+    var settingsLink = null;
+    if (off && typeof off.settingsLink === "function") {
+      try { settingsLink = off.settingsLink(doc, t); } catch (e) { settingsLink = null; }
+    }
+    if (!settingsLink) {
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          settingsLink = HistoryNotice.actionLink(doc, t, "settings");
+        }
+      } catch (e) { settingsLink = null; }
+    }
+    if (!settingsLink) {
+      settingsLink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { settingsLink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(settingsLink);
+    }
+    row.appendChild(settingsLink);
   }
   function unlockBox(doc, wrap, retry) {
     wrap.appendChild(el(doc, "p", t("barter.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
@@ -113,7 +173,17 @@ var PoolUI = (function () {
     var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
-    if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); return null; }
+    if (Chain.status().state !== "open") {
+      offlineBox(doc, wrap, retry);
+      autoRetry(myGen, retry);
+      /* Automated handshake: a dropped socket almost always just needs a
+       * fresh login->database handshake against the active node. Fire one
+       * attempt on entry (no-op when already connecting); success re-renders
+       * via the autoRetry "open" subscription above. Manual Retry covers
+       * further attempts; Open Settings covers node failover. */
+      offlineEnsure();
+      return null;
+    }
     /* PUBLIC-FIRST: no wallet gate here — list/detail/quote render locked.
      * Write paths gate at review click (reviewSection) with an unlock notice. */
     return { doc: doc, wrap: wrap, myGen: myGen };

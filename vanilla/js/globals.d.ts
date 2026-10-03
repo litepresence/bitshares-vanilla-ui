@@ -76,6 +76,7 @@ declare var Notify: any;
 declare var NotifyHost: any;
 declare var NotifyRules: any;
 declare var NotifyUI: any;
+declare var Offline: any;
 declare var OpsUI: any;
 declare var PasswordUI: any;
 declare var Pool: any;

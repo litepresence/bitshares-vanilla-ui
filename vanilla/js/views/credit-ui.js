@@ -66,15 +66,40 @@ var CreditUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
   }
-  function offlineBox(doc, wrap, retryFn) { /* Retry panel: copy depends on
+  function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
-    * the network is down). */
+    * the network is down). Retry handshakes via the shared Offline helper
+    * (js/api/offline.js — re-render only left dead buttons); Open Settings
+    * links to #/settings for node failover. Falls back to plain re-render
+    * when the helper script failed to load. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(el(doc, "p", open
       ? t("credit.retry_load", "Retry loading.")
       : t("credit.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var status = el(doc, "p", "", "muted");
+    try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(status);
+    var row = el(doc, "div", null, "pools-offline-row");
+    wrap.appendChild(row);
     var b = touchable(el(doc, "button", t("credit.retry", "Retry"))); b.type = "button";
-    b.addEventListener("click", retryFn); wrap.appendChild(b);
+    row.appendChild(b);
+    var off = null;
+    try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
+    if (off && typeof off.wire === "function") {
+      try { off.wire(b, status, retryFn, t); } catch (e) { b.addEventListener("click", retryFn); }
+    } else {
+      b.addEventListener("click", retryFn);
+    }
+    var link = null;
+    if (off && typeof off.settingsLink === "function") {
+      try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
+    }
+    if (!link) {
+      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(link);
+    }
+    row.appendChild(link);
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet, verified live 2026-09-28). Reads stay
@@ -131,6 +156,8 @@ var CreditUI = (function () {
             if (typeof location === "undefined" || location.hash === h) retry(); }
         }));
       } catch (e) { /* manual Retry remains */ }
+      /* Automated handshake on entry (Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ }
       return null;
     }
     return { doc: doc, wrap: wrap, myGen: myGen };

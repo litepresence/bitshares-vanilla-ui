@@ -214,11 +214,34 @@ var VoteUI = (function () {
         var failed = makeWrap(doc, root);
         failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
         showError(doc, failed, new Error("not-connected"), t("vote.offline_short", "Network unavailable."));
+        var vstat = el(doc, "p", "", "muted");
+        try { vstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        failed.appendChild(vstat);
+        var vrow = el(doc, "div", null, "pools-offline-row");
+        failed.appendChild(vrow);
         var retry = touchable(el(doc, "button", t("vote.retry", "Retry")));
         retry.type = "button";
-        retry.addEventListener("click", function () { renderVoting(root); });
-        failed.appendChild(retry);
+        vrow.appendChild(retry);
+        var voff = null;
+        try { voff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { voff = null; }
+        if (voff && typeof voff.wire === "function") {
+          try { voff.wire(retry, vstat, function () { renderVoting(root); }, t); } catch (e) { retry.addEventListener("click", function () { renderVoting(root); }); }
+        } else {
+          retry.addEventListener("click", function () { renderVoting(root); });
+        }
+        var vlink = null;
+        if (voff && typeof voff.settingsLink === "function") {
+          try { vlink = voff.settingsLink(doc, t); } catch (e) { vlink = null; }
+        }
+        if (!vlink) {
+          vlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          try { vlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+          touchable(vlink);
+        }
+        vrow.appendChild(vlink);
       }, 15000);
+      /* Automated handshake on entry (shared Offline helper owns the throttle). */
+      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
     /* No entry unlock gate: public lists render locked. Resolve the

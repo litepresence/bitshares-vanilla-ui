@@ -182,11 +182,34 @@ var ExplorerUI = (function () {
       var failed = makeWrap(doc, root);
       failed.appendChild(shellTitle(doc));
       showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
+      var xstat = el(doc, "p", "", "muted");
+      try { xstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      failed.appendChild(xstat);
+      var xrow = el(doc, "div", null, "pools-offline-row");
+      failed.appendChild(xrow);
       var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
-      retry.addEventListener("click", function () { rerun(); });
-      failed.appendChild(retry);
+      xrow.appendChild(retry);
+      var xoff = null;
+      try { xoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { xoff = null; }
+      if (xoff && typeof xoff.wire === "function") {
+        try { xoff.wire(retry, xstat, rerun, t); } catch (e) { retry.addEventListener("click", function () { rerun(); }); }
+      } else {
+        retry.addEventListener("click", function () { rerun(); });
+      }
+      var xlink = null;
+      if (xoff && typeof xoff.settingsLink === "function") {
+        try { xlink = xoff.settingsLink(doc, t); } catch (e) { xlink = null; }
+      }
+      if (!xlink) {
+        xlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        try { xlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        touchable(xlink);
+      }
+      xrow.appendChild(xlink);
     }, CONNECT_TIMEOUT_MS);
+    /* Automated handshake on entry (shared Offline helper owns the throttle). */
+    try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
 

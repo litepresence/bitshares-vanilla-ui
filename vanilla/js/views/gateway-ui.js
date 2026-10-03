@@ -56,15 +56,38 @@ var GatewayUI = (function () {
   function showStatus(doc, box, text) {
     var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); box.appendChild(p); return p;
   }
-  function offlineBox(doc, box, retryFn) { /* Retry panel: copy depends on
+  function offlineBox(doc, box, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
-    * the network is down). */
+    * the network is down). Retry handshakes via the shared Offline helper
+    * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     box.appendChild(el(doc, "p", open
       ? t("gateway.retry_load", "Retry loading.")
       : t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+    var status = el(doc, "p", "", "muted");
+    try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    box.appendChild(status);
+    var row = el(doc, "div", null, "pools-offline-row");
+    box.appendChild(row);
     var b = touchable(el(doc, "button", t("gateway.retry", "Retry"))); b.type = "button";
-    b.addEventListener("click", retryFn); box.appendChild(b);
+    row.appendChild(b);
+    var off = null;
+    try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
+    if (off && typeof off.wire === "function") {
+      try { off.wire(b, status, retryFn, t); } catch (e) { b.addEventListener("click", retryFn); }
+    } else {
+      b.addEventListener("click", retryFn);
+    }
+    var link = null;
+    if (off && typeof off.settingsLink === "function") {
+      try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
+    }
+    if (!link) {
+      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+      touchable(link);
+    }
+    row.appendChild(link);
   }
   function dropSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
   /* autoRetry: sibling pattern (pool-ui.js) — re-run on reconnect only while
@@ -89,7 +112,7 @@ var GatewayUI = (function () {
     var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
     wrap.appendChild(el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + t("gateway.backend_missing", " backend missing: ") + miss + t("gateway.load_failed", " failed to load.")); return null; }
-    if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); return null; }
+    if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   /* fmtMoney: raw host int + row precision -> human via Format. Unknown
