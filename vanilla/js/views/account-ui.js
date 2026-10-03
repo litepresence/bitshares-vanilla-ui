@@ -45,6 +45,23 @@ var AccountUI = (function () {
    * persists per-view. First paint is a baseline (never toasts). */
   var _histFirst = {};
 
+  /* Followed accounts (menu-sitemap slice: moved here from app.js when the
+   * burger shrank to headings — follow/unfollow is contextual on the
+   * account page, not in a menu). Plain-name watch-list in localStorage
+   * (same key proposal-ui.js:383 reads for its trust check — keep the key
+   * byte-identical). No chain calls — pure watch-list. Never throws. */
+  var CONTACTS_KEY = "bts-vanilla-contacts-v1";
+  function loadContacts() {
+    try {
+      var raw = localStorage.getItem(CONTACTS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === "string"; }) : [];
+    } catch (e) { return []; }
+  }
+  function saveContacts(arr) {
+    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(arr)); } catch (e) { /* follow skips */ }
+  }
+
   /* Operation type -> i18n key (batch-2a; op 0 reuses transfer.title,
    * byte-identical "Transfer"). OP_LABELS stays the verbatim English
    * source (still exported); opLabel() resolves through t() at render
@@ -1450,6 +1467,34 @@ var AccountUI = (function () {
         });
         wrap.appendChild(row);
       } catch (e) { /* header stands without sharing */ }
+    })();
+    /* Follow toggle (moved from the burger menu — contextual here). Toggles
+     * acct.name in the localStorage watch-list; label flips in place.
+     * 44px touch target; never throws. */
+    (function followRow() {
+      try {
+        var name = acct && acct.name;
+        if (typeof name !== "string" || !name) return;
+        var btn = doc.createElement("button");
+        btn.type = "button";
+        btn.style.minHeight = "44px";
+        function paint() {
+          var follows = loadContacts().indexOf(name) !== -1;
+          btn.textContent = follows
+            ? t("account.unfollow", "Unfollow") + " " + name
+            : t("account.follow", "Follow") + " " + name;
+        }
+        paint();
+        btn.addEventListener("click", function () {
+          var list = loadContacts();
+          var i = list.indexOf(name);
+          if (i === -1) list.push(name);
+          else list.splice(i, 1);
+          saveContacts(list);
+          paint();
+        });
+        wrap.appendChild(btn);
+      } catch (e) { /* header stands without follow */ }
     })();
     /* Dense-table scope for the CSS below (smaller padding, tabular numbers
      * — columns untouched). */

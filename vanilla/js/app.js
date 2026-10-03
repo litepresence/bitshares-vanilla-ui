@@ -32,34 +32,26 @@ var App = (function () {
     return dflt;
   }
 
-  /* Full-route shell nav (mega-menu repair): every router.js list route is
-   *   one link, grouped Wallet / Exchange / Governance / Explorer / More.
-   *   #1 MenuDataStructure.js:66-152 spreads the same areas across its header
-   *   + burger dropdown; vanilla does the same split: #nav holds ONLY the
-   *   original 7-link bar (ORIGINAL_NAV below), and the full 46-link grouped
-   *   directory lives in a #nav-directory panel inside #nav, visible ONLY
-   *   while #nav.open (hamburger toggle + aria-expanded in finishBoot are
-   *   untouched; the toggle is forced visible at all widths so desktop
-   *   reaches every route too). Rendering all 46 links inline wrapped into a
-   *   3-row desktop mega-menu (seen in /tmp/grid-2560-tall.png) — never again.
-   *   Detail routes (/pools/:id, /proposals/:id, /asset/:symbol,
-   *   /block/:height, …) open from their list parents — as in #1, where rows
-   *   link to details — so only list routes get links. FIX vs the old nav:
-   *   "#/account/overview" resolved as an account literally named "overview"
-   *   (AccountUI only special-cases "me"); it now points at "#/account/me". */
-  var NAV_GROUPS = [
-    { heading: "Wallet", hrefs: ["#/", "#/account/me", "#/accounts", "#/transfer",
-      "#/invoice", "#/wallet", "#/wallet/password", "#/create-wallet-brainkey",
-      "#/existing-account", "#/create-account", "#/login", "#/registration",
-      "#/vesting", "#/authorities", "#/lists", "#/referrals"] },
-    { heading: "Exchange", hrefs: ["#/market/BTS_USD", "#/instant-trade", "#/pools",
-      "#/swap", "#/borrow", "#/barter", "#/deposit-withdraw", "#/samet"] },
-    { heading: "Governance", hrefs: ["#/voting", "#/proposals", "#/create-worker",
-      "#/credit-offer", "#/direct-debit", "#/spotlight", "#/tickets", "#/airdrop",
-      "#/htlc", "#/prediction"] },
-    { heading: "Explore", hrefs: ["#/explorer", "#/assets", "#/assets/create",
-      "#/assets/issue", "#/assets/feed", "#/fees", "#/ops", "#/top-ops", "#/api-lab", "#/es-lab", "#/news"] },
-    { heading: "More", hrefs: ["#/settings", "#/alerts", "#/favourites", "#/trollbox", "#/help"] }
+  /* Headings burger + sitemap pages (menu-sitemap slice): #nav holds ONLY
+   *   the original 5-link bar (ORIGINAL_NAV below), and the burger panel
+   *   holds 6 heading links + one "All pages" overview link — each heading
+   *   navigates to its #/menu/<slug> table-of-contents page, which lists
+   *   that section's pages as styled cards with its own filter. The old
+   *   46-link grouped directory + burger filter + per-account follow/send
+   *   shortcuts are gone (follow moved to account-ui.js showAccount, where
+   *   it is contextual; lock lives in the header; theme in header+settings).
+   *   The heading table is MenuUI.SECTIONS (menu-ui.js, single source),
+   *   consumed guarded with a label-only fallback so the burger never
+   *   blanks when the script is missing. Detail routes (/pools/:id,
+   *   /asset/:symbol, …) open from their list parents — as in #1 — so
+   *   only sections get burger links. */
+  var FALLBACK_SECTIONS = [
+    { slug: "wallet", title: "Wallet" },
+    { slug: "trade", title: "Trade" },
+    { slug: "earn", title: "Earn & Protect" },
+    { slug: "govern", title: "Govern" },
+    { slug: "explore", title: "Explore" },
+    { slug: "labs", title: "Labs & Personal" }
   ];
 
   /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
@@ -126,62 +118,19 @@ var App = (function () {
     "#/explorer": "server"
   };
 
-  /* Explicit per-href labels (not a data-driven t() loop) so the
-   * check_i18n.py drift gate scans every default against en.json. Hrefs
-   * with no title key use plain hardcoded English, like router.js route
-   * titles — never a t() call with an unknown key. */
+  /* Explicit per-href labels for the header bar links (not a data-driven
+   *   t() loop) so the check_i18n.py drift gate scans every default against
+   *   en.json. Menu page titles live in menu-ui.js SECTIONS (single source);
+   *   this covers the bar only. Hrefs with no title key use plain hardcoded
+   *   English, like router.js route titles — never a t() call with an
+   *   unknown key. */
   function navText(href) {
     switch (href) {
       case "#/": return t("nav.dashboard", "Dashboard");
-      case "#/account/me": return t("account.s4", "My Account");
-      case "#/accounts": return t("account.manager_title", "Accounts");
-      case "#/transfer": return t("nav.transfer", "Transfer");
-      case "#/invoice": return t("misc.title", "Invoice");
-      case "#/wallet": return t("wallet.title", "Wallet");
-      case "#/wallet/password": return t("password.change_wallet_password", "Change wallet password");
-      case "#/create-wallet-brainkey": return t("wallet.s4", "Create Wallet (Brainkey)");
-      case "#/existing-account": return t("password.import_existing_account", "Import existing account");
-      case "#/create-account": return t("account.register_short", "Register a new account");
-      case "#/login": return t("auth.login", "Login");
-      case "#/registration": return t("auth.registration", "Registration");
-      case "#/vesting": return t("vesting.title", "Vesting");
-      case "#/authorities": return t("misc.custom_authorities", "Custom Authorities");
-      case "#/lists": return t("misc.account_lists", "Account Lists");
-      case "#/referrals": return "Referrals";
       case "#/market/BTS_USD": return t("nav.exchange", "Exchange");
-      case "#/instant-trade": return "Instant Trade";
-      case "#/pools": return t("pools.title", "Liquidity Pools");
-      case "#/swap": return t("swap.title", "Swap");
-      case "#/borrow": return t("borrow.title", "Borrow");
-      case "#/barter": return t("barter.title", "Barter");
-      case "#/deposit-withdraw": return t("gateway.title", "Deposit / Withdraw");
-      case "#/samet": return t("samet.title", "Same-T Funds");
-      case "#/voting": return t("nav.voting", "Voting");
-      case "#/proposals": return t("proposals.title", "Proposals");
-      case "#/create-worker": return "Create Worker";
       case "#/credit-offer": return t("credit.title", "Credit Offer");
-      case "#/direct-debit": return t("debit.title", "Direct Debit");
-      case "#/spotlight": return "Spotlight";
-      case "#/tickets": return t("tickets.title", "Tickets");
-      case "#/airdrop": return "Airdrop";
-      case "#/htlc": return t("htlc.title", "HTLC");
-      case "#/prediction": return "Prediction Markets";
+      case "#/pools": return t("pools.title", "Liquidity Pools");
       case "#/explorer": return t("nav.explorer", "Explore");
-      case "#/assets": return t("assets.title", "Assets");
-      case "#/assets/create": return t("assets_manage.title", "Create Asset");
-      case "#/assets/issue": return "Issue Asset";
-      case "#/assets/feed": return t("assets_feed.title", "Publish Feed");
-      case "#/fees": return t("fees.network_fees", "Network fees");
-      case "#/ops": return "Top Operations";
-      case "#/api-lab": return "API Lab";
-      case "#/es-lab": return t("eslab.title", "ES Lab");
-      case "#/top-ops": return t("topops.title", "Top Operations");
-      case "#/news": return t("news.news", "News");
-      case "#/settings": return t("nav.settings", "Settings");
-      case "#/alerts": return t("notify.title", "Price Alerts");
-      case "#/trollbox": return t("trollbox.title", "Trollbox");
-      case "#/favourites": return t("favourites.favourites", "Favourites");
-      case "#/help": return t("help.help", "Help");
       default: return href;
     }
   }
@@ -221,159 +170,56 @@ var App = (function () {
     return a;
   }
 
-  /* buildDirectory: grouped 46-link command palette (lives inside #nav,
-   *   shown only while #nav.open via app.css — no inline positioning).
-   *   Search filters by label+href substring (case-insensitive, no lib);
-   *   empty groups hide, empty query shows all; no-match shows a note.
-   *   Link click closes the panel (wired here); Esc + hashchange close it
-   *   (wired once in finishBoot). Styling is class-driven in app.css so all
-   *   three themes keep working. Returns the panel div. Never throws. */
+  /* buildDirectory: 6 sitemap heading links + overview link (lives inside
+   *   #nav, shown only while #nav.open via app.css — no inline positioning).
+   *   Headings come from MenuUI.SECTIONS when loaded (icon + localized title
+   *   + page count), else the label-only fallback. Link click closes the
+   *   panel (wired here); Esc + hashchange close it (wired once in
+   *   finishBoot). Styling is class-driven in app.css so all three themes
+   *   keep working. Returns the panel div. Never throws. */
   function buildDirectory(iconOK) {
     var panel = document.createElement("div");
     panel.id = "nav-directory";
-    panel.setAttribute("role", "search");
-    var search = document.createElement("input");
-    search.type = "search";
-    search.className = "nav-dir-search";
-    search.setAttribute("aria-label", t("shell.menu_filter", "Filter menu"));
-    search.placeholder = t("shell.menu_filter", "Filter menu");
-    try { search.style.minHeight = "44px"; } catch (e) { /* native stands */ }
-    panel.appendChild(search);
-    var empty = document.createElement("p");
-    empty.className = "nav-dir-empty muted";
-    empty.textContent = t("shell.menu_no_match", "No matching pages.") + t("shell.clear_search_hint", " Clear the search to see every page.");
-    empty.style.display = "none";
-    /* Account actions (mirrors #1 dropdown head: lock toggle, create,
-     * follow, send/deposit/withdraw). Route-backed (no modal system in
-     * vanilla); lock acts directly on the Wallet keystore. */
-    try { panel.appendChild(buildAccountActions(document)); } catch (e) { /* groups stand alone */ }
-    var sections = [];
-    NAV_GROUPS.forEach(function (group) {
-      var section = document.createElement("div");
-      section.className = "nav-dir-group";
-      var head = document.createElement("span");
-      head.className = "nav-group";
-      head.textContent = group.heading;
-      section.appendChild(head);
-      var row = document.createElement("div");
-      row.className = "nav-dir-row";
-      group.hrefs.forEach(function (href) {
-        var a = buildNavLink(href, iconOK);
-        try { a.dataset.search = (navText(href) + " " + href).toLowerCase(); } catch (e) { /* filter skips */ }
-        a.addEventListener("click", function () { closeDirectory(true); });
-        row.appendChild(a);
-      });
-      section.appendChild(row);
-      panel.appendChild(section);
-      sections.push(section);
-    });
-    panel.appendChild(empty);
-    search.addEventListener("input", function () {
-      var q = "";
-      try { q = (search.value || "").toLowerCase(); } catch (e) { q = ""; }
-      var shown = 0;
-      sections.forEach(function (section) {
-        var links = section.querySelectorAll("a");
-        var vis = 0;
-        Array.prototype.forEach.call(links, function (a) {
-          var hay = "";
-          try { hay = a.dataset.search || (a.textContent || "").toLowerCase(); } catch (e) { hay = ""; }
-          var hit = !q || hay.indexOf(q) !== -1;
-          a.style.display = hit ? "" : "none";
-          if (hit) vis++;
-        });
-        section.style.display = vis ? "" : "none";
-        shown += vis;
-      });
-      empty.style.display = shown ? "none" : "block";
-    });
-    return panel;
-  }
-
-  /* Contacts (mirrors #1 follow/unfollow): localStorage set of followed
-   * account names. No chain calls — pure watch-list. Never throws. */
-  var CONTACTS_KEY = "bts-vanilla-contacts-v1";
-  function loadContacts() {
-    try {
-      var raw = localStorage.getItem(CONTACTS_KEY);
-      var arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === "string"; }) : [];
-    } catch (e) { return []; }
-  }
-  /* saveContacts: persist the followed-name list. Params: arr (string array).
-   * Returns nothing. Fails: never throws (blocked storage skips). */
-  function saveContacts(arr) {
-    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(arr)); } catch (e) { /* follow skips */ }
-  }
-  /* Current account name from the hash (#/account/<name>), "" otherwise. */
-  function hashAccount() {
-    try {
-      var h = (typeof location !== "undefined" && location.hash) || "";
-      var m = /^#\/account\/([^\/?#]+)/.exec(h);
-      if (!m || m[1] === "me") return "";
-      return decodeURIComponent(m[1]);
-    } catch (e) { return ""; }
-  }
-  /* buildAccountActions: lock toggle + follow + send/deposit/withdraw +
-   * create-account row at the palette head (#1 dropdown parity). Links close
-   * the palette; lock acts then rebuilds the nav. Never throws. */
-  function buildAccountActions(doc) {
-    var box = doc.createElement("div");
-    box.className = "nav-dir-actions";
-    function actLink(href, label) {
-      var a = doc.createElement("a");
+    panel.setAttribute("role", "navigation");
+    function headingLink(href, icon, label) {
+      var a = document.createElement("a");
       a.setAttribute("href", href);
-      a.textContent = label;
-      a.addEventListener("click", function () { closeDirectory(false); });
-      box.appendChild(a);
+      try {
+        if (icon && iconOK) {
+          a.appendChild(Icon.img(icon, "nav-icon", ""));
+          var span = document.createElement("span");
+          span.className = "nav-label";
+          span.textContent = label;
+          a.appendChild(span);
+        } else {
+          a.textContent = label;
+        }
+      } catch (e) { a.textContent = label; }
+      a.addEventListener("click", function () { closeDirectory(true); });
+      panel.appendChild(a);
       return a;
     }
-    function actButton(label, fn) {
-      var b = doc.createElement("button");
-      b.type = "button";
-      b.className = "nav-dir-btn";
-      b.textContent = label;
-      try { b.style.minHeight = "44px"; } catch (e) { /* native stands */ }
-      b.addEventListener("click", fn);
-      box.appendChild(b);
-      return b;
-    }
-    var unlocked = false;
+    var sections = null;
     try {
-      unlocked = (typeof Wallet !== "undefined" && Wallet &&
-        typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked());
-    } catch (e) { unlocked = false; }
-    if (unlocked) {
-      actButton(t("shell.lock", "Lock"), function () {
-        try { if (typeof Wallet !== "undefined" && Wallet && Wallet.lock) Wallet.lock(); } catch (e) { /* stays */ }
+      if (typeof MenuUI !== "undefined" && MenuUI && Array.isArray(MenuUI.SECTIONS)) sections = MenuUI.SECTIONS;
+    } catch (e) { sections = null; }
+    if (sections && sections.length) {
+      sections.forEach(function (section) {
+        var label = section.slug;
         try {
-          var nav = doc.getElementById("nav");
-          if (nav) buildNav(nav);
-        } catch (e) { /* label keeps prior state */ }
+          var T = (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") ? I18n.t : null;
+          label = T ? T(section.titleKey, section.titleDefault) : section.titleDefault;
+          label += " (" + section.links.length + ")";
+        } catch (e) { label = section.titleDefault || section.slug; }
+        headingLink("#/menu/" + section.slug, section.icon, label);
       });
     } else {
-      actLink("#/login", t("shell.unlock", "Unlock"));
-    }
-    var acct = hashAccount();
-    if (acct) {
-      var contacts = loadContacts();
-      var follows = contacts.indexOf(acct) !== -1;
-      actButton((follows ? t("shell.unfollow", "Unfollow") : t("shell.follow", "Follow")) + " " + acct, function () {
-        var list = loadContacts();
-        var i = list.indexOf(acct);
-        if (i === -1) list.push(acct);
-        else list.splice(i, 1);
-        saveContacts(list);
-        try {
-          var nav = doc.getElementById("nav");
-          if (nav) { buildNav(nav); nav.classList.add("open"); }
-        } catch (e) { /* label keeps prior state */ }
+      FALLBACK_SECTIONS.forEach(function (section) {
+        headingLink("#/menu/" + section.slug, null, section.title);
       });
-      actLink("#/transfer", t("nav.transfer", "Transfer"));
-      actLink("#/deposit-withdraw", t("gateway.title", "Deposit / Withdraw"));
     }
-    actLink("#/create-account", t("account.register_short", "Register a new account"));
-    return box;
+    headingLink("#/menu", null, t("menu.all_pages", "All pages"));
+    return panel;
   }
 
   /* closeDirectory: collapse #nav.open, refocus the toggle (focus-return).
@@ -393,10 +239,9 @@ var App = (function () {
    *   (#nav.open #nav-directory in app.css). Kept so callers never throw. */
   function syncDirectory(nav) { return; }
 
-  /* buildNav: 7-link bar + command-palette directory (idempotent; preserves
+  /* buildNav: 5-link bar + sitemap headings (idempotent; preserves
    *   the .open state so a locale switch never collapses the menu). Theme
-   *   switching lives in settings + the header-bar copy (finishBoot) — the
-   *   old second copy inside #nav was crowding the palette and is gone. */
+   *   switching lives in settings + the header-bar copy (finishBoot). */
   function buildNav(nav) {
     if (!nav || typeof document === "undefined") return;
     var wasOpen = nav.classList.contains("open");
@@ -405,7 +250,7 @@ var App = (function () {
     ORIGINAL_NAV.forEach(function (href) {
       nav.appendChild(buildNavLink(href, iconOK));
     });
-    /* Grouped directory: every NAV_GROUPS link, visible only while open. */
+    /* Grouped directory: sitemap headings, visible only while open. */
     try {
       nav.appendChild(buildDirectory(iconOK));
     } catch (e) { /* bar works without the directory */ }
@@ -1001,14 +846,8 @@ var App = (function () {
         var open = nav.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
         syncDirectory(nav);
-        /* Focus the filter on open (keyboard path); focus-return on close
-         * lives in closeDirectory. Never throws — missing search is fine. */
-        if (open) {
-          try {
-            var q = nav.querySelector(".nav-dir-search");
-            if (q && typeof /** @type {any} */ (q).focus === "function") /** @type {any} */ (q).focus();
-          } catch (e) { /* toggle keeps focus */ }
-        }
+        /* Focus-return on close lives in closeDirectory; nothing to focus
+         * on open (headings need no filter). Never throws. */
       });
       /* Esc closes + refocuses; route change closes without stealing focus. */
       try {
