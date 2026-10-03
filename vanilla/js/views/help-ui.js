@@ -1,8 +1,9 @@
 /* help-ui.js — help index + full topic articles.
  * Owns: /help/** (index at /help, one article view per topic key). Topic list
- *   is curated for this wallet (47 topics: wallet basics plus every feature
- *   this app ships — pools, HTLC, credit, trollbox, alerts, prediction/PMO,
- *   builder, top-ops, discovery, and more).
+ *   is curated for this wallet (61 topics: wallet basics plus every feature
+ *   this app ships — pools, HTLC, credit, samet, barter, spotlight, debit,
+ *   trollbox, alerts, prediction/PMO, builder, labs, charts, dashboard,
+ *   registration, URIs, and more).
  * Consumes: I18n.t for chrome, titles, guides, and full article bodies
  *   (help.topic_<key>_title/_text/_body). Bodies are lite-markdown blocks
  *   ("# " heading, "- " bullets, blank-line paragraphs) rendered via
@@ -85,6 +86,18 @@ var HelpUI = (function () {
     ["referrals", "Referrals", "How registration splits fees between referrer and registrar.", "#/referrals"],
     ["favourites", "Favourites", "Pin markets, assets and accounts for quick access.", "#/favourites"],
     ["tour", "Welcome tour", "The five-step first-run walkthrough; replay it any time.", "#/"],
+    ["samet", "Same-T Funds", "Pooled same-asset funds with draws and repayments.", "#/samet"],
+    ["barter", "Barter", "Propose direct asset-for-asset trades for approval.", "#/barter"],
+    ["spotlight", "Spotlight", "Showcase tiles plus a recurring-orders helper.", "#/spotlight"],
+    ["direct-debit", "Direct Debit", "Authorize recurring withdrawals; claim and manage them.", "#/direct-debit"],
+    ["api-lab", "API Lab", "Probe the connected node with a 29-call catalog.", "#/api-lab"],
+    ["es-lab", "ES Lab", "Search the community history index with curated forms.", "#/es-lab"],
+    ["charts", "Charts and indicators", "Candles, depth, and the 25-indicator catalog on the desk.", "#/market/BTS_USD"],
+    ["dashboard", "Dashboard", "Locked splash vs your unlocked watched-account overview.", "#/"],
+    ["register", "Creating an account", "Claim a name through the faucet registrar.", "#/create-account"],
+    ["password", "Changing the wallet password", "Re-encrypt the local vault with a new passphrase.", "#/wallet/password"],
+    ["news", "News", "Why this wallet ships no in-app news feed.", "#/news"],
+    ["uris", "Payment requests and exports", "BitShares links that prefill payments, plus CSV history export.", "#/invoice"],
     ["glossary", "Glossary", "Names used across this wallet: objects (1.x.y), operations, witnesses, committee.", null]
   ];
 
@@ -459,6 +472,8 @@ var HelpUI = (function () {
       "# What the chain does most",
       "Top operations counts real operation types across the last 200 blocks: transfers, orders, fills, votes — ranked with shares, plus a donut for the shape of chain activity.",
       "Refresh re-runs the window. Testnet works here, unlike the old stats pages that were mainnet-only.",
+      "# Two desks, one count",
+      "Top Operations pairs the rankings with the activity donut; the Operations desk shows the same window as a plain ranked table. Both read the same blocks.",
       "# Reading it",
       "A healthy chain shows transfers and order flow on top with governance and maintenance underneath. Spikes in exotic types deserve a look in the explorer."
     ],
@@ -471,7 +486,9 @@ var HelpUI = (function () {
       "# Testnet limits",
       "Node history works on testnet, but the community index covers mainnet only — index-powered features (holders, hash lookup) are unavailable on testnet by data, not by bug.",
       "# The switch",
-      "Settings holds the community-index toggle (on by default). Turn it off and every index surface falls back to chain history or an honest notice — your call, reversible any time."
+      "Settings holds the community-index toggle (on by default). Turn it off and every index surface falls back to chain history or an honest notice — your call, reversible any time.",
+      "# Browsing the index",
+      "The ES Lab desk turns the index into searchable forms plus a raw console: operations by account or type, holders, and hash lookup, each showing the exact query it runs."
     ],
     "txbuilder": [
       "# Several operations, one signature round",
@@ -578,6 +595,97 @@ var HelpUI = (function () {
       "The first-run tour walks the dashboard, market strip, charts, trade panels, and beyond: where to look, what each part does, how to leave. Dismiss any time; it never blocks.",
       "# Replay",
       "Take tour replays from the dashboard whenever you want a refresher — same five steps, same dismiss."
+    ],
+    "samet": [
+      "# Pooled funds, same asset in and out",
+      "Same-T funds pool one asset from many suppliers. Borrowers draw against a fund and repay with interest; the chain enforces balances and schedules.",
+      "# Denomination discipline",
+      "Funds denominate in whole units (1M base): create, draw, and repay in the same asset, and mind the fund's limits before committing size.",
+      "# Same-transaction rule",
+      "Paired fund operations belong in one transaction: split legs can strand half a deal. The desk builds the pair together — review once, sign once."
+    ],
+    "barter": [
+      "# Propose a straight swap",
+      "Barter proposes an asset-for-asset trade to a counterparty: you offer an amount of one asset and ask an amount of another, with an expiry.",
+      "# They approve or it lapses",
+      "The proposal executes when the counterparty approves, and deletes itself past expiry. Treat surprise barters as hostile until proven otherwise.",
+      "# In this wallet",
+      "Build the offer under Barter; the confirm dialog shows both legs in human terms before you sign."
+    ],
+    "spotlight": [
+      "# A showcase, not an exchange",
+      "Spotlight is the reference UI's showcase grid: tiles that point at wallet features (HTLC, Direct Debit) plus a recurring-orders helper. It moves no funds itself and carries no chain operation.",
+      "# Recurring orders helper",
+      "The helper places N limit orders NOW at stepped prices — one transaction per order, each with its own confirm. No scheduler runs in a static page: closing the page places nothing further."
+    ],
+    "direct-debit": [
+      "# Authorize pulls, then manage them",
+      "Direct debit lets an account authorize another to withdraw up to a limit on a schedule. Givers and recipients each see their side in tables.",
+      "# Create, update, claim, delete",
+      "Permissions carry periods and limits; claims draw against them, updates change the terms, and deletion is a free cancel. Claim memos are plaintext — never put secrets in one.",
+      "# Reads are public",
+      "Tables render even while locked (viewing as committee-account); the password is asked only at Sign & Send."
+    ],
+    "api-lab": [
+      "# A 29-call node prober",
+      "API Lab catalogs the calls this wallet actually uses — account and asset lookups, market data, fees, block reads — with forms for parameters and raw JSON results.",
+      "# Reads run free, broadcasts cost",
+      "Read-only calls execute against the connected node immediately. Anything that would broadcast names its fee before signing, same as every other desk.",
+      "# When a call fails",
+      "Failures name the cause (offline node, history-less node, bad parameter) and link back to Settings. Switch nodes from the node table and re-run."
+    ],
+    "es-lab": [
+      "# The community index, browsable",
+      "ES Lab searches the third-party community index (es.bitshares.dev): operations by account or type, block ranges, transaction lookup by hash, and top asset holders — the things no public node serves.",
+      "# Gated and honest",
+      "The lab runs only while the community-index switch in Settings is on, and says so when it is off. Holders and hash lookup cover mainnet only — on testnet those desks explain the data gap instead of guessing.",
+      "# Curated forms plus raw console",
+      "Every catalog search shows the exact query it runs; the raw console accepts arbitrary bodies against the allowlisted indexes for power users."
+    ],
+    "charts": [
+      "# Price, depth, and oscillators",
+      "The desk shows a price pane (candles plus moving averages) with stacked oscillator sub-panes on independent scales, a volume pane, and a cumulative depth chart beside the book.",
+      "# Real candles, carried forward",
+      "Candles come from chain history with timeframe-aware interpolation: gaps carry the last price forward and flag red/green, so thin markets never invent volume.",
+      "# A 25-indicator catalog",
+      "Trend, momentum, volatility, and volume math (SMA through Fisher and PSAR) ships as dependency-free formulas verified against published vectors. Pick them from the indicator menu; parameters stay on their published defaults unless you change them."
+    ],
+    "dashboard": [
+      "# Locked: the splash",
+      "While locked, the home page is a landing: the project motto, a live market strip, the chain pulse, feature cards, and the steps to start. Nothing here needs your keys.",
+      "# Unlocked: your watched account",
+      "Unlock and the same page becomes your overview: balances, recent activity, favourite markets, and quick links for the wallet's own account.",
+      "# Starred markets strip",
+      "The above-fold strip mixes starred and featured quotes — star pairs from any market picker to make the tape yours."
+    ],
+    "register": [
+      "# Claim a name",
+      "Registration claims an on-chain account name through the faucet registrar: pick an unused name, fund the creation fee, and the registrar creates the account for you.",
+      "# Faucet reality",
+      "The testnet faucet answers reliably; the old European testnet faucet is dead and stays listed nowhere. On mainnet, creation goes through the registrar your settings name.",
+      "# After creation",
+      "Back up the new wallet before funding it — the brainkey IS the backup. Import existing keys instead under Import if the account already exists."
+    ],
+    "password": [
+      "# Re-encrypt everything",
+      "Changing the password re-encrypts the whole local vault under a new passphrase: enter the current one, choose a unique replacement, and confirm.",
+      "# Verify before you walk away",
+      "Lock and unlock once with the new passphrase before funding anything — a typo here plus a lost brainkey means lost funds.",
+      "# Short or reused passwords fall to guessing; a unique passphrase written on paper does not."
+    ],
+    "news": [
+      "# No in-app feed, by decision",
+      "This wallet ships no news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. No fetch is attempted, so there is no spinner and no fetch-error panel.",
+      "# Staying current instead",
+      "The connection line on the News page is always live, and project discussion happens in the linked community chats under Help."
+    ],
+    "uris": [
+      "# Links that prefill payments",
+      "BitShares URIs (bitshares:…) pack a payment request — recipient, asset, amount, memo — into a shareable link. Opening one prefills the transfer or invoice form; only review and sign remain.",
+      "# Verify before signing",
+      "Links can lie about who they pay: check the recipient name yourself. The wallet never signs from a link alone.",
+      "# CSV history export",
+      "Account history exports to CoinTracking-compatible CSV for taxes and records. Amounts export as display decimals with symbols; dates stay empty rather than guessed."
     ],
     "glossary": [
       "# Objects: everything has an id",
@@ -745,14 +853,53 @@ var HelpUI = (function () {
       wrap.appendChild(ul);
     });
   }
+  /* GROUPS: help index sections (menu-sitemap slice) — same 6 headings as
+   * the sitemap. [i18nKey, enDefault, [topicKeys]]. Unknown future keys
+   * fall into "More" at render. Exported via _test for locale/test tooling. */
+  var GROUPS = [
+    ["menu.section_wallet", "Wallet", ["disclaimer", "wallets", "backups", "accounts-general", "accounts-proposed", "accounts-permissions", "accounts-membership", "transfer", "invoice", "vesting", "authorities", "lists", "register", "password", "referrals", "dashboard"]],
+    ["menu.section_trade", "Trade", ["bitshares", "blockchain", "dex-intro", "dex-trading", "dex-shorting", "instant", "pools", "swap", "gateways", "gateways-xbts", "gateways-ioxbank", "borrow-extra", "samet", "barter", "spotlight"]],
+    ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
+    ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
+    ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "topops", "fees", "charts", "history-index"]],
+    ["menu.section_labs", "Labs & Personal", ["settings", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary"]]
+  ];
+
   function paintIndexList(doc, wrap) {
-    var list = doc.createElement("ul");
-    list.className = "help-index";
-    TOPICS.forEach(function (e) {
-      var li = doc.createElement("li"), a = doc.createElement("a");
-      a.href = "#/help/" + e[0]; a.textContent = t("help.topic_" + e[0] + "_title", e[1]); li.appendChild(a); list.appendChild(li);
+    /* Grouped index (menu-sitemap slice): same 6 headings as the sitemap so
+     * help mirrors the burger. Unknown future keys fall into "More" — never
+     * dropped. Group titles reuse menu.* keys with verbatim defaults. */
+    var byKey = {};
+    TOPICS.forEach(function (e) { byKey[e[0]] = e; });
+    var seen = {};
+    GROUPS.forEach(function (g) {
+      var h = doc.createElement("h2");
+      h.textContent = t(g[0], g[1]);
+      wrap.appendChild(h);
+      var list = doc.createElement("ul");
+      list.className = "help-index";
+      g[2].forEach(function (key) {
+        var e = byKey[key];
+        if (!e) return;
+        seen[key] = true;
+        var li = doc.createElement("li"), a = doc.createElement("a");
+        a.href = "#/help/" + e[0]; a.textContent = t("help.topic_" + e[0] + "_title", e[1]); li.appendChild(a); list.appendChild(li);
+      });
+      wrap.appendChild(list);
     });
-    wrap.appendChild(list);
+    var rest = TOPICS.filter(function (e) { return !seen[e[0]]; });
+    if (rest.length) {
+      var mh = doc.createElement("h2");
+      mh.textContent = t("menu.section_more", "More");
+      wrap.appendChild(mh);
+      var mlist = doc.createElement("ul");
+      mlist.className = "help-index";
+      rest.forEach(function (e) {
+        var li = doc.createElement("li"), a = doc.createElement("a");
+        a.href = "#/help/" + e[0]; a.textContent = t("help.topic_" + e[0] + "_title", e[1]); li.appendChild(a); mlist.appendChild(li);
+      });
+      wrap.appendChild(mlist);
+    }
   }
 
   /* Topic: title + guide summary + full article body + in-app pointer + back.
@@ -775,7 +922,17 @@ var HelpUI = (function () {
     back.appendChild(b); wrap.appendChild(back);
   }
 
-  return { renderHelp: renderHelp, TOPICS: TOPICS };
+  /* topicBody: joined English body for a topic key (locale/tooling seam).
+   * Params: key string. Returns the "\n"-joined body or "". Pure. */
+  function topicBody(key) {
+    try {
+      var arr = BODY_DEFAULTS[key] || [];
+      return Array.isArray(arr) ? arr.join("\n") : String(arr);
+    } catch (e) { return ""; }
+  }
+
+  return { renderHelp: renderHelp, TOPICS: TOPICS,
+    _test: { topicBody: topicBody, GROUPS: GROUPS } };
 })();
 
 if (typeof module !== "undefined") { module.exports = HelpUI; }
