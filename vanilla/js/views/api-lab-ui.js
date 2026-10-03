@@ -245,6 +245,9 @@ var ApiLabUI = (function () {
       card.appendChild(meta);
       (entry.params || []).forEach(function (p, i) {
         var lab = el(doc, "label", p.name + (p.required ? " *" : "") + (p.hint ? " — " + p.hint : ""), null);
+        /* Stacked rows (Swagger feel): label text on its own line, box below.
+         * Inline styles only — no new CSS file (doctrine). */
+        try { lab.style.display = "block"; lab.style.margin = "10px 0 2px"; } catch (e) { /* stands */ }
         var inp;
         if (p.type === "bool") {
           inp = doc.createElement("select");
@@ -265,12 +268,16 @@ var ApiLabUI = (function () {
           if (!inp.value && p.example && (entry.method === "get_account_by_name" || entry.method === "get_chain_id")) inp.value = p.example;
         }
         touchable(inp);
+        try { inp.style.display = "block"; inp.style.width = "100%"; inp.style.maxWidth = "560px"; inp.style.boxSizing = "border-box"; inp.style.marginTop = "4px"; } catch (e) { /* stands */ }
         lab.appendChild(inp);
         card.appendChild(lab);
         inputEls.push(inp);
       });
       var rawLab = el(doc, "label", t("apilab.raw_params", "Raw params JSON (mirrors the boxes)"), null);
       rawBox = doc.createElement("textarea"); rawBox.rows = 3;
+      try { rawLab.style.display = "block"; rawLab.style.margin = "10px 0 2px";
+        rawBox.style.display = "block"; rawBox.style.width = "100%"; rawBox.style.maxWidth = "560px";
+        rawBox.style.boxSizing = "border-box"; rawBox.style.marginTop = "4px"; } catch (e) { /* stands */ }
       touchable(rawLab);
       rawLab.appendChild(rawBox); card.appendChild(rawLab);
       syncRaw();

@@ -38,9 +38,10 @@ Spec: `docs/superpowers/specs/2026-10-03-api-lab-design.md` (Option B, approved)
 - `vanilla/js/router.js` — `#/api-lab` route (before `*`); `Router.query()`
   (pre-existing uncommitted helper) reads `?by=&params=`.
 - `vanilla/index.html` — `api-lab.js` + `api-lab-ui.js` script tags (before
-  `router.js`), nav `API Lab` link after Explore. Deviation from spec §4:
-  top-nav link instead of Explorer-header link (keeps slice small; header
-  link is a one-line follow-up).
+  `router.js`), static `API Lab` nav link (no-JS fallback).
+- `vanilla/js/app.js` — `#/api-lab` in the Explore `NAV_GROUPS` directory +
+  `navText` label (the runtime nav rebuild owns the header; the top bar keeps
+  the 5 original links per the mega-menu repair).
 - `vanilla/js/globals.d.ts` — `ApiLab`, `ApiLabUI` ambient lines.
 
 ## 3. Manual test steps + observed result (testnet, 2026-10-03)
