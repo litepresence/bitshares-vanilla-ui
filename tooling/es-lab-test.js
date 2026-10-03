@@ -52,7 +52,7 @@ eq(bal.body.query.bool.must[0].match.owner_.query, "1.2.0", "owner_ match");
 // fromBody round-trips (raw-mirror reverse direction):
 function rt(key, vals) { return EsLab.fromBody(EsLab.byKey(key), EsLab.build(EsLab.byKey(key), vals).body); }
 eq(rt("holders-by-asset", ["1.3.1849", "10"]), ["1.3.1849", "10"], "holders round-trip");
-eq(rt("fills-by-market", ["BTS", "USD"]), ["BTS", "USD"], "fills round-trip");
+eq(rt("fills-by-market", ["1.3.0", "1.3.121"]), ["1.3.0", "1.3.121"], "fills round-trip (ids, not symbols)");
 eq(rt("pool-swaps", ["1.19.66"]), ["1.19.66"], "swaps round-trip");
 eq(rt("top-ops-agg", ["7"]), ["7"], "agg round-trip");
 eq(rt("ops-by-account", ["1.2.0", "", "10"]), ["1.2.0", "", "10"], "account round-trip");

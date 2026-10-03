@@ -50,10 +50,10 @@ var EsLab = (function () {
   var TEMPLATES = [
     { key: "fills-by-market", group: "Operations", kind: "ops", index: "bitshares-*",
       title: "Market fills",
-      desc: "Fill-order ops (type 4) for a base/quote pair, newest first. Text-matched, then leg-checked in parse.",
+      desc: "Fill-order ops (type 4) for a base/quote asset pair, newest first. Ids are text-matched, then leg-checked in parse.",
       sourceRef: "vanilla/js/api/market-fills-history.js:83-92",
-      fields: [F("base", "string", { example: "BTS" }),
-        F("quote", "string", { example: "USD" })] },
+      fields: [F("base", "string", { example: "1.3.0", hint: "Base asset id (symbols do NOT match)." }),
+        F("quote", "string", { example: "1.3.121", hint: "Quote asset id." })] },
     { key: "pool-swaps", group: "Operations", kind: "ops", index: "bitshares-*",
       title: "Pool swaps",
       desc: "Liquidity-pool exchange ops (type 63) for one pool id, newest first.",

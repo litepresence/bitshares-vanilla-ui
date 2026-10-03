@@ -222,12 +222,14 @@ var EsLabUI = (function () {
     var rawBox = null, rawIndexSel = null, resultPre = null, hintP = null, histBox = null;
     var tablesBox = null;
     var rawOverride = false; /* raw edited since last curated sync — Run sends it verbatim */
+    var lastGood = null; /* last runnable body text (mirror keeps it while boxes are invalid) */
 
     /* renderForm: template card body for the current entry. */
     function renderForm(prefill) {
       while (card.firstChild) card.removeChild(card.firstChild);
       inputEls = [];
       rawOverride = false;
+      lastGood = null;
       card.appendChild(el(doc, "h3", entry.title || entry.key, null));
       card.appendChild(el(doc, "p", entry.desc || "", "muted"));
       if (!isRaw(entry.key)) {
@@ -328,26 +330,24 @@ var EsLabUI = (function () {
       renderHistory();
     }
 
-    /* syncRaw: curated boxes -> raw mirror. Never throws. */
+    /* syncRaw: curated boxes -> raw mirror. Success shows the runnable
+     * body; failure keeps the last runnable body (or {} before the first
+     * one) and flags data-bad — the mirror always answers "what will Run
+     * send", never echoes invalid boxes. Never throws. */
     function syncRaw() {
       if (!rawBox || isRaw(entry.key)) return;
       var vals = readCurated(inputEls);
       try {
-        rawBox.value = JSON.stringify(EsLab.build(entry, resolveIds(vals)).body, null, 2);
+        rawBox.value = JSON.stringify(EsLab.build(entry, vals).body, null, 2);
         rawBox.removeAttribute("data-bad");
         rawOverride = false;
+        lastGood = rawBox.value;
       } catch (e) {
-        rawBox.value = JSON.stringify(vals);
+        rawBox.value = (lastGood !== null) ? lastGood : "{}";
         rawBox.setAttribute("data-bad", (e && e.message) || "bad params");
         rawOverride = false;
       }
     }
-
-    /* resolveIds: curated values with account names resolved IF already
-     * known this session (pure best-effort for the mirror — the real
-     * resolution happens async in onRun). Params: vals. Returns vals
-     * unchanged (never throws). */
-    function resolveIds(vals) { return vals; }
 
     /* syncCurated: raw mirror -> curated boxes via EsLab.fromBody.
      * Unrecognized bodies keep the raw override flag (Run sends verbatim). */
@@ -580,6 +580,12 @@ var EsLabUI = (function () {
 
     lastQ = entry.key;
     renderForm(startVals);
+    /* Deep-link auto-run (spec §6.5): read templates execute on entry so
+     * shareable links show results, not just prefilled boxes. Safe: reads
+     * only, no signing path exists on this desk. Raw console always waits. */
+    if (q.q && startEntry && !isRaw(startEntry.key) && myGen === gen) {
+      onRun();
+    }
   }
 
   /* renderLab: route entry — bumps gen, delegates to renderDesk. */
