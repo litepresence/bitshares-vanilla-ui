@@ -1008,6 +1008,66 @@ var MarketDesk = (function () {
    * Unlocked prefills the wallet account; the wallet auto-load is unchanged.
    * Amounts/prices go through Format (BigInt, 8 places like Market.trades)
    * — never raw integers (#6). */
+  /* paintDeepButton: "Load deeper history" under the recent-trades list
+   * (Phase 7 B1 UI). One-shot 7-day window via Market.tradesDeep (same
+   * envelope as trades(), so renderTrades is reused verbatim). Success
+   * stores state.deepRows and paints the deep view, which SURVIVES the 15s
+   * refill loop (fill() re-renders deepRows instead of refetching — without
+   * this the loop clobbers deep rows within seconds and in-flight fetches
+   * resolve into a stale host). "Back to live" clears the flag and
+   * refills. Failure appends the mapped error with the Round-1 Settings
+   * link and re-arms for retry. Gen-guarded by market id like live() below.
+   * Params: doc, state, b/q (asset {id, symbol}). Fails: never (fetch
+   * errors render inline). */
+  function paintDeepButton(doc, state, b, q) {
+    var host = state.recentBody || state.tradesBody;
+    if (!host) return;
+    try { if (state.deepBtn && state.deepBtn.parentNode) state.deepBtn.parentNode.removeChild(state.deepBtn); } catch (e) { /* refetch stands */ }
+    state.deepBtn = null;
+    if (state.deepRows) { paintBackButton(doc, state); return; }
+    if (typeof Market === "undefined" || !Market || typeof Market.tradesDeep !== "function") return;
+    var btn = touchable(el(doc, "button", t("market.load_deeper", "Load deeper history")));
+    btn.type = "button";
+    state.deepBtn = btn;
+    host.appendChild(btn);
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      Market.tradesDeep(b.id, q.id, { days: 7, limit: 100 }).then(function (deep) {
+        try {
+          if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
+        } catch (e) { /* headless: hash guard skipped */ }
+        state.deepRows = deep;
+        MarketBook.renderTrades(doc, host, { rows: deep, quoteSymbol: q.symbol });
+        paintBackButton(doc, state);
+        renderMyTrades(doc, state);
+        MarketInd.maybeDraw(state);
+      }).catch(function (e) {
+        showError(doc, host, e, t("market.fail_trades", "Could not load recent trades."));
+        try { host.appendChild(btn); } catch (e2) { /* error stands */ }
+        btn.disabled = false;
+        renderMyTrades(doc, state);
+      });
+    });
+  }
+  /* paintBackButton: leaves the deep view ("Back to live trades" clears
+   * state.deepRows and refills the live 30). Params: doc, state. The desk
+   * re-renders deep rows on every refill while the flag stands, so this is
+   * the only exit — no auto-expiry, no surprise reverts. Never throws. */
+  function paintBackButton(doc, state) {
+    var host = state.recentBody || state.tradesBody;
+    if (!host) return;
+    try { if (state.deepBtn && state.deepBtn.parentNode) state.deepBtn.parentNode.removeChild(state.deepBtn); } catch (e) { /* refetch stands */ }
+    state.deepBtn = null;
+    var back = touchable(el(doc, "button", t("market.back_to_live", "Back to live trades")));
+    back.type = "button";
+    state.deepBtn = back;
+    host.appendChild(back);
+    back.addEventListener("click", function () {
+      state.deepRows = null;
+      state.deepBtn = null;
+      try { fill(state); } catch (e) { /* refill carries errors */ }
+    });
+  }
   function renderMyTrades(doc, state) {
     var host = state.myBody || state.tradesBody;
     var assets = state.assets;
@@ -1335,8 +1395,19 @@ var MarketDesk = (function () {
       showError(doc, state.tickerRaw, e, t("market.fail_stats", "Could not load market stats."));
     });
 
+    /* Deep view wins refills: while state.deepRows stands, the loop
+     * re-renders it (no refetch, no wipe) — the Back button is the exit. */
+    if (state.deepRows) {
+      MarketBook.renderTrades(doc, state.recentBody || state.tradesBody, { rows: state.deepRows, quoteSymbol: q.symbol });
+      paintDeepButton(doc, state, b, q);
+      renderMyTrades(doc, state);
+      MarketInd.maybeDraw(state);
+      MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
+      done();
+    } else {
     Market.trades(b.id, q.id, 30).then(function (rows) {
       MarketBook.renderTrades(doc, state.recentBody || state.tradesBody, { rows: rows, quoteSymbol: q.symbol });
+      paintDeepButton(doc, state, b, q);
       renderMyTrades(doc, state);
       MarketInd.maybeDraw(state);
       MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
@@ -1345,10 +1416,14 @@ var MarketDesk = (function () {
       var rb = state.recentBody || state.tradesBody;
       while (rb.firstChild) rb.removeChild(rb.firstChild);
       showError(doc, rb, e, t("market.fail_trades", "Could not load recent trades."));
+      /* Deep path stays offered: it reads the database api (time-windowed),
+       * independent of the history plugin the fills above needed. */
+      paintDeepButton(doc, state, b, q);
       renderMyTrades(doc, state);
       MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
       done();
     });
+    }
 
     /* Timeframe radios (once per desk): preferred shortlist first, then any
      * live extras the node offers (60s, weekly — reconcileBuckets, never a

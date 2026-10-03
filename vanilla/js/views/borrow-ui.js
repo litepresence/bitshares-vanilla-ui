@@ -204,6 +204,7 @@ var BorrowUI = (function () {
     ctx.wrap.appendChild(el(doc, "h2", t("borrow.how_borrowing_works", "How borrowing works")));
     howStepper(doc, ctx.wrap);
     settleSection(doc, ctx.wrap, myGen);
+    mySettleSection(doc, ctx.wrap, myGen);
     go.addEventListener("click", function () {
       if (myGen !== gen) return; go.disabled = true; clearBox(listBox); clearBox(formBox);
       showStatus(doc, listBox, t("borrow.loading_positions", "Loading positions…"));
@@ -633,6 +634,116 @@ var BorrowUI = (function () {
       }).catch(function (e) {
         if (myGen !== gen) return; clearBox(out);
         showError(doc, out, e, t("borrow.could_not_prepare_the_borrow", "Could not prepare the borrow.")); btn.disabled = false;
+      });
+    });
+  }
+
+  /* My settlements (Phase 7 B4 UI): force-settlement orders for a typed
+   * account (blank = wallet, resolved like fAcct above; reads are public).
+   * Market.mySettlements first page (cursor unverifiable while no open
+   * settlements exist chain-wide — afk-round-06). Table reuses
+   * account.asset_th / market.th_amount / market.th_settle_date headers;
+   * amounts via Format with per-asset precision from one batched get_assets
+   * (raw fallback with title, never bare); dates via I18n.date with raw
+   * fallback (market-orders settle-tab precedent). history-unavailable is
+   * handled HERE with a keyed notice + Settings link (borrow showError has
+   * no history mapping — never delegated). Never throws outward. */
+  function mySettleSection(doc, wrap, myGen) {
+    wrap.appendChild(el(doc, "h2", t("borrow.my_settlements", "My settlements")));
+    wrap.appendChild(el(doc, "p", t("borrow.my_settlements_hint", "Force-settlement orders waiting at the feed price — yours or any account's, reads are public."), "muted"));
+    var f = field(doc, t("borrow.account", "Account"), { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
+    wrap.appendChild(f.row);
+    var go = touchable(el(doc, "button", t("referrals.look_up", "Look up"))); go.type = "button";
+    wrap.appendChild(go);
+    var box = el(doc, "div"); wrap.appendChild(box);
+    go.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      clearBox(box);
+      showStatus(doc, box, t("market.loading_settle", "Loading settlement orders…"));
+      Promise.resolve().then(async function () {
+        var input = f.input.value.trim(), id = null;
+        if (typeof Account === "undefined" || !Account) throw new Error("account backend missing");
+        if (input) {
+          if (typeof Account.resolve !== "function") throw new Error("account backend missing");
+          var acct = await Account.resolve(input);
+          id = acct && acct.id;
+        } else if (typeof Account.myAccountId === "function") {
+          id = await Account.myAccountId().catch(function () { return VIEWING_AS_ID; });
+        } else {
+          id = VIEWING_AS_ID;
+        }
+        if (!/^1\.2\.\d+$/.test(id || "")) throw new Error("unknown-account");
+        if (typeof Market === "undefined" || !Market || typeof Market.mySettlements !== "function") throw new Error("settle backend missing");
+        var rows = await Market.mySettlements(id, 100);
+        if (!rows || !rows.length) return { empty: true };
+        var need = {};
+        rows.forEach(function (r) { var aid = r && r.balance && r.balance.asset_id; if (aid) need[aid] = true; });
+        var ids = Object.keys(need), precById = {}, symById = {};
+        if (ids.length && typeof Chain !== "undefined" && Chain && typeof Chain.db === "function") {
+          var dbId = await Chain.db();
+          var metas = await Chain.call(dbId, "get_assets", [ids]);
+          (metas || []).forEach(function (a, i) {
+            if (a && typeof a.precision === "number") precById[ids[i]] = a.precision;
+            if (a && a.symbol) symById[ids[i]] = a.symbol;
+          });
+        }
+        var sorted = (typeof Market.sortSettles === "function") ? Market.sortSettles(rows) : rows.slice();
+        return { rows: sorted, precById: precById, symById: symById };
+      }).then(function (R) {
+        if (myGen !== gen) return;
+        clearBox(box);
+        if (!R || R.empty) {
+          box.appendChild(el(doc, "p", t("borrow.my_settlements_empty", "No open settlements for this account."), "muted"));
+          return;
+        }
+        var table = doc.createElement("table"); table.className = "node-table";
+        var hr = doc.createElement("tr");
+        hr.appendChild(el(doc, "th", t("account.asset_th", "Asset")));
+        hr.appendChild(el(doc, "th", t("market.th_amount", "Amount")));
+        hr.appendChild(el(doc, "th", t("market.th_settle_date", "Settlement date")));
+        table.appendChild(hr);
+        R.rows.forEach(function (r) {
+          var tr = doc.createElement("tr");
+          var aid = (r && r.balance && r.balance.asset_id) || "";
+          var sym = R.symById[aid] || aid;
+          tr.appendChild(el(doc, "td", sym));
+          var raw = (r && r.balance && r.balance.amount !== undefined && r.balance.amount !== null) ? String(r.balance.amount) : null;
+          var prec = R.precById[aid];
+          var td = null;
+          if (raw !== null && typeof prec === "number") {
+            try {
+              td = el(doc, "td", Format.formatAmount(raw, prec));
+              td.title = raw;
+            } catch (e) { td = el(doc, "td", raw); }
+          } else {
+            td = el(doc, "td", raw === null ? "—" : raw);
+          }
+          tr.appendChild(td);
+          var dt = (r && r.settlement_date) || "";
+          var dHuman = dt;
+          try {
+            if (dt && typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") dHuman = I18n.date(dt);
+          } catch (e) { dHuman = dt; }
+          tr.appendChild(el(doc, "td", dHuman || "—"));
+          table.appendChild(tr);
+        });
+        box.appendChild(table);
+      }).catch(function (e) {
+        if (myGen !== gen) return;
+        clearBox(box);
+        var m = (e && e.message) ? e.message : "";
+        if (m.indexOf("history-unavailable") !== -1) {
+          box.appendChild(el(doc, "p", t("borrow.settlements_unavailable", "Settlements unavailable on this node — switch nodes in Settings."), "muted"));
+          try {
+            if (typeof HistoryNotice !== "undefined" && HistoryNotice &&
+                typeof HistoryNotice.actionLink === "function") {
+              var link = HistoryNotice.actionLink(doc, t, "settings");
+              if (link) box.appendChild(link);
+            }
+          } catch (e2) { /* notice stands without the link */ }
+          return;
+        }
+        showError(doc, box, e, t("market.fail_settle", "Could not load settlement orders."));
       });
     });
   }

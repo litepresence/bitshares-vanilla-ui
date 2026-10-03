@@ -12,18 +12,51 @@ import json
 import sys
 
 LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
-ANCHOR = "network_testnet"  # insert new settings keys after this one
 
-NEW_KEYS = {
-    "settings.hist_yes": "History",
-    "settings.hist_no": "No history",
-    "settings.es_title": "Community history index",
-    "settings.es_toggle": "Enable community history (ElasticSearch)",
-    "settings.es_note": "Run by the community, not by this wallet — questions: t.me/bitsharesDEV. Turn off to use chain history only.",
-    "settings.testnet_hist": "Testnet: node history works here, but the community index covers mainnet only — index-powered features are unavailable.",
-}
+# Batches: (namespace, anchor-key, {full.key: english-default}). New keys go
+# after the anchor; en inventory kept sorted. Non-en dicts keep English
+# (honest stubs, never machine-translated).
+BATCHES = [
+    ("settings", "network_testnet", {
+        "settings.hist_yes": "History",
+        "settings.hist_no": "No history",
+        "settings.es_title": "Community history index",
+        "settings.es_toggle": "Enable community history (ElasticSearch)",
+        "settings.es_note": "Run by the community, not by this wallet — questions: t.me/bitsharesDEV. Turn off to use chain history only.",
+        "settings.testnet_hist": "Testnet: node history works here, but the community index covers mainnet only — index-powered features are unavailable.",
+    }),
+    ("market", "no_price_history", {
+        "market.load_deeper": "Load deeper history",
+        "market.back_to_live": "Back to live trades",
+    }),
+    ("borrow", "blank_wallet_account", {
+        "borrow.my_settlements": "My settlements",
+        "borrow.my_settlements_hint": "Force-settlement orders waiting at the feed price — yours or any account's, reads are public.",
+        "borrow.my_settlements_empty": "No open settlements for this account.",
+        "borrow.settlements_unavailable": "Settlements unavailable on this node — switch nodes in Settings.",
+    }),
+]
 
-NS, _, _ = "settings", None, None
+
+def apply_batch(data, ns, anchor, new_keys):
+    """Insert one batch into data[ns] after anchor (position-preserving
+    value sync; reruns self-heal to the script values, which must mirror
+    the t() defaults byte-for-byte). Returns True if the anchor existed."""
+    section = data.get(ns)
+    if not isinstance(section, dict) or anchor not in section:
+        return False
+    shorts = {}
+    for full, v in new_keys.items():
+        shorts[full.split(".", 1)[1]] = v
+    rebuilt = {}
+    for key, val in section.items():
+        rebuilt[key] = shorts.get(key, val)
+        if key == anchor:
+            for short, v in shorts.items():
+                if short not in section:
+                    rebuilt[short] = v
+    data[ns] = rebuilt
+    return True
 
 
 def main():
@@ -31,31 +64,18 @@ def main():
         path = "vanilla/locales/%s.json" % code
         with io.open(path, encoding="utf-8") as f:
             data = json.load(f)
-        settings = data.get("settings")
-        if not isinstance(settings, dict) or ANCHOR not in settings:
-            print("ANCHOR MISSING in %s" % path)
-            return 1
-        rebuilt = {}
-        for key, val in settings.items():
-            # Existing keys keep position but take the script value (script
-            # mirrors the t() defaults byte-for-byte; reruns self-heal).
-            if key in [f.split(".", 1)[1] for f in NEW_KEYS]:
-                for full, v in NEW_KEYS.items():
-                    if full.split(".", 1)[1] == key:
-                        rebuilt[key] = v
-                        break
-            else:
-                rebuilt[key] = val
-            if key == ANCHOR:
-                for full, v in NEW_KEYS.items():
-                    if full.split(".", 1)[1] not in settings:
-                        rebuilt[full.split(".", 1)[1]] = v
-        data["settings"] = rebuilt
-        if code == "en":
+        for ns, anchor, new_keys in BATCHES:
+            if not apply_batch(data, ns, anchor, new_keys):
+                print("ANCHOR %s.%s MISSING in %s" % (ns, anchor, path))
+                return 1
+        if code != "en":
+            pass  # inventory lives in en.json only (W1 precedent)
+        else:
             inv = data["_meta"]["translated"]
-            for full in NEW_KEYS:
-                if full not in inv:
-                    inv.append(full)
+            for _, _, new_keys in BATCHES:
+                for full in new_keys:
+                    if full not in inv:
+                        inv.append(full)
             inv.sort()
         with io.open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
