@@ -401,7 +401,10 @@ var InstantTradeUI = (function () {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
-    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.viewing_as", "Viewing as committee-account (1.2.0) — unlock to trade as your account."), "muted"));
+    if (!isUnlockedNow()) {
+      var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+      wrap.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+    }
     if (P.pairErr) {
       var pe = el(doc, "div", P.pairErr, "error");
       pe.setAttribute("aria-live", "polite"); wrap.appendChild(pe);
@@ -792,7 +795,7 @@ var InstantTradeUI = (function () {
       }
       try {
         var op = [Tx.OP.limit_order_create, {
-          fee: { amount: 0, asset_id: FEE_ASSET }, seller: VIEWING_AS_ID,
+          fee: { amount: 0, asset_id: FEE_ASSET }, seller: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0",
           amount_to_sell: { amount: String(sellRaw), asset_id: ctx.sellId },
           min_to_receive: { amount: String(receiveRaw), asset_id: ctx.receiveId },
           expiration: new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, -5),
@@ -894,7 +897,7 @@ var InstantTradeUI = (function () {
   async function reviewConvert(P) {
     var M = P.M, ctx = M.ctx;
     var locked = !isUnlockedNow();
-    var myId = locked ? VIEWING_AS_ID : await Account.myAccountId();
+    var myId = locked ? (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" : await Account.myAccountId();
     var me = await Account.resolve(myId).then(function (a) { return { id: myId, name: a.name }; });
     var sellRaw, receiveRaw, walk;
     if (P.activeInput === "receive" && (P.receiveAmount || "").trim()) {

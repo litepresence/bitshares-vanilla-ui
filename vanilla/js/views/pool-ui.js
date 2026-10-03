@@ -32,6 +32,9 @@ var PoolUI = (function () {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
   var gen = 0;
@@ -87,7 +90,8 @@ var PoolUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", "Viewing as " + VIEWING_AS_NAME + " (" + VIEWING_AS_ID + ") — unlock to act as your account.", "muted");
+    var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function dropSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
   function autoRetry(myGen, retryFn) {
@@ -470,7 +474,7 @@ var PoolUI = (function () {
     loadPage();
     (function () {
       var locked = !isUnlockedNow();
-      var idP = locked ? Promise.resolve(VIEWING_AS_ID) : Account.myAccountId();
+      var idP = locked ? Promise.resolve((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0") : Account.myAccountId();
       idP.then(function (id) { return Account.resolve(id); }).then(function (me) {
         if (myGen !== gen) return;
         if (locked) mineBox.appendChild(viewingAsNotice(doc));

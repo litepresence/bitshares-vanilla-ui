@@ -24,10 +24,13 @@ var AssetUI = (function () {
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
    * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
   var CORE = "1.3.0", SYM_RE = /^[A-Z0-9.]+$/;
@@ -258,10 +261,13 @@ var AssetUI = (function () {
      * get_required_fees) at review time in both states. */
     w.appendChild(el(d, "h1", t("asset.create_title", "Create asset")));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        w.appendChild(el(d, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
-    var issuer = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), null, "1.2.0");
+    var issuerDef = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0";
+    var issuer = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), null, issuerDef);
     w.appendChild(issuer.row);
     /* LOW punchlist: account-detached flow honesty — this page defaults to
      * the viewing-as account; opening it from an account page keeps context.
@@ -278,7 +284,7 @@ var AssetUI = (function () {
     /* Unlocked prefill: swap the public 1.2.0 default for the wallet account
      * (locked viewers keep 1.2.0). Null-tolerant, gen-guarded — manual stands. */
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
-      if (g === gen && issuer.input.value.trim() === "1.2.0") issuer.input.value = me.name; }).catch(function () { /* manual stands */ });
+      if (g === gen && issuer.input.value.trim() === issuerDef) issuer.input.value = me.name; }).catch(function () { /* manual stands */ });
     var tab = "uia", bar = el(d, "div", null, "vote-tabs"); w.appendChild(bar);
     var body = el(d, "div", null, "asset-create"); w.appendChild(body);
     function draw() {
@@ -389,7 +395,7 @@ var AssetUI = (function () {
           var db = await Chain.db();
           var taken = await Chain.call(db, "lookup_asset_symbols", [[symbol]]);
           if (taken && taken[0]) throw new Error("symbol-taken");
-          var me = await Account.resolve(issuer.input.value.trim() || "1.2.0");
+          var me = await Account.resolve(issuer.input.value.trim() || issuerDef);
           var perms = pg.read(), flags = fg.read();
           if (!smart) { perms &= ~(128 | 256 | 32); flags &= ~(128 | 256); }
           var nftObj = null;

@@ -22,10 +22,13 @@ var HtlcUI = (function () {
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
    * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
   var gen = 0;
@@ -73,7 +76,8 @@ var HtlcUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", "Viewing as " + VIEWING_AS_NAME + " (" + VIEWING_AS_ID + ") — unlock to act as your account.", "muted");
+    var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
     return el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
@@ -136,7 +140,7 @@ var HtlcUI = (function () {
     showError(doc, failed, e, fallback); offlineBox(doc, failed, retry);
   }
   function loadAccount(myGen, loader) { /* wallet account when unlocked, else committee-account 1.2.0; stale gens bail */
-    return Account.myAccountId().catch(function () { return VIEWING_AS_ID; })
+    return Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; })
       .then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return null;
       return loader(me).then(function (data) { return { me: me, data: data }; }); });

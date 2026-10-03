@@ -129,17 +129,19 @@ var TicketUI = (function () {
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.tickets_lock_funds_for_vote_weight_there_is_n", "Tickets lock funds for vote weight. There is no delete operation, so every ticket row is permanent."), "muted"));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     var go = ui.touchable(ui.el(doc, "button", t("ticket.load_leaderboard", "Load leaderboard"))); go.type = "button"; ctx.wrap.appendChild(go);
     var boardBox = ui.el(doc, "div"); ctx.wrap.appendChild(boardBox);
-    var fM = ui.field(doc, t("ticket.my_account", "My account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fM = ui.field(doc, t("ticket.my_account", "My account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     ctx.wrap.appendChild(fM.row);
     var mine = ui.touchable(ui.el(doc, "button", t("ticket.my_tickets", "My tickets"))); mine.type = "button"; ctx.wrap.appendChild(mine);
     var mineBox = ui.el(doc, "div"); ctx.wrap.appendChild(mineBox);
     ctx.wrap.appendChild(ui.el(doc, "h2", t("ticket.create_ticket", "Create ticket")));
-    var fA = ui.field(doc, t("ticket.account", "Account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fA = ui.field(doc, t("ticket.account", "Account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var fS = ui.field(doc, t("ticket.asset", "Asset"), { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
     var fQ = ui.field(doc, t("ticket.amount", "Amount"), { placeholder: "1.5", inputmode: "decimal" });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fS.row); ctx.wrap.appendChild(fQ.row);
@@ -164,13 +166,13 @@ var TicketUI = (function () {
     mine.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; mine.disabled = true; ui.clearBox(mineBox);
       ui.showStatus(doc, mineBox, t("ticket.loading_my_tickets", "Loading my tickets…"));
-      ProposalTicket.ticketsByAccount(fM.input.value.trim() || "1.2.0").then(function (rows) {
+      ProposalTicket.ticketsByAccount(fM.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0")).then(function (rows) {
         if (!live(myGen, uiGen)) return; drawRows(mineBox, rows, true); mine.disabled = false;
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(mineBox); ui.showError(doc, mineBox, e, t("ticket.could_not_load_tickets", "Could not load tickets.")); mine.disabled = false; });
     });
     ui.reviewSection(doc, cbox, uiGen, t("ticket.review_ticket", "Review ticket"), {
       build: async function () {
-        var acct = await Account.resolve(fA.input.value.trim() || "1.2.0"), info = await Asset.describe(fS.input.value.trim() || "BTS");
+        var acct = await Account.resolve(fA.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0")), info = await Asset.describe(fS.input.value.trim() || "BTS");
         var raw = Format.parseAmount(fQ.input.value.trim(), info.precision);
         if (BigInt(raw) <= 0n) throw new Error(t("ticket.ticket_amount_must_be_0", "Ticket amount must be > 0."));
         var before = (await ProposalTicket.ticketsByAccount(acct.name || acct.id, {})).length;
@@ -217,10 +219,12 @@ var TicketUI = (function () {
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.airdrop_note_tpl", "No airdrop operation exists on chain — this calculator emits batches of plain asset-issue (op 14). You must be the asset issuer. Batches chunk at %(n)s issues per transaction until testnet sizes them (ambiguity J).", { n: AIRDROP_CHUNK }), "muted"));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v2 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
-    var fI = ui.field(doc, t("ticket.issuer_account", "Issuer account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fI = ui.field(doc, t("ticket.issuer_account", "Issuer account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var fS = ui.field(doc, t("ticket.asset", "Asset"), { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fI.row); ctx.wrap.appendChild(fS.row);
     var area = doc.createElement("textarea");
@@ -232,7 +236,7 @@ var TicketUI = (function () {
       if (!live(myGen, uiGen)) return; prev.disabled = true; ui.clearBox(box);
       ui.showStatus(doc, box, t("ticket.resolving_recipients", "Resolving recipients…"));
       Promise.resolve().then(async function () {
-        var issuer = await Account.resolve(fI.input.value.trim() || "1.2.0");
+        var issuer = await Account.resolve(fI.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
         var info = await Asset.describe(fS.input.value.trim());
         var objs = await Chain.call(await Chain.db(), "get_objects", [[info.id]]);
         if (!objs || !objs[0] || objs[0].issuer !== issuer.id)

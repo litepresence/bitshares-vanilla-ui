@@ -109,7 +109,7 @@ var DebitUI = (function () {
   function createUpdateBox(u, doc, box, me, lists, myGen) { /* fee RE-READ at review; update gets old→new rows */
     var locked = !u.isUnlockedNow();
     var fPerm = u.field(doc, t("debit.perm_field", "Permission id (update only, else blank)"), { placeholder: "1.12.N" });
-    var fAuth = u.field(doc, t("debit.auth_field", "Authorized account"), locked ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" } : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+    var fAuth = u.field(doc, t("debit.auth_field", "Authorized account"), locked ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" } : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
     var fAsset = u.field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
     var fLimit = u.field(doc, t("debit.limit_field", "Limit per period"), { placeholder: "10", inputmode: "decimal" });
     var fCount = u.field(doc, t("debit.count_field", "Period count"), { value: "12", inputmode: "numeric" });
@@ -274,7 +274,7 @@ var DebitUI = (function () {
       previewBtn.disabled = true;
       u.showStatus(doc, out,t("debit.computing", "Computing order ladder…"));
       Promise.resolve().then(async function () {
-        var actId = await Account.myAccountId().catch(function () { return u.viewingAsId; });
+        var actId = await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; });
         var me = await Account.resolve(actId);
         var sell = await Asset.describe(fSell.input.value.trim() || "BTS");
         var recv = await Asset.describe(fRecv.input.value.trim() || "USD");

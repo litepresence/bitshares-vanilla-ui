@@ -116,7 +116,7 @@ var CreditDetailUI = (function () {
     var ui = U(), lockedA = false;
     try { lockedA = !ui.isUnlockedNow(); } catch (e) { lockedA = false; }
     var fBor = ui.field(doc, t("credit.borrower", "Borrower"), lockedA
-      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: ui.viewingAsId }
+      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
     var fAmt = ui.field(doc, t("credit.accept_borrow_amt_tpl", "Borrow amount (%(sym)s)", { sym: a.symbol }), { placeholder: "0.0", inputmode: "decimal" });
     var fCollA = ui.field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
@@ -137,7 +137,7 @@ var CreditDetailUI = (function () {
     ui.reviewSection(doc, box, uiGen, t("credit.review_accept", "Review accept"), {
       build: async function () {
         var bor = fBor.input.value.trim() ? await Account.resolve(fBor.input.value.trim())
-          : await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var borrowRaw = Format.parseAmount(fAmt.input.value.trim(), a.precision);
         var ca = await Asset.describe(fCollA.input.value.trim());
         var collRaw = Format.parseAmount(fColl.input.value.trim(), ca.precision);
@@ -198,7 +198,7 @@ var CreditDetailUI = (function () {
           var deal = null;
           deals.forEach(function (d) { if (d.id === sel.value) deal = d; });
           if (!deal) throw new Error("unknown-deal");
-          var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
           var prec = (deal.debt_prec === null || deal.debt_prec === undefined) ? a.precision : deal.debt_prec;
           var repayRaw = Format.parseAmount(fRepay.input.value.trim(), prec);
           var feeRaw = Credit.creditFee(repayRaw, deal.rate_units);
@@ -230,7 +230,7 @@ var CreditDetailUI = (function () {
           var deal = null;
           deals.forEach(function (d) { if (d.id === sel.value) deal = d; });
           if (!deal) throw new Error("unknown-deal");
-          var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
           var n = 0; arInputs.forEach(function (r) { if (r.checked) n = parseInt(r.value, 10); });
           var pair = Credit.buildDealUpdate({ accountId: me.id, dealId: deal.id, autoRepay: n });
           return { pair: pair, fee: await Credit.fee(pair, "1.3.0"), me: me, deal: deal, n: n,

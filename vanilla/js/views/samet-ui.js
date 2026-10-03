@@ -110,9 +110,9 @@ var SametUI = (function () {
         if (!live(myGen, uiGen)) return; ui.clearBox(listBox); ui.showError(doc, listBox, e, t("samet.could_not_load_funds", "Could not load funds."));
       }).then(function () { go.disabled = false; });
     });
-    Account.myAccountId().catch(function () { return ui.viewingAsId; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
+    Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (!live(myGen, uiGen)) return;
-      if (lockedS) mineBox.appendChild(ui.el(doc, "p", t("samet.viewing_as", "Viewing as committee-account (1.2.0)."), "muted"));
+      if (lockedS) mineBox.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: me.name, id: me.id }), "muted"));
       CreditSamet.fundsByOwner(me.id, {}).then(function (rows) {
         if (!live(myGen, uiGen)) return; draw(mineBox, rows, true);
       }).catch(function () {
@@ -199,7 +199,7 @@ var SametUI = (function () {
         ui.clearBox(comboOut); goBtn.disabled = true;
         ui.showStatus(doc, comboOut, t("samet.resolving_and_estimating_fees", "Resolving and estimating fees…"));
         (async function () {
-          var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
           var prec = await fundPrec(f), sym = f.sym || f.asset_id;
           var borrowRaw = Format.parseAmount(fB.input.value.trim(), prec);
           var rpV = fRP.input.value.trim();
@@ -263,7 +263,7 @@ var SametUI = (function () {
         gate.appendChild(ui.el(doc, "p", "Unpaid now: " + now.text + ". Hint: quoted fee = ceil(amount × " + Credit.rateUnitsToHuman(f.rate_units) + "%).", "muted"));
         ui.reviewSection(doc, gate, uiGen, t("samet.review_repay", "Review repay"), {
           build: async function () {
-            var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+            var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
             var repayRaw = Format.parseAmount(fR.input.value.trim(), prec);
             var feeRaw = Format.parseAmount(fF.input.value.trim(), prec);
             var pair = CreditSamet.buildSametRepay({ accountId: me.id, fundId: f.id,
@@ -292,7 +292,7 @@ var SametUI = (function () {
       out.appendChild(fD.row); out.appendChild(fN.row);
       ui.reviewSection(doc, out, uiGen, t("samet.review_update", "Review update"), {
         build: async function () {
-          var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
           var prec = await fundPrec(f);
           var dv = fD.input.value.trim(), deltaRaw = null;
           if (dv) {
@@ -318,7 +318,7 @@ var SametUI = (function () {
     } else {
       ui.reviewSection(doc, out, uiGen, t("samet.review_delete", "Review delete"), {
         build: async function () {
-          var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+          var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
           var pair = CreditSamet.buildSametDelete({ accountId: me.id, fundId: f.id });
           return { pair: pair, fee: await withFee(pair), me: me,
             prove: async function () {
@@ -340,7 +340,7 @@ var SametUI = (function () {
     [fAsset, fBal, fRate].forEach(function (f) { box.appendChild(f.row); });
     ui.reviewSection(doc, box, uiGen, t("samet.review_create", "Review create"), {
       build: async function () {
-        var me = await Account.resolve(await Account.myAccountId().catch(function () { return ui.viewingAsId; }));
+        var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var a = await Asset.describe(fAsset.input.value.trim());
         var balRaw = Format.parseAmount(fBal.input.value.trim(), a.precision);
         var pair = CreditSamet.buildSametCreate({ accountId: me.id, assetId: a.id,

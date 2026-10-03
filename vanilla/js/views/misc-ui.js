@@ -86,10 +86,12 @@ var MiscUI = (function () {
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.custom_authorities_restrict_which_operations", "Custom authorities restrict which operations an account key may sign. The chain has no list method — look authorities up by explicit 1.17.x id. Issuer-only override_transfer (op 38) is not offered here."), "muted"));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(ui.el(doc, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
-    var fA = ui.field(doc, t("misc.account_or_authority_id", "Account or authority id"), { placeholder: t("misc.name_1_2_n_or_1_17_n", "name, 1.2.N or 1.17.N"), value: "1.2.0" });
+    var fA = ui.field(doc, t("misc.account_or_authority_id", "Account or authority id"), { placeholder: t("misc.name_1_2_n_or_1_17_n", "name, 1.2.N or 1.17.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     ctx.wrap.appendChild(fA.row);
     var go = ui.touchable(ui.el(doc, "button", t("misc.look_up", "Look up"))); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);
@@ -175,7 +177,7 @@ var MiscUI = (function () {
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, t("misc.lookup_failed", "Lookup failed.")); go.disabled = false; });
     });
     ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.create_authority_op_54", "Create authority (op 54)")));
-    var cA = ui.field(doc, t("misc.account", "Account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var cA = ui.field(doc, t("misc.account", "Account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var cF = ui.field(doc, t("misc.valid_from_2", "Valid from"), { type: "datetime-local" });
     var cT = ui.field(doc, t("misc.valid_to_2", "Valid to"), { type: "datetime-local" });
     var cO = ui.field(doc, t("misc.operation_type_number", "Operation type number"), { placeholder: t("misc.0_transfer", "0 = transfer"), inputmode: "numeric" });
@@ -203,7 +205,7 @@ var MiscUI = (function () {
     var crbox = ui.el(doc, "div"); ctx.wrap.appendChild(crbox);
     ui.reviewSection(doc, crbox, uiGen, t("misc.review_authority", "Review authority"), {
       build: async function () {
-        var acct = await Account.resolve(cA.input.value.trim() || "1.2.0");
+        var acct = await Account.resolve(cA.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
         var auth = { weight_threshold: parseInt(cTh.input.value.trim() || "1", 10), account_auths: [], key_auths: [], address_auths: [] };
         if (cK.input.value.trim() !== "") auth.key_auths = [[cK.input.value.trim(), 1]];
         var pair = ProposalMisc.buildAuthorityCreate({ accountId: acct.id, enabled: !!en.checked,
@@ -239,10 +241,12 @@ var MiscUI = (function () {
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.listing_is_a_bitfield_none_0_whitelisted_1_bl", "Listing is a bitfield: none 0, whitelisted 1, blacklisted 2, both 3. Adding ORs the bit; removing subtracts it."), "muted"));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(ui.el(doc, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v2 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
-    var fA = ui.field(doc, t("misc.authorizing_account", "Authorizing account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fA = ui.field(doc, t("misc.authorizing_account", "Authorizing account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var fL = ui.field(doc, t("misc.counterparty", "Counterparty"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N") });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fL.row);
     var go = ui.touchable(ui.el(doc, "button", t("misc.check_current", "Check current"))); go.type = "button"; ctx.wrap.appendChild(go);
@@ -269,7 +273,7 @@ var MiscUI = (function () {
       if (!live(myGen, uiGen)) return; go.disabled = true; ui.clearBox(box);
       ui.showStatus(doc, box, t("misc.reading_current_listing", "Reading current listing…"));
       Promise.resolve().then(async function () {
-        var auth = await Account.resolve(fA.input.value.trim() || "1.2.0"), listee = await Account.resolve(fL.input.value.trim() || "1.2.0");
+        var auth = await Account.resolve(fA.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0")), listee = await Account.resolve(fL.input.value.trim() || "1.2.0");
         var rows = await Chain.call(await Chain.db(), "get_accounts", [[auth.id]]);
         var full = (rows && rows[0]) || {};
         var cur = ((full.whitelisted_accounts || []).indexOf(listee.id) !== -1 ? 1 : 0) +

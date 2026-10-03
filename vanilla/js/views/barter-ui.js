@@ -103,7 +103,8 @@ var BarterUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", t("barter.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted");
+    var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
     return el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
@@ -159,7 +160,7 @@ var BarterUI = (function () {
     if (lockedBar) wrap.appendChild(viewingAsNotice(doc));
     wrap.appendChild(el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
     var fA = field(doc, t("barter.peer_a_account", "Peer A account"), lockedBar
-      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: VIEWING_AS_ID }
+      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
     wrap.appendChild(fA.row);
     wrap.appendChild(el(doc, "h2", t("barter.a_gives", "A gives")));
@@ -168,7 +169,7 @@ var BarterUI = (function () {
     var addA = touchable(el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; wrap.appendChild(addA);
     addA.addEventListener("click", function () { legsA.push(legRow(doc, boxA)); });
     var fB = field(doc, t("barter.peer_b_account", "Peer B account"), lockedBar
-      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: VIEWING_AS_ID }
+      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
     wrap.appendChild(fB.row);
     wrap.appendChild(el(doc, "h2", t("barter.b_gives", "B gives")));

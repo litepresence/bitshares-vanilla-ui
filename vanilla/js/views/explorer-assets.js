@@ -984,8 +984,10 @@ var ExplorerAssets = (function () {
         if (poolRaw !== null) pPool.title = poolRaw;
         actBox.appendChild(pPool);
         try {
-          if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-            actBox.appendChild(el(doc, "p", t("explorer.viewing_as_committee", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+          if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+            var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+            actBox.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+          }
         } catch (e) { /* notice is display-only */ }
         function fundField(label, val, mode, ph) {
           var row = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", label + " ");
@@ -996,7 +998,7 @@ var ExplorerAssets = (function () {
           lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
         }
         var amtF = fundField(t("explorer.fund_amount_label", "Amount (core, human — e.g. 0.1)"), "0.1", "decimal", "0.1");
-        var whoF = fundField(t("explorer.fund_from_label", "From account (name or 1.2.N)"), "1.2.0", null, "1.2.0");
+        var whoF = fundField(t("explorer.fund_from_label", "From account (name or 1.2.N)"), (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0", null, "1.2.0");
         actBox.appendChild(amtF.row); actBox.appendChild(whoF.row);
         var review = touchable(el(doc, "button", t("explorer.review_funding", "Review funding")));
         review.type = "button"; actBox.appendChild(review);
@@ -1021,7 +1023,7 @@ var ExplorerAssets = (function () {
             var amountHuman = (amtF.input.value || "").trim();
             var raw = Format.parseAmount(amountHuman, CORE_PRECISION);
             if (!/[1-9]/.test(raw)) throw new Error(t("explorer.fund_amount_zero", "Amount must be greater than zero."));
-            var from = await Account.resolve((whoF.input.value || "").trim() || "1.2.0");
+            var from = await Account.resolve((whoF.input.value || "").trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
             var before = poolRaw;
             var pair = AssetOps.buildFundFeePool({
               fromAccountId: from.id, assetId: a.id,

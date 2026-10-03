@@ -119,6 +119,9 @@ var TransferUI = (function () {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
 
@@ -295,8 +298,8 @@ var TransferUI = (function () {
     }
 
     wrap.appendChild(el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
-    Account.myAccountId().catch(function () { return "1.2.0"; }).then(function (id) {
-      return Account.resolve(id).catch(function () { return { id: "1.2.0", name: "committee-account" }; });
+    Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }).then(function (id) {
+      return Account.resolve(id).catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" }; });
     }).then(function (from) {
       clearRoot(root);
       var q = hashQuery();
@@ -329,7 +332,7 @@ var TransferUI = (function () {
     wrap.appendChild(el(doc, "h1", t("transfer.title", "Transfer")));
     if (locked) {
       wrap.appendChild(el(doc, "p",
-        t("transfer.viewing_as_committee", "Viewing as committee-account (1.2.0) — public data visible while locked; password is asked only at signing."), "muted"));
+        t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: from.name, id: from.id }), "muted"));
     }
 
     if (state.error) showError(doc, wrap, state.error, t("transfer.prepare_failed", "Could not prepare the transfer."));
@@ -454,7 +457,7 @@ var TransferUI = (function () {
      * object) else the wallet sender; expiry defaults +24h; review blank. */
     var proposerF = fieldRow(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)"), {
       id: "xfer-proposer",
-      value: (state && state.proposer) || (locked ? "1.2.0" : (state.from || from.name)),
+      value: (state && state.proposer) || (locked ? (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" : (state.from || from.name)),
       placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off"
     });
     var expiryF = fieldRow(doc, t("barter.proposal_expiration", "Proposal expiration"), {
@@ -1024,7 +1027,7 @@ var TransferUI = (function () {
     function done() { reviewBtn.disabled = false; }
     Promise.resolve().then(async function () {
       if (!vals.to || !String(vals.to).trim()) throw new Error(t("transfer.recipient_required", "Recipient is required."));
-      var fromAcc = await Account.resolve(String(vals.from || "").trim() || "1.2.0");
+      var fromAcc = await Account.resolve(String(vals.from || "").trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
       var to = await Account.resolve(String(vals.to).trim());
       var asset = await lookupAssetLocal(vals.asset);
       var amountInt;
@@ -1180,7 +1183,7 @@ var TransferUI = (function () {
     if (!snap.to || !String(snap.to).trim()) {
       throw new Error(t("transfer.recipient_required", "Recipient is required."));
     }
-    var fromAcc = await Account.resolve(String(snap.from || "").trim() || "1.2.0");
+    var fromAcc = await Account.resolve(String(snap.from || "").trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
     var to = await Account.resolve(String(snap.to).trim());
     if (fromAcc.id === to.id) throw new Error(t("transfer.sender_recipient_different", "Sender and recipient must be different."));
     var asset = await lookupAssetLocal(snap.asset);
@@ -1393,7 +1396,7 @@ var TransferUI = (function () {
         throw new Error(t("transfer.proposal_backend_missing", "Proposal backend missing: js/proposal.js failed to load."));
       }
       var wid = await Account.myAccountId();
-      var proposer = await Account.resolve(String(snap.proposer || "").trim() || "1.2.0");
+      var proposer = await Account.resolve(String(snap.proposer || "").trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
       if (proposer.id !== wid) {
         throw new Error(t("transfer.proposer_mismatch_prefix", "Proposer must match the unlocked wallet account (fee-payer signs) — got ") +
           proposer.name + " (" + proposer.id + t("transfer.proposer_mismatch_wallet_mid", "), wallet is ") + wid + ".");
@@ -1444,7 +1447,7 @@ var TransferUI = (function () {
       if (typeof Proposal === "undefined" || !Proposal || typeof Proposal.buildCreate !== "function") {
         throw new Error(t("transfer.proposal_backend_missing", "Proposal backend missing: js/proposal.js failed to load."));
       }
-      var proposer = await Account.resolve(String(vals.proposer || "").trim() || "1.2.0");
+      var proposer = await Account.resolve(String(vals.proposer || "").trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
       var leg = await resolveProposeLeg(vals, true);
       var expIso = normaliseExpiration(vals.expiration);
       var rev = parseReviewPeriod(vals.reviewPeriod);

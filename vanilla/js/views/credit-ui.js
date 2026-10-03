@@ -88,7 +88,8 @@ var CreditUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", t("credit.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted");
+    var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
     return el(doc, "p", t("credit.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
@@ -420,7 +421,7 @@ var CreditUI = (function () {
       [t("credit.max_duration", "Max duration"), Credit.durToHuman(o.max_dur_sec)]]));
     if (locked) panel.appendChild(signNotice(doc));
     var fBor = field(doc, t("credit.borrower", "Borrower"), locked
-      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
     var fAmt = field(doc, t("credit.accept_borrow_amt_tpl", "Borrow amount (%(sym)s)", { sym: (o.sym || o.asset_id) }), { placeholder: "0.0", inputmode: "decimal" });
     var fCollA = field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
@@ -441,7 +442,7 @@ var CreditUI = (function () {
     reviewSection(doc, panel, myGen, t("credit.review_accept", "Review accept"), {
       build: async function () {
         var bor = fBor.input.value.trim() ? await Account.resolve(fBor.input.value.trim())
-          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var a = await Asset.describe(o.asset_id);
         var borrowRaw = Format.parseAmount(fAmt.input.value.trim(), a.precision);
         var ca = await Asset.describe(fCollA.input.value.trim());
@@ -489,7 +490,7 @@ var CreditUI = (function () {
     if (locked0) ctx.wrap.appendChild(viewingAsNotice(doc));
     ctx.wrap.appendChild(el(doc, "p", t("credit.lend_assets_at_a_fee_rate_a_borrower_accepts", "Lend assets at a fee rate. A borrower accepts an offer and a credit deal appears. Rates are percent at denom 1,000,000 — 0.1% stores 1000 units."), "muted"));
     var fO = field(doc, t("credit.owner", "Owner"), locked0
-      ? { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N"), value: VIEWING_AS_ID }
+      ? { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N") });
     var fA = field(doc, t("credit.asset", "Asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fO.row); ctx.wrap.appendChild(fA.row);
@@ -524,7 +525,7 @@ var CreditUI = (function () {
         return Credit.offers({});
       }));
     });
-    Account.myAccountId().catch(function () { return VIEWING_AS_ID; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
+    Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return;
       if (!isUnlockedNow()) mineBox.appendChild(viewingAsNotice(doc));
       Credit.offersByOwner(me.id, {}).then(function (rows) {
@@ -572,7 +573,7 @@ var CreditUI = (function () {
   function createBox(doc, box, myGen) {
     var lockedC = !isUnlockedNow();
     var fAcct = field(doc, t("credit.owner_account", "Owner account"), lockedC
-      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
     var fAsset = field(doc, t("credit.asset", "Asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     var fBal = field(doc, t("credit.balance", "Balance"), { placeholder: "0.0", inputmode: "decimal" });
@@ -601,7 +602,7 @@ var CreditUI = (function () {
     reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
         var me = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
-          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var a = await Asset.describe(fAsset.input.value.trim());
         var balRaw = Format.parseAmount(fBal.input.value.trim(), a.precision);
         var minRaw = Format.parseAmount(fMin.input.value.trim(), a.precision);

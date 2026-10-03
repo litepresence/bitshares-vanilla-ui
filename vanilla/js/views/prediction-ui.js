@@ -732,12 +732,13 @@ var PredictionUI = (function () {
      * never fabricated). textContent only. */
     wrap.appendChild(el(doc, "h2", t("prediction.portfolio", "Portfolio")));
     if (!isUnlockedNow()) {
-      wrap.appendChild(el(doc, "p", t("borrow.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted"));
+      var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+      wrap.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
     }
     wrap.appendChild(el(doc, "p", t("prediction.portfolio_hint", "Holdings are PMA balances joined to the scan; avg cost replays fill history (chain-history only)."), "muted"));
     wrap.appendChild(el(doc, "p", t("prediction.filter_hint", "Active = unexpired and unsettled (closing soon first); Expired = past expiry awaiting resolution; My = created or held by the wallet account."), "muted"));
     var pfAccount = pField(t("borrow.account", "Account"), !isUnlockedNow()
-      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(pfAccount.row);
     if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
@@ -759,7 +760,7 @@ var PredictionUI = (function () {
       Promise.resolve().then(async function () {
         var input = (pfAccount.input.value || "").trim();
         var me = input ? await Account.resolve(input)
-          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var bals = await Account.balances(me.id);
         var byId = {};
         (cache.rows || []).forEach(function (r) {

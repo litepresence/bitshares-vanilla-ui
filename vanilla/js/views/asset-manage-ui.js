@@ -26,10 +26,13 @@ var AssetManageUI = (function () {
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
    * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
   var CORE = "1.3.0", gen = 0;
@@ -138,8 +141,10 @@ var AssetManageUI = (function () {
     if (cold(d, w, root, function () { renderUpdate(root, symbol); })) return;
     /* No entry unlock gate: reads are public; signing gates in publish(). */
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        w.appendChild(el(d, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        w.appendChild(el(d, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     if (!symbol) { w.appendChild(el(d, "h1", t("asset.update_title", "Update asset"))); err(d, w,new Error("unknown-asset"),t("barter.unknown_asset", "Unknown asset.")); return; }
     w.appendChild(el(d, "h1", "Update " + symbol)); status(d, w, t("explorer.loading_asset", "Loading asset…"));
@@ -152,8 +157,10 @@ var AssetManageUI = (function () {
       if (g !== gen) return; wipe(root);
       var v = wrap(d, root); v.appendChild(el(d, "h1", "Update " + info.symbol));
       try {
-        if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-          v.appendChild(el(d, "p", t("misc.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+        if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+          var _v2 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+          v.appendChild(el(d, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
+        }
       } catch (e) { /* notice is display-only */ }
       /* Public read panel first: symbol/id/issuer/precision/supply/fee. */
       (function () {
@@ -262,7 +269,7 @@ var AssetManageUI = (function () {
     var s = field(d, t("explorer.th_symbol", "Symbol"), null, "", null, false, "AFKTEST01");
     var toF = isReserve ? null : field(d, t("asset.to_field", "To (name or 1.2.N)"), null, "");
     var a = field(d, t("asset.amount_field", "Amount (human)"), null, "1", "decimal");
-    var who = field(d, isReserve ? t("asset.payer_field", "Payer (name or 1.2.N)") : t("asset.acting_field", "Acting account (name or 1.2.N)"), null, "1.2.0");
+    var who = field(d, isReserve ? t("asset.payer_field", "Payer (name or 1.2.N)") : t("asset.acting_field", "Acting account (name or 1.2.N)"), null, (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0");
     v.appendChild(s.row); if (toF) v.appendChild(toF.row); v.appendChild(a.row); v.appendChild(who.row);
     var r = touch(el(d, "button", btnLabel)); r.type = "button"; v.appendChild(r);
     r.addEventListener("click", function () { r.disabled = true;
@@ -274,7 +281,7 @@ var AssetManageUI = (function () {
         if (!/[1-9]/.test(raw)) throw new Error(t("transfer.amount_positive", "Amount must be greater than zero."));
         /* Explicit acting account (public default 1.2.0) — never
          * myAccountId at render; the wallet is proven only at sign time. */
-        var me = await Account.resolve(who.input.value.trim() || "1.2.0");
+        var me = await Account.resolve(who.input.value.trim() || ((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"));
         if (isReserve && me.id !== info.issuer_id) throw new Error("not-issuer");
         var to = isReserve ? null : await Account.resolve(toF.input.value.trim());
         var pair = isReserve
@@ -309,8 +316,10 @@ var AssetManageUI = (function () {
     /* No entry unlock gate: reads/preview are public; signing gates in publish(). */
     v.appendChild(el(d, "h1", t("asset.issue_title", "Issue / reserve")));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        v.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v3 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        v.appendChild(el(d, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v3.name, id: _v3.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     half(d, v, root, g, t("asset.issue_op14_title", "Issue to account (op 14)"), t("asset.review_issue", "Review issue"), false);
     half(d, v, root, g, t("asset.reserve_op15_title", "Reserve / burn back (op 15)"), t("asset.review_reserve", "Review reserve"), true);

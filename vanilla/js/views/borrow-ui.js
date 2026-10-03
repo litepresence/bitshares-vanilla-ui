@@ -86,7 +86,8 @@ var BorrowUI = (function () {
     } catch (e) { return false; }
   }
   function viewingAsNotice(doc) {
-    return el(doc, "p", t("borrow.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted");
+    var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
     return el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
@@ -185,7 +186,7 @@ var BorrowUI = (function () {
     if (lockedB) ctx.wrap.appendChild(viewingAsNotice(doc));
     ctx.wrap.appendChild(el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op 3 (call_order_update) on your call order."), "muted"));
     var fAcct = field(doc, t("borrow.account", "Account"), lockedB
-      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     ctx.wrap.appendChild(fAcct.row);
     var go = touchable(el(doc, "button", t("borrow.load_positions", "Load positions"))); go.type = "button"; ctx.wrap.appendChild(go);
@@ -210,7 +211,7 @@ var BorrowUI = (function () {
       showStatus(doc, listBox, t("borrow.loading_positions", "Loading positions…"));
       Promise.resolve().then(async function () {
         var me = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
-          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var rows = await Credit.positions(me.id);
         /* R1e CR enrichment: one bitasset_data read per unique debt leg, then
          * previewRatio (Format-only math) per position. Fail-open: a feed miss
@@ -516,7 +517,7 @@ var BorrowUI = (function () {
     var lockedOpen = !isUnlockedNow();
     if (lockedOpen) box.appendChild(signNotice(doc));
     var fAcct = field(doc, t("borrow.account", "Account"), lockedOpen
-      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     var fCollA = field(doc, t("borrow.collateral_asset_symbol_or_1_3_x", "Collateral asset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bts", "e.g. BTS") });
     var fDebtA = field(doc, t("borrow.debt_bitasset_symbol_or_1_3_x", "Debt bitasset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
@@ -540,7 +541,7 @@ var BorrowUI = (function () {
         if (!fColl.input.value.trim() || !fDebt.input.value.trim())
           throw new Error(t("borrow.enter_both_amounts_first", "Enter both amounts first."));
         var acct = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
-          : await Account.resolve(await Account.myAccountId().catch(function () { return VIEWING_AS_ID; }));
+          : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
         var coll = await Asset.describe(fCollA.input.value.trim());
         var debt = await Asset.describe(fDebtA.input.value.trim());
         if (!debt.is_smartcoin) throw new Error("not-bitasset (" + debt.symbol + t("borrow.is_not_a_bitasset_no_margin", " is not a bitasset — no margin)"));
@@ -668,9 +669,9 @@ var BorrowUI = (function () {
           var acct = await Account.resolve(input);
           id = acct && acct.id;
         } else if (typeof Account.myAccountId === "function") {
-          id = await Account.myAccountId().catch(function () { return VIEWING_AS_ID; });
+          id = await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; });
         } else {
-          id = VIEWING_AS_ID;
+          id = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0";
         }
         if (!/^1\.2\.\d+$/.test(id || "")) throw new Error("unknown-account");
         if (typeof Market === "undefined" || !Market || typeof Market.mySettlements !== "function") throw new Error("settle backend missing");
@@ -884,7 +885,7 @@ var BorrowUI = (function () {
     box.appendChild(el(doc, "h3", t("borrow.place_a_bid", "Place a bid")));
     var lockedBid = !isUnlockedNow();
     var fBidder = field(doc, t("borrow.bidder_blank_wallet_account", "Bidder (blank = wallet account)"), lockedBid
-      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: VIEWING_AS_ID }
+      ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     var fColl = field(doc, t("borrow.coll_units_tpl", "Collateral (%(id)s units)", { id: R.backingId }), { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
     var fDebt = field(doc, t("borrow.debt_units_tpl", "Debt to cover (%(sym)s units)", { sym: R.asset.symbol }), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
@@ -901,7 +902,7 @@ var BorrowUI = (function () {
       showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       Promise.resolve().then(async function () {
         var bidderId = fBidder.input.value.trim() ? (await Account.resolve(fBidder.input.value.trim())).id
-          : await Account.myAccountId().catch(function () { return VIEWING_AS_ID; });
+          : await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; });
         var collRaw = Format.parseAmount(fColl.input.value, R.backingPrec);
         var debtRaw = Format.parseAmount(fDebt.input.value, R.debtPrec);
         if (BigInt(collRaw) <= 0n || BigInt(debtRaw) <= 0n) {

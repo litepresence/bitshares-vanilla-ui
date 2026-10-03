@@ -94,6 +94,9 @@ var VoteUI = (function () {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
 
@@ -226,7 +229,7 @@ var VoteUI = (function () {
     Account.myAccountId().then(function (id) {
       return Account.resolve(id);
     }).catch(function () {
-      return Account.resolve("1.2.0");
+      return Account.resolve((typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0");
     }).then(function (me) {
       if (myGen !== gen) return;
       loadAll(root, doc, me, myGen);
@@ -236,7 +239,7 @@ var VoteUI = (function () {
       var failed = makeWrap(doc, root);
       failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
       showError(doc, failed, e, t("vote.load_account_failed", "Could not load your account."));
-      showAccountPicker(doc, failed, root, myGen, "1.2.0");
+      showAccountPicker(doc, failed, root, myGen, (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0");
     });
   }
 
@@ -328,7 +331,7 @@ var VoteUI = (function () {
     try {
       var lockedView = (typeof Wallet === "undefined" || typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked());
       if (lockedView || (me && me.id === "1.2.0"))
-        wrap.appendChild(el(doc, "p", t("vote.viewing_as", "Viewing as committee-account (1.2.0) — unlock to vote as yourself."), "muted"));
+        wrap.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: me.name, id: me.id }), "muted"));
     } catch (e) { /* notice is display-only */ }
 
     /* Punchlist gov row (see header): join entries + lock link + budget.
