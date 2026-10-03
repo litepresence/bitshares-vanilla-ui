@@ -62,7 +62,73 @@ var ViewingAs = (function () {
     listeners.push(fn);
     return function () { var i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
   }
-  return { get: get, id: id, isDefault: isDefault, set: set, clear: clear, subscribe: subscribe, DEF_ID: DEF_ID, DEF_NAME: DEF_NAME };
+  /* openPicker: shared locked view-as dialog. Params: doc (document).
+   * Returns the dialog wrapper element. Validates via set(), shows
+   * viewing.unknown_account / viewing.network_error inline, never throws out. */
+  function openPicker(doc) {
+    var overlay = doc.createElement("div");
+    overlay.className = "viewing-picker-overlay";
+    var box = doc.createElement("div");
+    box.className = "viewing-picker";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-label", t("viewing.dialog_title", "View as account"));
+    var h = doc.createElement("h2");
+    h.textContent = t("viewing.dialog_title", "View as account");
+    box.appendChild(h);
+    var hint = doc.createElement("p");
+    hint.className = "muted";
+    hint.textContent = t("viewing.dialog_hint", "Public data — no unlock needed. Type any account name or 1.2.N id.");
+    box.appendChild(hint);
+    var label = doc.createElement("label");
+    label.textContent = t("viewing.dialog_label", "Account name ");
+    var input = doc.createElement("input");
+    input.type = "text";
+    input.setAttribute("placeholder", t("viewing.dialog_placeholder", "account-name"));
+    input.setAttribute("autocomplete", "off");
+    input.style.minHeight = "44px";
+    label.appendChild(input);
+    box.appendChild(label);
+    var err = doc.createElement("div");
+    err.className = "error";
+    err.setAttribute("aria-live", "polite");
+    box.appendChild(err);
+    var row = doc.createElement("p");
+    var go = doc.createElement("button");
+    go.type = "button";
+    go.style.minHeight = "44px";
+    go.textContent = t("viewing.dialog_open", "View as this account");
+    row.appendChild(go);
+    var reset = doc.createElement("button");
+    reset.type = "button";
+    reset.style.minHeight = "44px";
+    reset.textContent = t("viewing.dialog_reset", "Reset to committee-account");
+    row.appendChild(reset);
+    var close = doc.createElement("button");
+    close.type = "button";
+    close.style.minHeight = "44px";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Close");
+    row.appendChild(close);
+    box.appendChild(row);
+    overlay.appendChild(box);
+    function done() { try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) { /* gone */ } }
+    close.addEventListener("click", done);
+    overlay.addEventListener("click", function (ev) { if (ev.target === overlay) done(); });
+    reset.addEventListener("click", function () { err.textContent = ""; try { ViewingAs.clear(); } catch (e) { /* default stands */ } done(); });
+    go.addEventListener("click", function () {
+      err.textContent = "";
+      go.disabled = true;
+      ViewingAs.set(input.value).then(function () { done(); }).catch(function (e) {
+        go.disabled = false;
+        var m = (e && e.message) ? e.message : "";
+        if (m.indexOf("unknown-account") !== -1) err.textContent = t("viewing.unknown_account", "Unknown account name.");
+        else err.textContent = t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry.");
+      });
+    });
+    try { input.focus(); } catch (e) { /* display-only */ }
+    return overlay;
+  }
+  return { get: get, id: id, isDefault: isDefault, set: set, clear: clear, subscribe: subscribe, openPicker: openPicker, DEF_ID: DEF_ID, DEF_NAME: DEF_NAME };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.ViewingAs === "undefined") { globalThis.ViewingAs = ViewingAs; }
 if (typeof module !== "undefined") { module.exports = ViewingAs; }

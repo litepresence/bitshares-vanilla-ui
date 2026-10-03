@@ -24,11 +24,17 @@ var App = (function () {
    *   through the footer subscription only.
    * @param {string} key
    * @param {string} dflt
+   * @param {Object} [vars] optional %(name)s values (viewing.header_locked/unlocked)
    * @returns {string} */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") {
+      return dflt.replace(/%\(([^)]+)\)s/g, function (m, n) {
+        return (vars[n] !== undefined) ? String(vars[n]) : m;
+      });
+    }
     return dflt;
   }
 
@@ -343,31 +349,55 @@ var App = (function () {
       } catch (e) { /* name stands */ }
     }
     if (!walletUnlockedNow()) {
-      show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+      (function () {
+        var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+        else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+      })();
       return;
     }
     show("…", t("shell.acting_loading", "Resolving account…"));
     try {
       if (typeof Account === "undefined" || !Account ||
           typeof Account.myAccountId !== "function") {
-        show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+        (function () {
+          var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+          if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+          else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+        })();
         return;
       }
       Account.myAccountId().then(function (id) {
-        if (!id) { show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)")); return; }
+        if (!id) { (function () {
+          var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+          if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+          else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+        })(); return; }
         return Account.resolve(id).then(function (a) {
           if (!walletUnlockedNow()) {
-            show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+            (function () {
+              var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+              if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+              else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+            })();
             return;
           }
           var name = (a && a.name) ? String(a.name) : String(id);
-          show(name, t("shell.acting_unlocked", "Acting as ") + name);
+          show(name, t("viewing.header_unlocked", "Acting as %(name)s", { name: name }));
         });
       }).catch(function () {
-        show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+        (function () {
+          var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+          if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+          else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+        })();
       });
     } catch (e) {
-      show("committee-account", t("shell.acting_default", "Viewing as committee-account (locked)"));
+      (function () {
+        var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        if (v.name === "committee-account") show(v.name, t("viewing.header_default", "Viewing as committee-account (locked)"));
+        else show(v.name, t("viewing.header_locked", "Viewing as %(name)s (locked) — tap to change", { name: v.name }));
+      })();
     }
   }
   /* paintLock: lock affordance next to the hamburger (Header.jsx:663-681).
@@ -406,6 +436,32 @@ var App = (function () {
       } catch (e) { /* stays unlocked */ }
       paintLock();
       paintActingAs();
+    });
+  }
+
+  /* bindViewingAsOnce: header #acting-as click (locked only) + repaint
+   *   subscription. Locked click appends ViewingAs.openPicker(document) to
+   *   the body; unlocked clicks keep the wallet identity (no-op). Repaint
+   *   flows through the ViewingAs subscription (no manual DOM edit at dialog
+   *   close). Wired once in finishBoot next to bindLockOnce. Params: none.
+   *   Returns nothing. Fails: never throws — missing ViewingAs/DOM is a no-op
+   *   (safe direction: header keeps the 1.2.0 default via paintActingAs). */
+  function bindViewingAsOnce() {
+    if (typeof document === "undefined") return;
+    try {
+      if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.subscribe === "function") {
+        ViewingAs.subscribe(function () { paintActingAs(); });
+      }
+    } catch (e) { /* header keeps prior paint */ }
+    var el = document.getElementById("acting-as");
+    if (!el || el.getAttribute("data-viewing-bound") === "true") return;
+    el.setAttribute("data-viewing-bound", "true");
+    el.addEventListener("click", function () {
+      try {
+        if (walletUnlockedNow()) return; /* unlocked keeps wallet identity */
+        if (typeof ViewingAs === "undefined" || !ViewingAs || typeof ViewingAs.openPicker !== "function") return;
+        document.body.appendChild(ViewingAs.openPicker(document));
+      } catch (e) { /* dialog best-effort */ }
     });
   }
 
@@ -825,6 +881,7 @@ var App = (function () {
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
     bindLockOnce();
+    bindViewingAsOnce();
     /* M4a: extension-wrapper Tier 1 — the SW's vb-lock broadcast locks the
      * in-page keystore (auto-lock fan-out across open app pages). Unlock/
      * lock notices ride the other way from wallet.js _notifySw. Web build

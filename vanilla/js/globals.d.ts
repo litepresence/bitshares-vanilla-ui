@@ -114,6 +114,7 @@ declare var VestingUI: any;
 declare var Vote: any;
 declare var VoteSlate: any;
 declare var VoteUI: any;
+declare var ViewingAs: any;
 declare var Wallet: any;
 declare var WalletUI: any;
 declare var BRAINKEY_DICT: any;
