@@ -88,7 +88,21 @@ def main():
             # need no build step (tsc runs --noEmit; browsers never load them).
             # Self-policing: a .d.ts referenced by any <script> tag or import
             # fails as a violation — unloaded-by-construction is the rule.
+            # Loading-reference rule: only a <script src>, a static
+            # import/require() of the basename, or a ///<reference directive
+            # counts as loaded; bare mentions (JSON strings, comments, prose) do not.
             loaded = False
+            esc = re.escape(base)
+            loading_res = [
+                re.compile(
+                    r"""<script\b[^>]*\bsrc\s*=\s*['"][^'"]*%s[^'"]*['"]""" % esc,
+                    re.IGNORECASE,
+                ),
+                re.compile(r"""import\s+(?:[^;'"]*from\s+)?['"][^'"]*%s[^'"]*['"]""" % esc),
+                re.compile(r"""import\s*\(\s*['"][^'"]*%s[^'"]*['"]""" % esc),
+                re.compile(r"""require\s*\(\s*['"][^'"]*%s[^'"]*['"]""" % esc),
+                re.compile(r"""/{2,}\s*<\s*reference\b[^>]*%s""" % esc, re.IGNORECASE),
+            ]
             for probe in iter_files(VANILLA):
                 if probe == path:
                     continue
@@ -96,9 +110,10 @@ def main():
                     continue
                 try:
                     with open(probe, "r", encoding="utf-8", errors="strict") as fh:
-                        if base in fh.read():
-                            loaded = True
-                            break
+                        content = fh.read()
+                    if any(rx.search(content) for rx in loading_res):
+                        loaded = True
+                        break
                 except (OSError, UnicodeError):
                     continue
             if loaded:
