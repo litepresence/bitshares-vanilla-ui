@@ -422,6 +422,27 @@ var SettingsNodes = (function () {
     return {text: "", cls: "node-history"};
   }
 
+  /* latencyText: pure latency-cell content (unit-tested). Params: t (the
+   *   injected settings lookup), ms (probe latency number), ageS (r.headAgeS
+   *   seconds, or null/unknown). Returns "NNNms · X.Xs" — the age segment
+   *   goes through the keyed settings.age_s template ("%(n)ss", unit owned
+   *   by the template so translators can reposition it), substituted here by
+   *   split/join because the injected t is the 2-arg settings.js wrapper
+   *   that drops vars (same workaround as pool-graph.js map labels).
+   *   Missing/non-finite age renders latency only, never a dangling "·".
+   *   Cards need no special case: setRow mirrors .latency to them. Fails:
+   *   never (a throwing t still returns the bare latency). */
+  function latencyText(t, ms, ageS) {
+    var base = ms + "ms";
+    try {
+      if (typeof ageS === "number" && isFinite(ageS)) {
+        var seg = String(t("settings.age_s", "%(n)ss")).split("%(n)s").join(ageS.toFixed(1));
+        return base + " · " + seg;
+      }
+    } catch (e) { /* base stands */ }
+    return base;
+  }
+
   /* paintHistory: paint the .node-history span in a row + its mirrored card.
    * Params: row (tr or null), url, t. Reads HistoryCap live-then-snapshot
    * (guarded — absent HistoryCap paints unknown, never throws). Called at
@@ -498,7 +519,7 @@ var SettingsNodes = (function () {
         try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
         if (mismatch) {
           pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
-          setRow(row, r.latencyMs + "ms", "mismatch " + prefix, "down",
+          setRow(row, latencyText(t, r.latencyMs, r.headAgeS), "mismatch " + prefix, "down",
             detailText(r, prefix, "wrong chain for this network"));
           /* History truth is recorded even for mismatches (the probe found
            * it) — the row is unselectable anyway, the pill stays honest. */
@@ -534,7 +555,7 @@ var SettingsNodes = (function () {
             var ago = agoMinutes(lg.t);
             if (ago) extra = "last good " + ago;
           }
-          setRow(row, r.latencyMs + "ms", (v.status === "GOOD") ? prefix : (pill + " · " + prefix),
+          setRow(row, latencyText(t, r.latencyMs, r.headAgeS), (v.status === "GOOD") ? prefix : (pill + " · " + prefix),
             id, detailText(r, prefix, extra));
           /* Live history truth overwrites the snapshot (Phase-1 matrix). */
           try {
@@ -585,7 +606,7 @@ var SettingsNodes = (function () {
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText }
   };
 })();
 

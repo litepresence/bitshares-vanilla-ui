@@ -2440,6 +2440,7 @@
       "samet.viewing_as",
       "settings.add",
       "settings.add_node",
+      "settings.age_s",
       "settings.connecting",
       "settings.custom_placeholder",
       "settings.dash",
@@ -3158,7 +3159,8 @@
     "discover_reading": "Reading node lists…",
     "discover_probing": "Probing candidates…",
     "discover_checking": "Checking",
-    "add_node": "Add node"
+    "add_node": "Add node",
+    "age_s": "%(n)ss"
   },
   "shell": {
     "brand": "BitShares",

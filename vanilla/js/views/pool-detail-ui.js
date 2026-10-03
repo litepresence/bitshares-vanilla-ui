@@ -148,7 +148,7 @@ var PoolDetailUI = (function () {
   }
   /* Pool chart buckets (swap-tape timeframes; chain buckets API has no pool
    * leg, so bucketing happens here over enriched swaps). */
-  var POOL_BUCKETS = [60, 300, 900, 1800, 3600];
+  var POOL_BUCKETS = [60, 300, 900, 1800, 3600, 14400, 86400, 604800];
 
   function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook) {
     /* Swap-price candles (ES adapter -> chain fallback) drawn through the

@@ -102,4 +102,19 @@ eq(SN._test.histInfo(tk, true).cls, "node-history yes", "yes class");
 eq(SN._test.histInfo(tk, false).cls, "node-history no", "no class");
 eq(SN._test.histInfo(null, true).text, "", "throwing t -> empty, never throws");
 
+/* latencyText — pure latency-cell content (age appended in the cell).
+ * Unit lives in the keyed settings.age_s template ("%(n)ss"), substituted
+ * by split/join (the injected settings t drops vars); the " · " separator
+ * is layout-owned, so a missing age leaves latency bare, never dangling. */
+function tl(k, d) { return d; }
+eq(SN._test.latencyText(tl, 123, 1.2), "123ms · 1.2s", "ms + age");
+eq(SN._test.latencyText(tl, 123, undefined), "123ms", "missing age -> latency only");
+eq(SN._test.latencyText(tl, 123, null), "123ms", "null age -> latency only");
+eq(SN._test.latencyText(tl, 123, NaN), "123ms", "NaN age -> latency only, no dangling separator");
+eq(SN._test.latencyText(tl, 123, "1.2"), "123ms", "string age -> latency only");
+eq(SN._test.latencyText(tl, 87, 1.26), "87ms · 1.3s", "age toFixed(1) rounding");
+eq(SN._test.latencyText(tl, 87, 0), "87ms · 0.0s", "zero age still shown");
+eq(SN._test.latencyText(function () { return "%(n)s sec"; }, 50, 2), "50ms · 2.0 sec", "translated template owns the unit");
+eq(SN._test.latencyText(null, 50, 2), "50ms", "throwing t -> latency only, never throws");
+
 console.log("node-health-test: " + passed + " passed, 0 failed");

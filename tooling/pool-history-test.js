@@ -10,6 +10,8 @@ globalThis.Pool = require("/workspace/vanilla/js/api/pool.js");
 /* HistoryCap seam preload (Phase 4b migration — see market-fills-test.js). */
 globalThis.HistoryCap = require("/workspace/vanilla/js/api/history-cap.js");
 const PH = require("/workspace/vanilla/js/api/pool-history.js");
+const MI = require("/workspace/vanilla/js/views/market-ind.js");
+const fs = require("fs");
 
 let pass = 0, fail = 0;
 function eq(got, want, name) {
@@ -182,6 +184,44 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     eq(seen, 100, "chainSwaps defaults to 100");
     globalThis.Pool = realPool;
   } catch (e) { fail++; console.log("FAIL chainSwaps clamp\n " + (e && e.stack || e)); }
+
+  // 7. Pool chart timeframes (pool-detail-ui.js POOL_BUCKETS + chartPane
+  //    default + market-ind.js bucketLabel coverage). POOL_BUCKETS is a
+  //    closure private in the view, so list/order/default asserts read the
+  //    shipped source (explorer-blocks-ago-test.js precedent); bucketing
+  //    behavior asserts run through swapsToCandles above.
+  const _poolDetailSrc = fs.readFileSync("/workspace/vanilla/js/views/pool-detail-ui.js", "utf8");
+  (function () {
+    const m = _poolDetailSrc.match(/var POOL_BUCKETS = \[([^\]]*)\]/);
+    eq(m ? JSON.parse("[" + m[1] + "]") : null,
+      [60, 300, 900, 1800, 3600, 14400, 86400, 604800], "POOL_BUCKETS exact contents/order");
+  })();
+  (function () {
+    const d = _poolDetailSrc.match(/bucket: (\d+), liveBuckets: POOL_BUCKETS\.slice\(\)/);
+    eq(d ? Number(d[1]) : null, 300, "pool chart default bucket stays 300");
+  })();
+  // bucketLabel already maps every pool size (market-ind.js) — zero new strings.
+  eq([60, 300, 900, 1800, 3600, 14400, 86400, 604800].map((b) => MI.bucketLabel(b)),
+    ["1m", "5m", "15m", "30m", "1h", "4h", "1D", "1W"], "bucketLabel covers all pool sizes");
+  // 1D-bucket smoke: synthetic swaps across 2 days bucket into 2 slots.
+  (function () {
+    const twoDays = [
+      { time: "2026-09-29T10:00:00Z", price: "2.00000000",
+        paid: { amount: "30000", asset: "1.3.2" }, received: { amount: "150000", asset: "1.3.1" } },
+      { time: "2026-09-28T15:00:00Z", price: "1.50000000",
+        paid: { amount: "100000", asset: "1.3.1" }, received: { amount: "15000", asset: "1.3.2" } },
+      { time: "2026-09-28T09:00:00Z", price: "1.00000000",
+        paid: { amount: "10000", asset: "1.3.2" }, received: { amount: "50000", asset: "1.3.1" } },
+    ];
+    const c = PH.swapsToCandles(twoDays, 86400, "1.3.2", 4);
+    eq(c.length, 2, "1D smoke: 2 days -> 2 slots");
+    eq([c[0].timeMs, c[1].timeMs], [1790553600000, 1790640000000], "1D smoke: day-boundary slots");
+    eq([c[0].open, c[0].high, c[0].low, c[0].close],
+      ["1.50000000", "1.50000000", "1.00000000", "1.00000000"], "1D smoke: day-1 OHLC (newest-first input)");
+    eq([c[1].open, c[1].high, c[1].low, c[1].close],
+      ["2.00000000", "2.00000000", "2.00000000", "2.00000000"], "1D smoke: day-2 OHLC");
+    eq([c[0].baseVolume, c[1].baseVolume], ["2.5000", "3.0000"], "1D smoke: B-leg volume per slot");
+  })();
 
   console.log("Pool-history vectors: " + pass + " pass, " + fail + " fail");
   process.exit(fail ? 1 : 0);
