@@ -48,6 +48,17 @@ var Explorer = (function () {
     "credit_offer_accept", "credit_deal_repay", "credit_deal_expired",
     "liquidity_pool_update", "credit_deal_update", "limit_order_update"];
   var VIRTUAL = { 4: 1, 42: 1, 44: 1, 46: 1, 51: 1, 53: 1, 74: 1 }; /* VIRTUAL ops */
+
+  /* opName: operation-type id -> short display name. Params: id (number or
+   * numeric string, FC_REFLECT order <- operations.hpp:56-133). Returns the
+   * name, or "Operation #<id>" when out of range. Fails: never (non-numeric
+   * input yields "Operation #?"). Added for the es-lab catalog (agg buckets
+   * carry bare type ids); the table itself stays the single owner. */
+  function opName(id) {
+    var n = (typeof id === "number") ? id : parseInt(id, 10);
+    if (isNaN(n) || n < 0 || n >= OP_NAMES.length) return "Operation #" + String(id);
+    return OP_NAMES[n];
+  }
   var SPACE = {"1.0": "null", "1.1": "base", "1.2": "account", "1.3": "asset",
     "1.4": "force_settlement", "1.5": "committee_member", "1.6": "witness",
     "1.7": "limit_order", "1.8": "call_order", "1.9": "custom", "1.10": "proposal",
@@ -749,7 +760,7 @@ var Explorer = (function () {
     suggestAssets: suggestAssets, _normSuggestPairs: normSuggestPairs,
     recentTxById: recentTxById, resolveTxHash: resolveTxHash,
     _isTxHash: _isTxHash, _txHashQueries: _txHashQueries,
-    _txHashBlock: _txHashBlock };
+    _txHashBlock: _txHashBlock, opName: opName };
 })();
 
 if (typeof module !== "undefined") { module.exports = Explorer; }

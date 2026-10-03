@@ -43,4 +43,9 @@ var r2 = Explorer.opsFromBody(5, objForm);
 eq(r2.length, 1, "object-form op accepted");
 eq(r2[0].type_idx, 0, "object-form idx");
 
+eq(Explorer.opName(0), "transfer", "opName 0");
+eq(Explorer.opName(4), "fill_order", "opName virtual 4");
+eq(Explorer.opName(78), "Operation #78", "opName out of range falls back");
+eq(Explorer.opName(999), "Operation #999", "opName unknown falls back");
+
 console.log("explorer-ops-test: " + passed + " passed, 0 failed");
