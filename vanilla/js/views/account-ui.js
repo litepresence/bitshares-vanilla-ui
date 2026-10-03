@@ -1203,6 +1203,46 @@ var AccountUI = (function () {
       lookErr.textContent = "";
       if (typeof location !== "undefined") location.hash = "#/account/" + encodeURIComponent(v);
     });
+    /* Locked view-as affordance (view-as task 3, same block as
+     * accounts-ui.js lookup: same keys, same error mapping, same field
+     * error slot). The unlock form above stays untouched (signing path
+     * unchanged). ViewingAs missing -> network_error. */
+    var lookViewBtn = doc.createElement("button");
+    lookViewBtn.type = "button";
+    lookViewBtn.style.minHeight = "44px";
+    lookViewBtn.textContent = t("viewing.dialog_open", "View as this account");
+    wrap.appendChild(lookViewBtn);
+    lookViewBtn.addEventListener("click", function () {
+      var v = lookInput.value.trim().toLowerCase();
+      if (!v) { lookErr.textContent = t("account.enter_name", "Enter an account name."); return; }
+      lookErr.textContent = "";
+      lookViewBtn.disabled = true;
+      Promise.resolve().then(function () {
+        if (typeof ViewingAs === "undefined" || !ViewingAs || typeof ViewingAs.set !== "function") throw new Error("network_error");
+        return ViewingAs.set(v);
+      }).then(function () {
+        lookViewBtn.disabled = false;
+      }).catch(function (e) {
+        lookViewBtn.disabled = false;
+        var m = (e && e.message) ? e.message : "";
+        if (m.indexOf("unknown-account") !== -1) lookErr.textContent = t("viewing.unknown_account", "Unknown account name.");
+        else lookErr.textContent = t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry.");
+      });
+    });
+    var lookResetLine = doc.createElement("p");
+    lookResetLine.className = "muted";
+    var lookResetBtn = doc.createElement("button");
+    lookResetBtn.type = "button";
+    lookResetBtn.style.minHeight = "44px";
+    lookResetBtn.textContent = t("viewing.dialog_reset", "Reset to committee-account");
+    lookResetLine.appendChild(lookResetBtn);
+    wrap.appendChild(lookResetLine);
+    lookResetBtn.addEventListener("click", function () {
+      lookErr.textContent = "";
+      try {
+        if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.clear === "function") ViewingAs.clear();
+      } catch (e) { /* default stands */ }
+    });
     var walletLine = doc.createElement("p");
     walletLine.className = "muted";
     var walletLink = doc.createElement("a");

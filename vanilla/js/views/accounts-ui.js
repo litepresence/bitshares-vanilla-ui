@@ -188,6 +188,40 @@ var AccountsUI = (function () {
       setFieldError(nameF, "");
       if (typeof location !== "undefined") location.hash = "#/account/" + encodeURIComponent(name);
     });
+    /* Locked view-as affordance (view-as task 3): View-as validates the same
+     * lookup value via ViewingAs.set (header + dashboard follow through the
+     * ViewingAs subscription, no reload); Reset restores committee-account
+     * via ViewingAs.clear. Same field error slot (no new strings, no new
+     * route). ViewingAs missing -> network_error (feature unavailable). */
+    var viewBtn = touchable(el(doc, "button", t("viewing.dialog_open", "View as this account")));
+    viewBtn.type = "button"; wrap.appendChild(viewBtn);
+    viewBtn.addEventListener("click", function () {
+      var name = nameF.input.value.trim().toLowerCase();
+      if (!name) { setFieldError(nameF, t("account.enter_name", "Enter an account name.")); return; }
+      setFieldError(nameF, "");
+      viewBtn.disabled = true;
+      Promise.resolve().then(function () {
+        if (typeof ViewingAs === "undefined" || !ViewingAs || typeof ViewingAs.set !== "function") throw new Error("network_error");
+        return ViewingAs.set(name);
+      }).then(function () {
+        viewBtn.disabled = false;
+      }).catch(function (e) {
+        viewBtn.disabled = false;
+        var m = (e && e.message) ? e.message : "";
+        if (m.indexOf("unknown-account") !== -1) setFieldError(nameF, t("viewing.unknown_account", "Unknown account name."));
+        else setFieldError(nameF, t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry."));
+      });
+    });
+    var resetLine = el(doc, "p", null, "muted");
+    var resetBtn = el(doc, "button", t("viewing.dialog_reset", "Reset to committee-account"));
+    resetBtn.type = "button"; resetLine.appendChild(resetBtn);
+    wrap.appendChild(resetLine);
+    resetBtn.addEventListener("click", function () {
+      setFieldError(nameF, "");
+      try {
+        if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.clear === "function") ViewingAs.clear();
+      } catch (e) { /* default stands */ }
+    });
     wrap.appendChild(el(doc, "h3", t("account.manage", "Manage")));
     wrap.appendChild(linkPara(doc, [
       ["#/create-wallet-brainkey", t("account.create_wallet", "Create new wallet")],

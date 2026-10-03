@@ -6,10 +6,11 @@
  *   + steps + CTA); unlocked visitors get the watched-account dashboard
  *   exactly as before. Landing is a superset of the old locked gate card,
  *   so no locked CTA is lost (Create/Login both present).
- * When the wallet is
- *   unlocked the watched account is the wallet's own (Account.myAccountId);
- *   otherwise it is the read-only committee-account watch (1.2.0), same
- *   default App.jsx:489-495 falls back to when no account is selected.
+  * When the wallet is
+  *   unlocked the watched account is the wallet's own (Account.myAccountId);
+  *   otherwise it is the locked ViewingAs pick (default committee-account
+  *   1.2.0 watch), same default App.jsx:489-495 falls back to when no
+  *   account is selected.
  * Consumes: Account.resolve/balances/history/myAccountId (js/account.js),
  *   Wallet.isUnlocked (js/wallet.js, read-only here), Chain.status (connect
  *   gate), Store.subscribe (connection only), MarketUI.defaultMarket +
@@ -37,11 +38,18 @@ var DashboardUI = (function () {
   /* Display strings resolve via I18n.t with the pre-conversion literal as
    * enDefault (accounts-ui.js shape). Every key below exists in
    * vanilla/locales/en.json with the identical default, so
-   * tooling/check_i18n.py stays green. Absent i18n.js: defaults, never blank. */
-  function t(key, dflt) {
+   * tooling/check_i18n.py stays green. Absent i18n.js: defaults, never blank.
+   * vars fills %(name)s placeholders (viewing-as.js shape) so file:// still
+   * shows names when the dict fetch fails. */
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") {
+      return dflt.replace(/%\(([^)]+)\)s/g, function (m, n) {
+        return (vars[n] !== undefined) ? String(vars[n]) : m;
+      });
+    }
     return dflt;
   }
 
@@ -450,8 +458,9 @@ var DashboardUI = (function () {
     return card;
   }
 
-  /* Watched account: the wallet's own when unlocked, else the public
-   * committee-account watch (App.jsx:489-495 default). Returns
+  /* Watched account: the wallet's own when unlocked, else the locked
+   * ViewingAs pick (default committee-account watch, App.jsx:489-495
+   * default). ViewingAs missing -> WATCH_NAME fallback (1.2.0). Returns
    * Promise of {id, name, watched}. Fails: wallet-locked/no-account/
    * unknown-account from Account. */
   function resolveWatched(unlocked) {
@@ -460,7 +469,14 @@ var DashboardUI = (function () {
         return Account.resolve(id).then(function (a) { return { id: id, name: a.name, watched: false }; });
       });
     }
-    return Account.resolve(WATCH_NAME).then(function (a) { return { id: a.id, name: a.name, watched: true }; });
+    var watchName = WATCH_NAME;
+    try {
+      if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") {
+        var v = ViewingAs.get();
+        if (v && typeof v.name === "string" && v.name) watchName = v.name;
+      }
+    } catch (e) { /* WATCH_NAME fallback stands */ }
+    return Account.resolve(watchName).then(function (a) { return { id: a.id, name: a.name, watched: true }; });
   }
 
   /* Account heading: name linked to its page + watch-mode disclaimer. */
@@ -476,7 +492,7 @@ var DashboardUI = (function () {
     section.appendChild(el(doc, "p", found.id, "muted"));
     if (found.watched || !unlocked) {
       section.appendChild(el(doc, "p",
-        t("borrow.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as your account."), "muted"));
+        t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: found.name, id: found.id }), "muted"));
     }
     section.appendChild(linkPara(doc, [
       ["#/account/" + encodeURIComponent(found.name), t("account.open_prefix", "Open ") + found.name],
