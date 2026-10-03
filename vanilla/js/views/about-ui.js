@@ -311,6 +311,7 @@ var AboutUI = (function () {
           try {
             groups[g].head.style.display = n ? "" : "none";
             groups[g].wrap.style.display = n ? "" : "none";
+            if (n) groups[g].head.textContent = groups[g].day + " (" + n + ")";
           } catch (e4) { /* group stands */ }
         }
         try { status.textContent = t("about.dlg_showing", "Showing") + " " + shown + "/" + index.length; } catch (e5) { /* count stands */ }
@@ -337,6 +338,7 @@ var AboutUI = (function () {
       }
     }
     /* expandOnce: first-open asset fetch (guard flag lives on the box).
+     * Guard covers loading/ready/error alike: error persists until re-render by design (no retry).
      * Params: none. Returns nothing. Never throws. */
     function expandOnce() {
       try {
