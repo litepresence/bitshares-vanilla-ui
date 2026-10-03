@@ -36,7 +36,7 @@
 > `curl`-ing the folder doesn't include it, the app doesn't need it, and
 > `python3 -m http.server` must serve a working wallet.)
 
-> **Guiding principles (in priority order — all nine are binding):**
+> **Guiding principles (in priority order — all ten are binding):**
 > - **#1 — NEVER RE-CREATE #3583.** The replacement cannot rot the way
 >   `bitshares-ui` did (see §4). Every dependency, abstraction, and build step
 >   is a future #3583. Default answer to all three is **no**. Doctrine: §4.5;
@@ -75,6 +75,10 @@
 >   unlock. The password is asked ONLY at signing. Acting-as defaults to
 >   `committee-account` (`1.2.0`, verified on both chains; `1.2.5` is
 >   proxy-to-self, not the default) with an honest viewing-as notice.
+> - **#10 — EVERY LANGUAGE, FULLY.** BitShares is global; the wallet speaks
+>   every supported language completely — every display string keyed, every
+>   locale fully translated and audited, never a half-translated screen.
+>   English is the fallback, never the excuse. (Elaboration: §3.9.)
 
 ---
 
@@ -343,8 +347,26 @@ honesty (no fabricated stats, volumes, or counts — a dead feed says so,
 never fakes it), never at the cost of performance (jank kills delight —
 see the tour scroll-hijack lesson), never at the cost of accessibility
 (`prefers-reduced-motion` silences all candy), and never at the cost of
-the doctrine (§4.5 — marketing that needs a dependency is advertising
-for someone else's release cycle).
+   the doctrine (§4.5 — marketing that needs a dependency is advertising
+   for someone else's release cycle).
+
+### 3.9 Every language, fully (principle #10)
+
+BitShares holders live on every continent; a wallet that speaks only English
+is a wallet with a gate on it. Every user-visible string in the app resolves
+through the locale system (`vanilla/js/i18n.js` + `vanilla/locales/*.json`) —
+no hardcoded display text anywhere, in any view, including errors, empty
+states, confirm dialogs, and help articles. Supported languages
+(en, de, es, fr, hi, it, ja, ko, pt, ru, tr, zh) each ship a complete,
+audited dictionary; English fills only what no translator has verified yet,
+and the drift gate (`tooling/check_i18n.py`) proves key-completeness on every
+change. Translation rules, in this order: placeholders (`%(name)s`), URLs,
+object IDs, operation numbers, asset symbols, and theme/network IDs stay
+byte-verbatim — a translation that breaks a placeholder is a bug, not a
+translation; BitShares terms (witness, committee, worker, proxy, brainkey,
+vesting, HTLC, swap, slate) follow one shared glossary per language, never
+per-translator improvisation; and no unverified string ever passes as
+translated (stubs stay honestly English until a human verifies them).
 
 ---
 
@@ -966,7 +988,7 @@ bitshares-core/libraries/protocol/operations.hpp ← op field ground truth
 
 Screenshot: `docs/founding-vision.png`. The following is the project's
 original statement of intent, transcribed word-for-word. It predates the
-eight guiding principles above — where they differ, the principles (§1–§3)
+ten guiding principles above — where they differ, the principles (§1–§3)
 are binding and this section is history.
 
 > We're going to build a replacement for the BitShares reference wallet —

@@ -50,7 +50,7 @@ def flatten(d, prefix=""):
             out[prefix + k] = v
     return out
 def main():
-    for code in ["en","de","es","fr","it","ja","ko","ru","tr","zh"]:
+    for code in ["en","de","es","fr","it","ja","ko","ru","tr","zh","hi","pt"]:
         path = os.path.join(LOCALES, code + ".json")
         d = json.load(open(path, encoding="utf-8"))
         pred = d.get("prediction")

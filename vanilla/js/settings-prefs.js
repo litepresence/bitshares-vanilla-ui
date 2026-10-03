@@ -72,10 +72,10 @@ var SettingsPrefs = (function () {
 
   /* Locale switcher (slice-17 Task 2): mirrors the theme selector shape
    * (Reference #8). Option labels are the Reference-#7 display names;
-   * stub locales (8) are suffixed " — in English" (honest marking) and
+   * stub locales (10) are suffixed " — in English" (honest marking) and
    * render English via the t() fallback chain. The visible "Language "
    * label stays a hardcoded English literal (no dict key exists for it;
-   * converting it would churn all 10 dicts — queued for a later per-view
+   * converting it would churn all 12 dicts — queued for a later per-view
    * batch with its Task-1-style key). The failure line in the settings.js
    * handler is likewise hardcoded: the ambiguity-E wording, shown only
    * when the dict fetch fails.
@@ -91,8 +91,8 @@ var SettingsPrefs = (function () {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.names === "function") localeNames = I18n.names();
     } catch (e) { localeNames = {}; }
-    var localeCodes = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"];
-    var stubCodes = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh"];
+    var localeCodes = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"];
+    var stubCodes = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"];
     var currentLocale = "en";
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.locale === "function") currentLocale = I18n.locale();

@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LOCALES = os.path.join(HERE, "..", "vanilla", "locales")
 JS_DIRS = [os.path.join(HERE, "..", "vanilla", "js")]
 INDEX_HTML = os.path.join(HERE, "..", "vanilla", "index.html")
-STUB_CODES = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+STUB_CODES = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 
 # Values identical in every language by design (proper nouns, URL schemes,
 # symbols, theme/network ids). May appear in _meta.translated nowhere and
@@ -133,7 +133,7 @@ def main():
         print("FAIL (%d call sites scanned):" % calls)
         print("\n".join(problems))
         return 1
-    print("OK: 10 dicts key-complete (%d keys); allowlists exact; "
+    print("OK: 12 dicts key-complete (%d keys); allowlists exact; "
           "stubs honest; %d t() call sites drift-free." % (len(en_keys), calls))
     return 0
 

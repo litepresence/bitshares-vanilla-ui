@@ -15,12 +15,13 @@ var I18n = (function () {
   var CACHE_KEY = "bts-vanilla-i18n-v1";
   var DICT_PATH = "locales/";
 
-  /* Shipped locale codes (bitshares-ui/app/assets/locales.js:1-3 = 9 + en). */
-  var CODES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"];
+  /* Shipped locale codes (bitshares-ui/app/assets/locales.js:1-3 = 9 + en, plus hi + pt). */
+  var CODES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"];
 
   /* Switcher display names, Reference #7 verbatim (identifiers, untranslated). */
   var NAMES = { de: "Deutsch", en: "English", es: "Español", fr: "Français", it: "Italiano",
-    ja: "日本語", ko: "한국어", ru: "Русский", tr: "Türkçe", zh: "简体中文" };
+    ja: "日本語", ko: "한국어", ru: "Русский", tr: "Türkçe", zh: "简体中文",
+    hi: "हिन्दी", pt: "Português" };
 
   var registry = {}; /* code -> nested dict (sections); en seeded at init */
   var current = "en";

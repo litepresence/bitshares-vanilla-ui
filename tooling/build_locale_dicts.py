@@ -3,7 +3,7 @@
 
 Reads vanilla/locales/en.json, applies the ES_OVERRIDES table below (batch-1
 keys only, each with per-key provenance per plan ambiguity B), and writes
-vanilla/locales/es.json (key-complete) + 8 key-complete English-fallback
+vanilla/locales/es.json (key-complete) + 10 key-complete English-fallback
 stubs (de/fr/it/ja/ko/ru/tr/zh, _meta.untranslated=true, empty allowlist).
 
 Usage: python3 tooling/build_locale_dicts.py [--check]
@@ -29,7 +29,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOCALES = os.path.join(HERE, "..", "vanilla", "locales")
-STUB_CODES = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+STUB_CODES = ["de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 
 # key -> (es value, provenance). Batch-1 translatable keys ONLY (32);
 # identifiers (network/theme names, placeholder, pending/dash, brand) are

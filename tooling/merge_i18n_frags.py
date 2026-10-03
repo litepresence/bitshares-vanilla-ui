@@ -10,7 +10,7 @@ import json
 import os
 import sys
 
-LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "vanilla", "locales")
 
 

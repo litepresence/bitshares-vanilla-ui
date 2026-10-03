@@ -4,7 +4,7 @@
 Usage: python3 tooling/sync_locale_keys.py <section> <key> <en-value>
 Example: python3 tooling/sync_locale_keys.py shell lock Lock
 
-Writes the key with the en value into all 10 dicts (stubs stay honest;
+Writes the key with the en value into all 12 dicts (stubs stay honest;
 translators upgrade values later + list them in _meta.translated).
 Also appends the dotted key to en.json _meta.translated.
 Preserves trailing newline. Exit 0 on success.
@@ -15,7 +15,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOCALES = os.path.join(HERE, "..", "vanilla", "locales")
-CODES = ["en", "es", "de", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+CODES = ["en", "es", "de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 
 
 def main():

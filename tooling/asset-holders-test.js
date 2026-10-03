@@ -103,7 +103,7 @@ var NEW_KEYS = {
   holders_balance: "Balance",
   holders_unavailable: "Top holders unavailable — the community index is off or unreachable; check Settings."
 };
-["en", "es", "de", "fr", "it", "ja", "ko", "ru", "tr", "zh"].forEach(function (code) {
+["en", "es", "de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"].forEach(function (code) {
   var d = JSON.parse(fs.readFileSync(
     path.join(__dirname, "..", "vanilla", "locales", code + ".json"), "utf8"));
   Object.keys(NEW_KEYS).forEach(function (k) {

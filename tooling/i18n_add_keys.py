@@ -11,7 +11,7 @@ import io
 import json
 import sys
 
-LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 
 # Batches: (namespace, anchor-key, {full.key: english-default}). New keys go
 # after the anchor; en inventory kept sorted. Non-en dicts keep English

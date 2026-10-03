@@ -14,7 +14,7 @@ import re
 import sys
 
 BASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "vanilla")
-LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh"]
+LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"]
 Q = chr(34)
 CALL = re.compile("(?<![A-Za-z0-9_$])t" + chr(92) + chr(40) + chr(92) + "s*" + Q + "([^" + Q + "]+)" + Q)
 
