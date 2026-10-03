@@ -38,3 +38,10 @@ Owner-supplied exception (2026-10-01):
   after first load; light theme frames it as a card (no recolor, no second
   file). Background source `docs/header-background.webp` stays out of the
   app (docs-only, never referenced by shipped code).
+
+Hand-drawn addition (Tier 2):
+- `icons/shield-check.svg` (32×32 stroke shield + check, `#929292` to take
+  the existing `--icon-filter` theming like the set) is ORIGINAL art drawn
+  for the extension-signing header badge — no source, no license surface.
+  Same viewBox/stroke convention as the set so it sits evenly beside
+  `locked.svg` at 18px.

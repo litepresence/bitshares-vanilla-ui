@@ -84,10 +84,19 @@ var ids = Gate.collectAssetIds({ amount: "100", asset_id: "1.3.0", fee: { amount
 ok(ids.length === 2 && ids.indexOf("1.3.0") !== -1, "asset ids collected once each");
 var fields = Gate.humanizeFields(
   { from: "1.2.1", amount: { amount: "150000", asset_id: "1.3.0" }, memo: "hi" },
-  { "1.3.0": { symbol: "BTS", precision: 5 } });
+  { assets: { "1.3.0": { symbol: "BTS", precision: 5 } },
+    accounts: { "1.2.1": "alice" } });
 ok(fields.length === 3, "three fields rendered");
+ok(fields[0].v === "alice (1.2.1)", "account id resolved with id kept");
 ok(fields[1].v.indexOf("BTS") !== -1 && fields[1].v.indexOf("raw 150000") !== -1,
   "amount humanized with raw kept");
+/* Legacy bare-assets meta shape still renders (back-compat). */
+var legacy = Gate.humanizeFields(
+  { amount: { amount: "7", asset_id: "1.3.0" } },
+  { "1.3.0": { symbol: "BTS", precision: 5 } });
+ok(legacy[0].v.indexOf("raw 7") !== -1, "legacy meta shape works");
+ok(Gate.collectAccountIds({ to: "1.2.9", memo: "pay 1.2.9 soon", deep: ["1.2.9"] }).length === 1,
+  "account ids whole-value only, deduplicated");
 
 /* Router paths with stubbed chrome + Chain + Wallet + Tx. */
 var approvalsOpened = 0;
@@ -129,6 +138,11 @@ global.Chain = {
     if (method === "get_objects") {
       return Promise.resolve((params[0] || []).map(function (id) {
         return { id: id, symbol: "TST", precision: 3 };
+      }));
+    }
+    if (method === "get_accounts") {
+      return Promise.resolve((params[0] || []).map(function (id) {
+        return { id: id, name: "user-" + id.slice(4) };
       }));
     }
     if (method === "get_dynamic_global_properties") return Promise.resolve({ head_block_number: 42 });
@@ -195,6 +209,8 @@ function send(type, payload, sender, extra) {
   var it = await Gate.getIntent(id2);
   ok(it.status === "pending" && it.enriched.ops[0].name === "Transfer", "intent enriched");
   ok(it.enriched.ops[0].fields.length > 0, "intent fields rendered");
+  var toField = it.enriched.ops[0].fields.filter(function (f) { return f.k === "to"; })[0];
+  ok(toField && toField.v.indexOf("1.2.2") !== -1, "recipient id kept verbatim");
   var proof = await Gate.approveIntent(id2, "pw", true);
   ok(proof && proof.via.indexOf("sw-ack") !== -1, "SW broadcast proof");
   var al = await Gate.getAllowlist();

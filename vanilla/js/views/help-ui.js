@@ -72,6 +72,7 @@ var HelpUI = (function () {
     ["trollbox", "Trollbox chat", "On-chain public chat rooms, paid per kilobyte like any transaction.", "#/trollbox"],
     ["alerts", "Price alerts", "Get notified when a market crosses a price you set.", "#/alerts"],
     ["settings", "Settings and nodes", "Pick API nodes by live health, switch themes and language.", "#/settings"],
+    ["extension-install", "Installing the extension", "Per-browser install steps, what changes, and the honest limits.", "#/settings"],
     ["history-index", "Community history index", "Node history vs the community index: what works where, and how to reconcile gaps.", "#/settings"],
     ["topops", "Top operations", "Which chain operations run hottest, counted from recent blocks.", "#/top-ops"],
     ["txbuilder", "Transaction builder", "Compose several operations into one transaction and sign once.", "#/txbuilder"],
@@ -468,7 +469,29 @@ var HelpUI = (function () {
       "# Themes, language, housekeeping",
       "Three themes, ten languages, custom nodes with add and remove, plus wallet, password, and reset controls — all on this one page, all instant, no reload.",
       "# Candle depth",
-      "The candle-count input sets how many candles charts fetch (default 2000). Deeper windows cost more history calls — raise it for research, lower it on slow connections."
+      "The candle-count input sets how many candles charts fetch (default 2000). Deeper windows cost more history calls — raise it for research, lower it on slow connections.",
+      "# Signing route",
+      "The Signing section shows where your signatures happen: in the extension (isolated from websites) or in this page's memory. Automatic mode prefers the extension whenever it is detected.",
+      "# Connected sites",
+      "Every site you approve for signing is listed with its bound accounts and a per-site Revoke. Revoking never affects past transactions — it only stops future prompts from skipping straight past your attention. Wallet requests always prompt; they are never remembered."
+    ],
+    "extension-install": [
+      "# What the extension changes",
+      "The extension runs the exact same wallet in an isolated browser origin with a locked-down script policy. Page scripts on websites cannot read its storage or memory. Signing requests from sites — and from the wallet itself when extension routing is on — open an approval window showing every operation field, and die unapproved after 60 seconds.",
+      "# What it does not change",
+      "It cannot protect a hosted web copy you do not control: a compromised page could still show you lies (wrong addresses, wrong amounts) even when signatures are gated. Verify what you approve, every time. It also cannot move your existing web wallet over by itself — migration is one explicit import, then wipe the web copy.",
+      "# Chromium, Edge, Opera, Brave",
+      "Open the extensions page (chrome://extensions), enable Developer mode, choose Load unpacked, and point it at the extension folder (or the unzipped store package). Pin the wallet icon for one-tap access.",
+      "# Firefox",
+      "Install the signed Firefox package through Add-ons Manager and confirm it is enabled. The Firefox build is the MV2 variant — same wallet, same approvals.",
+      "# Safari",
+      "Safari needs an Xcode wrapper app around the extension sources plus an Apple developer account — follow-up work with real cost, not yet built. The web build remains the Safari story.",
+      "# Android and iOS",
+      "Firefox Android can install extensions distributed through AMO. Chrome on Android supports no extensions at all — the web build is the mobile story there.",
+      "# Migrating",
+      "Create fresh inside the extension, or import your web envelope once (Settings shows the way) and then wipe the web copy. Back up the brainkey first either way — the envelope import moves ciphertext, and only your password plus brainkey can ever recover it.",
+      "# Supply-chain honesty",
+      "Extensions auto-update through their store, which is a trust relationship with the store and the publisher key — a static folder you diff yourself has neither. Prefer reproducible builds and published hashes where offered."
     ],
     "topops": [
       "# What the chain does most",
@@ -896,7 +919,7 @@ var HelpUI = (function () {
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
     ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "topops", "fees", "charts", "history-index"]],
-    ["menu.section_labs", "Labs & Personal", ["settings", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary"]]
+    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary"]]
   ];
 
   function paintIndexList(doc, wrap) {

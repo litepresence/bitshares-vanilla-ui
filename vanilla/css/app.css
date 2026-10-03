@@ -783,6 +783,13 @@ img, canvas, pre { max-width: 100%; }
   margin-left: auto; min-width: 44px; min-height: 44px; padding: 0 8px;
   color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
 #lock-toggle .nav-icon { width: 18px; height: 18px; filter: invert(1); }
+/* Extension-signing badge (Tier 2): same metrics as the lock it sits
+ * beside — renders only when the route is extension, so in-browser users
+ * pay zero header pixels. Inherits header color like the lock. */
+#ext-sign-badge { display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; padding: 0 8px;
+  color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
+#ext-sign-badge .nav-icon { width: 18px; height: 18px; filter: invert(1); }
 /* The theme switcher sits before lock+hamburger on the bar; at 360px the four
  * items wrap instead of overflowing (principle #7). */
 .topbar { flex-wrap: wrap; }

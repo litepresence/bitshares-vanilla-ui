@@ -61,10 +61,16 @@ nothing copied from reference/wallet-extension/.
       extension-origin storage is a separate origin the page cannot touch;
       `window.bitsharesWallet` exposes message-only stubs with zero key
       access (see content/inject.js header).
-- [ ] Tier 2 (NOT this scaffold): approval page shows the full human-
-      readable op fields; 60s timeout denies silently; a site approved for
-      account A cannot sign as B (allowedAccountIds binding, bridge.js);
-      `signMessage` refuses loudly; HTTPS-only + chain_id check enforced.
+- [ ] Tier 2 (WIRED 2026-10-04, parity: vanilla/notes/extension-tier2.md):
+      approval page shows every op field (names + humanized amounts +
+      resolved account names, unknowns raw-never-blank); 60s timeout denies
+      silently (alarm backstop, countdown is display-only); a site approved
+      for account A cannot sign as B (allowedAccountIds binding, bridge.js);
+      tab-close denies (closing is never consent); `signMessage` refuses
+      loudly; HTTPS-only + chain_id check enforced; rate limit 5/min/origin
+      (session-persisted, fail closed); wallet-self always prompts, never
+      allowlisted. Headless proof: `node tooling/tier2-gate-test.js` (49
+      checks). Browser proof below still required.
 
 ## 5. Web build untouched (regression gate)
 
@@ -77,8 +83,11 @@ nothing copied from reference/wallet-extension/.
 
 ## What REMAINS human-gated (explicitly not claimed)
 
-Install drill (§1), XSS drill (§4), and any testnet approval flow: none can
-run headless, none has run. The Tier 2 signing gate (approvals UI,
-session key holder, allowlist persistence) is specified in
-adapter/bridge.js + background/sw.js headers but UNWIRED — building it is a
-separate, scheduled task, not a silent extension of this scaffold.
+Install drill (§1), XSS drill (§4), install-guide walkthrough (two
+browsers), header-indicator states (three themes, 360px + desktop), and any
+testnet approval flow: none can run headless, none has run. The Tier 2
+signing gate (approvals UI, session key holder, allowlist persistence,
+wallet-as-dApp seam, settings section) is WIRED and headless-tested
+(`tier2-gate-test.js` 49/49, pack byte-stable) — the browser + testnet
+proof above is still required before any "done" claim. See
+vanilla/notes/extension-tier2.md §4 for the exact drill list.

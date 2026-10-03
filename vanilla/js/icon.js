@@ -28,8 +28,9 @@ var Icon = (function () {
    * [a-z0-9_-] is rejected before a request is built (no path traversal). */
   var VALID = /^[a-z0-9][a-z0-9_-]*$/i;
 
-  /* KNOWN: the 84 icons-loader.js names (bitshares-ui read-only). Unknown
-   * names skip the network entirely and render the text fallback directly. */
+  /* KNOWN: the 84 icons-loader.js names (bitshares-ui read-only) plus
+   *   shield-check (Tier 2 original art, see assets/PROVENANCE.md). Unknown
+   *   names skip the network entirely and render the text fallback directly. */
   var KNOWN = {
     "photo-camera": 1, adjust: 1, alarm: 1, assets: 1, autolock: 1,
     barter: 1, borrow: 1, "checkmark-circle": 1, "chevron-down": 1,
@@ -43,6 +44,7 @@ var Icon = (function () {
     share: 1, showcases: 1, shuffle: 1, text: 1, "thumb-tack": 1,
     "thumb-untack": 1, "thumbs-up": 1, times: 1, trade: 1, transfer: 1,
     unlocked: 1, user: 1, voting: 1, warning: 1, withdraw: 1, filter: 1,
+    "shield-check": 1,
     "info-circle-o": 1, zoom: 1, people: 1, fire: 1, "question-in-circle": 1,
     attention: 1, checkmark: 1, paperclip: 1, wallet: 1, prediction: 1,
     "prediction-large": 1, merchant: 1, insight: 1, create_account: 1,

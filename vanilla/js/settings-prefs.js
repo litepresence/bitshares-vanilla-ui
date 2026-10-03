@@ -143,11 +143,91 @@ var SettingsPrefs = (function () {
     return { wrap: wrap, checkbox: box };
   }
 
+  /* Signing section (Tier 2): route display + override + warning + sites.
+   * Builds DOM only — radio/revoke wiring lives in settings.js (it owns
+   * rerender). Effective mode resolves via SignMode (guarded: missing
+   * module reads as in-browser, the safe display direction — never claim
+   * protection that isn't there). The allowlist listBox is filled async by
+   * settings.js (chrome.storage read); prefs only owns the empty shell +
+   * empty note so this builder stays sync like the rest.
+   * Params: doc, settings (Store envelope with .signing), t. Returns
+   * {wrap, radios, listBox, emptyNote}. */
+  function buildSigning(doc, settings, t) {
+    var wrap = doc.createElement("div");
+    wrap.id = "sign-block";
+    var title = doc.createElement("h2");
+    title.textContent = t("settings.sign_title", "Signing");
+    wrap.appendChild(title);
+    var mode = "browser", cap = "none";
+    try {
+      if (typeof SignMode !== "undefined" && SignMode) {
+        if (typeof SignMode.effectiveMode === "function") mode = SignMode.effectiveMode();
+        if (typeof SignMode.capable === "function") cap = SignMode.capable();
+      }
+    } catch (e) { /* browser display below */ }
+    if (mode !== "extension" && mode !== "browser") mode = "browser";
+    var status = doc.createElement("p");
+    status.className = "muted";
+    status.setAttribute("aria-live", "polite");
+    if (mode === "extension" && cap === "extension-page") {
+      status.textContent = t("settings.sign_mode_ext_page", "Signatures stay in the extension — isolated from websites.");
+    } else if (mode === "extension") {
+      status.textContent = t("settings.sign_mode_ext", "Signatures are approved in the extension window.");
+    } else {
+      status.textContent = t("settings.sign_mode_browser", "Signatures happen in this page's memory.");
+    }
+    wrap.appendChild(status);
+    var pin = "auto";
+    try {
+      if (settings && (settings.signing === "extension" || settings.signing === "browser" ||
+          settings.signing === "auto")) pin = settings.signing;
+    } catch (e) { /* auto stands */ }
+    var radios = {};
+    [["auto", t("settings.sign_auto", "Automatic (extension when available)")],
+     ["extension", t("settings.sign_ext", "Always use the extension")],
+     ["browser", t("settings.sign_browser", "Always sign in this page")]].forEach(function (pr) {
+      var label = doc.createElement("label");
+      var radio = doc.createElement("input");
+      radio.type = "radio";
+      radio.name = "signing";
+      radio.value = pr[0];
+      if (pin === pr[0]) radio.checked = true;
+      try { radio.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+      label.appendChild(radio);
+      label.appendChild(doc.createTextNode(" " + pr[1]));
+      wrap.appendChild(label);
+      radios[pr[0]] = radio;
+    });
+    if (mode === "browser") {
+      var warn = doc.createElement("p");
+      warn.className = "muted";
+      warn.textContent = t("settings.sign_warn", "Any script running on this page — including a compromised hosted copy — could read your keys while unlocked. Route signing through the extension, or run a copy you control.");
+      wrap.appendChild(warn);
+      var guide = doc.createElement("a");
+      guide.textContent = t("settings.sign_guide", "How to install the extension");
+      try { guide.setAttribute("href", "#/help/extension-install"); } catch (e) { /* label stands */ }
+      try { guide.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+      wrap.appendChild(guide);
+    }
+    var sitesTitle = doc.createElement("h3");
+    sitesTitle.textContent = t("settings.sign_sites", "Connected sites");
+    wrap.appendChild(sitesTitle);
+    var listBox = doc.createElement("div");
+    listBox.className = "sign-sites";
+    wrap.appendChild(listBox);
+    var emptyNote = doc.createElement("p");
+    emptyNote.className = "muted";
+    emptyNote.textContent = t("settings.sign_sites_empty", "No sites approved yet — approvals appear here with per-site revoke.");
+    wrap.appendChild(emptyNote);
+    return { wrap: wrap, radios: radios, listBox: listBox, emptyNote: emptyNote };
+  }
+
   return {
     buildNetwork: buildNetwork,
     buildTheme: buildTheme,
     buildLocale: buildLocale,
-    buildHistory: buildHistory
+    buildHistory: buildHistory,
+    buildSigning: buildSigning
   };
 })();
 

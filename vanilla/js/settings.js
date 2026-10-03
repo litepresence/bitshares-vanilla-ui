@@ -108,6 +108,14 @@ var SettingsPage = (function () {
     wrap.appendChild(hist.wrap);
     var esBox = hist.checkbox;
 
+    /* Signing section (Tier 2): route display + pin + warning + sites.
+     * Radio changes persist + rerender (mode display + badge follow the
+     * envelope); the allowlist fills async below (empty note stands when
+     * the extension store is absent — web builds show no sites). */
+    var sign = SettingsPrefs.buildSigning(doc, settings, t);
+    wrap.appendChild(sign.wrap);
+    var signRadios = sign.radios, signList = sign.listBox, signEmpty = sign.emptyNote;
+
     var theme = SettingsPrefs.buildTheme(doc, settings, t);
     wrap.appendChild(theme.label);
     var themeSelect = theme.select;
@@ -271,6 +279,92 @@ var SettingsPage = (function () {
       try { Store.saveSettings({esEnabled: esBox.checked === true}); }
       catch (e) { /* pref write failed — box keeps user pick, next load reseeds */ }
     });
+
+    /* Events: signing pin (persist + rerender — the mode line, warning,
+     * badge, and effective route all follow the envelope). */
+    ["auto", "extension", "browser"].forEach(function (v) {
+      try {
+        if (signRadios && signRadios[v]) {
+          signRadios[v].addEventListener("change", function () {
+            if (!signRadios[v].checked) return;
+            try { Store.saveSettings({ signing: v }); } catch (e) { /* select keeps pick */ }
+            render(rootEl);
+          });
+        }
+      } catch (e) { /* radio stands unpinned */ }
+    });
+
+    /* Connected sites (Tier 2 allowlist): read from the persistent
+     * extension store; each row names the origin + bound account ids with a
+     * per-origin Revoke (removes the binding — next request prompts again).
+     * Absent store (plain web) keeps the empty note: no sites, honestly. */
+    (function fillSites() {
+      var store = null;
+      try {
+        if (typeof chrome !== "undefined" && chrome && chrome.storage && chrome.storage.local) {
+          store = chrome.storage.local;
+        } else if (typeof browser !== "undefined" && browser && browser.storage && browser.storage.local) {
+          store = browser.storage.local;
+        }
+      } catch (e) { store = null; }
+      if (!store) return;
+      try {
+        store.get(["vb-allowlist-v1"], function (items) {
+          try {
+            var denied = false;
+            try {
+              var ns = (typeof chrome !== "undefined" && chrome) ||
+                (typeof browser !== "undefined" && browser);
+              if (ns && ns.runtime && ns.runtime.lastError) denied = true;
+            } catch (e) { denied = true; }
+            if (denied) return;
+            var a = items ? items["vb-allowlist-v1"] : null;
+            if (!a || typeof a !== "object") return;
+            var origins = Object.keys(a);
+            if (!origins.length) return;
+            while (signEmpty.firstChild) signEmpty.removeChild(signEmpty.firstChild);
+            try { signEmpty.parentNode.removeChild(signEmpty); } catch (e) { /* note stands empty */ }
+            origins.forEach(function (origin) {
+              var entry = a[origin] || {};
+              var ids = Array.isArray(entry.allowedAccountIds) ? entry.allowedAccountIds : [];
+              var row = doc.createElement("div");
+              row.className = "sign-site-row";
+              var name = doc.createElement("div");
+              name.textContent = origin;
+              row.appendChild(name);
+              var sub = doc.createElement("div");
+              sub.className = "muted";
+              sub.textContent = ids.join(", ") || t("settings.sign_sites_empty", "No sites approved yet — approvals appear here with per-site revoke.");
+              row.appendChild(sub);
+              var revoke = doc.createElement("button");
+              revoke.type = "button";
+              revoke.textContent = t("settings.sign_revoke", "Revoke");
+              try { revoke.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+              revoke.addEventListener("click", function () {
+                revoke.disabled = true;
+                try {
+                  store.get(["vb-allowlist-v1"], function (items2) {
+                    try {
+                      var a2 = items2 ? items2["vb-allowlist-v1"] : null;
+                      if (a2 && typeof a2 === "object" && a2[origin]) {
+                        delete a2[origin];
+                        var o = {};
+                        o["vb-allowlist-v1"] = a2;
+                        store.set(o, function () { render(rootEl); });
+                        return;
+                      }
+                    } catch (e) { /* fall through to rerender */ }
+                    render(rootEl);
+                  });
+                } catch (e) { render(rootEl); }
+              });
+              row.appendChild(revoke);
+              signList.appendChild(row);
+            });
+          } catch (e) { /* empty note stands */ }
+        });
+      } catch (e) { /* empty note stands */ }
+    })();
 
     /* Events: locale select. Full router re-render on switch (ambiguity D:
      * cheap, plain, no subscriptions to rot — the whole shell + current

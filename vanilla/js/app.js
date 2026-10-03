@@ -309,6 +309,7 @@ var App = (function () {
       if (toggle) toggle.setAttribute("aria-label", t("shell.menu", "Menu"));
       paintLock();
       paintActingAs();
+      paintShieldBadge();
       paintFootActions();
       var nav = document.getElementById("nav");
       if (nav) localizeNav(nav);
@@ -735,6 +736,7 @@ var App = (function () {
   function onSettings(next) {
     if (!next) return;
     if (next.theme !== lastTheme) { lastTheme = next.theme; applyTheme(next.theme); syncThemeSwitchers(next.theme); }
+    paintShieldBadge();
     if (next.activeNode !== lastNode || next.network !== lastNetwork) {
       lastNetwork = next.network; lastNode = next.activeNode; connect(next.activeNode);
     }
@@ -810,6 +812,56 @@ var App = (function () {
     return missing;
   }
 
+  /* Signing-route badge (Tier 2): shield-check immediately left of the
+   * lock — lock answers "locked?", shield answers "extension-routed?".
+   * Renders ONLY when the effective route is extension (in-browser users
+   * pay zero header pixels; the settings warning covers them). Taps to the
+   * settings signing section (indicators navigate, never mutate). Label via
+   * settings.sign_badge; Icon.img carries its own text fallback so a
+   * missing glyph degrades to "EXT"-ish text, never a broken image.
+   * Params: none (reads SignMode + document). Returns nothing. Never throws. */
+  function paintShieldBadge() {
+    if (typeof document === "undefined") return;
+    try {
+      var lock = document.getElementById("lock-toggle");
+      if (!lock || !lock.parentNode) return;
+      var old = document.getElementById("ext-sign-badge");
+      var routed = false;
+      try {
+        if (typeof SignMode !== "undefined" && SignMode &&
+            typeof SignMode.effectiveMode === "function") {
+          routed = SignMode.effectiveMode() === "extension";
+        }
+      } catch (e) { routed = false; }
+      if (!routed) {
+        if (old) {
+          try { old.parentNode.removeChild(old); } catch (e) { /* stays hidden */ }
+        }
+        return;
+      }
+      var label = t("settings.sign_badge", "Extension signing active — details in Settings");
+      if (!old) {
+        var a = document.createElement("a");
+        a.id = "ext-sign-badge";
+        try { a.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        try {
+          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+            a.appendChild(Icon.img("shield-check", "nav-icon", "EXT"));
+          } else {
+            a.textContent = "EXT";
+          }
+        } catch (e) { a.textContent = "EXT"; }
+        try { a.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+        lock.parentNode.insertBefore(a, lock);
+        old = a;
+      }
+      try {
+        old.setAttribute("aria-label", label);
+        old.setAttribute("title", label);
+      } catch (e) { /* badge stands unlabeled */ }
+    } catch (e) { /* header keeps prior paint */ }
+  }
+
   /* finishBoot: wire footer + settings subscriptions and first paint.
    * Params: settings (Store envelope, already loaded). Returns nothing.
    * Fails: never — every DOM/storage touch is guarded; errors surface in
@@ -870,8 +922,8 @@ var App = (function () {
     } catch (e) { /* banner keeps static state */ }
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
-    /* Header theme copy: sits on the bar before the hamburger toggle, so it
-     * is visible without opening any menu (guarded: exactly one copy). */
+  /* Header theme copy: sits on the bar before the hamburger toggle, so it
+   * is visible without opening any menu (guarded: exactly one copy). */
     try {
       var topbar = document.querySelector(".topbar");
       if (topbar && toggle && !document.getElementById("theme-switch-header")) {
@@ -882,6 +934,7 @@ var App = (function () {
     if (toggle) ensureToggleIcon(toggle);
     bindLockOnce();
     bindViewingAsOnce();
+    paintShieldBadge();
     /* M4a: extension-wrapper Tier 1 — the SW's vb-lock broadcast locks the
      * in-page keystore (auto-lock fan-out across open app pages). Unlock/
      * lock notices ride the other way from wallet.js _notifySw. Web build

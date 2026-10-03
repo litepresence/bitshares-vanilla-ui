@@ -98,7 +98,8 @@ var Store = (function () {
   }
 
   /* baseSettings: fresh defaults (mainnet + first node + ref-ui-theme + en +
-   *   ElasticSearch ON per owner ruling — community history is a main feature).
+   *   ElasticSearch ON per owner ruling — community history is a main feature;
+   *   signing "auto" per Tier 2 ruling — extension route when detected).
    *   Params: none. Returns a new settings object. Fails: never (pure). */
   function baseSettings() {
     return {
@@ -107,7 +108,8 @@ var Store = (function () {
       customNodes: [],
       theme: "ref-ui-theme",
       locale: "en",
-      esEnabled: true
+      esEnabled: true,
+      signing: "auto"
     };
   }
 
@@ -153,14 +155,19 @@ var Store = (function () {
      * 2026-10-02: community ES is a main feature). Only an explicit false
      * opts out, so old wallets gain history illumination, never lose it. */
     var esEnabled = (stored.esEnabled === false) ? false : true;
-    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale, esEnabled: esEnabled };
+    /* signing: Tier 2 route pin ("auto"|"extension"|"browser", default auto
+     * — extension route when a channel is detected). Unknown values read as
+     * auto (fail toward the default, never toward a forced route). */
+    var signing = (stored.signing === "extension" || stored.signing === "browser" ||
+      stored.signing === "auto") ? stored.signing : base.signing;
+    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale, esEnabled: esEnabled, signing: signing };
   }
 
   /* saveSettings: merges a patch onto current settings, persists + emits.
    *   Params: patch (object, optional — only known fields apply: strings,
-   *   string arrays, and the esEnabled boolean). Returns the merged settings
-   *   object. Fails: never throws — blocked/full storage still emits the
-   *   in-memory value. */
+   *   string arrays, the esEnabled boolean, and the signing pin). Returns
+   *   the merged settings object. Fails: never throws — blocked/full
+   *   storage still emits the in-memory value. */
   function saveSettings(patch) {
     var current = loadSettings();
     var next = {
@@ -169,7 +176,8 @@ var Store = (function () {
       customNodes: current.customNodes,
       theme: current.theme,
       locale: current.locale,
-      esEnabled: current.esEnabled
+      esEnabled: current.esEnabled,
+      signing: current.signing
     };
     if (patch && typeof patch === "object") {
       if (typeof patch.network === "string") next.network = patch.network;
@@ -178,6 +186,9 @@ var Store = (function () {
       if (typeof patch.theme === "string") next.theme = patch.theme;
       if (typeof patch.locale === "string") next.locale = patch.locale;
       if (typeof patch.esEnabled === "boolean") next.esEnabled = patch.esEnabled;
+      if (patch.signing === "auto" || patch.signing === "extension" || patch.signing === "browser") {
+        next.signing = patch.signing;
+      }
     }
     try {
       _store().set(SETTINGS_KEY, JSON.stringify(next));
