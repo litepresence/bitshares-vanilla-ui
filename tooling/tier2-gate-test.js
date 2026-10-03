@@ -70,6 +70,10 @@ ok(JSON.stringify(st) === frozen, "inputs never mutated");
 global.Bridge = require("../extension-wrapper/adapter/bridge.js");
 global.SessionVault = require("../extension-wrapper/background/session.js");
 var Gate = require("../extension-wrapper/background/gate.js");
+/* readSettings is always thenable (regression: the no-vault path once
+ * returned a bare object, breaking ensureChain off-SW). */
+ok(!!(Gate.readSettings() && typeof Gate.readSettings().then === "function"),
+  "readSettings always thenable");
 /* Format stub up front: humanizeFields display math needs it. */
 global.Format = { formatAmount: function (raw, prec) { return String(raw) + "/p" + prec; } };
 ok(Gate.opName(0) === "Transfer", "op 0 named");

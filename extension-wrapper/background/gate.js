@@ -185,7 +185,7 @@ var OP_NAMES = {
   function readSettings() {
     var fb = { network: "mainnet", activeNode: "wss://api.bitshares.dev/ws" };
     try {
-      if (typeof SessionVault === "undefined" || !SessionVault) return fb;
+      if (typeof SessionVault === "undefined" || !SessionVault) return Promise.resolve(fb);
       return SessionVault.localGet(["bts-vanilla-settings-v1"]).then(function (items) {
         try {
           var raw = items ? items["bts-vanilla-settings-v1"] : null;
