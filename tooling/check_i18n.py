@@ -103,14 +103,23 @@ def main():
                     problems.append("es.json: translated %s identical to en (mistake or identifier?)" % k)
                     break
         else:
-            if m.get("untranslated") is not True:
-                problems.append("%s stub _meta.untranslated must be true" % code)
-            if allow != []:
-                problems.append("%s stub _meta.translated must be []" % code)
-            for k in sorted(en_keys):
-                if flat.get(k) != en_flat[k]:
-                    problems.append("%s stub: %s != en value" % (code, k))
-                    break
+            if m.get("untranslated") is True:
+                if allow != []:
+                    problems.append("%s stub _meta.translated must be []" % code)
+                for k in sorted(en_keys):
+                    if flat.get(k) != en_flat[k]:
+                        problems.append("%s stub: %s != en value" % (code, k))
+                        break
+            else:
+                # Fully translated dict (wave-1+): allowlist must cover every
+                # key, identifiers included (validate_translations enforces
+                # their byte-verbatim values pre-merge). Quality (meaning,
+                # placeholders) is the auditors' job (parity notes).
+                if set(allow) != en_keys:
+                    only = sorted(set(flat) - en_keys)
+                    miss = sorted(en_keys - set(allow))
+                    problems.append("%s allowlist drift (extra=%s missing=%s)"
+                                    % (code, only[:5], miss[:5]))
 
     # Call-site drift (ambiguity A): t() defaults must equal en.json values.
     calls = 0
