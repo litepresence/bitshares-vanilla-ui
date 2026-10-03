@@ -89,14 +89,8 @@ Spec: `docs/superpowers/specs/2026-10-03-api-lab-design.md` (Option B, approved)
 - (a) 2036 test: catalog is in-repo data (no remote spec fetch), UI is
   platform DOM, single shared socket. Yes, still runs.
 - (b) New dependencies: none. No package, no CDN, no build step; two static
-  files + 3 one-line wirings. `check_rot.py`: my files clean — the single
-  violation is the long-pre-existing dev-only `js/globals.d.ts` ("loaded
-  .d.ts would need a build step"; never loaded by index.html, predates this
-  slice — same standing note as every slice since). `check_types.sh`: PASS
-  tree-wide as of 2026-10-03 (the earlier `bitshares-uri.js` errors were
-  that file's, since fixed upstream of this note).
-  [Refreshed 2026-10-03 during the F2/F4 repair round — symptom wording
-  updated to current tool output; substance unchanged: not this slice's dirt.]
+  files + minimal wirings (route, scripts, nav directory). `check_rot.py`:
+  PASS (2026-10-03). `check_types.sh` (checkJs, no emit): PASS tree-wide.
 - (c) Smallest deletable subset: the Debug probe + broadcast entry could go
   and reads still work — kept because the owner explicitly asked for full
   surface with honest failures; each is tier-gated so deletion stays trivial.
