@@ -253,6 +253,14 @@ var Router = (function () {
     { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
     { path: "/api-lab", title: "API Lab", render: function (root) { ApiLabUI.renderLab(root); } },
     { path: "/es-lab", title: "ES Lab", render: function (root) { EsLabUI.renderLab(root); } },
+    { path: "/menu", title: "Menu", render: function (root) {
+      if (typeof MenuUI !== "undefined" && MenuUI && typeof MenuUI.renderMenu === "function") { MenuUI.renderMenu(root); return; }
+      placeholder("Menu")(root);
+    } },
+    { path: "/menu/:section", title: "Menu", render: function (root, params) {
+      if (typeof MenuUI !== "undefined" && MenuUI && typeof MenuUI.renderSection === "function") { MenuUI.renderSection(root, params && params.section); return; }
+      placeholder("Menu")(root);
+    } },
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 
