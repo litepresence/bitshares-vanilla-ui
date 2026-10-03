@@ -49,24 +49,28 @@ body { margin: 0; background: var(--bg); color: var(--text);
   color: var(--text); text-decoration: none; border-radius: 6px; }
 #nav a:hover { background: var(--bg); }
 #nav a[aria-current="page"] { outline: 2px solid var(--accent); outline-offset: -2px; font-weight: 700; }
-/* Command-palette directory: full-width panel under the bar, open only.
- * Search + grouped links; theme tokens only; 44px targets; no hover-only. */
+/* Sitemap headings panel: full-width list under the bar, open only.
+ * Six heading links + overview; theme tokens only; 44px targets. */
 #nav-directory { display: none; flex-basis: 100%; border-top: 1px solid var(--border);
   padding: 12px 4px 16px; max-height: 70vh; overflow-y: auto;
   background: var(--panel); color: var(--text); }
 #nav.open #nav-directory { display: block; }
-.nav-dir-search { width: 100%; max-width: 420px; margin: 0 0 12px; }
-.nav-dir-group { margin: 0 0 10px; }
-.nav-dir-group .nav-group { font-weight: 700; display: block; margin: 0 0 4px; }
-.nav-dir-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.nav-dir-empty { margin: 12px 0 0; }
-/* Palette account-actions row (#1 dropdown head): lock/follow/buttons. */
-.nav-dir-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; }
-.nav-dir-actions a { padding: 10px 14px; min-height: 44px; display: inline-flex;
-  align-items: center; color: var(--text); text-decoration: none; border-radius: 6px; }
-.nav-dir-actions a:hover { background: var(--bg); }
-.nav-dir-btn { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
-  border-radius: 6px; background: transparent; color: var(--text); cursor: pointer; }
+/* Sitemap TOC pages (#/menu, #/menu/:section): responsive card grid —
+ * 1 column on phones, 2 at tablet, 3 at desk. Full-card links (keyboard
+ * focusable, visible ring), theme tokens only, 44px minimum targets. */
+.menu-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .menu-grid { grid-template-columns: 1fr 1fr; } }
+@media (min-width: 1200px) { .menu-grid { grid-template-columns: 1fr 1fr 1fr; } }
+.menu-card { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px;
+  min-height: 44px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); color: var(--text); text-decoration: none; }
+.menu-card:hover { background: var(--bg); }
+.menu-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.menu-card .nav-icon { width: 22px; height: 22px; flex: none; }
+.menu-card b { display: block; }
+.menu-card small { display: block; opacity: 0.85; }
+.menu-filter { width: 100%; max-width: 420px; min-height: 44px; margin: 0 0 12px; }
+.menu-crumb { margin: 0 0 4px; }
 /* Warning banner (mirrors #1 root.png scam banner): per-theme --banner-*
  * tokens (themes.css); dismiss persists in localStorage. */
 #warn-banner { display: flex; align-items: center; gap: 8px; padding: 6px 12px;
@@ -795,10 +799,7 @@ img, canvas, pre { max-width: 100%; }
 #nav-directory { background: var(--header-bg); color: var(--header-text);
   border-top: 1px solid var(--border); }
 #nav-directory a { color: var(--header-text); }
-#nav-directory a:hover, .nav-dir-actions a:hover { background: rgba(255, 255, 255, 0.08); }
-.nav-dir-actions .nav-dir-btn { color: var(--header-text); border-color: var(--header-text); }
-.nav-dir-search { background: transparent; color: var(--header-text);
-  border: 1px solid var(--header-text); border-radius: 0; }
+#nav-directory a:hover { background: rgba(255, 255, 255, 0.08); }
 
 /* Pair stats strip type (target: big white values, small grey labels beneath).
  * DOM order (market-ind.js renderStrip, pool-detail-ui.js detailFill) is
@@ -980,13 +981,13 @@ a#appfoot-status { text-decoration: none; color: inherit; }
  * keyboard focus rings live outside the guard. */
 @media (hover:hover) {
   /* 1. Buttons / primary actions: 120ms lift + press-down. */
-  button, a.btn, .appfoot-actions a, .nav-dir-btn,
+  button, a.btn, .appfoot-actions a,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
   .pools-pager button, .mkt-star, .mkt-bell {
     transition: transform 120ms ease, box-shadow 120ms ease,
       background-color 120ms ease, border-color 120ms ease, color 120ms ease;
   }
-  button:hover, a.btn:hover, .appfoot-actions a:hover, .nav-dir-btn:hover,
+  button:hover, a.btn:hover, .appfoot-actions a:hover,
   .mkt-quotes button:hover, .mkt-scalerow button:hover,
   .mkt-indmenu-btn:hover, .pools-pager button:hover {
     transform: translateY(-1px);
@@ -1037,7 +1038,7 @@ a#appfoot-status { text-decoration: none; color: inherit; }
    * shorthands reset it to none). .mkt-tabs excluded: desk-grid renders those
    * as bordered pills, where a bottom gradient would hide under the border —
    * they get an accent border-color shift instead (same no-shift contract). */
-  #nav a, .nav-dir-actions a, .mkt-picker-list a,
+  #nav a, .menu-card, .mkt-picker-list a,
   .trade-tabs button, .order-tabs a {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 0% 2px;
@@ -1046,7 +1047,7 @@ a#appfoot-status { text-decoration: none; color: inherit; }
     transition: background-size 120ms ease, color 120ms ease,
       background-color 120ms ease;
   }
-  #nav a:hover, .nav-dir-actions a:hover, .mkt-picker-list a:hover,
+  #nav a:hover, .menu-card:hover, .mkt-picker-list a:hover,
   .trade-tabs button:hover, .order-tabs a:hover {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 100% 2px;
@@ -1115,12 +1116,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
   button, a, summary, input, select, textarea,
   .node-table tbody tr, table.pools-table tbody tr,
   tr.book-row, .book-row-card,
-  #nav a, .nav-dir-actions a, .mkt-picker-list a,
+  #nav a, .menu-card, .mkt-picker-list a,
   .trade-tabs button, .order-tabs a, .mkt-tabs button,
   .node-card, .dashboard-gate, .alert-row,
   .mkt-statstrip, .mkt-chart-empty,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
-  .pools-pager button, .nav-dir-btn, .mkt-star, .mkt-bell,
+  .pools-pager button, .mkt-star, .mkt-bell,
   .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind,
   tr.xplore-flash, .xplore-live-dot, .xplore-live.xplore-bump {
     transition: none;
