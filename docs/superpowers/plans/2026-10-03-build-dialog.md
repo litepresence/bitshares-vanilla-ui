@@ -1,0 +1,303 @@
+# Build-dialog archive in /about Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Embed the 413-exchange vanilla-UI build dialog in the `/about` page as a lazily-loaded, searchable, collapsible historical archive generated from the same source as the docs.
+
+**Architecture:** `tooling/collate_vanilla_prompts.py` gains a third output (`vanilla/assets/build-dialog.js`, a same-origin script data asset so `file://` keeps working); `vanilla/js/views/about-ui.js` gains a "Making of this wallet" section that injects the asset on first expansion and renders native `<details>` per exchange; deep links ride the router's existing hash-query mechanism (`#/about?dialog=N`).
+
+**Tech Stack:** Plain browser JS (ES5-style `var`, matching `about-ui.js`), Python 3 stdlib (generator), Node.js stdlib `assert` (tests). Zero new dependencies.
+
+## Global Constraints
+
+- `vanilla/` stays dependency-free and static-servable: no `package.json`, no `node_modules`, no CDN `<script src>`, no framework imports — `tooling/check_rot.py` must stay green.
+- `file://` and any static server must both work: the data asset loads via injected same-origin `<script>` (never `fetch()` of JSON — fails on `file://` in Chrome). CSP is `script-src 'self'` — same-origin injection complies.
+- Dialog text reaches the DOM via `textContent` ONLY (never `innerHTML`) — the archive contains URLs and code fences.
+- Every `t("key", "default")` literal must satisfy `tooling/check_i18n.py`: default equals `en.json`, key present in all 12 locale dicts, new keys appended to en `_meta.translated`.
+- No new routes, no menu changes, no theme changes except section CSS.
+- Touch targets ≥44px in one dimension; no hover-only UI; `prefers-reduced-motion` respected (add no smooth scrolling).
+- Archive stays byte-verbatim English, never translated (translating history falsifies it).
+
+---
+
+## File structure
+
+- Modify: `tooling/collate_vanilla_prompts.py` — third output, the data asset.
+- Create: `vanilla/assets/build-dialog.js` — generated, ~500KB, committed (needed on the live Pages site).
+- Create: `vanilla/assets/BUILD-DIALOG-PROVENANCE.md` — one-paragraph provenance record (generator, source db, counts, archival rule). Hand-written once; the asset header comment points at it.
+- Modify: `vanilla/js/views/about-ui.js` — story section + lazy container + render + `_test` exports.
+- Modify: `vanilla/locales/*.json` (12 files) — 8 new `about.*` keys.
+- Modify: `vanilla/css/app.css` — ~15 lines of `.bd-*` rules.
+- Create: `tooling/build-dialog-test.js` — node stdlib tests (fake-doc pattern).
+- Regenerated (no hand edits): `docs/vanilla-ui-prompts.md`, `docs/vanilla-ui-dialog.md`.
+
+---
+
+### Task 1: Data-asset generation
+
+**Files:**
+- Modify: `tooling/collate_vanilla_prompts.py`
+- Create: `vanilla/assets/build-dialog.js` (generated)
+- Create: `vanilla/assets/BUILD-DIALOG-PROVENANCE.md`
+
+**Interfaces:**
+- Consumes: existing `prompts` list `(time, sid, mid, user, reply)` already collected in `main()`.
+- Produces: `window.BuildDialog` array of `{n, time, session, user, reply}` (`reply: null` when empty), plus `module.exports = BuildDialog` node shim (repo precedent: `about-ui.js:114`).
+
+- [ ] **Step 1: Write the failing test**
+
+```js
+// tooling/build-dialog-test.js (first half: asset-shape vectors)
+"use strict";
+var path = require("path");
+var assert = require("assert");
+var D = require(path.join(__dirname__, "..", "vanilla", "assets", "build-dialog.js"));
+assert.ok(Array.isArray(D), "asset exports an array");
+assert.strictEqual(D.length, 413, "413 exchanges (got " + D.length + ")");
+assert.deepStrictEqual(
+  Object.keys(D[0]).sort(), ["n", "reply", "session", "time", "user"], "entry keys");
+assert.strictEqual(D[0].n, 1, "numbering starts at 1");
+assert.strictEqual(D[D.length - 1].n, 413, "numbering ends at 413");
+assert.ok(D[0].user.indexOf("acquire bitshares-ui") !== -1, "first prompt is the founding prompt");
+assert.ok(D[D.length - 1].user.indexOf("issues/1") !== -1, "last prompt is the issue-1 prompt");
+console.log("build-dialog asset shape: 7 passed, 0 failed");
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node tooling/build-dialog-test.js`
+Expected: FAIL with `Cannot find module '../vanilla/assets/build-dialog.js'`
+
+- [ ] **Step 3: Extend the generator with the third output**
+
+In `tooling/collate_vanilla_prompts.py`, after the dialog write, add (same `prompts` order — numbering identical by construction):
+
+```python
+asset = []
+for i, (mtc, sid, _mid, text, reply) in enumerate(prompts, 1):
+    asset.append({
+        "n": i,
+        "time": utc(mtc),
+        "session": titles[sid],
+        "user": text.strip(),
+        "reply": reply.strip() or None,
+    })
+payload = ("/* Build-dialog archive: 413 vanilla-UI exchanges, generated by\n"
+           " * tooling/collate_vanilla_prompts.py from opencode.db. DO NOT HAND-EDIT.\n"
+           " * Verbatim English historical record, never translated. See\n"
+           " * vanilla/assets/BUILD-DIALOG-PROVENANCE.md. */\n"
+           "window.BuildDialog = " + json.dumps(asset, ensure_ascii=False) + ";\n"
+           "if (typeof module !== \"undefined\") { module.exports = window.BuildDialog; }\n")
+with open("/workspace/vanilla/assets/build-dialog.js", "w", encoding="utf-8") as f:
+    f.write(payload)
+print("wrote asset: %d entries" % len(asset))
+```
+
+- [ ] **Step 4: Write the provenance file**
+
+`vanilla/assets/BUILD-DIALOG-PROVENANCE.md`:
+
+```markdown
+# build-dialog.js provenance
+
+Generated asset: the 413-exchange vanilla-UI build dialog (user prompts +
+assistant replies, 14 sessions, 2026-09-26 → 2026-10-03, ending after issue
+#1 was addressed). Source: opencode.db via
+`tooling/collate_vanilla_prompts.py` (third output; rerun regenerates docs +
+asset together). 6 off-topic protocol-upgrade prompts excluded by message
+ID (see script `EXCLUDE_MESSAGE_IDS`). Verbatim English historical record:
+never translated, never hand-edited. Same-origin `<script>` data (not
+fetched JSON) so `file://` keeps working.
+```
+
+- [ ] **Step 5: Regenerate and verify**
+
+Run: `python3 tooling/collate_vanilla_prompts.py`
+Expected: `wrote /workspace/docs/vanilla-ui-prompts.md: 413 prompts`, `wrote .../vanilla-ui-dialog.md: 413 exchanges`, `wrote asset: 413 entries`
+
+Run: `node tooling/build-dialog-test.js`
+Expected: PASS (7 passed)
+
+Run: `python3 tooling/check_rot.py`
+Expected: PASSED (dialog text pre-scanned: zero framework-import / CDN-pattern hits)
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add tooling/collate_vanilla_prompts.py tooling/build-dialog-test.js vanilla/assets/build-dialog.js vanilla/assets/BUILD-DIALOG-PROVENANCE.md docs/vanilla-ui-prompts.md docs/vanilla-ui-dialog.md
+git commit -m "feat(about): build-dialog data asset (413 exchanges) + generator third output"
+```
+
+---
+
+### Task 2: i18n keys
+
+**Files:**
+- Modify: `vanilla/locales/en.json` (`about` section + `_meta.translated`), 11 stub dicts (`de es fr hi it ja ko pt ru tr zh`).
+
+**Interfaces:**
+- Consumes: exact key/default pairs below.
+- Produces: `check_i18n.py`-green dicts for Task 3 call sites.
+
+New keys (defaults are the shipped English copy):
+
+| key | en default |
+|---|---|
+| `about.making_title` | `Making of this wallet` |
+| `about.making_body` | `What follows is the original build story: every prompt that created this wallet, from "acquire bitshares-ui" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited. It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated. 413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.` |
+| `about.dlg_heading` | `Full build dialog` (exchange count appended as a bare number at render: `Full build dialog (413)`) |
+| `about.dlg_search_ph` | `Filter exchanges…` |
+| `about.dlg_search_clear` | `Clear` |
+| `about.dlg_showing` | `Showing` (status renders `Showing 12 / 413` — numbers need no keys) |
+| `about.dlg_unavailable` | `Build-dialog archive unavailable.` |
+| `about.dlg_no_reply` | `No reply recorded — the next prompt followed immediately.` |
+
+Stub rule (gate §4): every stub value EQUALS the en value; stub `_meta.translated` arrays stay as-is; append the 8 key names to en `_meta.translated` only.
+
+- [ ] **Step 1: Run the gate to verify it fails**
+
+Run: `python3 tooling/check_i18n.py`
+Expected: PASS now (no call sites yet) — this task's "failing test" is the Task 3 gate run; record current green as baseline.
+
+- [ ] **Step 2: Add the 8 keys to all 12 dicts**
+
+Add each key under the top-level `"about"` object in `en.json` with the defaults above; copy identical values into the `"about"` object of each stub dict; append the 8 dotted names to `en.json` `_meta.translated` (keep the list sorted as it currently is — verify neighboring entries first).
+
+- [ ] **Step 3: Run the gate**
+
+Run: `python3 tooling/check_i18n.py`
+Expected: PASS (keys without call sites are allowed — gate §6 checks call-site→en direction)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add vanilla/locales/
+git commit -m "feat(about): build-dialog i18n keys (8, en-verbatim stubs)"
+```
+
+---
+
+### Task 3: About section + lazy render
+
+**Files:**
+- Modify: `vanilla/js/views/about-ui.js`
+- Modify: `vanilla/css/app.css` (append `.bd-*` rules)
+
+**Interfaces:**
+- Consumes: `window.BuildDialog` (Task 1), `t(key, dflt)` batch pattern already in file, `el(doc, tag, text, cls)` textContent-only helper already in file.
+- Produces (via `_test` export, `help-ui.js:992` precedent): `dialogNumber(query)` — `(object) -> integer|null`; `matchExchange(entry, needle)` — `(object, string) -> boolean`.
+
+Behavior contract:
+- `renderAbout` appends after the links list: `h2` story title, story paragraph, collapsed container with heading `Full build dialog (N)`, search row (input + clear button + status line), day-grouped `<details>` list. Container starts collapsed; first expansion injects `<script src="assets/build-dialog.js">` once (guard flag on the container element); load error writes `about.dlg_unavailable` line.
+- Asset path is relative (`assets/build-dialog.js`) — same shape as `index.html`'s own `js/...` script tags, works from the app root on `file://` and http.
+- Exchange permalinks update the hash to `#/about?dialog=N` on user click only (a plain anchor does this natively — no JS navigation on render, hence no render loop).
+- On render, if `Router.query().dialog` parses to 1..N (guard `typeof Router !== "undefined"` exactly like the `I18n` guard in `t()`), lazy-load then expand that `<details>` and `scrollIntoView()` it (no smooth behavior — reduced-motion safe by default).
+- CSS (append to `vanilla/css/app.css`): `.bd-search` row layout (flex, wrap, 100% max-width 640px); `.bd-details summary` min-height 44px with comfortable padding; `.bd-day` header spacing reusing `.muted` where possible. No new theme variables.
+
+- [ ] **Step 1: Write the failing test** (append to `tooling/build-dialog-test.js`)
+
+```js
+var AboutUI = require(path.join(__dirname__, "..", "vanilla", "js", "views", "about-ui.js"));
+var T = AboutUI._test;
+assert.ok(T && typeof T.dialogNumber === "function", "_test.dialogNumber exported");
+assert.ok(typeof T.matchExchange === "function", "_test.matchExchange exported");
+assert.strictEqual(T.dialogNumber({dialog: "413"}), 413, "query dialog=413");
+assert.strictEqual(T.dialogNumber({dialog: "0"}), null, "dialog=0 rejected");
+assert.strictEqual(T.dialogNumber({dialog: "414"}), null, "dialog>413 rejected");
+assert.strictEqual(T.dialogNumber({}), null, "missing query rejected");
+assert.strictEqual(T.dialogNumber({dialog: "abc"}), null, "non-numeric rejected");
+assert.strictEqual(T.matchExchange({user: "acquire bitshares-ui", reply: "Done"}, "bitshares"), true, "user hit");
+assert.strictEqual(T.matchExchange({user: "acquire bitshares-ui", reply: "Done"}, "DONE"), true, "case-insensitive");
+assert.strictEqual(T.matchExchange({user: "a", reply: "b"}, "zzz"), false, "miss");
+assert.strictEqual(T.matchExchange({user: "a", reply: null}, ""), true, "empty needle matches all");
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `node tooling/build-dialog-test.js`
+Expected: FAIL with `_test.dialogNumber exported`
+
+- [ ] **Step 3: Implement in `about-ui.js`**
+
+Add (following file's existing `t`/`el`/`section` internal-function style, `var`, no arrow functions):
+
+```js
+/* dialogNumber: parse Router.query() into a 1-based exchange number.
+ * Params: q (object, possibly {}). Returns integer or null. Bounds come
+ * from window.BuildDialog when loaded, else fall back to 413 (committed
+ * count — stale only until first expansion loads the real length). */
+function dialogNumber(q) {
+  var raw = q && q.dialog;
+  var n = parseInt(raw, 10);
+  if (isNaN(n) || n < 1) return null;
+  var total = (typeof window !== "undefined" && window.BuildDialog) ? window.BuildDialog.length : 413;
+  if (n > total) return null;
+  return n;
+}
+
+/* matchExchange: plain case-insensitive substring over user+reply.
+ * Params: entry ({user, reply}), needle (string). Returns boolean.
+ * Empty needle matches everything (clear-box state). Never throws. */
+function matchExchange(entry, needle) {
+  if (!needle) return true;
+  var hay = ((entry && entry.user) || "") + "\n" + ((entry && entry.reply) || "");
+  return hay.toLowerCase().indexOf(String(needle).toLowerCase()) !== -1;
+}
+```
+
+Plus the section render (story `h2`+`p` via existing `section()`, collapsed container, search row, day groups, lazy script inject with loaded/error guard, `?dialog=N` expand+scroll on render when `Router` exists). All dialog strings via `el()`/`textContent` — no `innerHTML` anywhere on this path. Export: `return { renderAbout: renderAbout, _test: { dialogNumber: dialogNumber, matchExchange: matchExchange } };`
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `node tooling/build-dialog-test.js`
+Expected: PASS (all assertions, shape + behavior)
+
+- [ ] **Step 5: Append CSS and run gates**
+
+Append to `vanilla/css/app.css`:
+
+```css
+/* Build-dialog archive (about): search row + roomy collapsible rows. */
+.bd-search { display: flex; flex-wrap: wrap; gap: 8px; max-width: 640px; margin: 8px 0; }
+.bd-search input { flex: 1 1 200px; min-height: 44px; }
+.bd-search button { min-height: 44px; min-width: 44px; }
+.bd-details summary { min-height: 44px; padding: 10px 4px; cursor: pointer; }
+.bd-day { margin-top: 16px; }
+```
+
+Run: `python3 tooling/check_rot.py` → PASSED; `python3 tooling/check_i18n.py` → PASS (new call-site defaults must equal en.json); `bash tooling/check_types.sh` → PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add vanilla/js/views/about-ui.js vanilla/css/app.css tooling/build-dialog-test.js
+git commit -m "feat(about): making-of section with lazy build-dialog archive"
+```
+
+---
+
+### Task 4: Browser verification (human gate, then done)
+
+No new files. This task is the slice-style verification pass; it produces no code, only the observed-result record (paste into the commit message body or a `vanilla/notes/` line — do NOT invent results).
+
+- [ ] **Step 1: Serve and walk the matrix**
+
+Run: `python3 -m http.server 8080 --directory /workspace/vanilla`
+Visit `http://localhost:8080/#/about` and confirm: story block renders; collapsed container present; first expansion loads data (Network tab shows one `assets/build-dialog.js` request, ~500KB); 413 exchanges in day groups; search `tour` narrows with counts; clear restores; `#/about?dialog=413` deep-link expands #413 and scrolls to it; missing-asset simulation (temporarily rename the asset, reload, expand) shows the unavailable line, then restore.
+Repeat at 360px phone width and 1440px desktop, in all three themes, plus one `file://` load of the page.
+
+- [ ] **Step 2: Record and commit the observation**
+
+Only what was observed. If anything fails, fix under Task 3's files (new commit) and re-walk.
+
+```bash
+git status --short  # confirm only Task 1-3 files changed; stage exactly those, never git add -A (unrelated work may be dirty)
+```
+
+---
+
+## Self-Review
+
+- Spec coverage: §1 data file → Task 1 (shape, lazy script, provenance, generator-third-output, verbatim rule via textContent-only + no-translate note in provenance). §2 story+wiring → Tasks 2+3 (8 keys table, exact story copy, collapsed container, unavailable line, no router/menu changes). §3 rendering → Task 3 (lazy, `<details>`, substring search with counts, `?dialog=N` anchors — fragment scheme chosen at plan time as hash-query because `#/about/413` would 404 per `matchPattern` segment-count rule). Verification → Task 4 (360/1440, 3 themes, reduced-motion by omission, file://). Anti-rot (a)(b)(c) → gates in Tasks 1/3 + lazy-load design.
+- Placeholder scan: no TBD/TODO; every step has exact paths, code, commands, expected output. The `413` fallback bound in `dialogNumber` is a documented constant, not a placeholder (real length takes over on load).
+- Type consistency: `dialogNumber(object)->int|null`, `matchExchange({user,reply}, string)->bool` used identically in test and implementation; `window.BuildDialog` array-of-`{n,time,session,user,reply}` consistent across generator, test, and view.
