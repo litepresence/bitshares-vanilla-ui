@@ -51,7 +51,7 @@
 "use strict";
 var path = require("path");
 var assert = require("assert");
-var D = require(path.join(__dirname__, "..", "vanilla", "assets", "build-dialog.js"));
+var D = require(path.join(__dirname, "..", "vanilla", "assets", "build-dialog.js"));
 assert.ok(Array.isArray(D), "asset exports an array");
 assert.strictEqual(D.length, 413, "413 exchanges (got " + D.length + ")");
 assert.deepStrictEqual(
@@ -197,7 +197,7 @@ Behavior contract:
 - [ ] **Step 1: Write the failing test** (append to `tooling/build-dialog-test.js`)
 
 ```js
-var AboutUI = require(path.join(__dirname__, "..", "vanilla", "js", "views", "about-ui.js"));
+var AboutUI = require(path.join(__dirname, "..", "vanilla", "js", "views", "about-ui.js"));
 var T = AboutUI._test;
 assert.ok(T && typeof T.dialogNumber === "function", "_test.dialogNumber exported");
 assert.ok(typeof T.matchExchange === "function", "_test.matchExchange exported");
