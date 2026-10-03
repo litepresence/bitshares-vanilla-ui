@@ -68,6 +68,7 @@ declare var MarketInd: any;
 declare var MarketOrders: any;
 declare var MarketPicker: any;
 declare var MarketUI: any;
+declare var MenuUI: any;
 declare var MiscUI: any;
 declare var NewsUI: any;
 declare var Notify: any;

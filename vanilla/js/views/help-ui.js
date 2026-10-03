@@ -855,7 +855,8 @@ var HelpUI = (function () {
   }
   /* GROUPS: help index sections (menu-sitemap slice) — same 6 headings as
    * the sitemap. [i18nKey, enDefault, [topicKeys]]. Unknown future keys
-   * fall into "More" at render. Exported via _test for locale/test tooling. */
+   * fall into "More" at render. Exported via _test for locale/test tooling.
+   * @type {Array.<[string, string, string[]]>} */
   var GROUPS = [
     ["menu.section_wallet", "Wallet", ["disclaimer", "wallets", "backups", "accounts-general", "accounts-proposed", "accounts-permissions", "accounts-membership", "transfer", "invoice", "vesting", "authorities", "lists", "register", "password", "referrals", "dashboard"]],
     ["menu.section_trade", "Trade", ["bitshares", "blockchain", "dex-intro", "dex-trading", "dex-shorting", "instant", "pools", "swap", "gateways", "gateways-xbts", "gateways-ioxbank", "borrow-extra", "samet", "barter", "spotlight"]],
@@ -878,7 +879,7 @@ var HelpUI = (function () {
       wrap.appendChild(h);
       var list = doc.createElement("ul");
       list.className = "help-index";
-      g[2].forEach(function (key) {
+      /** @type {string[]} */ (g[2]).forEach(function (key) {
         var e = byKey[key];
         if (!e) return;
         seen[key] = true;

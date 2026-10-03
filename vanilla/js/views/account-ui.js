@@ -1568,8 +1568,8 @@ var AccountUI = (function () {
       var HE = null;
       try {
         /* globalThis-bracket (not bare `typeof HistoryExport`): the type
-         * gate's globals.d.ts has no HistoryExport line and this file
-         * cannot mint one — bare references fail checkJs, brackets pass. */
+         * gate's ambient declarations file has no HistoryExport line and
+         * this file cannot mint one — bare references fail checkJs. */
         HE = (typeof globalThis !== "undefined" && globalThis["HistoryExport"]) || null;
       } catch (e) { HE = null; }
       if (!HE) {
