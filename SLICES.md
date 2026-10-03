@@ -1,6 +1,6 @@
 # Slice Roadmap — bitshares-vanilla-ui
 
-> The binding build order. Each slice: brainstorm → plan (`docs/superpowers/plans/`) → build → testnet-verify → parity note (`vanilla/notes/`) → 8-check audit. A slice is NOT done until its parity note is green; browser passes marked ⏳ are with the human tester. This file is the answer to "what's left".
+> The binding build order. Each slice: brainstorm → plan (`docs/superpowers/plans/`) → build → testnet-verify → parity note (`vanilla/notes/`) → nine-check audit. A slice is NOT done until its parity note is green; browser passes marked ⏳ are with the human tester. This file is the answer to "what's left".
 
 Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human tester · 🔒 deferred post-v1.
 
@@ -26,7 +26,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 | 16 | Notifications + alerts | ✅ built (engine wired, CSS, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 17 | i18n foundations | ✅ built (en+es+8 stubs, switcher, batch-1 en-identical, Store envelope; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 18 | Final readability pass | 🔨 (oversize list inventoried — see below; audit then fixes) |
-| 19 | Principle #10 + 11-language program | 🔨 in progress (AGENTS.md #10 landed; hi+pt plumbed; 136 unkeyed strings keyed; ru/zh/hi/ko/ja/tr/fr/de/it/pt/es fully translated + audited + validator-green; spec `docs/superpowers/specs/2026-10-04-multilingual-design.md`; browser pass ⏳) |
+| 19 | Principle #10 + 12-language program | 🔨 in progress (AGENTS.md #10 landed; hi+pt plumbed; 136 unkeyed strings keyed; ru/zh/hi/ko/ja/tr/fr/de/it/pt/es fully translated + audited + validator-green; spec `docs/superpowers/specs/2026-10-04-multilingual-design.md`; browser pass ⏳) |
 | — | Extension-wrapper adapter Tier 1 (repackage+harden) + Tier 2 gate (WIRED 2026-10-04, headless-tested; human drills gate v1) | 🔨 Tier 1 drill + Tier 2 browser/testnet drills pending (parity: vanilla/notes/extension-tier2.md) |
 
 ## Sub-objectives per slice
@@ -79,7 +79,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] Timeframe-aware interpolated candles (carry-forward gaps, red/green flags, unit-tested)
 - [x] Stacked oscillator sub-panes (independent scales) + volume pane
 - [x] Scroll regions + desk styling alignment (density, header stats, sidebar) + DEX-UX dark values
-- [x] Live candle proof, headless shots (read), parity note `vanilla/notes/slice-07-indicators.md`, 8-check audit DONE-WITH-BROWSER-ITEMS (percent vector `2000`→`20%` recorded)
+- [x] Live candle proof, headless shots (read), parity note `vanilla/notes/slice-07-indicators.md`, nine-check audit DONE-WITH-BROWSER-ITEMS (percent vector `2000`→`20%` recorded)
 
 ### 8. Voting/governance ✅ (browser ⏳)
 - [x] Witness / committee / worker lists + details (`vote.js` reads)
@@ -131,7 +131,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] Parity note `vanilla/notes/slice-16-notify.md`, audit DONE-WITH-BROWSER-ITEMS
 
 ### 17. i18n foundations ✅ (browser ⏳)
-- [x] `i18n.js` + 10 dicts (121 keys; en full, es 32, 8 stubs); switcher; batch-1 en-identical (16/16); Store-envelope pref; drift gate
+- [x] `i18n.js` + 12 dicts (121 keys; en full, es 32, 8 stubs); switcher; batch-1 en-identical (16/16); Store-envelope pref; drift gate
 - [x] Batch ledger in parity note `vanilla/notes/slice-17-i18n.md`; audit DONE-WITH-BROWSER-ITEMS
 
 ### 18. Final readability pass ✅

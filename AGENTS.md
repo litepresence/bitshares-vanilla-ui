@@ -138,15 +138,15 @@ When in doubt, ship less code, not more tooling.
    source into repo with license headers).
 5. **Port incrementally by vertical slice.** Binding order lives in
    `/workspace/SLICES.md` (slices 1–18 + deferred extension-wrapper).
-   Slices 1–3 are built (browser passes with tester); slice 4 (transfer)
-   is next. No slice is "done" until its parity note passes all eight
+   Slices 1–18 built; 19 + extension drills remain — see SLICES.md.
+   No slice is "done" until its parity note passes all eight
    audit checks (principle #8, §3.7).
 6. **Prove parity.** Side-by-side checklist + manual test script per slice
    against testnet. No slice is "done" without connect → read → sign → broadcast
    verified on testnet. "Parity" means BOTH references: old-UI look/flows (#2)
    and astro-ui feature coverage (#3), with modern responsiveness (#4) — every
    number in human terms, never raw integers (#6), verified at phone width
-   and desktop width (#7).
+   and desktop width (#7). See the §2 objectives paragraph.
 
 ### Explicit non-goals
 
@@ -178,7 +178,7 @@ New world:  index.html + app.js + styles.css + vendored crypto
 **Principles for the vanilla build:**
 
 These are the short form. The binding form is the Anti-Rot Doctrine (§4.5) —
-principle #1 outranks all six below.
+principle #1 outranks all nine below.
 
 1. **Zero-runtime-dependency rule.** If `curl`-ing the folder doesn't include
    it, the app doesn't need it. Build tools (if any) must be optional, never
@@ -812,11 +812,11 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
 5. **Evidence before claims.** "Parity achieved" requires: (a) reference
    behavior noted (file:line), (b) vanilla file:line, (c) manual test steps +
    observed result. Run `verification-before-completion` before declaring done.
-   Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
-   and the `tooling/check_rot.py` scan. A slice that works but rots is not done.
-   Every "done" claim must ALSO pass the hard type gate
-   (`bash tooling/check_types.sh` — tsc checkJs, zero emit). A slice that
-   works but doesn't typecheck is not done.
+Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
+    and the `tooling/check_rot.py` scan. A slice that works but rots is not done.
+    Every "done" claim must ALSO pass the hard type gate (check 9)
+    (`bash tooling/check_types.sh` — tsc checkJs, zero emit). A slice that
+    works but doesn't typecheck is not done.
 6. **Chain safety.** Real keys only on testnet during dev. Never paste mainnet
    private keys/brainkeys into logs, issues, or commits. Test transfers on
    testnet faucet accounts.
