@@ -849,7 +849,7 @@ Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
 - [x] Sparse-clone `bitshares/bitshares-core` @ `develop` → `/workspace/reference/bitshares-core`
 - [x] Record HEAD (`fe7000c`, 2026-09-15) — API-contract 4th reference (headers only, ~2 MB)
 - [x] Clone `squidKid-deluxe/bitshares-dex-ux` @ `main` → `/workspace/reference/bitshares-dex-ux`
-- [x] Record HEAD (`bad2545`, 2026-09-28) — dashboard/style 5th reference (Python/Falcon, behavior-only; live shots in `vanilla/notes/dexux-ref/`)
+- [x] Record HEAD (`bad2545`, committed 2023-02-21, cloned 2026-09-28) — dashboard/style 5th reference (Python/Falcon, behavior-only; live shots in `vanilla/notes/dexux-ref/`)
 
 ### Phase 1 — Inventory (folded into slices — no separate inventory docs)
 
