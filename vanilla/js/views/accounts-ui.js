@@ -206,7 +206,7 @@ var AccountsUI = (function () {
      * ViewingAs subscription, no reload); Reset restores committee-account
      * via ViewingAs.clear. Same field error slot (no new strings, no new
      * route). ViewingAs missing -> network_error (feature unavailable). */
-    var viewBtn = touchable(DOM.el(doc, "button", t("viewing.dialog_open", "View as this account")));
+    var viewBtn = touchable(DOM.el(doc, "button", t("viewing.dialog_open", "View as")));
     viewBtn.type = "button"; viewBtn.classList.add("btn-ghost"); DOM.append(wrap, viewBtn);
     viewBtn.addEventListener("click", function () {
       var name = nameF.input.value.trim().toLowerCase();
@@ -226,7 +226,7 @@ var AccountsUI = (function () {
       });
     });
     var resetLine = DOM.el(doc, "p", null, "muted");
-    var resetBtn = touchable(DOM.el(doc, "button", t("viewing.dialog_reset", "Reset to committee-account")));
+    var resetBtn = touchable(DOM.el(doc, "button", t("viewing.dialog_reset", "Reset")));
     resetBtn.type = "button"; resetBtn.classList.add("btn-ghost"); DOM.append(resetLine, resetBtn);
     DOM.append(wrap, resetLine);
     resetBtn.addEventListener("click", function () {

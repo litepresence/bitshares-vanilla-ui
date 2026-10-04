@@ -61,8 +61,8 @@ function ok(cond, name) {
   var sec = ViewingAs.renderSection(doc);
   var html = JSON.stringify(sec);
   assert.ok(/View as account/.test(html), "heading text present");
-  assert.ok(/View as this account/.test(html), "Go button present");
-  assert.ok(/Reset to committee-account/.test(html), "Reset button present");
+  assert.ok(/"View as"(?!\s)/.test(html) || html.indexOf('"View as"') !== -1, "Go button present");
+  assert.ok(/"Reset"/.test(html), "Reset button present");
   assert.ok(html.indexOf('"×"') === -1, "no × close button in section mode");
   pass += 4;
 })();

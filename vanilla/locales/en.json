@@ -6556,9 +6556,9 @@
   "viewing": {
     "dialog_hint": "Public data — no unlock needed. Type any account name or 1.2.N id.",
     "dialog_label": "Account name ",
-    "dialog_open": "View as this account",
+    "dialog_open": "View as",
     "dialog_placeholder": "account-name",
-    "dialog_reset": "Reset to committee-account",
+    "dialog_reset": "Reset",
     "dialog_title": "View as account",
     "header_default": "Viewing as committee-account (locked)",
     "header_locked": "Viewing as %(name)s (locked) — tap to change",

@@ -1221,7 +1221,7 @@ var AccountUI = (function () {
     var lookViewBtn = doc.createElement("button");
     lookViewBtn.type = "button";
     lookViewBtn.style.minHeight = "44px";
-    lookViewBtn.textContent = t("viewing.dialog_open", "View as this account");
+    lookViewBtn.textContent = t("viewing.dialog_open", "View as");
     wrap.appendChild(lookViewBtn);
     lookViewBtn.addEventListener("click", function () {
       var v = lookInput.value.trim().toLowerCase();
@@ -1245,7 +1245,7 @@ var AccountUI = (function () {
     var lookResetBtn = doc.createElement("button");
     lookResetBtn.type = "button";
     lookResetBtn.style.minHeight = "44px";
-    lookResetBtn.textContent = t("viewing.dialog_reset", "Reset to committee-account");
+    lookResetBtn.textContent = t("viewing.dialog_reset", "Reset");
     lookResetLine.appendChild(lookResetBtn);
     wrap.appendChild(lookResetLine);
     lookResetBtn.addEventListener("click", function () {

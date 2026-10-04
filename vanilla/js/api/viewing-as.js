@@ -78,6 +78,8 @@ var ViewingAs = (function () {
     hint.className = "muted";
     hint.textContent = t("viewing.dialog_hint", "Public data — no unlock needed. Type any account name or 1.2.N id.");
     box.appendChild(hint);
+    var entry = doc.createElement("div");
+    entry.className = "viewing-input-row";
     var label = doc.createElement("label");
     label.textContent = t("viewing.dialog_label", "Account name ");
     var input = doc.createElement("input");
@@ -86,21 +88,22 @@ var ViewingAs = (function () {
     input.setAttribute("autocomplete", "off");
     input.style.minHeight = "44px";
     label.appendChild(input);
-    box.appendChild(label);
+    entry.appendChild(label);
+    var go = doc.createElement("button");
+    go.type = "button";
+    go.style.minHeight = "44px";
+    go.textContent = t("viewing.dialog_open", "View as");
+    entry.appendChild(go);
+    box.appendChild(entry);
     var err = doc.createElement("div");
     err.className = "error";
     err.setAttribute("aria-live", "polite");
     box.appendChild(err);
     var row = doc.createElement("p");
-    var go = doc.createElement("button");
-    go.type = "button";
-    go.style.minHeight = "44px";
-    go.textContent = t("viewing.dialog_open", "View as this account");
-    row.appendChild(go);
     var reset = doc.createElement("button");
     reset.type = "button";
     reset.style.minHeight = "44px";
-    reset.textContent = t("viewing.dialog_reset", "Reset to committee-account");
+    reset.textContent = t("viewing.dialog_reset", "Reset");
     row.appendChild(reset);
     if (closable) {
       var close = doc.createElement("button");
