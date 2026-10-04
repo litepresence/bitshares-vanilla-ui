@@ -245,6 +245,7 @@ var AboutUI = (function () {
     var bdList = doc.createElement("div");
     bdBox.appendChild(bdList);
     wrap.appendChild(bdBox);
+    wrap.appendChild(el(doc, "p", t("about.dlg_noscript", "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo."), "muted"));
     /* Deep link: ?dialog=N read on render only (never navigated to here,
      * so no render loop). Guard mirrors the I18n guard in t(). */
     var query = {};

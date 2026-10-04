@@ -11,6 +11,7 @@
       "about.dlg_search_ph",
       "about.dlg_showing",
       "about.dlg_unavailable",
+      "about.dlg_noscript",
       "about.hero_lede",
       "about.hero_title",
       "about.link",
@@ -7201,6 +7202,7 @@
     "dlg_search_clear": "Clear",
     "dlg_showing": "Showing",
     "dlg_unavailable": "Build-dialog archive unavailable.",
+    "dlg_noscript": "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo.",
     "dlg_no_reply": "No reply recorded — the next prompt followed immediately."
   },
   "approval": {
