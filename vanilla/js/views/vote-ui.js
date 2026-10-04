@@ -952,26 +952,32 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
         box.appendChild(el(doc, "p", "No live workers on chain — valid, not an error.", "muted"));
         return;
       }
-      var table = doc.createElement("table");
-      table.className = "node-table";
-      var thead = doc.createElement("thead");
-      var hr = doc.createElement("tr");
-      ["Worker", "Pay/day", "Share"].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
-      thead.appendChild(hr);
-      table.appendChild(thead);
-      var tb = doc.createElement("tbody");
-      rows.forEach(function (r) {
-        var tr = doc.createElement("tr");
-        tr.appendChild(el(doc, "td", (r.name || r.id) + " (" + r.id + ")"));
+      /* Shared renderer (TableRenderer pilot): the table shell comes from the
+       * shared renderer (fragment-backed detached build, single insert below
+       * on data arrival); cell strings are computed verbatim with the old
+       * inline logic — same titles, order, and text. No clicks before, none
+       * added (read-only table, no tabindex). */
+      var fundRows = rows.map(function (r) {
         var payHuman;
         try {
           payHuman = Format.formatAmount(String((r.extra || {}).daily_pay_raw || "0"), CORE_PRECISION_FALLBACK);
         } catch (e2) { payHuman = String((r.extra || {}).daily_pay_raw || "0"); }
-        tr.appendChild(el(doc, "td", payHuman));
-        tr.appendChild(el(doc, "td", GovAnalytics.fundingShare((r.extra || {}).daily_pay_raw, fr.budgetRaw)));
-        tb.appendChild(tr);
+        return {
+          id: r.id,
+          worker: (r.name || r.id) + " (" + r.id + ")",
+          pay: payHuman,
+          share: GovAnalytics.fundingShare((r.extra || {}).daily_pay_raw, fr.budgetRaw)
+        };
       });
-      table.appendChild(tb);
+      var table = TableRenderer.render({
+        columns: [
+          { key: "worker", title: "Worker" },
+          { key: "pay", title: "Pay/day" },
+          { key: "share", title: "Share" }
+        ],
+        rows: fundRows,
+        keyExtractor: function (r) { return r.id; }
+      });
       /* Insert the table right after the heading line. */
       if (fundP.nextSibling) box.insertBefore(table, fundP.nextSibling);
       else box.appendChild(table);
@@ -999,22 +1005,26 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
         box.appendChild(el(doc, "p", "No top voters returned.", "muted"));
         return;
       }
-      var vt = doc.createElement("table");
-      vt.className = "node-table";
-      var vh = doc.createElement("thead");
-      var vr = doc.createElement("tr");
-      ["Voter", "Voting power", "Proxy"].forEach(function (h) { vr.appendChild(el(doc, "th", h)); });
-      vh.appendChild(vr);
-      vt.appendChild(vh);
-      var vb = doc.createElement("tbody");
-      mx.voters.forEach(function (v) {
-        var tr = doc.createElement("tr");
-        tr.appendChild(el(doc, "td", v.name + " (" + v.id + ")"));
-        tr.appendChild(el(doc, "td", commas(v.vpRaw)));
-        tr.appendChild(el(doc, "td", v.proxy && v.proxy !== PROXY_SENTINEL ? v.proxy : "—"));
-        vb.appendChild(tr);
+      /* Shared renderer (same pilot as the funding table above): detached
+       * build, single append; cell strings verbatim — same titles, order,
+       * and text, no clicks. */
+      var voterRows = mx.voters.map(function (v) {
+        return {
+          id: v.id,
+          voter: v.name + " (" + v.id + ")",
+          power: commas(v.vpRaw),
+          proxy: v.proxy && v.proxy !== PROXY_SENTINEL ? v.proxy : "—"
+        };
       });
-      vt.appendChild(vb);
+      var vt = TableRenderer.render({
+        columns: [
+          { key: "voter", title: "Voter" },
+          { key: "power", title: "Voting power" },
+          { key: "proxy", title: "Proxy" }
+        ],
+        rows: voterRows,
+        keyExtractor: function (r) { return r.id; }
+      });
       box.appendChild(vt);
       /* Matrix: rows = voters, columns = top candidates (W = witness votes,
        * C = committee votes). "✓" = the voter's on-chain slate contains that
@@ -1023,32 +1033,31 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
         "Proxy-vote matrix (rows: top-10 voters; columns: top-10 witnesses + top-10 committee by weight) — ✓ means the voter's slate carries that vote.", "muted"));
       var scroller = doc.createElement("div");
       scroller.style.overflowX = "auto";
-      var mt = doc.createElement("table");
-      mt.className = "node-table";
-      var mh = doc.createElement("thead");
-      var mhr = doc.createElement("tr");
-      mhr.appendChild(el(doc, "th", "Voter \\ candidate"));
       var cands = mx.candidates.witness.concat(mx.candidates.committee);
+      /* Shared renderer (same pilot): dynamic columns per candidate
+       * (W:/C: titles verbatim), ✓/· cells verbatim, single append into the
+       * keyboard-scrollable region. No clicks before, none added. */
+      var mCols = [{ key: "voter", title: "Voter \\ candidate" }];
       cands.forEach(function (cid, i) {
         var kind = i < mx.candidates.witness.length ? "W" : "C";
-        mhr.appendChild(el(doc, "th", kind + ":" + cid));
+        mCols.push({ key: cid, title: kind + ":" + cid });
       });
-      mh.appendChild(mhr);
-      mt.appendChild(mh);
-      var mb = doc.createElement("tbody");
-      mx.matrix.forEach(function (row) {
-        var tr = doc.createElement("tr");
+      var mRows = mx.matrix.map(function (row) {
         var who = null;
         for (var k = 0; k < mx.voters.length; k++) {
           if (mx.voters[k].id === row.voter) { who = mx.voters[k]; break; }
         }
-        tr.appendChild(el(doc, "td", (who ? who.name : row.voter)));
+        var rec = { voterId: row.voter, voter: (who ? who.name : row.voter) };
         cands.forEach(function (cid) {
-          tr.appendChild(el(doc, "td", row.cells[cid] ? "✓" : "·"));
+          rec[cid] = row.cells[cid] ? "✓" : "·";
         });
-        mb.appendChild(tr);
+        return rec;
       });
-      mt.appendChild(mb);
+      var mt = TableRenderer.render({
+        columns: mCols,
+        rows: mRows,
+        keyExtractor: function (r) { return r.voterId; }
+      });
       scroller.appendChild(mt);
       box.appendChild(scroller);
     }).catch(function (e) {

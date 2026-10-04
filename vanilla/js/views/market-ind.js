@@ -824,24 +824,72 @@ var MarketInd = (function () {
     paintCountNote(state);
   }
 
+  /* Read one candle bucket into the pixel-ready series arrays at index i
+   * (verbatim extraction of the maybeDraw loop body — chart-pixel inputs
+   * only; raw integer money never enters. Volume -> Number is PIXELS-ONLY:
+   * the source is market.js buckets[].baseVolume, a human string already
+   * scaled by Format.formatAmount — never a raw int, never float math). */
+  function readSlot(buckets, i, into) {
+    into.closes[i] = numOrNull(Number(buckets[i] ? buckets[i].close : NaN));
+    into.highs[i] = numOrNull(Number(buckets[i] ? buckets[i].high : NaN));
+    into.lows[i] = numOrNull(Number(buckets[i] ? buckets[i].low : NaN));
+    into.opens[i] = numOrNull(Number(buckets[i] ? buckets[i].open : NaN));
+    into.times[i] = Math.floor(((buckets[i] && buckets[i].timeMs) || 0) / 1000);
+    var bv = buckets[i] ? buckets[i].baseVolume : null;
+    into.vols[i] = bv === null || bv === undefined ? null : numOrNull(Number(bv));
+  }
+
   /* Draw all three panes once book/candle data has arrived (either may come
-   * first; cached so resize/theme/log redraws never re-hit the chain). */
+   * first; cached so resize/theme/log redraws never re-hit the chain).
+   * PERF (output-identical): the pixel-ready closes/highs/lows/opens/times/
+   * vols arrays live on state._seriesCache and are rebuilt ONLY when the
+   * candle identity changes. A tip poll that merely extends the live bucket
+   * updates the cached arrays in place (rewrite the last slot; push one new
+   * slot when the tip rolled a fresh bucket). Full recompute happens ONLY
+   * when one of these invalidation conditions holds:
+   *   (a) no cache yet (first paint, or a fresh state object),
+   *   (b) state.bucket changed (timeframe switch),
+   *   (c) CANDLE_COUNT changed (count input),
+   *   (d) buckets.length shrank, or grew by more than 1 (a same-window poll
+   *       can only touch the live last slot — history slots are immutable
+   *       aggregates, so anything else is a deepen re-query/new window),
+   *   (e) first-bucket timeMs changed (deepen re-query shifted the window).
+   * Overlays and osc panes still recompute every draw from the cached arrays
+   * (indicator toggles must reflect instantly); the cache saves only the
+   * per-candle Number()/string reads plus array allocs. Rendered charts are
+   * identical: same arrays, same order, same values. */
   function maybeDraw(state) {
     var buckets = (state.candles && Array.isArray(state.candles.buckets))
       ? state.candles.buckets : [];
-    var closes = [], highs = [], lows = [], opens = [], times = [], vols = [];
-    var i;
-    for (i = 0; i < buckets.length; i++) {
-      closes.push(numOrNull(Number(buckets[i] ? buckets[i].close : NaN)));
-      highs.push(numOrNull(Number(buckets[i] ? buckets[i].high : NaN)));
-      lows.push(numOrNull(Number(buckets[i] ? buckets[i].low : NaN)));
-      opens.push(numOrNull(Number(buckets[i] ? buckets[i].open : NaN)));
-      times.push(Math.floor(((buckets[i] && buckets[i].timeMs) || 0) / 1000));
-      /* Volume -> Number is PIXELS-ONLY (chart coordinate, not money): the
-       * source is market.js buckets[].baseVolume, a human string already
-       * scaled by Format.formatAmount — never a raw int, never float math. */
-      var bv = buckets[i] ? buckets[i].baseVolume : null;
-      vols.push(bv === null || bv === undefined ? null : numOrNull(Number(bv)));
+    var firstMs = buckets.length > 0 ? ((buckets[0] && buckets[0].timeMs) || 0) : 0;
+    var c = state._seriesCache || null;
+    var hit = !!c &&
+      c.bucket === state.bucket && c.count === CANDLE_COUNT &&
+      buckets.length > 0 && buckets.length >= c.len && buckets.length <= c.len + 1 &&
+      c.firstMs === firstMs && Array.isArray(c.closes) && c.closes.length === c.len &&
+      Array.isArray(c.highs) && Array.isArray(c.lows) &&
+      Array.isArray(c.opens) && Array.isArray(c.times) && Array.isArray(c.vols);
+    var closes, highs, lows, opens, times, vols;
+    if (hit) {
+      /* Tip-poll fast path: slots 0..len-1 stand untouched; the live last
+       * slot is rewritten, and a rolled-over tip extends the arrays by one
+       * indexed store (assignment past the end lengthens them). */
+      closes = c.closes; highs = c.highs; lows = c.lows;
+      opens = c.opens; times = c.times; vols = c.vols;
+      readSlot(buckets, buckets.length - 1,
+        { closes: closes, highs: highs, lows: lows, opens: opens, times: times, vols: vols });
+      if (buckets.length === c.len + 1) c.len = buckets.length;
+    } else {
+      closes = []; highs = []; lows = []; opens = []; times = []; vols = [];
+      var fresh = { closes: closes, highs: highs, lows: lows, opens: opens, times: times, vols: vols };
+      var i;
+      for (i = 0; i < buckets.length; i++) {
+        readSlot(buckets, i, fresh);
+      }
+      state._seriesCache = {
+        bucket: state.bucket, count: CANDLE_COUNT, len: buckets.length, firstMs: firstMs,
+        closes: closes, highs: highs, lows: lows, opens: opens, times: times, vols: vols
+      };
     }
     var any = closes.some(function (v) { return v !== null; });
     var C = themeChartColors();

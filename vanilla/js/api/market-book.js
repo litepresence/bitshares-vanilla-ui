@@ -375,6 +375,181 @@ var MarketBook = (function () {
     section.appendChild(d);
   }
 
+  /* phoneCardsOn: phone-card layouts exist for the <=559px␣layout only
+   * (app.css:196-199 — .node-cards display:none above 559px, .node-table
+   * hidden below it). Perf: desktop paints skip the hidden card twins.
+   * Guarded: no matchMedia (headless/old browsers) means build (today's
+   * behavior, never blank). Resize edge: a breakpoint crossing without a
+   * book poll keeps the old twin set until the next poll rebuilds (orderbook
+   * polls run every few seconds on a live desk, so the stale window is one
+   * poll, never permanent). */
+  function phoneCardsOn() {
+    try {
+      if (typeof window !== "undefined" && window && typeof window.matchMedia === "function") {
+        return !!window.matchMedia("(max-width: 559px)").matches;
+      }
+    } catch (e) { /* build below */ }
+    return true;
+  }
+
+  /* Per-host row cache for keyed reuse (perf, output-identical): host element
+   * -> {Asks: {...}, Bids: {...}} -> price key -> row record. Detached rows
+   * keep their click/keydown listeners, so repaints attach zero new listeners
+   * for resting prices. Stored as an expando on the STABLE host (renderBook's
+   * parentEl, renderSplit's bidsEl/asksEl — never the per-paint grid wrapper,
+   * which is fresh every call). Fake-doc safe (plain-object expandos). */
+  function bookCache(host) {
+    try {
+      if (host && typeof host === "object") {
+        if (!host._bookRowCache || typeof host._bookRowCache !== "object") host._bookRowCache = {};
+        return host._bookRowCache;
+      }
+    } catch (e) { /* fresh map below */ }
+    return {};
+  }
+
+  /* One side's price->record map out of a host cache (never throws). */
+  function sideMap(cache, title) {
+    try {
+      if (cache && typeof cache === "object") {
+        if (!cache[title] || typeof cache[title] !== "object") cache[title] = {};
+        return cache[title];
+      }
+    } catch (e) { /* empty map below */ }
+    return {};
+  }
+
+  /* DocumentFragment or null (headless fake docs lack it — callers fall back
+   * to direct appends, same nodes, same order). */
+  function frag(doc) {
+    try {
+      if (doc && typeof doc.createDocumentFragment === "function") return doc.createDocumentFragment();
+    } catch (e) { /* direct appends below */ }
+    return null;
+  }
+
+  /* Depth-bar width percent for one level (pixel shading from depth Numbers
+   * only — money never enters; verbatim extraction of the inline math so the
+   * create and update paths share one rule). */
+  function depthPct(depthPt, maxTot, logVol) {
+    var pct = 0;
+    if (maxTot > 0 && depthPt && typeof depthPt.totalBase === "number") {
+      var tot = depthPt.totalBase;
+      if (logVol) {
+        /* Log share: dust stays visible next to whales (same compression
+         * as the log-volume chart axis). ln(1+x) keeps 0 at 0%. */
+        pct = tot <= 0 ? 0 : (100 * Math.log(1 + tot)) / Math.log(1 + maxTot);
+      } else {
+        pct = (100 * tot) / maxTot;
+      }
+      if (!(pct >= 0)) pct = 0;
+      if (pct > 100) pct = 100;
+    }
+    return String(pct) + "%";
+  }
+
+  /* Create one book-level row record (the ONLY place listeners attach: row
+   * click + row keydown + card click + card keydown — 4 per level when cards
+   * build, 2 when they don't). The click closure captures the level price;
+   * records are keyed by that same price, so a reused record's closure is
+   * always current — updates never rewire listeners. Returns {key, tr, amtTx,
+   * totTx, priceTd, fullPx, card, cardAmt, cardTot}. */
+  function buildLevelRec(doc, isAsk, lv, frac) {
+    var fullPx = (lv.displayPrice !== undefined && lv.displayPrice !== null) ? String(lv.displayPrice) : "";
+    var texts = [
+      fullPx === "" ? "" : trim6(fullPx),
+      lv.quote !== undefined ? String(lv.quote) : "",
+      lv.base !== undefined ? String(lv.base) : ""
+    ];
+    var tr = doc.createElement("tr");
+    tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
+    try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+    try {
+      tr.setAttribute("tabindex", "0");
+      tr.setAttribute("role", "button");
+      tr.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(texts[0]));
+      tr.title = t("market_book.fill_price", "Fill price");
+    } catch (e) { /* rows render unclickable */ }
+    var spans = [];
+    var priceTd = null;
+    texts.forEach(function (text, ci) {
+      var td = doc.createElement("td");
+      td.className = "book-cell" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "");
+      if (ci === 0 && fullPx) td.title = fullPx;
+      if (ci === 0) priceTd = td;
+      if ((isAsk && ci === 0) || (!isAsk && ci === texts.length - 1)) {
+        var bar = doc.createElement("span");
+        bar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
+        bar.setAttribute("aria-hidden", "true");
+        td.appendChild(bar);
+      }
+      var tx = doc.createElement("span");
+      tx.className = "cell-text";
+      tx.textContent = text;
+      td.appendChild(tx);
+      tr.appendChild(td);
+      spans.push(tx);
+    });
+    var rec = {
+      key: fullPx, tr: tr, amtTx: spans[1], totTx: spans[2],
+      priceTd: priceTd, fullPx: fullPx, card: null, cardAmt: null, cardTot: null
+    };
+    /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
+     * Ask rows take into the buy panel, bid rows into the sell panel. */
+    (function (row, priceText) {
+      function go() { fillTradePrice(doc, priceText, isAsk ? "buy" : "sell"); }
+      try {
+        row.addEventListener("click", go);
+        row.addEventListener("keydown", function (ev) {
+          if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
+        });
+      } catch (e) { /* rows render unclickable */ }
+    })(tr, texts[0]);
+    return rec;
+  }
+
+  /* Build the phone-card twin for a record (the remaining 2 of the 4
+   * listeners); called at creation on phones, or lazily when a later poll
+   * finds the breakpoint flipped phone-ward. Same nodes/order as before. */
+  function buildLevelCard(doc, isAsk, rec, lv) {
+    var fullPx = rec.fullPx;
+    var card = doc.createElement("div");
+    card.className = "node-card book-row-card " + (isAsk ? "book-ask-row" : "book-bid-row");
+    try {
+      var cur = null;
+      try { cur = rec.tr.style.getPropertyValue("--depth"); } catch (e2) { cur = null; }
+      card.style.setProperty("--depth", cur || "0%");
+    } catch (e) { /* cards render without bars */ }
+    var cbar = doc.createElement("span");
+    cbar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
+    cbar.setAttribute("aria-hidden", "true");
+    card.appendChild(cbar);
+    var divs = [];
+    [(fullPx === "" ? "" : trim6(fullPx)), "Amount " + String((lv && lv.quote) || ""), "Total " + String((lv && lv.base) || "")].forEach(function (text, ci) {
+      /* Phone-card price (first div) mirrors the table price color hook. */
+      var cd = el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : ""));
+      if (ci === 0 && fullPx) cd.title = fullPx;
+      card.appendChild(cd);
+      divs.push(cd);
+    });
+    rec.card = card;
+    rec.cardAmt = divs[1];
+    rec.cardTot = divs[2];
+    (function (cardEl, priceText) {
+      function go() { fillTradePrice(doc, priceText, isAsk ? "buy" : "sell"); }
+      try {
+        cardEl.setAttribute("tabindex", "0");
+        cardEl.setAttribute("role", "button");
+        cardEl.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(priceText));
+        cardEl.title = t("market_book.fill_price", "Fill price");
+        cardEl.addEventListener("click", go);
+        cardEl.addEventListener("keydown", function (ev) {
+          if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
+        });
+      } catch (e) { /* cards render unclickable */ }
+    })(card, (rec.fullPx === "" ? "" : trim6(rec.fullPx)));
+    return card;
+  }
   /* Book side table + phone cards (same .node-table/.node-cards pattern as
    * account-ui renderBalances). Amount = quote leg, Total = base leg, both
    * verbatim chain-human strings. opts.bare (split cells) skips the inner
@@ -387,7 +562,15 @@ var MarketBook = (function () {
    * bitshares-ui OrderBook.jsx:176-184). logVol mirrors the depth chart's
    * volume toggle (log widths share its scale so bars and chart agree);
    * absent/false keeps the legacy linear share. Scroll regions + grid live
-   * in desk-grid.css (.book-scroll/.book-cards/.book-grid). */
+   * in desk-grid.css (.book-scroll/.book-cards/.book-grid).
+   * PERF (output-identical): rows are keyed by price and reused across polls
+   * (buildLevelRec/buildLevelCard above attach the 4 listeners exactly once;
+   * repaints update textContent/--depth in place and reorder via one
+   * synchronous fragment append = one paint). Rendered nodes, order, attrs,
+   * and listener behavior match the old clear+rebuild path exactly; only
+   * node identity and listener churn differ (unobservable). opts.cache
+   * carries the host's side map (renderBook/renderSplit pass the STABLE
+   * host's map — never the per-paint wrapper's). */
   function renderBookSide(doc, section, title, levels, depthPts, logVol, opts) {
     var isAsk = title === "Asks";
     var bare = !!(opts && opts.bare);
@@ -422,105 +605,70 @@ var MarketBook = (function () {
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = doc.createElement("tbody");
-    var cards = doc.createElement("div");
-    cards.className = "node-cards book-cards";
+    /* Keyed row pass: reuse records by price, update amount/total/--depth in
+     * place, collect in level order into fragments, single append per
+     * container (one paint — all writes are synchronous). */
+    var wantCards = phoneCardsOn();
+    var cache = (opts && opts.cache && typeof opts.cache === "object") ? opts.cache : bookCache(section);
+    var map = sideMap(cache, title);
+    /* Cache hygiene: a side churning through hundreds of distinct prices
+     * drops its map and rebuilds once instead of pinning dead nodes. */
+    try {
+      if (Object.keys(map).length > 600) {
+        try { delete cache[title]; } catch (e2) { cache[title] = {}; }
+        map = sideMap(cache, title);
+      }
+    } catch (e) { /* map stands */ }
+    var seen = {};
+    var tFrag = frag(doc), cFrag = wantCards ? frag(doc) : null;
+    var cards = wantCards ? doc.createElement("div") : null;
+    if (wantCards) cards.className = "node-cards book-cards";
     for (i = 0; i < levels.length; i++) {
       var lv = levels[i] || {};
-      var pct = 0; /* width percent: pixel shading from depth Numbers only */
-      if (maxTot > 0 && depthPts[i] && typeof depthPts[i].totalBase === "number") {
-        var tot = depthPts[i].totalBase;
-        if (logVol) {
-          /* Log share: dust stays visible next to whales (same compression
-           * as the log-volume chart axis). ln(1+x) keeps 0 at 0%. */
-          pct = tot <= 0 ? 0 : (100 * Math.log(1 + tot)) / Math.log(1 + maxTot);
-        } else {
-          pct = (100 * tot) / maxTot;
-        }
-        if (!(pct >= 0)) pct = 0;
-        if (pct > 100) pct = 100;
+      var pxKey = (lv.displayPrice !== undefined && lv.displayPrice !== null) ? String(lv.displayPrice) : "";
+      /* Duplicate prices in one side share the key namespace with a suffix
+       * (aggregated books never duplicate, so this path is cold). */
+      var key = pxKey, dup = 1;
+      while (Object.prototype.hasOwnProperty.call(seen, key)) { dup++; key = pxKey + "#" + dup; }
+      seen[key] = true;
+      var frac = depthPct(depthPts[i], maxTot, logVol);
+      var rec = Object.prototype.hasOwnProperty.call(map, key) ? map[key] : null;
+      if (!rec || !rec.tr) {
+        rec = buildLevelRec(doc, isAsk, lv, frac);
+        rec.key = key;
+        map[key] = rec;
+      } else {
+        /* Same price key => same price text/title/aria (derived from the
+         * key); only amount/total/depth move. Listeners stand untouched. */
+        try { rec.tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
+        rec.amtTx.textContent = lv.quote !== undefined ? String(lv.quote) : "";
+        rec.totTx.textContent = lv.base !== undefined ? String(lv.base) : "";
       }
-      var frac = String(pct) + "%";
-      var tr = doc.createElement("tr");
-      tr.className = "book-row " + (isAsk ? "book-ask-row" : "book-bid-row");
-      try { tr.style.setProperty("--depth", frac); } catch (e) { /* rows render without bars */ }
-      /* Punchlist MED: book-row prices trimmed to 6 decimals at RENDER
-       * (trim6 above — same rule as the spread line). The chain ships long
-       * human strings via price_to_string (market.js header); the full
-       * string stays in the price cell's title. */
-      var fullPx = (lv.displayPrice !== undefined && lv.displayPrice !== null) ? String(lv.displayPrice) : "";
-      var texts = [
-        fullPx === "" ? "" : trim6(fullPx),
-        lv.quote !== undefined ? String(lv.quote) : "",
-        lv.base !== undefined ? String(lv.base) : ""
-      ];
-      /* Click-to-fill: row price → trade-form price input (keyboard: Enter). */
-      try {
-        tr.setAttribute("tabindex", "0");
-        tr.setAttribute("role", "button");
-        tr.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(texts[0]));
-        tr.title = t("market_book.fill_price", "Fill price");
-      } catch (e) { /* rows render unclickable */ }
-      texts.forEach(function (text, ci) {
-        var td = doc.createElement("td");
-        /* Price cell (ci 0) carries the side color hook (book-price-bid green
-         * / book-price-ask red via desk-grid.css theme tokens) alongside the
-         * row-side class — mirrored column order stays AS-IS, raw/title attrs
-         * on the row (fill-price title + aria-label) are untouched. */
-        td.className = "book-cell" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : "");
-        if (ci === 0 && fullPx) td.title = fullPx;
-        /* The row's single .depth-bar anchors in the price-side cell
-         * (asks: first cell; bids: last cell) so desk-grid.css can grow it
-         * across the row from the price side as a full-row cumulative wash
-         * (original language: wash proportional to cumulative depth). */
-        if ((isAsk && ci === 0) || (!isAsk && ci === texts.length - 1)) {
-          var bar = doc.createElement("span");
-          bar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
-          bar.setAttribute("aria-hidden", "true");
-          td.appendChild(bar);
+      if (wantCards) {
+        if (!rec.card) buildLevelCard(doc, isAsk, rec, lv);
+        else {
+          try { rec.card.style.setProperty("--depth", frac); } catch (e) { /* cards render without bars */ }
+          rec.cardAmt.textContent = "Amount " + String(lv.quote || "");
+          rec.cardTot.textContent = "Total " + String(lv.base || "");
         }
-        var tx = doc.createElement("span");
-        tx.className = "cell-text";
-        tx.textContent = text;
-        td.appendChild(tx);
-        tr.appendChild(td);
-      });
-      tbody.appendChild(tr);
-      var card = doc.createElement("div");
-      card.className = "node-card book-row-card " + (isAsk ? "book-ask-row" : "book-bid-row");
-      try { card.style.setProperty("--depth", frac); } catch (e) { /* cards render without bars */ }
-      var cbar = doc.createElement("span");
-      cbar.className = "depth-bar " + (isAsk ? "bar-ask" : "bar-bid");
-      cbar.setAttribute("aria-hidden", "true");
-      card.appendChild(cbar);
-      [(fullPx === "" ? "" : trim6(fullPx)), "Amount " + String(lv.quote || ""), "Total " + String(lv.base || "")].forEach(function (text, ci) {
-        /* Phone-card price (first div) mirrors the table price color hook. */
-        var cd = el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : ""));
-        if (ci === 0 && fullPx) cd.title = fullPx;
-        card.appendChild(cd);
-      });
-      cards.appendChild(card);
-      /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
-       * Ask rows take into the buy panel, bid rows into the sell panel. */
-      (function (row, cardEl, priceText) {
-        function go() { fillTradePrice(doc, priceText, isAsk ? "buy" : "sell"); }
-        try {
-          row.addEventListener("click", go);
-          row.addEventListener("keydown", function (ev) {
-            if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
-          });
-        } catch (e) { /* rows render unclickable */ }
-        try {
-          cardEl.setAttribute("tabindex", "0");
-          cardEl.setAttribute("role", "button");
-          cardEl.setAttribute("aria-label", t("market_book.fill_price", "Fill price") + " " + String(priceText));
-          cardEl.title = t("market_book.fill_price", "Fill price");
-          cardEl.addEventListener("click", go);
-          cardEl.addEventListener("keydown", function (ev) {
-            if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
-          });
-        } catch (e) { /* cards render unclickable */ }
-      })(tr, card, texts[0]);
+      } else if (rec.card) {
+        /* Desktop paint: drop the hidden twin (rebuilt lazily on flip). */
+        rec.card = null;
+        rec.cardAmt = null;
+        rec.cardTot = null;
+      }
+      if (tFrag) tFrag.appendChild(rec.tr);
+      else tbody.appendChild(rec.tr);
+      if (wantCards) {
+        if (cFrag) cFrag.appendChild(rec.card);
+        else cards.appendChild(rec.card);
+      }
     }
+    /* Evict prices that left the book (listeners GC with the nodes). */
+    try {
+      Object.keys(map).forEach(function (k) { if (!seen[k]) delete map[k]; });
+    } catch (e) { /* stale records age out via the 600-cap above */ }
+    if (tFrag) tbody.appendChild(tFrag);
     table.appendChild(tbody);
     /* Scroll region (matches the original's fixed-height book areas; native
      * overflow, no library): long books scroll in place instead of running
@@ -529,7 +677,10 @@ var MarketBook = (function () {
     scroller.className = "book-scroll";
     scroller.appendChild(table);
     sideWrap.appendChild(scroller);
-    sideWrap.appendChild(cards);
+    if (wantCards && cards) {
+      if (cFrag) cards.appendChild(cFrag);
+      sideWrap.appendChild(cards);
+    }
   }
 
   /* Book section fill (moved verbatim from the MarketUI fill book handler):
@@ -564,8 +715,11 @@ var MarketBook = (function () {
     var grid = doc.createElement("div");
     grid.className = "book-grid";
     parentEl.appendChild(grid);
-    renderBookSide(doc, grid, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol);
-    renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol);
+    /* Keyed row cache lives on the STABLE parent (the per-paint grid above
+     * is fresh every call, so caching on it would never hit). */
+    var rc = bookCache(parentEl);
+    renderBookSide(doc, grid, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol, { cache: rc });
+    renderBookSide(doc, grid, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol, { cache: rc });
     rawDetails(doc, parentEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
@@ -598,8 +752,8 @@ var MarketBook = (function () {
     } else {
       ctx.spreadLine.textContent = t("market_book.s1", "Spread — (empty book side)");
     }
-    renderBookSide(doc, bidsEl, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol, { bare: true });
-    renderBookSide(doc, asksEl, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol, { bare: true });
+    renderBookSide(doc, bidsEl, "Bids", ctx.book.bids, depth.bids, !!ctx.logVol, { bare: true, cache: bookCache(bidsEl) });
+    renderBookSide(doc, asksEl, "Asks", ctx.book.asks, depth.asks, !!ctx.logVol, { bare: true, cache: bookCache(asksEl) });
     rawDetails(doc, asksEl, t("market.raw_book", "Raw order book"), ctx.book);
     return depth;
   }
@@ -607,7 +761,12 @@ var MarketBook = (function () {
   /* Trades section fill (moved verbatim from the MarketUI fill trades
    * handler): table + phone cards from fill rows, raw fills JSON. ctx carries
    * exactly the moved code's free variables: { rows, quoteSymbol }. Empty
-   * markets get the muted sentence, never a blank panel. */
+   * markets get the muted sentence, never a blank panel.
+   * PERF (output-identical): fill rows are keyed (time|price|amount) and
+   * reused across polls via the stable parent's cache (same expando as the
+   * book sides, under the "Trades" side key); repaints update textContent in
+   * place and land through one synchronous fragment append. Phone cards obey
+   * the same <=559px guard as the book sides. */
   function renderTrades(doc, parentEl, ctx) {
     var rows = ctx.rows;
     while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
@@ -617,6 +776,16 @@ var MarketBook = (function () {
       mountTape(doc, parentEl, []);
       return;
     }
+    var wantCards = phoneCardsOn();
+    var tMap = sideMap(bookCache(parentEl), "Trades");
+    try {
+      if (Object.keys(tMap).length > 600) {
+        var tc = bookCache(parentEl);
+        try { delete tc.Trades; } catch (e2) { tc.Trades = {}; }
+        tMap = sideMap(tc, "Trades");
+      }
+    } catch (e) { /* map stands */ }
+    var tSeen = {};
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead");
@@ -625,17 +794,75 @@ var MarketBook = (function () {
     thead.appendChild(hr);
     table.appendChild(thead);
     var tbody = doc.createElement("tbody");
+    var tFrag = frag(doc), cFrag = wantCards ? frag(doc) : null;
+    var cards = wantCards ? doc.createElement("div") : null;
+    if (wantCards) cards.className = "node-cards trades-cards";
     rows.forEach(function (r) {
-      var tr = doc.createElement("tr");
-      tr.appendChild(el(doc, "td", timeText(r.time)));
       /* Punchlist MED: fill prices trimmed like book rows (trim6); the full
        * chain string stays in the cell title. */
-      var ftd = el(doc, "td", (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice)));
-      if (r.displayPrice !== null && r.displayPrice !== undefined) ftd.title = String(r.displayPrice);
-      tr.appendChild(ftd);
-      tr.appendChild(el(doc, "td", (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol)));
-      tbody.appendChild(tr);
+      var priceShown = (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice));
+      var priceFull = (r.displayPrice === null || r.displayPrice === undefined) ? null : String(r.displayPrice);
+      var amtShown = (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol);
+      var tKey = timeText(r.time) + " " + String(priceFull === null ? "—" : priceFull) + " " + amtShown;
+      var dup = 1, k = tKey;
+      while (Object.prototype.hasOwnProperty.call(tSeen, k)) { dup++; k = tKey + "#" + dup; }
+      tSeen[k] = true;
+      var rec = Object.prototype.hasOwnProperty.call(tMap, k) ? tMap[k] : null;
+      if (!rec || !rec.tr) {
+        var tr = doc.createElement("tr");
+        var timeTd = el(doc, "td", timeText(r.time));
+        var ftd = el(doc, "td", priceShown);
+        if (priceFull !== null) ftd.title = priceFull;
+        var atd = el(doc, "td", amtShown);
+        tr.appendChild(timeTd);
+        tr.appendChild(ftd);
+        tr.appendChild(atd);
+        rec = { tr: tr, timeTd: timeTd, priceTd: ftd, amtTd: atd, card: null, cardTime: null, cardPrice: null, cardAmt: null };
+        tMap[k] = rec;
+      } else {
+        /* Same key => same time/price/amount strings; rewrite verbatim
+         * (covers the "—" vs value flip when a fill's legs resolve). */
+        rec.timeTd.textContent = timeText(r.time);
+        rec.priceTd.textContent = priceShown;
+        if (priceFull !== null) rec.priceTd.title = priceFull;
+        rec.amtTd.textContent = amtShown;
+      }
+      if (tFrag) tFrag.appendChild(rec.tr);
+      else tbody.appendChild(rec.tr);
+      if (wantCards) {
+        if (!rec.card) {
+          var card = doc.createElement("div");
+          card.className = "node-card";
+          var cTime = el(doc, "div", timeText(r.time));
+          var fcd = el(doc, "div", priceShown);
+          if (priceFull !== null) fcd.title = priceFull;
+          var cAmt = el(doc, "div", amtShown);
+          card.appendChild(cTime);
+          card.appendChild(fcd);
+          card.appendChild(cAmt);
+          rec.card = card;
+          rec.cardTime = cTime;
+          rec.cardPrice = fcd;
+          rec.cardAmt = cAmt;
+        } else {
+          rec.cardTime.textContent = timeText(r.time);
+          rec.cardPrice.textContent = priceShown;
+          if (priceFull !== null) rec.cardPrice.title = priceFull;
+          rec.cardAmt.textContent = amtShown;
+        }
+        if (cFrag) cFrag.appendChild(rec.card);
+        else cards.appendChild(rec.card);
+      } else if (rec.card) {
+        rec.card = null;
+        rec.cardTime = null;
+        rec.cardPrice = null;
+        rec.cardAmt = null;
+      }
     });
+    try {
+      Object.keys(tMap).forEach(function (k) { if (!tSeen[k]) delete tMap[k]; });
+    } catch (e) { /* stale records age out via the 600-cap above */ }
+    if (tFrag) tbody.appendChild(tFrag);
     table.appendChild(tbody);
     /* Fixed-height scroll region (desk-grid.css: 15-row fold, sticky thead);
      * fills scroll in place like the original market-history list. */
@@ -643,19 +870,10 @@ var MarketBook = (function () {
     scroller.className = "trades-scroll";
     scroller.appendChild(table);
     parentEl.appendChild(scroller);
-    var cards = doc.createElement("div");
-    cards.className = "node-cards trades-cards";
-    rows.forEach(function (r) {
-      var card = doc.createElement("div");
-      card.className = "node-card";
-      card.appendChild(el(doc, "div", timeText(r.time)));
-      var fcd = el(doc, "div", (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice)));
-      if (r.displayPrice !== null && r.displayPrice !== undefined) fcd.title = String(r.displayPrice);
-      card.appendChild(fcd);
-      card.appendChild(el(doc, "div", (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol)));
-      cards.appendChild(card);
-    });
-    parentEl.appendChild(cards);
+    if (wantCards && cards) {
+      if (cFrag) cards.appendChild(cFrag);
+      parentEl.appendChild(cards);
+    }
     /* Fill-size tape histogram (proposal 2, owned by MarketOrders): mounts
      * into this same mkt-trades pane from the already-fetched fill rows —
      * no new chain call. Guarded: trades render fully when the module is

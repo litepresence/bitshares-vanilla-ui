@@ -410,7 +410,10 @@ var MarketPicker = (function () {
     }
 
     /* paint: render the filtered picker rows (search + kind + fav-only).
-     * Params: filter (raw search string, matched case-insensitively). */
+     * Params: filter (raw search string, matched case-insensitively).
+     * PERF (output-identical): header + rows build into a DocumentFragment
+     * (capped at 20 rows, same slice as before) with a single append — one
+     * paint instead of one per row. Same nodes, same order, same wiring. */
     function paint(filter) {
       DOM.clear(ul);
       var f = String(filter || "").trim().toUpperCase();
@@ -437,6 +440,14 @@ var MarketPicker = (function () {
         return;
       }
       /* Column header (original MARKET/VOL/PRICE/CHANGE language). */
+      var batch = null;
+      try {
+        if (doc && typeof doc.createDocumentFragment === "function") batch = doc.createDocumentFragment();
+      } catch (e) { batch = null; }
+      function emit(n) {
+        if (batch) batch.appendChild(n);
+        else ul.appendChild(n);
+      }
       var head = doc.createElement("li");
       head.className = "mkt-picker-row mkt-picker-head";
       head.setAttribute("aria-hidden", "true");
@@ -445,7 +456,7 @@ var MarketPicker = (function () {
       head.appendChild(DOM.el(doc, "span", t("market.vol_label", "Vol"), "mkt-pk-num"));
       head.appendChild(DOM.el(doc, "span", t("market.th_price", "Price"), "mkt-pk-num"));
       head.appendChild(DOM.el(doc, "span", t("market.chg_label", "24h Δ"), "mkt-pk-num"));
-      ul.appendChild(head);
+      emit(head);
       rows.forEach(function (id) {
         var li = doc.createElement("li");
         li.className = "mkt-picker-row";
@@ -501,8 +512,9 @@ var MarketPicker = (function () {
           }
           if (r.chg !== null) paintChg(chgCell, r.chg);
         });
-        ul.appendChild(li);
+        emit(li);
       });
+      if (batch) ul.appendChild(batch);
     }
     /* paintTabs: All/Starred ARIA selection follows favOnly. */
     function paintTabs() {

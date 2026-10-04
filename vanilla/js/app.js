@@ -543,11 +543,24 @@ var App = (function () {
    *   string via paintVersion below.
    *   Params: status ({state, node, latencyMs, headBlock}). Returns nothing.
    *   Fails: never — missing footer is a no-op. */
+  /* Last painted footer identity (perf: connection events refire with
+   *   identical status — shallow-compare the painted fields and skip the
+   *   clear+rebuild when nothing moved. The foot.firstChild guard covers a
+   *   shell that wiped the footer out from under us: same key but empty DOM
+   *   still repaints. paintVersion above keeps its own logic — version truth
+   *   refreshes on its TTL regardless of this skip). */
+  var lastFootKey = null;
   function paintFooter(status) {
     paintVersion(status);
     var foot = document.getElementById("appfoot-status");
     if (!foot) return;
     var s = status || {};
+    try {
+      var fkey = [s.state || "unknown", s.node || "", s.latencyMs, s.headBlock,
+        s.mismatch || "", currentNetwork()].join("|");
+      if (fkey === lastFootKey && foot.firstChild) return;
+      lastFootKey = fkey;
+    } catch (e) { /* compare is advisory — paint below */ }
     var state = s.state || "unknown";
     while (foot.firstChild) foot.removeChild(foot.firstChild);
     var doc = foot.ownerDocument || document;
@@ -820,6 +833,12 @@ var App = (function () {
    * Ladder: full relation | offbranch counted/plain | hash-only |
    * skeleton (no version.json — bootBuildInfo fails open, skeleton stands).
    * Called from paintFooter so every connection event refreshes it. */
+  /* Persistent version nodes (perf: paintVersion runs on every connection
+   * event — the brand/relation/link/note text nodes are built once per
+   * build identity and updated in place instead of clear+rebuild. The child
+   * sequence matches the old path exactly in every state (rel/note nodes
+   * attach only when non-empty), so rendered output is identical. */
+  var verNodes = null;
   function paintVersion() {
     if (typeof document === "undefined") return;
     var left = document.getElementById("appfoot-version");
@@ -827,9 +846,8 @@ var App = (function () {
     try {
       if (!buildInfo) { bootBuildInfo(); return; }
       maybeRefreshCmp();
-      while (left.firstChild) left.removeChild(left.firstChild);
       var doc = left.ownerDocument || document;
-      left.appendChild(doc.createTextNode(t("shell.footer_brand_vanilla", "BITSHARES VANILLA UI") + " " + buildInfo.short + " · "));
+      var brandText = t("shell.footer_brand_vanilla", "BITSHARES VANILLA UI") + " " + buildInfo.short + " · ";
       var cmpRel = null, cmpNote = null;
       if (buildCmp && buildCmp.offbranch) {
         var ob = offbranchText(buildInfo);
@@ -837,14 +855,37 @@ var App = (function () {
       } else if (buildCmp) {
         cmpRel = relationText(buildCmp);
       }
-      if (cmpRel) left.appendChild(doc.createTextNode(cmpRel + " "));
-      var a = doc.createElement("a");
-      a.setAttribute("href", "https://github.com/" + buildInfo.repo);
-      a.setAttribute("target", "_blank");
-      a.setAttribute("rel", "noopener noreferrer");
-      a.textContent = "Master";
-      left.appendChild(a);
-      if (cmpNote) left.appendChild(doc.createTextNode(" (" + cmpNote + ")"));
+      if (!verNodes || verNodes.host !== left || verNodes.repo !== buildInfo.repo || verNodes.commit !== buildInfo.commit) {
+        while (left.firstChild) left.removeChild(left.firstChild);
+        var a0 = doc.createElement("a");
+        a0.setAttribute("href", "https://github.com/" + buildInfo.repo);
+        a0.setAttribute("target", "_blank");
+        a0.setAttribute("rel", "noopener noreferrer");
+        a0.textContent = "Master";
+        verNodes = {
+          host: left, repo: buildInfo.repo, commit: buildInfo.commit,
+          brand: doc.createTextNode(""), rel: doc.createTextNode(""),
+          link: a0, note: doc.createTextNode("")
+        };
+        left.appendChild(verNodes.brand);
+        left.appendChild(verNodes.link);
+      }
+      verNodes.brand.textContent = brandText;
+      /* rel attaches only when non-empty (same child sequence as before). */
+      var wantRel = cmpRel ? cmpRel + " " : "";
+      if (wantRel) {
+        if (verNodes.rel.parentNode !== left) left.insertBefore(verNodes.rel, verNodes.link);
+        verNodes.rel.textContent = wantRel;
+      } else if (verNodes.rel.parentNode === left) {
+        left.removeChild(verNodes.rel);
+      }
+      var wantNote = cmpNote ? " (" + cmpNote + ")" : "";
+      if (wantNote) {
+        if (verNodes.note.parentNode !== left) left.appendChild(verNodes.note);
+        verNodes.note.textContent = wantNote;
+      } else if (verNodes.note.parentNode === left) {
+        left.removeChild(verNodes.note);
+      }
     } catch (e) { /* static skeleton stands */ }
   }
 

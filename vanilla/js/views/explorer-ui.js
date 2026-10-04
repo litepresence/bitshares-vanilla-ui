@@ -354,7 +354,20 @@ var ExplorerUI = (function () {
             "#/asset/" + encodeURIComponent(a.symbol)));
         });
         sugItems = sugItems.slice(0, 8);
-        sugItems.forEach(function (b) { suggestBox.appendChild(b); });
+        /* PERF (output-identical): suggestions land through one fragment
+         * append (capped at 8, same cap as before) — one paint instead of
+         * one per row. Same buttons, same order, same keyboard wiring; the
+         * 200ms debounce above is untouched. */
+        var sFrag = null;
+        try {
+          if (doc && typeof doc.createDocumentFragment === "function") sFrag = doc.createDocumentFragment();
+        } catch (e) { sFrag = null; }
+        if (sFrag) {
+          sugItems.forEach(function (b) { sFrag.appendChild(b); });
+          suggestBox.appendChild(sFrag);
+        } else {
+          sugItems.forEach(function (b) { suggestBox.appendChild(b); });
+        }
         paintSuggestActive();
       });
     }

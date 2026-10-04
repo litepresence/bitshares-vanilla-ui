@@ -191,6 +191,35 @@ var DashboardUI = (function () {
     return p;
   }
 
+  /* Coalesced tick paint (perf, output-identical): per-row tickRow
+   * resolutions queue their cell writes and flush in one microtask — one
+   * paint per tick instead of one per row. Extends the pending-memo above:
+   * fetches stay deduped, only the DOM writes batch. Flush runs before the
+   * next task (microtask), so generation guards inside the queued fns observe
+   * the same generation the direct write would have — ordering and final
+   * cells are identical, only paint count differs. Never throws. */
+  var _paintQueue = [], _paintScheduled = false;
+  function queueTickPaint(fn) {
+    _paintQueue.push(fn);
+    if (_paintScheduled) return;
+    _paintScheduled = true;
+    var flush = function () {
+      _paintScheduled = false;
+      var q = _paintQueue;
+      _paintQueue = [];
+      for (var i = 0; i < q.length; i++) {
+        try { q[i](); } catch (e) { /* one bad cell never blocks the rest */ }
+      }
+    };
+    try {
+      if (typeof queueMicrotask === "function") queueMicrotask(flush);
+      else if (typeof Promise !== "undefined" && Promise.resolve) Promise.resolve().then(flush);
+      else setTimeout(flush, 0);
+    } catch (e) {
+      try { setTimeout(flush, 0); } catch (e2) { /* cells keep "…" */ }
+    }
+  }
+
   /* clearTickMisses: drop legacy cached-null misses (pre-fix sessions cached
    * offline failures as null). Params: none. Returns the dropped count.
    * Non-null rows are untouched. Never throws. */
@@ -696,9 +725,11 @@ var DashboardUI = (function () {
       list.appendChild(a);
       if (typeof Market !== "undefined" && Market) {
         tickRow(id).then(function (r) {
-          if (myGen !== gen) return;
-          px.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
-          chg.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+          queueTickPaint(function () {
+            if (myGen !== gen) return;
+            px.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
+            chg.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+          });
         });
       } else {
         px.textContent = "—";
@@ -786,8 +817,10 @@ var DashboardUI = (function () {
       tbody.appendChild(tr);
       if (typeof Market !== "undefined" && Market) {
         tickRow(id).then(function (r) {
-          tdL.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
-          tdC.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+          queueTickPaint(function () {
+            tdL.textContent = (r && r.latest !== null && r.latest !== undefined) ? r.latest : "—";
+            tdC.textContent = (r && r.chg !== null && r.chg !== undefined) ? r.chg : "—";
+          });
         });
       } else {
         tdL.textContent = "—";
