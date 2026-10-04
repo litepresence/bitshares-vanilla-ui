@@ -7,6 +7,9 @@ footer_net_host, footer_offbranch, footer_sync) to all 12
 vanilla/locales/*.json as honest English stubs (principle #10 -
 translators verify later). "Master" needs no key: it is the branch-name
 identifier and stays byte-verbatim everywhere.
+TRANSLATORS: shell.footer_offbranch ("not on Master") must keep "Master"
+byte-verbatim in every locale - it is the branch-name identifier, never
+translated or transliterated.
 
 Exact string surgery only (no JSON round-trip, diffs stay minimal).
 Safe to re-run: finished files match no pattern and are left untouched.

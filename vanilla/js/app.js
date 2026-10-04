@@ -534,16 +534,6 @@ var App = (function () {
     if (theme) document.documentElement.setAttribute("data-theme", theme);
   }
 
-  /* Header theme switcher REMOVED (owner call): the switcher lives only on
-   * #/settings now (settings.js theme select — the #1-parity location), so
-   * the header copies (bar + #nav) are deleted: THEMES/THEME_NAMES/setTheme/
-   * currentTheme/buildThemeSwitcher/syncThemeSwitchers all removed as dead
-   * code with them. Settings-page changes still flip data-theme instantly
-   * via the existing settings subscription (onSettings->applyTheme). */
-
-  /* Header theme-switcher builder + sync removed with the copies (see note
-   * above) — the settings page owns the only selector now. */
-
   /* paintFooter: persistent status bar — the connectivity signal (#1
    *   parity: the node location name carries the state in COLOR, vivid
    *   --live green when connected, red otherwise; no topbar badge).
@@ -763,7 +753,8 @@ var App = (function () {
     } catch (e) { /* cache optional */ }
   }
 
-  /* Kick one guarded compare fetch; completion repaints. Never throws. */
+  /** Kick one guarded compare fetch; completion repaints. Never throws.
+   * @returns {void} */
   function maybeRefreshCmp() {
     if (!buildInfo || buildFetching) return;
     if (typeof fetch === "undefined") return;
@@ -777,16 +768,17 @@ var App = (function () {
       if (!r.ok) return null;
       return r.json().catch(function () { return null; });
     }).then(function (j) {
-      if (!j) return;
+      if (!j) { buildCmpAt = Date.now(); return; }
       var next = j.offbranch ? { offbranch: true } : parseCompare(j);
-      if (!next) return;
+      if (!next) { buildCmpAt = Date.now(); return; }
       buildCmp = next; buildCmpAt = Date.now();
       writeCmpCache(buildInfo.commit, next);
       paintVersion();
-    }).then(null, function () { /* hash-only stands */ }).then(function () { buildFetching = false; });
+    }).then(null, function () { buildCmpAt = Date.now(); /* hash-only stands */ }).then(function () { buildFetching = false; });
   }
 
-  /* One-shot boot for build info (skeleton stands until info lands). */
+  /** One-shot boot for build info (skeleton stands until info lands).
+   * @returns {void} */
   function bootBuildInfo() {
     if (buildBooted) return;
     buildBooted = true;
@@ -821,7 +813,8 @@ var App = (function () {
       }
       var a = doc.createElement("a");
       a.setAttribute("href", "https://github.com/" + buildInfo.repo);
-      a.setAttribute("rel", "noopener");
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
       a.textContent = "Master";
       left.appendChild(a);
     } catch (e) { /* static skeleton stands */ }
@@ -1079,8 +1072,6 @@ var App = (function () {
     } catch (e) { /* banner keeps static state */ }
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
-    /* Header theme copy removed (owner call — settings page owns the only
-     * selector now); the bar keeps lock + hamburger only. */
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
     bindLockOnce();

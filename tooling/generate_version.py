@@ -6,6 +6,8 @@ Writes {repo, branch, commit, short, generated_at} for the footer-left
 docs/superpowers/specs/2026-10-04-footer-build-info-design.md).
 Optional dev/deploy tooling: the app runs without version.json (the static
 skeleton stays). Safe to re-run. Verify with: git rev-parse HEAD.
+Branch is pinned to "master" (not HEAD's ref) because the footer always
+reports the build against Master (compare base + link label).
 Usage: python3 tooling/generate_version.py [--repo owner/name]
 """
 import datetime
@@ -35,7 +37,7 @@ def main():
     try:
         top = sh(["git", "rev-parse", "--show-toplevel"], os.getcwd())
         commit = sh(["git", "rev-parse", "HEAD"], top)
-        branch = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"], top)
+        branch = "master"
     except (subprocess.CalledProcessError, OSError) as e:
         print("generate_version: not a git checkout (%s)" % e, file=sys.stderr)
         return 1
