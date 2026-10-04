@@ -1382,6 +1382,7 @@
       "gateway.withdraw_prefix",
       "gateway.withdraw_tab",
       "gateway.your_account",
+      "help.about_link",
       "help.ai_deepwiki",
       "help.ai_help",
       "help.ai_help_hint",
@@ -1419,6 +1420,9 @@
       "help.link_tg_scams",
       "help.link_tg_wallet",
       "help.open_in_the_wallet",
+      "help.topic_about-making_body",
+      "help.topic_about-making_text",
+      "help.topic_about-making_title",
       "help.topic_accounts-general_body",
       "help.topic_accounts-general_text",
       "help.topic_accounts-general_title",
@@ -5883,7 +5887,11 @@
     "topic_uris_body": "# Enlaces que prerrellenan pagos\nLos URI de BitShares (bitshares:…) empaquetan una solicitud de pago — destinatario, activo, monto, memo — en un enlace compartible. Abrir uno prerrellena el formulario de transferencia o factura; solo quedan revisar y firmar.\n# Verifique antes de firmar\nLos enlaces pueden mentir sobre a quién pagan: compruebe usted mismo el nombre del destinatario. La billetera nunca firma solo desde un enlace.\n# Exportación CSV del historial\nEl historial de cuenta se exporta a CSV compatible con CoinTracking para impuestos y registros. Los montos se exportan como decimales visibles con símbolos; las fechas quedan vacías en vez de adivinarse.",
     "community_hint": "Los chats, foros y exploradores viven en la página de Comunidad: ",
     "community_title": "Comunidad",
-    "community_intro": "Personas y lugares de BitShares: página principal, código, exploradores, foros y chats. Los enlaces externos se abren en una pestaña nueva."
+    "community_intro": "Personas y lugares de BitShares: página principal, código, exploradores, foros y chats. Los enlaces externos se abren en una pestaña nueva.",
+    "about_link": "About this wallet",
+    "topic_about-making_title": "Making of this wallet",
+    "topic_about-making_text": "The build story behind this wallet — 413 exchanges across 14 sessions.",
+    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
   },
   "instant": {
     "amount": "Cantidad",

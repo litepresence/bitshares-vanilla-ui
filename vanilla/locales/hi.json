@@ -1382,6 +1382,7 @@
       "gateway.withdraw_prefix",
       "gateway.withdraw_tab",
       "gateway.your_account",
+      "help.about_link",
       "help.ai_deepwiki",
       "help.ai_help",
       "help.ai_help_hint",
@@ -1419,6 +1420,9 @@
       "help.link_tg_scams",
       "help.link_tg_wallet",
       "help.open_in_the_wallet",
+      "help.topic_about-making_body",
+      "help.topic_about-making_text",
+      "help.topic_about-making_title",
       "help.topic_accounts-general_body",
       "help.topic_accounts-general_text",
       "help.topic_accounts-general_title",
@@ -5883,7 +5887,11 @@
     "topic_uris_body": "# भुगतान भरने वाले लिंक\nBitShares URI (bitshares:…) भुगतान अनुरोध — प्राप्तकर्ता, एसेट, राशि, मेमो — साझा-योग्य लिंक में पैक करते हैं। एक खोलने से ट्रांसफर या चालान फ़ॉर्म भरता है; केवल समीक्षा व हस्ताक्षर शेष।\n# हस्ताक्षर से पहले सत्यापित करें\nलिंक भुगतानकर्ता बारे में झूठ बोल सकते हैं: प्राप्तकर्ता नाम स्वयं जाँचें। वॉलेट केवल लिंक से कभी हस्ताक्षर नहीं करता।\n# CSV हिस्ट्री निर्यात\nखाता हिस्ट्री कर व रिकॉर्ड हेतु CoinTracking-संगत CSV निर्यात करती है। राशियाँ प्रतीकों सहित प्रदर्शन दशमलव निर्यात होती हैं; दिनांक अनुमान के बजाय रिक्त रहते हैं।",
     "community_hint": "चैट, फ़ोरम व एक्सप्लोरर कम्युनिटी पृष्ठ पर हैं: ",
     "community_title": "कम्युनिटी",
-    "community_intro": "BitShares के आसपास के लोग व स्थान: होमपेज, कोड, एक्सप्लोरर, फ़ोरम व चैट। बाहरी लिंक नए टैब में खुलते हैं।"
+    "community_intro": "BitShares के आसपास के लोग व स्थान: होमपेज, कोड, एक्सप्लोरर, फ़ोरम व चैट। बाहरी लिंक नए टैब में खुलते हैं।",
+    "about_link": "About this wallet",
+    "topic_about-making_title": "Making of this wallet",
+    "topic_about-making_text": "The build story behind this wallet — 413 exchanges across 14 sessions.",
+    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
   },
   "instant": {
     "amount": "राशि",

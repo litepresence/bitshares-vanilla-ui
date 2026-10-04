@@ -1382,6 +1382,7 @@
       "gateway.withdraw_prefix",
       "gateway.withdraw_tab",
       "gateway.your_account",
+      "help.about_link",
       "help.ai_deepwiki",
       "help.ai_help",
       "help.ai_help_hint",
@@ -1419,6 +1420,9 @@
       "help.link_tg_scams",
       "help.link_tg_wallet",
       "help.open_in_the_wallet",
+      "help.topic_about-making_body",
+      "help.topic_about-making_text",
+      "help.topic_about-making_title",
       "help.topic_accounts-general_body",
       "help.topic_accounts-general_text",
       "help.topic_accounts-general_title",
@@ -5883,7 +5887,11 @@
     "topic_uris_body": "# Links que preenchem pagamentos\nURIs BitShares (bitshares:…) empacotam um pedido de pagamento — destinatário, ativo, valor, memo — em um link compartilhável. Abrir um preenche o formulário de transferência ou fatura; restam só revisar e assinar.\n# Confira antes de assinar\nLinks podem mentir sobre quem recebem: confira você mesmo o nome do destinatário. A carteira nunca assina só por um link.\n# Exportação de histórico em CSV\nHistórico de conta exporta para CSV compatível com CoinTracking para impostos e registros. Valores exportam como decimais de exibição com símbolos; datas ficam vazias em vez de chutadas.",
     "community_hint": "Chats, fóruns e exploradores vivem na página Comunidade: ",
     "community_title": "Comunidade",
-    "community_intro": "Pessoas e lugares em torno da BitShares: página inicial, código, exploradores, fóruns e chats. Links externos abrem em nova aba."
+    "community_intro": "Pessoas e lugares em torno da BitShares: página inicial, código, exploradores, fóruns e chats. Links externos abrem em nova aba.",
+    "about_link": "About this wallet",
+    "topic_about-making_title": "Making of this wallet",
+    "topic_about-making_text": "The build story behind this wallet — 413 exchanges across 14 sessions.",
+    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
   },
   "instant": {
     "amount": "Valor",

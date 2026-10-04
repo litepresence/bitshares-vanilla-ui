@@ -101,7 +101,8 @@ var HelpUI = (function () {
     ["password", "Changing the wallet password", "Re-encrypt the local vault with a new passphrase.", "#/wallet/password"],
     ["news", "News", "Why this wallet ships no in-app news feed.", "#/news"],
     ["uris", "Payment requests and exports", "BitShares links that prefill payments, plus CSV history export.", "#/invoice"],
-    ["glossary", "Glossary", "Names used across this wallet: objects (1.x.y), operations, witnesses, committee.", null]
+    ["glossary", "Glossary", "Names used across this wallet: objects (1.x.y), operations, witnesses, committee.", null],
+    ["about-making", "Making of this wallet", "The build story behind this wallet — 413 exchanges across 14 sessions.", "#/about"]
   ];
 
   /* Article bodies: key -> sections. Section = [heading, [paragraphs], [bullets]?].
@@ -723,6 +724,14 @@ var HelpUI = (function () {
       "# Money words",
       "Precision is how many decimals an asset uses — amounts are stored as integers and shifted by it, so the wallet always shows human decimals, never raw integers.",
       "Collateral backs borrowed SmartCoins; margin calls and settlements close weak positions; fees on every operation split between the network, referrers, and registrars."
+    ],
+    "about-making": [
+      "# Making of this wallet",
+      "What follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.",
+      "It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.",
+      "413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.",
+      "# The full dialog archive",
+      "The complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
     ]
   };
 
@@ -865,7 +874,12 @@ var HelpUI = (function () {
     paintCommunityDir(doc, wrap);
     var back = el(doc, "p", null, "muted"), b = doc.createElement("a");
     b.href = "#/help"; b.textContent = t("help.help", "Help");
-    back.appendChild(b); wrap.appendChild(back);
+    back.appendChild(b);
+    back.appendChild(doc.createTextNode(" · "));
+    var ab = doc.createElement("a");
+    ab.href = "#/about"; ab.textContent = t("help.about_link", "About this wallet");
+    back.appendChild(ab);
+    wrap.appendChild(back);
   }
 
   /* paintCommunityDir: the link directory (Homepage/Code/Explorers/Elastic/

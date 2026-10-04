@@ -1382,6 +1382,7 @@
       "gateway.withdraw_prefix",
       "gateway.withdraw_tab",
       "gateway.your_account",
+      "help.about_link",
       "help.ai_deepwiki",
       "help.ai_help",
       "help.ai_help_hint",
@@ -1419,6 +1420,9 @@
       "help.link_tg_scams",
       "help.link_tg_wallet",
       "help.open_in_the_wallet",
+      "help.topic_about-making_body",
+      "help.topic_about-making_text",
+      "help.topic_about-making_title",
       "help.topic_accounts-general_body",
       "help.topic_accounts-general_text",
       "help.topic_accounts-general_title",
@@ -5883,7 +5887,11 @@
     "topic_uris_body": "# 预填付款的链接\nBitShares URI (bitshares:…) 把付款请求——收方、资产、金额、备注——打包为可分享链接。打开即预填划转或发票表单；只剩核对与签名。\n# 签名前核验\n链接谎报收款人：收方名称自己验。钱包绝不凭链接即签。\n# CSV 历史导出\n账户历史导出为 CoinTracking 兼容 CSV，供税务与记账。金额按日常小数加符号导出；日期宁空不猜。",
     "community_hint": "聊天、论坛与浏览器都在社区页： ",
     "community_title": "社区",
-    "community_intro": "BitShares 周边的人与地：官网、代码、浏览器、论坛与聊天。外部链接新标签页打开。"
+    "community_intro": "BitShares 周边的人与地：官网、代码、浏览器、论坛与聊天。外部链接新标签页打开。",
+    "about_link": "About this wallet",
+    "topic_about-making_title": "Making of this wallet",
+    "topic_about-making_text": "The build story behind this wallet — 413 exchanges across 14 sessions.",
+    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
   },
   "instant": {
     "amount": "金额",
