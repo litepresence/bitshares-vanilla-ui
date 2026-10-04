@@ -252,7 +252,7 @@ var AssetFeedUI = (function () {
         try { feedFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
         catch (feeErr) { feedFee = String(f.amount) + " (core)"; }
         var feedDlg = ConfirmDialog.show({ title: t("asset.confirm_feed", "Confirm feed"),
-          rows: feedRows, feeHuman: feedFee,
+          rows: feedRows, feeHuman: feedFee, feeTerm: t("borrow.fee", "Fee"),
           backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
           onBack: function () { renderFeed(root); },
           onSend: function () {
@@ -312,7 +312,7 @@ var AssetFeedUI = (function () {
         try { prodFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
         catch (feeErr2) { prodFee = String(f.amount) + " (core)"; }
         var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
-          rows: prodRows, feeHuman: prodFee,
+          rows: prodRows, feeHuman: prodFee, feeTerm: t("borrow.fee", "Fee"),
           backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
           onBack: function () { renderFeed(root); },
           onSend: function () {

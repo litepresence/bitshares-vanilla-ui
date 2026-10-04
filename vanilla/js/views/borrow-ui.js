@@ -390,7 +390,7 @@ var BorrowUI = (function () {
             [t("borrow.delta_debt", "Delta debt"), (op.delta_debt.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_debt.amount, R.dPrec) + (op.delta_debt.amount.charAt(0) === "-" ? " — NEW DEBT, warned" : ""), "raw " + op.delta_debt.amount],
             [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.network", "Network"), "testnet"]];
           var adjDlg = ConfirmDialog.show({ title: t("borrow.confirm_margin_adjust", "Confirm margin adjust"),
-            rows: adjRows, feeHuman: feeHuman,
+            rows: adjRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doAdjSend(); } });
@@ -608,7 +608,7 @@ var BorrowUI = (function () {
             [t("borrow.target_ratio", "Target ratio"), tcrRow],
             [t("borrow.network", "Network"), "testnet"]];
           var openDlg = ConfirmDialog.show({ title: t("borrow.confirm_new_borrow", "Confirm new borrow"),
-            rows: openRows, feeHuman: feeHuman,
+            rows: openRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doOpenSend(); } });
@@ -949,7 +949,7 @@ var BorrowUI = (function () {
             [t("borrow.fund", "Fund"), Format.formatAmount(R.fundRaw, R.backingPrec), "raw " + R.fundRaw],
             [t("borrow.network", "Network"), "testnet"]];
           var bidDlg = ConfirmDialog.show({ title: t("borrow.confirm_settlement_bid", "Confirm settlement bid"),
-            rows: bidRows, feeHuman: feeHuman,
+            rows: bidRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doBidSend(); } });

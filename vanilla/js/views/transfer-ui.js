@@ -1284,7 +1284,7 @@ var TransferUI = (function () {
       [t("confirm.memo", "Memo"), memoText],
       [t("confirm.network", "Network"), networkNameLocal()]];
     var dlg = ConfirmDialog.show({ title: t("transfer.confirm_proposal_title", "Confirm proposal (op 22)"),
-      rows: rows, feeHuman: fh.text,
+      rows: rows, feeHuman: fh.text, feeTerm: t("transfer.fee_live_label", "Fee (live)"),
       backLabel: t("confirm.back", "Back"), sendLabel: t("confirm.sign_send", "Sign & Send"),
       onBack: function () { if (typeof onBack === "function") onBack(); },
       onSend: function () { doPropSend(); } });

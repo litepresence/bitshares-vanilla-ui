@@ -450,7 +450,7 @@ var AssetUI = (function () {
           catch (feeErr) { feeHuman = String(f.amount) + " (core)"; }
           rows.push([t("borrow.network", "Network"), netName()]);
           var dlg = ConfirmDialog.show({ title: t("asset.confirm_create", "Confirm asset create"),
-            rows: rows, feeHuman: feeHuman,
+            rows: rows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
             onBack: function () { renderCreate(root); },
             onSend: function () {

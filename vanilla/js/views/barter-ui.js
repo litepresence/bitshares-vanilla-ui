@@ -314,7 +314,7 @@ var BarterUI = (function () {
      [t("barter.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("barter.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
      [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)]];
     var dlg = ConfirmDialog.show({ title: t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)"),
-      rows: rows, feeHuman: feeHuman,
+      rows: rows, feeHuman: feeHuman, feeTerm: t("barter.fee_live", "Fee (live)"),
       backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
       onSend: function () { doSend(); } });

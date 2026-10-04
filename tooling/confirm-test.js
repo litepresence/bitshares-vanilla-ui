@@ -138,4 +138,38 @@ send.__handlers.click();
 assert.strictEqual(sendCalled, 1, "Send click fires onSend");
 passed += 2;
 
+// 7. Fee term fallback: absent feeTerm renders dt "Fee" (legacy output).
+assert.strictEqual(dts[dts.length - 1].textContent, "Fee", "absent feeTerm falls back to Fee");
+passed += 1;
+
+// 8. Fee term passed: caller's keyed string renders as the fee dt.
+var doc2 = fakeDoc();
+var feeTermBox = ConfirmDialog.show({
+  doc: doc2,
+  title: "Confirm",
+  rows: [],
+  feeHuman: feeHuman,
+  feeTerm: "Fee (live)",
+  onBack: function () {},
+  onSend: function () {}
+});
+var feeDts = findAll(feeTermBox, "dt");
+assert.strictEqual(feeDts[feeDts.length - 1].textContent, "Fee (live)", "passed feeTerm renders");
+passed += 1;
+
+// 9. Raw titles: [term, text, raw] sets dd.title; [term, text] sets none.
+var doc3 = fakeDoc();
+var rawBox = ConfirmDialog.show({
+  doc: doc3,
+  title: "Confirm",
+  rows: [["Amount", "1.0 BTS", "100000"], ["Memo", "(none)"]],
+  feeHuman: feeHuman,
+  onBack: function () {},
+  onSend: function () {}
+});
+var rawDds = findAll(rawBox, "dd");
+assert.strictEqual(rawDds[0].title, "100000", "third element sets dd.title");
+assert.ok(!rawDds[1].title, "two-element row sets no title");
+passed += 2;
+
 console.log("ConfirmDialog: " + passed + " passed, 0 failed");

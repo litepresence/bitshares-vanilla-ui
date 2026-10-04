@@ -67,8 +67,12 @@ var ConfirmDialog = (function () {
   }
 
   /* Render the confirm subset: heading, named rows, fee line, Back + Send.
-   * @param {any} cfg {title: string, rows: [[term, text]...],
+   * @param {any} cfg {title: string, rows: [[term, text, rawTitle?]...]
+   *   (third element sets dd.title = raw, e.g. "raw 123" or "12345";
+   *   [term, text] still valid — no title when absent),
    *   feeHuman: string (human fee line; skipped when null/undefined),
+   *   feeTerm?: string (caller's already-keyed fee dt, e.g.
+   *   t("borrow.fee", "Fee"); fallback "Fee" when absent),
    *   onBack: function, onSend: function,
    *   doc?: Document (Node-test seam; browsers omit it),
    *   backLabel?: string (default "Back"), sendLabel?: string
@@ -88,11 +92,13 @@ var ConfirmDialog = (function () {
     var onSend = (typeof cfg.onSend === "function") ? cfg.onSend : function () {};
     var backLabel = (cfg.backLabel === undefined || cfg.backLabel === null) ? "Back" : cfg.backLabel;
     var sendLabel = (cfg.sendLabel === undefined || cfg.sendLabel === null) ? "Sign & Send" : cfg.sendLabel;
+    var feeTerm = (cfg.feeTerm === undefined || cfg.feeTerm === null) ? "Fee" : cfg.feeTerm;
     var box;
     var list;
     var actions;
     var back;
     var send;
+    var dd;
     var i;
     if (!doc) throw new Error("confirm: no document");
     box = mk(doc, "div", null, "confirm-dialog");
@@ -100,10 +106,12 @@ var ConfirmDialog = (function () {
     list = mk(doc, "dl", null, "confirm");
     for (i = 0; i < rows.length; i++) {
       list.appendChild(mk(doc, "dt", rows[i][0]));
-      list.appendChild(mk(doc, "dd", rows[i][1]));
+      dd = mk(doc, "dd", rows[i][1]);
+      if (rows[i][2]) dd.title = rows[i][2];
+      list.appendChild(dd);
     }
     if (cfg.feeHuman !== undefined && cfg.feeHuman !== null) {
-      list.appendChild(mk(doc, "dt", "Fee"));
+      list.appendChild(mk(doc, "dt", feeTerm));
       list.appendChild(mk(doc, "dd", cfg.feeHuman));
     }
     if (D) D.append(box, list);

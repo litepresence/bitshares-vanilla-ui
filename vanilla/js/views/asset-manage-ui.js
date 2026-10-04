@@ -206,7 +206,7 @@ var AssetManageUI = (function () {
           try { updFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
           catch (feeErr) { updFee = String(f.amount) + " (core)"; }
           var updDlg = ConfirmDialog.show({ title: t("asset.confirm_update", "Confirm asset update"),
-            rows: rows, feeHuman: updFee,
+            rows: rows, feeHuman: updFee, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
             onBack: function () { renderUpdate(root, info.symbol); },
             onSend: function () {
@@ -251,7 +251,7 @@ var AssetManageUI = (function () {
             try { bitFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
             catch (feeErr2) { bitFee = String(f.amount) + " (core)"; }
             var bitDlg = ConfirmDialog.show({ title: t("asset.confirm_bitasset", "Confirm bitasset update"),
-              rows: bitRows, feeHuman: bitFee,
+              rows: bitRows, feeHuman: bitFee, feeTerm: t("borrow.fee", "Fee"),
               backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
               onBack: function () { renderUpdate(root, info.symbol); },
               onSend: function () {
@@ -292,7 +292,7 @@ var AssetManageUI = (function () {
           try { prodFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
           catch (feeErr3) { prodFee = String(f.amount) + " (core)"; }
           var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
-            rows: prodRows, feeHuman: prodFee,
+            rows: prodRows, feeHuman: prodFee, feeTerm: t("borrow.fee", "Fee"),
             backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
             onBack: function () { renderUpdate(root, info.symbol); },
             onSend: function () {
@@ -351,7 +351,7 @@ var AssetManageUI = (function () {
         try { halfFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
         catch (feeErr4) { halfFee = String(f.amount) + " (core)"; }
         var halfDlg = ConfirmDialog.show({ title: isReserve ? "Confirm reserve" : "Confirm issue",
-          rows: rows, feeHuman: halfFee,
+          rows: rows, feeHuman: halfFee, feeTerm: t("borrow.fee", "Fee"),
           backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
           onBack: function () { renderIssue(root); },
           onSend: function () {
