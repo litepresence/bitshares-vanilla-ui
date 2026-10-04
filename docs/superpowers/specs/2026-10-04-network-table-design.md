@@ -23,7 +23,8 @@ that owns switching has nothing to keep in sync.
 - Row selection owns network switching. The radio toggle is DELETED
   (`buildNetwork`, its `settings.js` change handler, and references).
 
-## Rows and NETWORK column
+## Rows and NETWORK column (NETWORK later merged into CHAIN — see
+§Merged chain column; the row order/grouping below still stands)
 
 - Order: mainnet defaults (existing order), then testnet defaults
   (existing order), then customs (existing order). No group headers, no
@@ -49,6 +50,27 @@ that owns switching has nothing to keep in sync.
 - `.node-card` mirrors gain the network cell via the existing mirror
   pattern in the `setRow`/paint path. Mobile behavior otherwise untouched.
 
+## Merged chain column (follow-up 2026-10-04)
+
+- NETWORK and CHAIN merge into ONE column (header reuse `settings.th_chain`;
+  `settings.th_network` is dropped from all 12 dicts via one-shot removal).
+  Exactly three finite states for observed chains, all caps via CSS
+  `text-transform` on the cell (no caps in locale values):
+  green `MAINNET` for chain `4018d784…`, yellow `TESTNET` for `39f5…`,
+  red `DEVNET` for anything else. Words reuse `settings.network_mainnet` /
+  `network_testnet`; `DEVNET` is one new key (`settings.net_devnet`).
+- Unprobed rows show the pending dash (same `…` as every other cell) —
+  the three states are claims about observed chains only.
+- The old GOOD/STALE/SUSPECT/FORKED pill text and `mismatch ab12` text
+  leave the cell (the three states replace them); full probe facts stay
+  in the row tooltip (`detailText`, unchanged), and per-column health
+  colors (latency/participation/head) are untouched. A listed default
+  answering a foreign chain now reads as that chain's state sitting in
+  the wrong block — the anomaly stays visible.
+- `data-status` (up/stale/suspect/forked/down) and the offline all-down
+  check are untouched; selection, probe-first, and hidden-list behavior
+  are untouched.
+
 ## Remove column + hidden list
 
 - Last column (after History, header reuse `settings.remove`) carries a
@@ -63,6 +85,9 @@ that owns switching has nothing to keep in sync.
   which `loadSettings` resolves to the network default and `connect`
   safely skips). `×` uses the existing `settings.remove` key as header +
   `aria-label` — zero new keys. Glyph sized to the 44px touch floor.
+- Removal always confirms first (shared Overlay + ConfirmDialog): title,
+  node URL, hide-vs-unlist consequence, and the active-node move target
+  when applicable. Back/Esc/backdrop cancels with no change.
 
 ## Selection = switching
 

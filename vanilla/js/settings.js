@@ -20,10 +20,15 @@ var SettingsPage = (function () {
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
    * the default when i18n.js failed to load: never blank, never throws. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") {
+      return dflt.replace(/%\(([^)]+)\)s/g, function (m, n) {
+        return (vars[n] !== undefined) ? String(vars[n]) : m;
+      });
+    }
     return dflt;
   }
 
@@ -277,8 +282,8 @@ var SettingsPage = (function () {
       });
     })();
 
-    // Events: node remove (table + cards) — defaults hide persistently,
-    // customs unlist; removing the active node falls back to first visible.
+    // Events: node remove (table + cards) — confirm first via the shared
+    // Overlay + ConfirmDialog builders, then hide/unlist + fallback + render.
     Array.prototype.forEach.call(wrap.querySelectorAll(".node-remove"), function (b) {
       b.addEventListener("click", function () {
         var u = b.getAttribute("data-url");
@@ -290,12 +295,55 @@ var SettingsPage = (function () {
           customNodes: isC ? customs.filter(function (x) { return x !== u; }) : customs,
           hiddenNodes: isC ? hidden : SettingsNodes.hideNode(hidden, u)
         };
+        var fb = "";
         if (cur.activeNode === u) {
           var rest = SettingsNodes.allNodes({ network: cur.network, customNodes: patch.customNodes, hiddenNodes: patch.hiddenNodes });
           patch.activeNode = rest[0] || "";
+          fb = patch.activeNode;
         }
-        Store.saveSettings(patch);
-        render(rootEl);
+        function apply() {
+          Store.saveSettings(patch);
+          render(rootEl);
+        }
+        /* Shared builders missing (script order guarantees them in the
+         * bundle — this is fail-open paranoia): fall back to immediate
+         * removal, today's behavior. */
+        if (typeof Overlay === "undefined" || typeof ConfirmDialog === "undefined") {
+          apply();
+          return;
+        }
+        var rows = [
+          [t("settings.th_node", "Node"), u],
+          [t("settings.confirm_remove_action", "Action"),
+            isC ? t("settings.confirm_remove_unlist", "Remove from my list")
+              : t("settings.confirm_remove_hide", "Hide this node (stays hidden until re-added)")]
+        ];
+        if (cur.activeNode === u) {
+          var dest = fb;
+          try {
+            dest = fb || String(t("settings.dash", "—"));
+          } catch (e) { dest = fb || "—"; }
+          rows.push([t("settings.confirm_remove_result", "Result"),
+            t("settings.confirm_remove_switch", "Active node moves to %(node)s", { node: dest })]);
+        }
+        var dlg = null, box = null;
+        function closeBox() {
+          try { if (box && typeof box.close === "function") box.close(); } catch (e) { /* detached stands */ }
+        }
+        try {
+          dlg = ConfirmDialog.show({
+            title: t("settings.confirm_remove_title", "Remove node?"),
+            rows: rows,
+            backLabel: t("settings.confirm_back", "Back"),
+            sendLabel: t("settings.remove", "Remove"),
+            onBack: function () { closeBox(); },
+            onSend: function () { closeBox(); apply(); }
+          });
+          box = Overlay.open({ content: dlg });
+        } catch (e) {
+          closeBox();
+          apply();
+        }
       });
     });
 
