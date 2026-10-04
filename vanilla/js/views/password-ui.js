@@ -42,16 +42,13 @@ var PasswordUI = (function () {
   function makeError(doc) {
     var err = DOM.el(doc, "div", null, "error"); err.setAttribute("aria-live", "polite"); return err;
   }
-  /* Labeled password row. */
+  /* Labeled password row via the shared Forms seam (Task 2.2):
+   * identical contract — div.xfer-field > label(text + " ") > input. */
   function pwRow(doc, labelText, id) {
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    input.id = id; input.type = "password";
-    input.setAttribute("autocomplete", "new-password");
-    input.setAttribute("spellcheck", "false");
-    touchable(input); label.appendChild(input); row.appendChild(label);
-    return { row: row, input: input };
+    var seam = Forms.labeledInput(doc, labelText + " ", {
+      id: id, type: "password", autocomplete: "new-password" });
+    seam.input.setAttribute("spellcheck", "false");
+    return seam;
   }
 
   /* Backend guard: loud inline panel when js/wallet.js failed to load. */

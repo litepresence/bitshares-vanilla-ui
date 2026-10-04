@@ -87,29 +87,26 @@ var InstantTradeUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = DOM.status(wrap, text);
     return p; }
-  /* Labeled input row with its own inline error slot. opts.unit renders a
-   * unit suffix span after the input (dexux-ref cue, textContent only). */
+  /* Labeled input row with its own inline error slot, via the shared Forms
+   * seam (Task 2.2). opts.unit renders a unit suffix span after the input
+   * (dexux-ref cue, textContent only). Structure is unchanged: label >
+   * input (or label > span.unit-wrap > input + suffix), err div after. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input"); input.type = opts.type || "text";
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    if (opts.id) input.id = opts.id;
-    if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input);
+    var seam = Forms.labeledInput(doc, labelText + " ", {
+      type: opts.type, id: opts.id, value: opts.value,
+      placeholder: opts.placeholder, inputmode: opts.inputmode });
+    var input = seam.input;
     if (opts.unit) {
       var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
+      var lab = seam.row.querySelector("label");
+      lab.insertBefore(wrap, input);
       wrap.appendChild(input);
       wrap.appendChild(DOM.el(doc, "span", opts.unit, "unit-suffix"));
-      label.appendChild(wrap);
-    } else {
-      label.appendChild(input);
     }
-    row.appendChild(label);
     var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
-    return { row: row, input: input, err: err }; }
+    err.setAttribute("aria-live", "polite"); err.style.display = "none"; seam.row.appendChild(err);
+    return { row: seam.row, input: input, err: err }; }
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("instant.none", "none"); }
   /* Network label from Store (sole settings owner); mainnet when unreadable. */
   function networkName() {

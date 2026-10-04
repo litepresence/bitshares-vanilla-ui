@@ -189,8 +189,9 @@ var CreditDetailUI = (function () {
       var sel = doc.createElement("select"); ui.touchable(sel);
       deals.forEach(function (d) {
         var op = doc.createElement("option"); op.value = d.id; op.textContent = d.id; sel.appendChild(op); });
-      var selRow = ui.el(doc, "div", null, "xfer-field"), selLab = ui.el(doc, "label", t("credit.deal_2", "Deal "));
-      selLab.appendChild(sel); selRow.appendChild(selLab); box.appendChild(selRow);
+      /* Forms seam (Task 2.2): single-select row — div.xfer-field > label > select. */
+      var selRow = Forms.fieldRow(doc, t("credit.deal_2", "Deal "), sel);
+      box.appendChild(selRow);
       var fRepay = ui.field(doc, t("credit.repay_amount", "Repay amount"), { placeholder: "0.0", inputmode: "decimal" });
       box.appendChild(fRepay.row);
       ui.reviewSection(doc, box, uiGen, t("credit.review_repay", "Review repay"), {
@@ -258,8 +259,9 @@ var CreditDetailUI = (function () {
     [["", t("credit.unchanged", "unchanged")], ["1", t("credit.enabled_2", "enabled")], ["0", t("credit.disabled", "disabled")]].forEach(function (x) {
       var op = doc.createElement("option"); op.value = x[0]; op.textContent = x[1]; fEn.appendChild(op); });
     [fDelta, fRate].forEach(function (f) { box.appendChild(f.row); });
-    var enRow = ui.el(doc, "div", null, "xfer-field"), enLab = ui.el(doc, "label", t("credit.enabled_3", "Enabled "));
-    enLab.appendChild(fEn); enRow.appendChild(enLab); box.appendChild(enRow);
+    /* Forms seam (Task 2.2): single-select row — div.xfer-field > label > select. */
+    var enRow = Forms.fieldRow(doc, t("credit.enabled_3", "Enabled "), fEn);
+    box.appendChild(enRow);
     ui.reviewSection(doc, box, uiGen, t("credit.review_update", "Review update"), {
       build: async function () {
         var dv = fDelta.input.value.trim(), rv = fRate.input.value.trim();

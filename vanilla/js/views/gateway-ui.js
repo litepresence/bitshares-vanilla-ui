@@ -134,11 +134,12 @@ var GatewayUI = (function () {
     });
     return b;
   }
+  /* Forms seam (Task 2.2): labeled readonly input row + copy button. */
   function copyRow(doc, label, value) {
-    var row = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", label + " ");
     var inp = doc.createElement("input");
     inp.readOnly = true; inp.value = value; touchable(inp);
-    lab.appendChild(inp); row.appendChild(lab); row.appendChild(copyBtn(doc, value));
+    var row = Forms.fieldRow(doc, label + " ", inp);
+    row.appendChild(copyBtn(doc, value));
     return row;
   }
   function factList(doc, pairs) {
@@ -334,7 +335,6 @@ var GatewayUI = (function () {
       return;
     }
     if (!ctx.coin || !pool.some(function (r) { return r.symbol === ctx.coin; })) ctx.coin = pool[0].symbol;
-    var selRow = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", t("gateway.coin_label", "Coin "));
     var sel = doc.createElement("select"); touchable(sel);
     pool.forEach(function (r) {
       var o = doc.createElement("option"); o.value = r.symbol;
@@ -343,7 +343,9 @@ var GatewayUI = (function () {
     });
     sel.value = ctx.coin;
     sel.addEventListener("change", function () { if (myGen !== gen) return; ctx.coin = sel.value; DOM.clear(ctx.bodyBox); liveTab(ctx, entry, rows); });
-    lab.appendChild(sel); selRow.appendChild(lab); ctx.bodyBox.appendChild(selRow);
+    /* Forms seam (Task 2.2): single-select row — div.xfer-field > label > select. */
+    var selRow = Forms.fieldRow(doc, t("gateway.coin_label", "Coin "), sel);
+    ctx.bodyBox.appendChild(selRow);
     var row = null, i;
     for (i = 0; i < pool.length; i++) if (pool[i].symbol === ctx.coin) row = pool[i];
     if (wantDeposit) depositPanel(ctx, entry, row);
@@ -365,12 +367,13 @@ var GatewayUI = (function () {
     ctx.bodyBox.appendChild(DOM.el(doc, "p",
       t("gateway.no_qr_a", "No QR code is shown: the reference UI renders QR via an npm component ") +
       t("gateway.no_qr_b", "with no zero-dependency replacement on disk — copy the text below instead."), "muted"));
-    var acctRow = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", t("gateway.your_account", "Your BitShares account "));
     var acct = doc.createElement("input");
     acct.setAttribute("placeholder", t("gateway.account_ph", "account name")); acct.setAttribute("autocomplete", "off");
     acct.value = ctx.account || ""; touchable(acct);
     acct.addEventListener("input", function () { ctx.account = acct.value; });
-    lab.appendChild(acct); acctRow.appendChild(lab); ctx.bodyBox.appendChild(acctRow);
+    /* Forms seam (Task 2.2): single-field row — div.xfer-field > label > input. */
+    var acctRow = Forms.fieldRow(doc, t("gateway.your_account", "Your BitShares account "), acct);
+    ctx.bodyBox.appendChild(acctRow);
     var out = DOM.el(doc, "div"); ctx.bodyBox.appendChild(out);
     var go = touchable(DOM.el(doc, "button", t("gateway.get_address", "Get deposit address"))); go.type = "button";
     function doDeposit() {
@@ -413,11 +416,12 @@ var GatewayUI = (function () {
       [t("gateway.min_withdraw", "Minimum withdrawal (gateway-stated)"), fmtMoney(row.minAmountRaw, row.precision), row.minAmountRaw === null ? null : t("gateway.raw_prefix", "raw: ") + row.minAmountRaw],
       [t("gateway.pays_to", "Pays to (gateway-stated)"), row.gatewayWallet || row.issuer || "—"]
     ]));
-    var destRow = DOM.el(doc, "div", null, "xfer-field"), dlab = DOM.el(doc, "label", t("gateway.dest_label", "Destination external address "));
     var dest = doc.createElement("input");
     dest.setAttribute("placeholder", t("gateway.dest_ph_prefix", "external ") + (row.backingCoin || row.symbol) + t("gateway.dest_ph_suffix", " address"));
     dest.setAttribute("autocomplete", "off"); touchable(dest);
-    dlab.appendChild(dest); destRow.appendChild(dlab); ctx.bodyBox.appendChild(destRow);
+    /* Forms seam (Task 2.2): single-field row — div.xfer-field > label > input. */
+    var destRow = Forms.fieldRow(doc, t("gateway.dest_label", "Destination external address "), dest);
+    ctx.bodyBox.appendChild(destRow);
     var memoOut = DOM.el(doc, "div"); ctx.bodyBox.appendChild(memoOut);
     var validOut = DOM.el(doc, "div"); ctx.bodyBox.appendChild(validOut);
     function prefix() { return entry.id === "XBTSX" ? ((row.backingCoin || row.symbol) + ":") : entry.id === "IOB" ? "dex:" : ""; }

@@ -172,14 +172,13 @@ var HtlcUI = (function () {
     });
     return list;
   }
-  function field(doc, labelText, opts) { /* labeled touch-sized input row */
+  /* Labeled touch-sized input row via the shared Forms seam (Task 2.2):
+   * identical contract — div.xfer-field > label(text + " ") > input. */
+  function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
+    return Forms.labeledInput(doc, labelText + " ", {
+      type: opts.type, value: opts.value,
+      placeholder: opts.placeholder, inputmode: opts.inputmode });
   }
   function selectOpts(doc, sel, pairs) { /* [[value, title]] -> options */
     pairs.forEach(function (p) {

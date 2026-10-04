@@ -165,14 +165,14 @@ var CreditUI = (function () {
     });
     return list;
   }
+  /* Labeled touch-sized input row via the shared Forms seam (Task 2.2):
+   * identical contract — div.xfer-field > label(text + " ") > input.
+   * @return {{row: HTMLElement, input: HTMLInputElement}} row + field. */
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
+    return Forms.labeledInput(doc, labelText + " ", {
+      type: opts.type, value: opts.value,
+      placeholder: opts.placeholder, inputmode: opts.inputmode });
   }
   function tableHead(doc, titles) {
     var hr = doc.createElement("tr");
@@ -614,8 +614,9 @@ var CreditUI = (function () {
     touchable(fDurCustom); durLab.appendChild(durSel); durLab.appendChild(fDurCustom); durRow.appendChild(durLab);
     box.appendChild(durRow);
     var enLab = doc.createElement("input"); enLab.type = "checkbox"; enLab.checked = true; touchable(enLab);
-    var enRow = DOM.el(doc, "div", null, "xfer-field"), enL = DOM.el(doc, "label", t("credit.enabled_3", "Enabled "));
-    enL.appendChild(enLab); enRow.appendChild(enL); box.appendChild(enRow);
+    /* Forms seam (Task 2.2): single-field row — div.xfer-field > label > checkbox. */
+    var enRow = Forms.fieldRow(doc, t("credit.enabled_3", "Enabled "), enLab);
+    box.appendChild(enRow);
     box.appendChild(DOM.el(doc, "h3", t("credit.acceptable_collateral_asset_price_legs", "Acceptable collateral (asset + price legs)")));
     var collBox = DOM.el(doc, "div"); box.appendChild(collBox); collRow(doc, collBox);
     var addC = touchable(DOM.el(doc, "button", t("credit.add_collateral_row", "Add collateral row"))); addC.type = "button"; box.appendChild(addC);

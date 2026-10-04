@@ -186,8 +186,9 @@ var MiscUI = (function () {
     ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cF.row); ctx.wrap.appendChild(cT.row);
     ctx.wrap.appendChild(cO.row); ctx.wrap.appendChild(cTh.row); ctx.wrap.appendChild(cK.row);
     var en = doc.createElement("input"); en.type = "checkbox"; en.checked = true; ui.touchable(en);
-    var enRow = ui.el(doc, "div", null, "xfer-field"), enL = ui.el(doc, "label", t("misc.enabled_2", "Enabled "));
-    enL.appendChild(en); enRow.appendChild(enL); ctx.wrap.appendChild(enRow);
+    /* Forms seam (Task 2.2): single-field row — div.xfer-field > label > checkbox. */
+    var enRow = Forms.fieldRow(doc, t("misc.enabled_2", "Enabled "), en);
+    ctx.wrap.appendChild(enRow);
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.restrictions_default_to_zero_the_proven_path", "Restrictions default to zero (the proven path). Adding any restriction is blocked until testnet proves it."), "muted"));
     /* LOW punchlist: multiple key/account/address auth rows. This form
      * supports one key-auth plus threshold only — extra rows stay a

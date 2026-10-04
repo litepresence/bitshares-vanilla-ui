@@ -971,13 +971,14 @@ var ExplorerAssets = (function () {
             actBox.appendChild(DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
           }
         } catch (e) { /* notice is display-only */ }
+        /* Forms seam (Task 2.2): labeled text input — div.xfer-field >
+         * label(text + " ") > input; autocomplete stays off as before. */
         function fundField(label, val, mode, ph) {
-          var row = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", label + " ");
-          var inp = doc.createElement("input");
-          inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode);
-          inp.value = val || ""; if (ph) inp.setAttribute("placeholder", ph);
-          inp.setAttribute("autocomplete", "off"); touchable(inp);
-          lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
+          var seam = Forms.labeledInput(doc, label + " ", {
+            value: val || "", placeholder: ph, inputmode: mode || undefined });
+          seam.input.type = "text";
+          seam.input.setAttribute("autocomplete", "off");
+          return seam;
         }
         var amtF = fundField(t("explorer.fund_amount_label", "Amount (core, human — e.g. 0.1)"), "0.1", "decimal", "0.1");
         var whoF = fundField(t("explorer.fund_from_label", "From account (name or 1.2.N)"), (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0", null, "1.2.0");
