@@ -1170,7 +1170,7 @@ var TransferUI = (function () {
         feeSym: feeSym, feePrec: feePrec };
     }).then(function (P) {
       DOM.clear(box);
-      box.appendChild(DOM.el(doc, "h3", t("transfer.preview_title", "Transfer preview (locked)")));
+      box.appendChild(DOM.el(doc, "h2", t("transfer.preview_title", "Transfer preview (locked)")));
       var list = DOM.el(doc, "dl", null, "xfer-confirm");
       function row(term, text, title) {
         list.appendChild(DOM.el(doc, "dt", term));
@@ -1560,7 +1560,7 @@ var TransferUI = (function () {
       return { proposer: proposer, leg: leg, pair: pair, fh: fh };
     }).then(function (P) {
       DOM.clear(box);
-      box.appendChild(DOM.el(doc, "h3", t("transfer.propose_preview_title", "Proposal preview (locked)")));
+      box.appendChild(DOM.el(doc, "h2", t("transfer.propose_preview_title", "Proposal preview (locked)")));
       var list = DOM.el(doc, "dl", null, "xfer-confirm");
       function row(term, text, title) {
         list.appendChild(DOM.el(doc, "dt", term));

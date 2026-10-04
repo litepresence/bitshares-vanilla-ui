@@ -73,7 +73,7 @@ var NewsUI = (function () {
         try { conn.textContent = connectionLine(); } catch (e) { /* line stays */ }
       });
     }
-    wrap.appendChild(DOM.el(doc, "h3", t("news.start_here", "Start here")));
+    wrap.appendChild(DOM.el(doc, "h2", t("news.start_here", "Start here")));
     var list = doc.createElement("ul");
     [["#/market/BTS_USD", t("news.exchange_trade_on_the_dex", "Exchange — trade on the DEX")],
      ["#/account/me", t("news.account_overview_balances_and_history", "Account overview — balances and history")],

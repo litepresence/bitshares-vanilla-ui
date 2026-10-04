@@ -1324,7 +1324,7 @@ var PredictionUI = (function () {
     row(t("prediction.pmo_attestation", "Attestation"), dash(pmo ? pmo.attestation : ""));
     wrap.appendChild(dl);
 
-    wrap.appendChild(DOM.el(doc, "h3", t("prediction.pmo_sub_markets", "Markets under this organization")));
+    wrap.appendChild(DOM.el(doc, "h2", t("prediction.pmo_sub_markets", "Markets under this organization")));
     var subStatus = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
     var subWrap = DOM.el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(subWrap);
     var sub = doc.createElement("a");
@@ -1489,7 +1489,7 @@ var PredictionUI = (function () {
            * share). Paints loading first, then updates in place when the
            * ticker/book resolve (gen-guarded) — that update IS the
            * live-updating. textContent only. */
-          var probH = DOM.el(doc, "h3", t("prediction.probability", "Implied probability"));
+          var probH = DOM.el(doc, "h2", t("prediction.probability", "Implied probability"));
           wrap.appendChild(probH);
           var probBox = DOM.el(doc, "div", null, "prob-panel");
           wrap.appendChild(probBox);
@@ -1568,7 +1568,7 @@ var PredictionUI = (function () {
            * backing (sell=backing receive=shares), Buy-NO spends shares
            * (sell=shares receive=backing). No side flag is invented in the
            * URL — orientation carries the intent, stated in the hint below. */
-          var qh = DOM.el(doc, "h3", t("prediction.quick_position", "Quick position via Instant Trade"));
+          var qh = DOM.el(doc, "h2", t("prediction.quick_position", "Quick position via Instant Trade"));
           wrap.appendChild(qh);
           wrap.appendChild(DOM.el(doc, "p",
             t("prediction.quick_position_hint", "Direction sets the convert side: YES spends backing, NO spends shares. Instant Trade has no side parameter, so the market direction is the preset."), "muted"));
@@ -1586,7 +1586,7 @@ var PredictionUI = (function () {
           quickLink(t("prediction.buy_yes", "Buy YES"), backSym, info.symbol);
           quickLink(t("prediction.buy_no", "Buy NO"), info.symbol, backSym);
 
-          var h = DOM.el(doc, "h3", t("prediction.take_a_position", "Take a position")); wrap.appendChild(h);
+          var h = DOM.el(doc, "h2", t("prediction.take_a_position", "Take a position")); wrap.appendChild(h);
           wrap.appendChild(DOM.el(doc, "p", "YES and NO are ordinary limit orders on the " +
             info.symbol + " / " + backSym + " market. You trade from the desk — nothing here signs.", "muted"));
           var desk = doc.createElement("a");

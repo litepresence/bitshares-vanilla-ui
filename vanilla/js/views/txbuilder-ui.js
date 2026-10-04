@@ -108,7 +108,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
       grid.style.display = "grid"; grid.style.gap = "12px";
       grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(280px, 1fr))";
     } catch (e) { /* class-only stacking stands */ }
-    var qcol = el("div", "tb-col"); qcol.appendChild(el("h3", null, t("txbuilder.queue_tpl", "Queue (%(n)s)", { n: st.ops.length })));
+    var qcol = el("div", "tb-col"); qcol.appendChild(el("h2", null, t("txbuilder.queue_tpl", "Queue (%(n)s)", { n: st.ops.length })));
     grid.appendChild(qcol);
     for (var i = 0; i < st.ops.length; i++) { await renderCard(qcol, st.ops[i]); }
     var scol = el("div", "tb-col"); grid.appendChild(scol);

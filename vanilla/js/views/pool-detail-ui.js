@@ -750,13 +750,13 @@ var PoolDetailUI = (function () {
     var bidsSec = doc.createElement("section");
     bidsSec.className = "mkt-bids";
     book.appendChild(bidsSec);
-    bidsSec.appendChild(u.el(doc, "h2", "Buy orders"));
+    bidsSec.appendChild(u.el(doc, "h3", "Buy orders"));
     var bidsBody = doc.createElement("div");
     bidsSec.appendChild(bidsBody);
     var asksSec = doc.createElement("section");
     asksSec.className = "mkt-asks";
     book.appendChild(asksSec);
-    asksSec.appendChild(u.el(doc, "h2", "Sell orders"));
+    asksSec.appendChild(u.el(doc, "h3", "Sell orders"));
     var asksBody = doc.createElement("div");
     asksSec.appendChild(asksBody);
     try {

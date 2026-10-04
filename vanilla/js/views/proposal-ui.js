@@ -726,7 +726,7 @@ var ProposalUI = (function () {
           })));
           /* Raw JSON per proposal (JSONModal concept, inline <details>). */
           var rawBox = DOM.el(doc, "div");
-          rawBox.appendChild(DOM.el(doc, "h3", t("proposal.raw_json", "Raw JSON")));
+          rawBox.appendChild(DOM.el(doc, "h2", t("proposal.raw_json", "Raw JSON")));
           enriched.forEach(function (en) {
             rawBox.appendChild(rawJson(doc, t("proposal.raw_proposal_prefix", "Raw proposal ") + en.slim.id,
               en.full ? (en.full.proposed_transaction || en.full) : en.slim));

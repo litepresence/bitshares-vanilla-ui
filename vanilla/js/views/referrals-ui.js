@@ -214,7 +214,7 @@ var ReferralsUI = (function () {
     }
     if (myGen !== gen) return;
     DOM.clear(body);
-    body.appendChild(DOM.el(doc, "h3", (acct.name || nameOrId) + " (" + acct.id + ")"));
+    body.appendChild(DOM.el(doc, "h2", (acct.name || nameOrId) + " (" + acct.id + ")"));
     paintParties(doc, body, myGen, acct);
     paintPercents(doc, body, acct);
     paintCashback(doc, body, myGen, acct);
@@ -224,7 +224,7 @@ var ReferralsUI = (function () {
   /* Registrar / referrer / lifetime-referrer ids -> linked names. */
   async function paintParties(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(DOM.el(doc, "h3", t("referrals.registrar_referrer", "Registrar & referrer")));
+    box.appendChild(DOM.el(doc, "h2", t("referrals.registrar_referrer", "Registrar & referrer")));
     var loading = DOM.el(doc, "p", t("referrals.resolving_names", "Resolving names…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     var ids = [acct.registrar, acct.referrer, acct.lifetime_referrer].filter(function (x) {
@@ -259,7 +259,7 @@ var ReferralsUI = (function () {
   /* Fee-split percent fields, raw + human (never raw alone). */
   function paintPercents(doc, body, acct) {
     var box = doc.createElement("section");
-    box.appendChild(DOM.el(doc, "h3", t("referrals.fee_split", "Fee split")));
+    box.appendChild(DOM.el(doc, "h2", t("referrals.fee_split", "Fee split")));
     var have = (acct.network_fee_percentage !== undefined) ||
       (acct.lifetime_referrer_fee_percentage !== undefined) ||
       (acct.referrer_rewards_percentage !== undefined);
@@ -288,7 +288,7 @@ var ReferralsUI = (function () {
   /* Pending cashback from the statistics object (core units -> human). */
   async function paintCashback(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(DOM.el(doc, "h3", t("referrals.pending_cashback", "Pending cashback")));
+    box.appendChild(DOM.el(doc, "h2", t("referrals.pending_cashback", "Pending cashback")));
     var loading = DOM.el(doc, "p", t("referrals.loading_statistics", "Loading statistics…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
@@ -327,7 +327,7 @@ var ReferralsUI = (function () {
   /* Vesting balances for the account; empty state when none/unavailable. */
   async function paintVesting(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(DOM.el(doc, "h3", t("referrals.vesting_balances", "Vesting balances")));
+    box.appendChild(DOM.el(doc, "h2", t("referrals.vesting_balances", "Vesting balances")));
     var loading = DOM.el(doc, "p", t("referrals.loading_vesting_balances", "Loading vesting balances…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
