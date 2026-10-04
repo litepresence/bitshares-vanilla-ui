@@ -82,13 +82,8 @@ var PredictionUI = (function () {
   var openSubs = [];
   function dropOpenSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
 
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
+  /* No local el — use DOM.el */
+/* clearBox removed — use DOM.clear */
 
   function missingBackends() {
     var need = ["Explorer", "Asset", "Format", "Chain", "Store"], miss = null;
@@ -102,13 +97,13 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
       ["not-a-pma", t("prediction.that_asset_is_not_a_prediction_market_no_is_p", "That asset is not a prediction market (no is_prediction_market flag).")]];
     if (m.indexOf("not connected") !== -1) m = map[0][1];
     for (var i = 0; i < map.length; i++) if (m.indexOf(map[i][0]) !== -1) { m = map[i][1]; break; }
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m); return err;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
   function retryButton(doc, wrap, retryFn) {
-    var b = touchable(el(doc, "button", t("prediction.retry", "Retry"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("prediction.retry", "Retry"))); b.type = "button";
     b.addEventListener("click", retryFn); wrap.appendChild(b);
   }
   function autoRetryOnOpen(myGen, retryFn) {
@@ -530,22 +525,22 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     if (!root) return;
     var doc = root.ownerDocument || document, myGen = ++gen, miss = missingBackends();
     dropOpenSubs();
-    clearBox(root);
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", t("prediction.prediction_markets", "Prediction Markets")));
-    wrap.appendChild(el(doc, "p", t("prediction.prediction_market_assets_yes_no_shares_positi", "Prediction-market assets (YES/NO shares). Positions are ordinary limit orders on the asset's market — open a market below and trade from the desk."), "muted"));
+    DOM.clear(root);
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", t("prediction.prediction_markets", "Prediction Markets")));
+    wrap.appendChild(DOM.el(doc, "p", t("prediction.prediction_market_assets_yes_no_shares_positi", "Prediction-market assets (YES/NO shares). Positions are ordinary limit orders on the asset's market — open a market below and trade from the desk."), "muted"));
     /* PMO org section (parent assets group markets; tallies cover the same
      * bounded scan as the PMA list below — scanPMOs returns both, one scan).
      * Painted by paintOrgs() once the scan lands; empty state is an honest
      * row, never a blank. */
-    wrap.appendChild(el(doc, "h2", t("prediction.pmo_section", "Organizations (PMO)")));
-    wrap.appendChild(el(doc, "p", t("prediction.pmo_note", "Parent organization assets group prediction markets. Counts cover the scanned range below."), "muted"));
-    var orgTableWrap = el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(orgTableWrap);
-    var orgNote = el(doc, "p", "", "muted"); wrap.appendChild(orgNote);
+    wrap.appendChild(DOM.el(doc, "h2", t("prediction.pmo_section", "Organizations (PMO)")));
+    wrap.appendChild(DOM.el(doc, "p", t("prediction.pmo_note", "Parent organization assets group prediction markets. Counts cover the scanned range below."), "muted"));
+    var orgTableWrap = DOM.el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(orgTableWrap);
+    var orgNote = DOM.el(doc, "p", "", "muted"); wrap.appendChild(orgNote);
     if (miss) { showError(doc, wrap, "Prediction backend missing: " + miss + " failed to load."); return; }
     var self = function () { if (myGen === gen) renderList(root); };
 
-    var toolbar = el(doc, "div", null, "toolbar"); wrap.appendChild(toolbar);
+    var toolbar = DOM.el(doc, "div", null, "toolbar"); wrap.appendChild(toolbar);
     var search = doc.createElement("input");
     search.type = "search"; search.placeholder = t("prediction.filter_by_symbol_or_condition", "Filter by symbol or condition…");
     search.setAttribute("aria-label", t("prediction.filter_prediction_markets", "Filter prediction markets")); touchable(search);
@@ -557,14 +552,14 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     });
     filterSel.value = "active";
     toolbar.appendChild(filterSel);
-    var refreshBtn = touchable(el(doc, "button", t("prediction.refresh", "Refresh"))); refreshBtn.type = "button";
+    var refreshBtn = touchable(DOM.el(doc, "button", t("prediction.refresh", "Refresh"))); refreshBtn.type = "button";
     refreshBtn.setAttribute("aria-label", t("prediction.refresh", "Refresh"));
     toolbar.appendChild(refreshBtn);
     var sym = doc.createElement("input");
     sym.type = "text"; sym.placeholder = t("prediction.look_up_symbol_or_1_3_x_id", "Look up symbol or 1.3.x id…");
     sym.setAttribute("aria-label", t("prediction.look_up_a_prediction_asset_directly", "Look up a prediction asset directly")); touchable(sym);
     toolbar.appendChild(sym);
-    var go = touchable(el(doc, "button", t("prediction.open", "Open"))); go.type = "button"; toolbar.appendChild(go);
+    var go = touchable(DOM.el(doc, "button", t("prediction.open", "Open"))); go.type = "button"; toolbar.appendChild(go);
     go.addEventListener("click", function () {
       var v = (sym.value || "").trim();
       if (v) location.hash = "#/prediction/" + encodeURIComponent(v);
@@ -573,19 +568,19 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
      * vanilla creates under the existing #/assets/create PMA tab (verified:
      * router.js maps /assets/create -> AssetUI.renderCreate, which draws a
      * PMA tab locking is_prediction_market ON). Batch-3 i18n: keyed. */
-    var mk = touchable(el(doc, "button", t("prediction.create_prediction_market", "Create prediction market"))); mk.type = "button";
+    var mk = touchable(DOM.el(doc, "button", t("prediction.create_prediction_market", "Create prediction market"))); mk.type = "button";
     toolbar.appendChild(mk);
     mk.addEventListener("click", function () { location.hash = "#/assets/create"; });
     /* PMO create entry: orgs are plain UIAs whose description carries the
      * pmo_object — the template button lives on #/assets/create (asset-ui.js
      * prefill), so this just navigates there like the PMA button above. */
-    var mkOrg = touchable(el(doc, "button", t("prediction.pmo_create_org", "Create organization (PMO)"))); mkOrg.type = "button";
+    var mkOrg = touchable(DOM.el(doc, "button", t("prediction.pmo_create_org", "Create organization (PMO)"))); mkOrg.type = "button";
     toolbar.appendChild(mkOrg);
     mkOrg.addEventListener("click", function () { location.hash = "#/assets/create"; });
     /* MED client-side toggles (#1 PredictionMarkets.jsx:37-38 defaults ON,
      * :378-400 _filterMarkets): unknown house = issuer name unresolvable on
      * this network; invalid = invalidReason() non-empty. Batch-3 i18n: keyed. */
-    var toggleRow = el(doc, "div", null, "toolbar"); wrap.appendChild(toggleRow);
+    var toggleRow = DOM.el(doc, "div", null, "toolbar"); wrap.appendChild(toggleRow);
     function checkBox(labelText, checked) {
       var lab = doc.createElement("label");
       var box = doc.createElement("input"); box.type = "checkbox"; box.checked = !!checked;
@@ -596,12 +591,12 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     }
     var chkU = checkBox(t("prediction.hide_unknown_houses", "Hide unknown houses"), true);
     var chkI = checkBox(t("prediction.hide_invalid_assets", "Hide invalid assets"), true);
-    wrap.appendChild(el(doc, "p", t("prediction.new_markets_are_created_under_assets_", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("prediction.new_markets_are_created_under_assets_", "New markets are created under Assets → Create → PMA tab (#/assets/create). Unknown house = issuer name not resolvable on this network."), "muted"));
 
     var status = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
-    var tableWrap = el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(tableWrap);
-    var note = el(doc, "p", "", "muted"); wrap.appendChild(note);
-    var createP = el(doc, "p", "", "muted"); wrap.appendChild(createP);
+    var tableWrap = DOM.el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(tableWrap);
+    var note = DOM.el(doc, "p", "", "muted"); wrap.appendChild(note);
+    var createP = DOM.el(doc, "p", "", "muted"); wrap.appendChild(createP);
     var ca = doc.createElement("a"); ca.href = "#/assets/create"; ca.textContent = t("prediction.create_one_under_assets_create_pma_tab", "Create one under Assets → Create (PMA tab)");
     createP.textContent = t("prediction.scan_prefix", "No market you expected? The scan covers the first ") + (SCAN_PAGES * PAGE_SIZE) +
       t("prediction.scan_suffix", " assets — use the lookup box above, or ");
@@ -670,16 +665,16 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
       } catch (e) { return false; }
     }
     function confirmListP(rows) {
-      var list = el(doc, "dl", null, "xfer-confirm");
+      var list = DOM.el(doc, "dl", null, "xfer-confirm");
       rows.forEach(function (r) {
-        list.appendChild(el(doc, "dt", r[0]));
-        var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
+        list.appendChild(DOM.el(doc, "dt", r[0]));
+        var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
       });
       return list;
     }
     function pField(labelText, opts) {
       opts = opts || {};
-      var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+      var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
       var input = doc.createElement("input");
       if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
       if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -688,13 +683,13 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     }
     function unlockInlineP(parent, onUnlock) {
       if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-      var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+      var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
       var inp = doc.createElement("input");
       inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
       inp.setAttribute("placeholder", t("borrow.password", "password"));
       inp.setAttribute("aria-label", t("borrow.password", "password"));
       touchable(inp); row.appendChild(inp);
-      var b = touchable(el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
+      var b = touchable(DOM.el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
       parent.appendChild(row);
       b.addEventListener("click", function () {
         b.disabled = true;
@@ -705,11 +700,11 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     }
     function signGateLockedP(out, sendBtn, backBtn) {
       if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-        var noteP = el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+        var noteP = DOM.el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
         noteP.className = "muted xfer-sign-note"; out.appendChild(noteP);
       }
       unlockInlineP(out, function () {
-        out.appendChild(el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+        out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
       });
       sendBtn.disabled = false; backBtn.disabled = false;
     }
@@ -729,22 +724,22 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
      * unlock-at-sign, named-row confirm, broadcast live with balances
      * re-read proof (code-live when no holder fixture funds — tester-queued,
      * never fabricated). textContent only. */
-    wrap.appendChild(el(doc, "h2", t("prediction.portfolio", "Portfolio")));
+    wrap.appendChild(DOM.el(doc, "h2", t("prediction.portfolio", "Portfolio")));
     if (!isUnlockedNow()) {
       var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-      wrap.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
     }
-    wrap.appendChild(el(doc, "p", t("prediction.portfolio_hint", "Holdings are PMA balances joined to the scan; avg cost replays fill history (chain-history only)."), "muted"));
-    wrap.appendChild(el(doc, "p", t("prediction.filter_hint", "Active = unexpired and unsettled (closing soon first); Expired = past expiry awaiting resolution; My = created or held by the wallet account."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("prediction.portfolio_hint", "Holdings are PMA balances joined to the scan; avg cost replays fill history (chain-history only)."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("prediction.filter_hint", "Active = unexpired and unsettled (closing soon first); Expired = past expiry awaiting resolution; My = created or held by the wallet account."), "muted"));
     var pfAccount = pField(t("borrow.account", "Account"), !isUnlockedNow()
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(pfAccount.row);
-    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
-    var pfLoad = touchable(el(doc, "button", t("prediction.load_portfolio", "Load portfolio"))); pfLoad.type = "button";
+    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    var pfLoad = touchable(DOM.el(doc, "button", t("prediction.load_portfolio", "Load portfolio"))); pfLoad.type = "button";
     wrap.appendChild(pfLoad);
-    var pfBox = el(doc, "div"); wrap.appendChild(pfBox);
-    var pfConfirm = el(doc, "div", null, "xfer-out"); wrap.appendChild(pfConfirm);
+    var pfBox = DOM.el(doc, "div"); wrap.appendChild(pfBox);
+    var pfConfirm = DOM.el(doc, "div", null, "xfer-out"); wrap.appendChild(pfConfirm);
     var portfolio = { lastAccountId: null, rescan: function () {
       if (portfolio.lastAccountId && myGen === gen) pfLoad.click();
     } };
@@ -754,7 +749,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     pfLoad.addEventListener("click", function () {
       if (myGen !== gen) return;
       pfLoad.disabled = true;
-      clearBox(pfBox); clearBox(pfConfirm);
+      DOM.clear(pfBox); DOM.clear(pfConfirm);
       showStatus(doc, pfBox, t("prediction.loading_portfolio", "Loading portfolio…"));
       Promise.resolve().then(async function () {
         var input = (pfAccount.input.value || "").trim();
@@ -813,14 +808,14 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
           historyUnavailable: historyUnavailable, backingMeta: backingMeta, mids: mids };
       }).then(function (R) {
         if (myGen !== gen) return;
-        clearBox(pfBox);
+        DOM.clear(pfBox);
         portfolio.lastAccountId = R.me.id;
         if (!R.holdings.length) {
-          pfBox.appendChild(el(doc, "p", t("prediction.no_holdings", "No prediction-market holdings for this account."), "muted"));
+          pfBox.appendChild(DOM.el(doc, "p", t("prediction.no_holdings", "No prediction-market holdings for this account."), "muted"));
           pfLoad.disabled = false;
           return;
         }
-        if (R.historyUnavailable) pfBox.appendChild(el(doc, "p", t("prediction.history_unavailable", "History unavailable — avg cost shows dashes."), "muted"));
+        if (R.historyUnavailable) pfBox.appendChild(DOM.el(doc, "p", t("prediction.history_unavailable", "History unavailable — avg cost shows dashes."), "muted"));
         var table = doc.createElement("table"); table.className = "node-table";
         var thead = doc.createElement("thead"), hr = doc.createElement("tr");
         [t("prediction.hdr_asset", "Asset"), t("prediction.balance", "Balance"), t("prediction.avg_cost", "Avg cost"), t("prediction.current", "Current"), t("prediction.pnl", "PnL"), t("prediction.settle", "Settle")].forEach(function (h) {
@@ -948,7 +943,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
           tr.appendChild(pnlTd);
           var actTd = doc.createElement("td");
           if (settled && holdingRaw !== "0" && pmaPrec !== null) {
-            var sb = touchable(el(doc, "button", t("prediction.settle", "Settle"))); sb.type = "button";
+            var sb = touchable(DOM.el(doc, "button", t("prediction.settle", "Settle"))); sb.type = "button";
             (function (hold, btn) {
               btn.addEventListener("click", function () { settleReview(R.me, hold, btn); });
             })(h, sb);
@@ -963,13 +958,13 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
           tbody.appendChild(tr);
         });
         table.appendChild(tbody); pfBox.appendChild(table);
-        var cards = el(doc, "div", null, "node-cards");
+        var cards = DOM.el(doc, "div", null, "node-cards");
         R.holdings.forEach(function (h) {
-          var c = el(doc, "div", null, "node-card");
+          var c = DOM.el(doc, "div", null, "node-card");
           var p = h._pnl || {};
           var sym = (h.balance && h.balance.symbol) || (h.balance && h.balance.asset_id) || "—";
-          c.appendChild(el(doc, "div", sym + " " + (h.balance ? h.balance.display || "" : "")));
-          c.appendChild(el(doc, "div", "PnL " + (p.pnlRaw !== null && p.pnlRaw !== undefined && p.backPrec !== null
+          c.appendChild(DOM.el(doc, "div", sym + " " + (h.balance ? h.balance.display || "" : "")));
+          c.appendChild(DOM.el(doc, "div", "PnL " + (p.pnlRaw !== null && p.pnlRaw !== undefined && p.backPrec !== null
             ? (function () { try { return Format.formatAmount(p.pnlRaw, p.backPrec) + " " + (p.backSym || ""); } catch (e) { return "—"; } })()
             : "—")));
           cards.appendChild(c);
@@ -978,7 +973,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
         pfLoad.disabled = false;
       }).catch(function (e) {
         if (myGen !== gen) return;
-        clearBox(pfBox);
+        DOM.clear(pfBox);
         showError(doc, pfBox, e, t("prediction.could_not_load_portfolio", "Could not load the portfolio."));
         pfLoad.disabled = false;
       });
@@ -990,7 +985,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
      * re-read proof (holding reduced or gone). Live ONLY on a holder
      * fixture — otherwise code-live, tester-queued, never fabricated. */
     function settleReview(me, h, btn) {
-      clearBox(pfConfirm);
+      DOM.clear(pfConfirm);
       showStatus(doc, pfConfirm, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       if (btn) btn.disabled = true;
       Promise.resolve().then(async function () {
@@ -1013,19 +1008,19 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
         .then(function (fa) {
           if (myGen !== gen) return;
           var feeHuman = fa ? Format.formatAmount(String(S.fee.amount), fa.precision) + " " + fa.symbol : String(S.fee.amount);
-          clearBox(pfConfirm);
-          pfConfirm.appendChild(el(doc, "h3", t("prediction.confirm_settle", "Confirm settle")));
+          DOM.clear(pfConfirm);
+          pfConfirm.appendChild(DOM.el(doc, "h3", t("prediction.confirm_settle", "Confirm settle")));
           pfConfirm.appendChild(confirmListP([
             [t("borrow.account", "Account"), me.name + " (" + me.id + ")"],
             [t("prediction.asset", "Asset"), (h.balance.symbol || h.balance.asset_id) + " (" + h.balance.asset_id + ")"],
             [t("confirm.amount", "Amount"), S.amountHuman + " " + (h.balance.symbol || ""), "raw " + S.holdingRaw],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(S.fee.amount)],
             [t("borrow.network", "Network"), "testnet"]]));
-          pfConfirm.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
+          pfConfirm.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
+          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
+          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           pfConfirm.appendChild(back); pfConfirm.appendChild(send);
-          back.addEventListener("click", function () { clearBox(pfConfirm); if (btn) btn.disabled = false; });
+          back.addEventListener("click", function () { DOM.clear(pfConfirm); if (btn) btn.disabled = false; });
           send.addEventListener("click", function () {
             if (myGen !== gen) return;
             send.disabled = true; back.disabled = true;
@@ -1049,9 +1044,9 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
               });
             }).then(async function (res) {
               if (myGen !== gen) return;
-              clearBox(pfConfirm);
-              pfConfirm.appendChild(el(doc, "p", t("prediction.settle_broadcast", "Settle broadcast."), "xfer-ok"));
-              pfConfirm.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlockP()) + " (" + res.via + ").", "muted"));
+              DOM.clear(pfConfirm);
+              pfConfirm.appendChild(DOM.el(doc, "p", t("prediction.settle_broadcast", "Settle broadcast."), "xfer-ok"));
+              pfConfirm.appendChild(DOM.el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlockP()) + " (" + res.via + ").", "muted"));
               if (btn) btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return;
@@ -1063,7 +1058,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
         });
       }).catch(function (e) {
         if (myGen !== gen) return;
-        clearBox(pfConfirm);
+        DOM.clear(pfConfirm);
         showError(doc, pfConfirm, e, t("prediction.could_not_prepare_settle", "Could not prepare the settle."));
         if (btn) btn.disabled = false;
       });
@@ -1073,7 +1068,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
      * strings of small ints (never chain money), Details targets
      * #/prediction/SYMBOL which branches to the org view. Never throws. */
     function paintOrgs() {
-      clearBox(orgTableWrap);
+      DOM.clear(orgTableWrap);
       var table = doc.createElement("table"); table.className = "node-table";
       var thead = doc.createElement("thead"), hr = doc.createElement("tr");
       [t("prediction.pmo_org", "Organization"), t("prediction.pmo_name", "Name"), t("prediction.pmo_markets", "Markets"), t("prediction.pmo_active", "Active"), t("prediction.pmo_expired", "Expired"), t("prediction.details", "Details")].forEach(function (h) {
@@ -1176,7 +1171,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
       });
     }
     function paint() {
-      clearBox(tableWrap);
+      DOM.clear(tableWrap);
       var q = (search.value || "").toUpperCase(), f = filterSel.value;
       var hideU = !!(chkU && chkU.checked), hideI = !!(chkI && chkI.checked);
       var nowMs = Date.now();
@@ -1249,7 +1244,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
       if (myGen !== gen) return;
       refreshBtn.disabled = true;
       status.textContent = t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…");
-      clearBox(tableWrap);
+      DOM.clear(tableWrap);
       scanPMOs().then(function (r) {
         if (myGen !== gen) return;
         cache = r;
@@ -1307,8 +1302,8 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
    * past the header (load failures paint the honest empty + Retry via the
    * caller's catch — this function owns its own status line instead). */
   function renderOrgDetail(doc, wrap, info, pmo, myGen) {
-    clearBox(wrap);
-    wrap.appendChild(el(doc, "h1", "Organization: " + info.symbol));
+    DOM.clear(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", "Organization: " + info.symbol));
     var ident = (pmo && pmo.identity) || {}, gov = (pmo && pmo.governance) || {};
     function dash(s) { return (typeof s === "string" && s) ? s : "—"; }
     var dl = doc.createElement("dl");
@@ -1327,14 +1322,14 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     row(t("prediction.pmo_attestation", "Attestation"), dash(pmo ? pmo.attestation : ""));
     wrap.appendChild(dl);
 
-    wrap.appendChild(el(doc, "h3", t("prediction.pmo_sub_markets", "Markets under this organization")));
+    wrap.appendChild(DOM.el(doc, "h3", t("prediction.pmo_sub_markets", "Markets under this organization")));
     var subStatus = showStatus(doc, wrap, t("prediction.scanning_assets_for_prediction_markets", "Scanning assets for prediction markets…"));
-    var subWrap = el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(subWrap);
+    var subWrap = DOM.el(doc, "div", null, "table-scroll prediction-scroll"); wrap.appendChild(subWrap);
     var sub = doc.createElement("a");
     sub.href = "#/assets/create?sub=" + encodeURIComponent(info.symbol);
     sub.textContent = t("prediction.pmo_create_sub", "Create sub-asset");
     touchable(sub); wrap.appendChild(sub);
-    var more = el(doc, "p", "", "muted"); wrap.appendChild(more);
+    var more = DOM.el(doc, "p", "", "muted"); wrap.appendChild(more);
     var a1 = doc.createElement("a"); a1.href = "#/asset/" + encodeURIComponent(info.symbol);
     a1.textContent = t("prediction.asset_detail", "Asset detail"); more.appendChild(a1);
     more.appendChild(doc.createTextNode(" · "));
@@ -1392,11 +1387,11 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
     if (!root) return;
     var doc = root.ownerDocument || document, myGen = ++gen, miss = missingBackends();
     dropOpenSubs();
-    clearBox(root);
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    DOM.clear(root);
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
     var key = (market !== undefined && market !== null) ? String(market) : "";
     try { key = decodeURIComponent(key); } catch (e) { /* raw key stands */ }
-    wrap.appendChild(el(doc, "h1", "Prediction Market" + (key ? ": " + key : "")));
+    wrap.appendChild(DOM.el(doc, "h1", "Prediction Market" + (key ? ": " + key : "")));
     if (miss) { showError(doc, wrap, "Prediction backend missing: " + miss + " failed to load."); return; }
     if (!key) { showError(doc, wrap, "unknown-asset", t("prediction.no_market_given", "No market given.")); return; }
     var self = function () { if (myGen === gen) renderDetail(root, market); };
@@ -1419,12 +1414,12 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
         var backId = (info.bitasset && info.bitasset.short_backing_asset) || "1.3.0";
         return backingSymbol(backId).then(function (backSym) {
           if (myGen !== gen) return;
-          clearBox(wrap);
-          wrap.appendChild(el(doc, "h1", "Prediction Market: " + info.symbol));
+          DOM.clear(wrap);
+          wrap.appendChild(DOM.el(doc, "h1", "Prediction Market: " + info.symbol));
           var d = parsePMADescription(info.description || "");
-          if (d.main) wrap.appendChild(el(doc, "p", d.main));
-          if (d.condition) wrap.appendChild(el(doc, "p", "Condition: " + d.condition));
-          if (d.expiry) wrap.appendChild(el(doc, "p", "Expiry: " + d.expiry));
+          if (d.main) wrap.appendChild(DOM.el(doc, "p", d.main));
+          if (d.condition) wrap.appendChild(DOM.el(doc, "p", "Condition: " + d.condition));
+          if (d.expiry) wrap.appendChild(DOM.el(doc, "p", "Expiry: " + d.expiry));
 
           var dl = doc.createElement("dl");
           function row(k, v) {
@@ -1492,11 +1487,11 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
            * share). Paints loading first, then updates in place when the
            * ticker/book resolve (gen-guarded) — that update IS the
            * live-updating. textContent only. */
-          var probH = el(doc, "h3", t("prediction.probability", "Implied probability"));
+          var probH = DOM.el(doc, "h3", t("prediction.probability", "Implied probability"));
           wrap.appendChild(probH);
-          var probBox = el(doc, "div", null, "prob-panel");
+          var probBox = DOM.el(doc, "div", null, "prob-panel");
           wrap.appendChild(probBox);
-          var probStatus = el(doc, "p", t("prediction.prob_loading", "Loading market price..."), "muted");
+          var probStatus = DOM.el(doc, "p", t("prediction.prob_loading", "Loading market price..."), "muted");
           probStatus.setAttribute("aria-live", "polite");
           probBox.appendChild(probStatus);
           /* paintProb: render one resolved probability (or the empty state).
@@ -1504,9 +1499,9 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
            * only. Params: res ({p, source, price} or null). No return. */
           function paintProb(res) {
             if (myGen !== gen) return;
-            clearBox(probBox);
+            DOM.clear(probBox);
             if (!res) {
-              probBox.appendChild(el(doc, "p",
+              probBox.appendChild(DOM.el(doc, "p",
                 t("prediction.prob_no_price", "No market price yet - probability unavailable."), "muted"));
               return;
             }
@@ -1527,7 +1522,7 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
             var srcKey = res.source === "mid" ? "prediction.prob_source_mid" : "prediction.prob_source_last";
             var srcDflt = res.source === "mid" ? "Mid-price %(price)s" : "Last price %(price)s";
             var srcPrice = (typeof res.price === "number" && isFinite(res.price)) ? String(res.price) : "—";
-            probBox.appendChild(el(doc, "p", t(srcKey, srcDflt, { price: srcPrice }), "muted"));
+            probBox.appendChild(DOM.el(doc, "p", t(srcKey, srcDflt, { price: srcPrice }), "muted"));
           }
           /* Resolve the market price: book top for the mid, ticker for the
            * fallback. Chain direct (no new Market global — this file owns no
@@ -1571,11 +1566,11 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
            * backing (sell=backing receive=shares), Buy-NO spends shares
            * (sell=shares receive=backing). No side flag is invented in the
            * URL — orientation carries the intent, stated in the hint below. */
-          var qh = el(doc, "h3", t("prediction.quick_position", "Quick position via Instant Trade"));
+          var qh = DOM.el(doc, "h3", t("prediction.quick_position", "Quick position via Instant Trade"));
           wrap.appendChild(qh);
-          wrap.appendChild(el(doc, "p",
+          wrap.appendChild(DOM.el(doc, "p",
             t("prediction.quick_position_hint", "Direction sets the convert side: YES spends backing, NO spends shares. Instant Trade has no side parameter, so the market direction is the preset."), "muted"));
-          var qrow = el(doc, "div", null, "toolbar");
+          var qrow = DOM.el(doc, "div", null, "toolbar");
           wrap.appendChild(qrow);
           function quickLink(label, sellSym, recvSym) {
             var link = doc.createElement("a");
@@ -1589,14 +1584,14 @@ function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild);
           quickLink(t("prediction.buy_yes", "Buy YES"), backSym, info.symbol);
           quickLink(t("prediction.buy_no", "Buy NO"), info.symbol, backSym);
 
-          var h = el(doc, "h3", t("prediction.take_a_position", "Take a position")); wrap.appendChild(h);
-          wrap.appendChild(el(doc, "p", "YES and NO are ordinary limit orders on the " +
+          var h = DOM.el(doc, "h3", t("prediction.take_a_position", "Take a position")); wrap.appendChild(h);
+          wrap.appendChild(DOM.el(doc, "p", "YES and NO are ordinary limit orders on the " +
             info.symbol + " / " + backSym + " market. You trade from the desk — nothing here signs.", "muted"));
           var desk = doc.createElement("a");
           desk.href = "#/market/" + encodeURIComponent(info.symbol) + "_" + encodeURIComponent(backSym);
           desk.textContent = t("account.open_prefix", "Open ") + info.symbol + " / " + backSym + t("prediction.desk_suffix", " desk");
           touchable(desk); wrap.appendChild(desk);
-          var more = el(doc, "p", "", "muted"); wrap.appendChild(more);
+          var more = DOM.el(doc, "p", "", "muted"); wrap.appendChild(more);
           var a1 = doc.createElement("a"); a1.href = "#/asset/" + encodeURIComponent(info.symbol);
           a1.textContent = t("prediction.asset_detail", "Asset detail"); more.appendChild(a1);
           more.appendChild(doc.createTextNode(" · "));

@@ -66,37 +66,33 @@ var ProposalUI = (function () {
     ["restrictions-unproven", "Restrictions are unproven — create with zero restrictions until testnet proves them."],
     ["blind-disabled", "Blind transfers are disabled: they need vendored commitment/range-proof crypto (read-only lookup only)."],
     ["method-missing", "This node lacks the read method. Try another node."]];
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+  /* No local el — use DOM.el */
+/* clearBox removed — use DOM.clear */
   /* showError: human error line (ERRMAP maps chain codes to dict strings,
    * aria-live). Returns the node. Never throws. */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("proposal.unexpected_error", "Unexpected error"));
     ERRMAP.forEach(function (p) { if (m.indexOf(p[0]) !== -1) m = t("proposal.err_" + p[0].replace(/-/g, "_"), p[1]); });
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m); return err;
   }
   /* showStatus: muted aria-live status line. Returns the node. */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
   function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
     * the network is down). Retry handshakes via the shared Offline helper
     * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
-    wrap.appendChild(el(doc, "p", open
+    wrap.appendChild(DOM.el(doc, "p", open
       ? t("proposal.retry_load", "Retry loading.")
       : t("proposal.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-    var status = el(doc, "p", "", "muted");
+    var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
-    var row = el(doc, "div", null, "pools-offline-row");
+    var row = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(row);
-    var b = touchable(el(doc, "button", t("proposal.retry", "Retry"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("proposal.retry", "Retry"))); b.type = "button";
     row.appendChild(b);
     var off = null;
     try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
@@ -110,7 +106,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
     }
     if (!link) {
-      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      link = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       touchable(link);
     }
@@ -125,8 +121,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     dropSubs(); root.innerHTML = "";
     (need || ["Proposal", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]).forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       offlineBox(doc, wrap, retry);
@@ -147,17 +143,17 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function confirmList(doc, rows) {
-    var list = el(doc, "dl", null, "confirm");
+    var list = DOM.el(doc, "dl", null, "confirm");
     rows.forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = t("proposal.raw_prefix", "raw: ") + r[2]; list.appendChild(dd);
+      list.appendChild(DOM.el(doc, "dt", r[0]));
+      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = t("proposal.raw_prefix", "raw: ") + r[2]; list.appendChild(dd);
     });
     return list;
   }
   /* field: labeled touch-sized input row. Returns {row, input}. */
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -166,22 +162,22 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   }
   /* Table (desktop) + cards (phone) with sticky-first-col CSS; href links col 0, action buttons ride cards. */
   function deskTable(doc, headers, rows) {
-    var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet.") + t("proposal.create_hint", " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below."), "muted")); return box; }
+    var box = DOM.el(doc, "div");
+    if (!rows.length) { box.appendChild(DOM.el(doc, "p", t("proposal.nothing_here_yet", "Nothing here yet.") + t("proposal.create_hint", " Proposals appear when anyone proposes enclosed operations — draft one in the Create proposal form below."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
-    headers.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    headers.forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); table.appendChild(thead);
-    var tbody = doc.createElement("tbody"), cards = el(doc, "div", null, "node-cards");
+    var tbody = doc.createElement("tbody"), cards = DOM.el(doc, "div", null, "node-cards");
     rows.forEach(function (r) {
-      var tr = doc.createElement("tr"), card = el(doc, "div", null, "node-card");
+      var tr = doc.createElement("tr"), card = DOM.el(doc, "div", null, "node-card");
       r.cells.forEach(function (c, i) {
-        var td = el(doc, "td", c.text); if (c.raw) td.title = t("proposal.raw_prefix", "raw: ") + c.raw;
+        var td = DOM.el(doc, "td", c.text); if (c.raw) td.title = t("proposal.raw_prefix", "raw: ") + c.raw;
         if (i === 0 && r.href) { td.innerHTML = ""; var a = doc.createElement("a"); a.setAttribute("href", r.href); a.textContent = c.text; td.appendChild(a); }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
-      r.cardLines.forEach(function (ln) { card.appendChild(el(doc, "div", ln)); });
+      r.cardLines.forEach(function (ln) { card.appendChild(DOM.el(doc, "div", ln)); });
       if (r.href) { var a2 = doc.createElement("a"); a2.setAttribute("href", r.href); a2.textContent = t("proposal.open", "Open"); card.appendChild(a2); }
       if (r.action) card.appendChild(r.action);
       cards.appendChild(card);
@@ -237,22 +233,22 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * cfg.extra(doc), when present, appends DOM after the named rows (the
    * op-22 create confirm uses it for per-inner nested rows via renderInnerOp). */
   function sendConfirm(doc, out, cfg, myGen) {
-    clearBox(out);
-    out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
+    DOM.clear(out);
+    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
     if (cfg.extra) {
       try { var ex = cfg.extra(doc); if (ex) out.appendChild(ex); }
-      catch (e) { out.appendChild(el(doc, "p", "Enclosed-op detail unavailable (" + String((e && e.message) || e) + ") — the count row above still holds.", "muted")); }
+      catch (e) { out.appendChild(DOM.el(doc, "p", "Enclosed-op detail unavailable (" + String((e && e.message) || e) + ") — the count row above still holds.", "muted")); }
     }
-    var back = touchable(el(doc, "button", t("proposal.back", "Back"))); back.type = "button";
-    var send = touchable(el(doc, "button", t("proposal.sign_send", "Sign & Send"))); send.type = "button";
+    var back = touchable(DOM.el(doc, "button", t("proposal.back", "Back"))); back.type = "button";
+    var send = touchable(DOM.el(doc, "button", t("proposal.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
     /* Sign-time gate note: visible while locked so headless/returning users
      * see browsing is public and only signing needs the password. */
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        out.appendChild(el(doc, "p", t("proposal.locked_sign_note", "Wallet is locked — browsing is public; unlock to sign."), "muted"));
+        out.appendChild(DOM.el(doc, "p", t("proposal.locked_sign_note", "Wallet is locked — browsing is public; unlock to sign."), "muted"));
     } catch (e) { /* note is display-only */ }
-    back.addEventListener("click", function () { clearBox(out); });
+    back.addEventListener("click", function () { DOM.clear(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, t("proposal.signing", "Signing…"));
@@ -262,9 +258,9 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         status.textContent = t("proposal.broadcasting", "Broadcasting…");
         return Proposal.sendAndProve(unsigned, wif, cfg.prove);
       }).then(async function (res) {
-        if (myGen !== gen) return; clearBox(out);
-        out.appendChild(el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+        if (myGen !== gen) return; DOM.clear(out);
+        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
         showError(doc, out, e, t("proposal.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
@@ -282,7 +278,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * @param {any} cfg {build, rows, title, ok, fail, extra?, btn?}
    * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
-    clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
+    DOM.clear(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out, t("proposal.resolving_and_estimating_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
@@ -294,16 +290,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           makeUnsigned: function () { return Tx.buildTx((/** @type {any} */ (built).ops) || [(/** @type {any} */ (built).pair)]); },
           prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, t("proposal.fee_lookup_failed", "Fee lookup failed.")); } done(); });
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(out); showError(doc, out, e, t("proposal.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, cfg.fail || t("proposal.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
+      DOM.clear(out); showError(doc, out, e, cfg.fail || t("proposal.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
   /* Review button + output box wiring reviewPaid (gen-checked; cfg.btn disabled while building). Params: doc, box, myGen, label, cfg. */
   function reviewSection(doc, box, myGen, label, cfg) {
-    var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    var btn = touchable(DOM.el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
   }
@@ -318,8 +314,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   /* THE nested-op human renderer: each proposed_ops entry -> named rows.
    * Unknown inner type -> honest fallback row, never raw JSON, never blank. */
   function renderInnerOp(doc, type, data, join) {
-    var box = el(doc, "div", null, "inner-op");
-    box.appendChild(el(doc, "h4", opName(type) + " (op " + type + ")"));
+    var box = DOM.el(doc, "div", null, "inner-op");
+    box.appendChild(DOM.el(doc, "h4", opName(type) + " (op " + type + ")"));
     function row(k, v, raw) { box.appendChild(confirmList(doc, [[k, v, raw]])); }
     if (type === 0) {
       var a = (data.amount && typeof data.amount === "object") ? data.amount : {};
@@ -342,7 +338,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       row(t("proposal.issuer", "Issuer"), String(data.issuer || "?")); row(t("proposal.recipient", "Recipient"), String(data.issue_to_account || "?"));
       row(t("proposal.amount", "Amount"), amtText(ia.amount, String(ia.asset_id || "?"), join), String(ia.amount));
     } else {
-      box.appendChild(el(doc, "p", "Type " + type + " has no human renderer yet — approve or reject it from its own page.", "muted"));
+      box.appendChild(DOM.el(doc, "p", "Type " + type + " has no human renderer yet — approve or reject it from its own page.", "muted"));
     }
     return box;
   }
@@ -570,18 +566,18 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var ctx = routeReady(root, t("proposal.proposals", "Proposals"), function () { renderProposals(root); });
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
-    ctx.wrap.appendChild(el(doc, "p", t("proposal.proposals_need_approvals_before_they_execute", "Proposals need approvals before they execute. Anyone can propose enclosed operations; approvers sign op 23, vetoes use op 24."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.proposals_need_approvals_before_they_execute", "Proposals need approvals before they execute. Anyone can propose enclosed operations; approvers sign op 23, vetoes use op 24."), "muted"));
     /* Public-by-default (gate-repair): locked viewers browse as the
      * committee-account until they unlock and act as themselves. */
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
     var fA = field(doc, t("proposal.account_for_approvals", "Account for approvals"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
-    var go = touchable(el(doc, "button", t("proposal.list_proposals", "List proposals"))); go.type = "button"; ctx.wrap.appendChild(go);
-    var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
-    ctx.wrap.appendChild(el(doc, "h2", t("proposal.create_proposal", "Create proposal")));
+    var go = touchable(DOM.el(doc, "button", t("proposal.list_proposals", "List proposals"))); go.type = "button"; ctx.wrap.appendChild(go);
+    var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.create_proposal", "Create proposal")));
     var fP = field(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
     var fE = field(doc, t("proposal.expiration", "Expiration"), { type: "datetime-local" });
     var fR = field(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)"), { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
@@ -595,15 +591,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       var o = doc.createElement("option"); o.value = k; o.textContent = t("proposal.inner_op_prefix", "Inner op: ") + k; kindSel.appendChild(o);
     });
     ctx.wrap.appendChild(kindSel);
-    var innerBox = el(doc, "div"), addedBox = el(doc, "div"), inners = [];
+    var innerBox = DOM.el(doc, "div"), addedBox = DOM.el(doc, "div"), inners = [];
     ctx.wrap.appendChild(innerBox); ctx.wrap.appendChild(addedBox);
     /* Repaint the enclosed-ops list with per-row Remove buttons. */
     function drawInners() {
-      clearBox(addedBox);
-      addedBox.appendChild(el(doc, "h3", "Enclosed ops (" + inners.length + ")"));
+      DOM.clear(addedBox);
+      addedBox.appendChild(DOM.el(doc, "h3", "Enclosed ops (" + inners.length + ")"));
       inners.forEach(function (en, i) {
-        var p = el(doc, "p", (i + 1) + ". " + innerSummary(en.kind, en.vals));
-        var rm = touchable(el(doc, "button", t("proposal.remove", "Remove"))); rm.type = "button";
+        var p = DOM.el(doc, "p", (i + 1) + ". " + innerSummary(en.kind, en.vals));
+        var rm = touchable(DOM.el(doc, "button", t("proposal.remove", "Remove"))); rm.type = "button";
         /* A11y delta 2026-10-01: bare "Remove" repeats per row — name which
          * enclosed op it drops (plain suffix, no new i18n key). */
         try { rm.setAttribute("aria-label", t("proposal.remove", "Remove") + t("proposal.enclosed_op_mid", " enclosed op ") + (i + 1)); } catch (e) { /* text stands */ }
@@ -613,7 +609,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     }
     /* Inner-op descriptor form for one kind (fields from INNER_DEFS + Add button). Params: kind. */
     function innerForm(kind) {
-      clearBox(innerBox);
+      DOM.clear(innerBox);
       var inputs = INNER_DEFS[kind].map(function (d, i) {
         // Placeholder tokens ("", "1.5", "180", "white") and inputmodes stay
         // untranslated: they are example values / input types, not language.
@@ -622,7 +618,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         var x = field(doc, t("proposal.inner_" + kind + "_" + i, d[0]), { placeholder: ph, inputmode: d[2] || null });
         innerBox.appendChild(x.row); return x.input;
       });
-      var btn = touchable(el(doc, "button", "Add " + kind + " inner op")); btn.type = "button"; innerBox.appendChild(btn);
+      var btn = touchable(DOM.el(doc, "button", "Add " + kind + " inner op")); btn.type = "button"; innerBox.appendChild(btn);
       btn.addEventListener("click", function () {
         var vals = inputs.map(function (n) { return n.value.trim(); });
         if (!vals[0] || !vals[1] || (kind !== "whitelist" && !vals[2]) || (kind === "transfer" && !vals[3]) || (kind === "ticket" && (!vals[2] || !vals[3]))) {
@@ -635,7 +631,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     }
     kindSel.addEventListener("change", function () { innerForm(kindSel.value); });
     innerForm("transfer"); drawInners();
-    var cfgBox = el(doc, "div"); ctx.wrap.appendChild(cfgBox);
+    var cfgBox = DOM.el(doc, "div"); ctx.wrap.appendChild(cfgBox);
     reviewSection(doc, cfgBox, myGen, t("proposal.review_proposal", "Review proposal"), {
       build: async function () {
         if (!inners.length) throw new Error(t("proposal.add_at_least_one_enclosed_op_first", "Add at least one enclosed op first."));
@@ -676,7 +672,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       ok: function () { return t("proposal.proposal_created_and_re_read_on_chain", "Proposal created and re-read on chain."); },
       fail: t("proposal.could_not_build_the_proposal_check_accounts_a", "Could not build the proposal (check accounts, assets and amounts).") });
     go.addEventListener("click", function () {
-      if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
+      if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox);
       showStatus(doc, listBox, t("proposal.loading_proposals", "Loading proposals…"));
       Proposal.proposalsFor(fA.input.value.trim() || "1.2.0").then(function (rows) {
         if (myGen !== gen) return;
@@ -688,7 +684,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
             .catch(function () { return { slim: r, full: null }; });
         })).then(function (enriched) {
           if (myGen !== gen) return;
-          clearBox(listBox);
+          DOM.clear(listBox);
           listBox.appendChild(deskTable(doc, [t("proposal.id", "ID"), t("proposal.fee_payer", "Fee payer"), t("proposal.expires", "Expires"), t("proposal.review", "Review"), t("proposal.enclosed", "Enclosed"), t("proposal.trust", "Trust"), t("proposal.approvals", "Approvals")], enriched.map(function (en) {
             var r = en.slim, full = en.full;
             var tx = (full && full.proposed_transaction) || {}, entries = tx.operations || (full && full.proposed_ops) || r.proposed_ops || [];
@@ -706,16 +702,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
                 t("proposal.source_prefix", "Source: ") + badge.label, t("proposal.approvals_prefix", "Approvals: ") + ap] };
           })));
           /* Raw JSON per proposal (JSONModal concept, inline <details>). */
-          var rawBox = el(doc, "div");
-          rawBox.appendChild(el(doc, "h3", t("proposal.raw_json", "Raw JSON")));
+          var rawBox = DOM.el(doc, "div");
+          rawBox.appendChild(DOM.el(doc, "h3", t("proposal.raw_json", "Raw JSON")));
           enriched.forEach(function (en) {
             rawBox.appendChild(rawJson(doc, t("proposal.raw_proposal_prefix", "Raw proposal ") + en.slim.id,
               en.full ? (en.full.proposed_transaction || en.full) : en.slim));
           });
           listBox.appendChild(rawBox);
           go.disabled = false;
-        }).catch(function (e) { if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
-      }).catch(function (e) { if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
+        }).catch(function (e) { if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
+      }).catch(function (e) { if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("proposal.could_not_load_proposals", "Could not load proposals.")); go.disabled = false; });
     });
   }
   /** Route entry: #/proposals/:id — detail + nested table + approve/unapprove/delete.
@@ -728,7 +724,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var doc = ctx.doc, myGen = ctx.myGen;
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
     showStatus(doc, ctx.wrap, t("proposal.loading_proposal", "Loading proposal…"));
     Proposal.proposal(id).then(function (p) {
@@ -743,18 +739,18 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         [t("proposal.required_owner", "Required owner"), (p.required_owner_approvals || []).length ? p.required_owner_approvals.join(", ") : t("proposal.none", "none")],
         [t("proposal.active_approvals", "Active approvals"), (p.available_active_approvals || []).length ? p.available_active_approvals.join(", ") : t("proposal.none_yet", "none yet")],
         [t("proposal.owner_approvals", "Owner approvals"), (p.available_owner_approvals || []).length ? p.available_owner_approvals.join(", ") : t("proposal.none_yet", "none yet")]]));
-      ctx.wrap.appendChild(el(doc, "h2", "Enclosed operations (" + entries.length + ")"));
+      ctx.wrap.appendChild(DOM.el(doc, "h2", "Enclosed operations (" + entries.length + ")"));
       /* MED badges + per-approver status + raw JSON (batch-3 keyed). */
       var badge = trustBadge(touchedIds(entries, p.proposer || p.fee_paying_account));
-      var srcLine = el(doc, "p", t("proposal.source_prefix", "Source: ") + badge.label + " — " + badge.title, "muted");
+      var srcLine = DOM.el(doc, "p", t("proposal.source_prefix", "Source: ") + badge.label + " — " + badge.title, "muted");
       srcLine.title = badge.title;
       ctx.wrap.appendChild(srcLine);
-      ctx.wrap.appendChild(el(doc, "h2", t("proposal.approver_status", "Approver status")));
+      ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.approver_status", "Approver status")));
       var ap = approvalLines(p);
-      ctx.wrap.appendChild(el(doc, "p", approvalCell(p), "muted"));
-      ap.lines.forEach(function (ln) { ctx.wrap.appendChild(el(doc, "p", ln)); });
+      ctx.wrap.appendChild(DOM.el(doc, "p", approvalCell(p), "muted"));
+      ap.lines.forEach(function (ln) { ctx.wrap.appendChild(DOM.el(doc, "p", ln)); });
       ctx.wrap.appendChild(rawJson(doc, t("proposal.raw_proposal_json", "Raw proposal JSON"), p));
-      if (!entries.length) ctx.wrap.appendChild(el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations.") + t("proposal.empty_hint", " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N)."), "muted"));
+      if (!entries.length) ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.no_enclosed_operations", "No enclosed operations.") + t("proposal.empty_hint", " The proposal carries nothing to approve — unusual but valid; check the id (proposals look like 1.10.N)."), "muted"));
       symJoin(innerAssetIds(entries)).then(function (join) {
         if (myGen !== gen) return;
         entries.forEach(function (e) {
@@ -762,7 +758,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           if (pair) ctx.wrap.appendChild(renderInnerOp(doc, pair[0], pair[1], join));
         });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, t("proposal.could_not_join_asset_symbols", "Could not join asset symbols.")); });
-      ctx.wrap.appendChild(el(doc, "h2", t("proposal.approve_reject", "Approve / reject")));
+      ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.approve_reject", "Approve / reject")));
       var fW = field(doc, t("proposal.approver_account", "Approver account"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       var fP2 = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
@@ -771,7 +767,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       ["active", "owner"].forEach(function (k) { var o = doc.createElement("option"); o.value = k; o.textContent = k + " authority"; ow.appendChild(o); });
       ctx.wrap.appendChild(ow);
       [[t("proposal.approve", "Approve"), false], [t("proposal.reject_approval", "Reject approval"), true]].forEach(function (ab) {
-        var box = el(doc, "div"); ctx.wrap.appendChild(box);
+        var box = DOM.el(doc, "div"); ctx.wrap.appendChild(box);
         reviewSection(doc, box, myGen, ab[0] + " (op 23)", {
           build: async function () {
             var who = await Account.resolve(fW.input.value.trim() || "1.2.0");
@@ -793,13 +789,13 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           },
           ok: function () { return "Approval " + (ab[1] ? "removed" : "recorded") + " and re-read on chain."; } });
       });
-      ctx.wrap.appendChild(el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op 24)")));
+      ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op 24)")));
       var fD = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fD.row);
       var chk = doc.createElement("input"); chk.type = "checkbox"; touchable(chk);
-      var chkRow = el(doc, "div", null, "xfer-field"), chkL = el(doc, "label", t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "));
+      var chkRow = DOM.el(doc, "div", null, "xfer-field"), chkL = DOM.el(doc, "label", t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "));
       chkL.appendChild(chk); chkRow.appendChild(chkL); ctx.wrap.appendChild(chkRow);
-      var dbox = el(doc, "div"); ctx.wrap.appendChild(dbox);
+      var dbox = DOM.el(doc, "div"); ctx.wrap.appendChild(dbox);
       reviewSection(doc, dbox, myGen, t("proposal.delete_proposal_op_24", "Delete proposal (op 24)"), {
         build: async function () {
           var payer = await Account.resolve(fD.input.value.trim() || "1.2.0");
@@ -821,13 +817,13 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       ctx.wrap.removeChild(ctx.wrap.lastChild);
       showError(doc, ctx.wrap, e, t("proposal.could_not_load_the_proposal", "Could not load the proposal."));
       if (String((e && e.message) || e).indexOf("unknown-proposal") !== -1)
-        ctx.wrap.appendChild(el(doc, "p", t("proposal.check_the_id_proposals_look_like_1_10_n", "Check the id — proposals look like 1.10.N."), "muted"));
+        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.check_the_id_proposals_look_like_1_10_n", "Check the id — proposals look like 1.10.N."), "muted"));
     });
   }
 
   return { renderProposals: renderProposals, renderProposalDetail: renderProposalDetail, renderInnerOp: renderInnerOp, opName: opName,
     live: function (g) { return g === gen; },
-    _ui: { el: el, touchable: touchable, clearBox: clearBox, showError: showError, showStatus: showStatus,
+    _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       confirmList: confirmList, field: field, deskTable: deskTable, symJoin: symJoin, amtText: amtText,
       feeText: feeText, headBlock: headBlock, timeHuman: timeHuman,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,

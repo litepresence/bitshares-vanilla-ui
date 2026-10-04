@@ -103,7 +103,7 @@ var NotifyUI = (function () {
     if (!root) return;
     var myGen = ++gen;
     var doc = root.ownerDocument || document;
-    while (root.firstChild) root.removeChild(root.firstChild);
+    DOM.clear(root);
     var host = H(), RL = R();
     var wrap = doc.createElement("div");
     wrap.className = "wrap alerts-view";
@@ -118,11 +118,11 @@ var NotifyUI = (function () {
       return;
     }
     var N = Notify;
-    var el = host.el, touchable = host.touchable;
+    var touchable = host.touchable; /* el() calls use DOM.el directly */
     var uiGen = host.mark();
-    wrap.appendChild(el(doc, "h1", t("notify.title", "Price Alerts")));
+    wrap.appendChild(DOM.el(doc, "h1", t("notify.title", "Price Alerts")));
     var honesty = t("notify.honesty", "Rules are checked while this page is open. Timers die with the page — alerts never fire while the app is closed.");
-    wrap.appendChild(el(doc, "p", honesty, "muted"));
+    wrap.appendChild(DOM.el(doc, "p", honesty, "muted"));
     host.mountToasts();
     var live = function () { return myGen === gen; };
     /* Slice-16 (F1c): stale-pair sweep on #/alerts entry. The sync
@@ -137,32 +137,32 @@ var NotifyUI = (function () {
     } catch (e) { /* sweep best-effort */ }
 
     /* Rule list grouped by pair, per-rule delete (>= 44px). */
-    var listBox = el(doc, "div", null, "alerts-list");
+    var listBox = DOM.el(doc, "div", null, "alerts-list");
     wrap.appendChild(listBox);
     function drawList() {
       if (!live()) return;
-      while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+      DOM.clear(listBox);
       var rs = [];
       try { rs = RL.rules() || []; } catch (e) { rs = []; }
       if (rs.length === 0) {
-        listBox.appendChild(el(doc, "p",
+        listBox.appendChild(DOM.el(doc, "p",
           t("notify.empty_list", "No price alerts yet. Use Add rule below to watch a market."), "muted"));
         return;
       }
       groups(rs).forEach(function (g) {
-        listBox.appendChild(el(doc, "h2",
+        listBox.appendChild(DOM.el(doc, "h2",
           g.quote + "/" + g.base + " (" + String(g.rows.length) + ")"));
         g.rows.forEach(function (r) {
           var row = doc.createElement("div");
           row.className = "alert-row";
-          row.appendChild(el(doc, "span",
+          row.appendChild(DOM.el(doc, "span",
             dirWord(r.type) + " " + String(r.price)));
-          var latest = el(doc, "span", t("notify.waiting", "waiting for price"), "muted");
+          var latest = DOM.el(doc, "span", t("notify.waiting", "waiting for price"), "muted");
           row.appendChild(latest);
           if (r.unresolvedSince) {
-            row.appendChild(el(doc, "span", t("notify.unresolved", "pair unresolved"), "badge"));
+            row.appendChild(DOM.el(doc, "span", t("notify.unresolved", "pair unresolved"), "badge"));
           }
-          var del = touchable(el(doc, "button", t("notify.delete", "Delete")));
+          var del = touchable(DOM.el(doc, "button", t("notify.delete", "Delete")));
           del.type = "button";
           del.setAttribute("aria-label", t("notify.delete_aria_prefix", "Delete alert ") + dirWord(r.type) + " " + String(r.price));
           del.addEventListener("click", function () {
@@ -199,7 +199,7 @@ var NotifyUI = (function () {
     } catch (e) { /* offline panel path unaffected */ }
 
     /* Add-rule form (pair defaults to the last-viewed market). */
-    wrap.appendChild(el(doc, "h2", t("notify.add_rule", "Add rule")));
+    wrap.appendChild(DOM.el(doc, "h2", t("notify.add_rule", "Add rule")));
     var form = doc.createElement("div");
     form.className = "alert-form";
     wrap.appendChild(form);
@@ -210,7 +210,7 @@ var NotifyUI = (function () {
     }
     function field(label, value, mode) {
       var lab = doc.createElement("label");
-      lab.appendChild(el(doc, "span", label));
+      lab.appendChild(DOM.el(doc, "span", label));
       var inp = doc.createElement("input");
       inp.value = value || "";
       if (mode) inp.setAttribute("inputmode", mode);
@@ -222,7 +222,7 @@ var NotifyUI = (function () {
     var inQ = field(t("notify.quote_label", "Quote"), lq, null);
     var inB = field(t("notify.base_label", "Base"), lb, null);
     var dirLab = doc.createElement("label");
-    dirLab.appendChild(el(doc, "span", t("notify.dir_label", "Alert me when")));
+    dirLab.appendChild(DOM.el(doc, "span", t("notify.dir_label", "Alert me when")));
     var dirSel = doc.createElement("select");
     touchable(dirSel);
     [["1", t("notify.higher", "Higher Than")], ["2", t("notify.lower", "Lower Than")]].forEach(function (o) {
@@ -233,10 +233,10 @@ var NotifyUI = (function () {
     dirLab.appendChild(dirSel);
     form.appendChild(dirLab);
     var inP = field(t("notify.price_label", "Price"), "", "decimal");
-    var err = el(doc, "p", "", "error");
+    var err = DOM.el(doc, "p", "", "error");
     err.setAttribute("aria-live", "polite");
     form.appendChild(err);
-    var add = touchable(el(doc, "button", t("notify.add_rule", "Add rule")));
+    var add = touchable(DOM.el(doc, "button", t("notify.add_rule", "Add rule")));
     add.type = "button";
     form.appendChild(add);
     add.addEventListener("click", async function () {
@@ -282,8 +282,8 @@ var NotifyUI = (function () {
     });
 
     /* Permission section: explicit opt-in only, honest skip reasons. */
-    wrap.appendChild(el(doc, "h2", t("notify.browser_h2", "Browser notifications")));
-    var permBox = el(doc, "div", null, "alerts-perm");
+    wrap.appendChild(DOM.el(doc, "h2", t("notify.browser_h2", "Browser notifications")));
+    var permBox = DOM.el(doc, "div", null, "alerts-perm");
     wrap.appendChild(permBox);
     function skipLine() {
       var r = null;
@@ -298,10 +298,10 @@ var NotifyUI = (function () {
     }
     function drawPerm() {
       if (!live()) return;
-      while (permBox.firstChild) permBox.removeChild(permBox.firstChild);
+      DOM.clear(permBox);
       var prefs = null;
       try { prefs = N.prefs(); } catch (e) { prefs = { browser: false }; }
-      var btn = touchable(el(doc, "button",
+      var btn = touchable(DOM.el(doc, "button",
         prefs && prefs.browser ? t("notify.browser_on", "Browser notifications on") : t("notify.browser_enable", "Enable browser notifications")));
       btn.type = "button";
       btn.addEventListener("click", async function () {
@@ -310,18 +310,18 @@ var NotifyUI = (function () {
         if (live()) { drawPerm(); drawToggles(); }
       });
       permBox.appendChild(btn);
-      permBox.appendChild(el(doc, "p", skipLine(), "muted"));
+      permBox.appendChild(DOM.el(doc, "p", skipLine(), "muted"));
     }
     drawPerm();
 
     /* Settings delegation: the two notification toggles live here by calling
      * Notify prefs directly — no forked settings state (LINK-OUT honoring). */
-    wrap.appendChild(el(doc, "h2", t("notify.settings_h2", "Notification settings")));
-    var togBox = el(doc, "div", null, "alerts-toggles");
+    wrap.appendChild(DOM.el(doc, "h2", t("notify.settings_h2", "Notification settings")));
+    var togBox = DOM.el(doc, "div", null, "alerts-toggles");
     wrap.appendChild(togBox);
     function drawToggles() {
       if (!live()) return;
-      while (togBox.firstChild) togBox.removeChild(togBox.firstChild);
+      DOM.clear(togBox);
       var prefs = null;
       try { prefs = N.prefs(); } catch (e) { prefs = { browser: false, transferToMe: true }; }
       var bLab = doc.createElement("label");
@@ -330,7 +330,7 @@ var NotifyUI = (function () {
       bBox.checked = !!(prefs && prefs.browser);
       touchable(bBox);
       bLab.appendChild(bBox);
-      bLab.appendChild(el(doc, "span", t("notify.allow_browser", "Allow browser notifications")));
+      bLab.appendChild(DOM.el(doc, "span", t("notify.allow_browser", "Allow browser notifications")));
       togBox.appendChild(bLab);
       bBox.addEventListener("change", async function () {
         if (!live()) return;
@@ -346,7 +346,7 @@ var NotifyUI = (function () {
       tBox.checked = !(prefs && prefs.transferToMe === false);
       touchable(tBox);
       tLab.appendChild(tBox);
-      tLab.appendChild(el(doc, "span", t("notify.transfer_toggle", "Notify me about incoming transfers")));
+      tLab.appendChild(DOM.el(doc, "span", t("notify.transfer_toggle", "Notify me about incoming transfers")));
       togBox.appendChild(tLab);
       tBox.addEventListener("change", function () {
         try { N.setPrefs({ transferToMe: !!tBox.checked }); } catch (e) { /* repaint */ }

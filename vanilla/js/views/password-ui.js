@@ -33,25 +33,19 @@ var PasswordUI = (function () {
     return dflt;
   }
   var gen = 0;
-  /* textContent-only element (all strings via textContent, never HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error line (aria-live so failures are announced). */
   function makeError(doc) {
-    var err = doc.createElement("div");
-    err.className = "error"; err.setAttribute("aria-live", "polite"); return err;
+    var err = DOM.el(doc, "div", null, "error"); err.setAttribute("aria-live", "polite"); return err;
   }
   /* Labeled password row. */
   function pwRow(doc, labelText, id) {
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field");
+    var label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     input.id = id; input.type = "password";
     input.setAttribute("autocomplete", "new-password");
@@ -73,16 +67,16 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("password.change_wallet_password", "Change wallet password")));
+    wrap.appendChild(DOM.el(doc, "h1", t("password.change_wallet_password", "Change wallet password")));
     if (backendMissing()) {
       var missing = makeError(doc);
       missing.textContent = t("password.wallet_backend_missing_js_wallet_js_failed_to", "Wallet backend missing: js/wallet.js failed to load.");
       wrap.appendChild(missing);
       return;
     }
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "p",
       "Changes the password that encrypts this device's wallet copy. " +
       "Your brainkey and keys do not change — only the local lock on them. " +
       "Nothing is broadcast; this never touches the chain.",
@@ -95,8 +89,8 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
           !localStorage.getItem("bts-vanilla-wallet-v1")) hasWallet = false;
     } catch (e) { /* unreadable storage: let unlock surface it */ }
     if (!hasWallet) {
-      wrap.appendChild(el(doc, "p", t("password.no_wallet_stored_on_this_device_yet_there_is", "No wallet stored on this device yet — there is no password to change."), "muted"));
-      var p = el(doc, "p", null, "muted");
+      wrap.appendChild(DOM.el(doc, "p", t("password.no_wallet_stored_on_this_device_yet_there_is", "No wallet stored on this device yet — there is no password to change."), "muted"));
+      var p = DOM.el(doc, "p", null, "muted");
       [["#/create-wallet-brainkey", t("password.create_new_wallet", "Create new wallet")],
        ["#/existing-account", t("password.import_existing_account", "Import existing account")]].forEach(function (pr, i) {
         if (i > 0) p.appendChild(doc.createTextNode(" · "));
@@ -109,10 +103,10 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var nw = pwRow(doc, t("password.new_password", "New password"), "pwcur-new");
     var cf = pwRow(doc, t("password.confirm_new_password", "Confirm new password"), "pwcur-confirm");
     wrap.appendChild(cur.row); wrap.appendChild(nw.row); wrap.appendChild(cf.row);
-    var btn = touchable(el(doc, "button", t("password.change_password", "Change password")));
+    var btn = touchable(DOM.el(doc, "button", t("password.change_password", "Change password")));
     btn.id = "pwcur-do"; btn.type = "button"; wrap.appendChild(btn);
     var err = makeError(doc); wrap.appendChild(err);
-    var ok = el(doc, "p", "", "xfer-ok");
+    var ok = DOM.el(doc, "p", "", "xfer-ok");
     ok.setAttribute("aria-live", "polite"); wrap.appendChild(ok);
     btn.addEventListener("click", function () {
       err.textContent = ""; ok.textContent = "";
@@ -160,7 +154,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
           err.textContent = msg;
         });
     });
-    var back = el(doc, "p", null, "muted");
+    var back = DOM.el(doc, "p", null, "muted");
     var a = doc.createElement("a"); a.href = "#/wallet"; a.textContent = t("password.back_to_wallet_manager", "Back to Wallet manager");
     back.appendChild(a); wrap.appendChild(back);
   }

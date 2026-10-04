@@ -137,20 +137,11 @@ var TransferUI = (function () {
     return "BTS";
   }
 
-  /* Create an element with optional text + class (textContent only — user
-   * and chain strings never reach innerHTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch target floor (principle #7): every interactive element is ≥44px
    * in at least one dimension. Inline style keeps this view self-contained. */
-function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
+/* clearRoot removed — use DOM.clear */
 
   function makeWrap(doc, root) {
     var wrap = doc.createElement("div");
@@ -162,8 +153,7 @@ function clearRoot(root) {
   /* Inline error panel that is never blank: any thrown value maps to a
    * human sentence; unknown shapes fall back to a generic message. */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
+    var err = null; /* created via DOM.error below */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
@@ -176,17 +166,13 @@ function clearRoot(root) {
     } else if (msg.indexOf("not connected") !== -1) {
       msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    err.textContent = msg;
-    wrap.appendChild(err);
+    err = DOM.error(wrap, msg);
     return err;
   }
 
   /* Status line for multi-step sends (signing → broadcasting). */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p);
-    return p;
+    var p = DOM.status(wrap, text); return p;
   }
 
   /* UTF-8 memo hex + account/asset lookups moved verbatim to
@@ -195,8 +181,8 @@ function clearRoot(root) {
   /* Labeled text input row. Returns {row, input}. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field");
+    var label = DOM.el(doc, "label", labelText + " ");
     var input;
     if (opts.textarea) {
       input = doc.createElement("textarea");
@@ -214,7 +200,7 @@ function clearRoot(root) {
     touchable(input);
     label.appendChild(input);
     row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite");
     err.style.display = "none";
     row.appendChild(err);
@@ -258,7 +244,7 @@ function clearRoot(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Tx === "undefined" || !Tx ||
         typeof Account === "undefined" || !Account ||
@@ -272,7 +258,7 @@ function clearRoot(root) {
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled) return;
@@ -286,15 +272,15 @@ function clearRoot(root) {
       var timer = setTimeout(function () {
         if (settled) return; settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failWrap = makeWrap(doc, root);
         showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
-        var tstat = el(doc, "p", "", "muted");
+        var tstat = DOM.el(doc, "p", "", "muted");
         try { tstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(tstat);
-        var trow = el(doc, "div", null, "pools-offline-row");
+        var trow = DOM.el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(trow);
-        var tryBtn = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        var tryBtn = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
         tryBtn.type = "button";
         trow.appendChild(tryBtn);
         var toff = null;
@@ -309,7 +295,7 @@ function clearRoot(root) {
           try { tlink = toff.settingsLink(doc, t); } catch (e) { tlink = null; }
         }
         if (!tlink) {
-          tlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          tlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { tlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           touchable(tlink);
         }
@@ -320,11 +306,11 @@ function clearRoot(root) {
       return;
     }
 
-    wrap.appendChild(el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
     Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }).then(function (id) {
       return Account.resolve(id).catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" }; });
     }).then(function (from) {
-      clearRoot(root);
+      DOM.clear(root);
       var q = hashQuery();
       showForm(doc, makeWrap(doc, root), root, from, {
         from: from.name,
@@ -337,9 +323,9 @@ function clearRoot(root) {
         error: null
       });
     }).catch(function (e) {
-      clearRoot(root);
+      DOM.clear(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("transfer.title", "Transfer")));
+      failed.appendChild(DOM.el(doc, "h1", t("transfer.title", "Transfer")));
       showError(doc, failed, e, t("transfer.load_account_failed", "Could not load your account."));
     });
   }
@@ -352,9 +338,9 @@ function clearRoot(root) {
    * Errors stay inline above a preserved form — input is never wiped. */
   function showForm(doc, wrap, root, from, state) {
     var locked = (typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked());
-    wrap.appendChild(el(doc, "h1", t("transfer.title", "Transfer")));
+    wrap.appendChild(DOM.el(doc, "h1", t("transfer.title", "Transfer")));
     if (locked) {
-      wrap.appendChild(el(doc, "p",
+      wrap.appendChild(DOM.el(doc, "p",
         t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: from.name, id: from.id }), "muted"));
     }
 
@@ -384,7 +370,7 @@ function clearRoot(root) {
     wrap.appendChild(toF.row);
     /* LOW punchlist: known-scammer flag (AccountSelector concept). No scam
      * registry is vendored, so this stays an honest hint, not a verdict. */
-    wrap.appendChild(el(doc, "p", t("transfer.no_scam_list_is_loaded_here_double_che", "No scam list is loaded here — double-check the recipient name before reviewing."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("transfer.no_scam_list_is_loaded_here_double_che", "No scam list is loaded here — double-check the recipient name before reviewing."), "muted"));
     /* Non-blocking blur check: warns early, submit still decides. */
     toF.input.addEventListener("blur", function () {
       var v = toF.input.value.trim();
@@ -409,7 +395,7 @@ function clearRoot(root) {
     /* Available balance (punchlist MED): a click-to-fill button when the
      * selected asset has a known sender balance (unlocked only), a status
      * line while loading or when the load failed, empty otherwise. */
-    var availBox = el(doc, "div", null, "xfer-avail");
+    var availBox = DOM.el(doc, "div", null, "xfer-avail");
     wrap.appendChild(availBox);
 
     var amountF = fieldRow(doc, t("transfer.amount_label", "Amount "), {
@@ -422,8 +408,8 @@ function clearRoot(root) {
     });
     wrap.appendChild(memoF.row);
 
-    var encRow = el(doc, "div", null, "xfer-field");
-    var encLabel = el(doc, "label", t("transfer.encrypted_label", "Encrypted memo "));
+    var encRow = DOM.el(doc, "div", null, "xfer-field");
+    var encLabel = DOM.el(doc, "label", t("transfer.encrypted_label", "Encrypted memo "));
     var encBox = doc.createElement("input");
     encBox.type = "checkbox";
     encBox.id = "xfer-encrypted";
@@ -436,8 +422,8 @@ function clearRoot(root) {
     /* Fee asset (punchlist MED): the transfer asset plus the sender's
      * non-zero balances when unlocked, the transfer asset alone when
      * locked. The choice follows the transfer asset until touched. */
-    var feeRow = el(doc, "div", null, "xfer-field");
-    var feeLabel = el(doc, "label", t("confirm.fee", "Fee") + " ");
+    var feeRow = DOM.el(doc, "div", null, "xfer-field");
+    var feeLabel = DOM.el(doc, "label", t("confirm.fee", "Fee") + " ");
     var feeSel = doc.createElement("select");
     feeSel.id = "xfer-fee-asset";
     touchable(feeSel);
@@ -447,7 +433,7 @@ function clearRoot(root) {
     /* Equivalent-fee quote in an alternate fee asset (unlocked only, hidden
      * otherwise and on any lookup failure — the confirm stays the source
      * of truth; a missing quote is never a wrong number). */
-    var feeQuote = el(doc, "div", "", "muted");
+    var feeQuote = DOM.el(doc, "div", "", "muted");
     feeQuote.setAttribute("aria-live", "polite");
     wrap.appendChild(feeQuote);
 
@@ -457,11 +443,11 @@ function clearRoot(root) {
      * and keyboard-focusable. Propose reveals proposer + expiration +
      * review-period below; Review re-labels accordingly. */
     var mode = (state && state.mode === "propose") ? "propose" : "send";
-    var modeRow = el(doc, "div", null, "xfer-field xfer-mode");
-    var sendModeBtn = touchable(el(doc, "button", t("transfer.mode_send", "Send")));
+    var modeRow = DOM.el(doc, "div", null, "xfer-field xfer-mode");
+    var sendModeBtn = touchable(DOM.el(doc, "button", t("transfer.mode_send", "Send")));
     sendModeBtn.type = "button";
     sendModeBtn.id = "xfer-mode-send";
-    var proposeModeBtn = touchable(el(doc, "button", t("transfer.mode_propose", "Propose")));
+    var proposeModeBtn = touchable(DOM.el(doc, "button", t("transfer.mode_propose", "Propose")));
     proposeModeBtn.type = "button";
     proposeModeBtn.id = "xfer-mode-propose";
     modeRow.appendChild(sendModeBtn);
@@ -495,23 +481,23 @@ function clearRoot(root) {
     wrap.appendChild(proposerF.row);
     wrap.appendChild(expiryF.row);
     wrap.appendChild(reviewPeriodF.row);
-    var proposeNotice = el(doc, "p",
+    var proposeNotice = DOM.el(doc, "p",
       t("transfer.propose_notice_locked", "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself.") + " " + t("transfer.propose_notice_fee", "Proposal fee is quoted live in the core asset at review."), "muted");
     wrap.appendChild(proposeNotice);
 
     /* Toggle refresh: button emphasis + propose-field visibility + Review
      * label. Never throws; gating owns the disabled state. */
-    var reviewBtn = touchable(el(doc, "button", t("transfer.review", "Review transfer")));
+    var reviewBtn = touchable(DOM.el(doc, "button", t("transfer.review", "Review transfer")));
     reviewBtn.id = "xfer-review";
     reviewBtn.type = "button";
     reviewBtn.disabled = true; /* gating owns this from here on */
     wrap.appendChild(reviewBtn);
     /* Gating reasons: every disabled state names its reasons inline
      * (honest, never silent). Empty when the form is submittable. */
-    var gateBox = el(doc, "div", null, "xfer-gate");
+    var gateBox = DOM.el(doc, "div", null, "xfer-gate");
     gateBox.setAttribute("aria-live", "polite");
     wrap.appendChild(gateBox);
-    var previewBox = el(doc, "div", null, "xfer-out");
+    var previewBox = DOM.el(doc, "div", null, "xfer-out");
     wrap.appendChild(previewBox);
 
     /* Toggle refresh: button emphasis (bold + aria-pressed, SendModal
@@ -533,7 +519,7 @@ function clearRoot(root) {
       feeRow.style.display = isPropose ? "none" : "";
       feeQuote.style.display = isPropose ? "none" : "";
       if (isPropose) {
-        while (feeQuote.firstChild) feeQuote.removeChild(feeQuote.firstChild);
+        DOM.clear(feeQuote);
       }
       if (isPropose) reviewBtn.textContent = t("transfer.review_proposal", "Review proposal");
       else reviewBtn.textContent = t("transfer.review", "Review transfer");
@@ -543,13 +529,13 @@ function clearRoot(root) {
     sendModeBtn.addEventListener("click", function () {
       if (mode === "send") return;
       mode = "send";
-      while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      DOM.clear(previewBox);
       refreshMode();
     });
     proposeModeBtn.addEventListener("click", function () {
       if (mode === "propose") return;
       mode = "propose";
-      while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      DOM.clear(previewBox);
       refreshMode();
     });
     proposerF.input.addEventListener("input", updateGate);
@@ -596,7 +582,7 @@ function clearRoot(root) {
       push(tSym);
       push(feeSym);
       for (var i = 0; i < bals.length; i++) push(bals[i].symbol);
-      while (feeSel.firstChild) feeSel.removeChild(feeSel.firstChild);
+      DOM.clear(feeSel);
       for (var k = 0; k < opts.length; k++) {
         var o = doc.createElement("option");
         o.value = opts[k];
@@ -611,19 +597,19 @@ function clearRoot(root) {
      * loading/failed text while unresolved, empty when locked or when the
      * selected asset is not a sender balance. */
     function refreshAvail() {
-      while (availBox.firstChild) availBox.removeChild(availBox.firstChild);
+      DOM.clear(availBox);
       if (locked) return;
       if (balsState === "loading") {
-        availBox.appendChild(el(doc, "span", t("account.loading_balances", "Loading balances…"), "muted"));
+        availBox.appendChild(DOM.el(doc, "span", t("account.loading_balances", "Loading balances…"), "muted"));
         return;
       }
       if (balsState === "failed") {
-        availBox.appendChild(el(doc, "span", t("account.load_balances_failed", "Could not load balances."), "muted"));
+        availBox.appendChild(DOM.el(doc, "span", t("account.load_balances_failed", "Could not load balances."), "muted"));
         return;
       }
       var b = findBal(assetVal());
       if (!b) return;
-      var btn = el(doc, "button", t("credit.current_balance", "Current balance") + ": " + b.display + " " + b.symbol);
+      var btn = DOM.el(doc, "button", t("credit.current_balance", "Current balance") + ": " + b.display + " " + b.symbol);
       btn.type = "button";
       btn.id = "xfer-max";
       btn.style.borderBottom = "var(--border, #A09F9F) 1px dotted"; /* SendModal affordance (themed token + classic fallback) */
@@ -685,7 +671,7 @@ function clearRoot(root) {
      * the confirm settles the exact fee in the transfer asset (named in
      * the note). Hidden on any failure. */
     function refreshFeeQuote() {
-      while (feeQuote.firstChild) feeQuote.removeChild(feeQuote.firstChild);
+      DOM.clear(feeQuote);
       if (locked) return;
       var tSym = assetVal().toUpperCase();
       if (!feeSym || feeSym === tSym) return;
@@ -758,9 +744,9 @@ function clearRoot(root) {
           reasons.push(t("transfer.review_period_integer", "Review period must be a non-negative integer."));
         }
       }
-      while (gateBox.firstChild) gateBox.removeChild(gateBox.firstChild);
+      DOM.clear(gateBox);
       for (var i = 0; i < reasons.length; i++) {
-        gateBox.appendChild(el(doc, "div", reasons[i], "xfer-gate-reason"));
+        gateBox.appendChild(DOM.el(doc, "div", reasons[i], "xfer-gate-reason"));
       }
       reviewBtn.disabled = reasons.length > 0;
     }
@@ -868,7 +854,7 @@ function clearRoot(root) {
       setFieldError(toF, "");
       setFieldError(assetF, "");
       setFieldError(amountF, "");
-      while (previewBox.firstChild) previewBox.removeChild(previewBox.firstChild);
+      DOM.clear(previewBox);
       /* Propose mode never touches the op-0 confirm file: the transfer
        * becomes the single enclosed op of an op-22 proposal (From may
        * differ from the wallet — only the proposer must sign now). */
@@ -922,9 +908,9 @@ function clearRoot(root) {
               transfer asset today, see header */
           });
         }).then(function (ctx) {
-          clearRoot(root);
+          DOM.clear(root);
           TransferConfirm.showConfirm(doc, makeWrap(doc, root), root, from, ctx, function () {
-            clearRoot(root);
+            DOM.clear(root);
             showForm(doc, makeWrap(doc, root), root, from, {
               from: from.name,
               to: ctx.to.name,
@@ -954,7 +940,7 @@ function clearRoot(root) {
             setFieldError(amountF, msg);
           }
           wrap.removeChild(status);
-          clearRoot(root);
+          DOM.clear(root);
           showForm(doc, makeWrap(doc, root), root, from, {
             from: fromF.input.value,
             to: toF.input.value,
@@ -1044,7 +1030,7 @@ function clearRoot(root) {
    * unsigned op-0 envelope + live fee, render human rows, then offer
    * Unlock & Sign (password asked only here). Amounts stay integer strings. */
   function lockedPreview(doc, box, root, vals, reviewBtn) {
-    while (box.firstChild) box.removeChild(box.firstChild);
+    DOM.clear(box);
     reviewBtn.disabled = true;
     showStatus(doc, box, t("transfer.checking", "Checking recipient, asset, and fee…"));
     function done() { reviewBtn.disabled = false; }
@@ -1096,12 +1082,12 @@ function clearRoot(root) {
         encrypted: !!vals.encrypted, fee: fee,
         feeSym: feeSym, feePrec: feePrec };
     }).then(function (P) {
-      while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "h3", t("transfer.preview_title", "Transfer preview (locked)")));
-      var list = el(doc, "dl", null, "xfer-confirm");
+      DOM.clear(box);
+      box.appendChild(DOM.el(doc, "h3", t("transfer.preview_title", "Transfer preview (locked)")));
+      var list = DOM.el(doc, "dl", null, "xfer-confirm");
       function row(term, text, title) {
-        list.appendChild(el(doc, "dt", term));
-        var dd = el(doc, "dd", text);
+        list.appendChild(DOM.el(doc, "dt", term));
+        var dd = DOM.el(doc, "dd", text);
         if (title) dd.title = title;
         list.appendChild(dd);
       }
@@ -1118,13 +1104,13 @@ function clearRoot(root) {
       row(t("confirm.fee", "Fee") + " (" + P.feeSym + ")", feeHuman, String(P.fee.amount));
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
-      box.appendChild(el(doc, "p",
+      box.appendChild(DOM.el(doc, "p",
         t("transfer.locked_sign_hint", "Unlock to sign — the password is asked only here, at signing."), "muted"));
-      var pwRow = el(doc, "div", null, "xfer-field");
+      var pwRow = DOM.el(doc, "div", null, "xfer-field");
       var pw = doc.createElement("input");
       pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
       pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
-      var ub = touchable(el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
+      var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
       ub.type = "button"; pwRow.appendChild(ub);
       box.appendChild(pwRow);
       ub.addEventListener("click", function () {
@@ -1148,9 +1134,9 @@ function clearRoot(root) {
             });
           })
           .then(function (ctx) {
-            clearRoot(root);
+            DOM.clear(root);
             TransferConfirm.showConfirm(doc, makeWrap(doc, root), root, P.fromAcc, ctx, function () {
-              clearRoot(root);
+              DOM.clear(root);
               showForm(doc, makeWrap(doc, root), root, P.fromAcc, {
                 from: P.fromAcc.name, to: ctx.to.name, asset: ctx.asset.symbol,
                 amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
@@ -1170,7 +1156,7 @@ function clearRoot(root) {
       });
       done();
     }).catch(function (e) {
-      while (box.firstChild) box.removeChild(box.firstChild);
+      DOM.clear(box);
       showError(doc, box, (e && e.message) ? e.message : String(e || "Could not prepare the transfer."),
         t("transfer.prepare_failed", "Could not prepare the transfer."));
       done();
@@ -1279,11 +1265,11 @@ function clearRoot(root) {
    * proof (the new proposal id observed on chain — the barter
    * confirmPropose pattern). built = {proposer, leg, pair, before, snap}. */
   function showProposeConfirm(doc, wrap, root, built, fh, onBack) {
-    wrap.appendChild(el(doc, "h1", t("transfer.confirm_proposal_title", "Confirm proposal (op 22)")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    wrap.appendChild(DOM.el(doc, "h1", t("transfer.confirm_proposal_title", "Confirm proposal (op 22)")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text);
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text);
       if (title) dd.title = title;
       list.appendChild(dd);
     }
@@ -1304,7 +1290,7 @@ function clearRoot(root) {
     row(t("transfer.fee_live_label", "Fee (live)"), fh.text, String(built.pair[1].fee.amount));
     row(t("confirm.network", "Network"), networkNameLocal());
     wrap.appendChild(list);
-    wrap.appendChild(el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted"));
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
@@ -1315,10 +1301,10 @@ function clearRoot(root) {
     catch (e) { preOp.textContent = String(built.pair); }
     detOp.appendChild(preOp);
     wrap.appendChild(detOp);
-    var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
+    var backBtn = touchable(DOM.el(doc, "button", t("confirm.back", "Back")));
     backBtn.type = "button";
     wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", t("confirm.sign_send", "Sign & Send")));
+    var sendBtn = touchable(DOM.el(doc, "button", t("confirm.sign_send", "Sign & Send")));
     sendBtn.type = "button";
     wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () {
@@ -1360,7 +1346,7 @@ function clearRoot(root) {
         try {
           head = (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
         } catch (e) { /* head stays 0 — never blocks the proof */ }
-        clearRoot(root);
+        DOM.clear(root);
         showProposeResult(doc, makeWrap(doc, root), root, built, fh, res, head);
       }).catch(function (e) {
         var msg = (e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal.");
@@ -1375,7 +1361,7 @@ function clearRoot(root) {
   /* Proposal result: the re-read proposal id + head block + channel.
    * Links to the proposals page. Never blank. */
   function showProposeResult(doc, wrap, root, built, fh, res, head) {
-    wrap.appendChild(el(doc, "h1", t("transfer.proposal_sent_title", "Proposal sent")));
+    wrap.appendChild(DOM.el(doc, "h1", t("transfer.proposal_sent_title", "Proposal sent")));
     var pid = "?";
     try {
       if (res && res.proof) {
@@ -1384,13 +1370,13 @@ function clearRoot(root) {
       }
     } catch (e) { /* "?" stands */ }
     var via = (res && res.via) ? res.via : "?";
-    var ok = el(doc, "p", t("transfer.proposal_observed_prefix", "Proposal ") + pid + t("transfer.proposal_observed_mid", " observed at head block #") + String(head) + " (" + via + ").", "xfer-ok");
+    var ok = DOM.el(doc, "p", t("transfer.proposal_observed_prefix", "Proposal ") + pid + t("transfer.proposal_observed_mid", " observed at head block #") + String(head) + " (" + via + ").", "xfer-ok");
     ok.setAttribute("aria-live", "polite");
     wrap.appendChild(ok);
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "p",
       Format.formatAmount(built.leg.amountInt, built.leg.asset.precision) + " " +
       built.leg.asset.symbol + " → " + built.leg.to.name + t("transfer.enclosed_fee_mid", " enclosed; fee ") + fh.text + ".", "muted"));
-    var link = el(doc, "a", t("transfer.view_proposals", "View proposals"));
+    var link = DOM.el(doc, "a", t("transfer.view_proposals", "View proposals"));
     link.setAttribute("href", "#/proposals");
     touchable(link);
     wrap.appendChild(link);
@@ -1406,7 +1392,7 @@ function clearRoot(root) {
     var status = showStatus(doc, wrap, t("transfer.checking", "Checking recipient, asset, and fee…"));
     function fail(msg) {
       if (wrap.contains(status)) wrap.removeChild(status);
-      clearRoot(root);
+      DOM.clear(root);
       showForm(doc, makeWrap(doc, root), root, from, {
         from: snap.from, to: snap.to, asset: snap.asset, amount: snap.amount,
         memo: snap.memo, encrypted: snap.encrypted, feeAsset: snap.feeAsset,
@@ -1435,10 +1421,10 @@ function clearRoot(root) {
     }).then(function (built) {
       feeHumanFor(built.pair[1].fee).then(function (fh) {
         if (wrap.contains(status)) wrap.removeChild(status);
-        clearRoot(root);
+        DOM.clear(root);
         var w2 = makeWrap(doc, root);
         showProposeConfirm(doc, w2, root, built, fh, function () {
-          clearRoot(root);
+          DOM.clear(root);
           showForm(doc, makeWrap(doc, root), root, from, {
             from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
             amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
@@ -1462,7 +1448,7 @@ function clearRoot(root) {
    * quoted again — a switch note names the change, so the preview never
    * signs something it did not show. */
   function lockedProposePreview(doc, box, root, vals, reviewBtn) {
-    while (box.firstChild) box.removeChild(box.firstChild);
+    DOM.clear(box);
     reviewBtn.disabled = true;
     showStatus(doc, box, t("transfer.checking", "Checking recipient, asset, and fee…"));
     function done() { reviewBtn.disabled = false; }
@@ -1480,12 +1466,12 @@ function clearRoot(root) {
       var fh = await feeHumanFor(pair[1].fee);
       return { proposer: proposer, leg: leg, pair: pair, fh: fh };
     }).then(function (P) {
-      while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "h3", t("transfer.propose_preview_title", "Proposal preview (locked)")));
-      var list = el(doc, "dl", null, "xfer-confirm");
+      DOM.clear(box);
+      box.appendChild(DOM.el(doc, "h3", t("transfer.propose_preview_title", "Proposal preview (locked)")));
+      var list = DOM.el(doc, "dl", null, "xfer-confirm");
       function row(term, text, title) {
-        list.appendChild(el(doc, "dt", term));
-        var dd = el(doc, "dd", text);
+        list.appendChild(DOM.el(doc, "dt", term));
+        var dd = DOM.el(doc, "dd", text);
         if (title) dd.title = title;
         list.appendChild(dd);
       }
@@ -1502,13 +1488,13 @@ function clearRoot(root) {
       row(t("transfer.fee_live_label", "Fee (live)"), P.fh.text, String(P.pair[1].fee.amount));
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
-      box.appendChild(el(doc, "p",
+      box.appendChild(DOM.el(doc, "p",
         t("transfer.locked_sign_hint", "Unlock to sign — the password is asked only here, at signing."), "muted"));
-      var pwRow = el(doc, "div", null, "xfer-field");
+      var pwRow = DOM.el(doc, "div", null, "xfer-field");
       var pw = doc.createElement("input");
       pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
       pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
-      var ub = touchable(el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
+      var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
       ub.type = "button"; pwRow.appendChild(ub);
       box.appendChild(pwRow);
       ub.addEventListener("click", function () {
@@ -1540,14 +1526,14 @@ function clearRoot(root) {
               snap: snap2, fh: fh, switched: switched };
           })
           .then(function (built) {
-            clearRoot(root);
+            DOM.clear(root);
             var w2 = makeWrap(doc, root);
             if (built.switched) {
-              w2.appendChild(el(doc, "p",
+              w2.appendChild(DOM.el(doc, "p",
                 t("transfer.unlocked_rebuilt_prefix", "Unlocked — proposal rebuilt with you (") + built.proposer.name + t("transfer.unlocked_rebuilt_suffix", ") as proposer."), "muted"));
             }
             showProposeConfirm(doc, w2, root, built, built.fh, function () {
-              clearRoot(root);
+              DOM.clear(root);
               showForm(doc, makeWrap(doc, root), root, built.proposer, {
                 from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
                 amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
@@ -1566,7 +1552,7 @@ function clearRoot(root) {
       });
       done();
     }).catch(function (e) {
-      while (box.firstChild) box.removeChild(box.firstChild);
+      DOM.clear(box);
       showError(doc, box, (e && e.message) ? e.message : t("transfer.could_not_build_proposal", "Could not build the proposal."),
         t("transfer.prepare_failed", "Could not prepare the transfer."));
       done();

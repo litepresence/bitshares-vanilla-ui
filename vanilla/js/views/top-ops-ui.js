@@ -168,16 +168,10 @@ var TopOpsUI = (function () {
     } catch (e) { return ""; }
   }
 
-  /* textContent-only element (chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
   // using global touchable from js/utils/touchable.js
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
   }
@@ -187,12 +181,10 @@ var TopOpsUI = (function () {
     if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) {
       msg = t("topops.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    var box = el(doc, "div", msg, "error");
-    box.setAttribute("aria-live", "polite"); wrap.appendChild(box); return box;
+    var box = DOM.error(wrap, msg); return box;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
 
   /* Connect gate (ops-ui.js pattern): cold socket paints a connecting panel
@@ -204,9 +196,9 @@ var TopOpsUI = (function () {
         Chain.status().state === "open") return false;
     showStatus(doc, wrap, t("topops.loading", "Reading the last 200 blocks…"));
     var tostat = showStatus(doc, wrap, "");
-    var torow = el(doc, "div", null, "pools-offline-row");
+    var torow = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(torow);
-    var retry = touchable(el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
+    var retry = touchable(DOM.el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
     retry.type = "button"; torow.appendChild(retry);
     var tooff = null;
     try { tooff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { tooff = null; }
@@ -224,7 +216,7 @@ var TopOpsUI = (function () {
       try { tolink = tooff.settingsLink(doc, t); } catch (e) { tolink = null; }
     }
     if (!tolink) {
-      tolink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      tolink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { tolink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       tolink.className = "subtle-btn";
     }
@@ -305,7 +297,7 @@ var TopOpsUI = (function () {
   function renderDonut(doc, wrap, rows, total) {
     var spans = sliceSpans(rows, total);
     if (spans.length === 0) return;
-    var box = el(doc, "div", null, "topops-layout");
+    var box = DOM.el(doc, "div", null, "topops-layout");
     var NS = "http://www.w3.org/2000/svg";
     var svg = doc.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", "0 0 200 200");
@@ -332,19 +324,19 @@ var TopOpsUI = (function () {
       svg.appendChild(path);
     }
     box.appendChild(svg);
-    var legend = el(doc, "ul", null, "topops-legend");
+    var legend = DOM.el(doc, "ul", null, "topops-legend");
     ci = 0;
     for (s = 0; s < spans.length; s++) {
       var lab2 = spans[s].idx === -1 ? { name: t("topops.other", "Other"), virtual: false } : opLabel(spans[s].idx);
       var li = doc.createElement("li");
-      var sw = el(doc, "span", "", "topops-sw");
+      var sw = DOM.el(doc, "span", "", "topops-sw");
       sw.setAttribute("aria-hidden", "true");
       try {
         sw.style.background = (spans[s].idx === -1) ? OTHER_FILL : SLICE_FILLS[ci++ % SLICE_FILLS.length];
       } catch (e) { /* swatch stands unfilled */ }
       li.appendChild(sw);
       var nm = spans[s].idx === -1 ? lab2.name : (spans[s].idx + ": " + lab2.name + (lab2.virtual ? " (virtual)" : ""));
-      li.appendChild(el(doc, "span", nm + " — " + spans[s].count + " (" + Format.pct1(spans[s].count, total) + ")"));
+      li.appendChild(DOM.el(doc, "span", nm + " — " + spans[s].count + " (" + Format.pct1(spans[s].count, total) + ")"));
       legend.appendChild(li);
     }
     box.appendChild(legend);
@@ -356,26 +348,26 @@ var TopOpsUI = (function () {
    * the shared .ops-scroll region (principle #7 — phones scroll, never clip). */
   function renderTable(doc, wrap, rows, total) {
     if (rows.length === 0) {
-      wrap.appendChild(el(doc, "p", t("topops.empty", "No operations in the last 200 blocks — retry at the chain tip."), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("topops.empty", "No operations in the last 200 blocks — retry at the chain tip."), "muted"));
       return;
     }
-    var scroller = el(doc, "div", null, "ops-scroll");
+    var scroller = DOM.el(doc, "div", null, "ops-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-    ["Type", "Operation", "Count", "Share"].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+    ["Type", "Operation", "Count", "Share"].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
     thead.appendChild(hr); table.appendChild(thead);
     var tb = doc.createElement("tbody");
     rows.forEach(function (r) {
       var lab = opLabel(r.idx);
       var tr = doc.createElement("tr");
-      var tdT = el(doc, "td", String(r.idx));
+      var tdT = DOM.el(doc, "td", String(r.idx));
       tdT.style.whiteSpace = "nowrap"; tr.appendChild(tdT);
-      tr.appendChild(el(doc, "td", lab.name + (lab.virtual ? " (virtual)" : "")));
-      var tdC = el(doc, "td", String(r.count));
+      tr.appendChild(DOM.el(doc, "td", lab.name + (lab.virtual ? " (virtual)" : "")));
+      var tdC = DOM.el(doc, "td", String(r.count));
       tdC.style.textAlign = "right"; tdC.style.whiteSpace = "nowrap"; tr.appendChild(tdC);
-      var tdP = el(doc, "td", Format.pct1(r.count, total));
+      var tdP = DOM.el(doc, "td", Format.pct1(r.count, total));
       tdP.style.textAlign = "right"; tdP.style.whiteSpace = "nowrap"; tr.appendChild(tdP);
       tb.appendChild(tr);
     });
@@ -390,23 +382,23 @@ var TopOpsUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Chain === "undefined" || !Chain ||
         typeof Chain.db !== "function" || typeof Chain.call !== "function" ||
         typeof Format === "undefined" || !Format || typeof Format.pct1 !== "function") {
-      wrap.appendChild(el(doc, "h1", t("topops.title", "Top Operations")));
+      wrap.appendChild(DOM.el(doc, "h1", t("topops.title", "Top Operations")));
       showError(doc, wrap, "Chain backend missing: js/chain.js or js/format.js failed to load.");
       return;
     }
-    wrap.appendChild(el(doc, "h1", t("topops.title", "Top Operations")));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "h1", t("topops.title", "Top Operations")));
+    wrap.appendChild(DOM.el(doc, "p",
       t("topops.scope", "Last 200 blocks on this node — a live sample, not a chain-wide ranking."),
       "muted"));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "p",
       t("topops.testnet", "Works on testnet and mainnet (unlike the reference index, which is mainnet-only)."),
       "muted"));
-    var refresh = touchable(el(doc, "button", t("topops.refresh", "Refresh")));
+    var refresh = touchable(DOM.el(doc, "button", t("topops.refresh", "Refresh")));
     refresh.type = "button";
     refresh.addEventListener("click", function () { if (myGen === gen) renderTopOps(root); });
     wrap.appendChild(refresh);
@@ -416,7 +408,7 @@ var TopOpsUI = (function () {
       if (myGen !== gen || !res) return;
       status.textContent = "";
       var host = shortHost(res.node) || res.node || "this node";
-      wrap.appendChild(el(doc, "p",
+      wrap.appendChild(DOM.el(doc, "p",
         t("topops.sample", "Sample: blocks %(lo)s–%(hi)s (%(blocks)s blocks, %(txs)s transactions, %(total)s operations) on %(node)s.", {
           lo: String(res.lo), hi: String(res.head),
           blocks: String(res.head - res.lo + 1 - res.skipped),
@@ -424,7 +416,7 @@ var TopOpsUI = (function () {
         }),
         "muted"));
       if (res.skipped > 0) {
-        wrap.appendChild(el(doc, "p",
+        wrap.appendChild(DOM.el(doc, "p",
           t("topops.skipped", " — %(n)s block(s) unreadable, skipped.", { n: String(res.skipped) }),
           "muted"));
       }
@@ -434,7 +426,7 @@ var TopOpsUI = (function () {
       rows.sort(function (a, b) { return b.count - a.count; });
       renderDonut(doc, wrap, rows, res.total);
       renderTable(doc, wrap, rows, res.total);
-      var more = el(doc, "p", null, "muted");
+      var more = DOM.el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/explorer"; a.textContent = t("topops.back", "Back to Explorer");
       a.className = "subtle-btn"; touchable(a); a.style.display = "inline-block";
@@ -443,7 +435,7 @@ var TopOpsUI = (function () {
       if (myGen !== gen) return;
       status.textContent = "";
       showError(doc, wrap, e, "Could not sample recent blocks.");
-      var retry = touchable(el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
+      var retry = touchable(DOM.el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
       retry.type = "button";
       retry.addEventListener("click", function () { if (myGen === gen) renderTopOps(root); });
       wrap.appendChild(retry);

@@ -39,14 +39,9 @@ var ReferralsUI = (function () {
   }
   var gen = 0;
   var ID_RE = /^1\.2\.\d+$/;
-  /* textContent-only element (chain/user strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
@@ -54,8 +49,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("referrals.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("referrals.unknown_account", "Unknown account.");
     else if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) msg = t("referrals.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg); return err;
   }
   /* Hundredths-of-a-percent uint16 -> human "x.yy%" string (integer math:
    * raw 100 -> "1%", raw 150 -> "1.5%", raw 2000 -> "20%"). */
@@ -100,23 +94,23 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("referrals.referrals", "Referrals")));
-    wrap.appendChild(el(doc, "p", t("referrals.intro", "Who registered and referred an account, the fee-split percents, and any pending cashback. Read-only: referral COUNTS need an off-chain history service the reference UI used, so counts are not shown here."),
+    wrap.appendChild(DOM.el(doc, "h1", t("referrals.referrals", "Referrals")));
+    wrap.appendChild(DOM.el(doc, "p", t("referrals.intro", "Who registered and referred an account, the fee-split percents, and any pending cashback. Read-only: referral COUNTS need an off-chain history service the reference UI used, so counts are not shown here."),
       "muted"));
     if (typeof Chain === "undefined" || !Chain) {
       showError(doc, wrap, t("referrals.chain_backend_missing_js_chain_js_failed_to_l", "Chain backend missing: js/chain.js failed to load."));
       return;
     }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("referrals.connecting_to_network", "Connecting to network…"), "muted"));
-      var rstat = el(doc, "p", "", "muted");
+      wrap.appendChild(DOM.el(doc, "p", t("referrals.connecting_to_network", "Connecting to network…"), "muted"));
+      var rstat = DOM.el(doc, "p", "", "muted");
       try { rstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(rstat);
-      var rrow = el(doc, "div", null, "pools-offline-row");
+      var rrow = DOM.el(doc, "div", null, "pools-offline-row");
       wrap.appendChild(rrow);
-      var rtry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+      var rtry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
       rtry.type = "button";
       rrow.appendChild(rtry);
       var roff = null;
@@ -132,7 +126,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         try { rlink = roff.settingsLink(doc, t); } catch (e) { rlink = null; }
       }
       if (!rlink) {
-        rlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        rlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { rlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(rlink);
       }
@@ -156,8 +150,8 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", t("referrals.account", "Account "));
+    var row = DOM.el(doc, "div", null, "xfer-field");
+    var label = DOM.el(doc, "label", t("referrals.account", "Account "));
     var input = doc.createElement("input");
     input.id = "ref-lookup"; input.type = "text";
     input.setAttribute("placeholder", t("referrals.account_name_or_1_2_n", "account name or 1.2.N"));
@@ -166,11 +160,11 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     input.setAttribute("spellcheck", "false");
     touchable(input); label.appendChild(input); row.appendChild(label);
     wrap.appendChild(row);
-    var go = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
+    var go = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
     go.id = "ref-go"; go.type = "button"; wrap.appendChild(go);
-    var mine = touchable(el(doc, "button", t("referrals.use_my_account", "Use my account")));
+    var mine = touchable(DOM.el(doc, "button", t("referrals.use_my_account", "Use my account")));
     mine.id = "ref-mine"; mine.type = "button"; wrap.appendChild(mine);
-    var err = el(doc, "div", null, "error");
+    var err = DOM.el(doc, "div", null, "error");
     err.setAttribute("aria-live", "polite"); wrap.appendChild(err);
     var body = doc.createElement("div"); wrap.appendChild(body);
     function fail(e, fallback) {
@@ -208,19 +202,19 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   /* Fill the results box for one account: parties, percents, cashback, vesting.
    * Each block fails inline (empty state), never wiping the others. */
   async function paint(doc, body, myGen, nameOrId, fail) {
-    while (body.firstChild) body.removeChild(body.firstChild);
-    body.appendChild(el(doc, "p", "Loading " + nameOrId + "…", "muted"));
+    DOM.clear(body);
+    body.appendChild(DOM.el(doc, "p", "Loading " + nameOrId + "…", "muted"));
     var acct;
     try { acct = await fetchAccount(nameOrId); }
     catch (e) {
       if (myGen !== gen) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       fail(e, "Unknown account: " + nameOrId + ".");
       return;
     }
     if (myGen !== gen) return;
-    while (body.firstChild) body.removeChild(body.firstChild);
-    body.appendChild(el(doc, "h3", (acct.name || nameOrId) + " (" + acct.id + ")"));
+    DOM.clear(body);
+    body.appendChild(DOM.el(doc, "h3", (acct.name || nameOrId) + " (" + acct.id + ")"));
     paintParties(doc, body, myGen, acct);
     paintPercents(doc, body, acct);
     paintCashback(doc, body, myGen, acct);
@@ -230,8 +224,8 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   /* Registrar / referrer / lifetime-referrer ids -> linked names. */
   async function paintParties(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", t("referrals.registrar_referrer", "Registrar & referrer")));
-    var loading = el(doc, "p", t("referrals.resolving_names", "Resolving names…"), "muted");
+    box.appendChild(DOM.el(doc, "h3", t("referrals.registrar_referrer", "Registrar & referrer")));
+    var loading = DOM.el(doc, "p", t("referrals.resolving_names", "Resolving names…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     var ids = [acct.registrar, acct.referrer, acct.lifetime_referrer].filter(function (x) {
       return typeof x === "string" && !!x;
@@ -244,14 +238,14 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     if (myGen !== gen) return;
     box.removeChild(loading);
     if (!ids.length) {
-      box.appendChild(el(doc, "p", t("referrals.no_registrar_or_referrer_recorded_for_this_ac", "No registrar or referrer recorded for this account.") + t("referrals.faucet_hint", " Faucet-created accounts normally carry one."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("referrals.no_registrar_or_referrer_recorded_for_this_ac", "No registrar or referrer recorded for this account.") + t("referrals.faucet_hint", " Faucet-created accounts normally carry one."), "muted"));
       return;
     }
-    var dl = el(doc, "dl", null, "xplore-fields");
+    var dl = DOM.el(doc, "dl", null, "xplore-fields");
     [[t("referrals.registrar", "Registrar"), acct.registrar], [t("referrals.referrer", "Referrer"), acct.referrer],
      [t("referrals.lifetime_referrer", "Lifetime referrer"), acct.lifetime_referrer]].forEach(function (pr) {
       if (!pr[1]) return;
-      dl.appendChild(el(doc, "dt", pr[0]));
+      dl.appendChild(DOM.el(doc, "dt", pr[0]));
       var dd = doc.createElement("dd");
       var a = doc.createElement("a");
       var nm = names[pr[1]];
@@ -265,19 +259,19 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   /* Fee-split percent fields, raw + human (never raw alone). */
   function paintPercents(doc, body, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", t("referrals.fee_split", "Fee split")));
+    box.appendChild(DOM.el(doc, "h3", t("referrals.fee_split", "Fee split")));
     var have = (acct.network_fee_percentage !== undefined) ||
       (acct.lifetime_referrer_fee_percentage !== undefined) ||
       (acct.referrer_rewards_percentage !== undefined);
     if (!have) {
-      box.appendChild(el(doc, "p", t("referrals.no_fee_split_fields_returned_for_this_account", "No fee-split fields returned for this account.") + t("referrals.node_hint", " The node omitted them — retry or try another node."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("referrals.no_fee_split_fields_returned_for_this_account", "No fee-split fields returned for this account.") + t("referrals.node_hint", " The node omitted them — retry or try another node."), "muted"));
       body.appendChild(box);
       return;
     }
-    var dl = el(doc, "dl", null, "xplore-fields");
+    var dl = DOM.el(doc, "dl", null, "xplore-fields");
     function row(term, raw, human, note) {
-      dl.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", human);
+      dl.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", human);
       dd.title = t("account.raw_prefix", "raw ") + String(raw) + (note ? " — " + note : "");
       dl.appendChild(dd);
     }
@@ -294,8 +288,8 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   /* Pending cashback from the statistics object (core units -> human). */
   async function paintCashback(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", t("referrals.pending_cashback", "Pending cashback")));
-    var loading = el(doc, "p", t("referrals.loading_statistics", "Loading statistics…"), "muted");
+    box.appendChild(DOM.el(doc, "h3", t("referrals.pending_cashback", "Pending cashback")));
+    var loading = DOM.el(doc, "p", t("referrals.loading_statistics", "Loading statistics…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
       if (!acct.statistics) throw new Error("no-statistics");
@@ -309,16 +303,16 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       } catch (e) { /* precision 5 stands */ }
       if (myGen !== gen) return;
       box.removeChild(loading);
-      var dl = el(doc, "dl", null, "xplore-fields");
+      var dl = DOM.el(doc, "dl", null, "xplore-fields");
       [[t("referrals.pending_fees", "Pending fees"), st.pending_fees], [t("referrals.pending_vested_fees", "Pending vested fees"), st.pending_vested_fees]].forEach(function (pr) {
-        dl.appendChild(el(doc, "dt", pr[0]));
+        dl.appendChild(DOM.el(doc, "dt", pr[0]));
         var raw = (pr[1] !== undefined && pr[1] !== null) ? String(pr[1]) : "0";
         var human = raw;
         try {
           if (typeof Format !== "undefined" && Format && typeof Format.formatAmount === "function")
             human = Format.formatAmount(raw, prec);
         } catch (e) { human = raw; }
-        var dd = el(doc, "dd", human);
+        var dd = DOM.el(doc, "dd", human);
         dd.title = t("account.raw_prefix", "raw ") + raw;
         dl.appendChild(dd);
       });
@@ -326,22 +320,22 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     } catch (e) {
       if (myGen !== gen) return;
       box.removeChild(loading);
-      box.appendChild(el(doc, "p", t("referrals.no_cashback_statistics_available_for_this_acc", "No cashback statistics available for this account."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("referrals.no_cashback_statistics_available_for_this_acc", "No cashback statistics available for this account."), "muted"));
     }
   }
 
   /* Vesting balances for the account; empty state when none/unavailable. */
   async function paintVesting(doc, body, myGen, acct) {
     var box = doc.createElement("section");
-    box.appendChild(el(doc, "h3", t("referrals.vesting_balances", "Vesting balances")));
-    var loading = el(doc, "p", t("referrals.loading_vesting_balances", "Loading vesting balances…"), "muted");
+    box.appendChild(DOM.el(doc, "h3", t("referrals.vesting_balances", "Vesting balances")));
+    var loading = DOM.el(doc, "p", t("referrals.loading_vesting_balances", "Loading vesting balances…"), "muted");
     box.appendChild(loading); body.appendChild(box);
     try {
       var rows = await dbCall("get_vesting_balances", [acct.id]);
       if (myGen !== gen) return;
       box.removeChild(loading);
       if (!rows || rows.length === 0) {
-        box.appendChild(el(doc, "p", t("referrals.no_vesting_balances_for_this_account", "No vesting balances for this account.") + t("vesting.balances_hint", " Balances appear after a transfer with a vesting policy lands here."), "muted"));
+        box.appendChild(DOM.el(doc, "p", t("referrals.no_vesting_balances_for_this_account", "No vesting balances for this account.") + t("vesting.balances_hint", " Balances appear after a transfer with a vesting policy lands here."), "muted"));
         return;
       }
       var ul = doc.createElement("ul");
@@ -358,7 +352,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     } catch (e) {
       if (myGen !== gen) return;
       box.removeChild(loading);
-      box.appendChild(el(doc, "p", t("referrals.vesting_balances_unavailable_on_this_node", "Vesting balances unavailable on this node."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("referrals.vesting_balances_unavailable_on_this_node", "Vesting balances unavailable on this node."), "muted"));
     }
   }
 

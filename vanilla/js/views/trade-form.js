@@ -80,18 +80,10 @@ var TradeForm = (function () {
     { key: "SPECIFIC", title: "Specific" }
   ];
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearBox(box) {
-    while (box.firstChild) box.removeChild(box.firstChild);
-  }
+/* clearBox removed — use DOM.clear */
 
   /* Promise pause between inclusion-probe polls (prove loop timing only). */
   function sleep(ms) {
@@ -107,8 +99,7 @@ function clearBox(box) {
 
   /* Inline error panel that is never blank: any thrown value maps to text. */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
+    var err = null; /* created via DOM.error below */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
@@ -119,17 +110,13 @@ function clearBox(box) {
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
-    err.textContent = msg;
-    wrap.appendChild(err);
+    err = DOM.error(wrap, msg);
     return err;
   }
 
   /* Status line for multi-step flows (signing → broadcasting → confirming). */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p);
-    return p;
+    var p = DOM.status(wrap, text); return p;
   }
 
   /* Labeled input row with its own inline error slot. Returns refs.
@@ -137,8 +124,8 @@ function clearBox(box) {
    * input (e.g. "BTS", "BITUSD / BTS") — textContent only, never read back. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field");
+    var label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     input.type = opts.type || "text";
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
@@ -153,14 +140,14 @@ function clearBox(box) {
       var wrap = doc.createElement("span");
       wrap.className = "unit-wrap";
       wrap.appendChild(input);
-      suffix = el(doc, "span", opts.unit, "unit-suffix");
+      suffix = DOM.el(doc, "span", opts.unit, "unit-suffix");
       wrap.appendChild(suffix);
       label.appendChild(wrap);
     } else {
       label.appendChild(input);
     }
     row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite");
     err.style.display = "none";
     row.appendChild(err);
@@ -224,8 +211,8 @@ function clearBox(box) {
    * side namespaces the ids: both panels live at once (trade-expiry-buy vs
    * trade-expiry-sell). */
   function renderExpiry(doc, wrap, st, side) {
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", t("trade.expiration", "Expiration "));
+    var row = DOM.el(doc, "div", null, "xfer-field");
+    var label = DOM.el(doc, "label", t("trade.expiration", "Expiration "));
     var sel = doc.createElement("select");
     sel.id = "trade-expiry-" + side;
     EXPIRATIONS.forEach(function (p) {
@@ -246,7 +233,7 @@ function clearBox(box) {
     touchable(custom);
     custom.style.display = (st.key === "SPECIFIC") ? "" : "none";
     row.appendChild(custom);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite");
     err.style.display = "none";
     row.appendChild(err);
@@ -574,7 +561,7 @@ function clearBox(box) {
    * integer as visible text). Offline/node errors keep the dash + reason in
    * the title. Debounced: schedule() callers fire on every keystroke. */
   function mountFeePreview(doc, wrap, P, side, getVals) {
-    var line = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
+    var line = DOM.el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
     line.id = "trade-fee-preview-" + side;
     wrap.appendChild(line);
     /* Market-fee row (BuySell.jsx:227-260 + :495-502): the RECEIVE leg's
@@ -583,7 +570,7 @@ function clearBox(box) {
      * hidden); per-keystroke updates only redo the BigInt fee. Locked and
      * unlocked share this path — never blank (dash until a valid quote),
      * never throws. */
-    var mktLine = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
+    var mktLine = DOM.el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
     mktLine.id = "trade-market-fee-" + side;
     try { mktLine.style.display = "none"; } catch (e) { /* shown on first fee */ }
     wrap.appendChild(mktLine);
@@ -693,7 +680,7 @@ function clearBox(box) {
     var sym = side === "buy" ? ctx.baseSym : ctx.quoteSym;
     var assetId = side === "buy" ? ctx.base : ctx.quote;
     var prec = side === "buy" ? ctx.basePrec : ctx.quotePrec;
-    var line = el(doc, "p", "", "muted");
+    var line = DOM.el(doc, "p", "", "muted");
     wrap.appendChild(line);
     if (isLockedView(P)) {
       line.textContent = t("trade.balance_locked", "Balance: 0 " + sym + " — unlock for balances");
@@ -720,7 +707,7 @@ function clearBox(box) {
       id: "trade-unlock-password-" + side, type: "password"
     });
     wrap.appendChild(f.row);
-    var errBox = el(doc, "div", null, "error");
+    var errBox = DOM.el(doc, "div", null, "error");
     errBox.setAttribute("aria-live", "polite");
     wrap.appendChild(errBox);
     return { pwField: f, pwErr: errBox };
@@ -811,8 +798,8 @@ function clearBox(box) {
    * panel's review button ("Unlock & review"), never on viewing. */
   function renderDual(doc, buyMount, sellMount, ctx) {
     if (!buyMount || !sellMount) return;
-    clearBox(buyMount);
-    clearBox(sellMount);
+    DOM.clear(buyMount);
+    DOM.clear(sellMount);
     if (typeof Tx === "undefined" || !Tx ||
         typeof Account === "undefined" || !Account ||
         typeof Wallet === "undefined" || !Wallet ||
@@ -850,8 +837,8 @@ function clearBox(box) {
       paintSide(doc, sellMount, P0, "sell");
       return;
     }
-    buyMount.appendChild(el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
-    sellMount.appendChild(el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
+    buyMount.appendChild(DOM.el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
+    sellMount.appendChild(DOM.el(doc, "p", t("trade.loading", "Loading trading…"), "muted"));
     Account.myAccountId().then(function (myId) {
       return Account.resolve(myId).then(function (me) {
         return { id: myId, name: me.name };
@@ -861,8 +848,8 @@ function clearBox(box) {
       paintSide(doc, buyMount, P, "buy");
       paintSide(doc, sellMount, P, "sell");
     }).catch(function (e) {
-      clearBox(buyMount);
-      clearBox(sellMount);
+      DOM.clear(buyMount);
+      DOM.clear(sellMount);
       showError(doc, buyMount, e, t("trade.fail_account", "Could not load your account."));
       showError(doc, sellMount, e, t("trade.fail_account", "Could not load your account."));
     });
@@ -927,11 +914,11 @@ function clearBox(box) {
    * paint into the same mount; Back returns here with P (both sides'
    * inputs) intact. */
   function paintSide(doc, mountEl, P, side) {
-    clearBox(mountEl);
+    DOM.clear(mountEl);
     if (side === "buy") {
-      var bar = el(doc, "div", null, "trade-tabs");
+      var bar = DOM.el(doc, "div", null, "trade-tabs");
       [["buy", t("trade.tab_buy", "Buy"), false], ["scaled", t("trade.tab_scaled", "Scaled"), true]].forEach(function (d) {
-        var b = touchable(el(doc, "button", d[1]));
+        var b = touchable(DOM.el(doc, "button", d[1]));
         b.type = "button";
         b.id = "trade-tab-" + d[0];
         var active = P.scaledOpen === d[2];
@@ -952,7 +939,7 @@ function clearBox(box) {
        * form — this link is the entry point, not a second form (same
        * single-home rationale as the faucet). Plain literals only. */
       (function borrowEntry() {
-        var brow = el(doc, "p", null, "muted");
+        var brow = DOM.el(doc, "p", null, "muted");
         var blink = doc.createElement("a");
         blink.href = "#/borrow";
         blink.textContent = t("trade.borrow_margin_link", "Borrow (margin)");
@@ -1001,9 +988,9 @@ function clearBox(box) {
     /* LOW punchlist: lowest-ask / highest-bid helper line under each form.
      * The book owns the live best prices (market-book.js spread lines), so
      * the forms link there instead of duplicating a second price source. */
-    body.appendChild(el(doc, "p", side === "buy" ? t("trade.lowest_ask_lives_in_the_order_book_above", "Lowest ask lives in the order book above — click an ask row to fill the price.") : t("trade.highest_bid_lives_in_the_order_book_above", "Highest bid lives in the order book above — click a bid row to fill the price."), "muted"));
-    var fokRow = el(doc, "div", null, "xfer-field");
-    var fokLabel = el(doc, "label", t("trade.fok_label", "Fill or kill "));
+    body.appendChild(DOM.el(doc, "p", side === "buy" ? t("trade.lowest_ask_lives_in_the_order_book_above", "Lowest ask lives in the order book above — click an ask row to fill the price.") : t("trade.highest_bid_lives_in_the_order_book_above", "Highest bid lives in the order book above — click a bid row to fill the price."), "muted"));
+    var fokRow = DOM.el(doc, "div", null, "xfer-field");
+    var fokLabel = DOM.el(doc, "label", t("trade.fok_label", "Fill or kill "));
     var fokBox = doc.createElement("input");
     fokBox.type = "checkbox";
     fokBox.id = sid("trade-fok", side);
@@ -1011,7 +998,7 @@ function clearBox(box) {
     touchable(fokBox);
     fokLabel.appendChild(fokBox);
     fokRow.appendChild(fokLabel);
-    fokRow.appendChild(el(doc, "span",
+    fokRow.appendChild(DOM.el(doc, "span",
       t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
     body.appendChild(fokRow);
     var exp = renderExpiry(doc, body, st, side);
@@ -1056,7 +1043,7 @@ function clearBox(box) {
     }
     if (locked) {
       var refs = lockedPasswordRow(doc, body, side);
-      var unlockBtn = touchable(el(doc, "button", t("trade.unlock_review", "Unlock & review")));
+      var unlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       unlockBtn.id = sid("unlock-and-review", side);
       unlockBtn.type = "button";
       body.appendChild(unlockBtn);
@@ -1074,7 +1061,7 @@ function clearBox(box) {
       });
       return;
     }
-    var reviewBtn = touchable(el(doc, "button", t("trade.review", "Review order")));
+    var reviewBtn = touchable(DOM.el(doc, "button", t("trade.review", "Review order")));
     reviewBtn.id = sid("trade-review", side);
     reviewBtn.type = "button";
     body.appendChild(reviewBtn);
@@ -1191,12 +1178,12 @@ function clearBox(box) {
    * Back repaints just this side via paintSide with P (both inputs) intact. */
   function paintConfirmSingle(doc, mount, P, side, R) {
     var ctx = P.ctx;
-    clearBox(mount);
-    mount.appendChild(el(doc, "h3", t("trade.confirm_title", "Confirm order")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    DOM.clear(mount);
+    mount.appendChild(DOM.el(doc, "h3", t("trade.confirm_title", "Confirm order")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text);
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text);
       if (title) dd.title = title;
       list.appendChild(dd);
     }
@@ -1224,7 +1211,7 @@ function clearBox(box) {
     row(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
     row(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
-    mount.appendChild(el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
+    mount.appendChild(DOM.el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
     /* The exact operation about to be signed (unsigned, no secrets).
      * Review bytes before Sign & Send. */
     var detOp = doc.createElement("details");
@@ -1237,11 +1224,11 @@ function clearBox(box) {
     catch (e) { preOp.textContent = String(R.unsigned && R.unsigned.operations); }
     detOp.appendChild(preOp);
     mount.appendChild(detOp);
-    var backBtn = touchable(el(doc, "button", t("trade.back", "Back")));
+    var backBtn = touchable(DOM.el(doc, "button", t("trade.back", "Back")));
     backBtn.id = sid("trade-back", side);
     backBtn.type = "button";
     mount.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", t("trade.sign_send", "Sign & Send")));
+    var sendBtn = touchable(DOM.el(doc, "button", t("trade.sign_send", "Sign & Send")));
     sendBtn.id = sid("trade-send", side);
     sendBtn.type = "button";
     mount.appendChild(sendBtn);
@@ -1305,9 +1292,9 @@ function clearBox(box) {
     var ctx = P.ctx;
     var st = P.scaled;
     var lockedScaled = isLockedView(P);
-    body.appendChild(el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
-    var sideRow = el(doc, "div", null, "xfer-field");
-    var sideLabel = el(doc, "label", t("trade.side_label", "Side "));
+    body.appendChild(DOM.el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
+    var sideRow = DOM.el(doc, "div", null, "xfer-field");
+    var sideLabel = DOM.el(doc, "label", t("trade.side_label", "Side "));
     var sideSel = doc.createElement("select");
     sideSel.id = "trade-scaled-side-buy";
     [["sell", "Sell " + ctx.quoteSym + " (spend " + ctx.quoteSym + ")"],
@@ -1351,10 +1338,10 @@ function clearBox(box) {
     var exp = renderExpiry(doc, body, st, "buy");
     if (lockedScaled) {
       var sellSym = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
-      body.appendChild(el(doc, "p",
+      body.appendChild(DOM.el(doc, "p",
         t("trade.balance_locked", "Balance: 0 " + sellSym + " — unlock for balances"), "muted"));
       var sRefs = lockedPasswordRow(doc, body, "buy");
-      var sUnlockBtn = touchable(el(doc, "button", t("trade.unlock_review", "Unlock & review")));
+      var sUnlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       sUnlockBtn.id = sid("unlock-and-review", "buy");
       sUnlockBtn.type = "button";
       body.appendChild(sUnlockBtn);
@@ -1375,7 +1362,7 @@ function clearBox(box) {
       });
       return;
     }
-    var prevBtn = touchable(el(doc, "button", t("trade.preview", "Preview scaled orders")));
+    var prevBtn = touchable(DOM.el(doc, "button", t("trade.preview", "Preview scaled orders")));
     prevBtn.id = sid("trade-preview", "buy");
     prevBtn.type = "button";
     body.appendChild(prevBtn);
@@ -1503,13 +1490,13 @@ function clearBox(box) {
    * still true) with inputs intact. */
   function paintConfirmScaled(doc, mount, P, R) {
     var ctx = P.ctx;
-    clearBox(mount);
-    mount.appendChild(el(doc, "h3", "Confirm " + R.calc.orders.length + " scaled orders"));
+    DOM.clear(mount);
+    mount.appendChild(DOM.el(doc, "h3", "Confirm " + R.calc.orders.length + " scaled orders"));
     var table = doc.createElement("table");
     table.className = "node-table";
     var hr = doc.createElement("tr");
     ["#", t("trade.row_price", "Price"), t("trade.col_sell", "Sell"), t("trade.col_receive", "Receive")].forEach(function (h) {
-      hr.appendChild(el(doc, "th", h));
+      hr.appendChild(DOM.el(doc, "th", h));
     });
     var thead = doc.createElement("thead");
     thead.appendChild(hr);
@@ -1521,22 +1508,22 @@ function clearBox(box) {
     var recvP = R.calc.recvAssetId === ctx.base ? ctx.basePrec : ctx.quotePrec;
     R.calc.orders.forEach(function (o, i) {
       var tr = doc.createElement("tr");
-      tr.appendChild(el(doc, "td", String(i + 1)));
-      tr.appendChild(el(doc, "td", ratioToDec(o.priceNum, o.priceDen, PRICE_PLACES)));
-      tr.appendChild(el(doc, "td",
+      tr.appendChild(DOM.el(doc, "td", String(i + 1)));
+      tr.appendChild(DOM.el(doc, "td", ratioToDec(o.priceNum, o.priceDen, PRICE_PLACES)));
+      tr.appendChild(DOM.el(doc, "td",
         Format.formatAmount(o.sellRaw, sellP) + " " + sellS,
         "raw " + o.sellRaw));
       var recvCell = Format.formatAmount(o.recvRaw, recvP) + " " + recvS;
       if (i === R.calc.orders.length - 1) recvCell += " (includes remainder)";
-      tr.appendChild(el(doc, "td", recvCell, "raw " + o.recvRaw));
+      tr.appendChild(DOM.el(doc, "td", recvCell, "raw " + o.recvRaw));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
     mount.appendChild(table);
-    var list = el(doc, "dl", null, "xfer-confirm");
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function confirmRow(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text);
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text);
       if (title) dd.title = title;
       list.appendChild(dd);
     }
@@ -1545,7 +1532,7 @@ function clearBox(box) {
     confirmRow(t("trade.row_expiration", "Expiration"), R.expWire);
     confirmRow(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
-    mount.appendChild(el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
+    mount.appendChild(DOM.el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));
     /* All N operations about to be signed (unsigned, no secrets). */
     var detOps = doc.createElement("details");
     detOps.className = "raw";
@@ -1557,11 +1544,11 @@ function clearBox(box) {
     catch (e) { preOps.textContent = String(R.unsigned && R.unsigned.operations); }
     detOps.appendChild(preOps);
     mount.appendChild(detOps);
-    var backBtn = touchable(el(doc, "button", t("trade.back", "Back")));
+    var backBtn = touchable(DOM.el(doc, "button", t("trade.back", "Back")));
     backBtn.id = sid("trade-back", "buy");
     backBtn.type = "button";
     mount.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", "Sign & Send (" + R.calc.orders.length + " orders)"));
+    var sendBtn = touchable(DOM.el(doc, "button", "Sign & Send (" + R.calc.orders.length + " orders)"));
     sendBtn.id = sid("trade-send", "buy");
     sendBtn.type = "button";
     mount.appendChild(sendBtn);

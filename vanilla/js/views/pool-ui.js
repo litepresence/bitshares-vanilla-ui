@@ -42,21 +42,17 @@ var PoolUI = (function () {
   /* Page-sort (honest scope): the chain offers no sorted pool endpoint, so
    * sortable headers reorder the LOADED page only, never the chain. */
   var sortKey = "id", sortDir = 1;
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-  function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
+  /* No local el — use DOM.el */
+  /* clearBox removed — use DOM.clear */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
     if (m.indexOf("unknown-pool") !== -1) m = t("pool.unknown_pool", "Unknown pool.");
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m); return err;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
   /* Offline backend: the shared Offline helper (js/api/offline.js) owns the
    * handshake, failure counts, and Settings link. Present when loaded;
@@ -94,15 +90,15 @@ var PoolUI = (function () {
     * "open" event, so a successful handshake paints via both paths
     * harmlessly. */
     var open = offlineState() === "open";
-    wrap.appendChild(el(doc, "p", open
+    wrap.appendChild(DOM.el(doc, "p", open
       ? t("pool.retry_load", "Retry loading.")
       : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-    var status = el(doc, "p", "", "muted");
+    var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
-    var row = el(doc, "div", null, "pools-offline-row");
+    var row = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(row);
-    var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button"; b.className = "btn-ghost";
+    var b = touchable(DOM.el(doc, "button", t("fees.retry", "Retry"))); b.type = "button"; b.className = "btn-ghost";
     row.appendChild(b);
     var off = offlineBackend();
     if (off && typeof off.wire === "function") {
@@ -122,16 +118,16 @@ var PoolUI = (function () {
       } catch (e) { settingsLink = null; }
     }
     if (!settingsLink) {
-      settingsLink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      settingsLink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { settingsLink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       settingsLink.className = "subtle-btn";
     }
     row.appendChild(settingsLink);
   }
   function unlockBox(doc, wrap, retry) {
-    wrap.appendChild(el(doc, "p", t("barter.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("barter.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
     var inp = doc.createElement("input"); inp.type = "password"; touchable(inp); wrap.appendChild(inp);
-    var b = touchable(el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; wrap.appendChild(b);
+    var b = touchable(DOM.el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; wrap.appendChild(b);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
       var pw = inp.value;
@@ -150,7 +146,7 @@ var PoolUI = (function () {
   }
   function viewingAsNotice(doc) {
     var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
+    return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function dropSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
   function autoRetry(myGen, retryFn) {
@@ -169,8 +165,8 @@ var PoolUI = (function () {
     dropSubs(); root.innerHTML = "";
     ["Pool", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       offlineBox(doc, wrap, retry);
@@ -189,21 +185,21 @@ var PoolUI = (function () {
   }
   function routeFail(root, title, e, retry) {
     root.innerHTML = "";
-    var doc = root.ownerDocument || document, box = el(doc, "div", null, "wrap");
-    root.appendChild(box); box.appendChild(el(doc, "h1", title));
+    var doc = root.ownerDocument || document, box = DOM.el(doc, "div", null, "wrap");
+    root.appendChild(box); box.appendChild(DOM.el(doc, "h1", title));
     showError(doc, box,e,t("pool.load_failed", "Could not load pools.")); offlineBox(doc, box, retry);
   }
   function confirmList(doc, rows) {
-    var list = el(doc, "dl", null, "xfer-confirm");
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     rows.forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
+      list.appendChild(DOM.el(doc, "dt", r[0]));
+      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
     });
     return list;
   }
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -213,7 +209,7 @@ var PoolUI = (function () {
     if (opts.unit) {
       var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
       wrap.appendChild(input);
-      suffix = el(doc, "span", opts.unit, "unit-suffix");
+      suffix = DOM.el(doc, "span", opts.unit, "unit-suffix");
       wrap.appendChild(suffix);
       label.appendChild(wrap);
     } else {
@@ -223,7 +219,7 @@ var PoolUI = (function () {
   }
   function tableHead(doc, titles) {
     var hr = doc.createElement("tr");
-    titles.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    titles.forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); return thead;
   }
   async function feeText(fee) { /* live fee -> human + raw title (lookup miss stays honest) */
@@ -243,10 +239,10 @@ var PoolUI = (function () {
   function pctText(u) { return Pool.pctUnitsToHuman(u) + "%"; } /* u16 hundredths -> "1.5%" */
   function whoText(me) { return me.name + " (" + me.id + ")"; }
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
-    clearBox(out);
-    out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
-    var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
+    DOM.clear(out);
+    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
+    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
+    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
     /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
      * deposit without broadcasting. Create/unstake/swap confirms render no
@@ -255,7 +251,7 @@ var PoolUI = (function () {
     try {
       if (cfg && cfg.pair && cfg.pair[0] === 61 && cfg.pair[1] &&
           typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function") {
-        var tbDep = touchable(el(doc, "button", t("txbuilder.add_deposit", "Add deposit to TxBuilder")));
+        var tbDep = touchable(DOM.el(doc, "button", t("txbuilder.add_deposit", "Add deposit to TxBuilder")));
         tbDep.type = "button";
         tbDep.addEventListener("click", function () {
           var tbSrc = "pool:deposit " + String(cfg.pair[1].pool || "");
@@ -270,7 +266,7 @@ var PoolUI = (function () {
         out.appendChild(tbDep);
       }
     } catch (e) { /* outlet never breaks the one-shot path */ }
-    back.addEventListener("click", function () { clearBox(out); });
+    back.addEventListener("click", function () { DOM.clear(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, "Signing…");
@@ -280,9 +276,9 @@ var PoolUI = (function () {
         status.textContent = t("htlc.s2", "Broadcasting…");
         return Pool.sendAndProve(unsigned, wif, cfg.prove);
       }).then(async function (res) {
-        if (myGen !== gen) return; clearBox(out);
-        out.appendChild(el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+        if (myGen !== gen) return; DOM.clear(out);
+        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
         showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
@@ -300,7 +296,7 @@ var PoolUI = (function () {
    * @param {any} cfg {build, rows, title, ok, fail, btn?}
    * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
-    clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
+    DOM.clear(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out,t("account.resolving_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
@@ -311,15 +307,15 @@ var PoolUI = (function () {
           makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
           prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
+      DOM.clear(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
   function reviewSection(doc, box, myGen, label, cfg) {
-    var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    var btn = touchable(DOM.el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
     /* SIGN-TIME GATE: password asked only here, never at render. A locked
      * click shows an honest notice + inline unlock; success flows into review
@@ -327,8 +323,8 @@ var PoolUI = (function () {
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
       if (!isUnlockedNow()) {
-        clearBox(out);
-        out.appendChild(el(doc, "p", t("pool.unlock_notice", "Unlock to act — signing needs your wallet password."), "muted"));
+        DOM.clear(out);
+        out.appendChild(DOM.el(doc, "p", t("pool.unlock_notice", "Unlock to act — signing needs your wallet password."), "muted"));
         unlockBox(doc, out, function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
         return;
       }
@@ -339,7 +335,7 @@ var PoolUI = (function () {
   /* assetLink: symbol -> #/asset/:symbol anchor (existing route; join misses
    * link by bare id, which the asset view also resolves). textContent only. */
   function assetLink(doc, sym) {
-    var a = el(doc, "a", sym);
+    var a = DOM.el(doc, "a", sym);
     a.setAttribute("href", "#/asset/" + sym);
     return a;
   }
@@ -348,7 +344,7 @@ var PoolUI = (function () {
     *   detail desk (#/pools/:id), which owns the inline swap and stake panels
     *   — the list stays a list (no separate STAKE column: same destination).
     *   Sort: Pool ID / Taker / Withdrawal headers toggle page-sort. */
-    if (!rows.length) return el(doc, "p", t("pool.no_pools", "No pools found.") + t("pool.zero_supply_hint", " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first."), "muted");
+    if (!rows.length) return DOM.el(doc, "p", t("pool.no_pools", "No pools found.") + t("pool.zero_supply_hint", " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first."), "muted");
     var view = rows.slice();
     function sortVal(r) {
       if (sortKey === "taker") return Number(r.taker_units) || 0;
@@ -409,24 +405,24 @@ var PoolUI = (function () {
        * assets — dexux-ref density); raw integers stay in title. */
       var aA = amtText(r.balance_a_raw, r.asset_a_id, r.prec_a, null);
       var aB = amtText(r.balance_b_raw, r.asset_b_id, r.prec_b, null);
-      tr.appendChild(el(doc, "td", r.id));
+      tr.appendChild(DOM.el(doc, "td", r.id));
       /* EXCHANGE second: ⇄ text link in link blue (#1 shows ⇄ here; the
        * vendored swap.svg <img> cannot inherit link color, so text keeps
        * the column blue like every other link). href, aria-label, title
        * unchanged — skin only. */
       var tdX = doc.createElement("td");
-      var xl = el(doc, "a", "⇄", "pools-xlink");
+      var xl = DOM.el(doc, "a", "⇄", "pools-xlink");
       xl.setAttribute("href", "#/pools/" + r.id);
       xl.setAttribute("aria-label", t("pool.swap_title", "Swap in pool") + " " + r.id);
       xl.title = t("pool.swap_title_attr", "Swap in this pool");
       tdX.appendChild(xl); tr.appendChild(tdX);
       var tdS = doc.createElement("td"); tdS.appendChild(assetLink(doc, r.sym_share)); tr.appendChild(tdS);
       var tdA = doc.createElement("td"); tdA.appendChild(assetLink(doc, r.sym_a)); tr.appendChild(tdA);
-      var cA = el(doc, "td", aA.text, "num"); cA.title = t("account.raw_prefix", "raw ") + aA.raw; tr.appendChild(cA);
+      var cA = DOM.el(doc, "td", aA.text, "num"); cA.title = t("account.raw_prefix", "raw ") + aA.raw; tr.appendChild(cA);
       var tdB = doc.createElement("td"); tdB.appendChild(assetLink(doc, r.sym_b)); tr.appendChild(tdB);
-      var cB = el(doc, "td", aB.text, "num"); cB.title = t("account.raw_prefix", "raw ") + aB.raw; tr.appendChild(cB);
-      tr.appendChild(el(doc, "td", pctText(r.taker_units), "num"));
-      tr.appendChild(el(doc, "td", pctText(r.withdrawal_units), "num"));
+      var cB = DOM.el(doc, "td", aB.text, "num"); cB.title = t("account.raw_prefix", "raw ") + aB.raw; tr.appendChild(cB);
+      tr.appendChild(DOM.el(doc, "td", pctText(r.taker_units), "num"));
+      tr.appendChild(DOM.el(doc, "td", pctText(r.withdrawal_units), "num"));
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); return table;
@@ -447,14 +443,14 @@ var PoolUI = (function () {
      * needs full-bleed room; replaces mkt-wrap. Children span full width
      * via the app.css .wide contract; the table keeps its scroll region. */
     ctx.wrap.className = "wrap wide";
-    ctx.wrap.appendChild(el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
-    var filters = el(doc, "div", null, "pools-filters");
+    var filters = DOM.el(doc, "div", null, "pools-filters");
     var fA = field(doc, t("pool.asset_a_field", "Asset A"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     var fB = field(doc, t("pool.asset_b_field", "Asset B"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     var fS = field(doc, t("pool.share_asset_field", "Share asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
-    var sizeLab = el(doc, "label", t("pool.per_page", "Per page "));
+    var sizeLab = DOM.el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");
     ["10", "25", "50"].forEach(function (n) {
       var o = doc.createElement("option");
@@ -464,18 +460,18 @@ var PoolUI = (function () {
     });
     touchable(sizeSel);
     sizeLab.appendChild(sizeSel);
-    var sizeWrap = el(doc, "div", null, "xfer-field");
+    var sizeWrap = DOM.el(doc, "div", null, "xfer-field");
     sizeWrap.appendChild(sizeLab);
     filters.appendChild(sizeWrap);
-    var go = touchable(el(doc, "button", t("pool.list_btn", "List pools"))); go.type = "button";
+    var go = touchable(DOM.el(doc, "button", t("pool.list_btn", "List pools"))); go.type = "button";
     filters.appendChild(go);
     ctx.wrap.appendChild(filters);
-    var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
-    var mineBox = el(doc, "div");
-    ctx.wrap.appendChild(el(doc, "h2", t("pool.mine_title", "My pools")));
+    var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
+    var mineBox = DOM.el(doc, "div");
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("pool.mine_title", "My pools")));
     ctx.wrap.appendChild(mineBox);
-    ctx.wrap.appendChild(el(doc, "h2", t("pool.create_title", "Create pool")));
-    ctx.wrap.appendChild(el(doc, "p", t("pool.share_help", "Needs a zero-supply non-smartcoin share asset. Create one at #/assets/create first."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("pool.create_title", "Create pool")));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.share_help", "Needs a zero-supply non-smartcoin share asset. Create one at #/assets/create first."), "muted"));
     createBox(doc, ctx.wrap, myGen);
     async function resolveOpt(v) {
       v = String(v || "").trim(); if (!v) return null;
@@ -484,11 +480,11 @@ var PoolUI = (function () {
     /* pagerBar: Prev / "Page N" / Next. Next stores the page's last id as
      * the following page's startId (list_* paging has no offsets). */
     function pagerBar(pageRows, hasNext) {
-      var bar = el(doc, "div", null, "pools-pager");
-      var prev = touchable(el(doc, "button", t("pool.prev_btn", "‹ Prev"))); prev.type = "button"; prev.className = "subtle-btn";
+      var bar = DOM.el(doc, "div", null, "pools-pager");
+      var prev = touchable(DOM.el(doc, "button", t("pool.prev_btn", "‹ Prev"))); prev.type = "button"; prev.className = "subtle-btn";
       prev.disabled = pager.page === 0;
-      var note = el(doc, "span", "Page " + (pager.page + 1), "pools-page");
-      var next = touchable(el(doc, "button", t("pool.next_btn", "Next ›"))); next.type = "button"; next.className = "subtle-btn";
+      var note = DOM.el(doc, "span", "Page " + (pager.page + 1), "pools-page");
+      var next = touchable(DOM.el(doc, "button", t("pool.next_btn", "Next ›"))); next.type = "button"; next.className = "subtle-btn";
       next.disabled = !hasNext;
       prev.addEventListener("click", function () {
         if (myGen !== gen || pager.page === 0) return;
@@ -505,7 +501,7 @@ var PoolUI = (function () {
       return bar;
     }
     function loadPage() {
-      if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
+      if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox);
       showStatus(doc, listBox,t("pool.loading", "Loading pools…"));
       Promise.resolve().then(async function () {
         var a = await resolveOpt(fA.input.value), b = await resolveOpt(fB.input.value), s = await resolveOpt(fS.input.value);
@@ -513,17 +509,17 @@ var PoolUI = (function () {
           share: s ? s.id : null, limit: pager.size + 2, startId: pager.starts[pager.page] });
         return rows || [];
       }).then(function (rows) {
-        if (myGen !== gen) return; clearBox(listBox);
+        if (myGen !== gen) return; DOM.clear(listBox);
         /* Drop the inclusive-start duplicate of the previous page's tail. */
         if (pager.page > 0 && rows.length && rows[0].id === pager.starts[pager.page]) rows.shift();
         var hasNext = rows.length > pager.size;
         var pageRows = hasNext ? rows.slice(0, pager.size) : rows;
-        var scroller = el(doc, "div", null, "pools-scroll");
+        var scroller = DOM.el(doc, "div", null, "pools-scroll");
         scroller.appendChild(poolTable(doc, pageRows));
         listBox.appendChild(scroller);
         listBox.appendChild(pagerBar(pageRows, hasNext));
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox,e,t("pool.load_failed", "Could not load pools."));
+        if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox,e,t("pool.load_failed", "Could not load pools."));
       }).then(function () { go.disabled = false; });
     }
     function resetAndLoad() {
@@ -549,7 +545,7 @@ var PoolUI = (function () {
         if (locked) mineBox.appendChild(viewingAsNotice(doc));
         Pool.mine(me.id).then(function (rows) {
           if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows));
-        }).catch(function () { if (myGen === gen) { mineBox.appendChild(el(doc, "p", t("pool.no_mine", "No owned pools.") + t("pool.owned_hint", " Stake both legs in any pool above — owned pools list here."), "muted")); } });
+        }).catch(function () { if (myGen === gen) { mineBox.appendChild(DOM.el(doc, "p", t("pool.no_mine", "No owned pools.") + t("pool.owned_hint", " Stake both legs in any pool above — owned pools list here."), "muted")); } });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap,e,t("trade.fail_account", "Could not load your account.")); });
     })();
   }
@@ -562,7 +558,7 @@ var PoolUI = (function () {
     [fA, fB, fSh, fT, fW].forEach(function (f) { box.appendChild(f.row); });
     /* Virgin-mint rule (slice-12 proven: max(raw)): first deposit into an
      * empty pool mints the larger leg — inline so nobody learns it by failing. */
-    box.appendChild(el(doc, "p", t("pool.virgin_note", "First deposit into an empty pool mints shares equal to the larger leg — fund both legs accordingly."), "muted"));
+    box.appendChild(DOM.el(doc, "p", t("pool.virgin_note", "First deposit into an empty pool mints shares equal to the larger leg — fund both legs accordingly."), "muted"));
     reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());
@@ -589,7 +585,7 @@ var PoolUI = (function () {
       title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
   return { renderPools: renderPools,
-    _ui: { el: el, clearBox: clearBox, showError: showError, showStatus: showStatus,
+    _ui: { el: DOM.el, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, unlockBox: unlockBox, confirmList: confirmList, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,

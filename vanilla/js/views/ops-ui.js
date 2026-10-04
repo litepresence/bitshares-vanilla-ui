@@ -114,15 +114,9 @@ var OpsUI = (function () {
     return Number((BigInt(count) * 100n) / BigInt(total));
   }
 
-  /* textContent-only element (chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
   }
@@ -132,12 +126,10 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) {
       msg = "Network unavailable. Check Settings → Nodes and retry.";
     }
-    var box = el(doc, "div", msg, "error");
-    box.setAttribute("aria-live", "polite"); wrap.appendChild(box); return box;
+    var box = DOM.error(wrap, msg); return box;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
 
   /* Connect gate (fees-ui.js pattern): cold socket paints a connecting panel
@@ -149,9 +141,9 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         Chain.status().state === "open") return false;
     showStatus(doc, wrap, "Connecting to network…");
     var ostat = showStatus(doc, wrap, "");
-    var orow = el(doc, "div", null, "pools-offline-row");
+    var orow = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(orow);
-    var retry = touchable(el(doc, "button", "Retry"));
+    var retry = touchable(DOM.el(doc, "button", "Retry"));
     retry.type = "button"; orow.appendChild(retry);
     var ooff = null;
     try { ooff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { ooff = null; }
@@ -223,26 +215,26 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var keys = Object.keys(counts).map(function (k) { return parseInt(k, 10); });
     keys.sort(function (a, b) { return counts[b] - counts[a]; });
     if (keys.length === 0) {
-      wrap.appendChild(el(doc, "p", t("ops.no_ops_hint", "No operations in the sampled blocks — widen the sample or retry at the chain tip."), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("ops.no_ops_hint", "No operations in the sampled blocks — widen the sample or retry at the chain tip."), "muted"));
       return;
     }
-    var scroller = el(doc, "div", null, "ops-scroll");
+    var scroller = DOM.el(doc, "div", null, "ops-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-    ["Type", "Operation", "Count", "Share", ""].forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    ["Type", "Operation", "Count", "Share", ""].forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     thead.appendChild(hr); table.appendChild(thead);
     var tb = doc.createElement("tbody");
     keys.forEach(function (idx) {
       var lab = opLabel(idx), c = counts[idx];
       var tr = doc.createElement("tr");
-      var tdT = el(doc, "td", String(idx));
+      var tdT = DOM.el(doc, "td", String(idx));
       tdT.style.whiteSpace = "nowrap"; tr.appendChild(tdT);
-      tr.appendChild(el(doc, "td", lab.name + (lab.virtual ? " (virtual)" : "")));
-      var tdC = el(doc, "td", String(c));
+      tr.appendChild(DOM.el(doc, "td", lab.name + (lab.virtual ? " (virtual)" : "")));
+      var tdC = DOM.el(doc, "td", String(c));
       tdC.style.textAlign = "right"; tdC.style.whiteSpace = "nowrap"; tr.appendChild(tdC);
-      var tdP = el(doc, "td", fmtPct(pctTenths(c, total)));
+      var tdP = DOM.el(doc, "td", fmtPct(pctTenths(c, total)));
       tdP.style.textAlign = "right"; tdP.style.whiteSpace = "nowrap"; tr.appendChild(tdP);
       var tdB = doc.createElement("td");
       var track = doc.createElement("div");
@@ -266,16 +258,16 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer ||
         typeof Explorer.head !== "function" || typeof Explorer.block !== "function") {
-      wrap.appendChild(el(doc, "h1", "Top operations"));
+      wrap.appendChild(DOM.el(doc, "h1", "Top operations"));
       showError(doc, wrap, "Explorer backend missing: js/explorer.js failed to load.");
       return;
     }
-    wrap.appendChild(el(doc, "h1", "Top operations"));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "h1", "Top operations"));
+    wrap.appendChild(DOM.el(doc, "p",
       "Recent-block sample, not a chain-wide ranking: counts come from the N " +
       "most recent blocks read live from your connected node. No external index exists.",
       "muted"));
@@ -287,7 +279,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     num.setAttribute("aria-label", t("ops.blocks_sampled_aria", "Blocks sampled"));
     touchable(num); num.style.maxWidth = "120px";
     lab.appendChild(num); form.appendChild(lab);
-    var apply = touchable(el(doc, "button", "Apply", "subtle-btn"));
+    var apply = touchable(DOM.el(doc, "button", "Apply", "subtle-btn"));
     apply.type = "submit"; form.appendChild(apply);
     wrap.appendChild(form);
     form.addEventListener("submit", function (ev) {
@@ -317,13 +309,13 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
           }
         }
       }
-      wrap.appendChild(el(doc, "p",
+      wrap.appendChild(DOM.el(doc, "p",
         "Sample: blocks " + res.lo + "–" + res.head + " (" + res.blocks.length +
         " blocks, " + txs + " transactions, " + total + " operations" +
         (res.skipped > 0 ? ", " + res.skipped + " block(s) unreadable — skipped" : "") + ").",
         "muted"));
       renderTable(doc, wrap, counts, total);
-      var more = el(doc, "p", null, "muted");
+      var more = DOM.el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/explorer"; a.textContent = t("topops.back", "Back to Explorer");
       touchable(a); a.style.display = "inline-block";
@@ -332,7 +324,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       if (myGen !== gen) return;
       status.textContent = "";
       showError(doc, wrap, e, "Could not sample recent blocks.");
-      var retry = touchable(el(doc, "button", "Retry"));
+      var retry = touchable(DOM.el(doc, "button", "Retry"));
       retry.type = "button";
       retry.addEventListener("click", function () { if (myGen === gen) renderOps(root); });
       wrap.appendChild(retry);
