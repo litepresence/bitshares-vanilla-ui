@@ -427,7 +427,7 @@ var AssetUI = (function () {
             [t("explorer.max_supply", "Max supply"),  msup.input.value],
             [t("explorer.market_fee", "Market fee"),  AssetOps.hundredthsToPct(pair[1].common_options.market_fee_percent) + "%", String(pair[1].common_options.market_fee_percent)],
             [t("help.topic_accounts-permissions_title", "Permissions"),  bitNames(PERMS, perms)], [t("asset.flags_title", "Flags"),  bitNames(FLAGS, flags)],
-            [t("asset.cer_row", "CER"),  (cb.input.value || "1") + " CORE / " + (cq.input.value || "1") + " " + symbol]];
+            [t("asset.cer_row", "Core exchange rate (CER)"),  (cb.input.value || "1") + " CORE / " + (cq.input.value || "1") + " " + symbol]];
           if (bit) rows.push([t("asset.bitasset_row", "Bitasset"),  "feeds≥" + mf.input.value + ", backing " + bit.short_backing_asset]);
           if (nftObj) rows.push([t("asset.nft_row", "NFT"),  (nftObj.title || "") + " / nft"]);
           rows.push([t("asset.pma_row", "Prediction market"),  (tab === "pma") ? "yes" : "no"]);

@@ -197,7 +197,7 @@ var AssetFeedUI = (function () {
       if (cur && cur.settlement_price) {
         dl.appendChild(el(d, "dt", t("explorer.th_settlement", "Settlement"))); var sd = el(d, "dd", feedPrice(cur.settlement_price, info.precision, backingPrec));
         sd.title = t("explorer.price_base", "base ") + cur.settlement_price.base.amount + t("explorer.price_quote", " / quote ") + cur.settlement_price.quote.amount; dl.appendChild(sd);
-        dl.appendChild(el(d, "dt", t("asset.cer_row", "CER"))); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
+        dl.appendChild(el(d, "dt", t("asset.cer_row", "Core exchange rate (CER)"))); var cd = el(d, "dd", feedPrice(cur.core_exchange_rate, info.precision, backingPrec));
         cd.title = t("explorer.price_base", "base ") + cur.core_exchange_rate.base.amount + t("explorer.price_quote", " / quote ") + cur.core_exchange_rate.quote.amount; dl.appendChild(cd);
       } else body.appendChild(el(d, "p", t("asset.no_live_feed", "No live feed published yet.") + t("asset.feed_hint", " Feeds appear once publishers publish for this asset."), "muted"));
       dl.appendChild(el(d, "dt", t("asset.mcr_row", "MCR"))); var m1 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mcr) + "%"); m1.title = String(info.bitasset.mcr); dl.appendChild(m1);
@@ -252,7 +252,7 @@ var AssetFeedUI = (function () {
         var cer = cb.input.value + " " + info.symbol + " / " + cq.input.value + " backing";
         var feedRows = [[t("asset.publisher_row", "Publisher"), who.name + " (" + who.id + ")"], [t("asset_ops.title", "Asset"), info.symbol + " (" + info.id + ")"],
           [t("explorer.th_settlement", "Settlement"), stl], [t("asset.mcr_row", "MCR"), mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
-          [t("explorer.th_mssr", "MSSR"), mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "CER"), cer]];
+          [t("explorer.th_mssr", "MSSR"), mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "Core exchange rate (CER)"), cer]];
         feedRows.push([t("borrow.network", "Network"), netName()]);
         var feedFee;
         try { feedFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }

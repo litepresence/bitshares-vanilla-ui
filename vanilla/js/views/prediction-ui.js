@@ -686,7 +686,7 @@ var PredictionUI = (function () {
     }
     function signGateLockedP(out, sendBtn, backBtn) {
       if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-        var noteP = DOM.el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+        var noteP = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
         noteP.className = "muted xfer-sign-note"; out.appendChild(noteP);
       }
       unlockInlineP(out, function () {
@@ -721,7 +721,7 @@ var PredictionUI = (function () {
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(pfAccount.row);
-    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
     var pfLoad = touchable(DOM.el(doc, "button", t("prediction.load_portfolio", "Load portfolio"))); pfLoad.type = "button";
     wrap.appendChild(pfLoad);
     var pfBox = DOM.el(doc, "div"); wrap.appendChild(pfBox);

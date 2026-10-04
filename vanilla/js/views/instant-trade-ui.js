@@ -1001,7 +1001,7 @@ var InstantTradeUI = (function () {
     row(t("instant.network", "Network"), networkName());
     wrap.appendChild(list);
     if (R.previewWarn) wrap.appendChild(DOM.el(doc, "p", R.previewWarn, "error"));
-    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
     var backBtn = touchable(DOM.el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
     var sendBtn = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
@@ -1013,7 +1013,7 @@ var InstantTradeUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
         if (!wrap.querySelector || !wrap.querySelector(".xfer-sign-note")) {
-          var note = DOM.el(doc, "p", t("instant.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
           note.className = "muted xfer-sign-note"; wrap.appendChild(note);
         }
         unlockInline(doc, wrap, function () {

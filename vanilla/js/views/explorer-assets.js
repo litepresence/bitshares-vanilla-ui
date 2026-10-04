@@ -1216,11 +1216,11 @@ var ExplorerAssets = (function () {
           var cer = cur ? cur.core_exchange_rate : null;
           var bps = cerPremiumBps(cer, f.settlement_raw);
           if (bps === null) {
-            rowInto(t("explorer.feed_cer_premium", "CER premium (publisher-rule estimate)"), "—",
+            rowInto(t("explorer.feed_cer_premium", "Core exchange rate (CER) premium (publisher-rule estimate)"), "—",
               cer ? t("explorer.feed_cer_uncomputable", "core_exchange_rate present but premium not computable from fetched legs")
                 : t("explorer.feed_cer_missing", "core_exchange_rate missing"));
           } else {
-            rowInto(t("explorer.feed_cer_premium", "CER premium (publisher-rule estimate)"), fmtBps(bps),
+            rowInto(t("explorer.feed_cer_premium", "Core exchange rate (CER) premium (publisher-rule estimate)"), fmtBps(bps),
               t("explorer.feed_cer_title", "cer base %(cb)s / quote %(cq)s vs settle base %(sb)s / quote %(sq)s",
                 { cb: String(cer.base.amount), cq: String(cer.quote.amount), sb: String(f.settlement_raw.base.amount), sq: String(f.settlement_raw.quote.amount) }));
           }

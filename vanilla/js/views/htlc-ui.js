@@ -99,7 +99,7 @@ var HtlcUI = (function () {
     return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return DOM.el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
@@ -241,7 +241,7 @@ var HtlcUI = (function () {
         if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
           out.removeChild(status);
           if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
-            out.appendChild(DOM.el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
+            out.appendChild(DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
           unlockInline(doc, out, function () {
             out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
           });
@@ -313,7 +313,7 @@ var HtlcUI = (function () {
       var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
        box.appendChild(DOM.pageHead(doc, t("htlc.list_title", "Hashed Timelock Contracts"), "htlc"));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
-      box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Hash time-locked contract (HTLC) transfers redeemable with a secret preimage before expiry."), "muted"));
       box.appendChild(DOM.el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
       box.appendChild(htlcTable(doc, found.data.sent, found.data.received));
       box.appendChild(DOM.el(doc, "h2", t("htlc.new_title", "New HTLC")));

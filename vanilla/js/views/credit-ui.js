@@ -112,7 +112,7 @@ var CreditUI = (function () {
     return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return DOM.el(doc, "p", t("credit.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
@@ -250,7 +250,7 @@ var CreditUI = (function () {
         if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
           out.removeChild(status);
           if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-            var note = DOM.el(doc, "p", t("credit.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+            var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
             note.className = "muted xfer-sign-note"; out.appendChild(note);
           }
           unlockInline(doc, out, function () {

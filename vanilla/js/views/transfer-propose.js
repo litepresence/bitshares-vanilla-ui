@@ -415,12 +415,12 @@ var TransferPropose = (function () {
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
       box.appendChild(DOM.el(doc, "p",
-        t("transfer.locked_sign_hint", "Unlock to sign — the password is asked only here, at signing."), "muted"));
+        t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted"));
       var pwRow = DOM.el(doc, "div", null, "xfer-field");
       var pw = doc.createElement("input");
       pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
       pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
-      var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & Sign")));
+      var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & review")));
       ub.type = "button"; pwRow.appendChild(ub);
       box.appendChild(pwRow);
       ub.addEventListener("click", function () {

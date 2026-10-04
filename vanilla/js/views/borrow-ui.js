@@ -85,7 +85,7 @@ var BorrowUI = (function () {
     return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return DOM.el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
@@ -108,7 +108,7 @@ var BorrowUI = (function () {
    * the rebuilt transaction uses the wallet account, never a stale 1.2.0. */
   function signGateLocked(doc, out, sendBtn, backBtn) {
     if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-      var note = DOM.el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+      var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
       note.className = "muted xfer-sign-note"; out.appendChild(note);
     }
     unlockInline(doc, out, function () {
