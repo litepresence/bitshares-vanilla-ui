@@ -1143,9 +1143,7 @@ var AccountUI = (function () {
   /* Unlock prompt for /account/me while locked: password + button; on
    * success re-renders #/account/me so the user lands back where asked. */
   function renderUnlockPrompt(doc, wrap, root) {
-    var h1 = doc.createElement("h1");
-    h1.textContent = t("account.s4", "My Account");
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
     var hint = doc.createElement("p");
     hint.textContent = t("account.s5", "Wallet is locked. Enter your password to view your account.");
     wrap.appendChild(hint);
@@ -1492,9 +1490,7 @@ var AccountUI = (function () {
     } catch (e) { /* URL stays; view unaffected */ }
   }
   function showAccount(doc, wrap, root, acct) {
-    var h1 = doc.createElement("h1");
-    h1.textContent = acct.name;
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, acct.name, "user"));
     var sub = doc.createElement("p");
     sub.className = "muted";
     sub.textContent = acct.id;
@@ -2025,9 +2021,7 @@ var AccountUI = (function () {
       }).catch(function (e) {
         clearRoot(root);
         var retry = makeWrap(doc, root);
-        var h1 = doc.createElement("h1");
-        h1.textContent = t("account.s4", "My Account");
-        retry.appendChild(h1);
+        retry.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
         showError(doc, retry, e, t("transfer.load_account_failed", "Could not load your account."));
       });
       return;

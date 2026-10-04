@@ -66,7 +66,7 @@ var AssetManageUI = (function () {
    * stale offline panel survives after connect). true = caller stops. */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(el(d, "h1", t("assets.title", "Assets"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    w.appendChild(DOM.pageHead(d, t("assets.title", "Assets"), "assets")); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
     var cstat = el(d, "p", "", "muted");
     try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     w.appendChild(cstat);
@@ -112,7 +112,7 @@ var AssetManageUI = (function () {
    * sendAndProve stay in the caller's onSend. */
   /* done: observed-head result panel (no fabricated txid). */
   function done(d, w, title, headN, via, sub, href, link) {
-    w.appendChild(el(d, "h1", title)); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
+    w.appendChild(DOM.pageHead(d, title, "assets")); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
     ok.setAttribute("aria-live", "polite"); w.appendChild(ok); w.appendChild(el(d, "p", sub, "muted"));
     var a = el(d, "a", link); a.setAttribute("href", href); touch(a); w.appendChild(a);
   }
@@ -149,8 +149,8 @@ var AssetManageUI = (function () {
         w.appendChild(el(d, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
-    if (!symbol) { w.appendChild(el(d, "h1", t("asset.update_title", "Update asset"))); err(d, w,new Error("unknown-asset"),t("barter.unknown_asset", "Unknown asset.")); return; }
-    w.appendChild(el(d, "h1", "Update " + symbol)); status(d, w, t("explorer.loading_asset", "Loading asset…"));
+    if (!symbol) { w.appendChild(DOM.pageHead(d, t("asset.update_title", "Update asset"), "assets")); err(d, w,new Error("unknown-asset"),t("barter.unknown_asset", "Unknown asset.")); return; }
+    w.appendChild(DOM.pageHead(d, "Update " + symbol, "assets")); status(d, w, t("explorer.loading_asset", "Loading asset…"));
     (async function () {
       var info = await Asset.describe(symbol);
       /* Null-tolerant at render: locked viewers get "" (never the issuer),
@@ -158,7 +158,7 @@ var AssetManageUI = (function () {
        * password stays loud only at sign time in publish(). */
       var mine = await Account.myAccountId().catch(function () { return ""; });
       if (g !== gen) return; wipe(root);
-      var v = wrap(d, root); v.appendChild(el(d, "h1", "Update " + info.symbol));
+      var v = wrap(d, root); v.appendChild(DOM.pageHead(d, "Update " + info.symbol, "assets"));
       try {
         if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
           var _v2 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
@@ -310,7 +310,7 @@ var AssetManageUI = (function () {
           w4.appendChild(prodDlg);
         })().catch(function (e) { r3.disabled = false; err(d, v,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); }); });
     })().catch(function (e) { if (g === gen) { wipe(root); var w2 = wrap(d, root);
-      w2.appendChild(el(d, "h1", "Update " + symbol)); err(d, w2,e,t("barter.unknown_asset", "Unknown asset.")); } });
+      w2.appendChild(DOM.pageHead(d, "Update " + symbol, "assets")); err(d, w2,e,t("barter.unknown_asset", "Unknown asset.")); } });
   }
   /* half: one issue/reserve half-form wired to its builder + supply-delta proof.
    * PUBLIC preview (gate-repair): the acting account is an explicit input
@@ -383,7 +383,7 @@ var AssetManageUI = (function () {
     if (noBackend()) { err(d, v,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, v, root, function () { renderIssue(root); })) return;
     /* No entry unlock gate: reads/preview are public; signing gates in publish(). */
-    v.appendChild(el(d, "h1", t("asset.issue_title", "Issue / reserve")));
+    v.appendChild(DOM.pageHead(d, t("asset.issue_title", "Issue / reserve"), "assets"));
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
         var _v3 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };

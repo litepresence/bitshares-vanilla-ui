@@ -140,19 +140,6 @@ var AuthUI = (function () {
   function notePara(doc, text) {
     return DOM.el(doc, "p", text, "muted"); }
 
-  /* loginHead: page h1 + blue-lock icon (owner-supplied art, same family
-   * as the state padlocks). Icon guarded like settings-prefs buildSigning:
-   * heading stands without it. Params: doc. Returns the h1. */
-  function loginHead(doc) {
-    var h = DOM.el(doc, "h1", t("auth.login", "Login"));
-    try {
-      if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
-        h.appendChild(doc.createTextNode(" "));
-        h.appendChild(Icon.img("lock-blue", "h-title-icon", ""));
-      }
-    } catch (e) { /* heading stands without the icon */ }
-    return h;
-  }
   /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
    * the local wallet (the only key path Wallet supports); card B looks an
    * account name up read-only and points back at card A. Neither the .bin
@@ -165,7 +152,7 @@ var AuthUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    DOM.append(wrap, loginHead(doc));
+    DOM.append(wrap, DOM.pageHead(doc, t("auth.login", "Login"), "lock-blue"));
     if (walletMissing(doc, wrap)) return;
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
@@ -201,7 +188,7 @@ var AuthUI = (function () {
           if (myGen !== gen) return;
           DOM.clear(root);
           var done = makeWrap(doc, root);
-          DOM.append(done, loginHead(doc));
+           DOM.append(done, DOM.pageHead(doc, t("auth.login", "Login"), "lock-blue"));
           DOM.append(done, DOM.el(doc, "p", t("auth.wallet_unlocked", "Wallet unlocked."), "muted"));
           DOM.append(done, linkPara(doc, [
             ["#/accounts", t("auth.open_accounts", "Open accounts")],
@@ -300,7 +287,7 @@ var AuthUI = (function () {
     ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    DOM.append(wrap, DOM.el(doc, "h1", t("auth.registration", "Registration")));
+    DOM.append(wrap, DOM.pageHead(doc, t("auth.registration", "Registration"), "create_account"));
     DOM.append(wrap, DOM.el(doc, "p", t("auth.pick_how_to_get_started_registration_itself_h", "Pick how to get started. Registration itself happens on the linked screens — this page only points."), "muted"));
     /* Local-wallet card: the recommended model (WalletHeaderSelection's
      * "recommended" badge concept). */
@@ -350,7 +337,7 @@ var AuthUI = (function () {
     ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    DOM.append(wrap, DOM.el(doc, "h1", t("auth.local_registration", "Local registration")));
+    DOM.append(wrap, DOM.pageHead(doc, t("auth.local_registration", "Local registration"), "create_account"));
     DOM.append(wrap, DOM.el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
     var row = DOM.el(doc, "p", null, null);
     DOM.append(row, goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey", null));
@@ -378,7 +365,7 @@ var AuthUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    DOM.append(wrap, DOM.el(doc, "h1", t("auth.cloud_registration", "Cloud registration")));
+    DOM.append(wrap, DOM.pageHead(doc, t("auth.cloud_registration", "Cloud registration"), "create_account"));
     DOM.append(wrap, DOM.el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
     DOM.append(wrap, notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
       "Name checks work on either network."));

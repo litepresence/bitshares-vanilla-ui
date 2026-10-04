@@ -157,7 +157,7 @@ var ApiLabUI = (function () {
     var box = DOM.el(doc, "div", null, "card");
     box.setAttribute("role", "alertdialog");
     box.setAttribute("aria-label", t("apilab.gate_title", "Advanced tool — confirm you understand"));
-    DOM.append(box, DOM.el(doc, "h1", t("apilab.gate_title", "Advanced tool — confirm you understand")));
+    DOM.append(box, DOM.pageHead(doc, t("apilab.gate_title", "Advanced tool — confirm you understand"), "server"));
     var body = tier === "broadcast"
       ? t("apilab.gate_broadcast", "Broadcasting sends a REAL signed transaction on the connected chain. Only proceed if you built and reviewed the transaction yourself and you know which chain (mainnet or testnet) you are on.")
       : tier === "debug"
@@ -195,7 +195,7 @@ var ApiLabUI = (function () {
     if (!gateOk) { renderGate(doc, wrap, root, myGen, proceed, null); return; }
     if (waitForOpen(doc, wrap, root, myGen, proceed)) return;
 
-    DOM.append(wrap, DOM.el(doc, "h1", t("apilab.title", "API Lab")));
+    DOM.append(wrap, DOM.pageHead(doc, t("apilab.title", "API Lab"), "server"));
     DOM.append(wrap, DOM.el(doc, "p",
       t("apilab.subtitle", "Probe the connected node by hand: pick a method, fill the boxes, read raw JSON. Reads are safe; broadcast moves real funds."),
       "muted"));

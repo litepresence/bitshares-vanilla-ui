@@ -61,7 +61,7 @@ var AccountsUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      DOM.append(wrap, DOM.el(doc, "h1", t("account.manager_title", "Accounts")));
+      DOM.append(wrap, DOM.pageHead(doc, t("account.manager_title", "Accounts"), "user"));
       DOM.append(wrap, DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -77,7 +77,7 @@ var AccountsUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = DOM.append(root, DOM.el(doc, "div", null, "wrap"));
-        DOM.append(failWrap, DOM.el(doc, "h1", t("account.manager_title", "Accounts")));
+        DOM.append(failWrap, DOM.pageHead(doc, t("account.manager_title", "Accounts"), "user"));
         showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
         var acstat = DOM.el(doc, "p", "", "muted");
         try { acstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -120,7 +120,7 @@ var AccountsUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = DOM.append(root, DOM.el(doc, "div", null, "wrap"));
-    DOM.append(wrap, DOM.el(doc, "h1", t("account.manager_title", "Accounts")));
+    DOM.append(wrap, DOM.pageHead(doc, t("account.manager_title", "Accounts"), "user"));
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
     catch (e) { unlocked = false; }

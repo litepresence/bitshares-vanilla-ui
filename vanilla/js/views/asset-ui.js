@@ -126,7 +126,7 @@ var AssetUI = (function () {
    * stale offline panel survives after connect). true = caller stops. */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(el(d, "h1", t("assets.title", "Assets"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    w.appendChild(DOM.pageHead(d, t("assets.title", "Assets"), "assets")); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
     var cstat = el(d, "p", "", "muted");
     try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     w.appendChild(cstat);
@@ -186,7 +186,7 @@ var AssetUI = (function () {
    * gates + status + sendAndProve stay in the caller's onSend. */
   /* done: observed-head result panel (no fabricated txid). */
   function done(d, w, title, headN, via, sub, href, link) {
-    w.appendChild(el(d, "h1", title)); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
+    w.appendChild(DOM.pageHead(d, title, "assets")); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
     ok.setAttribute("aria-live", "polite"); w.appendChild(ok); w.appendChild(el(d, "p", sub, "muted"));
     var a = el(d, "a", link); a.setAttribute("href", href); touch(a); w.appendChild(a);
   }
@@ -213,7 +213,7 @@ var AssetUI = (function () {
     wipe(root); var w = wrap(d, root);
     if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderAssets(root); })) return;
-    w.appendChild(el(d, "h1", t("assets.title", "Assets"))); nav(d, w);
+    w.appendChild(DOM.pageHead(d, t("assets.title", "Assets"), "assets")); nav(d, w);
     var f = Forms.labeledInput(d, t("asset.issuer_field", "Issuer (name or 1.2.N)") + " ", { id: "asset-issuer", value: "", autocomplete: "off" }); w.appendChild(f.row);
     var go = touch(el(d, "button", t("asset.load_issued", "Load issued assets"))); go.type = "button"; w.appendChild(go);
     /* Punchlist MED: default table without a manual LOAD — the explorer
@@ -262,7 +262,7 @@ var AssetUI = (function () {
      * render — asset-manage-ui.js half() pattern); the password stays ONLY
      * at publish() via the fresh-WIF throw. Fee stays live (AssetOps.fee ->
      * get_required_fees) at review time in both states. */
-    w.appendChild(el(d, "h1", t("asset.create_title", "Create asset")));
+    w.appendChild(DOM.pageHead(d, t("asset.create_title", "Create asset"), "assets"));
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
         var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };

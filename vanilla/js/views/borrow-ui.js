@@ -125,7 +125,7 @@ var BorrowUI = (function () {
     /* borrow-prose hook (app.css): direct-child explainer paragraphs cap at
      * ~75ch like help articles. Display-only class; forms/tables untouched. */
     var wrap = DOM.el(doc, "div", null, "wrap borrow-prose"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "borrow"));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       wrap.appendChild(DOM.el(doc, "p", t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));

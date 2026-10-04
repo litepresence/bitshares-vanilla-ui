@@ -130,7 +130,7 @@ var BarterUI = (function () {
     DOM.clear(root);
     ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].forEach(function () { /* checked below */ });
     var wrap = DOM.append(root, DOM.el(doc, "div", null, "wrap"));
-    DOM.append(wrap, DOM.el(doc, "h1", t("barter.barter", "Barter")));
+    DOM.append(wrap, DOM.pageHead(doc, t("barter.barter", "Barter"), "barter"));
     var miss = ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].filter(function (g) {
       return typeof globalThis[g] === "undefined"; });
     if (miss.length) { showError(doc, wrap, "Barter backend missing: " + miss.join(", ") + " failed to load."); return; }

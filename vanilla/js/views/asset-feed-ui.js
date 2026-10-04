@@ -62,7 +62,7 @@ var AssetFeedUI = (function () {
    * stale offline panel survives after connect). */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed"))); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    w.appendChild(DOM.pageHead(d, t("asset.feed_title", "Publish feed"), "assets")); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
     var cstat = el(d, "p", "", "muted");
     try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     w.appendChild(cstat);
@@ -151,7 +151,7 @@ var AssetFeedUI = (function () {
     if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderFeed(root); })) return;
     /* No entry unlock gate: reads are public; signing gates at send time. */
-    w.appendChild(el(d, "h1", t("asset.feed_title", "Publish feed")));
+    w.appendChild(DOM.pageHead(d, t("asset.feed_title", "Publish feed"), "assets"));
     try {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
         w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
@@ -271,7 +271,7 @@ var AssetFeedUI = (function () {
                 } catch (e) { return null; } });
               var h = await head(); if (g !== gen) return; wipe(root);
               var w3 = wrap(d, root);
-              w3.appendChild(el(d, "h1", t("asset.feed_published", "Feed published")));
+              w3.appendChild(DOM.pageHead(d, t("asset.feed_published", "Feed published"), "assets"));
               var ok = el(d, "p", "Observed at head block #" + h + " (" + r.via + ").", "xfer-ok");
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               w3.appendChild(el(d, "p", info.symbol + " feed re-read matches MCR " + mcr.input.value + "% / MSSR " + mssr.input.value + "%.", "muted"));
@@ -327,7 +327,7 @@ var AssetFeedUI = (function () {
               var r = await AssetOps.sendAndProve(unsigned, wif, async function () { return true; });
               var h = await head(); if (g !== gen) return; wipe(root);
               var w3 = wrap(d, root);
-              w3.appendChild(el(d, "h1", t("asset.producers_updated", "Producers updated")));
+              w3.appendChild(DOM.pageHead(d, t("asset.producers_updated", "Producers updated"), "assets"));
               var ok = el(d, "p", "Observed at head block #" + h + " (" + r.via + ").", "xfer-ok");
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               var a = el(d, "a", "Open " + info.symbol); a.setAttribute("href", "#/asset/" + info.symbol); touch(a); w3.appendChild(a);

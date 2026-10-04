@@ -157,7 +157,7 @@ var AboutUI = (function () {
     wrap.className = "wrap";
     root.appendChild(wrap);
     DOM.append(wrap,
-      DOM.el(doc, "h1", t("about.hero_title", "BitShares, in your browser. Nothing to install.")),
+      DOM.pageHead(doc, t("about.hero_title", "BitShares, in your browser. Nothing to install."), "info-circle-o"),
       DOM.el(doc, "p",
         t("about.hero_lede", "A complete wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser."),
         "muted"));
