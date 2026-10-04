@@ -102,22 +102,9 @@ var AssetFeedUI = (function () {
   }
   /* No local field builder — use Forms.labeledInput (row + input) or
    * Forms.labeledTextarea for the producers box (plus autocomplete off). */
-  /* confirm: named rows + fee + network. Never raw JSON. */
-  function confirm(d, w, root, title, rows, feeRaw, fp, onBack, onSend) {
-    w.appendChild(el(d, "h1", title));
-    var dl = el(d, "dl", null, "xfer-confirm");
-    rows.forEach(function (r) { dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd); });
-    var fh; try { fh = Format.formatAmount(String(feeRaw), fp); } catch (e) { fh = String(feeRaw); }
-    dl.appendChild(el(d, "dt", t("borrow.fee", "Fee"))); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
-    dl.appendChild(el(d, "dt", t("borrow.network", "Network"))); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
-    var back = touch(el(d, "button", t("barter.back", "Back"))); back.type = "button"; w.appendChild(back);
-    var send = touch(el(d, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button"; w.appendChild(send);
-    back.addEventListener("click", onBack);
-    send.addEventListener("click", function () { back.disabled = true; send.disabled = true;
-      var st = status(d, w, "Signing…");
-      onSend(function (t) { st.textContent = t; }).catch(function (e) {
-        try { w.removeChild(st); } catch (x) { /* gone */ } err(d, w,e,t("createworker.send_failed", "Send failed.")); back.disabled = false; }); });
-  }
+  /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
+   * Back/Sign&Send). Fee/network rows are built at the call site; status +
+   * sendAndProve stay in the caller's onSend. */
   /* feeSection: read-only fee-schedule table (slice-9 deferral, Ref #20).
    * Own per-call token (separate from renderFeed's gen): AssetUI's list
    * embeds this section but owns a different gen counter, so comparing the
@@ -257,15 +244,26 @@ var AssetFeedUI = (function () {
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
         var stl = sb.input.value + " " + info.symbol + " / " + sq.input.value + " backing";
         var cer = cb.input.value + " " + info.symbol + " / " + cq.input.value + " backing";
-        confirm(d, w2, root, t("asset.confirm_feed", "Confirm feed"),
-          [[t("asset.publisher_row", "Publisher"),  who.name + " (" + who.id + ")"], [t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
-            [t("explorer.th_settlement", "Settlement"),  stl], [t("asset.mcr_row", "MCR"),  mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
-            [t("explorer.th_mssr", "MSSR"),  mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "CER"),  cer]],
-          f.amount, pp, function () { renderFeed(root); }, function (onStep) {
-            return (async function () {
+        var feedRows = [[t("asset.publisher_row", "Publisher"), who.name + " (" + who.id + ")"], [t("asset_ops.title", "Asset"), info.symbol + " (" + info.id + ")"],
+          [t("explorer.th_settlement", "Settlement"), stl], [t("asset.mcr_row", "MCR"), mcr.input.value + "%", String(pair[1].feed.maintenance_collateral_ratio)],
+          [t("explorer.th_mssr", "MSSR"), mssr.input.value + "%", String(pair[1].feed.maximum_short_squeeze_ratio)], [t("asset.cer_row", "CER"), cer]];
+        feedRows.push([t("borrow.network", "Network"), netName()]);
+        var feedFee;
+        try { feedFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+        catch (feeErr) { feedFee = String(f.amount) + " (core)"; }
+        var feedDlg = ConfirmDialog.show({ title: t("asset.confirm_feed", "Confirm feed"),
+          rows: feedRows, feeHuman: feedFee,
+          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          onBack: function () { renderFeed(root); },
+          onSend: function () {
+            var btns = feedDlg.getElementsByTagName("button");
+            var backB = btns[0], sendB = btns[1];
+            backB.disabled = true; sendB.disabled = true;
+            var st = status(d, w2, "Signing…");
+            (async function () {
               var unsigned = await Tx.buildTx([pair]);
               var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
-              if (!wif) throw new Error("wallet-locked"); onStep("Broadcasting…");
+              if (!wif) throw new Error("wallet-locked"); st.textContent = "Broadcasting…";
               var r = await AssetOps.sendAndProve(unsigned, wif, async function () {
                 try { var n = await Asset.describe(info.symbol);
                   return (n.bitasset && n.bitasset.mcr === pair[1].feed.maintenance_collateral_ratio &&
@@ -278,7 +276,11 @@ var AssetFeedUI = (function () {
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               w3.appendChild(el(d, "p", info.symbol + " feed re-read matches MCR " + mcr.input.value + "% / MSSR " + mssr.input.value + "%.", "muted"));
               var a = el(d, "a", "Open " + info.symbol); a.setAttribute("href", "#/asset/" + info.symbol); touch(a); w3.appendChild(a);
-            })(); });
+            })().catch(function (e) {
+              try { w2.removeChild(st); } catch (x) { /* gone */ }
+              err(d, w2, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+          } });
+        w2.appendChild(feedDlg);
       })().catch(function (e) { rev.disabled = false; err(d, body,e,t("asset.feed_prepare_failed", "Could not prepare the feed.")); });
     });
   }
@@ -304,13 +306,24 @@ var AssetFeedUI = (function () {
         var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
         var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
-        confirm(d, w2, root, t("asset.confirm_producers", "Confirm feed producers"),
-          [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"], [t("asset.producers_row", "Producers"),  ids.length ? ids.join(", ") : "(empty)"]],
-          f.amount, pp, function () { renderFeed(root); }, function (onStep) {
-            return (async function () {
+        var prodRows = [[t("asset_ops.title", "Asset"), info.symbol + " (" + info.id + ")"], [t("asset.producers_row", "Producers"), ids.length ? ids.join(", ") : "(empty)"]];
+        prodRows.push([t("borrow.network", "Network"), netName()]);
+        var prodFee;
+        try { prodFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+        catch (feeErr2) { prodFee = String(f.amount) + " (core)"; }
+        var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
+          rows: prodRows, feeHuman: prodFee,
+          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          onBack: function () { renderFeed(root); },
+          onSend: function () {
+            var btns = prodDlg.getElementsByTagName("button");
+            var backB = btns[0], sendB = btns[1];
+            backB.disabled = true; sendB.disabled = true;
+            var st = status(d, w2, "Signing…");
+            (async function () {
               var unsigned = await Tx.buildTx([pair]);
               var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
-              if (!wif) throw new Error("wallet-locked"); onStep("Broadcasting…");
+              if (!wif) throw new Error("wallet-locked"); st.textContent = "Broadcasting…";
               var r = await AssetOps.sendAndProve(unsigned, wif, async function () { return true; });
               var h = await head(); if (g !== gen) return; wipe(root);
               var w3 = wrap(d, root);
@@ -318,7 +331,11 @@ var AssetFeedUI = (function () {
               var ok = el(d, "p", "Observed at head block #" + h + " (" + r.via + ").", "xfer-ok");
               ok.setAttribute("aria-live", "polite"); w3.appendChild(ok);
               var a = el(d, "a", "Open " + info.symbol); a.setAttribute("href", "#/asset/" + info.symbol); touch(a); w3.appendChild(a);
-            })(); });
+            })().catch(function (e) {
+              try { w2.removeChild(st); } catch (x) { /* gone */ }
+              err(d, w2, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+          } });
+        w2.appendChild(prodDlg);
       })().catch(function (e) { rev.disabled = false; err(d, body,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); });
     });
   }

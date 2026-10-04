@@ -107,23 +107,9 @@ var AssetManageUI = (function () {
   /* No local field builder — use Forms.labeledInput (row + input) or
    * Forms.labeledTextarea for the description/producers boxes (plus
    * autocomplete off). */
-  /* confirm: named rows + fee + network, Back / Sign&Send. Never raw JSON. */
-  function confirm(d, w, root, title, rows, feeRaw, fp, onBack, onSend) {
-    w.appendChild(el(d, "h1", title));
-    var dl = el(d, "dl", null, "xfer-confirm");
-    rows.forEach(function (r) { dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd); });
-    var fh; try { fh = Format.formatAmount(String(feeRaw), fp); } catch (e) { fh = String(feeRaw); }
-    dl.appendChild(el(d, "dt", t("borrow.fee", "Fee"))); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
-    dl.appendChild(el(d, "dt", t("borrow.network", "Network"))); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
-    var back = touch(el(d, "button", t("barter.back", "Back"))); back.type = "button"; w.appendChild(back);
-    var send = touch(el(d, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button"; w.appendChild(send);
-    back.addEventListener("click", onBack);
-    send.addEventListener("click", function () { back.disabled = true; send.disabled = true;
-      var st = status(d, w, "Signing…");
-      onSend(function (t) { st.textContent = t; }).catch(function (e) {
-        try { w.removeChild(st); } catch (x) { /* gone */ }
-        err(d, w,e,t("createworker.send_failed", "Send failed.")); back.disabled = false; }); });
-  }
+  /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
+   * Back/Sign&Send). Fee/network rows are built at the call site; status +
+   * sendAndProve stay in the caller's onSend. */
   /* done: observed-head result panel (no fabricated txid). */
   function done(d, w, title, headN, via, sub, href, link) {
     w.appendChild(el(d, "h1", title)); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
@@ -212,16 +198,32 @@ var AssetManageUI = (function () {
           var pair = AssetOps.buildUpdate({ issuerId: info.issuer_id, assetId: info.id, newIssuerOrNull: null, newOptions: next });
           var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
           if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
-          var rows = [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
-            [t("explorer.market_fee", "Market fee"),  AssetOps.hundredthsToPct(info.market_fee_hundredths) + "% → " + fp.input.value + "%", String(next.market_fee_percent)]];
-          if ((info.description || "") !== (ds.input.value || "")) rows.push([t("asset.description_row", "Description"),  "changed (verified by re-read)"]);
-          confirm(d, w2, root, t("asset.confirm_update", "Confirm asset update"), rows, f.amount, pp,
-            function () { renderUpdate(root, info.symbol); }, function (s) {
-              return publish(root, d, g, pair, async function () {
+          var rows = [[t("asset_ops.title", "Asset"), info.symbol + " (" + info.id + ")"],
+            [t("explorer.market_fee", "Market fee"), AssetOps.hundredthsToPct(info.market_fee_hundredths) + "% → " + fp.input.value + "%", String(next.market_fee_percent)]];
+          if ((info.description || "") !== (ds.input.value || "")) rows.push([t("asset.description_row", "Description"), "changed (verified by re-read)"]);
+          rows.push([t("borrow.network", "Network"), netName()]);
+          var updFee;
+          try { updFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+          catch (feeErr) { updFee = String(f.amount) + " (core)"; }
+          var updDlg = ConfirmDialog.show({ title: t("asset.confirm_update", "Confirm asset update"),
+            rows: rows, feeHuman: updFee,
+            backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+            onBack: function () { renderUpdate(root, info.symbol); },
+            onSend: function () {
+              var btns = updDlg.getElementsByTagName("button");
+              var backB = btns[0], sendB = btns[1];
+              backB.disabled = true; sendB.disabled = true;
+              var st = status(d, w2, "Signing…");
+              publish(root, d, g, pair, async function () {
                 try { var n = await Asset.describe(info.symbol);
                   return (n.description === (ds.input.value || "") && n.market_fee_hundredths === next.market_fee_percent) ? n : null;
                 } catch (e) { return null; } },
-                t("asset.updated", "Asset updated"), info.symbol + " re-read matches the new options.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
+                t("asset.updated", "Asset updated"), info.symbol + " re-read matches the new options.", "#/asset/" + info.symbol, "Open " + info.symbol,
+                function (x) { st.textContent = x; }).catch(function (e) {
+                try { w2.removeChild(st); } catch (x) { /* gone */ }
+                err(d, w2, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+            } });
+          w2.appendChild(updDlg);
         })().catch(function (e) { r1.disabled = false; err(d, v,e,t("credit.could_not_prepare_the_update", "Could not prepare the update.")); }); });
       /* op-12 bitasset (MPA only) */
       if (info.is_smartcoin) {
@@ -243,15 +245,31 @@ var AssetManageUI = (function () {
                 short_backing_asset: cur.short_backing_asset } });
             var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
             if (g !== gen) return; wipe(root); var w3 = wrap(d, root), pp = await feePrec(f.asset_id);
-            confirm(d, w3, root, t("asset.confirm_bitasset", "Confirm bitasset update"),
-              [[t("asset_ops.title", "Asset"),  info.symbol], [t("asset.offset_row", "Offset"),  of.input.value + "%"], [t("asset.max_vol_row", "Max vol"),  vf.input.value + "%"]],
-              f.amount, pp, function () { renderUpdate(root, info.symbol); }, function (s) {
-                return publish(root, d, g, pair, async function () {
+            var bitRows = [[t("asset_ops.title", "Asset"), info.symbol], [t("asset.offset_row", "Offset"), of.input.value + "%"], [t("asset.max_vol_row", "Max vol"), vf.input.value + "%"]];
+            bitRows.push([t("borrow.network", "Network"), netName()]);
+            var bitFee;
+            try { bitFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+            catch (feeErr2) { bitFee = String(f.amount) + " (core)"; }
+            var bitDlg = ConfirmDialog.show({ title: t("asset.confirm_bitasset", "Confirm bitasset update"),
+              rows: bitRows, feeHuman: bitFee,
+              backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+              onBack: function () { renderUpdate(root, info.symbol); },
+              onSend: function () {
+                var btns = bitDlg.getElementsByTagName("button");
+                var backB = btns[0], sendB = btns[1];
+                backB.disabled = true; sendB.disabled = true;
+                var st = status(d, w3, "Signing…");
+                publish(root, d, g, pair, async function () {
                   try { var o = await Chain.call(await Chain.db(), "get_objects", [[rawB.bitasset_data_id]]);
                     var n = o && o[0] && o[0].options;
                     return (n && n.force_settlement_offset_percent === pair[1].new_options.force_settlement_offset_percent) ? n : null;
                   } catch (e) { return null; } },
-                  t("asset.bitasset_updated", "Bitasset updated"), info.symbol + " bitasset re-read matches.", "#/asset/" + info.symbol, "Open " + info.symbol, s); });
+                  t("asset.bitasset_updated", "Bitasset updated"), info.symbol + " bitasset re-read matches.", "#/asset/" + info.symbol, "Open " + info.symbol,
+                  function (x) { st.textContent = x; }).catch(function (e) {
+                  try { w3.removeChild(st); } catch (x) { /* gone */ }
+                  err(d, w3, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+              } });
+            w3.appendChild(bitDlg);
           })().catch(function (e) { r2.disabled = false; err(d, v,e,t("asset.bitasset_prepare_failed", "Could not prepare the bitasset update.")); }); });
       }
       /* op-13 producers */
@@ -268,12 +286,28 @@ var AssetManageUI = (function () {
           var pair = AssetOps.buildUpdateProducers({ issuerId: info.issuer_id, assetId: info.id, producerIds: ids });
           var f = await AssetOps.fee(pair, CORE); pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
           if (g !== gen) return; wipe(root); var w4 = wrap(d, root), pp = await feePrec(f.asset_id);
-          confirm(d, w4, root, t("asset.confirm_producers", "Confirm feed producers"),
-            [[t("asset_ops.title", "Asset"),  info.symbol], [t("asset.producers_row", "Producers"),  ids.length ? ids.join(", ") : "(empty)"]],
-            f.amount, pp, function () { renderUpdate(root, info.symbol); }, function (s) {
-              return publish(root, d, g, pair, async function () { return true; },
+          var prodRows = [[t("asset_ops.title", "Asset"), info.symbol], [t("asset.producers_row", "Producers"), ids.length ? ids.join(", ") : "(empty)"]];
+          prodRows.push([t("borrow.network", "Network"), netName()]);
+          var prodFee;
+          try { prodFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+          catch (feeErr3) { prodFee = String(f.amount) + " (core)"; }
+          var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
+            rows: prodRows, feeHuman: prodFee,
+            backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+            onBack: function () { renderUpdate(root, info.symbol); },
+            onSend: function () {
+              var btns = prodDlg.getElementsByTagName("button");
+              var backB = btns[0], sendB = btns[1];
+              backB.disabled = true; sendB.disabled = true;
+              var st = status(d, w4, "Signing…");
+              publish(root, d, g, pair, async function () { return true; },
                 t("asset.producers_updated", "Producers updated"), "Broadcast observed; verify on #/asset/" + info.symbol + ".",
-                "#/asset/" + info.symbol, "Open " + info.symbol, s); });
+                "#/asset/" + info.symbol, "Open " + info.symbol,
+                function (x) { st.textContent = x; }).catch(function (e) {
+                try { w4.removeChild(st); } catch (x) { /* gone */ }
+                err(d, w4, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+            } });
+          w4.appendChild(prodDlg);
         })().catch(function (e) { r3.disabled = false; err(d, v,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); }); });
     })().catch(function (e) { if (g === gen) { wipe(root); var w2 = wrap(d, root);
       w2.appendChild(el(d, "h1", "Update " + symbol)); err(d, w2,e,t("barter.unknown_asset", "Unknown asset.")); } });
@@ -311,17 +345,33 @@ var AssetManageUI = (function () {
         if (g !== gen) return; wipe(root); var w2 = wrap(d, root), pp = await feePrec(f.asset_id);
         var rows = [[t("asset_ops.title", "Asset"),  info.symbol + " (" + info.id + ")"],
           [t("confirm.amount", "Amount"),  Format.formatAmount(raw, info.precision) + " " + info.symbol, raw]];
-        rows.push(isReserve ? [t("asset.payer_row", "Payer"),  me.name + " (" + me.id + ")"] : [t("confirm.to", "To"),  to.name + " (" + to.id + ")"]);
-        confirm(d, w2, root, isReserve ? "Confirm reserve" : "Confirm issue", rows, f.amount, pp,
-          function () { renderIssue(root); }, function (st) {
-            return publish(root, d, g, pair, async function () {
+        rows.push(isReserve ? [t("asset.payer_row", "Payer"), me.name + " (" + me.id + ")"] : [t("confirm.to", "To"), to.name + " (" + to.id + ")"]);
+        rows.push([t("borrow.network", "Network"), netName()]);
+        var halfFee;
+        try { halfFee = Format.formatAmount(String(f.amount), pp) + " (core)"; }
+        catch (feeErr4) { halfFee = String(f.amount) + " (core)"; }
+        var halfDlg = ConfirmDialog.show({ title: isReserve ? "Confirm reserve" : "Confirm issue",
+          rows: rows, feeHuman: halfFee,
+          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          onBack: function () { renderIssue(root); },
+          onSend: function () {
+            var btns = halfDlg.getElementsByTagName("button");
+            var backB = btns[0], sendB = btns[1];
+            backB.disabled = true; sendB.disabled = true;
+            var st = status(d, w2, "Signing…");
+            publish(root, d, g, pair, async function () {
               try { var n = await Asset.describe(sym); if (before === null) return n;
                 var have = BigInt(n.supply_raw || "0"), was = BigInt(before), want = BigInt(raw);
                 return (isReserve ? (was - have === want) : (have - was === want)) ? n : null;
               } catch (e) { return null; } },
               isReserve ? "Assets reserved" : "Assets issued",
               Format.formatAmount(raw, info.precision) + " " + info.symbol + (isReserve ? " burned back." : " → " + to.name + "."),
-              "#/asset/" + info.symbol, "Open " + info.symbol, st); });
+              "#/asset/" + info.symbol, "Open " + info.symbol,
+              function (x) { st.textContent = x; }).catch(function (e) {
+              try { w2.removeChild(st); } catch (x) { /* gone */ }
+              err(d, w2, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+          } });
+        w2.appendChild(halfDlg);
       })().catch(function (e) { r.disabled = false; err(d, v, e, isReserve ? t("asset.reserve_prepare_failed", "Could not prepare the reserve.") : t("asset.issue_prepare_failed", "Could not prepare the issue.")); }); });
   }
   /* renderIssue: op-14 issue + op-15 reserve halves. PUBLIC preview renders

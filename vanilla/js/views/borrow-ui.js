@@ -167,14 +167,9 @@ var BorrowUI = (function () {
     /* PUBLIC-FIRST: no wallet gate here — positions/fund/bids render locked. */
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
-  function confirmList(doc, rows) {
-    var list = DOM.el(doc, "dl", null, "xfer-confirm");
-    rows.forEach(function (r) {
-      list.appendChild(DOM.el(doc, "dt", r[0]));
-      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
-    });
-    return list;
-  }
+  /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
+   * Back/Sign&Send). Fee/network rows are built at the call site; the
+   * sign-time gate + status + sendAndProve stay in the caller's onSend. */
   /* No local field builder — use Forms.labeledInput (row + input) or
    * Forms.fieldRow for caller-built fields (position select). */
   /* Raw amount -> {text (human + sym, or raw + id fallback), raw}. Params: raw, prec (number|null), sym, id. */
@@ -379,7 +374,6 @@ var BorrowUI = (function () {
           var tcrRow = (R.tcr === null) ? "unchanged"
             : ((R.pos.tcr_units === null || R.pos.tcr_units === undefined ? "—" : Credit.tcrUnitsToHuman(R.pos.tcr_units) + "%") + " → " + Credit.tcrUnitsToHuman(R.tcr) + "%");
           DOM.clear(out);
-          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_margin_adjust", "Confirm margin adjust")));
           var crRow = "—";
           try {
             if (R.pos._cr && R.pos._cr.x) {
@@ -389,19 +383,30 @@ var BorrowUI = (function () {
               }
             }
           } catch (e) { crRow = "—"; }
-          out.appendChild(confirmList(doc, [
+          var adjRows = [
             [t("borrow.account", "Account"), me.name + " (" + me.id + ")"], [t("borrow.order", "Order"), R.pos.call_id],
             [t("borrow.hdr_cr", "Collateral ratio"), crRow],
             [t("borrow.delta_collateral", "Delta collateral"), (op.delta_collateral.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_collateral.amount, R.cPrec), "raw " + op.delta_collateral.amount],
             [t("borrow.delta_debt", "Delta debt"), (op.delta_debt.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_debt.amount, R.dPrec) + (op.delta_debt.amount.charAt(0) === "-" ? " — NEW DEBT, warned" : ""), "raw " + op.delta_debt.amount],
-            [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
-          out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
-          send.addEventListener("click", function () {
-            if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+            [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.network", "Network"), "testnet"]];
+          var adjDlg = ConfirmDialog.show({ title: t("borrow.confirm_margin_adjust", "Confirm margin adjust"),
+            rows: adjRows, feeHuman: feeHuman,
+            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            onBack: function () { DOM.clear(out); btn.disabled = false; },
+            onSend: function () { doAdjSend(); } });
+          try {
+            var adjActs = adjDlg.querySelector ? adjDlg.querySelector(".confirm-actions") : null;
+            var adjNote = DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted");
+            if (adjActs && adjActs.parentNode) adjActs.parentNode.insertBefore(adjNote, adjActs);
+            else DOM.append(adjDlg, adjNote);
+          } catch (noteErr) { DOM.append(adjDlg, DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted")); }
+          DOM.append(out, adjDlg);
+          btn.disabled = false;
+          function doAdjSend() {
+            if (myGen !== gen) return;
+            var btns = adjDlg.getElementsByTagName("button");
+            var back = btns[0], send = btns[1];
+            send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
@@ -422,8 +427,7 @@ var BorrowUI = (function () {
               showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
-          });
-          btn.disabled = false;
+          }
         });
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(out);
@@ -595,23 +599,32 @@ var BorrowUI = (function () {
           var feeHuman = fa ? Format.formatAmount(String(R.fee.amount), fa.precision) + " " + fa.symbol : String(R.fee.amount);
           var tcrRow = (R.tcr === null) ? "unchanged" : Credit.tcrUnitsToHuman(R.tcr) + "%";
           DOM.clear(out);
-          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_new_borrow", "Confirm new borrow")));
-          out.appendChild(confirmList(doc, [
+          var openRows = [
             [t("borrow.account", "Account"), R.acct.name + " (" + R.acct.id + ")"],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(R.collRaw, R.coll.precision) + " " + R.coll.symbol, "raw " + R.collRaw],
             [t("borrow.hdr_debt", "Debt"), Format.formatAmount(R.debtRaw, R.debt.precision) + " " + R.debt.symbol, "raw " + R.debtRaw],
             [t("borrow.backing_ratio", "Backing ratio"), R.ratio.x],
             [t("borrow.maintenance_ratio", "Maintenance ratio"), R.mcrRow + (R.ratio.kind === "nominal" ? " (target only — preview is nominal)" : "")],
             [t("borrow.target_ratio", "Target ratio"), tcrRow],
-            [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)],
-            [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
-          out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
-          send.addEventListener("click", function () {
-            if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+            [t("borrow.network", "Network"), "testnet"]];
+          var openDlg = ConfirmDialog.show({ title: t("borrow.confirm_new_borrow", "Confirm new borrow"),
+            rows: openRows, feeHuman: feeHuman,
+            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            onBack: function () { DOM.clear(out); btn.disabled = false; },
+            onSend: function () { doOpenSend(); } });
+          try {
+            var openActs = openDlg.querySelector ? openDlg.querySelector(".confirm-actions") : null;
+            var openNote = DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted");
+            if (openActs && openActs.parentNode) openActs.parentNode.insertBefore(openNote, openActs);
+            else DOM.append(openDlg, openNote);
+          } catch (noteErr2) { DOM.append(openDlg, DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted")); }
+          DOM.append(out, openDlg);
+          btn.disabled = false;
+          function doOpenSend() {
+            if (myGen !== gen) return;
+            var btns = openDlg.getElementsByTagName("button");
+            var back = btns[0], send = btns[1];
+            send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
@@ -639,8 +652,7 @@ var BorrowUI = (function () {
               showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
-          });
-          btn.disabled = false;
+          }
         });
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(out);
@@ -930,20 +942,30 @@ var BorrowUI = (function () {
           if (myGen !== gen) return;
           var feeHuman = fa ? Format.formatAmount(String(S.fee.amount), fa.precision) + " " + fa.symbol : String(S.fee.amount);
           DOM.clear(out);
-          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_settlement_bid", "Confirm settlement bid")));
-          out.appendChild(confirmList(doc, [
+          var bidRows = [
             [t("borrow.bidder", "Bidder"), S.bidderId],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(S.collRaw, R.backingPrec) + " (" + R.backingId + ")", "raw " + S.collRaw],
             [t("borrow.debt_covered", "Debt covered"), Format.formatAmount(S.debtRaw, R.debtPrec) + " " + R.asset.symbol, "raw " + S.debtRaw],
             [t("borrow.fund", "Fund"), Format.formatAmount(R.fundRaw, R.backingPrec), "raw " + R.fundRaw],
-            [t("borrow.fee", "Fee"), feeHuman, "raw " + String(S.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
-          out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
-          send.addEventListener("click", function () {
-            if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+            [t("borrow.network", "Network"), "testnet"]];
+          var bidDlg = ConfirmDialog.show({ title: t("borrow.confirm_settlement_bid", "Confirm settlement bid"),
+            rows: bidRows, feeHuman: feeHuman,
+            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            onBack: function () { DOM.clear(out); btn.disabled = false; },
+            onSend: function () { doBidSend(); } });
+          try {
+            var bidActs = bidDlg.querySelector ? bidDlg.querySelector(".confirm-actions") : null;
+            var bidNote = DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted");
+            if (bidActs && bidActs.parentNode) bidActs.parentNode.insertBefore(bidNote, bidActs);
+            else DOM.append(bidDlg, bidNote);
+          } catch (noteErr3) { DOM.append(bidDlg, DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted")); }
+          DOM.append(out, bidDlg);
+          btn.disabled = false;
+          function doBidSend() {
+            if (myGen !== gen) return;
+            var btns = bidDlg.getElementsByTagName("button");
+            var back = btns[0], send = btns[1];
+            send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
@@ -964,8 +986,7 @@ var BorrowUI = (function () {
               showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
-          });
-          btn.disabled = false;
+          }
         });
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(out);

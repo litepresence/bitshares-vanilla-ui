@@ -1265,32 +1265,32 @@ var TransferUI = (function () {
    * proof (the new proposal id observed on chain — the barter
    * confirmPropose pattern). built = {proposer, leg, pair, before, snap}. */
   function showProposeConfirm(doc, wrap, root, built, fh, onBack) {
-    wrap.appendChild(DOM.el(doc, "h1", t("transfer.confirm_proposal_title", "Confirm proposal (op 22)")));
-    var list = DOM.el(doc, "dl", null, "xfer-confirm");
-    function row(term, text, title) {
-      list.appendChild(DOM.el(doc, "dt", term));
-      var dd = DOM.el(doc, "dd", text);
-      if (title) dd.title = title;
-      list.appendChild(dd);
-    }
     var leg = built.leg;
-    row(t("transfer.proposer_label", "Proposer"), built.proposer.name + " (" + built.proposer.id + ")");
-    row(t("transfer.expiration_label", "Expiration"), built.pair[1].expiration_time);
+    var memoText;
+    if (leg.memoKind === "encrypted") memoText = t("transfer.memo_encrypted", "Encrypted");
+    else if (leg.memoKind === "plain") memoText = t("transfer.memo_plain_prefix", "Plain: ") + leg.memoText;
+    else if (leg.lockedEnc) memoText =
+      t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.");
+    else memoText = t("transfer.memo_none", "(none)");
     var rev = built.pair[1].review_period_seconds;
-    row(t("transfer.review_period_label", "Review period"), (rev === null || rev === undefined) ? t("transfer.review_period_none", "none") : Proposal.durToHuman(rev));
-    row(t("confirm.from", "From"), leg.fromAcc.name + " (" + leg.fromAcc.id + ")");
-    row(t("confirm.to", "To"), leg.to.name + " (" + leg.to.id + ")");
-    row(t("confirm.amount", "Amount"),
-      Format.formatAmount(leg.amountInt, leg.asset.precision) + " " + leg.asset.symbol, leg.amountInt);
-    if (leg.memoKind === "encrypted") row(t("confirm.memo", "Memo"), t("transfer.memo_encrypted", "Encrypted"));
-    else if (leg.memoKind === "plain") row(t("confirm.memo", "Memo"), t("transfer.memo_plain_prefix", "Plain: ") + leg.memoText);
-    else if (leg.lockedEnc) row(t("confirm.memo", "Memo"),
-      t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain."));
-    else row(t("confirm.memo", "Memo"), t("transfer.memo_none", "(none)"));
-    row(t("transfer.fee_live_label", "Fee (live)"), fh.text, String(built.pair[1].fee.amount));
-    row(t("confirm.network", "Network"), networkNameLocal());
-    wrap.appendChild(list);
-    wrap.appendChild(DOM.el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted"));
+    var rows = [
+      [t("transfer.proposer_label", "Proposer"), built.proposer.name + " (" + built.proposer.id + ")"],
+      [t("transfer.expiration_label", "Expiration"), built.pair[1].expiration_time],
+      [t("transfer.review_period_label", "Review period"), (rev === null || rev === undefined) ? t("transfer.review_period_none", "none") : Proposal.durToHuman(rev)],
+      [t("confirm.from", "From"), leg.fromAcc.name + " (" + leg.fromAcc.id + ")"],
+      [t("confirm.to", "To"), leg.to.name + " (" + leg.to.id + ")"],
+      [t("confirm.amount", "Amount"),
+        Format.formatAmount(leg.amountInt, leg.asset.precision) + " " + leg.asset.symbol, leg.amountInt],
+      [t("confirm.memo", "Memo"), memoText],
+      [t("confirm.network", "Network"), networkNameLocal()]];
+    var dlg = ConfirmDialog.show({ title: t("transfer.confirm_proposal_title", "Confirm proposal (op 22)"),
+      rows: rows, feeHuman: fh.text,
+      backLabel: t("confirm.back", "Back"), sendLabel: t("confirm.sign_send", "Sign & Send"),
+      onBack: function () { if (typeof onBack === "function") onBack(); },
+      onSend: function () { doPropSend(); } });
+    /* Enclosed-op note + raw op JSON ride inside the dialog above its
+     * actions (old rows-then-notes-then-buttons order, textContent-only). */
+    var noteEl = DOM.el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted");
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");
@@ -1300,17 +1300,23 @@ var TransferUI = (function () {
     try { preOp.textContent = JSON.stringify(built.pair, null, 2); }
     catch (e) { preOp.textContent = String(built.pair); }
     detOp.appendChild(preOp);
-    wrap.appendChild(detOp);
-    var backBtn = touchable(DOM.el(doc, "button", t("confirm.back", "Back")));
-    backBtn.type = "button";
-    wrap.appendChild(backBtn);
-    var sendBtn = touchable(DOM.el(doc, "button", t("confirm.sign_send", "Sign & Send")));
-    sendBtn.type = "button";
-    wrap.appendChild(sendBtn);
-    backBtn.addEventListener("click", function () {
-      if (typeof onBack === "function") onBack();
-    });
-    sendBtn.addEventListener("click", function () {
+    /* Mount first so insertBefore has a parent, then slot notes above actions. */
+    wrap.appendChild(dlg);
+    (function () {
+      try {
+        var acts = dlg.querySelector ? dlg.querySelector(".confirm-actions") : null;
+        if (acts && acts.parentNode) {
+          acts.parentNode.insertBefore(noteEl, acts);
+          acts.parentNode.insertBefore(detOp, acts);
+          return;
+        }
+      } catch (e2) { /* fall through */ }
+      wrap.appendChild(noteEl);
+      wrap.appendChild(detOp);
+    })();
+    function doPropSend() {
+      var btns = dlg.getElementsByTagName("button");
+      var backBtn = btns[0], sendBtn = btns[1];
       backBtn.disabled = true;
       sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
@@ -1355,7 +1361,7 @@ var TransferUI = (function () {
         backBtn.disabled = false;
         sendBtn.disabled = false;
       });
-    });
+    }
   }
 
   /* Proposal result: the re-read proposal id + head block + channel.

@@ -181,23 +181,9 @@ var AssetUI = (function () {
   }
   /* bitNames: bit int -> "a, b" label list for confirm rows. */
   function bitNames(list, v) { var o = []; list.forEach(function (p) { if (v & p[0]) o.push(p[1]); }); return o.length ? o.join(", ") : "(none)"; }
-  /* confirm: named rows + fee + network, Back / Sign&Send. Never raw JSON. */
-  function confirm(d, w, root, title, rows, feeRaw, fp, onBack, onSend) {
-    w.appendChild(el(d, "h1", title));
-    var dl = el(d, "dl", null, "xfer-confirm");
-    rows.forEach(function (r) { dl.appendChild(el(d, "dt", r[0])); var dd = el(d, "dd", r[1]); if (r[2]) dd.title = r[2]; dl.appendChild(dd); });
-    var fh; try { fh = Format.formatAmount(String(feeRaw), fp); } catch (e) { fh = String(feeRaw); }
-    dl.appendChild(el(d, "dt", t("borrow.fee", "Fee"))); var fd = el(d, "dd", fh + " (core)"); fd.title = String(feeRaw); dl.appendChild(fd);
-    dl.appendChild(el(d, "dt", t("borrow.network", "Network"))); dl.appendChild(el(d, "dd", netName())); w.appendChild(dl);
-    var back = touch(el(d, "button", t("barter.back", "Back"))); back.type = "button"; w.appendChild(back);
-    var send = touch(el(d, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button"; w.appendChild(send);
-    back.addEventListener("click", onBack);
-    send.addEventListener("click", function () { back.disabled = true; send.disabled = true;
-      var st = status(d, w, "Signing…");
-      onSend(function (t) { st.textContent = t; }).catch(function (e) {
-        try { w.removeChild(st); } catch (x) { /* gone */ }
-        err(d, w,e,t("createworker.send_failed", "Send failed.")); back.disabled = false; }); });
-  }
+  /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
+   * Back/Sign&Send). Fee/network rows are built at the call site; unlock
+   * gates + status + sendAndProve stay in the caller's onSend. */
   /* done: observed-head result panel (no fabricated txid). */
   function done(d, w, title, headN, via, sub, href, link) {
     w.appendChild(el(d, "h1", title)); var ok = el(d, "p", "Observed at head block #" + headN + " (" + via + ").", "xfer-ok");
@@ -459,12 +445,27 @@ var AssetUI = (function () {
           })();
           if (g !== gen) return; wipe(root);
           var w2 = wrap(d, root), fpp = await feePrec(f.asset_id);
-          confirm(d, w2, root, t("asset.confirm_create", "Confirm asset create"), rows, f.amount, fpp,
-            function () { renderCreate(root); }, function (onStep) {
-              return publish(root, d, g, pair, async function () {
+          var feeHuman;
+          try { feeHuman = Format.formatAmount(String(f.amount), fpp) + " (core)"; }
+          catch (feeErr) { feeHuman = String(f.amount) + " (core)"; }
+          rows.push([t("borrow.network", "Network"), netName()]);
+          var dlg = ConfirmDialog.show({ title: t("asset.confirm_create", "Confirm asset create"),
+            rows: rows, feeHuman: feeHuman,
+            backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+            onBack: function () { renderCreate(root); },
+            onSend: function () {
+              var btns = dlg.getElementsByTagName("button");
+              var backB = btns[0], sendB = btns[1];
+              backB.disabled = true; sendB.disabled = true;
+              var st = status(d, w2, "Signing…");
+              publish(root, d, g, pair, async function () {
                 try { return await Asset.describe(symbol); } catch (e) { return null; }
               }, t("asset.created", "Asset created"), symbol + " precision " + precision + " issued by " + me.name + ".",
-                "#/asset/" + symbol, "Open " + symbol, onStep); });
+                "#/asset/" + symbol, "Open " + symbol, function (x) { st.textContent = x; }).catch(function (e) {
+                try { w2.removeChild(st); } catch (x) { /* gone */ }
+                err(d, w2, e, t("createworker.send_failed", "Send failed.")); backB.disabled = false; });
+            } });
+          w2.appendChild(dlg);
         })().catch(function (e) { rev.disabled = false; err(d, body,e,t("credit.could_not_prepare_the_create", "Could not prepare the create.")); });
       });
     }

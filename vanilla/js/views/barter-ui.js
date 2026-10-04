@@ -304,43 +304,52 @@ var BarterUI = (function () {
       return Format.formatAmount(String(fee.amount), a.precision) + " " + a.symbol;
     } catch (e) { return String(fee.amount) + " (" + fee.asset_id + ")"; }
   }
-  /* Nested confirm rows for the barter legs (self-contained: no ProposalUI coupling). */
+  /* Nested confirm rows for the barter legs (self-contained: no ProposalUI coupling).
+   * Shared ConfirmDialog owns title/rows/fee/Back/Send; leg lines + fee recap
+   * ride inside the dialog above its actions; unlock-gating + broadcast stay here. */
   function confirmPropose(doc, out, myGen, prev, built, feeHuman, btn) {
     DOM.clear(out);
-    DOM.append(out, DOM.el(doc, "h3", t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)")));
-    var list = DOM.el(doc, "dl", null, "confirm");
-    [[t("barter.fee_payer", "Fee payer"), prev.A.acct.name + " (" + prev.A.acct.id + ")"],
+    var rows = [[t("barter.fee_payer", "Fee payer"), prev.A.acct.name + " (" + prev.A.acct.id + ")"],
      [t("barter.expiration", "Expiration"), built.pair[1].expiration_time],
      [t("barter.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("barter.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
-     [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)],
-     [t("barter.fee_live", "Fee (live)"), feeHuman]].forEach(function (r) {
-      DOM.append(list, DOM.el(doc, "dt", r[0])); DOM.append(list, DOM.el(doc, "dd", r[1]));
-    });
-    DOM.append(out, list);
+     [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)]];
+    var dlg = ConfirmDialog.show({ title: t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)"),
+      rows: rows, feeHuman: feeHuman,
+      backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+      onBack: function () { DOM.clear(out); },
+      onSend: function () { doSend(); } });
     /* MED fee recap (batch-3 keyed): timing + assets +
      * proposal estimate + BigInt total ride along from preview so the confirm
-     * shows what signing pays. */
-    if (prev.timing) DOM.append(out, DOM.el(doc, "p", prev.timing, "muted"));
-    DOM.append(out, DOM.el(doc, "p", t("barter.side_a_fee_asset_prefix", "Side A fee asset: ") + (prev.feeAId || "1.3.0") +
+     * shows what signing pays. Inserted above the dialog actions to keep the
+     * old rows-then-notes-then-buttons order. */
+    function insertNote(node) {
+      try {
+        var acts = dlg.querySelector ? dlg.querySelector(".confirm-actions") : null;
+        if (acts && acts.parentNode) { acts.parentNode.insertBefore(node, acts); return; }
+      } catch (e) { /* fallback below */ }
+      DOM.append(dlg, node);
+    }
+    if (prev.timing) insertNote(DOM.el(doc, "p", prev.timing, "muted"));
+    insertNote(DOM.el(doc, "p", t("barter.side_a_fee_asset_prefix", "Side A fee asset: ") + (prev.feeAId || "1.3.0") +
       t("barter.side_b_fee_asset_mid", "; Side B fee asset: ") + (prev.feeBId || "1.3.0") +
       t("barter.proposal_fee_asset_mid", "; proposal fee asset: ") + (prev.propFeeId || "1.3.0") + t("barter.due_now_suffix", " (due now)."), "muted"));
-    if (prev.propHuman) DOM.append(out, DOM.el(doc, "p", t("barter.proposal_fee_estimate_prefix", "Proposal fee estimate: ") + prev.propHuman, "muted"));
-    if (prev.totalText) DOM.append(out, DOM.el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + prev.totalText, "muted"));
+    if (prev.propHuman) insertNote(DOM.el(doc, "p", t("barter.proposal_fee_estimate_prefix", "Proposal fee estimate: ") + prev.propHuman, "muted"));
+    if (prev.totalText) insertNote(DOM.el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + prev.totalText, "muted"));
     prev.A.items.forEach(function (it) {
-      DOM.append(out, DOM.el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+      insertNote(DOM.el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
         " " + it.symbol + " → " + prev.B.acct.name, ""));
     });
     prev.B.items.forEach(function (it) {
-      DOM.append(out, DOM.el(doc, "p", prev.B.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+      insertNote(DOM.el(doc, "p", prev.B.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
         " " + it.symbol + " → " + prev.A.acct.name, ""));
     });
-    if (prev.esc) DOM.append(out, DOM.el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
-    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.classList.add("btn-ghost");
-    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
-    DOM.append(out, back); DOM.append(out, send);
-    back.addEventListener("click", function () { DOM.clear(out); });
-    send.addEventListener("click", function () {
-      if (myGen !== gen) return; send.disabled = true; back.disabled = true;
+    if (prev.esc) insertNote(DOM.el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
+    DOM.append(out, dlg);
+    function doSend() {
+      if (myGen !== gen) return;
+      var btns = dlg.getElementsByTagName("button");
+      var back = btns[0], send = btns[1];
+      send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, t("barter.signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
@@ -369,7 +378,7 @@ var BarterUI = (function () {
         showError(doc, out, e, t("barter.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
         send.disabled = false; back.disabled = false;
       });
-    });
+    }
   }
   /* Resolve one side: account + per-leg asset/precision + raw amounts + balance warnings. */
   async function readSide(acctV, legs, sideName) {
