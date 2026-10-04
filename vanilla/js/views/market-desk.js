@@ -1,68 +1,63 @@
-/* MarketDesk: DEX desk shell for /market/:marketID (skeleton, fill, refresh).
- * Owns: route entry renderMarket(root, marketID), desk skeleton showDesk
- *   (header, charts hosts, book/trades-toggle/orders/trade/depth/stats cells,
- *   side picker rail, refresh + 15s timer with cleanup), data fill
- *   (book/stats/trades/my-trades/timeframes/candles — each section fails
- *   inline), last-visited market persistence (saveLast under LAST_KEY),
- *   timer/listener cleanup.
- *   LAYOUT (retro equal 2x3 grid + right rail — reference
-  *   docs/parity/original-buy-sell-2x3-2026-09-28.png): chart stack on top
- *   (mkt-charts: price pane + volume pane + depth slice + oscillator panes
- *   + timeframe), then row 1 Buy panel | Sell panel | trades toggle, then
- *   row 2 BUY ORDERS (bids) | SELL ORDERS (asks) | my open orders — six
- *   equal thirds on desktop (grid-template-columns 1fr 1fr 1fr + 320px
-  *   rail), single-column stack on phones <1200px. GAP FIX: the six cells
-  *   are grouped in three column stacks (buy+bids | sell+asks |
-  *   trades+orders, .mkt-col-* in desk-grid.css) so row heights no longer
-  *   couple — the tall trades cell used to strand a ~400px void under the
-  *   forms. Same six cells, same desktop thirds, same phone order. The 24h stats strip lives
- *   in the head (MarketInd.renderStrip); there is no stats grid cell. Grid
- *   areas live in desk-grid.css (.mkt-exchange scope; the pool desk keeps
- *   the legacy .mkt areas).
- *   TRADES TOGGLE (mirrors #1 MarketHistory tabs): one trades cell holds
- *   Recent (activeMarketHistory, Exchange.jsx:2551-2581 activeTab "history")
- *   and My (myMarketHistory, Exchange.jsx:2583-2616 activeTab "my_history")
- *   panes behind Recent/My buttons (MarketHistory.jsx:21 historyTab default
- *   "history", :127-139 changeTab persists to viewSettings; vanilla keeps the
- *   tab in desk state only). My pane needs unlock: locked wallets get the
- *   honest Wallet-link hint (same contract as MarketOrders locked hint).
- *   Picker rendering delegates to MarketPicker, strip/timeframes/charts to
- *   MarketInd, book/recent-trades to MarketBook, my-orders to MarketOrders,
- *   panels to TradeUI (all via lazy globals — same convention as before).
- * Consumes: Market (book/stats/trades/timeframes/candles/assets/parseId),
- *   Format (via book/orders views, never directly), Store (network for
- *   defaults + connection wait), Chain.status, TableRenderer (my-fills table
- *   shell — script-tag global, index.html order). No signing, no cancel path.
- * Globals/side effects: DOM under the router root, localStorage last-market
- *   key (read half lives in market-ui.js homeTarget — same key string, single
- *   reader + single writer), one refresh timer + resize/theme listeners (all
- *   cleared on route change); global MarketDesk only.
- * Created by: building-vanilla-slices skill, slice-18 audit (market-ui split —
- *   renderMarket/showDesk/fill/cleanup moved verbatim from market-ui.js;
- *   fill-nested strip/timeframe/chart bodies now live in market-ind.js and are
- *   called here as MarketInd.* with (doc, state); call sites unchanged).
+/* market-desk.js — /market/:marketID THIN FACADE (identical public surface).
  *
- * PRICE DISPLAY: book levels, ticker fields and trade prices render the
- *   chain-human strings verbatim (proven base-per-quote, market.js header).
- *   Spread/midpoint use exact decimal-string math in MarketBook — binary
- *   float never touches money. Number() appears ONLY for depth-bar widths
- *   and time trimming (pixels).
- *
- * DEFAULT MARKET (no guessing): bitshares-ui/app/branding.js:98-108
- *   getDefaultMarket() returns "USD_TEST" on testnet, "BTS_CNY" on mainnet.
- *   "/" redirects to the last-visited market when stored and valid, else that
- *   network default (homeTarget lives in market-ui.js, the stable entry).
- * Side wording (bid/ask) follows Exchange.jsx:265-296 (bid sells the market
- *   base, ask sells the market quote); for_sale denomination is
- *   sell_price.base.asset_id per market_object.hpp:50.
+ * What it owns: route entry renderMarket (+ connect wait), the showDesk
+ *   skeleton (header, chart hosts, book/trades/orders/trade/depth/stats
+ *   cells, picker rail, control wiring, refresh + 15s timer with cleanup),
+ *   timer/listener cleanup. Data-fill + panel + deep-link bodies live in
+ *   market-desk-query.js (MarketDesk._query: persistence + URL state),
+ *   market-desk-panels.js (MarketDesk._panels: book + trades panes),
+ *   market-desk-fill.js (MarketDesk._fill: chain fill + pool-map/feed) and
+ *   are called via the registry at call time. _test + syncUrl re-export
+ *   the query module (market-deeplink-test.js pins the facade path).
+ * Consumes: MarketDesk._query/_fill/_panels (late-bound), Market/
+ *   MarketPicker/MarketInd/Chain/Store/Offline/DOM/Forms + touchable.
+ * Globals/side effects: publishes globalThis.MarketDesk; module.exports
+ *   for node suites. Load order in index.html: market-desk-query.js,
+ *   market-desk-panels.js, market-desk-fill.js, market-desk.js (facade LAST).
+ * Created by: split_responsibility.py account/market frontier (facade
+ *   assembly — skeleton + entries kept, bodies moved verbatim).
  */
-var MarketDesk = (function () {
+var MarketDesk = (typeof globalThis !== "undefined" && globalThis.MarketDesk) ? globalThis.MarketDesk : ((typeof MarketDesk !== "undefined") ? MarketDesk : {});
+/* Node suites require() the facade directly while the browser loads
+ * the parts via <script> order. Pull the parts through the module loader
+ * WITHOUT naming `require` (checkJs runs browser libs — a bare require()
+ * call is TS2591 there; tx.js precedent). module.require resolves relative
+ * to THIS file, like require(). */
+var __partRequire = null;
+try {
+  if (typeof module !== "undefined" && module && module.require && module.require.bind) __partRequire = module.require.bind(module);
+} catch (e) { __partRequire = null; }
+if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._fill)) {
+  try { __partRequire("./market-desk-query.js"); } catch (e) {}
+  try { __partRequire("./market-desk-panels.js"); } catch (e) {}
+  try { __partRequire("./market-desk-fill.js"); } catch (e) {}
+  if (typeof globalThis !== "undefined" && globalThis.MarketDesk) MarketDesk = globalThis.MarketDesk;
+}
+(function () {
   "use strict";
 
+  /* Verbatim copy of market-desk.js network (same per-file convention as the explorer/vote-slate splits): duplicated so moved bodies stay byte-identical — doctrine prefers duplication over a shared chart/vote abstraction. */
+  /* Network from Store (sole settings owner); mainnet when unreadable. */
+  function network() {
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+        var s = Store.loadSettings();
+        if (s && (s.network === "testnet" || s.network === "mainnet")) return s.network;
+      }
+    } catch (e) { /* default stands */ }
+    return "mainnet";
+  }
+
+  /* Verbatim copy of market-desk.js defaultMarket (same per-file convention as the explorer/vote-slate splits): duplicated so moved bodies stay byte-identical — doctrine prefers duplication over a shared chart/vote abstraction. */
+  /* Canonical default market per bitshares-ui/app/branding.js:98-108. */
+  function defaultMarket() {
+    return network() === "testnet" ? "USD_TEST" : "BTS_CNY";
+  }
+
   var REFRESH_MS = 15000;
-  var LAST_KEY = "bts-vanilla-last-market-v1";
 
   var _timer = null;
+
   var _cleanups = [];
 
   /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
@@ -101,142 +96,6 @@ var MarketDesk = (function () {
     }
   }
 
-  /* Network from Store (sole settings owner); mainnet when unreadable. */
-  function network() {
-    try {
-      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
-        var s = Store.loadSettings();
-        if (s && (s.network === "testnet" || s.network === "mainnet")) return s.network;
-      }
-    } catch (e) { /* default stands */ }
-    return "mainnet";
-  }
-
-  /* Canonical default market per bitshares-ui/app/branding.js:98-108. */
-  function defaultMarket() {
-    return network() === "testnet" ? "USD_TEST" : "BTS_CNY";
-  }
-
-  /* Last-visited market id (own key: Store.saveSettings drops unknown keys,
-   * so view state lives here, never in settings). */
-  function saveLast(id) {
-    try {
-      if (typeof localStorage !== "undefined") localStorage.setItem(LAST_KEY, id);
-    } catch (e) { /* private mode: desk still works, just not remembered */ }
-  }
-
-  /* Desk deep-link state (?tf=&over=&osc=&log=&vwap=&depth=&pmap=&dx=&dy=&
-   * trades=&group= — shareable links, back-button-safe). Indicator keys are
-   * stable identifiers (OSC_ORDER/OVERLAY_DEFS symbols); only non-default
-   * values serialize so plain pairs stay clean (#/market/BTS_USD). Unknown
-   * or malformed values fall back to current defaults — never throw, never
-   * blank. Overlay instances serialize as bare keys (default params on
-   * open — documented limitation, same class as the invoice worker). */
-  var GROUP_CHOICES = [8, 6, 4, 2];
-  var KEY_RE = /^[a-z0-9]+$/;
-  /* indKeys: valid indicator keys from the MarketInd def tables (guarded —
-   * tests inject fakes; absent MarketInd drops both lists, never throws). */
-  function indKeys(indApi) {
-    var over = {}, osc = {};
-    try {
-      var api = indApi || ((typeof MarketInd !== "undefined" && MarketInd) ? MarketInd : null);
-      if (api) {
-        (api.OVERLAY_DEFS || []).forEach(function (def) {
-          if (def && KEY_RE.test(def[0])) over[def[0]] = true;
-        });
-        (api.OSC_ORDER || []).forEach(function (def) {
-          if (def && KEY_RE.test(def[0])) osc[def[0]] = true;
-        });
-      }
-    } catch (e) { /* empty sets below */ }
-    return { over: over, osc: osc };
-  }
-  function flag01(v, dflt) {
-    if (v === "1") return true;
-    if (v === "0") return false;
-    return dflt;
-  }
-  function keyList(raw, valid) {
-    var out = [];
-    try {
-      String(raw || "").split(",").forEach(function (k) {
-        k = k.trim().toLowerCase();
-        if (k && KEY_RE.test(k) && valid[k] && out.indexOf(k) === -1) out.push(k);
-      });
-    } catch (e) { /* out stands */ }
-    return out;
-  }
-  /* readDeskQuery: URL -> desk seed (unit-tested). Params: raw (query object
-   * from Router.query(), or null), indApi (optional MarketInd override for
-   * tests). Returns a full seed with defaults filled. Bucket bounds are
-   * advisory (live reconcile corrects against the node list); indicator
-   * keys outside the def tables are dropped. Never throws. */
-  function readDeskQuery(raw, indApi) {
-    var q = (raw && typeof raw === "object") ? raw : {};
-    var keys = indKeys(indApi);
-    var seed = {
-      bucket: 3600, over: {}, osc: {},
-      logScale: false, showVwap: false, showDepth: false, showPoolMap: true,
-      depthLogX: true, depthLogY: true, tradesTab: "recent", groupDec: null
-    };
-    try {
-      var tf = parseInt(q.tf, 10);
-      if (Number.isInteger(tf) && tf > 0 && tf <= 86400 * 30) seed.bucket = tf;
-      keyList(q.over, keys.over).forEach(function (k) { seed.over[k] = [{}]; });
-      keyList(q.osc, keys.osc).forEach(function (k) { seed.osc[k] = true; });
-      seed.logScale = flag01(q.log, false);
-      seed.showVwap = flag01(q.vwap, false);
-      seed.showDepth = flag01(q.depth, false);
-      seed.showPoolMap = flag01(q.pmap, true);
-      seed.depthLogX = flag01(q.dx, true);
-      seed.depthLogY = flag01(q.dy, true);
-      if (q.trades === "my" || q.trades === "recent") seed.tradesTab = q.trades;
-      var g = parseInt(q.group, 10);
-      if (GROUP_CHOICES.indexOf(g) !== -1) seed.groupDec = g;
-    } catch (e) { /* defaults stand */ }
-    return seed;
-  }
-  /* buildDeskQuery: desk state -> "?k=v" (unit-tested). Params: state (desk
-   * state object). Returns "" when everything is default, else the query
-   * string with leading "?". Pure, never throws. */
-  function buildDeskQuery(state) {
-    var parts = [];
-    try {
-      var s = state || {};
-      if (Number.isInteger(s.bucket) && s.bucket > 0 && s.bucket !== 3600) parts.push("tf=" + s.bucket);
-      var ol = Object.keys(s.over || {}).filter(function (k) {
-        return KEY_RE.test(k) && s.over[k] && s.over[k].length;
-      });
-      if (ol.length) parts.push("over=" + ol.join(","));
-      var sl = Object.keys(s.osc || {}).filter(function (k) {
-        return KEY_RE.test(k) && !!s.osc[k];
-      });
-      if (sl.length) parts.push("osc=" + sl.join(","));
-      if (s.logScale) parts.push("log=1");
-      if (s.showVwap) parts.push("vwap=1");
-      if (s.showDepth) parts.push("depth=1");
-      if (s.showPoolMap === false) parts.push("pmap=0");
-      if (s.depthLogX === false) parts.push("dx=0");
-      if (s.depthLogY === false) parts.push("dy=0");
-      if (s.tradesTab === "my") parts.push("trades=my");
-      if (GROUP_CHOICES.indexOf(s.groupDec) !== -1) parts.push("group=" + s.groupDec);
-    } catch (e) { /* parts stand */ }
-    return parts.length ? ("?" + parts.join("&")) : "";
-  }
-  /* syncUrl: write current desk state into the hash without re-rendering
-   * (api-lab deepLink precedent — replaceState never fires hashchange, so
-   * no render loop). Params: state (desk state, needs .id). Returns
-   * nothing. Fails: never (every DOM/history touch guarded — the desk
-   * works identically with the URL untouched). */
-  function syncUrl(state) {
-    try {
-      if (!state || typeof state.id !== "string" || !state.id) return;
-      if (typeof location === "undefined" || !location.href) return;
-      if (typeof history === "undefined" || typeof history.replaceState !== "function") return;
-      history.replaceState(null, "", location.href.split("#")[0] + "#/market/" + state.id + buildDeskQuery(state));
-    } catch (e) { /* URL stays; view unaffected */ }
-  }
-
   /* Inline error panel (aria-live); chain error shapes map to sentences.
    * History fallback keeps its byte-identical message key and gains a linked
    * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
@@ -271,25 +130,6 @@ var MarketDesk = (function () {
       } catch (e2) { /* error panel stands without the link */ }
     }
     return err;
-  }
-
-  /* Raw-JSON <details> block for a section ( P R O O F, not decoration).
-   * Triangle-only summary per the shared details.raw contract in app.css. */
-  function rawDetails(doc, section, label, value) {
-    var d = doc.createElement("details");
-    d.className = "raw";
-    var s = doc.createElement("summary");
-    s.setAttribute("aria-label", label || t("market.raw_fallback", "Show raw JSON"));
-    touchable(s);
-    d.appendChild(s);
-    var pre = doc.createElement("pre");
-    try {
-      pre.textContent = JSON.stringify(value, null, 2);
-    } catch (e) {
-      pre.textContent = String(value);
-    }
-    d.appendChild(pre);
-    section.appendChild(d);
   }
 
   /* Route entry: renderMarket(root, marketID). Empty ids show the picker with
@@ -333,7 +173,7 @@ var MarketDesk = (function () {
       return;
     }
     var id = (pair.quote + "_" + pair.base).toUpperCase();
-    saveLast(id);
+    MarketDesk._query.saveLast(id);
 
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
@@ -400,10 +240,10 @@ var MarketDesk = (function () {
     var seed = (function () {
       try {
         if (typeof Router !== "undefined" && Router && typeof Router.query === "function") {
-          return readDeskQuery(Router.query());
+          return MarketDesk._query.readDeskQuery(Router.query());
         }
       } catch (e) { /* defaults below */ }
-      return readDeskQuery(null);
+      return MarketDesk._query.readDeskQuery(null);
     })();
     var state = {
       id: id, pair: pair, root: root, doc: doc, wrap: wrap,
@@ -616,12 +456,12 @@ var MarketDesk = (function () {
         var v = groupSel.value;
         state.groupDec = (v === "" || v === null) ? null : parseInt(v, 10);
         if (!Number.isInteger(state.groupDec)) state.groupDec = null;
-        paintBook(doc, state);
+        MarketDesk._panels.paintBook(doc, state);
         try {
           if (typeof MarketInd !== "undefined" && MarketInd &&
               typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
         } catch (e) { /* book stands without the chart */ }
-        try { syncUrl(state); } catch (e) { /* URL stays */ }
+        try { MarketDesk._query.syncUrl(state); } catch (e) { /* URL stays */ }
       });
       groupRow.appendChild(groupSel);
       head.appendChild(groupRow);
@@ -687,7 +527,7 @@ var MarketDesk = (function () {
     logBox.addEventListener("change", function () {
       state.logScale = logBox.checked;
       MarketInd.drawCharts(state);
-      try { syncUrl(state); } catch (e) { /* URL stays */ }
+      try { MarketDesk._query.syncUrl(state); } catch (e) { /* URL stays */ }
     });
     logLab.appendChild(logBox);
     logLab.appendChild(DOM.el(doc, "span", t("market.log_label", "Log")));
@@ -815,13 +655,13 @@ var MarketDesk = (function () {
     tabRecent.addEventListener("click", function () {
       state.tradesTab = "recent";
       paintTradesTab();
-      try { syncUrl(state); } catch (e) { /* URL stays */ }
+      try { MarketDesk._query.syncUrl(state); } catch (e) { /* URL stays */ }
     });
     tabMy.addEventListener("click", function () {
       state.tradesTab = "my";
       paintTradesTab();
-      renderMyTrades(doc, state);
-      try { syncUrl(state); } catch (e) { /* URL stays */ }
+      MarketDesk._panels.renderMyTrades(doc, state);
+      try { MarketDesk._query.syncUrl(state); } catch (e) { /* URL stays */ }
     });
     paintTradesTab();
 
@@ -889,9 +729,9 @@ var MarketDesk = (function () {
         paint();
         /* Volume scale also re-shades the book rows (bars share the chart
          * scale); price scale only redraws the chart. */
-        if (redrawBars) fill(state);
+        if (redrawBars) MarketDesk._fill.fill(state);
         else MarketInd.drawCharts(state);
-        try { syncUrl(state); } catch (e) { /* URL stays */ }
+        try { MarketDesk._query.syncUrl(state); } catch (e) { /* URL stays */ }
       });
       scaleRow.appendChild(b);
       return { repaint: paint };
@@ -943,7 +783,7 @@ var MarketDesk = (function () {
     var updated = DOM.el(doc, "span", "", "muted");
     foot.appendChild(updated);
     desk.appendChild(foot);
-    refreshBtn.addEventListener("click", function () { fill(state); });
+    refreshBtn.addEventListener("click", function () { MarketDesk._fill.fill(state); });
 
     state.head = head;
     state.sub = sub;
@@ -1007,7 +847,7 @@ var MarketDesk = (function () {
 
     state.redraw = function () {
       MarketInd.drawCharts(state);
-      try { redrawPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
+      try { MarketDesk._fill.redrawPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
     };
     if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
       var onResize = function () { state.redraw(); };
@@ -1031,19 +871,19 @@ var MarketDesk = (function () {
           return;
         }
       } catch (e) { /* headless: keep polling off */ }
-      fill(state);
+      MarketDesk._fill.fill(state);
     }, REFRESH_MS);
 
     Market.assets(pair.quote, pair.base).then(function (assets) {
       state.assets = assets;
       sub.textContent = assets.quote.symbol + " (" + assets.quote.id + ") / " +
         assets.base.symbol + " (" + assets.base.id + ")";
-      fill(state);
+      MarketDesk._fill.fill(state);
       /* Pool-map provenance (lazy, never blocks desk; stale-route guarded). */
-      try { fetchPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
+      try { MarketDesk._fill.fetchPoolMap(doc, state); } catch (e) { /* graph best-effort */ }
       /* Strip feed + settlement (retro round 2 D1: one lookup + one object
        * fetch per desk; fail-open, never blocks desk). */
-      try { fetchFeed(doc, state); } catch (e) { /* feed best-effort */ }
+      try { MarketDesk._fill.fetchFeed(doc, state); } catch (e) { /* feed best-effort */ }
       /* Deep-candles Task 4: live tip with poll fallback (exactness-first:
        * re-fetch the tip window via Market.candles + Market.stats — no
        * hand-rolled money math. Push path is Chain.subscribeMarket with a
@@ -1180,7 +1020,7 @@ var MarketDesk = (function () {
             baseSym: assets.base.symbol,
             quoteSym: assets.quote.symbol,
             myId: null,
-            refresh: function () { fill(state); }
+            refresh: function () { MarketDesk._fill.fill(state); }
           });
         }
       } catch (e) { /* TradeUI paints its own errors inline */ }
@@ -1189,732 +1029,11 @@ var MarketDesk = (function () {
       showError(doc, head, e, "Unknown market.");
     });
   }
-
-  /* My-trades pane (mirrors #1 myMarketHistory, Exchange.jsx:2583-2616 +
-   * MarketHistory.jsx:159-204): the wallet account's fill_order ops (op 4,
-   * protocol/operations.hpp:60) filtered to this QUOTE_BASE pair
-   * (pays/receives touch both legs, MarketHistory.jsx:176-184). Anyone can
-   * type an account (name or 1.2.N) + Look up to preview ITS fills via
-   * public Account.history; blank + locked keeps the Wallet-link hint
-   * (principle #9: reads never gate on unlock, but MY fills need a key).
-   * Unlocked prefills the wallet account; the wallet auto-load is unchanged.
-   * Amounts/prices go through Format (BigInt, 8 places like Market.trades)
-   * — never raw integers (#6). */
-  /* paintDeepButton: "Load deeper history" under the recent-trades list
-   * (Phase 7 B1 UI). One-shot 7-day window via Market.tradesDeep (same
-   * envelope as trades(), so renderTrades is reused verbatim). Success
-   * stores state.deepRows and paints the deep view, which SURVIVES the 15s
-   * refill loop (fill() re-renders deepRows instead of refetching — without
-   * this the loop clobbers deep rows within seconds and in-flight fetches
-   * resolve into a stale host). "Back to live" clears the flag and
-   * refills. Failure appends the mapped error with the Round-1 Settings
-   * link and re-arms for retry. Gen-guarded by market id like live() below.
-   * Params: doc, state, b/q (asset {id, symbol}). Fails: never (fetch
-   * errors render inline). */
-  function paintDeepButton(doc, state, b, q) {
-    var host = state.recentBody || state.tradesBody;
-    if (!host) return;
-    try { if (state.deepBtn && state.deepBtn.parentNode) state.deepBtn.parentNode.removeChild(state.deepBtn); } catch (e) { /* refetch stands */ }
-    state.deepBtn = null;
-    if (state.deepRows) { paintBackButton(doc, state); return; }
-    if (typeof Market === "undefined" || !Market || typeof Market.tradesDeep !== "function") return;
-    var btn = touchable(DOM.el(doc, "button", t("market.load_deeper", "Load deeper history")));
-    btn.type = "button";
-    state.deepBtn = btn;
-    host.appendChild(btn);
-    btn.addEventListener("click", function () {
-      btn.disabled = true;
-      Market.tradesDeep(b.id, q.id, { days: 7, limit: 100 }).then(function (deep) {
-        try {
-          if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
-        } catch (e) { /* headless: hash guard skipped */ }
-        state.deepRows = deep;
-        MarketBook.renderTrades(doc, host, { rows: deep, quoteSymbol: q.symbol });
-        paintBackButton(doc, state);
-        renderMyTrades(doc, state);
-        MarketInd.maybeDraw(state);
-      }).catch(function (e) {
-        showError(doc, host, e, t("market.fail_trades", "Could not load recent trades."));
-        try { host.appendChild(btn); } catch (e2) { /* error stands */ }
-        btn.disabled = false;
-        renderMyTrades(doc, state);
-      });
-    });
-  }
-  /* paintBackButton: leaves the deep view ("Back to live trades" clears
-   * state.deepRows and refills the live 30). Params: doc, state. The desk
-   * re-renders deep rows on every refill while the flag stands, so this is
-   * the only exit — no auto-expiry, no surprise reverts. Never throws. */
-  function paintBackButton(doc, state) {
-    var host = state.recentBody || state.tradesBody;
-    if (!host) return;
-    try { if (state.deepBtn && state.deepBtn.parentNode) state.deepBtn.parentNode.removeChild(state.deepBtn); } catch (e) { /* refetch stands */ }
-    state.deepBtn = null;
-    var back = touchable(DOM.el(doc, "button", t("market.back_to_live", "Back to live trades")));
-    back.type = "button";
-    state.deepBtn = back;
-    host.appendChild(back);
-    back.addEventListener("click", function () {
-      state.deepRows = null;
-      state.deepBtn = null;
-      try { fill(state); } catch (e) { /* refill carries errors */ }
-    });
-  }
-  function renderMyTrades(doc, state) {
-    var host = state.myBody || state.tradesBody;
-    var assets = state.assets;
-    if (!host || !assets) return;
-    DOM.clear(host);
-    var tok = (state._myGen = (state._myGen || 0) + 1);
-    /* live: this my-trades render is still current (generation token
-     * matches and the desk hash is still on this market). Stale async
-     * fills must not paint. */
-    function live() {
-      if (tok !== state._myGen) return false;
-      try {
-        if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return false;
-      } catch (e) { /* headless: hash guard skipped */ }
-      return true;
-    }
-    var unlocked = false;
-    try {
-      unlocked = typeof Wallet !== "undefined" && Wallet &&
-        (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
-    } catch (e) { unlocked = false; }
-    /* Typed-account preview row (public reads only). */
-    var acctRow = doc.createElement("div");
-    var lab = DOM.el(doc, "span", t("account.card_account", "Account") + " ");
-    var acctInput = doc.createElement("input");
-    acctInput.type = "text";
-    acctInput.setAttribute("placeholder", t("common.name_or_id_hint", "name or 1.2.N"));
-    acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
-    acctInput.style.minHeight = "44px";
-    acctInput.style.width = "12em";
-    var viewBtn = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
-    viewBtn.type = "button";
-    acctRow.appendChild(lab);
-    acctRow.appendChild(acctInput);
-    acctRow.appendChild(doc.createTextNode(" "));
-    acctRow.appendChild(viewBtn);
-    host.appendChild(acctRow);
-    var myBody = doc.createElement("div");
-    host.appendChild(myBody);
-    /* lockedHint: locked-wallet empty state with a Wallet link. */
-    function lockedHint() {
-      DOM.clear(myBody);
-      var hint = DOM.el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
-      var a = DOM.el(doc, "a", t("market.go_wallet", "Go to Wallet"));
-      a.setAttribute("href", "#/wallet");
-      touchable(a);
-      hint.appendChild(a);
-      myBody.appendChild(hint);
-    }
-    var q = assets.quote, b = assets.base;
-    /* Same op-4 pair filter as the old auto-load below
-     * (MarketHistory.jsx:176-184): fill ops whose pays/receives legs touch
-     * both market assets. */
-    function pairFills(rows) {
-      var fills = [];
-      (rows || []).forEach(function (r) {
-        var tup = r ? r.op : null;
-        var opId = null, op = null;
-        if (Array.isArray(tup)) { opId = tup[0]; op = tup[1]; }
-        else if (r && r.operation_type !== undefined) { opId = r.operation_type; op = r; }
-        else if (r && r.op_type !== undefined) { opId = r.op_type; op = r; }
-        if (opId !== 4 || !op) return;
-        var pays = op.pays || null, recv = op.receives || null;
-        if (!pays || !recv || !pays.asset_id || !recv.asset_id) return;
-        var hasQ = pays.asset_id === q.id || recv.asset_id === q.id;
-        var hasB = pays.asset_id === b.id || recv.asset_id === b.id;
-        if (!hasQ || !hasB) return;
-        fills.push({ row: r, op: op });
-      });
-      return fills;
-    }
-    /* fillCells: one pair-fill -> plain display-string row {block, price,
-     * amount} (TableRenderer pilot: the cell math moved verbatim from the
-     * paintFills row builder below — Format math untouched, honest dashes
-     * stand; the phone cards reuse the same triple). Params: f ({row, op}).
-     * Returns {block, price, amount} strings. Never throws. */
-    function fillCells(f) {
-      var blk = f.row.block_num !== undefined && f.row.block_num !== null ? String(f.row.block_num) : (f.row.block_time || f.row.time || "—");
-      var price = "—", amt = "—";
-      try {
-        var fp = f.op.fill_price || null;
-        if (fp && fp.base && fp.quote && /^-?\d+$/.test(String(fp.base.amount)) && /^-?\d+$/.test(String(fp.quote.amount))) {
-          var rawB = fp.base.asset_id === b.id ? String(fp.base.amount) : (fp.quote.asset_id === b.id ? String(fp.quote.amount) : null);
-          var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
-          if (rawB !== null && rawQ !== null) {
-            price = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
-          }
-        }
-        var qLeg = f.op.pays && f.op.pays.asset_id === q.id ? f.op.pays : (f.op.receives && f.op.receives.asset_id === q.id ? f.op.receives : null);
-        if (qLeg && /^-?\d+$/.test(String(qLeg.amount))) {
-          amt = Format.formatAmount(String(qLeg.amount), q.precision) + " " + q.symbol;
-        }
-      } catch (e) { /* honest dashes stand */ }
-      return { block: String(blk), price: String(price), amount: String(amt) };
-    }
-    /* paintFills: op-4 pair fills for the typed/unlocked account as a
-     * table (empty -> honest hint). No-ops when live() is false. */
-    function paintFills(fills) {
-      if (!live()) return;
-      DOM.clear(myBody);
-      if (fills.length === 0) {
-        myBody.appendChild(DOM.el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
-        return;
-      }
-      var shown = fills.slice(0, 30);
-      var rows = shown.map(fillCells);
-      /* TableRenderer pilot: the table shell comes from the shared renderer
-       * (same Block/Price/Amount titles, order, and left alignment as the
-       * hand-built table it replaces — no keys, classes, or clicks before,
-       * none added). Cards + scroller + raw details below are unchanged. */
-      var table = TableRenderer.render({
-        columns: [
-          { key: "block", title: t("market.th_block", "Block") },
-          { key: "price", title: t("market.th_price", "Price") },
-          { key: "amount", title: t("market.th_amount", "Amount") }
-        ],
-        rows: rows,
-        stickyFirstCol: true
-      });
-      var cards = doc.createElement("div");
-      cards.className = "node-cards trades-cards";
-      shown.forEach(function (f, i) {
-        var card = doc.createElement("div");
-        card.className = "node-card";
-        card.appendChild(DOM.el(doc, "div", "#" + rows[i].block));
-        card.appendChild(DOM.el(doc, "div", rows[i].price));
-        card.appendChild(DOM.el(doc, "div", rows[i].amount));
-        cards.appendChild(card);
-      });
-      var scroller = doc.createElement("div");
-      scroller.className = "trades-scroll";
-      scroller.appendChild(table);
-      myBody.appendChild(scroller);
-      myBody.appendChild(cards);
-      rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), shown.map(function (f) { return f.row; }));
-    }
-    /* Typed-account lookup: resolve the input, then paint that account's
-     * fills for this pair via public Account.history. Blank + locked keeps
-     * the hint; blank + unlocked reloads the wallet auto-load. */
-    function loadTyped() {
-      if (!live()) return;
-      var v = acctInput.value.trim();
-      if (!v) {
-        if (tok !== state._myGen) return;
-        if (!unlocked) lockedHint();
-        else renderMyTrades(doc, state);
-        return;
-      }
-      DOM.clear(myBody);
-      myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
-      Promise.resolve().then(function () {
-        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
-          throw new Error("account backend missing");
-        }
-        return Account.resolve(v);
-      }).then(function (acct) {
-        return Account.history(acct.id, 100);
-      }).then(function (rows) {
-        if (!live()) return;
-        paintFills(pairFills(rows || []));
-      }).catch(function (e) {
-        if (!live()) return;
-        DOM.clear(myBody);
-        showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
-      });
-    }
-    viewBtn.addEventListener("click", loadTyped);
-    if (!unlocked) {
-      lockedHint();
-      return;
-    }
-    /* Unlocked: prefill the wallet account id (convenience only); the
-     * auto-load below is the unchanged wallet path. */
-    try {
-      if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
-        Account.myAccountId().then(function (id) {
-          if (tok !== state._myGen) return;
-          if (!acctInput.value && id) acctInput.value = String(id);
-        }).catch(function () { /* auto-load below stands */ });
-      }
-    } catch (e) { /* auto-load below stands */ }
-    myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
-    Account.myAccountId().then(function (myId) {
-      return Account.history(myId, 100).then(function (rows) {
-        return { myId: myId, rows: rows || [] };
-      });
-    }).then(function (found) {
-      if (!live()) return;
-      paintFills(pairFills(found.rows));
-    }).catch(function (e) {
-      if (!live()) return;
-      DOM.clear(myBody);
-      showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
-    });
-  }
-
-  /* Lazy-deep backfill (2026-10-01 audit): after the chain-first candle
-   * paint, fetch the background ES buckets ONCE per pair+bucket, then re-run
-   * the chain candles (which merge the cache under fresh authority) and
-   * repaint with the "deep" note. Interval refreshes and live-tip polls never
-   * call this — they stay chain-only, so an idle desk costs ~0 ES bytes
-   * after the first deepen. Params: state (desk), b/q asset rows. Returns
-   * nothing. Never throws outward. */
-  function deepenOnce(state, b, q) {
-    try {
-      /* Count-aware key: changing the candle window must re-deepen (the old
-       * pair+bucket key reused a stale-window ES merge after count edits). */
-      var deepCount = 2000;
-      try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) deepCount = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
-      var key = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
-      if (state.deepKey === key || state._deepFlight === key) return;
-      if (typeof Market === "undefined" || !Market || typeof Market.deepen !== "function") return;
-      state._deepFlight = key;
-      Market.deepen(b.id, q.id, state.bucket).then(function (d) {
-        if (state._deepFlight === key) state._deepFlight = null;
-        if (!d) return;
-        var nowKey = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
-        if (nowKey !== key) return; // bucket/pair/count moved on mid-flight
-        try {
-          if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
-        } catch (e) { /* headless: keep going */ }
-        state.deepKey = key;
-        var count = 2000;
-        try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) count = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
-        Market.candles(b.id, q.id, state.bucket, count).then(function (c2) {
-          var k2 = b.id + "|" + q.id + "|" + state.bucket + "|" + count;
-          if (k2 !== key) return;
-          try {
-            if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
-          } catch (e) { /* headless: keep going */ }
-          /* Newest paint wins (see refreshTip): deepen completion invalidates
-           * older in-flight tips before its own synchronous paint. */
-          try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
-          state.candles = c2;
-          try { state.deep = !!(c2 && c2.deep); } catch (err) { state.deep = false; }
-          try { MarketInd.maybeDraw(state); } catch (err) { /* chart best-effort */ }
-          /* paintNote rides state (module scope cannot see the nested
-           * closure); missing means a torn-down desk — never throws. */
-          try { if (typeof state.paintNote === "function") state.paintNote(); } catch (err) { /* note best-effort */ }
-        }).catch(function () { /* chain paint stands */ });
-      }).catch(function () {
-        if (state._deepFlight === key) state._deepFlight = null;
-      });
-    } catch (e) { /* deep is best-effort */ }
-  }
-
-  /* paintBook: render bids/asks from the cached get_order_book pair.
-   * Applies state.groupDec (null = exact) via MarketBook.groupBook
-   * (client-side floor bucketing — no refetch, no new WS method, no ES) and
-   * paints through MarketBook.renderSplit (depth bars follow the grouped
-   * rows; the returned depth is cached for charts). Grouping faults fall
-   * back to the exact book — the lists never blank. No-op without a cached
-   * pair or assets. Params: (doc, state). Never throws outward. */
-  function paintBook(doc, state) {
-    try {
-      if (!state || !state.bookRaw || !state.assets) return;
-      if (!state.bidsBody || !state.asksBody || !state.spreadLine) return;
-      if (typeof MarketBook === "undefined" || !MarketBook ||
-          typeof MarketBook.renderSplit !== "function") return;
-      var grouped = state.bookRaw;
-      try {
-        if (state.groupDec !== null && state.groupDec !== undefined &&
-            typeof MarketBook.groupBook === "function") {
-          grouped = MarketBook.groupBook(state.bookRaw, state.groupDec);
-        }
-      } catch (e) { grouped = state.bookRaw; /* exact book stands */ }
-      state.bookDepth = MarketBook.renderSplit(doc, state.bidsBody, state.asksBody, {
-        book: grouped, basePrec: state.assets.base.precision, quotePrec: state.assets.quote.precision,
-        baseSymbol: state.assets.base.symbol, quoteSymbol: state.assets.quote.symbol,
-        spreadLine: state.spreadLine, logVol: !!state.depthLogY
-      });
-    } catch (e) { /* book cells keep their previous paint */ }
-  }
-
-  /* Fill every section from the chain; sections fail inline, never blank.
-   * Strip/timeframe/chart bodies live in market-ind.js (MarketInd.*) — the
-   * chain calls and section wiring stay here, exactly as before. */
-  function fill(state) {
-    if (state.loading) return;
-    if (!state.assets) return;
-    state.loading = true;
-    var doc = state.doc;
-    var q = state.assets.quote, b = state.assets.base;
-    var done = function () {
-      state.loading = false;
-      try {
-        state.updated.textContent = t("market.updated_prefix", "Updated ") + new Date().toLocaleTimeString();
-      } catch (e) { state.updated.textContent = ""; }
-    };
-
-    /* Click-to-fill lives in the book rows (market-book.js fillTradePrice):
-     * a row sets BOTH panels' price inputs and focuses the taking side's
-     * amount. The book cells stay display-only otherwise. */
-    Market.book(b.id, q.id, 50).then(function (book) {
-      state.bookRaw = book;
-      paintBook(doc, state);
-      MarketInd.maybeDraw(state);
-    }).catch(function (e) {
-      DOM.clear(state.bidsBody);
-      DOM.clear(state.asksBody);
-      showError(doc, state.bidsBody, e, t("market.fail_book", "Could not load the order book."));
-      var retry = touchable(DOM.el(doc, "button", t("market.retry", "Retry")));
-      retry.type = "button";
-      retry.addEventListener("click", function () { fill(state); });
-      state.bidsBody.appendChild(retry);
-      state.asksBody.appendChild(DOM.el(doc, "p", t("market.fail_book", "Could not load the order book."), "muted"));
-    });
-
-    MarketInd.renderStrip(doc, state);
-
-    Market.stats(b.id, q.id).then(function (st) {
-      state.ticker = st;
-      MarketInd.renderStrip(doc, state);
-      /* Slice-16 (F1a): pulled alert engine on the existing ticker refresh.
-       * Pair key QUOTE_BASE + human latest; a notify fault never breaks the
-       * desk (guarded; missing feed simply never fires downstream). */
-      try {
-        if (typeof NotifyHost !== "undefined" && NotifyHost &&
-            typeof NotifyHost.mountToasts === "function") {
-          try { NotifyHost.mountToasts(); } catch (e) { /* host best-effort */ }
-        }
-        if (typeof NotifyRules !== "undefined" && NotifyRules &&
-            typeof NotifyRules.checkAlerts === "function") {
-          try { NotifyRules.checkAlerts(state.id, st ? st.latest : null); } catch (e) { /* never break desk */ }
-        }
-      } catch (e) { /* notify optional here */ }
-      /* Raw-ticker proof (triangle-only, refilled per fetch — the 24h dl
-       * panel left with the stats grid cell; the strip above carries the
-       * human fields). */
-      DOM.clear(state.tickerRaw);
-      rawDetails(doc, state.tickerRaw, "Raw ticker", st.raw);
-    }).catch(function (e) {
-      DOM.clear(state.tickerRaw);
-      showError(doc, state.tickerRaw, e, t("market.fail_stats", "Could not load market stats."));
-    });
-
-    /* Deep view wins refills: while state.deepRows stands, the loop
-     * re-renders it (no refetch, no wipe) — the Back button is the exit. */
-    if (state.deepRows) {
-      MarketBook.renderTrades(doc, state.recentBody || state.tradesBody, { rows: state.deepRows, quoteSymbol: q.symbol });
-      paintDeepButton(doc, state, b, q);
-      renderMyTrades(doc, state);
-      MarketInd.maybeDraw(state);
-      MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
-      done();
-    } else {
-    Market.trades(b.id, q.id, 30).then(function (rows) {
-      MarketBook.renderTrades(doc, state.recentBody || state.tradesBody, { rows: rows, quoteSymbol: q.symbol });
-      paintDeepButton(doc, state, b, q);
-      renderMyTrades(doc, state);
-      MarketInd.maybeDraw(state);
-      MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
-      done();
-    }).catch(function (e) {
-      var rb = state.recentBody || state.tradesBody;
-      DOM.clear(rb);
-      showError(doc, rb, e, t("market.fail_trades", "Could not load recent trades."));
-      /* Deep path stays offered: it reads the database api (time-windowed),
-       * independent of the history plugin the fills above needed. */
-      paintDeepButton(doc, state, b, q);
-      renderMyTrades(doc, state);
-      MarketOrders.render(state.doc, state.ordersBody, { assets: state.assets });
-      done();
-    });
-    }
-
-    /* Timeframe radios (once per desk): preferred shortlist first, then any
-     * live extras the node offers (60s, weekly — reconcileBuckets, never a
-     * silent drop); reconcile the default 3600 when the node lacks it. */
-    if (!state.tfInit) {
-      state.tfInit = true;
-      Market.timeframes().then(function (live) {
-        var avail = (typeof MarketInd.reconcileBuckets === "function")
-          ? MarketInd.reconcileBuckets(live)
-          : MarketInd.PREF_BUCKETS.filter(function (x) { return live.indexOf(x) !== -1; });
-        if (avail.length === 0) avail = (live || []).slice();
-        if (avail.indexOf(state.bucket) === -1 && avail.length > 0) {
-          state.bucket = avail[0];
-        }
-        state.liveBuckets = avail;
-        MarketInd.paintTimeframes(doc, state, function () { fill(state); });
-        try {
-          if (typeof MarketInd.paintCountInput === "function") {
-            MarketInd.paintCountInput(doc, state, function () { fill(state); });
-          }
-        } catch (e) { /* radios + note stand without the input */ }
-      }).catch(function () {
-        DOM.clear(state.tfBox);
-        state.tfBox.appendChild(DOM.el(doc, "span", t("market.fail_timeframes", "Timeframes unavailable on this node."), "muted"));
-        MarketInd.paintCountNote(state);
-      });
-    }
-
-    MarketInd.paintCountNote(state);
-
-    Market.candles(b.id, q.id, state.bucket, MarketInd.CANDLE_COUNT).then(function (c) {
-      /* Newest paint wins: invalidate older in-flight tips before painting. */
-      try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
-      state.candles = c;
-      try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
-      MarketInd.maybeDraw(state);
-      /* Re-paint the deep/live suffix fill() itself reset above: the note
-       * stays honest across 15s refreshes even with no live-push traffic. */
-      try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
-      deepenOnce(state, b, q);
-    }).catch(function () {
-      state.candles = { buckets: [], closes: [] };
-      try { state.deep = false; } catch (e) { /* flag best-effort */ }
-      MarketInd.maybeDraw(state);
-      try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
-    });
-  }
-
-  /* Pool-map lazy loader (index.html frozen — dynamic script like router.js
-   * dashboard precedent; relative URL only, never CDN). Params: cb(bool).
-   * Returns nothing. Never throws. */
-  var _graphLoading = false, _graphWaiters = [];
-  function graphSrc() {
-    try {
-      if (typeof document !== "undefined" && document.baseURI) {
-        return new URL("js/api/pool-graph.js", document.baseURI).toString();
-      }
-    } catch (e) { /* relative fallback below */ }
-    return "js/api/pool-graph.js";
-  }
-  function ensurePoolGraph(cb) {
-    try {
-      if (typeof PoolGraph !== "undefined" && PoolGraph) { cb(true); return; }
-    } catch (e) { /* load below */ }
-    if (typeof document === "undefined") { try { cb(false); } catch (e) {} return; }
-    _graphWaiters.push(cb);
-    if (_graphLoading) return;
-    _graphLoading = true;
-    try {
-      var s = document.createElement("script");
-      s.src = graphSrc(); s.async = true;
-      s.onload = function () {
-        _graphLoading = false;
-        var w = _graphWaiters; _graphWaiters = [];
-        w.forEach(function (f) { try { f(true); } catch (e) {} });
-      };
-      s.onerror = function () {
-        _graphLoading = false;
-        var w = _graphWaiters; _graphWaiters = [];
-        w.forEach(function (f) { try { f(false); } catch (e) {} });
-      };
-      (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
-    } catch (e) {
-      _graphLoading = false;
-      var w = _graphWaiters; _graphWaiters = [];
-      w.forEach(function (f) { try { f(false); } catch (e2) {} });
-    }
-  }
-
-  /* Desk alive guard (stale-route: dead desk never paints). Params: state.
-   * Returns boolean. Never throws. */
-  function deskAlive(state) {
-    try {
-      return String((typeof location !== "undefined" && location.hash) || "")
-        .toUpperCase().indexOf(state.id) !== -1;
-    } catch (e) { return true; }
-  }
-
-  /* Fetch 2-layer pool graph for quote/base ids (lazy async, <=9 RPCs).
-   * Loading note -> render. Failures -> honest partial/empty note. */
-  function fetchPoolMap(doc, state) {
-    if (!state.graphWrap || !state.graphCanvas || !state.graphNote) return;
-    if (!state.assets) return;
-    var q = state.assets.quote, b = state.assets.base, myId = state.id;
-    try { state.graphNote.textContent = t("market.loading_pool_map", "Loading pool map…"); } catch (e) {}
-    ensurePoolGraph(function (ok) {
-      if (!deskAlive(state) || state.id !== myId) return;
-      if (!ok) {
-        try { state.graphNote.textContent = t("market.pool_map_unavailable_script", "Pool map unavailable (script load failed)."); } catch (e) {}
-        return;
-      }
-      var pA, pB;
-      try {
-        if (typeof PoolGraph === "undefined" || !PoolGraph) throw new Error("missing");
-        pA = q.id; pB = b.id;
-      } catch (e) { return; }
-      try {
-        PoolGraph.buildGraph(pA, pB, { depth: 2, cap: 25 }).then(function (g) {
-          if (!deskAlive(state) || state.id !== myId) return;
-          var pa = null, pb = null;
-          try { pa = PoolGraph.findCorePath(g, pA); } catch (e) { pa = null; }
-          try { pb = PoolGraph.findCorePath(g, pB); } catch (e) { pb = null; }
-          state.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
-          redrawPoolMap(doc, state);
-          try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
-        }).catch(function (e) {
-          if (!deskAlive(state) || state.id !== myId) return;
-          var m = String((e && e.message) || e || "");
-          try {
-            if (m.indexOf("not-connected") !== -1) state.graphNote.textContent = t("market.pool_map_unavailable_offline", "Pool map unavailable (offline).");
-            else state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-          } catch (x) {}
-        });
-      } catch (e) { /* graph best-effort */ }
-    });
-  }
-
-  /* Repaint the pool-map canvas from cached graphData (theme/resize path).
-   * Skips when toggled off or stale. Never throws outward. */
-  /* Feed + settlement estimate for the strip (R1d — read path mirrors
-   * asset-feed-ui.js loadFeed: lookup_asset_symbols -> bitasset_data_id ->
-   * get_objects -> current_feed.settlement_price, formatted with BOTH
-   * precisions via Format.formatPrice). Runs ONCE per desk (not per stats
-   * refresh): exactly 2 RPCs, stale-route guarded. Orientation is market
-   * base-per-quote: the settlement amounts map by asset_id onto the market
-   * legs (precisions already known from state.assets); legs that don't match
-   * the pair skip the feed (backing differs from the market quote) instead
-   * of guessing. Settlement ports #1 ExchangeHeader.jsx:190-198 (wins over
-   * astro's offset-less dialog per #4 asset_ops force-settlement comment):
-   * offset=bit.options.force_settlement_offset_percent; base CORE(1.3.0) ?
-   * feed/(1+off/10000) : feed*(1+off/10000) via Format.settleEstimate (exact
-   * BigInt, never float); globally-settled (settlement_fund>0) uses
-   * bitasset.settlement_price directly, same object, zero extra calls.
-   * Non-MPA pairs and every failure fail OPEN (state.feed null, no cells,
-   * the ticker strip stands). Params: (doc, state) with state.assets set.
-   * Never throws outward. */
-  function fetchFeed(doc, state) {
-    var myId = state.id;
-    function alive() {
-      try { return deskAlive(state) && state.id === myId; } catch (e) { return false; }
-    }
-    /* novalue: feed fetch failed/absent — clear state.feed and repaint
-     * the strip (which shows the missing-feed hint). Never throws. */
-    function novalue() {
-      if (!alive()) return;
-      state.feed = null;
-      try { MarketInd.renderStrip(doc, state); } catch (e) { /* strip stands */ }
-    }
-    try {
-      if (typeof Chain === "undefined" || !Chain ||
-          typeof Format === "undefined" || !Format ||
-          typeof MarketInd === "undefined" || !MarketInd) return;
-      var q = state.assets.quote, b = state.assets.base;
-      var dbId;
-      /* Perf: Market.assets already resolved this pair (its rows carry
-       * bitasset_data_id) — reuse the feed leg instead of re-looking-up the
-       * same symbols. Falls back to the lookup when the legs lack it. */
-      var directBid = (q && q.bitasset_data_id) || (b && b.bitasset_data_id) || null;
-      Chain.db().then(function (id) {
-        dbId = id;
-        if (directBid) return Chain.call(dbId, "get_objects", [[directBid]]);
-        return Chain.call(dbId, "lookup_asset_symbols", [[q.symbol, b.symbol]]);
-      }).then(function (rows) {
-        if (!alive()) return null;
-        if (directBid) return rows;
-        var bid = null;
-        (rows || []).forEach(function (r) {
-          if (r && r.bitasset_data_id && !bid) bid = r.bitasset_data_id;
-        });
-        if (!bid) { novalue(); return null; }
-        return Chain.call(dbId, "get_objects", [[bid]]);
-      }).then(function (objs) {
-        if (!objs || !alive()) return;
-        var bit = objs[0] || null;
-        var cur = bit && bit.current_feed;
-        var pair = cur && cur.settlement_price;
-        if (!pair || !pair.base || !pair.quote) { novalue(); return; }
-        var rawB = null, rawQ = null;
-        [pair.base, pair.quote].forEach(function (leg) {
-          if (leg.asset_id === b.id) rawB = String(leg.amount);
-          else if (leg.asset_id === q.id) rawQ = String(leg.amount);
-        });
-        if (rawB === null || rawQ === null) { novalue(); return; }
-        var feed;
-        try {
-          feed = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
-        } catch (e) { novalue(); return; }
-        var out = { feed: feed, settle: null };
-        try {
-          var fund = bit && bit.settlement_fund;
-          /* Round-3 verified: globally-settled flag is exact BigInt (the fund
-           * is a raw chain integer; Number() would still zero-test correctly
-           * but BigInt keeps the integer discipline of this read path). */
-          var fundStr = (fund === null || fund === undefined) ? "0" : String(fund).trim();
-          var isSettled = false;
-          try {
-            if (/^-?\d+$/.test(fundStr)) isSettled = BigInt(fundStr) > 0n;
-            else isSettled = Number(fund) > 0;
-          } catch (e) { isSettled = Number(fund) > 0; }
-          var sp = bit && bit.settlement_price;
-          if (isSettled && sp && sp.base && sp.quote) {
-            var sB = null, sQ = null;
-            [sp.base, sp.quote].forEach(function (leg) {
-              if (leg.asset_id === b.id) sB = String(leg.amount);
-              else if (leg.asset_id === q.id) sQ = String(leg.amount);
-            });
-            if (sB !== null && sQ !== null) {
-              out.settle = {
-                global: true,
-                value: Format.formatPrice(sB, b.precision, sQ, q.precision, 8)
-              };
-            }
-          } else {
-            /* Live asset: offset-adjusted estimate (R1d). Offset lives on the
-             * bitasset_data options; missing/invalid fails OPEN (feed stands,
-             * no settle cell) instead of guessing. baseIsCore follows #1
-             * baseId=="1.3.0" branch. */
-            var offRaw = bit && bit.options && bit.options.force_settlement_offset_percent;
-            var off = (Number.isInteger(offRaw) && offRaw >= 0 && offRaw <= 0xFFFF) ? offRaw : null;
-            if (off === null && offRaw !== undefined && offRaw !== null) {
-              var parsed = Number(offRaw);
-              off = (Number.isInteger(parsed) && parsed >= 0 && parsed <= 0xFFFF) ? parsed : null;
-            }
-            if (off === null && (offRaw === undefined || offRaw === null)) off = 0;
-            if (off !== null && typeof Format.settleEstimate === "function") {
-              var baseIsCore = String(b.id) === "1.3.0";
-              out.settle = {
-                global: false,
-                offset: off,
-                value: Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, 8)
-              };
-            }
-          }
-        } catch (e) { out.settle = null; }
-        if (!alive()) return;
-        state.feed = out;
-        try { MarketInd.renderStrip(doc, state); } catch (e) { /* strip stands */ }
-      }).catch(function () { novalue(); });
-    } catch (e) { /* feed optional, strip stands */ }
-  }
-
-  function redrawPoolMap(doc, state) {
-    if (!state.graphData || !state.graphCanvas) return;
-    if (state.showPoolMap === false) return;
-    if (!deskAlive(state)) return;
-    try {
-      if (typeof PoolGraph === "undefined" || !PoolGraph) return;
-      var gd = state.graphData, hi = [], seen = {};
-      [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
-        (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
-      });
-      PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
-        { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
-      var n = (gd.graph.edges || []).length;
-      if (!n) state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-      else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = t("market.no_bts_path", "No BTS path — treat pair as unverified.");
-      else {
-        var bits = [];
-        if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
-        if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        state.graphNote.textContent = t("market.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ".";
-      }
-    } catch (e) { /* canvas best-effort */ }
-  }
-
-  return {
-    renderMarket: renderMarket,
-    syncUrl: syncUrl,
-    _test: { readDeskQuery: readDeskQuery, buildDeskQuery: buildDeskQuery }
-  };
+  MarketDesk.renderMarket = renderMarket;
+  MarketDesk.syncUrl = MarketDesk._query.syncUrl;
+  MarketDesk._test = { readDeskQuery: MarketDesk._query.readDeskQuery, buildDeskQuery: MarketDesk._query.buildDeskQuery };
+  if (typeof globalThis !== "undefined") { globalThis.MarketDesk = MarketDesk; }
 })();
 
+if (typeof globalThis !== "undefined" && typeof globalThis.MarketDesk === "undefined") { globalThis.MarketDesk = MarketDesk; }
 if (typeof module !== "undefined") { module.exports = MarketDesk; }
