@@ -78,15 +78,7 @@ var BarterUI = (function () {
     var p = DOM.status(wrap, text);
     return p;
   }
-  function field(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
-  }
+  /* No local field builder — use Forms.labeledInput (row + input). */
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet, verified live 2026-09-28). The preview
    * resolves peer names/leg balances publicly; PROPOSE gates at Sign & Send. */
@@ -178,7 +170,7 @@ var BarterUI = (function () {
     var lockedBar = !isUnlockedNow();
     if (lockedBar) DOM.append(wrap, viewingAsNotice(doc));
     DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
-    var fA = field(doc, t("barter.peer_a_account", "Peer A account"), lockedBar
+    var fA = Forms.labeledInput(doc, t("barter.peer_a_account", "Peer A account") + " ", lockedBar
       ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
     DOM.append(wrap, fA.row);
@@ -187,7 +179,7 @@ var BarterUI = (function () {
     var legsA = [legRow(doc, boxA)];
     var addA = touchable(DOM.el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; addA.classList.add("subtle-btn"); DOM.append(wrap, addA);
     addA.addEventListener("click", function () { legsA.push(legRow(doc, boxA)); });
-    var fB = field(doc, t("barter.peer_b_account", "Peer B account"), lockedBar
+    var fB = Forms.labeledInput(doc, t("barter.peer_b_account", "Peer B account") + " ", lockedBar
       ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
     DOM.append(wrap, fB.row);
@@ -206,7 +198,7 @@ var BarterUI = (function () {
     var escrowBtn = touchable(DOM.el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button"; escrowBtn.classList.add("btn-ghost");
     DOM.append(wrap, escrowBtn);
     var escBox = DOM.el(doc, "div"); escBox.style.display = "none"; DOM.append(wrap, escBox);
-    var fEsc = field(doc, t("barter.escrow_account_optional", "Escrow account (optional)"), { placeholder: t("barter.blank_none", "blank = none") });
+    var fEsc = Forms.labeledInput(doc, t("barter.escrow_account_optional", "Escrow account (optional)") + " ", { placeholder: t("barter.blank_none", "blank = none") });
     DOM.append(escBox, fEsc.row);
     escrowBtn.addEventListener("click", function () {
       escState.on = !escState.on;
@@ -217,16 +209,16 @@ var BarterUI = (function () {
     /* MED fee assets (#1 Barter.jsx:1226-1283 per-side FeeAssetSelector +
      * proposal fee + total): batch-3-keyed inputs; every
      * fee sum below is BigInt via Format, never float. Defaults 1.3.0. */
-    var fFeeA = field(doc, t("barter.side_a_fee_asset_1_3_x", "Side A fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
-    var fFeeB = field(doc, t("barter.side_b_fee_asset_1_3_x", "Side B fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
-    var fPropFee = field(doc, t("barter.proposal_fee_asset_1_3_x_due_now", "Proposal fee asset (1.3.x, due now)"), { placeholder: "1.3.0", value: "1.3.0" });
+    var fFeeA = Forms.labeledInput(doc, t("barter.side_a_fee_asset_1_3_x", "Side A fee asset (1.3.x)") + " ", { placeholder: "1.3.0", value: "1.3.0" });
+    var fFeeB = Forms.labeledInput(doc, t("barter.side_b_fee_asset_1_3_x", "Side B fee asset (1.3.x)") + " ", { placeholder: "1.3.0", value: "1.3.0" });
+    var fPropFee = Forms.labeledInput(doc, t("barter.proposal_fee_asset_1_3_x_due_now", "Proposal fee asset (1.3.x, due now)") + " ", { placeholder: "1.3.0", value: "1.3.0" });
     DOM.append(wrap, fFeeA.row); DOM.append(wrap, fFeeB.row); DOM.append(wrap, fPropFee.row);
     var check = touchable(DOM.el(doc, "button", t("barter.preview_barter", "Preview barter"))); check.type = "button";
     if (lockedBar) DOM.append(wrap, signNotice(doc));
     DOM.append(wrap, check);
     var out = DOM.el(doc, "div", null, "xfer-out"); DOM.append(wrap, out);
-    var fExp = field(doc, t("barter.proposal_expiration", "Proposal expiration"), { type: "datetime-local", value: defaultExpiration() });
-    var fRev = field(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)"), { placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric" });
+    var fExp = Forms.labeledInput(doc, t("barter.proposal_expiration", "Proposal expiration") + " ", { type: "datetime-local", value: defaultExpiration() });
+    var fRev = Forms.labeledInput(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric" });
     DOM.append(wrap, fExp.row); DOM.append(wrap, fRev.row);
     var propose = touchable(DOM.el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op 22)")));
     propose.type = "button"; propose.disabled = true;

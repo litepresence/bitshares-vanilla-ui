@@ -175,15 +175,8 @@ var BorrowUI = (function () {
     });
     return list;
   }
-  function field(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
-  }
+  /* No local field builder — use Forms.labeledInput (row + input) or
+   * Forms.fieldRow for caller-built fields (position select). */
   /* Raw amount -> {text (human + sym, or raw + id fallback), raw}. Params: raw, prec (number|null), sym, id. */
   function amt(raw, prec, sym, id) {
     if (typeof prec === "number" && /^-?\d+$/.test(String(raw)))
@@ -203,7 +196,7 @@ var BorrowUI = (function () {
     var lockedB = !isUnlockedNow();
     if (lockedB) ctx.wrap.appendChild(viewingAsNotice(doc));
     ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op 3 (call_order_update) on your call order."), "muted"));
-    var fAcct = field(doc, t("borrow.account", "Account"), lockedB
+    var fAcct = Forms.labeledInput(doc, t("borrow.account", "Account") + " ", lockedB
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     ctx.wrap.appendChild(fAcct.row);
@@ -344,11 +337,10 @@ var BorrowUI = (function () {
       var op = doc.createElement("option"); op.value = p.call_id;
       op.textContent = p.call_id + " (" + (p.coll_sym || p.coll_id) + "/" + (p.debt_sym || p.debt_id) + ")";
       sel.appendChild(op); });
-    var selRow = DOM.el(doc, "div", null, "xfer-field"), selLab = DOM.el(doc, "label", t("borrow.position", "Position "));
-    selLab.appendChild(sel); selRow.appendChild(selLab); box.appendChild(selRow);
-    var fColl = field(doc, t("borrow.delta_collateral_signed_collateral_asset", "Delta collateral (signed, collateral asset)"), { placeholder: t("borrow.1_0_adds_1_0_removes", "+1.0 adds, -1.0 removes"), inputmode: "decimal" });
-    var fDebt = field(doc, t("borrow.delta_debt_signed_debt_asset", "Delta debt (signed, debt asset)"), { placeholder: t("borrow.1_0_borrows_more_risk", "-1.0 borrows MORE (risk!)"), inputmode: "decimal" });
-    var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
+    var selRow = Forms.fieldRow(doc, t("borrow.position", "Position "), sel); box.appendChild(selRow);
+    var fColl = Forms.labeledInput(doc, t("borrow.delta_collateral_signed_collateral_asset", "Delta collateral (signed, collateral asset)") + " ", { placeholder: t("borrow.1_0_adds_1_0_removes", "+1.0 adds, -1.0 removes"), inputmode: "decimal" });
+    var fDebt = Forms.labeledInput(doc, t("borrow.delta_debt_signed_debt_asset", "Delta debt (signed, debt asset)") + " ", { placeholder: t("borrow.1_0_borrows_more_risk", "-1.0 borrows MORE (risk!)"), inputmode: "decimal" });
+    var fTcr = Forms.labeledInput(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)") + " ", { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
     [fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
     box.appendChild(DOM.el(doc, "p", t("borrow.warning_a_negative_debt_delta_borrows_more_ag", "Warning: a negative debt delta borrows more against the same collateral and moves the position closer to margin call."), "muted"));
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
@@ -534,14 +526,14 @@ var BorrowUI = (function () {
   function openBox(doc, box, myGen) {
     var lockedOpen = !isUnlockedNow();
     if (lockedOpen) box.appendChild(signNotice(doc));
-    var fAcct = field(doc, t("borrow.account", "Account"), lockedOpen
+    var fAcct = Forms.labeledInput(doc, t("borrow.account", "Account") + " ", lockedOpen
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
-    var fCollA = field(doc, t("borrow.collateral_asset_symbol_or_1_3_x", "Collateral asset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bts", "e.g. BTS") });
-    var fDebtA = field(doc, t("borrow.debt_bitasset_symbol_or_1_3_x", "Debt bitasset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
-    var fColl = field(doc, t("borrow.collateral_amount_collateral_units", "Collateral amount (collateral units)"), { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
-    var fDebt = field(doc, t("borrow.amount_to_borrow_debt_units", "Amount to borrow (debt units)"), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
-    var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
+    var fCollA = Forms.labeledInput(doc, t("borrow.collateral_asset_symbol_or_1_3_x", "Collateral asset (symbol or 1.3.x)") + " ", { placeholder: t("borrow.e_g_bts", "e.g. BTS") });
+    var fDebtA = Forms.labeledInput(doc, t("borrow.debt_bitasset_symbol_or_1_3_x", "Debt bitasset (symbol or 1.3.x)") + " ", { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
+    var fColl = Forms.labeledInput(doc, t("borrow.collateral_amount_collateral_units", "Collateral amount (collateral units)") + " ", { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
+    var fDebt = Forms.labeledInput(doc, t("borrow.amount_to_borrow_debt_units", "Amount to borrow (debt units)") + " ", { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
+    var fTcr = Forms.labeledInput(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)") + " ", { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
     [fAcct, fCollA, fDebtA, fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
     box.appendChild(DOM.el(doc, "p", t("borrow.new_debt_is_issued_against_the_locked_collate", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it."), "muted"));
     var btn = touchable(DOM.el(doc, "button", t("borrow.review_borrow", "Review borrow"))); btn.type = "button"; box.appendChild(btn);
@@ -670,7 +662,7 @@ var BorrowUI = (function () {
   function mySettleSection(doc, wrap, myGen) {
     wrap.appendChild(DOM.el(doc, "h2", t("borrow.my_settlements", "My settlements")));
     wrap.appendChild(DOM.el(doc, "p", t("borrow.my_settlements_hint", "Force-settlement orders waiting at the feed price — yours or any account's, reads are public."), "muted"));
-    var f = field(doc, t("borrow.account", "Account"), { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
+    var f = Forms.labeledInput(doc, t("borrow.account", "Account") + " ", { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(f.row);
     var go = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up"))); go.type = "button";
     wrap.appendChild(go);
@@ -776,7 +768,7 @@ var BorrowUI = (function () {
   function settleSection(doc, wrap, myGen) {
     wrap.appendChild(DOM.el(doc, "h2", t("borrow.settlement_bids_op_45", "Settlement bids (op 45)")));
     wrap.appendChild(DOM.el(doc, "p", t("borrow.after_a_bitasset_globally_settles_anyone_can", "After a bitasset globally settles, anyone can bid collateral to take over part of the debt and the settlement fund (BSIP-0018). Enter the settled asset: the fund and existing bids always read; the bid form appears only while a settlement fund exists."), "muted"));
-    var fAsset = field(doc, t("borrow.settled_asset_symbol_or_1_3_x", "Settled asset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
+    var fAsset = Forms.labeledInput(doc, t("borrow.settled_asset_symbol_or_1_3_x", "Settled asset (symbol or 1.3.x)") + " ", { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
     wrap.appendChild(fAsset.row);
     var chk = touchable(DOM.el(doc, "button", t("borrow.check_settlement_fund", "Check settlement fund"))); chk.type = "button";
     wrap.appendChild(chk);
@@ -902,11 +894,11 @@ var BorrowUI = (function () {
   function bidBox(doc, box, myGen, R) {
     box.appendChild(DOM.el(doc, "h3", t("borrow.place_a_bid", "Place a bid")));
     var lockedBid = !isUnlockedNow();
-    var fBidder = field(doc, t("borrow.bidder_blank_wallet_account", "Bidder (blank = wallet account)"), lockedBid
+    var fBidder = Forms.labeledInput(doc, t("borrow.bidder_blank_wallet_account", "Bidder (blank = wallet account)") + " ", lockedBid
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
-    var fColl = field(doc, t("borrow.coll_units_tpl", "Collateral (%(id)s units)", { id: R.backingId }), { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
-    var fDebt = field(doc, t("borrow.debt_units_tpl", "Debt to cover (%(sym)s units)", { sym: R.asset.symbol }), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
+    var fColl = Forms.labeledInput(doc, t("borrow.coll_units_tpl", "Collateral (%(id)s units)", { id: R.backingId }) + " ", { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
+    var fDebt = Forms.labeledInput(doc, t("borrow.debt_units_tpl", "Debt to cover (%(sym)s units)", { sym: R.asset.symbol }) + " ", { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
     [fBidder, fColl, fDebt].forEach(function (f) { box.appendChild(f.row); });
     box.appendChild(DOM.el(doc, "p", t("borrow.a_bid_locks_your_collateral_against_the_settl", "A bid locks your collateral against the settlement fund; the chain matches it while reviving the asset. Both legs must be above zero."), "muted"));
     var btn = touchable(DOM.el(doc, "button", t("borrow.review_bid", "Review bid"))); btn.type = "button"; box.appendChild(btn);

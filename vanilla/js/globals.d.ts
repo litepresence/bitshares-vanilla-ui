@@ -46,6 +46,7 @@ declare var ExplorerUI: any;
 declare var FavouritesUI: any;
 declare var FeesUI: any;
 declare var Format: any;
+declare var Forms: any;
 declare var Gateway: any;
 declare var GatewayUI: any;
 declare var GovAnalytics: any;

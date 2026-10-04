@@ -7,11 +7,11 @@
  *   the DOM.
  * Created by: slice-10 audit fix B2 (split from asset-ui.js,
  *   behavior-identical). The small view chrome below (el/touch/wipe/wrap/
-   *   err/status/netName/feePrec/head/noBackend/cold/field/confirm/done/
+ *   err/status/netName/feePrec/head/noBackend/cold/confirm/done/
  *   publish) intentionally duplicates asset-ui.js verbatim — duplicated
  *   plain code over a shared import, per the anti-rot doctrine (no new
  *   load-bearing cross-file abstraction; each view file stays
- *   self-contained and readable alone).
+ *   self-contained and readable alone). Labeled rows use shared Forms.
  * TRUTH: op fields <- asset_ops.hpp; hundredths via AssetOps only; op-11
  *   clones the live chain object (rawAsset) so untouched fields pass
  *   through; market-issued reserve is client-blocked (not-market-issued).
@@ -104,15 +104,9 @@ var AssetManageUI = (function () {
     try { if (coff && typeof coff.ensure === "function") coff.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
-  /* field: labeled input row. */
-  function field(d, label, id, val, mode, area, ph) {
-    var row = el(d, "div", null, "xfer-field"), lab = el(d, "label", label + " ");
-    var inp = d.createElement(area ? "textarea" : "input");
-    if (!area) { inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode); }
-    if (id) inp.id = id; if (val !== undefined) inp.value = val;
-    if (ph) inp.setAttribute("placeholder", ph); inp.setAttribute("autocomplete", "off");
-    touch(inp); lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
-  }
+  /* No local field builder — use Forms.labeledInput (row + input) or
+   * Forms.labeledTextarea for the description/producers boxes (plus
+   * autocomplete off). */
   /* confirm: named rows + fee + network, Back / Sign&Send. Never raw JSON. */
   function confirm(d, w, root, title, rows, feeRaw, fp, onBack, onSend) {
     w.appendChild(el(d, "h1", title));
@@ -204,8 +198,9 @@ var AssetManageUI = (function () {
         v.appendChild(el(d, "p", "Issuer: " + (info.issuer_name || info.issuer_id) + ". Read-only.", "muted")); return; }
       /* op-11 common */
       v.appendChild(el(d, "h3", t("asset.common_title", "Common options (op 11)")));
-      var fp = field(d, "Market fee % (now " + AssetOps.hundredthsToPct(info.market_fee_hundredths) + "%)", null, AssetOps.hundredthsToPct(info.market_fee_hundredths), "decimal");
-      var ds = field(d, t("asset.description_row", "Description"), null, info.description || "", null, true);
+      var fp = Forms.labeledInput(d, "Market fee % (now " + AssetOps.hundredthsToPct(info.market_fee_hundredths) + "%)" + " ", { value: AssetOps.hundredthsToPct(info.market_fee_hundredths), inputmode: "decimal", autocomplete: "off" });
+      var ds = Forms.labeledTextarea(d, t("asset.description_row", "Description") + " ", { value: info.description || "" });
+      ds.input.setAttribute("autocomplete", "off");
       v.appendChild(fp.row); v.appendChild(ds.row);
       var r1 = touch(el(d, "button", t("credit.review_update", "Review update"))); r1.type = "button"; v.appendChild(r1);
       r1.addEventListener("click", function () { r1.disabled = true;
@@ -231,8 +226,8 @@ var AssetManageUI = (function () {
       /* op-12 bitasset (MPA only) */
       if (info.is_smartcoin) {
         v.appendChild(el(d, "h3", t("asset.bitasset_op12_title", "Bitasset options (op 12)")));
-        var of = field(d, t("asset.settle_offset_field", "Settlement offset %"), null, "1", "decimal");
-        var vf = field(d, t("asset.max_settle_vol_field", "Max settlement vol %"), null, "20", "decimal");
+        var of = Forms.labeledInput(d, t("asset.settle_offset_field", "Settlement offset %") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+        var vf = Forms.labeledInput(d, t("asset.max_settle_vol_field", "Max settlement vol %") + " ", { value: "20", inputmode: "decimal", autocomplete: "off" });
         v.appendChild(of.row); v.appendChild(vf.row);
         var r2 = touch(el(d, "button", t("asset.review_bitasset", "Review bitasset update"))); r2.type = "button"; v.appendChild(r2);
         r2.addEventListener("click", function () { r2.disabled = true;
@@ -261,7 +256,8 @@ var AssetManageUI = (function () {
       }
       /* op-13 producers */
       v.appendChild(el(d, "h3", t("asset.producers_title", "Feed producers (op 13)")));
-      var pa = field(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)"), null, "", null, true);
+      var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
+      pa.input.setAttribute("autocomplete", "off");
       v.appendChild(pa.row);
       var r3 = touch(el(d, "button", t("asset.review_producers", "Review producers"))); r3.type = "button"; v.appendChild(r3);
       r3.addEventListener("click", function () { r3.disabled = true;
@@ -289,10 +285,10 @@ var AssetManageUI = (function () {
   function half(d, v, root, g, title, btnLabel, isReserve) {
     v.appendChild(el(d, "h3", title));
     if (isReserve) v.appendChild(el(d, "p", t("asset.no_reserve_mpa", "Market-issued assets cannot be reserved."), "muted"));
-    var s = field(d, t("explorer.th_symbol", "Symbol"), null, "", null, false, "AFKTEST01");
-    var toF = isReserve ? null : field(d, t("asset.to_field", "To (name or 1.2.N)"), null, "");
-    var a = field(d, t("asset.amount_field", "Amount (human)"), null, "1", "decimal");
-    var who = field(d, isReserve ? t("asset.payer_field", "Payer (name or 1.2.N)") : t("asset.acting_field", "Acting account (name or 1.2.N)"), null, (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0");
+    var s = Forms.labeledInput(d, t("explorer.th_symbol", "Symbol") + " ", { value: "", placeholder: "AFKTEST01", autocomplete: "off" });
+    var toF = isReserve ? null : Forms.labeledInput(d, t("asset.to_field", "To (name or 1.2.N)") + " ", { value: "", autocomplete: "off" });
+    var a = Forms.labeledInput(d, t("asset.amount_field", "Amount (human)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+    var who = Forms.labeledInput(d, (isReserve ? t("asset.payer_field", "Payer (name or 1.2.N)") : t("asset.acting_field", "Acting account (name or 1.2.N)")) + " ", { value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0", autocomplete: "off" });
     v.appendChild(s.row); if (toF) v.appendChild(toF.row); v.appendChild(a.row); v.appendChild(who.row);
     var r = touch(el(d, "button", btnLabel)); r.type = "button"; v.appendChild(r);
     r.addEventListener("click", function () { r.disabled = true;

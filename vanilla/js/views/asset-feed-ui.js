@@ -100,15 +100,8 @@ var AssetFeedUI = (function () {
     try { if (coff && typeof coff.ensure === "function") coff.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
-  /* field: labeled input row. */
-  function field(d, label, id, val, mode, area, ph) {
-    var row = el(d, "div", null, "xfer-field"), lab = el(d, "label", label + " ");
-    var inp = d.createElement(area ? "textarea" : "input");
-    if (!area) { inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode); }
-    if (id) inp.id = id; if (val !== undefined) inp.value = val;
-    if (ph) inp.setAttribute("placeholder", ph); inp.setAttribute("autocomplete", "off");
-    touch(inp); lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
-  }
+  /* No local field builder — use Forms.labeledInput (row + input) or
+   * Forms.labeledTextarea for the producers box (plus autocomplete off). */
   /* confirm: named rows + fee + network. Never raw JSON. */
   function confirm(d, w, root, title, rows, feeRaw, fp, onBack, onSend) {
     w.appendChild(el(d, "h1", title));
@@ -176,7 +169,7 @@ var AssetFeedUI = (function () {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
         w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
     } catch (e) { /* notice is display-only */ }
-    var s = field(d, t("asset.smartcoin_field", "Smartcoin symbol"), "af-sym", "", null, false, "e.g. TESTMPA");
+    var s = Forms.labeledInput(d, t("asset.smartcoin_field", "Smartcoin symbol") + " ", { id: "af-sym", value: "", placeholder: "e.g. TESTMPA", autocomplete: "off" });
     w.appendChild(s.row);
     var go = touch(el(d, "button", t("asset.load_feed", "Load feed"))); go.type = "button"; w.appendChild(go);
     var body = el(d, "div", null, "asset-feed"); w.appendChild(body);
@@ -226,13 +219,13 @@ var AssetFeedUI = (function () {
    * to 1.2.0 — never myAccountId at render; the WIF throw at send is the gate. */
   function publishForm(d, body, root, g, info, backing, backingPrec) {
     body.appendChild(el(d, "h3", t("asset.publish_op19_title", "Publish feed (op 19)")));
-    var pub = field(d, t("asset.publisher_field", "Publisher (name or 1.2.N)"), null, "1.2.0");
-    var sb = field(d, "Settlement base (human, " + info.symbol + ")", null, "1", "decimal");
-    var sq = field(d, t("asset.settle_quote_field", "Settlement quote (human, backing)"), null, "1", "decimal");
-    var mcr = field(d, t("asset.mcr_field", "MCR % (human, e.g. 175)"), null, "175", "decimal");
-    var mssr = field(d, t("asset.mssr_field", "MSSR % (human, e.g. 150)"), null, "150", "decimal");
-    var cb = field(d, "CER base (human, " + info.symbol + ")", null, "1", "decimal");
-    var cq = field(d, t("asset.cer_quote_backing_field", "CER quote (human, backing)"), null, "1", "decimal");
+    var pub = Forms.labeledInput(d, t("asset.publisher_field", "Publisher (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
+    var sb = Forms.labeledInput(d, "Settlement base (human, " + info.symbol + ")" + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+    var sq = Forms.labeledInput(d, t("asset.settle_quote_field", "Settlement quote (human, backing)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+    var mcr = Forms.labeledInput(d, t("asset.mcr_field", "MCR % (human, e.g. 175)") + " ", { value: "175", inputmode: "decimal", autocomplete: "off" });
+    var mssr = Forms.labeledInput(d, t("asset.mssr_field", "MSSR % (human, e.g. 150)") + " ", { value: "150", inputmode: "decimal", autocomplete: "off" });
+    var cb = Forms.labeledInput(d, "CER base (human, " + info.symbol + ")" + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+    var cq = Forms.labeledInput(d, t("asset.cer_quote_backing_field", "CER quote (human, backing)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
     [pub, sb, sq, mcr, mssr, cb, cq].forEach(function (x) { body.appendChild(x.row); });
     var prev = el(d, "p", "", "muted"); body.appendChild(prev);
     /* paintPrev: live MCR/MSSR % preview from the raw inputs. Never throws
@@ -294,9 +287,10 @@ var AssetFeedUI = (function () {
    * myAccountId at render; issuer check + WIF throw gate the write path. */
   function producerForm(d, body, root, g, info) {
     body.appendChild(el(d, "h3", t("asset.producers_title", "Feed producers (op 13)")));
-    var whoF = field(d, t("asset.acting_field", "Acting account (name or 1.2.N)"), null, "1.2.0");
+    var whoF = Forms.labeledInput(d, t("asset.acting_field", "Acting account (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
     body.appendChild(whoF.row);
-    var pa = field(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)"), null, "", null, true);
+    var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
+    pa.input.setAttribute("autocomplete", "off");
     body.appendChild(pa.row);
     var rev = touch(el(d, "button", t("asset.review_producers", "Review producers"))); rev.type = "button"; body.appendChild(rev);
     rev.addEventListener("click", function () {

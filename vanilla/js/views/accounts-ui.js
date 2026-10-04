@@ -35,20 +35,8 @@ var AccountsUI = (function () {
     var err = DOM.error(wrap, msg);
     return err;
   }
-  /* Labeled input row with its own inline error slot. */
-  function fieldRow(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input"); input.type = opts.type || "text";
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    if (opts.id) input.id = opts.id;
-    if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
-    return { row: row, input: input, err: err }; }
+  /* Labeled input row with its own inline error slot (Forms builds the
+   * row; the err div stays per-view — Forms.fieldRow returns row only). */
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : "none"; }
   /* Internal link paragraph (href + text pairs). */
   function linkPara(doc, pairs) {
@@ -151,7 +139,9 @@ var AccountsUI = (function () {
           try { box.focus(); } catch (e) { /* display-only */ }
         }
       });
-      var f = fieldRow(doc, t("account.password_label", "Password "), { id: "accts-unlock-password", type: "password" });
+      var f = Forms.labeledInput(doc, t("account.password_label", "Password ") + " ", { id: "accts-unlock-password", type: "password" });
+      f.err = DOM.el(doc, "div", "", "error");
+      f.err.setAttribute("aria-live", "polite"); f.err.style.display = "none"; f.row.appendChild(f.err);
       DOM.append(wrap, f.row);
       var btn = touchable(DOM.el(doc, "button", t("account.s6", "Unlock")));
       btn.id = "accts-unlock-do"; btn.type = "button"; DOM.append(wrap, btn);
@@ -199,7 +189,9 @@ var AccountsUI = (function () {
     }
     DOM.append(wrap, DOM.el(doc, "h3", t("account.lookup_title", "Look up an account")));
     DOM.append(wrap, DOM.el(doc, "p", t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history)."), "muted"));
-    var nameF = fieldRow(doc, t("account.lookup_label", "Account name "), { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
+    var nameF = Forms.labeledInput(doc, t("account.lookup_label", "Account name ") + " ", { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
+    nameF.err = DOM.el(doc, "div", "", "error");
+    nameF.err.setAttribute("aria-live", "polite"); nameF.err.style.display = "none"; nameF.row.appendChild(nameF.err);
     DOM.append(wrap, nameF.row);
     var goBtn = touchable(DOM.el(doc, "button", t("account.open_account", "Open account page")));
     goBtn.id = "accts-open"; goBtn.type = "button"; DOM.append(wrap, goBtn);

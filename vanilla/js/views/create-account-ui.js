@@ -52,19 +52,8 @@ var CreateAccountUI = (function () {
   function showStatus(doc, wrap, text) {
     var p = DOM.status(wrap, text);
     return p; }
-  /* Labeled input row with its own inline error slot. */
-  function fieldRow(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input"); input.type = opts.type || "text";
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    if (opts.id) input.id = opts.id;
-    if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
-    return { row: row, input: input, err: err }; }
+  /* Labeled input row with its own inline error slot (Forms builds the
+   * row; the err div stays per-view — Forms.fieldRow returns row only). */
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("createaccount.none", "none"); }
   /* Settings network (sole owner: Store); testnet enables the faucet. */
   function networkName() {
@@ -183,7 +172,9 @@ var CreateAccountUI = (function () {
       card.appendChild(a);
       wrap.appendChild(card);
     })();
-    var nameF = fieldRow(doc, t("createaccount.account_name", "Account name "), { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
+    var nameF = Forms.labeledInput(doc, t("createaccount.account_name", "Account name ") + " ", { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
+    nameF.err = DOM.el(doc, "div", "", "error");
+    nameF.err.setAttribute("aria-live", "polite"); nameF.err.style.display = "none"; nameF.row.appendChild(nameF.err);
     wrap.appendChild(nameF.row);
     var checkBtn = touchable(DOM.el(doc, "button", t("createaccount.check_availability", "Check availability")));
     checkBtn.id = "ca-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
@@ -379,7 +370,9 @@ var CreateAccountUI = (function () {
     saved.id = "ca-backup-text"; saved.rows = 3; saved.readOnly = true; saved.value = P.brainkey; saved.style.width = "100%";
     wrap.appendChild(saved);
     wrap.appendChild(DOM.el(doc, "h3", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
-    var pwF = fieldRow(doc, t("createaccount.password", "Password "), { id: "ca-password", type: "password" });
+    var pwF = Forms.labeledInput(doc, t("createaccount.password", "Password ") + " ", { id: "ca-password", type: "password" });
+    pwF.err = DOM.el(doc, "div", "", "error");
+    pwF.err.setAttribute("aria-live", "polite"); pwF.err.style.display = "none"; pwF.row.appendChild(pwF.err);
     wrap.appendChild(pwF.row);
     var saveBtn = touchable(DOM.el(doc, "button", t("createaccount.save_wallet_with_this_brainkey", "Save wallet with this brainkey")));
     saveBtn.id = "ca-save"; saveBtn.type = "button"; wrap.appendChild(saveBtn);

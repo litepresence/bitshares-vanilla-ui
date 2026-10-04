@@ -164,15 +164,9 @@ var AssetUI = (function () {
     try { if (coff && typeof coff.ensure === "function") coff.ensure(); } catch (e) { /* wait above covers */ }
     return true;
   }
-  /* field: labeled input row. bits: checkbox group with read(). */
-  function field(d, label, id, val, mode, area, ph) {
-    var row = el(d, "div", null, "xfer-field"), lab = el(d, "label", label + " ");
-    var inp = d.createElement(area ? "textarea" : "input");
-    if (!area) { inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode); }
-    if (id) inp.id = id; if (val !== undefined) inp.value = val;
-    if (ph) inp.setAttribute("placeholder", ph); inp.setAttribute("autocomplete", "off");
-    touch(inp); lab.appendChild(inp); row.appendChild(lab); return { row: row, input: inp };
-  }
+  /* No local field builder — use Forms.labeledInput (row + input) or
+   * Forms.labeledTextarea for the description box (plus autocomplete off).
+   * bits stays local (checkbox group, not a labeled row). */
   /* bits: permission-bit checkbox group. Params: doc, [bit,label] list,
    * current mask. Returns {box, read()} where read() ORs checked bits. */
   function bits(d, list, cur) {
@@ -234,7 +228,7 @@ var AssetUI = (function () {
     if (noBackend()) { err(d, w,t("asset.backend_missing", "Asset backend missing.")); return; }
     if (cold(d, w, root, function () { renderAssets(root); })) return;
     w.appendChild(el(d, "h1", t("assets.title", "Assets"))); nav(d, w);
-    var f = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), "asset-issuer", ""); w.appendChild(f.row);
+    var f = Forms.labeledInput(d, t("asset.issuer_field", "Issuer (name or 1.2.N)") + " ", { id: "asset-issuer", value: "", autocomplete: "off" }); w.appendChild(f.row);
     var go = touch(el(d, "button", t("asset.load_issued", "Load issued assets"))); go.type = "button"; w.appendChild(go);
     /* Punchlist MED: default table without a manual LOAD — the explorer
      * all-assets table is one link away, and the wallet account's issued
@@ -290,7 +284,7 @@ var AssetUI = (function () {
       }
     } catch (e) { /* notice is display-only */ }
     var issuerDef = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0";
-    var issuer = field(d, t("asset.issuer_field", "Issuer (name or 1.2.N)"), null, issuerDef);
+    var issuer = Forms.labeledInput(d, t("asset.issuer_field", "Issuer (name or 1.2.N)") + " ", { value: issuerDef, autocomplete: "off" });
     w.appendChild(issuer.row);
     /* LOW punchlist: account-detached flow honesty — this page defaults to
      * the viewing-as account; opening it from an account page keeps context.
@@ -318,14 +312,15 @@ var AssetUI = (function () {
         b.type = "button"; b.addEventListener("click", function () { tab = t[0]; draw(); }); bar.appendChild(b); });
       var smart = (tab === "smart" || tab === "pma"), nft = (tab === "nft");
       if (tab === "pma") body.appendChild(el(d, "p", t("asset.pma_note", "Prediction market: is_prediction_market locked ON."), "muted"));
-      var sym = field(d, t("asset.symbol_field", "Symbol (A-Z0-9.)"), null, "", null, false, "AFKTEST01");
-      var prec = field(d, t("asset.precision_field", "Precision (0–12)"), null, "4", "numeric");
-      var msup = field(d, t("asset.max_supply_field", "Max supply (human)"), null, "1000000", "decimal");
-      var fpct = field(d, t("asset.market_fee_field", "Market fee % (human)"), null, "0", "decimal");
-      var mfee = field(d, t("asset.max_market_fee_field", "Max market fee (human)"), null, "1000000", "decimal");
-      var cb = field(d, t("asset.cer_base_field", "CER base (human, core)"), null, "1", "decimal");
-      var cq = field(d, t("asset.cer_quote_field", "CER quote (human, new asset)"), null, "1", "decimal");
-      var desc = field(d, t("asset.description_row", "Description"), null, "", null, true);
+      var sym = Forms.labeledInput(d, t("asset.symbol_field", "Symbol (A-Z0-9.)") + " ", { value: "", placeholder: "AFKTEST01", autocomplete: "off" });
+      var prec = Forms.labeledInput(d, t("asset.precision_field", "Precision (0–12)") + " ", { value: "4", inputmode: "numeric", autocomplete: "off" });
+      var msup = Forms.labeledInput(d, t("asset.max_supply_field", "Max supply (human)") + " ", { value: "1000000", inputmode: "decimal", autocomplete: "off" });
+      var fpct = Forms.labeledInput(d, t("asset.market_fee_field", "Market fee % (human)") + " ", { value: "0", inputmode: "decimal", autocomplete: "off" });
+      var mfee = Forms.labeledInput(d, t("asset.max_market_fee_field", "Max market fee (human)") + " ", { value: "1000000", inputmode: "decimal", autocomplete: "off" });
+      var cb = Forms.labeledInput(d, t("asset.cer_base_field", "CER base (human, core)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+      var cq = Forms.labeledInput(d, t("asset.cer_quote_field", "CER quote (human, new asset)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+      var desc = Forms.labeledTextarea(d, t("asset.description_row", "Description") + " ", { value: "" });
+      desc.input.setAttribute("autocomplete", "off");
       /* Sub-asset prefill (?sub=PARENT from the PMO org detail): the symbol
        * starts as "PARENT." with the cursor left for the child name; manual
        * typing always wins (only applied when the box is still empty). */
@@ -400,12 +395,12 @@ var AssetUI = (function () {
       body.appendChild(el(d, "h3", t("asset.flags_title", "Flags"))); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
       var nt = null, nu = null, lh = null, mf = null, dl = null, op = null, mv = null, ba = null;
       if (nft) { body.appendChild(el(d, "h3", t("asset.nft_meta_title", "NFT metadata (description nft_object)")));
-        nt = field(d, t("asset.nft_title_field", "NFT title"), null, ""); nu = field(d, t("asset.nft_uri_field", "NFT URI"), null, "");
+        nt = Forms.labeledInput(d, t("asset.nft_title_field", "NFT title") + " ", { value: "", autocomplete: "off" }); nu = Forms.labeledInput(d, t("asset.nft_uri_field", "NFT URI") + " ", { value: "", autocomplete: "off" });
         body.appendChild(nt.row); body.appendChild(nu.row); }
       if (smart) { body.appendChild(el(d, "h3", t("asset.bitasset_title", "Bitasset options")));
-        lh = field(d, t("asset.feed_lifetime_field", "Feed lifetime (hours)"), null, "24", "numeric"); mf = field(d, t("explorer.min_feeds", "Minimum feeds"), null, "1", "numeric");
-        dl = field(d, t("asset.settle_delay_field", "Settlement delay (sec)"), null, "86400", "numeric"); op = field(d, t("asset.settle_offset_field", "Settlement offset %"), null, "1", "decimal");
-        mv = field(d, t("asset.max_settle_vol_field", "Max settlement vol %"), null, "20", "decimal"); ba = field(d, t("asset.backing_field", "Backing (1.3.N)"), null, "1.3.0");
+        lh = Forms.labeledInput(d, t("asset.feed_lifetime_field", "Feed lifetime (hours)") + " ", { value: "24", inputmode: "numeric", autocomplete: "off" }); mf = Forms.labeledInput(d, t("explorer.min_feeds", "Minimum feeds") + " ", { value: "1", inputmode: "numeric", autocomplete: "off" });
+        dl = Forms.labeledInput(d, t("asset.settle_delay_field", "Settlement delay (sec)") + " ", { value: "86400", inputmode: "numeric", autocomplete: "off" }); op = Forms.labeledInput(d, t("asset.settle_offset_field", "Settlement offset %") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
+        mv = Forms.labeledInput(d, t("asset.max_settle_vol_field", "Max settlement vol %") + " ", { value: "20", inputmode: "decimal", autocomplete: "off" }); ba = Forms.labeledInput(d, t("asset.backing_field", "Backing (1.3.N)") + " ", { value: "1.3.0", autocomplete: "off" });
         [lh, mf, dl, op, mv, ba].forEach(function (x) { body.appendChild(x.row); }); }
       var rev = touch(el(d, "button", t("credit.review_create", "Review create"))); rev.type = "button"; body.appendChild(rev);
       rev.addEventListener("click", function () {

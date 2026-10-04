@@ -93,18 +93,8 @@ var AuthUI = (function () {
     var err = DOM.error(wrap, msg);
     return err;
   }
-  /* Labeled input row with its own inline error slot. */
-  function fieldRow(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input"); input.type = opts.type || "text";
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    if (opts.id) input.id = opts.id;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
-    return { row: row, input: input, err: err }; }
+  /* Labeled input row with its own inline error slot (Forms builds the
+   * row; the err div stays per-view — Forms.fieldRow returns row only). */
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("auth.none", "none"); }
   /* Backend guard: loud inline error when Wallet failed to load. */
   function walletMissing(doc, wrap) {
@@ -180,7 +170,9 @@ var AuthUI = (function () {
     var cardA = cardHead(doc, wrap, t("auth.local_wallet_unlock_on_this_device", "Local wallet — unlock on this device"),
       "Uses the password you set when this wallet was created. Keys never leave this device.",
       { hint: t("auth.best_security_stays_in_this_browser_move", "Best security — stays in this browser. Move it with the brainkey backup.") });
-    var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
+    var f = Forms.labeledInput(doc, t("auth.password", "Password ") + " ", { id: "login-password", type: "password" });
+    f.err = DOM.el(doc, "div", "", "error");
+    f.err.setAttribute("aria-live", "polite"); f.err.style.display = "none"; f.row.appendChild(f.err);
     DOM.append(cardA, f.row);
     var btn = touchable(DOM.el(doc, "button", t("auth.unlock", "Unlock")));
     btn.id = "login-do"; btn.type = "button"; DOM.append(cardA, btn);
@@ -223,7 +215,9 @@ var AuthUI = (function () {
       "Look an on-chain account up by name, then unlock the local wallet above " +
       "(or import its brainkey). Account-password key derivation from the old UI is not supported here.",
       { hint: t("auth.no_login_from_anywhere_with_name_password", "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.") });
-    var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
+    var g = Forms.labeledInput(doc, t("auth.account_name", "Account name ") + " ", { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
+    g.err = DOM.el(doc, "div", "", "error");
+    g.err.setAttribute("aria-live", "polite"); g.err.style.display = "none"; g.row.appendChild(g.err);
     DOM.append(cardB, g.row);
     var lookBtn = touchable(DOM.el(doc, "button", t("auth.look_up_account", "Look up account")));
     lookBtn.id = "login-lookup"; lookBtn.type = "button"; DOM.append(cardB, lookBtn);
@@ -375,7 +369,9 @@ var AuthUI = (function () {
     DOM.append(wrap, DOM.el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
     DOM.append(wrap, notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
       "Name checks work on either network."));
-    var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
+    var g = Forms.labeledInput(doc, t("auth.account_name", "Account name ") + " ", { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
+    g.err = DOM.el(doc, "div", "", "error");
+    g.err.setAttribute("aria-live", "polite"); g.err.style.display = "none"; g.row.appendChild(g.err);
     DOM.append(wrap, g.row);
     var checkBtn = touchable(DOM.el(doc, "button", t("auth.check_availability", "Check availability")));
     checkBtn.id = "reg-cloud-check"; checkBtn.type = "button"; DOM.append(wrap, checkBtn);

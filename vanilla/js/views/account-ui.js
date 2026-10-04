@@ -1179,16 +1179,11 @@ var AccountUI = (function () {
     lookNote.className = "muted";
     lookNote.textContent = t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history).");
     wrap.appendChild(lookNote);
-    var lookRow = doc.createElement("div");
-    lookRow.className = "xfer-field";
-    var lookLabel = doc.createElement("label");
-    lookLabel.appendChild(doc.createTextNode(t("account.lookup_label", "Account name ")));
     var lookInput = doc.createElement("input");
     lookInput.type = "text";
     lookInput.setAttribute("autocomplete", "off");
     lookInput.style.minHeight = "44px";
-    lookLabel.appendChild(lookInput);
-    lookRow.appendChild(lookLabel);
+    var lookRow = Forms.fieldRow(doc, t("account.lookup_label", "Account name "), lookInput);
     wrap.appendChild(lookRow);
     var lookErr = makeError(doc);
     wrap.appendChild(lookErr);
