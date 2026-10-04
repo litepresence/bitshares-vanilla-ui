@@ -7,6 +7,9 @@ function fakeDoc() {
   return {
     createElement: function(tag) {
       return { tag: tag, children: [], textContent: "", setAttribute: function(k,v){ this[k]=v; }, appendChild: function(c){ this.children.push(c); return c; }, className: "", style: {} };
+    },
+    createTextNode: function(text) {
+      return { tag: "#text", children: [], textContent: text == null ? "" : String(text), nodeValue: text == null ? "" : String(text), className: "", style: {} };
     }
   };
 }
@@ -32,4 +35,48 @@ var err = DOM.error(wrap, "oops");
 assert.strictEqual(err.className, "error");
 assert.ok(err.hasAttribute("aria-live"));
 
+// pageHead vectors (uniform heading-icons plan, Phase 1)
+assert.strictEqual(typeof DOM.pageHead, "function", "DOM.pageHead exists");
+
+// vector 1: icon present -> h1 with title text + img child class h-title-icon
+global.Icon = {
+  img: function(name, cls, alt) {
+    return { tag: "img", iconName: name, className: cls, alt: alt, children: [], textContent: "" };
+  }
+};
+var headed = DOM.pageHead(doc, "Markets", "candles");
+assert.strictEqual(headed.tag, "h1");
+assert.strictEqual(headed.textContent, "Markets");
+assert.strictEqual(headed.children.length, 2);
+assert.strictEqual(headed.children[0].textContent, " ");
+assert.strictEqual(headed.children[1].tag, "img");
+assert.strictEqual(headed.children[1].className, "h-title-icon");
+delete global.Icon;
+
+// vector 2: null icon -> text-only h1, no children
+var plainNull = DOM.pageHead(doc, "Markets", null);
+assert.strictEqual(plainNull.tag, "h1");
+assert.strictEqual(plainNull.textContent, "Markets");
+assert.strictEqual(plainNull.children.length, 0);
+
+// vector 3: Icon missing -> text-only h1, no throw
+var plainNoIcon = DOM.pageHead(doc, "Markets", "candles");
+assert.strictEqual(plainNoIcon.tag, "h1");
+assert.strictEqual(plainNoIcon.textContent, "Markets");
+assert.strictEqual(plainNoIcon.children.length, 0);
+
+// vector 4: undefined / "" icon -> text-only h1
+var plainUndef = DOM.pageHead(doc, "Markets");
+assert.strictEqual(plainUndef.textContent, "Markets");
+assert.strictEqual(plainUndef.children.length, 0);
+var plainEmpty = DOM.pageHead(doc, "Markets", "");
+assert.strictEqual(plainEmpty.textContent, "Markets");
+assert.strictEqual(plainEmpty.children.length, 0);
+
+// vector 5: title set textContent-only (no HTML parsing)
+var evil = DOM.pageHead(doc, "<b>x</b>", null);
+assert.strictEqual(evil.textContent, "<b>x</b>");
+assert.strictEqual(evil.children.length, 0);
+
 console.log("DOM utils: 7 passed, 0 failed");
+console.log("DOM pageHead: 6 passed, 0 failed");

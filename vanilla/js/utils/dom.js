@@ -119,6 +119,25 @@ var DOM = (function () {
     return wrap;
   }
 
+  /* pageHead: page h1 + optional heading icon (uniform heading-icons plan).
+   * Same guarded pattern as auth-ui.js loginHead: icon appended only when
+   * iconName is a non-empty string AND the Icon global with img() exists;
+   * any failure leaves the heading standing without the icon. Null,
+   * undefined, or "" iconName (gap pages) returns a plain text-only h1.
+   * Params: doc (document), titleText (string, set textContent-only),
+   * iconName (string|null|undefined). Returns the h1 element. */
+  function pageHead(doc, titleText, iconName) {
+    var h = el(doc, "h1", titleText);
+    try {
+      if (typeof iconName === "string" && iconName &&
+          typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+        h.appendChild(doc.createTextNode(" "));
+        h.appendChild(Icon.img(iconName, "h-title-icon", ""));
+      }
+    } catch (e) { /* heading stands without the icon */ }
+    return h;
+  }
+
   return {
     el: el,
     clear: clear,
@@ -126,7 +145,8 @@ var DOM = (function () {
     attrs: attrs,
     status: status,
     error: error,
-    append: append
+    append: append,
+    pageHead: pageHead
   };
 })();
 
