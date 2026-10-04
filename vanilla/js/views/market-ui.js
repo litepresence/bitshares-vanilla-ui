@@ -24,17 +24,7 @@ var MarketUI = (function () {
 
   var LAST_KEY = "bts-vanilla-last-market-v1";
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-
-  function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
 
   function makeWrap(doc, root) {
     var wrap = doc.createElement("div");
@@ -87,13 +77,10 @@ var MarketUI = (function () {
 
   /* Inline error panel (aria-live); missing-backend path only. */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || "Unexpected error");
-    err.textContent = msg;
-    wrap.appendChild(err);
+    var err = DOM.error(wrap, msg);
     return err;
   }
 
@@ -108,7 +95,7 @@ var MarketUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     showError(doc, wrap, "Market backend missing: js/market-desk.js failed to load.");
   }

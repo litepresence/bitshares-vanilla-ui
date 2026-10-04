@@ -39,13 +39,7 @@ var NotifyHost = (function () {
 
   var gen = 0;
   var _unsub = null;
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
   /* mark: open a new host generation (the view calls this per render).
    * live: true only for the current generation (stale async work dies). */
   function mark() { return ++gen; }
@@ -96,7 +90,7 @@ var NotifyHost = (function () {
     if (typeof document === "undefined") return;
     var host = document.getElementById("toast-stack");
     if (!host || typeof Notify === "undefined" || !Notify) return;
-    while (host.firstChild) host.removeChild(host.firstChild);
+    DOM.clear(host);
     var items = [];
     try { items = Notify.list() || []; } catch (e) { items = []; }
     items.forEach(function (item) {
@@ -105,9 +99,9 @@ var NotifyHost = (function () {
       /* Card skin lives in css/app.css (.toast + level stripes). No inline
        * border/padding/background here so the stylesheet wins without
        * !important; host positioning inline above stays as pre-CSS fallback. */
-      var head = el(document, "div", null, "toast-head");
-      if (item.title) head.appendChild(el(document, "strong", item.title));
-      var x = touchable(el(document, "button", "×", "toast-x subtle-btn"));
+      var head = DOM.el(document, "div", null, "toast-head");
+      if (item.title) head.appendChild(DOM.el(document, "strong", item.title));
+      var x = touchable(DOM.el(document, "button", "×", "toast-x subtle-btn"));
       x.type = "button";
       x.setAttribute("aria-label", t("notify.dismiss", "Dismiss notification"));
       x.addEventListener("click", function () {
@@ -115,7 +109,7 @@ var NotifyHost = (function () {
       });
       head.appendChild(x);
       card.appendChild(head);
-      if (item.body) card.appendChild(el(document, "div", item.body, "toast-body"));
+      if (item.body) card.appendChild(DOM.el(document, "div", item.body, "toast-body"));
       /* Tap-to-dismiss anywhere on the card; nothing is hover-only. */
       card.addEventListener("click", function (ev) {
         if (ev.target === x) return;
@@ -125,7 +119,7 @@ var NotifyHost = (function () {
     });
     var more = 0;
     try { more = Notify.overflow() || 0; } catch (e) { more = 0; }
-    if (more > 0) host.appendChild(el(document, "div", "+" + String(more) + t("notify.more_suffix", " more"), "muted"));
+    if (more > 0) host.appendChild(DOM.el(document, "div", "+" + String(more) + t("notify.more_suffix", " more"), "muted"));
   }
   /* bellFor: market-desk entry point (Reference #6 shape, link flavour).
    * Indicator class when the pair has rules; links to #/alerts (NOT a
@@ -134,7 +128,7 @@ var NotifyHost = (function () {
     if (typeof document === "undefined") return null;
     var q = String(quote || "").trim().toUpperCase();
     var b = String(base || "").trim().toUpperCase();
-var a = touchable(el(document, "a", "", "mkt-bell subtle-btn"));
+var a = touchable(DOM.el(document, "a", "", "mkt-bell subtle-btn"));
       a.setAttribute("href", "#/alerts");
       a.setAttribute("aria-label", t("notify.bell", "Price Alert"));
       a.setAttribute("title", t("notify.bell", "Price Alert"));
@@ -147,7 +141,7 @@ var a = touchable(el(document, "a", "", "mkt-bell subtle-btn"));
       if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
         a.appendChild(Icon.img("alarm", "bell-icon", ""));
         if (on) {
-          var dot = el(document, "span", "●", "bell-dot");
+          var dot = DOM.el(document, "span", "●", "bell-dot");
           dot.setAttribute("aria-hidden", "true");
           a.appendChild(dot);
         }
@@ -161,7 +155,7 @@ var a = touchable(el(document, "a", "", "mkt-bell subtle-btn"));
     return a;
   }
   return {
-    el: el, mark: mark, live: live,
+    el: DOM.el, mark: mark, live: live,
     mountToasts: mountToasts, paintToasts: paintToasts, bellFor: bellFor
   };
 })();

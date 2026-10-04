@@ -49,13 +49,7 @@ var MarketOrders = (function () {
     return dflt;
   }
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
   // using global touchable from js/utils/touchable.js
@@ -80,8 +74,6 @@ var MarketOrders = (function () {
    * History fallback keeps its byte-identical message key and gains a linked
    * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
     var raw = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || "");
@@ -102,8 +94,7 @@ var MarketOrders = (function () {
     } else if (msg.indexOf("not connected") !== -1) {
       msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    err.textContent = msg;
-    wrap.appendChild(err);
+    var err = DOM.error(wrap, msg);
     if (isHist) {
       try {
         if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
@@ -127,7 +118,7 @@ var MarketOrders = (function () {
     var assets = ctx.assets;
     var myGen = ++_gen;
     function live() { return myGen === _gen; }
-    while (parentEl.firstChild) parentEl.removeChild(parentEl.firstChild);
+    DOM.clear(parentEl);
     var unlocked = false;
     try {
       unlocked = typeof Wallet !== "undefined" && Wallet &&
@@ -141,11 +132,11 @@ var MarketOrders = (function () {
     tabs.className = "mkt-tabs";
     tabs.setAttribute("role", "tablist");
     tabs.setAttribute("aria-label", t("market.trades_toggle_label", "Recent or my trades"));
-    var tabOrders = touchable(el(doc, "button", t("market.tab_orders", "My orders")));
+    var tabOrders = touchable(DOM.el(doc, "button", t("market.tab_orders", "My orders")));
     tabOrders.type = "button";
     tabOrders.className = "subtle-btn";
     tabOrders.setAttribute("role", "tab");
-    var tabSettle = touchable(el(doc, "button", t("market.tab_settle", "Settlement orders")));
+    var tabSettle = touchable(DOM.el(doc, "button", t("market.tab_settle", "Settlement orders")));
     tabSettle.type = "button";
     tabSettle.className = "subtle-btn";
     tabSettle.setAttribute("role", "tab");
@@ -176,14 +167,14 @@ var MarketOrders = (function () {
     paintTabs(false);
     /* Typed-account preview row (principle #9: reads never gate on unlock). */
     var acctRow = doc.createElement("div");
-    var lab = el(doc, "span", t("account.card_account", "Account") + " ");
+    var lab = DOM.el(doc, "span", t("account.card_account", "Account") + " ");
     var acctInput = doc.createElement("input");
     acctInput.type = "text";
     acctInput.setAttribute("placeholder", t("ticket.name_or_1_2_n", "name or 1.2.N"));
     acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
     acctInput.style.minHeight = "44px";
     acctInput.style.width = "12em";
-    var viewBtn = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
+    var viewBtn = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
     viewBtn.type = "button";
     acctRow.appendChild(lab);
     acctRow.appendChild(acctInput);
@@ -194,9 +185,9 @@ var MarketOrders = (function () {
     myWrap.appendChild(body);
     /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
-      while (body.firstChild) body.removeChild(body.firstChild);
-      var hint = el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
-      var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
+      DOM.clear(body);
+      var hint = DOM.el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
+      var a = DOM.el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
       a.className = "subtle-btn";
       hint.appendChild(a);
@@ -214,9 +205,9 @@ var MarketOrders = (function () {
      * No-ops when live() is false. */
     function paintOrders(mine, canCancel) {
       if (!live()) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       if (mine.length === 0) {
-        body.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
+        body.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
         return;
       }
       /* rerender: full re-render after a cancel flow completes. */
@@ -234,8 +225,8 @@ var MarketOrders = (function () {
       table.className = "node-table";
       var thead = doc.createElement("thead");
       var hr = doc.createElement("tr");
-      [t("market.col_order", "Order"), t("market.col_side", "Side"), t("market.th_amount", "Amount"), t("market.col_price", "Price")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
-      if (canCancel) hr.appendChild(el(doc, "th", t("market.col_action", "Action")));
+      [t("market.col_order", "Order"), t("market.col_side", "Side"), t("market.th_amount", "Amount"), t("market.col_price", "Price")].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
+      if (canCancel) hr.appendChild(DOM.el(doc, "th", t("market.col_action", "Action")));
       thead.appendChild(hr);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
@@ -244,10 +235,10 @@ var MarketOrders = (function () {
       mine.forEach(function (o) {
         var view = orderView(o, assets);
         var tr = doc.createElement("tr");
-        tr.appendChild(el(doc, "td", view.id));
-        tr.appendChild(el(doc, "td", view.side));
-        tr.appendChild(el(doc, "td", view.amount));
-        tr.appendChild(el(doc, "td", view.price));
+        tr.appendChild(DOM.el(doc, "td", view.id));
+        tr.appendChild(DOM.el(doc, "td", view.side));
+        tr.appendChild(DOM.el(doc, "td", view.amount));
+        tr.appendChild(DOM.el(doc, "td", view.price));
         if (canCancel) {
           var td = doc.createElement("td");
           td.appendChild(cancelButton(doc, o, assets, cancelBox, rerender));
@@ -256,9 +247,9 @@ var MarketOrders = (function () {
         tbody.appendChild(tr);
         var card = doc.createElement("div");
         card.className = "node-card";
-        card.appendChild(el(doc, "div", view.id + " · " + view.side));
-        card.appendChild(el(doc, "div", view.amount));
-        card.appendChild(el(doc, "div", view.price));
+        card.appendChild(DOM.el(doc, "div", view.id + " · " + view.side));
+        card.appendChild(DOM.el(doc, "div", view.amount));
+        card.appendChild(DOM.el(doc, "div", view.price));
         if (canCancel) card.appendChild(cancelButton(doc, o, assets, cancelBox, rerender));
         var det = doc.createElement("details");
         det.className = "raw";
@@ -306,8 +297,8 @@ var MarketOrders = (function () {
         else render(doc, parentEl, ctx);
         return;
       }
-      while (body.firstChild) body.removeChild(body.firstChild);
-      body.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
+      DOM.clear(body);
+      body.appendChild(DOM.el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
       Promise.resolve().then(function () {
         if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
           throw new Error("account backend missing");
@@ -326,7 +317,7 @@ var MarketOrders = (function () {
         paintOrders(mine, canCancelNow());
       }).catch(function (e) {
         if (!live()) return;
-        while (body.firstChild) body.removeChild(body.firstChild);
+        DOM.clear(body);
         showError(doc, body, e, t("market.fail_orders", "Could not load your orders."));
       });
     }
@@ -342,8 +333,8 @@ var MarketOrders = (function () {
      * Never throws outward (fails inline). */
     function loadSettle() {
       if (!live()) return;
-      while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
-      settleWrap.appendChild(el(doc, "p", t("market.loading_settle", "Loading settlement orders…"), "muted"));
+      DOM.clear(settleWrap);
+      settleWrap.appendChild(DOM.el(doc, "p", t("market.loading_settle", "Loading settlement orders…"), "muted"));
       Promise.resolve().then(async function () {
         if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") throw new Error("not connected");
         if (typeof Market === "undefined" || !Market || typeof Market.settleOrders !== "function") throw new Error("settle backend missing");
@@ -401,15 +392,15 @@ var MarketOrders = (function () {
         return { rows: sorted, price: price, priceTitle: priceTitle, assetId: marketAssetId, prec: settledPrec, sym: settledSym };
       }).then(function (R) {
         if (!live()) return;
-        while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+        DOM.clear(settleWrap);
         if (!R || R.none) {
-          settleWrap.appendChild(el(doc, "p", t("market.no_settle_market", "No bitasset in this market — no settlement orders."), "muted"));
+          settleWrap.appendChild(DOM.el(doc, "p", t("market.no_settle_market", "No bitasset in this market — no settlement orders."), "muted"));
           return;
         }
         paintSettle(R.rows, R.price, R.priceTitle, R.prec, R.sym);
       }).catch(function (e) {
         if (!live()) return;
-        while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+        DOM.clear(settleWrap);
         showError(doc, settleWrap, e, t("market.fail_settle", "Could not load settlement orders."));
       });
     }
@@ -420,16 +411,16 @@ var MarketOrders = (function () {
      * mirror the my-orders pattern. No-ops when live() is false. */
     function paintSettle(rows, price, priceTitle, prec, sym) {
       if (!live()) return;
-      while (settleWrap.firstChild) settleWrap.removeChild(settleWrap.firstChild);
+      DOM.clear(settleWrap);
       if (!rows || rows.length === 0) {
-        settleWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        settleWrap.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
         return;
       }
       var table = doc.createElement("table");
       table.className = "node-table";
       var thead = doc.createElement("thead");
       var hr = doc.createElement("tr");
-      [t("market.col_price", "Price"), t("market.th_amount", "Amount"), t("market.th_settle_date", "Settlement date")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      [t("market.col_price", "Price"), t("market.th_amount", "Amount"), t("market.th_settle_date", "Settlement date")].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
       thead.appendChild(hr);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
@@ -449,21 +440,21 @@ var MarketOrders = (function () {
           if (dateRaw !== "—" && typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") dateShown = I18n.date(dateRaw);
         } catch (e) { dateShown = dateRaw; }
         var tr = doc.createElement("tr");
-        var tdP = el(doc, "td", String(price));
+        var tdP = DOM.el(doc, "td", String(price));
         if (priceTitle) tdP.title = priceTitle;
         tr.appendChild(tdP);
-        var tdA = el(doc, "td", String(amt));
+        var tdA = DOM.el(doc, "td", String(amt));
         if (amtTitle) tdA.title = amtTitle;
         tr.appendChild(tdA);
-        var tdD = el(doc, "td", String(dateShown));
+        var tdD = DOM.el(doc, "td", String(dateShown));
         if (dateShown !== dateRaw) tdD.title = dateRaw;
         tr.appendChild(tdD);
         tbody.appendChild(tr);
         var card = doc.createElement("div");
         card.className = "node-card";
-        card.appendChild(el(doc, "div", String(price)));
-        card.appendChild(el(doc, "div", String(amt)));
-        card.appendChild(el(doc, "div", String(dateShown)));
+        card.appendChild(DOM.el(doc, "div", String(price)));
+        card.appendChild(DOM.el(doc, "div", String(amt)));
+        card.appendChild(DOM.el(doc, "div", String(dateShown)));
         cards.appendChild(card);
       });
       table.appendChild(tbody);
@@ -500,14 +491,14 @@ var MarketOrders = (function () {
         }).catch(function () { /* auto-load below stands */ });
       }
     } catch (e) { /* auto-load below stands */ }
-    body.appendChild(el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
+    body.appendChild(DOM.el(doc, "p", t("market.loading_orders", "Loading your orders…"), "muted"));
     Market.myOrders().then(function (rows) {
       if (!live()) return;
       var mine = (rows || []).filter(function (o) { return isMine(o, assets); });
       paintOrders(mine, canCancelNow());
     }).catch(function (e) {
       if (!live()) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       showError(doc, body, e, t("market.fail_orders", "Could not load your orders."));
     });
   }
@@ -609,11 +600,11 @@ var MarketOrders = (function () {
     parentEl.appendChild(det);
     var bins = Object.keys(counts).map(Number).sort(function (a, b) { return a - b; });
     if (bins.length === 0) {
-      det.appendChild(el(doc, "p",
+      det.appendChild(DOM.el(doc, "p",
         t("market_orders.tape_empty", "No fills to bin — tape empty.") + t("market_orders.tape_hint", " The tape fills as orders match on this market."), "muted"));
       return;
     }
-    var note = el(doc, "p",
+    var note = DOM.el(doc, "p",
       t("market_orders.tape_note", "Fills binned by size") + ": " + String(binned) +
       " · 10^" + String(maxBin) + " " +
       t("market_orders.tape_largest", "largest bin") +
@@ -662,7 +653,7 @@ var MarketOrders = (function () {
   /* Per-row Cancel button: paints TradeUI's inline confirm into the shared
    * box (order id 1.7.x shown there). Done callback re-renders this list. */
   function cancelButton(doc, order, assets, cancelBox, rerender) {
-    var b = touchable(el(doc, "button", t("trade.cancel_button", "Cancel")));
+    var b = touchable(DOM.el(doc, "button", t("trade.cancel_button", "Cancel")));
     b.type = "button";
     b.className = "btn-ghost";
     b.setAttribute("aria-label", t("explorer.pill_cancel", "Cancel order") + " " + String(order.id));

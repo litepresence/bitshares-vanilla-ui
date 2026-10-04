@@ -75,18 +75,9 @@ var MarketDesk = (function () {
     return dflt;
   }
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
 
   function makeWrap(doc, root) {
     var wrap = doc.createElement("div");
@@ -137,8 +128,6 @@ function clearRoot(root) {
    * History fallback keeps its byte-identical message key and gains a linked
    * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
     var raw = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || "");
@@ -159,8 +148,7 @@ function clearRoot(root) {
     } else if (msg.indexOf("not connected") !== -1) {
       msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    err.textContent = msg;
-    wrap.appendChild(err);
+    var err = DOM.error(wrap, msg);
     if (isHist) {
       try {
         if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
@@ -199,7 +187,7 @@ function clearRoot(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     /* Dense desk earns wide screens (§3.6): plain .wrap caps at 720px, so the
      * desk gets .mkt-wrap (1400px cap) and the ≥1200px 3-column grid breathes.
@@ -215,8 +203,8 @@ function clearRoot(root) {
       return;
     }
     if (typeof marketID !== "string" || !marketID) {
-      wrap.appendChild(el(doc, "h1", t("market.title", "Exchange")));
-      wrap.appendChild(el(doc, "p", t("market.pick_to_start", "Pick a market to start."), "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("market.title", "Exchange")));
+      wrap.appendChild(DOM.el(doc, "p", t("market.pick_to_start", "Pick a market to start."), "muted"));
       var emptySec = doc.createElement("section");
       emptySec.className = "mkt-side";
       wrap.appendChild(emptySec);
@@ -227,7 +215,7 @@ function clearRoot(root) {
     try {
       pair = Market.parseId(marketID);
     } catch (e) {
-      wrap.appendChild(el(doc, "h1", t("market.not_found", "Market not found")));
+      wrap.appendChild(DOM.el(doc, "h1", t("market.not_found", "Market not found")));
       showError(doc, wrap, e, t("market.err_unknown", "Unknown market."));
       return;
     }
@@ -237,7 +225,7 @@ function clearRoot(root) {
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("market.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("market.connecting", "Connecting to network…"), "muted"));
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled) return;
@@ -253,16 +241,16 @@ function clearRoot(root) {
       var timer = setTimeout(function () {
         if (settled) return; settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failed = makeWrap(doc, root);
-        failed.appendChild(el(doc, "h1", t("market.title", "Exchange")));
+        failed.appendChild(DOM.el(doc, "h1", t("market.title", "Exchange")));
         showError(doc, failed, new Error("not connected"), t("market.err_offline_short", "Network unavailable."));
-        var mstat = el(doc, "p", "", "muted");
+        var mstat = DOM.el(doc, "p", "", "muted");
         try { mstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failed.appendChild(mstat);
-        var mrow = el(doc, "div", null, "pools-offline-row");
+        var mrow = DOM.el(doc, "div", null, "pools-offline-row");
         failed.appendChild(mrow);
-        var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
+        var retry = touchable(DOM.el(doc, "button", t("market.retry", "Retry")));
         retry.id = "mkt-retry";
         retry.type = "button";
         mrow.appendChild(retry);
@@ -278,7 +266,7 @@ function clearRoot(root) {
           try { mlink = moff.settingsLink(doc, t); } catch (e) { mlink = null; }
         }
         if (!mlink) {
-          mlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          mlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { mlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           touchable(mlink);
         }
@@ -326,14 +314,14 @@ function clearRoot(root) {
       graphWrap: null, graphCanvas: null, graphNote: null, graphData: null
     };
 
-    var desk = el(doc, "div", null, "mkt mkt-exchange");
+    var desk = DOM.el(doc, "div", null, "mkt mkt-exchange");
     wrap.appendChild(desk);
 
     var head = doc.createElement("section");
     head.className = "mkt-head";
     desk.appendChild(head);
-    head.appendChild(el(doc, "h1", pair.quote + " / " + pair.base));
-    var sub = el(doc, "p", t("market.loading", "Loading market…"), "muted");
+    head.appendChild(DOM.el(doc, "h1", pair.quote + " / " + pair.base));
+    var sub = DOM.el(doc, "p", t("market.loading", "Loading market…"), "muted");
     head.appendChild(sub);
     /* LOW punchlist: header star favourite next to the pair (same FAV_KEY the
      * picker owns) + disabled column-chooser gear (columns are fixed; the
@@ -422,7 +410,7 @@ function clearRoot(root) {
     strip.setAttribute("aria-live", "polite");
     head.appendChild(strip);
     state.strip = strip;
-    var spreadLine = el(doc, "p", "", "muted");
+    var spreadLine = DOM.el(doc, "p", "", "muted");
     head.appendChild(spreadLine);
     /* Grouped-book toggle (client-side bucketing of the fetched levels — no
      * refetch, no new WS method, no ES): Exact or floor to 8/6/4/2 decimals
@@ -432,7 +420,7 @@ function clearRoot(root) {
     try {
       var groupRow = doc.createElement("div");
       groupRow.className = "mkt-grouprow";
-      var groupLab = el(doc, "span", t("market.group_label", "Grouping") + " ");
+      var groupLab = DOM.el(doc, "span", t("market.group_label", "Grouping") + " ");
       groupRow.appendChild(groupLab);
       var groupSel = doc.createElement("select");
       groupSel.id = "mkt-book-group";
@@ -460,7 +448,7 @@ function clearRoot(root) {
       });
       groupRow.appendChild(groupSel);
       head.appendChild(groupRow);
-      head.appendChild(el(doc, "p", t("market.group_note", "Grouped rows sum base/quote exactly; bucket price is the floor."), "muted"));
+      head.appendChild(DOM.el(doc, "p", t("market.group_note", "Grouped rows sum base/quote exactly; bucket price is the floor."), "muted"));
     } catch (e) { /* head works without the grouping toggle */ }
     /* Raw-ticker proof host (triangle-only details, refilled per stats
      * fetch — the 24h dl panel is gone with the stats grid cell). */
@@ -470,7 +458,7 @@ function clearRoot(root) {
     var chartsSec = doc.createElement("section");
     chartsSec.className = "mkt-charts";
     desk.appendChild(chartsSec);
-    chartsSec.appendChild(el(doc, "h2", t("market.charts", "Charts")));
+    chartsSec.appendChild(DOM.el(doc, "h2", t("market.charts", "Charts")));
 
     /* Charts restyle: controls-left rail + zero-gap plots column.
      * div.mkt-chartgrid > div.mkt-controls + div.mkt-plots (shared with the
@@ -497,7 +485,7 @@ function clearRoot(root) {
     tfBox.setAttribute("aria-label", t("market.timeframe_label", "Candle timeframe"));
     controls.appendChild(tfBox);
     state.tfBox = tfBox;
-    var countNote = el(doc, "p", "", "muted mkt-count-note");
+    var countNote = DOM.el(doc, "p", "", "muted mkt-count-note");
     countNote.setAttribute("aria-live", "polite");
     controls.appendChild(countNote);
     state.countNote = countNote;
@@ -524,11 +512,11 @@ function clearRoot(root) {
       MarketInd.drawCharts(state);
     });
     logLab.appendChild(logBox);
-    logLab.appendChild(el(doc, "span", t("market.log_label", "Log")));
+    logLab.appendChild(DOM.el(doc, "span", t("market.log_label", "Log")));
     indRow.appendChild(logLab);
     /* Invert toggle (ported from DEX-UX): re-render the swapped QUOTE_BASE
      * pair via the hash router — cheap, no state to keep in sync. */
-    var invBtn = touchable(el(doc, "button", t("market.invert", "Invert")));
+    var invBtn = touchable(DOM.el(doc, "button", t("market.invert", "Invert")));
     invBtn.type = "button";
     invBtn.id = "mkt-invert";
     invBtn.setAttribute("aria-label", t("market.invert_label", "Invert market pair"));
@@ -555,7 +543,7 @@ function clearRoot(root) {
     oscHost.id = "mkt-osc-host";
     oscHost.className = "mkt-osc-host";
     plots.appendChild(oscHost);
-    var oscNote = el(doc, "p", "", "muted");
+    var oscNote = DOM.el(doc, "p", "", "muted");
     oscNote.setAttribute("aria-live", "polite");
     plots.appendChild(oscNote);
     state.oscNote = oscNote;
@@ -584,14 +572,14 @@ function clearRoot(root) {
     var buySec = doc.createElement("section");
     buySec.className = "mkt-buy";
     colBuy.appendChild(buySec);
-    buySec.appendChild(el(doc, "h2", "Buy " + pair.quote));
+    buySec.appendChild(DOM.el(doc, "h2", "Buy " + pair.quote));
     var buyMount = doc.createElement("div");
     buySec.appendChild(buyMount);
 
     var sellSec = doc.createElement("section");
     sellSec.className = "mkt-sell";
     colSell.appendChild(sellSec);
-    sellSec.appendChild(el(doc, "h2", "Sell " + pair.quote));
+    sellSec.appendChild(DOM.el(doc, "h2", "Sell " + pair.quote));
     var sellMount = doc.createElement("div");
     sellSec.appendChild(sellMount);
 
@@ -606,16 +594,16 @@ function clearRoot(root) {
     var tradesSec = doc.createElement("section");
     tradesSec.className = "mkt-trades";
     colTrade.appendChild(tradesSec);
-    tradesSec.appendChild(el(doc, "h2", t("market.trades_title", "Trades")));
+    tradesSec.appendChild(DOM.el(doc, "h2", t("market.trades_title", "Trades")));
     var tradesTabs = doc.createElement("div");
     tradesTabs.className = "mkt-tabs";
     tradesTabs.setAttribute("role", "tablist");
     tradesTabs.setAttribute("aria-label", t("market.trades_toggle_label", "Recent or my trades"));
-    var tabRecent = touchable(el(doc, "button", t("market.tab_recent", "Recent trades")));
+    var tabRecent = touchable(DOM.el(doc, "button", t("market.tab_recent", "Recent trades")));
     tabRecent.type = "button";
     tabRecent.id = "mkt-trades-tab-recent";
     tabRecent.setAttribute("role", "tab");
-    var tabMy = touchable(el(doc, "button", t("market.tab_my", "My trades")));
+    var tabMy = touchable(DOM.el(doc, "button", t("market.tab_my", "My trades")));
     tabMy.type = "button";
     tabMy.id = "mkt-trades-tab-my";
     tabMy.setAttribute("role", "tab");
@@ -664,14 +652,14 @@ function clearRoot(root) {
     var bidsSec = doc.createElement("section");
     bidsSec.className = "mkt-bids";
     colBuy.appendChild(bidsSec);
-    bidsSec.appendChild(el(doc, "h2", "Buy orders"));
+    bidsSec.appendChild(DOM.el(doc, "h2", "Buy orders"));
     var bidsBody = doc.createElement("div");
     bidsSec.appendChild(bidsBody);
 
     var asksSec = doc.createElement("section");
     asksSec.className = "mkt-asks";
     colSell.appendChild(asksSec);
-    asksSec.appendChild(el(doc, "h2", "Sell orders"));
+    asksSec.appendChild(DOM.el(doc, "h2", "Sell orders"));
     var asksBody = doc.createElement("div");
     asksSec.appendChild(asksBody);
 
@@ -682,7 +670,7 @@ function clearRoot(root) {
     var ordersSec = doc.createElement("section");
     ordersSec.className = "mkt-orders";
     colTrade.appendChild(ordersSec);
-    ordersSec.appendChild(el(doc, "h2", t("market.my_orders", "My open orders")));
+    ordersSec.appendChild(DOM.el(doc, "h2", t("market.my_orders", "My open orders")));
     var ordersBody = doc.createElement("div");
     ordersSec.appendChild(ordersBody);
 
@@ -695,7 +683,7 @@ function clearRoot(root) {
     depthWrap.className = "mkt-osc-pane";
     var depthHead = doc.createElement("div");
     depthHead.className = "mkt-osc-head";
-    depthHead.appendChild(el(doc, "span", t("market.depth_title", "Depth"), "mkt-osc-title"));
+    depthHead.appendChild(DOM.el(doc, "span", t("market.depth_title", "Depth"), "mkt-osc-title"));
     depthWrap.appendChild(depthHead);
     /* Scale toggles (ship log/log: far-spam prices and dust-to-whale
      * volumes both stay legible; linear stays one tap away). Session-only,
@@ -707,7 +695,7 @@ function clearRoot(root) {
     scaleRow.className = "mkt-scalerow";
     controls.appendChild(scaleRow);
     function scaleBtn(key, logKey, linKey, redrawBars) {
-      var b = touchable(el(doc, "button", "", "subtle-btn"));
+      var b = touchable(DOM.el(doc, "button", "", "subtle-btn"));
       b.type = "button";
       /* paint: relabel this scale toggle from state (log/lin pair). */
       function paint() {
@@ -744,12 +732,12 @@ function clearRoot(root) {
     graphWrap.className = "mkt-osc-pane";
     var graphHead = doc.createElement("div");
     graphHead.className = "mkt-osc-head";
-    graphHead.appendChild(el(doc, "span", "Pool map", "mkt-osc-title"));
+    graphHead.appendChild(DOM.el(doc, "span", "Pool map", "mkt-osc-title"));
     graphWrap.appendChild(graphHead);
     var graphCanvas = doc.createElement("canvas");
     graphCanvas.className = "mkt-canvas";
     graphWrap.appendChild(graphCanvas);
-    var graphNote = el(doc, "p", "Loading pool map…", "muted");
+    var graphNote = DOM.el(doc, "p", "Loading pool map…", "muted");
     graphNote.setAttribute("aria-live", "polite");
     graphWrap.appendChild(graphNote);
     oscHost.appendChild(graphWrap);
@@ -767,11 +755,11 @@ function clearRoot(root) {
 
     var foot = doc.createElement("div");
     foot.className = "mkt-foot";
-    var refreshBtn = touchable(el(doc, "button", t("market.refresh", "Refresh")));
+    var refreshBtn = touchable(DOM.el(doc, "button", t("market.refresh", "Refresh")));
     refreshBtn.id = "mkt-refresh";
     refreshBtn.type = "button";
     foot.appendChild(refreshBtn);
-    var updated = el(doc, "span", "", "muted");
+    var updated = DOM.el(doc, "span", "", "muted");
     foot.appendChild(updated);
     desk.appendChild(foot);
     refreshBtn.addEventListener("click", function () { fill(state); });
@@ -1049,7 +1037,7 @@ function clearRoot(root) {
     state.deepBtn = null;
     if (state.deepRows) { paintBackButton(doc, state); return; }
     if (typeof Market === "undefined" || !Market || typeof Market.tradesDeep !== "function") return;
-    var btn = touchable(el(doc, "button", t("market.load_deeper", "Load deeper history")));
+    var btn = touchable(DOM.el(doc, "button", t("market.load_deeper", "Load deeper history")));
     btn.type = "button";
     state.deepBtn = btn;
     host.appendChild(btn);
@@ -1081,7 +1069,7 @@ function clearRoot(root) {
     if (!host) return;
     try { if (state.deepBtn && state.deepBtn.parentNode) state.deepBtn.parentNode.removeChild(state.deepBtn); } catch (e) { /* refetch stands */ }
     state.deepBtn = null;
-    var back = touchable(el(doc, "button", t("market.back_to_live", "Back to live trades")));
+    var back = touchable(DOM.el(doc, "button", t("market.back_to_live", "Back to live trades")));
     back.type = "button";
     state.deepBtn = back;
     host.appendChild(back);
@@ -1095,7 +1083,7 @@ function clearRoot(root) {
     var host = state.myBody || state.tradesBody;
     var assets = state.assets;
     if (!host || !assets) return;
-    while (host.firstChild) host.removeChild(host.firstChild);
+    DOM.clear(host);
     var tok = (state._myGen = (state._myGen || 0) + 1);
     /* live: this my-trades render is still current (generation token
      * matches and the desk hash is still on this market). Stale async
@@ -1114,14 +1102,14 @@ function clearRoot(root) {
     } catch (e) { unlocked = false; }
     /* Typed-account preview row (public reads only). */
     var acctRow = doc.createElement("div");
-    var lab = el(doc, "span", t("account.card_account", "Account") + " ");
+    var lab = DOM.el(doc, "span", t("account.card_account", "Account") + " ");
     var acctInput = doc.createElement("input");
     acctInput.type = "text";
     acctInput.setAttribute("placeholder", t("ticket.name_or_1_2_n", "name or 1.2.N"));
     acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
     acctInput.style.minHeight = "44px";
     acctInput.style.width = "12em";
-    var viewBtn = touchable(el(doc, "button", t("referrals.look_up", "Look up")));
+    var viewBtn = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
     viewBtn.type = "button";
     acctRow.appendChild(lab);
     acctRow.appendChild(acctInput);
@@ -1132,9 +1120,9 @@ function clearRoot(root) {
     host.appendChild(myBody);
     /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
-      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
-      var hint = el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
-      var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
+      DOM.clear(myBody);
+      var hint = DOM.el(doc, "p", t("market.my_trades_locked", "Unlock your wallet to see your fills on this market. "), "muted");
+      var a = DOM.el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
       touchable(a);
       hint.appendChild(a);
@@ -1166,16 +1154,16 @@ function clearRoot(root) {
      * table (empty -> honest hint). No-ops when live() is false. */
     function paintFills(fills) {
       if (!live()) return;
-      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+      DOM.clear(myBody);
       if (fills.length === 0) {
-        myBody.appendChild(el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
+        myBody.appendChild(DOM.el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
         return;
       }
       var table = doc.createElement("table");
       table.className = "node-table";
       var thead = doc.createElement("thead");
       var hr = doc.createElement("tr");
-      [t("market.th_block", "Block"), t("market.th_price", "Price"), t("market.th_amount", "Amount")].forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+      [t("market.th_block", "Block"), t("market.th_price", "Price"), t("market.th_amount", "Amount")].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
       thead.appendChild(hr);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
@@ -1199,15 +1187,15 @@ function clearRoot(root) {
           }
         } catch (e) { /* honest dashes stand */ }
         var tr = doc.createElement("tr");
-        tr.appendChild(el(doc, "td", String(blk)));
-        tr.appendChild(el(doc, "td", String(price)));
-        tr.appendChild(el(doc, "td", String(amt)));
+        tr.appendChild(DOM.el(doc, "td", String(blk)));
+        tr.appendChild(DOM.el(doc, "td", String(price)));
+        tr.appendChild(DOM.el(doc, "td", String(amt)));
         tbody.appendChild(tr);
         var card = doc.createElement("div");
         card.className = "node-card";
-        card.appendChild(el(doc, "div", "#" + String(blk)));
-        card.appendChild(el(doc, "div", String(price)));
-        card.appendChild(el(doc, "div", String(amt)));
+        card.appendChild(DOM.el(doc, "div", "#" + String(blk)));
+        card.appendChild(DOM.el(doc, "div", String(price)));
+        card.appendChild(DOM.el(doc, "div", String(amt)));
         cards.appendChild(card);
       });
       table.appendChild(tbody);
@@ -1230,8 +1218,8 @@ function clearRoot(root) {
         else renderMyTrades(doc, state);
         return;
       }
-      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
-      myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+      DOM.clear(myBody);
+      myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
       Promise.resolve().then(function () {
         if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
           throw new Error("account backend missing");
@@ -1244,7 +1232,7 @@ function clearRoot(root) {
         paintFills(pairFills(rows || []));
       }).catch(function (e) {
         if (!live()) return;
-        while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+        DOM.clear(myBody);
         showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
       });
     }
@@ -1263,7 +1251,7 @@ function clearRoot(root) {
         }).catch(function () { /* auto-load below stands */ });
       }
     } catch (e) { /* auto-load below stands */ }
-    myBody.appendChild(el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+    myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
     Account.myAccountId().then(function (myId) {
       return Account.history(myId, 100).then(function (rows) {
         return { myId: myId, rows: rows || [] };
@@ -1273,7 +1261,7 @@ function clearRoot(root) {
       paintFills(pairFills(found.rows));
     }).catch(function (e) {
       if (!live()) return;
-      while (myBody.firstChild) myBody.removeChild(myBody.firstChild);
+      DOM.clear(myBody);
       showError(doc, myBody, e, t("market.fail_my_trades", "Could not load your fills."));
     });
   }
@@ -1380,14 +1368,14 @@ function clearRoot(root) {
       paintBook(doc, state);
       MarketInd.maybeDraw(state);
     }).catch(function (e) {
-      while (state.bidsBody.firstChild) state.bidsBody.removeChild(state.bidsBody.firstChild);
-      while (state.asksBody.firstChild) state.asksBody.removeChild(state.asksBody.firstChild);
+      DOM.clear(state.bidsBody);
+      DOM.clear(state.asksBody);
       showError(doc, state.bidsBody, e, t("market.fail_book", "Could not load the order book."));
-      var retry = touchable(el(doc, "button", t("market.retry", "Retry")));
+      var retry = touchable(DOM.el(doc, "button", t("market.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () { fill(state); });
       state.bidsBody.appendChild(retry);
-      state.asksBody.appendChild(el(doc, "p", t("market.fail_book", "Could not load the order book."), "muted"));
+      state.asksBody.appendChild(DOM.el(doc, "p", t("market.fail_book", "Could not load the order book."), "muted"));
     });
 
     MarketInd.renderStrip(doc, state);
@@ -1411,10 +1399,10 @@ function clearRoot(root) {
       /* Raw-ticker proof (triangle-only, refilled per fetch — the 24h dl
        * panel left with the stats grid cell; the strip above carries the
        * human fields). */
-      while (state.tickerRaw.firstChild) state.tickerRaw.removeChild(state.tickerRaw.firstChild);
+      DOM.clear(state.tickerRaw);
       rawDetails(doc, state.tickerRaw, "Raw ticker", st.raw);
     }).catch(function (e) {
-      while (state.tickerRaw.firstChild) state.tickerRaw.removeChild(state.tickerRaw.firstChild);
+      DOM.clear(state.tickerRaw);
       showError(doc, state.tickerRaw, e, t("market.fail_stats", "Could not load market stats."));
     });
 
@@ -1437,7 +1425,7 @@ function clearRoot(root) {
       done();
     }).catch(function (e) {
       var rb = state.recentBody || state.tradesBody;
-      while (rb.firstChild) rb.removeChild(rb.firstChild);
+      DOM.clear(rb);
       showError(doc, rb, e, t("market.fail_trades", "Could not load recent trades."));
       /* Deep path stays offered: it reads the database api (time-windowed),
        * independent of the history plugin the fills above needed. */
@@ -1469,8 +1457,8 @@ function clearRoot(root) {
           }
         } catch (e) { /* radios + note stand without the input */ }
       }).catch(function () {
-        while (state.tfBox.firstChild) state.tfBox.removeChild(state.tfBox.firstChild);
-        state.tfBox.appendChild(el(doc, "span", t("market.fail_timeframes", "Timeframes unavailable on this node."), "muted"));
+        DOM.clear(state.tfBox);
+        state.tfBox.appendChild(DOM.el(doc, "span", t("market.fail_timeframes", "Timeframes unavailable on this node."), "muted"));
         MarketInd.paintCountNote(state);
       });
     }

@@ -153,14 +153,7 @@ var MenuUI = (function () {
     return SECTIONS.map(function (s) { return s.slug; });
   }
 
-  /* textContent-only element (menu strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
 
   /* iconOK: vendored-icon availability probe. Params: none. Returns boolean.
    * Never throws. */
@@ -211,7 +204,7 @@ var MenuUI = (function () {
     g.className = "menu-grid";
     anchors.forEach(function (a) { g.appendChild(a); });
     wrap.appendChild(g);
-    var empty = el(doc, "p", t("menu.no_match", "No matching pages. Clear the search to see everything."), "muted");
+    var empty = DOM.el(doc, "p", t("menu.no_match", "No matching pages. Clear the search to see everything."), "muted");
     empty.style.display = "none";
     wrap.appendChild(empty);
     search.addEventListener("input", function () {
@@ -244,12 +237,12 @@ var MenuUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = doc.createElement("div");
     wrap.className = "wrap";
     root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", t("menu.title", "Menu")));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "h1", t("menu.title", "Menu")));
+    wrap.appendChild(DOM.el(doc, "p",
       t("menu.intro", "Every page in the wallet, grouped by job. Pick a section to see its pages."), "muted"));
     var anchors = [];
     SECTIONS.forEach(function (section) {
@@ -286,14 +279,14 @@ var MenuUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = doc.createElement("div");
     wrap.className = "wrap";
     root.appendChild(wrap);
     var section = findSection(slug);
     if (!section) {
-      wrap.appendChild(el(doc, "h1", t("menu.title", "Menu")));
-      wrap.appendChild(el(doc, "p",
+      wrap.appendChild(DOM.el(doc, "h1", t("menu.title", "Menu")));
+      wrap.appendChild(DOM.el(doc, "p",
         t("menu.unknown_section", "No menu section with that name. Pick one below."), "muted"));
       var back = doc.createElement("a");
       back.className = "menu-card";
@@ -302,15 +295,15 @@ var MenuUI = (function () {
       wrap.appendChild(back);
       return;
     }
-    var crumb = el(doc, "p", null, "muted menu-crumb");
+    var crumb = DOM.el(doc, "p", null, "muted menu-crumb");
     var home = doc.createElement("a");
     home.setAttribute("href", "#/menu");
     home.textContent = t("menu.title", "Menu");
     crumb.appendChild(home);
     crumb.appendChild(doc.createTextNode(" / " + t(section.titleKey, section.titleDefault)));
     wrap.appendChild(crumb);
-    wrap.appendChild(el(doc, "h1", pageTitle(section)));
-    wrap.appendChild(el(doc, "p", t(section.blurbKey, section.blurbDefault), "muted"));
+    wrap.appendChild(DOM.el(doc, "h1", pageTitle(section)));
+    wrap.appendChild(DOM.el(doc, "p", t(section.blurbKey, section.blurbDefault), "muted"));
     var anchors = section.links.map(function (link) { return card(doc, link); });
     grid(doc, wrap, anchors);
   }

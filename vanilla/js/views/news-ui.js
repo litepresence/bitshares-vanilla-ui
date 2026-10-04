@@ -30,13 +30,7 @@ var NewsUI = (function () {
     return dflt;
   }
   var gen = 0;
-  /* textContent-only element (chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
   /* Point-in-time connection line (honest: labeled as current state, with a
    * Settings pointer when offline — never a live-updating promise). */
   function connectionLine() {
@@ -64,12 +58,12 @@ var NewsUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = doc.createElement("div"); wrap.className = "wrap"; root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", t("news.news", "News")));
-    wrap.appendChild(el(doc, "p", t("news.this_wallet_ships_no_in_app_news_feed_the_ref", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current."), "muted"));
-    wrap.appendChild(el(doc, "p", t("news.no_feed_fetch_is_attempted_so_there_is_no", "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page."), "muted"));
-    var conn = el(doc, "p", t("news.checking_connection", "Checking connection…"), "muted");
+    wrap.appendChild(DOM.el(doc, "h1", t("news.news", "News")));
+    wrap.appendChild(DOM.el(doc, "p", t("news.this_wallet_ships_no_in_app_news_feed_the_ref", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("news.no_feed_fetch_is_attempted_so_there_is_no", "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page."), "muted"));
+    var conn = DOM.el(doc, "p", t("news.checking_connection", "Checking connection…"), "muted");
     conn.setAttribute("aria-live", "polite");
     wrap.appendChild(conn);
     try { conn.textContent = connectionLine(); } catch (e) { conn.textContent = t("news.network_unknown_connection_unknown_see_se", "Network: unknown · connection: unknown (see Settings → Nodes)"); }
@@ -79,7 +73,7 @@ var NewsUI = (function () {
         try { conn.textContent = connectionLine(); } catch (e) { /* line stays */ }
       });
     }
-    wrap.appendChild(el(doc, "h3", t("news.start_here", "Start here")));
+    wrap.appendChild(DOM.el(doc, "h3", t("news.start_here", "Start here")));
     var list = doc.createElement("ul");
     [["#/market/BTS_USD", t("news.exchange_trade_on_the_dex", "Exchange — trade on the DEX")],
      ["#/account/me", t("news.account_overview_balances_and_history", "Account overview — balances and history")],

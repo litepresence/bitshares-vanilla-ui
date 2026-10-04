@@ -53,7 +53,7 @@ var MiscUI = (function () {
   /* Resolve the shared _ui or paint the missing-backend box; returns ui or null. */
   function entry(root) {
     try { return U(); } catch (e) {
-      root.innerHTML = "";
+      DOM.clear(root);
       var d0 = root.ownerDocument || document, w0 = d0.createElement("div");
       w0.className = "wrap"; root.appendChild(w0);
       w0.appendChild(d0.createTextNode(t("misc.vesting_backend_missing_proposal_ui_js_failed", "Vesting backend missing: proposal-ui.js failed to load.")));

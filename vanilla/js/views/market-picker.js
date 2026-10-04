@@ -36,13 +36,7 @@ var MarketPicker = (function () {
     return dflt;
   }
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
 /* Display-only 6-decimal trim (retro round 2 D1 — same rule as the strip):
@@ -149,8 +143,6 @@ var MarketPicker = (function () {
    * History fallback keeps its byte-identical message key and gains a linked
    * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
   function showError(doc, wrap, e, fallback) {
-    var err = el(doc, "div", null, "error");
-    err.setAttribute("aria-live", "polite");
     var raw = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || "");
@@ -171,8 +163,7 @@ var MarketPicker = (function () {
     } else if (msg.indexOf("not connected") !== -1) {
       msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    err.textContent = msg;
-    wrap.appendChild(err);
+    var err = DOM.error(wrap, msg);
     if (isHist) {
       try {
         if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
@@ -297,7 +288,7 @@ var MarketPicker = (function () {
    * VOL/PRICE/CHANGE come from the same per-row ticker row (no new calls).
    * Prices render trim6 with full precision on title (D1 rule). */
   function renderPicker(doc, section, currentID, root) {
-    section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
+    section.appendChild(DOM.el(doc, "h2", t("market.picker_title", "Markets")));
     var list = (CURATED[network()] || CURATED.mainnet).slice();
     if (list.indexOf(currentID) === -1 && currentID) list.unshift(currentID);
     var favs = loadFavs();
@@ -338,7 +329,7 @@ var MarketPicker = (function () {
       radio.checked = (_kindFilter === def[0]);
       touchable(radio);
       lab.appendChild(radio);
-      lab.appendChild(el(doc, "span", def[1]));
+      lab.appendChild(DOM.el(doc, "span", def[1]));
       kinds.appendChild(lab);
     });
     section.appendChild(kinds);
@@ -421,7 +412,7 @@ var MarketPicker = (function () {
     /* paint: render the filtered picker rows (search + kind + fav-only).
      * Params: filter (raw search string, matched case-insensitively). */
     function paint(filter) {
-      while (ul.firstChild) ul.removeChild(ul.firstChild);
+      DOM.clear(ul);
       var f = String(filter || "").trim().toUpperCase();
       var rows = [];
       list.forEach(function (id) {
@@ -442,18 +433,18 @@ var MarketPicker = (function () {
        * per-row ticker fetch below must never grow unbounded — hard slice. */
       rows = rows.slice(0, 20);
       if (rows.length === 0) {
-        ul.appendChild(el(doc, "li", t("market.no_match", "No markets match.") + t("market.try_spelling_hint", " Try another spelling, or open any market from the picker."), "muted"));
+        ul.appendChild(DOM.el(doc, "li", t("market.no_match", "No markets match.") + t("market.try_spelling_hint", " Try another spelling, or open any market from the picker."), "muted"));
         return;
       }
       /* Column header (original MARKET/VOL/PRICE/CHANGE language). */
       var head = doc.createElement("li");
       head.className = "mkt-picker-row mkt-picker-head";
       head.setAttribute("aria-hidden", "true");
-      head.appendChild(el(doc, "span", "", "mkt-pk-star"));
-      head.appendChild(el(doc, "span", t("pool.market_col", "Market"), "mkt-pk-mkt"));
-      head.appendChild(el(doc, "span", t("market.vol_label", "Vol"), "mkt-pk-num"));
-      head.appendChild(el(doc, "span", t("market.th_price", "Price"), "mkt-pk-num"));
-      head.appendChild(el(doc, "span", t("market.chg_label", "24h Δ"), "mkt-pk-num"));
+      head.appendChild(DOM.el(doc, "span", "", "mkt-pk-star"));
+      head.appendChild(DOM.el(doc, "span", t("pool.market_col", "Market"), "mkt-pk-mkt"));
+      head.appendChild(DOM.el(doc, "span", t("market.vol_label", "Vol"), "mkt-pk-num"));
+      head.appendChild(DOM.el(doc, "span", t("market.th_price", "Price"), "mkt-pk-num"));
+      head.appendChild(DOM.el(doc, "span", t("market.chg_label", "24h Δ"), "mkt-pk-num"));
       ul.appendChild(head);
       rows.forEach(function (id) {
         var li = doc.createElement("li");
@@ -492,9 +483,9 @@ var MarketPicker = (function () {
         /* VOL / PRICE / CHANGE columns (mirrors #1 FIND MARKETS columns):
          * same per-row ticker fetch as before, split into three cells;
          * fail-open "—", fills in when the lookup lands. */
-        var volCell = el(doc, "span", "—", "muted mkt-pk-num");
-        var priceCell = el(doc, "span", "—", "muted mkt-pk-num");
-        var chgCell = el(doc, "span", "—", "muted mkt-pk-num");
+        var volCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
+        var priceCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
+        var chgCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
         li.appendChild(volCell);
         li.appendChild(priceCell);
         li.appendChild(chgCell);
@@ -564,11 +555,11 @@ var MarketPicker = (function () {
     go.setAttribute("spellcheck", "false");
     touchable(go);
     form.appendChild(go);
-    var btn = touchable(el(doc, "button", t("market.open_market", "Open market")));
+    var btn = touchable(DOM.el(doc, "button", t("market.open_market", "Open market")));
     btn.type = "submit";
     btn.id = "mkt-direct-go";
     form.appendChild(btn);
-    var ferr = el(doc, "div", null, "error");
+    var ferr = DOM.el(doc, "div", null, "error");
     ferr.setAttribute("aria-live", "polite");
     ferr.style.display = "none";
     section.appendChild(form);

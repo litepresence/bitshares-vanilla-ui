@@ -110,13 +110,7 @@ var MarketInd = (function () {
     return dflt;
   }
 
-  /* Element helper: textContent only, user/chain strings never reach HTML. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
 /* Short label for a bucket size in seconds (label text only, not money). */
@@ -261,7 +255,7 @@ var MarketInd = (function () {
       } catch (e) { return; }
       state.vwapWrap = wrap;
     }
-    while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
+    DOM.clear(wrap);
     var det = doc.createElement("details");
     det.className = "plot mkt-vwap";
     det.setAttribute("open", "");
@@ -275,7 +269,7 @@ var MarketInd = (function () {
       ? state.chartData.buckets : [];
     var assets = state.assets || null;
     if (buckets.length === 0) {
-      det.appendChild(el(doc, "p",
+      det.appendChild(DOM.el(doc, "p",
         t("market_ind.vwap_no_history", "No bucket history — VWAP unavailable on this market."), "muted"));
       return;
     }
@@ -284,7 +278,7 @@ var MarketInd = (function () {
         !assets || !assets.base || !assets.quote ||
         typeof assets.base.precision !== "number" ||
         typeof assets.quote.precision !== "number") {
-      det.appendChild(el(doc, "p",
+      det.appendChild(DOM.el(doc, "p",
         t("market_ind.vwap_unavailable", "VWAP unavailable (bucket math or asset precisions missing)."), "muted"));
       return;
     }
@@ -292,16 +286,16 @@ var MarketInd = (function () {
     try {
       v = MarketCandles.vwap(buckets, assets.base.precision, assets.quote.precision);
     } catch (e) {
-      det.appendChild(el(doc, "p",
+      det.appendChild(DOM.el(doc, "p",
         t("market_ind.vwap_unavailable", "VWAP unavailable (bucket math or asset precisions missing)."), "muted"));
       return;
     }
     if (!v || !Array.isArray(v.per) || v.per.length === 0 || v.human === null) {
-      det.appendChild(el(doc, "p",
+      det.appendChild(DOM.el(doc, "p",
         t("market_ind.vwap_no_volume", "No bucket volume — VWAP needs fills in this session."), "muted"));
       return;
     }
-    var note = el(doc, "p",
+    var note = DOM.el(doc, "p",
       t("market_ind.vwap_session", "Session VWAP") + ": " + String(v.human) +
       " " + assets.base.symbol + "/" + assets.quote.symbol +
       (v.skipped > 0 ? " · " + String(v.skipped) + " " +
@@ -689,9 +683,9 @@ var MarketInd = (function () {
    * feed} exactly as before. */
   function renderStrip(doc, state) {
     var st = state.ticker;
-    while (state.strip.firstChild) state.strip.removeChild(state.strip.firstChild);
+    DOM.clear(state.strip);
     if (!st) {
-      state.strip.appendChild(el(doc, "span", t("market.loading_stats", "Loading stats…"), "muted"));
+      state.strip.appendChild(DOM.el(doc, "span", t("market.loading_stats", "Loading stats…"), "muted"));
       return;
     }
     /* One label/value chip appended to the strip (missing values show —).
@@ -699,10 +693,10 @@ var MarketInd = (function () {
     function cell(label, value, full) {
       var s = doc.createElement("span");
       s.className = "mkt-stat";
-      s.appendChild(el(doc, "span", label + " ", "muted"));
+      s.appendChild(DOM.el(doc, "span", label + " ", "muted"));
       var shown = (value === null || value === undefined)
         ? t("market.stat_empty", "—") : trim6(String(value));
-      var v = el(doc, "strong", shown);
+      var v = DOM.el(doc, "strong", shown);
       if (value !== null && value !== undefined) {
         try { v.title = (full !== undefined && full !== null) ? String(full) : String(value); } catch (e) { /* text stands */ }
       }
@@ -800,7 +794,7 @@ var MarketInd = (function () {
 
   /* Rebuild the timeframe radios from the reconciled live bucket list. */
   function paintTimeframes(doc, state, onBucket) {
-    while (state.tfBox.firstChild) state.tfBox.removeChild(state.tfBox.firstChild);
+    DOM.clear(state.tfBox);
     /* Live list only (reconciled above); the current bucket is always a
      * member, so the checked radio never dangles off-list. */
     var avail = Array.isArray(state.liveBuckets) && state.liveBuckets.length > 0
@@ -821,7 +815,7 @@ var MarketInd = (function () {
         onBucket();
       });
       lab.appendChild(radio);
-      lab.appendChild(el(doc, "span", bucketLabel(b)));
+      lab.appendChild(DOM.el(doc, "span", bucketLabel(b)));
       state.tfBox.appendChild(lab);
     });
     paintCountNote(state);
@@ -945,9 +939,9 @@ var MarketInd = (function () {
           wrap.setAttribute("data-osc", key);
           var head = doc.createElement("div");
           head.className = "mkt-osc-head";
-          head.appendChild(el(doc, "span", label, "mkt-osc-title"));
+          head.appendChild(DOM.el(doc, "span", label, "mkt-osc-title"));
           /* Every pane (incl. Volume) gets an x that unchecks its menu box. */
-          var x = el(doc, "button", "✕", "mkt-osc-x subtle-btn");
+          var x = DOM.el(doc, "button", "✕", "mkt-osc-x subtle-btn");
           x.classList.add("touchable");
           x.type = "button";
           x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " pane");
@@ -1097,7 +1091,7 @@ var MarketInd = (function () {
           drawCharts(state);
         });
         lab.appendChild(box);
-        lab.appendChild(el(doc, "span", label));
+        lab.appendChild(DOM.el(doc, "span", label));
         sec.appendChild(lab);
         return;
       }
@@ -1113,8 +1107,8 @@ var MarketInd = (function () {
       }
       var row = doc.createElement("div");
       row.className = "mkt-indmenu-item";
-      row.appendChild(el(doc, "span", label));
-      var add = el(doc, "button", "＋", "subtle-btn");
+      row.appendChild(DOM.el(doc, "span", label));
+      var add = DOM.el(doc, "button", "＋", "subtle-btn");
       add.classList.add("touchable");
       add.type = "button";
       add.setAttribute("aria-label", t("settings.add", "Add") + " " + label + " overlay");
@@ -1132,11 +1126,11 @@ var MarketInd = (function () {
       /* paintChips: per-instance period chips (editable number + remove)
        * for this indicator; edits clamp into range and redraw the charts. */
       function paintChips() {
-        while (chips.firstChild) chips.removeChild(chips.firstChild);
+        DOM.clear(chips);
         state.over[key].forEach(function (inst, i) {
           var chip = doc.createElement("div");
           chip.className = "mkt-indmenu-chip";
-          chip.appendChild(el(doc, "span", label));
+          chip.appendChild(DOM.el(doc, "span", label));
           var num = doc.createElement("input");
           num.type = "number";
           num.value = String((inst && typeof inst.p === "number") ? inst.p : spec.param.def);
@@ -1155,7 +1149,7 @@ var MarketInd = (function () {
             drawCharts(state);
           });
           chip.appendChild(num);
-          var x = el(doc, "button", "✕", "mkt-osc-x subtle-btn");
+          var x = DOM.el(doc, "button", "✕", "mkt-osc-x subtle-btn");
           x.classList.add("touchable");
           x.type = "button";
           x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " " + num.value);
@@ -1239,7 +1233,7 @@ var MarketInd = (function () {
           drawCharts(state);
         });
         lab.appendChild(box);
-        lab.appendChild(el(doc, "span", label));
+        lab.appendChild(DOM.el(doc, "span", label));
         sec.appendChild(lab);
         if (kind === "osc") state.oscBoxes[key] = box;
       });

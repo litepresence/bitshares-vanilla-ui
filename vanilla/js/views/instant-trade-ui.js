@@ -70,13 +70,7 @@ var InstantTradeUI = (function () {
   var FEE_ASSET = "1.3.0";
   var PROVE_TIMEOUT_MS = 30000, PROVE_INTERVAL_MS = 2500, PRICE_PLACES = 6;
   var BOOK_LIMIT = 50, FEE_DEBOUNCE_MS = 400, WALK_ROWS_MAX = 10;
-  /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
@@ -86,18 +80,18 @@ var InstantTradeUI = (function () {
     else if (msg.indexOf("wallet-locked") !== -1) msg = t("instant.wallet_is_locked", "Wallet is locked.");
     else if (msg.indexOf("no-account") !== -1) msg = t("instant.no_on_chain_account_found_for_the_wallet_s_ac", "No on-chain account found for the wallet's active key.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("instant.unknown_market_asset", "Unknown market asset.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg);
+    return err;
   }
   /* Status line for multi-step flows (loading → review → broadcast). */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p); return p; }
+    var p = DOM.status(wrap, text);
+    return p; }
   /* Labeled input row with its own inline error slot. opts.unit renders a
    * unit suffix span after the input (dexux-ref cue, textContent only). */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input"); input.type = opts.type || "text";
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
     if (opts.id) input.id = opts.id;
@@ -107,13 +101,13 @@ var InstantTradeUI = (function () {
     if (opts.unit) {
       var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
       wrap.appendChild(input);
-      wrap.appendChild(el(doc, "span", opts.unit, "unit-suffix"));
+      wrap.appendChild(DOM.el(doc, "span", opts.unit, "unit-suffix"));
       label.appendChild(wrap);
     } else {
       label.appendChild(input);
     }
     row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("instant.none", "none"); }
@@ -176,12 +170,12 @@ var InstantTradeUI = (function () {
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
     inp.setAttribute("placeholder", t("instant.password", "Password ")); inp.setAttribute("aria-label", t("instant.password", "Password "));
     touchable(inp); row.appendChild(inp);
-    var b = touchable(el(doc, "button", t("instant.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
+    var b = touchable(DOM.el(doc, "button", t("instant.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
     parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
@@ -350,7 +344,7 @@ var InstantTradeUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Tx === "undefined" || !Tx || typeof Market === "undefined" || !Market ||
         typeof Account === "undefined" || !Account || typeof Wallet === "undefined" || !Wallet ||
@@ -359,8 +353,8 @@ var InstantTradeUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
-      wrap.appendChild(el(doc, "p", t("instant.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+      wrap.appendChild(DOM.el(doc, "p", t("instant.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -373,16 +367,16 @@ var InstantTradeUI = (function () {
         if (settled || myGen !== gen) return;
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+        failWrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
         showError(doc, failWrap, new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
-        var istat = el(doc, "p", "", "muted");
+        var istat = DOM.el(doc, "p", "", "muted");
         try { istat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(istat);
-        var irow = el(doc, "div", null, "pools-offline-row");
+        var irow = DOM.el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(irow);
-        var iretry = touchable(el(doc, "button", t("fees.retry", "Retry"))); iretry.type = "button"; iretry.className = "btn-ghost";
+        var iretry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry"))); iretry.type = "button"; iretry.className = "btn-ghost";
         iretry.type = "button";
         irow.appendChild(iretry);
         var ioff = null;
@@ -397,7 +391,7 @@ var InstantTradeUI = (function () {
           try { ilink = ioff.settingsLink(doc, t); } catch (e) { ilink = null; }
         }
         if (!ilink) {
-          ilink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          ilink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { ilink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           ilink.className = "subtle-btn";
         }
@@ -425,40 +419,40 @@ var InstantTradeUI = (function () {
    * above Review is computable locked. */
   function paintConvert(doc, root, myGen, P) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+    wrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
     if (!isUnlockedNow()) {
       var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-      wrap.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
     }
     if (P.pairErr) {
-      var pe = el(doc, "div", P.pairErr, "error");
+      var pe = DOM.el(doc, "div", P.pairErr, "error");
       pe.setAttribute("aria-live", "polite"); wrap.appendChild(pe);
     }
     /* Duo layout (SellReceive.jsx concept: side-by-side wide, stacked narrow).
      * Inline flex (no stylesheet edit — this file owns its layout): wraps at
      * phone width, splits at desk width. */
-    var duo = el(doc, "div", null, "it-duo");
+    var duo = DOM.el(doc, "div", null, "it-duo");
     try {
       duo.style.display = "flex"; duo.style.flexWrap = "wrap";
       duo.style.gap = "12px"; duo.style.alignItems = "stretch";
     } catch (e) { /* layout still stacks without inline flex */ }
-    var sellBox = el(doc, "div", null, "it-panel");
-    var recvBox = el(doc, "div", null, "it-panel");
+    var sellBox = DOM.el(doc, "div", null, "it-panel");
+    var recvBox = DOM.el(doc, "div", null, "it-panel");
     try {
       sellBox.style.flex = "1 1 280px"; sellBox.style.minWidth = "0";
       recvBox.style.flex = "1 1 280px"; recvBox.style.minWidth = "0";
     } catch (e) { /* widths best-effort */ }
-    sellBox.appendChild(el(doc, "h2", t("trade.col_sell", "Sell") + (P.sellSym ? " " + P.sellSym : "")));
-    recvBox.appendChild(el(doc, "h2", t("trade.col_receive", "Receive") + (P.receiveSym ? " " + P.receiveSym : "")));
+    sellBox.appendChild(DOM.el(doc, "h2", t("trade.col_sell", "Sell") + (P.sellSym ? " " + P.sellSym : "")));
+    recvBox.appendChild(DOM.el(doc, "h2", t("trade.col_receive", "Receive") + (P.receiveSym ? " " + P.receiveSym : "")));
     var sellSymF = fieldRow(doc, t("instant.sell_asset_label", "Sell asset "), { id: "it-sell-sym", value: P.sellSym, placeholder: "BTS", inputmode: "text" });
     sellSymF.input.setAttribute("aria-label", t("instant.sell_asset_symbol_aria", "Sell asset symbol"));
     sellSymF.input.setAttribute("autocapitalize", "characters");
     sellBox.appendChild(sellSymF.row);
     var sellAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.sellSym || "SELL" }), { id: "it-sell-amount", value: P.sellAmount, placeholder: "0.00", inputmode: "decimal", unit: P.sellSym || "SELL" });
     sellBox.appendChild(sellAmtF.row);
-    var sellBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.sellSym ? " " + P.sellSym : ""), "muted");
+    var sellBal = DOM.el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.sellSym ? " " + P.sellSym : ""), "muted");
     sellBal.id = "it-sell-bal";
     try { sellBal.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     sellBox.appendChild(sellBal);
@@ -468,15 +462,15 @@ var InstantTradeUI = (function () {
     recvBox.appendChild(recvSymF.row);
     var recvAmtF = fieldRow(doc, t("instant.amount_tpl", "Amount (%(sym)s) ", { sym: P.receiveSym || "RECEIVE" }), { id: "it-receive-amount", value: P.receiveAmount, placeholder: "0.00", inputmode: "decimal", unit: P.receiveSym || "RECEIVE" });
     recvBox.appendChild(recvAmtF.row);
-    var recvBal = el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.receiveSym ? " " + P.receiveSym : ""), "muted");
+    var recvBal = DOM.el(doc, "p", t("trade.balance_locked", "Balance: 0 — unlock for balances") + (P.receiveSym ? " " + P.receiveSym : ""), "muted");
     recvBal.id = "it-receive-bal";
     try { recvBal.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     recvBox.appendChild(recvBal);
-    var swapCell = el(doc, "div", null, "it-swap-cell");
+    var swapCell = DOM.el(doc, "div", null, "it-swap-cell");
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
-    var swapBtn = touchable(el(doc, "button", "⇄"));
+    var swapBtn = touchable(DOM.el(doc, "button", "⇄"));
     swapBtn.id = "it-swap"; swapBtn.type = "button";
-    var swapBtn = touchable(el(doc, "button", "21c4")); swapBtn.id = "it-swap"; swapBtn.type = "button"; swapBtn.className = "subtle-btn";
+    var swapBtn = touchable(DOM.el(doc, "button", "21c4")); swapBtn.id = "it-swap"; swapBtn.type = "button"; swapBtn.className = "subtle-btn";
     /* Bare-glyph swap (SellReceive.jsx concept: Icon name="swap" with no
      * button chrome): transparent, accent ⇄ at ~1.5em. touchable() keeps the
      * 44px target (min-height) plus min-width below. Same id/handler/
@@ -491,13 +485,13 @@ var InstantTradeUI = (function () {
     swapCell.appendChild(swapBtn);
     duo.appendChild(sellBox); duo.appendChild(swapCell); duo.appendChild(recvBox);
     wrap.appendChild(duo);
-    var loadBtn = touchable(el(doc, "button", t("instant.load_market", "Load market")));
+    var loadBtn = touchable(DOM.el(doc, "button", t("instant.load_market", "Load market")));
     loadBtn.id = "it-load"; loadBtn.type = "button"; wrap.appendChild(loadBtn);
-    var out = el(doc, "div"); out.id = "it-quote-out"; wrap.appendChild(out);
-    var walkBox = el(doc, "div"); walkBox.id = "it-walk"; wrap.appendChild(walkBox);
-    var reviewBtn = touchable(el(doc, "button", t("instant.review_order", "Review order")));
+    var out = DOM.el(doc, "div"); out.id = "it-quote-out"; wrap.appendChild(out);
+    var walkBox = DOM.el(doc, "div"); walkBox.id = "it-walk"; wrap.appendChild(walkBox);
+    var reviewBtn = touchable(DOM.el(doc, "button", t("instant.review_order", "Review order")));
     reviewBtn.id = "it-review"; reviewBtn.type = "button"; wrap.appendChild(reviewBtn);
-    var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
+    var deskP = DOM.el(doc, "p", null, "muted"), deskA = doc.createElement("a");
     deskA.href = "#/market/" + ((P.sellSym || "BTS") + "_" + (P.receiveSym || "CNY"));
     deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
     deskP.appendChild(deskA); wrap.appendChild(deskP);
@@ -508,7 +502,7 @@ var InstantTradeUI = (function () {
     }
     function load() {
       setFieldError(sellSymF, ""); setFieldError(recvSymF, "");
-      out.innerHTML = "";
+      DOM.clear(out);
       var s = readSyms();
       P.sellSym = s.sell; P.receiveSym = s.receive;
       P.sellAmount = sellAmtF.input.value; P.receiveAmount = recvAmtF.input.value;
@@ -591,32 +585,32 @@ var InstantTradeUI = (function () {
     } catch (e) { /* desk link keeps its default pair */ }
     var walkBox = doc.getElementById("it-walk");
     if (!walkBox) return;
-    while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
+    DOM.clear(walkBox);
     /* Stats (receive-per-sell orientation; human visible, verbatim raw in
      * title — principle #6, same humanPrice path as the old limit view). */
     var latestH = (M.stats && M.stats.latest) ? humanPrice(M.stats.latest) : null;
     var bidH = (M.stats && M.stats.highestBid) ? humanPrice(M.stats.highestBid) : (M.book.bids && M.book.bids[0] ? humanPrice(M.book.bids[0].displayPrice) : null);
     var askH = (M.stats && M.stats.lowestAsk) ? humanPrice(M.stats.lowestAsk) : (M.book.asks && M.book.asks[0] ? humanPrice(M.book.asks[0].displayPrice) : null);
-    var statsP = el(doc, "p", null, "muted");
+    var statsP = DOM.el(doc, "p", null, "muted");
     statsP.appendChild(doc.createTextNode(t("instant.latest", "Latest: ")));
-    var latestSpan = el(doc, "span", latestH ? latestH.human : "—");
+    var latestSpan = DOM.el(doc, "span", latestH ? latestH.human : "—");
     if (latestH) { try { latestSpan.title = latestH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(latestSpan);
     statsP.appendChild(doc.createTextNode(t("instant.best_bid", " · Best bid: ")));
-    var bidSpan = el(doc, "span", bidH ? bidH.human : "—");
+    var bidSpan = DOM.el(doc, "span", bidH ? bidH.human : "—");
     if (bidH) { try { bidSpan.title = bidH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(bidSpan);
     statsP.appendChild(doc.createTextNode(t("instant.best_ask", " · Best ask: ")));
-    var askSpan = el(doc, "span", askH ? askH.human : "—");
+    var askSpan = DOM.el(doc, "span", askH ? askH.human : "—");
     if (askH) { try { askSpan.title = askH.raw; } catch (e) { /* title best-effort */ } }
     statsP.appendChild(askSpan);
     walkBox.appendChild(statsP);
-    walkBox.appendChild(el(doc, "p", t("instant.walkthrough_trade_prefix", "Trade ") + ctx.sellSym + " → " + ctx.receiveSym + t("instant.walkthrough_bids_mid", " — walkthrough uses bids (selling ") + ctx.sellSym + t("instant.walkthrough_paying_mid", " hits bids paying ") + ctx.receiveSym + ").", "muted"));
-    if (!M.book.bids || M.book.bids.length === 0) walkBox.appendChild(el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
+    walkBox.appendChild(DOM.el(doc, "p", t("instant.walkthrough_trade_prefix", "Trade ") + ctx.sellSym + " → " + ctx.receiveSym + t("instant.walkthrough_bids_mid", " — walkthrough uses bids (selling ") + ctx.sellSym + t("instant.walkthrough_paying_mid", " hits bids paying ") + ctx.receiveSym + ").", "muted"));
+    if (!M.book.bids || M.book.bids.length === 0) walkBox.appendChild(DOM.el(doc, "p", t("instant.the_order_book_is_empty_type_a_price_manually", "The order book is empty — type a price manually."), "muted"));
     /* Per-side balances: locked 0 + hint (computable), unlocked real. */
     refreshBalances(doc, P, M);
     /* Walkthrough live region: effective price + fee display + orders table. */
-    var effP = el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted");
+    var effP = DOM.el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted");
     effP.id = "it-effective";
     /* A11y delta 2026-10-01: walked totals replace text per keystroke — polite
      * live announces the effective price + fee previews without moving focus.
@@ -626,7 +620,7 @@ var InstantTradeUI = (function () {
     /* Last-price walkthrough row (QuickTrade getPriceSection "last" concept):
      * dedicated row from the already-fetched ticker latest (latestH above),
      * receive-per-sell with both syms; dash when the ticker has no latest. */
-    var lastP = el(doc, "p", null, "muted");
+    var lastP = DOM.el(doc, "p", null, "muted");
     lastP.id = "it-last";
     if (latestH) {
       lastP.textContent = t("instant.latest", "Latest: ") + latestH.human + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym;
@@ -646,7 +640,7 @@ var InstantTradeUI = (function () {
      * count + top-of-book via the same humanPrice path as the stats strip).
      * Static reference by design: the live effective-price row above moves
      * against this top-of-book quote as the typed amount walks deeper. */
-    var liqP = el(doc, "p", null, "muted");
+    var liqP = DOM.el(doc, "p", null, "muted");
     liqP.id = "it-liquidity";
     var depthN = (M.book.bids || []).length;
     if (bidH && depthN > 0) {
@@ -656,15 +650,15 @@ var InstantTradeUI = (function () {
       liqP.textContent = t("market.order_book", "Order book") + ": —";
     }
     walkBox.appendChild(liqP);
-    var feeP = el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
+    var feeP = DOM.el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
     feeP.id = "it-fee-preview";
     try { feeP.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     walkBox.appendChild(feeP);
-    var mktP = el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
+    var mktP = DOM.el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted");
     mktP.id = "it-mkt-fee";
     try { mktP.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     walkBox.appendChild(mktP);
-    var tblWrap = el(doc, "div"); tblWrap.id = "it-walk-table";
+    var tblWrap = DOM.el(doc, "div"); tblWrap.id = "it-walk-table";
     try { tblWrap.style.overflowX = "auto"; } catch (e) { /* scroll best-effort */ }
     walkBox.appendChild(tblWrap);
     wireWalkthrough(doc, P, M, effP, feeP, mktP, tblWrap);
@@ -673,15 +667,15 @@ var InstantTradeUI = (function () {
   /* Empty walkthrough before any book loads: never blank, never a raw int. */
   function paintWalkEmpty(doc, walkBox, P) {
     void P;
-    while (walkBox.firstChild) walkBox.removeChild(walkBox.firstChild);
-    walkBox.appendChild(el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted"));
-    var lastE = el(doc, "p", t("instant.latest", "Latest: ") + "—", "muted");
+    DOM.clear(walkBox);
+    walkBox.appendChild(DOM.el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted"));
+    var lastE = DOM.el(doc, "p", t("instant.latest", "Latest: ") + "—", "muted");
     lastE.id = "it-last"; walkBox.appendChild(lastE);
-    var liqE = el(doc, "p", t("market.order_book", "Order book") + ": —", "muted");
+    var liqE = DOM.el(doc, "p", t("market.order_book", "Order book") + ": —", "muted");
     liqE.id = "it-liquidity"; walkBox.appendChild(liqE);
-    walkBox.appendChild(el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
-    walkBox.appendChild(el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
-    walkBox.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
+    walkBox.appendChild(DOM.el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
+    walkBox.appendChild(DOM.el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
+    walkBox.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
   }
 
   /* Per-side balance lines (locked 0 + hint; unlocked real via one balances
@@ -742,9 +736,9 @@ var InstantTradeUI = (function () {
      * WHY helper: both directions share this table; empty book shows honest muted.
      * Param rows (walk level list); no return. */
     function paintTable(rows) {
-      while (tblWrap.firstChild) tblWrap.removeChild(tblWrap.firstChild);
+      DOM.clear(tblWrap);
       if (!rows || rows.length === 0) {
-        tblWrap.appendChild(el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.type_price_hint", " Type a price manually above, or place one from the full desk — it lists here once resting."), "muted"));
+        tblWrap.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.type_price_hint", " Type a price manually above, or place one from the full desk — it lists here once resting."), "muted"));
         return;
       }
       var table = doc.createElement("table");
@@ -784,7 +778,7 @@ var InstantTradeUI = (function () {
         walkBody.appendChild(tr);
       });
       tblWrap.appendChild(table);
-      tblWrap.appendChild(el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + t("instant.level_suffix", " level") + (rows.length === 1 ? "" : "s") + t("instant.walk_suffix", " walk"), "muted"));
+      tblWrap.appendChild(DOM.el(doc, "p", t("market.order_book", "Order book") + ": " + String(rows.length) + t("instant.level_suffix", " level") + (rows.length === 1 ? "" : "s") + t("instant.walk_suffix", " walk"), "muted"));
     }
     /* paintMkt: paint the market-fee preview line (hidden when the asset has none).
      * WHY best-effort: fee preview must never block typing; failures dash the line.
@@ -987,13 +981,13 @@ var InstantTradeUI = (function () {
   function paintConfirm(doc, root, myGen, P, R) {
     if (myGen !== gen) return;
     var M = P.M, ctx = M.ctx;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("instant.confirm_order", "Confirm order")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    wrap.appendChild(DOM.el(doc, "h1", t("instant.confirm_order", "Confirm order")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
     var sellHuman, recvHuman;
     try { sellHuman = Format.formatAmount(R.sellRaw, ctx.sellPrec); }
     catch (e) { sellHuman = R.sellRaw; }
@@ -1010,11 +1004,11 @@ var InstantTradeUI = (function () {
     row(t("instant.fill_or_kill", "Fill or Kill"), t("trade.yes", "Yes"));
     row(t("instant.network", "Network"), networkName());
     wrap.appendChild(list);
-    if (R.previewWarn) wrap.appendChild(el(doc, "p", R.previewWarn, "error"));
-    if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
-    var backBtn = touchable(el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
+    if (R.previewWarn) wrap.appendChild(DOM.el(doc, "p", R.previewWarn, "error"));
+    if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
+    var backBtn = touchable(DOM.el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
     backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", t("instant.sign_send", "Sign & Send")));
+    var sendBtn = touchable(DOM.el(doc, "button", t("instant.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
     sendBtn.addEventListener("click", function () {
@@ -1024,11 +1018,11 @@ var InstantTradeUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
         if (!wrap.querySelector || !wrap.querySelector(".xfer-sign-note")) {
-          var note = el(doc, "p", t("instant.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          var note = DOM.el(doc, "p", t("instant.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
           note.className = "muted xfer-sign-note"; wrap.appendChild(note);
         }
         unlockInline(doc, wrap, function () {
-          wrap.appendChild(el(doc, "p", t("instant.unlocked_repreview_note", "Unlocked — press Back and review again so the order uses your account."), "muted"));
+          wrap.appendChild(DOM.el(doc, "p", t("instant.unlocked_repreview_note", "Unlocked — press Back and review again so the order uses your account."), "muted"));
         });
         backBtn.disabled = false; sendBtn.disabled = false; return;
       }
@@ -1041,14 +1035,14 @@ var InstantTradeUI = (function () {
         })
         .then(function (res) {
           if (myGen !== gen) return;
-          clearRoot(root);
+          DOM.clear(root);
           var done = makeWrap(doc, root);
-          done.appendChild(el(doc, "h1", t("instant.order_placed", "Order placed")));
-          done.appendChild(el(doc, "p", t("instant.order_prefix", "Order ") + res.found.id + t("instant.on_the_book_mid", " is on the book (") + ctx.sellSym + "/" + ctx.receiveSym + ")."));
-          done.appendChild(el(doc, "p", t("instant.observed_head_prefix", "Observed at head block #") + String(res.head) + t("instant.via_mid", " via ") + res.via + ".", "muted"));
-          var again = touchable(el(doc, "button", t("instant.trade_again", "Trade again")));
+          done.appendChild(DOM.el(doc, "h1", t("instant.order_placed", "Order placed")));
+          done.appendChild(DOM.el(doc, "p", t("instant.order_prefix", "Order ") + res.found.id + t("instant.on_the_book_mid", " is on the book (") + ctx.sellSym + "/" + ctx.receiveSym + ")."));
+          done.appendChild(DOM.el(doc, "p", t("instant.observed_head_prefix", "Observed at head block #") + String(res.head) + t("instant.via_mid", " via ") + res.via + ".", "muted"));
+          var again = touchable(DOM.el(doc, "button", t("instant.trade_again", "Trade again")));
           again.id = "it-again"; again.type = "button"; done.appendChild(again);
-          var deskP = el(doc, "p", null, "muted"), deskA = doc.createElement("a");
+          var deskP = DOM.el(doc, "p", null, "muted"), deskA = doc.createElement("a");
           deskA.href = "#/market/" + ctx.sellSym + "_" + ctx.receiveSym;
           deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
           deskP.appendChild(deskA); done.appendChild(deskP);
