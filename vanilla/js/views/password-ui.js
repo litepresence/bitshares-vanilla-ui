@@ -89,7 +89,7 @@ var PasswordUI = (function () {
       wrap.appendChild(DOM.el(doc, "p", t("password.no_wallet_stored_on_this_device_yet_there_is", "No wallet stored on this device yet — there is no password to change."), "muted"));
       var p = DOM.el(doc, "p", null, "muted");
       [["#/create-wallet-brainkey", t("password.create_new_wallet", "Create new wallet")],
-       ["#/existing-account", t("password.import_existing_account", "Import existing account")]].forEach(function (pr, i) {
+       ["#/existing-account", t("common.import_existing", "Import existing account")]].forEach(function (pr, i) {
         if (i > 0) p.appendChild(doc.createTextNode(" · "));
         var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; p.appendChild(a);
       });

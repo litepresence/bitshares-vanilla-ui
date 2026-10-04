@@ -1220,7 +1220,7 @@ var TradeForm = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, mount, t("trade.signing", "Signing…"));
+      var status = showStatus(doc, mount, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         mount.removeChild(status);
@@ -1556,7 +1556,7 @@ var TradeForm = (function () {
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, mount, t("trade.signing", "Signing…"));
+      var status = showStatus(doc, mount, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         mount.removeChild(status);

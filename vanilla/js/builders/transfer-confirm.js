@@ -328,7 +328,7 @@ var TransferConfirm = (function () {
        * before, and nothing here auto-signs on close). */
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
+      var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(activeWIF) : !activeWIF) {
         wrap.removeChild(status);

@@ -170,7 +170,7 @@ var MarketOrders = (function () {
     var lab = DOM.el(doc, "span", t("account.card_account", "Account") + " ");
     var acctInput = doc.createElement("input");
     acctInput.type = "text";
-    acctInput.setAttribute("placeholder", t("ticket.name_or_1_2_n", "name or 1.2.N"));
+    acctInput.setAttribute("placeholder", t("common.name_or_id_hint", "name or 1.2.N"));
     acctInput.setAttribute("aria-label", t("account.card_account", "Account"));
     acctInput.style.minHeight = "44px";
     acctInput.style.width = "12em";

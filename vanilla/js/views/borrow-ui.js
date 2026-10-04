@@ -424,7 +424,7 @@ var BorrowUI = (function () {
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
-              showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+              showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
           }
@@ -649,7 +649,7 @@ var BorrowUI = (function () {
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
-              showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+              showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
           }
@@ -983,7 +983,7 @@ var BorrowUI = (function () {
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
-              showError(doc, out, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+              showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               send.disabled = false; back.disabled = false;
             });
           }

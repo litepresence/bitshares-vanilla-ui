@@ -471,7 +471,7 @@ var DashboardUI = (function () {
     sub.appendChild(doc.createTextNode(t("dashboard.restore_prefix", "Optionally, ")));
     var restore = doc.createElement("a");
     restore.href = "#/existing-account";
-    restore.textContent = t("password.import_existing_account", "Import existing account");
+    restore.textContent = t("common.import_existing", "Import existing account");
     restore.className = "subtle-btn";
     card.appendChild(sub);
     return card;

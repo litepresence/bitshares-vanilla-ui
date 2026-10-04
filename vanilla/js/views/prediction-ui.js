@@ -1036,7 +1036,7 @@ var PredictionUI = (function () {
             }).catch(function (e) {
               if (myGen !== gen) return;
               try { pfConfirm.removeChild(st); } catch (ee) { /* status stands */ }
-              showError(doc, pfConfirm, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+              showError(doc, pfConfirm, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
               sendB.disabled = false; backB.disabled = false;
             });
           }

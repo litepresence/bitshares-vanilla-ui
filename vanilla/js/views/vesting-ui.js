@@ -227,14 +227,14 @@ var VestingUI = (function () {
         ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
-    var fA = ui.field(doc, t("vesting.account", "Account"), { placeholder: t("vesting.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fA = ui.field(doc, t("vesting.account", "Account"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     ctx.wrap.appendChild(fA.row);
     var go = ui.touchable(ui.el(doc, "button", t("vesting.list_vesting", "List vesting"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = ui.el(doc, "div"); ctx.wrap.appendChild(listBox);
     ctx.wrap.appendChild(ui.el(doc, "h2", t("vesting.create_vesting_op_32", "Create vesting (op 32)")));
-    var fC = ui.field(doc, t("vesting.creator", "Creator"), { placeholder: t("vesting.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fO = ui.field(doc, t("vesting.owner", "Owner"), { placeholder: t("vesting.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fS = ui.field(doc, t("vesting.asset", "Asset"), { placeholder: t("vesting.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
+    var fC = ui.field(doc, t("vesting.creator", "Creator"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fO = ui.field(doc, t("vesting.owner", "Owner"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fS = ui.field(doc, t("vesting.asset", "Asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x"), value: "BTS" });
     var fQ = ui.field(doc, t("vesting.amount", "Amount"), { placeholder: "1.5", inputmode: "decimal" });
     ctx.wrap.appendChild(fC.row); ctx.wrap.appendChild(fO.row); ctx.wrap.appendChild(fS.row); ctx.wrap.appendChild(fQ.row);
     var pol = doc.createElement("select"); ui.touchable(pol);
@@ -399,10 +399,10 @@ var VestingUI = (function () {
     });
     ctx.wrap.appendChild(ui.el(doc, "h2", t("vesting.balance_claim_op_37", "Balance claim (op 37)")));
     ctx.wrap.appendChild(ui.el(doc, "p", t("vesting.genesis_balances_claim_by_explicit_1_15_x_id", "Genesis balances claim by explicit 1.15.x id with the balance-owner-key signature (not account auth) and fee 0."), "muted"));
-    var fDep = ui.field(doc, t("vesting.deposit_to_account", "Deposit to account"), { placeholder: t("vesting.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fDep = ui.field(doc, t("vesting.deposit_to_account", "Deposit to account"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var fBal = ui.field(doc, t("vesting.balance_id", "Balance id"), { placeholder: "1.15.N" });
     var fKey = ui.field(doc, t("vesting.balance_owner_public_key", "Balance owner public key"), { placeholder: "BTS…" });
-    var fBA = ui.field(doc, t("vesting.asset", "Asset"), { placeholder: t("vesting.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
+    var fBA = ui.field(doc, t("vesting.asset", "Asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x"), value: "BTS" });
     var fBQ = ui.field(doc, t("vesting.total_to_claim", "Total to claim"), { placeholder: "1.5", inputmode: "decimal" });
     ctx.wrap.appendChild(fDep.row); ctx.wrap.appendChild(fBal.row); ctx.wrap.appendChild(fKey.row);
     ctx.wrap.appendChild(fBA.row); ctx.wrap.appendChild(fBQ.row);

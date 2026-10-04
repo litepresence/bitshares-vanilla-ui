@@ -258,7 +258,7 @@ var HtlcUI = (function () {
         }).catch(function (e) {
           if (myGen !== gen) return;
           out.removeChild(status);
-          showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast).")); sendB.disabled = false; backB.disabled = false;
+          showError(doc, out,e,t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast).")); sendB.disabled = false; backB.disabled = false;
         });
       } });
     /* Principle #6 (raw in title): rows carry native r[2] raw titles
@@ -389,7 +389,7 @@ var HtlcUI = (function () {
   }
   function createBox(doc, box, me, myGen) { /* create form; fee RE-READ at review; no preimage echo */
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
-    var fTo = field(doc, t("htlc.to_account", "To account"), { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+    var fTo = field(doc, t("htlc.to_account", "To account"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     var fAsset = field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
     var fAmount = field(doc, t("confirm.amount", "Amount"), { inputmode: "decimal", placeholder: "1.23456" });
     [fTo, fAsset, fAmount].forEach(function (f) { box.appendChild(f.row); });

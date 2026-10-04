@@ -482,7 +482,7 @@ var TransferUI = (function () {
     var proposerF = Forms.labeledInput(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)") + " ", {
       id: "xfer-proposer",
       value: (state && state.proposer) || (locked ? (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" : (state.from || from.name)),
-      placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off"
+      placeholder: t("common.name_or_id_hint", "name or 1.2.N"), autocomplete: "off"
     });
     proposerF.err = DOM.el(doc, "div", "", "error");
     proposerF.err.setAttribute("aria-live", "polite");
@@ -1406,7 +1406,7 @@ var TransferUI = (function () {
       var backBtn = btns[0], sendBtn = btns[1];
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
+      var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);

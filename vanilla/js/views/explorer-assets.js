@@ -1047,7 +1047,7 @@ var ExplorerAssets = (function () {
             back.addEventListener("click", function () { renderAsset(root, symbol); });
             send.addEventListener("click", function () {
               back.disabled = true; send.disabled = true;
-              var st = DOM.el(doc, "p", t("explorer.fund_signing", "Signing…"), "muted");
+              var st = DOM.el(doc, "p", t("common.status_signing", "Signing…"), "muted");
               st.setAttribute("aria-live", "polite"); actBox.appendChild(st);
               (async function () {
                 var unsigned = await Tx.buildTx([pair]);

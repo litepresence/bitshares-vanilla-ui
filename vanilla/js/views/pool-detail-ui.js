@@ -958,7 +958,7 @@ var PoolDetailUI = (function () {
        * locked keeps the Wallet-link hint. Unlocked prefills the wallet
        * account; the wallet tape-filter below is unchanged. */
       var fAcct = u.field(doc, t("account.card_account", "Account"),
-        { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N") });
+        { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
       myBodyEl.appendChild(fAcct.row);
       var viewBtn = u.touchable(u.el(doc, "button", t("referrals.look_up", "Look up")));
       viewBtn.type = "button";

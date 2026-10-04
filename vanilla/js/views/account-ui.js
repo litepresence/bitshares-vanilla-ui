@@ -1420,7 +1420,7 @@ var AccountUI = (function () {
                 }).catch(function (e) {
                   out.removeChild(bs);
                   showError(doc, out, e,
-                    t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+                    t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
                   send.disabled = false;
                   back.disabled = false;
                 });

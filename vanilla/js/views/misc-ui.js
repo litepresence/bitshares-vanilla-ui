@@ -191,7 +191,7 @@ var MiscUI = (function () {
       }).catch(function (e) { if (!live(myGen, uiGen)) return; ui.clearBox(box); ui.showError(doc, box, e, t("misc.lookup_failed", "Lookup failed.")); go.disabled = false; });
     });
     ctx.wrap.appendChild(ui.el(doc, "h2", t("misc.create_authority_op_54", "Create authority (op 54)")));
-    var cA = ui.field(doc, t("misc.account", "Account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var cA = ui.field(doc, t("misc.account", "Account"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     var cF = ui.field(doc, t("misc.valid_from_2", "Valid from"), { type: "datetime-local" });
     var cT = ui.field(doc, t("misc.valid_to_2", "Valid to"), { type: "datetime-local" });
     var cO = ui.field(doc, t("misc.operation_type_number", "Operation type number"), { placeholder: t("misc.0_transfer", "0 = transfer"), inputmode: "numeric" });
@@ -262,8 +262,8 @@ var MiscUI = (function () {
         ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
-    var fA = ui.field(doc, t("misc.authorizing_account", "Authorizing account"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fL = ui.field(doc, t("misc.counterparty", "Counterparty"), { placeholder: t("misc.name_or_1_2_n", "name or 1.2.N") });
+    var fA = ui.field(doc, t("misc.authorizing_account", "Authorizing account"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fL = ui.field(doc, t("misc.counterparty", "Counterparty"), { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fL.row);
     var go = ui.touchable(ui.el(doc, "button", t("misc.check_current", "Check current"))); go.type = "button"; ctx.wrap.appendChild(go);
     var box = ui.el(doc, "div"); ctx.wrap.appendChild(box);

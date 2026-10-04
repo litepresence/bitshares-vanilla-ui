@@ -238,7 +238,7 @@ var AccountsUI = (function () {
     DOM.append(wrap, DOM.el(doc, "h2", t("account.manage", "Manage")));
     DOM.append(wrap, linkPara(doc, [
       ["#/create-wallet-brainkey", t("account.create_wallet", "Create new wallet")],
-      ["#/existing-account", t("account.import_account", "Import existing account")],
+      ["#/existing-account", t("common.import_existing", "Import existing account")],
       ["#/create-account", t("account.register_account", "Register a new on-chain account")],
       ["#/wallet", t("account.wallet_manager", "Wallet manager")]
     ]));
@@ -285,7 +285,7 @@ var AccountsUI = (function () {
           DOM.append(card, DOM.el(doc, "p", t("account.no_account_yet", "The wallet is unlocked but its active key controls no on-chain account yet. Register one or import a funded brainkey."), "muted"));
           DOM.append(card, linkPara(doc, [
             ["#/create-account", t("account.register_short", "Register a new account")],
-            ["#/existing-account", t("account.import_account", "Import existing account")]
+            ["#/existing-account", t("common.import_existing", "Import existing account")]
           ]));
         } else {
           showError(doc, card, e, t("account.resolve_failed", "Could not resolve the wallet account."));

@@ -140,13 +140,13 @@ var TicketUI = (function () {
     } catch (e) { /* notice is display-only */ }
     var go = ui.touchable(ui.el(doc, "button", t("ticket.load_leaderboard", "Load leaderboard"))); go.type = "button"; ctx.wrap.appendChild(go);
     var boardBox = ui.el(doc, "div"); ctx.wrap.appendChild(boardBox);
-    var fM = Forms.labeledInput(doc, t("ticket.my_account", "My account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fM = Forms.labeledInput(doc, t("ticket.my_account", "My account") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     ctx.wrap.appendChild(fM.row);
     var mine = ui.touchable(ui.el(doc, "button", t("ticket.my_tickets", "My tickets"))); mine.type = "button"; ctx.wrap.appendChild(mine);
     var mineBox = ui.el(doc, "div"); ctx.wrap.appendChild(mineBox);
     ctx.wrap.appendChild(ui.el(doc, "h2", t("ticket.create_ticket", "Create ticket")));
-    var fA = Forms.labeledInput(doc, t("ticket.account", "Account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
+    var fA = Forms.labeledInput(doc, t("ticket.account", "Account") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x"), value: "BTS" });
     var fQ = Forms.labeledInput(doc, t("ticket.amount", "Amount") + " ", { placeholder: "1.5", inputmode: "decimal" });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fS.row); ctx.wrap.appendChild(fQ.row);
     var lock = lockSel(ui, doc, ctx.wrap, t("ticket.lock", "Lock"));
@@ -237,8 +237,8 @@ var TicketUI = (function () {
         ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
-    var fI = Forms.labeledInput(doc, t("ticket.issuer_account", "Issuer account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fI = Forms.labeledInput(doc, t("ticket.issuer_account", "Issuer account") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fI.row); ctx.wrap.appendChild(fS.row);
     var area = doc.createElement("textarea");
     area.setAttribute("placeholder", t("ticket.airdrop_example_ph", "alice,10\nbob,2.5")); area.setAttribute("rows", "6");

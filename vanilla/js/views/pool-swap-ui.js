@@ -229,7 +229,7 @@ var PoolSwapUI = (function () {
     } catch (e) { unlocked = false; }
     /* Typed-account preview row (principle #9: reads never gate on unlock). */
     var fAcct = u.field(doc, t("account.card_account", "Account"),
-      { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N") });
+      { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     box.appendChild(fAcct.row);
     var viewBtn = u.touchable(u.el(doc, "button", t("referrals.look_up", "Look up")));
     viewBtn.type = "button";

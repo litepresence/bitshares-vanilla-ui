@@ -245,7 +245,7 @@ var CreditUI = (function () {
         var btns = dlg.getElementsByTagName("button");
         var backB = btns[0], sendB = btns[1];
         sendB.disabled = true; backB.disabled = true;
-        var status = showStatus(doc, out, t("credit.signing", "Signing…"));
+        var status = showStatus(doc, out, t("common.status_signing", "Signing…"));
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
           out.removeChild(status);
@@ -266,7 +266,7 @@ var CreditUI = (function () {
           out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
         }).catch(function (e) {
           if (myGen !== gen) return; out.removeChild(status);
-          showError(doc, out, e, t("credit.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+          showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
           sendB.disabled = false; backB.disabled = false;
         });
       } });
@@ -477,7 +477,7 @@ var CreditUI = (function () {
       ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
     var fAmt = field(doc, t("credit.accept_borrow_amt_tpl", "Borrow amount (%(sym)s)", { sym: (o.sym || o.asset_id) }), { placeholder: "0.0", inputmode: "decimal" });
-    var fCollA = field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fCollA = field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fColl = field(doc, t("credit.collateral_amount", "Collateral amount"), { placeholder: "0.0", inputmode: "decimal" });
     var fRate = field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: safeRateHuman(o.rate_units), inputmode: "decimal" });
     var fDur = field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });
@@ -556,9 +556,9 @@ var CreditUI = (function () {
     if (locked0) ctx.wrap.appendChild(viewingAsNotice(doc));
     ctx.wrap.appendChild(DOM.el(doc, "p", t("credit.lend_assets_at_a_fee_rate_a_borrower_accepts", "Lend assets at a fee rate. A borrower accepts an offer and a credit deal appears. Rates are percent at denom 1,000,000 — 0.1% stores 1000 units."), "muted"));
     var fO = field(doc, t("credit.owner", "Owner"), locked0
-      ? { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
-      : { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N") });
-    var fA = field(doc, t("credit.asset", "Asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+      ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
+      : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
+    var fA = field(doc, t("credit.asset", "Asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fO.row); ctx.wrap.appendChild(fA.row);
     var go = touchable(DOM.el(doc, "button", t("credit.list_offers", "List offers"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
@@ -641,7 +641,7 @@ var CreditUI = (function () {
     var fAcct = field(doc, t("credit.owner_account", "Owner account"), lockedC
       ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
-    var fAsset = field(doc, t("credit.asset", "Asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fAsset = field(doc, t("credit.asset", "Asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fBal = field(doc, t("credit.balance", "Balance"), { placeholder: "0.0", inputmode: "decimal" });
     var fRate = field(doc, t("credit.fee_rate_2", "Fee rate %"), { placeholder: "0.1", inputmode: "decimal" });
     var fMin = field(doc, t("credit.min_deal_amount", "Min deal amount"), { placeholder: "0.0", inputmode: "decimal" });

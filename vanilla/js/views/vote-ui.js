@@ -730,7 +730,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, t("vote.signing", "Signing…"));
+      var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);
@@ -1083,7 +1083,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   function renderJoinWitness(doc, box, root, st, myGen, isUpdate) {
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el(doc, "h2", isUpdate ? t("vote.update_witness", "Update witness") : t("vote.join_as_witness", "Join as witness")));
-    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("vote.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off" });
+    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("common.name_or_id_hint", "name or 1.2.N"), autocomplete: "off" });
     box.appendChild(acctF.row);
     var urlF = Forms.labeledInput(doc, t("vote.url", "URL") + " ", { value: "", placeholder: "https://example.com", autocomplete: "off" });
     box.appendChild(urlF.row);
@@ -1167,7 +1167,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   function renderJoinCommittee(doc, box, root, st, myGen) {
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el(doc, "h2", t("vote.join_committee", "Join committee")));
-    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("vote.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off" });
+    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("common.name_or_id_hint", "name or 1.2.N"), autocomplete: "off" });
     box.appendChild(acctF.row);
     var urlF = Forms.labeledInput(doc, t("vote.url", "URL") + " ", { value: "", placeholder: "https://example.com", autocomplete: "off" });
     box.appendChild(urlF.row);
@@ -1261,7 +1261,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
-      var status = showStatus(doc, box, t("vote.signing", "Signing…"));
+      var status = showStatus(doc, box, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         box.removeChild(status);

@@ -260,7 +260,7 @@ var ProposalUI = (function () {
         var btns = dlg.getElementsByTagName("button");
         var backB = btns[0], sendB = btns[1];
         sendB.disabled = true; backB.disabled = true;
-        var status = showStatus(doc, out, t("proposal.signing", "Signing…"));
+        var status = showStatus(doc, out, t("common.status_signing", "Signing…"));
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); sendB.disabled = false; backB.disabled = false; return; }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
@@ -272,7 +272,7 @@ var ProposalUI = (function () {
           out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
         }).catch(function (e) {
           if (myGen !== gen) return; out.removeChild(status);
-          showError(doc, out, e, t("proposal.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+          showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
           sendB.disabled = false; backB.disabled = false;
         });
       } });
@@ -596,12 +596,12 @@ var ProposalUI = (function () {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
         ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
-    var fA = Forms.labeledInput(doc, t("proposal.account_for_approvals", "Account for approvals") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fA = Forms.labeledInput(doc, t("proposal.account_for_approvals", "Account for approvals") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
     var go = touchable(DOM.el(doc, "button", t("proposal.list_proposals", "List proposals"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
     ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.create_proposal", "Create proposal")));
-    var fP = Forms.labeledInput(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fP = Forms.labeledInput(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
     var fE = Forms.labeledInput(doc, t("proposal.expiration", "Expiration") + " ", { type: "datetime-local" });
     var fR = Forms.labeledInput(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
     ctx.wrap.appendChild(fP.row); ctx.wrap.appendChild(fE.row); ctx.wrap.appendChild(fR.row);
@@ -637,7 +637,13 @@ var ProposalUI = (function () {
         // Placeholder tokens ("", "1.5", "180", "white") and inputmodes stay
         // untranslated: they are example values / input types, not language.
         var ph = d[1] || "";
-        if (ph !== "" && ph !== "1.5" && ph !== "180" && ph !== "white") ph = t("proposal.innerph_" + kind + "_" + i, ph);
+        /* R2-LOCALE: hint placeholder suffixes merged into common.* (es keeps
+         * its majority variant); unlisted suffixes keep their innerph key. */
+        var sfx = kind + "_" + i, ck = null;
+        if (sfx === "transfer_0" || sfx === "transfer_1" || sfx === "whitelist_0" ||
+            sfx === "whitelist_1" || sfx === "ticket_0") ck = "common.name_or_id_hint";
+        else if (sfx === "transfer_2" || sfx === "ticket_2") ck = "common.symbol_or_id_hint";
+        if (ph !== "" && ph !== "1.5" && ph !== "180" && ph !== "white") ph = t(ck || ("proposal.innerph_" + sfx), ph);
         var x = Forms.labeledInput(doc, t("proposal.inner_" + kind + "_" + i, d[0]) + " ", { placeholder: ph || undefined, inputmode: d[2] || undefined });
         innerBox.appendChild(x.row); return x.input;
       });
@@ -782,8 +788,8 @@ var ProposalUI = (function () {
         });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, t("proposal.could_not_join_asset_symbols", "Could not join asset symbols.")); });
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.approve_reject", "Approve / reject")));
-      var fW = Forms.labeledInput(doc, t("proposal.approver_account", "Approver account") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
-      var fP2 = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+      var fW = Forms.labeledInput(doc, t("proposal.approver_account", "Approver account") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
+      var fP2 = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
       var ow = doc.createElement("select"); touchable(ow);
       try { ow.setAttribute("aria-label", t("misc.authority", "Authority")); } catch (e) { /* options stand */ }
@@ -813,7 +819,7 @@ var ProposalUI = (function () {
           ok: function () { return "Approval " + (ab[1] ? "removed" : "recorded") + " and re-read on chain."; } });
       });
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op 24)")));
-      var fD = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+      var fD = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fD.row);
       var chk = doc.createElement("input"); chk.type = "checkbox"; touchable(chk);
       var chkRow = Forms.fieldRow(doc, t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "), chk);

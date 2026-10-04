@@ -171,8 +171,8 @@ var BarterUI = (function () {
     if (lockedBar) DOM.append(wrap, viewingAsNotice(doc));
     DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
     var fA = Forms.labeledInput(doc, t("barter.peer_a_account", "Peer A account") + " ", lockedBar
-      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
-      : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+      ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
+      : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     DOM.append(wrap, fA.row);
     DOM.append(wrap, DOM.el(doc, "h2", t("barter.a_gives", "A gives")));
     var boxA = DOM.el(doc, "div"); DOM.append(wrap, boxA);
@@ -180,8 +180,8 @@ var BarterUI = (function () {
     var addA = touchable(DOM.el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; addA.classList.add("subtle-btn"); DOM.append(wrap, addA);
     addA.addEventListener("click", function () { legsA.push(legRow(doc, boxA)); });
     var fB = Forms.labeledInput(doc, t("barter.peer_b_account", "Peer B account") + " ", lockedBar
-      ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
-      : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+      ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
+      : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     DOM.append(wrap, fB.row);
     DOM.append(wrap, DOM.el(doc, "h2", t("barter.b_gives", "B gives")));
     var boxB = DOM.el(doc, "div"); DOM.append(wrap, boxB);
@@ -350,7 +350,7 @@ var BarterUI = (function () {
       var btns = dlg.getElementsByTagName("button");
       var back = btns[0], send = btns[1];
       send.disabled = true; back.disabled = true;
-      var status = showStatus(doc, out, t("barter.signing", "Signing…"));
+      var status = showStatus(doc, out, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         out.removeChild(status);
@@ -375,7 +375,7 @@ var BarterUI = (function () {
         DOM.append(out, DOM.el(doc, "p", "Observed at head block #" + String(head) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
-        showError(doc, out, e, t("barter.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+        showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
         send.disabled = false; back.disabled = false;
       });
     }

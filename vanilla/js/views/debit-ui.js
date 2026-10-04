@@ -109,7 +109,7 @@ var DebitUI = (function () {
   function createUpdateBox(u, doc, box, me, lists, myGen) { /* fee RE-READ at review; update gets old→new rows */
     var locked = !u.isUnlockedNow();
     var fPerm = u.field(doc, t("debit.perm_field", "Permission id (update only, else blank)"), { placeholder: "1.12.N" });
-    var fAuth = u.field(doc, t("debit.auth_field", "Authorized account"), locked ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" } : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
+    var fAuth = u.field(doc, t("debit.auth_field", "Authorized account"), locked ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" } : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     var fAsset = u.field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
     var fLimit = u.field(doc, t("debit.limit_field", "Limit per period"), { placeholder: "10", inputmode: "decimal" });
     var fCount = u.field(doc, t("debit.count_field", "Period count"), { value: "12", inputmode: "numeric" });

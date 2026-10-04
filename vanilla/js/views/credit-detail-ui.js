@@ -119,7 +119,7 @@ var CreditDetailUI = (function () {
       ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
     var fAmt = ui.field(doc, t("credit.accept_borrow_amt_tpl", "Borrow amount (%(sym)s)", { sym: a.symbol }), { placeholder: "0.0", inputmode: "decimal" });
-    var fCollA = ui.field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fCollA = ui.field(doc, t("credit.collateral_asset", "Collateral asset"), { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fColl = ui.field(doc, t("credit.collateral_amount", "Collateral amount"), { placeholder: "0.0", inputmode: "decimal" });
     var fRate = ui.field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: Credit.rateUnitsToHuman(o.rate_units), inputmode: "decimal" });
     var fDur = ui.field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });

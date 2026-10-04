@@ -252,7 +252,7 @@ var AuthUI = (function () {
           p.appendChild(doc.createTextNode(" · "));
           var b = doc.createElement("a");
           b.href = "#/existing-account";
-          b.textContent = t("auth.import_existing_account", "Import existing account");
+          b.textContent = t("common.import_existing", "Import existing account");
           DOM.append(p, b);
           DOM.append(out, p);
         })
@@ -270,7 +270,7 @@ var AuthUI = (function () {
     });
     DOM.append(wrap, linkPara(doc, [
       ["#/create-wallet-brainkey", t("auth.no_wallet_yet_create_one", "No wallet yet? Create one")],
-      ["#/existing-account", t("auth.import_existing_account", "Import existing account")]
+      ["#/existing-account", t("common.import_existing", "Import existing account")]
     ]));
   }
 
@@ -342,7 +342,7 @@ var AuthUI = (function () {
     var row = DOM.el(doc, "p", null, null);
     DOM.append(row, goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey", null));
     row.appendChild(doc.createTextNode(" "));
-    DOM.append(row, goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account", null));
+    DOM.append(row, goButton(doc, "reg-local-import", t("common.import_existing", "Import existing account"), "#/existing-account", null));
     row.appendChild(doc.createTextNode(" "));
     DOM.append(row, goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
     DOM.append(wrap, row);

@@ -64,7 +64,7 @@ var MenuUI = (function () {
         { href: "#/wallet", icon: "wallet", titleKey: "menu.p_wallet", titleDefault: "Wallet", blurbKey: "menu.d_wallet", blurbDefault: "Keys, backups, and lock state." },
         { href: "#/wallet/password", icon: "key", titleKey: "menu.p_password", titleDefault: "Change wallet password", blurbKey: "menu.d_password", blurbDefault: "Re-encrypt the local vault." },
         { href: "#/create-wallet-brainkey", icon: "paperclip", titleKey: "menu.p_brainkey", titleDefault: "Create Wallet (Brainkey)", blurbKey: "menu.d_brainkey", blurbDefault: "New wallet from a word brainkey." },
-        { href: "#/existing-account", icon: "download", titleKey: "menu.p_import", titleDefault: "Import existing account", blurbKey: "menu.d_import", blurbDefault: "Bring keys into this wallet." },
+        { href: "#/existing-account", icon: "download", titleKey: "common.import_existing", titleDefault: "Import existing account", blurbKey: "menu.d_import", blurbDefault: "Bring keys into this wallet." },
         { href: "#/create-account", icon: "plus-circle", titleKey: "menu.p_register", titleDefault: "Register a new account", blurbKey: "menu.d_register", blurbDefault: "Claim a name via the faucet." },
         { href: "#/login", icon: "unlocked", titleKey: "menu.p_login", titleDefault: "Login", blurbKey: "menu.d_login", blurbDefault: "Unlock the local vault." },
         { href: "#/registration", icon: "clippy", titleKey: "menu.p_registration", titleDefault: "Registration", blurbKey: "menu.d_registration", blurbDefault: "Cloud, local, and brainkey sign-up paths." },

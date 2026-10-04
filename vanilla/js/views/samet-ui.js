@@ -342,7 +342,7 @@ var SametUI = (function () {
   /* Op-64 Same-T create form. */
   function sametCreateBox(doc, box, uiGen) {
     var ui = U();
-    var fAsset = Forms.labeledInput(doc, t("samet.asset", "Asset") + " ", { placeholder: t("samet.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fAsset = Forms.labeledInput(doc, t("samet.asset", "Asset") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fBal = Forms.labeledInput(doc, t("samet.balance", "Balance") + " ", { placeholder: "0.0", inputmode: "decimal" });
     var fRate = Forms.labeledInput(doc, t("samet.fee_rate_2", "Fee rate %") + " ", { placeholder: "0.1", inputmode: "decimal" });
     [fAsset, fBal, fRate].forEach(function (f) { box.appendChild(f.row); });

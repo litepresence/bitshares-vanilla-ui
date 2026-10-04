@@ -248,7 +248,7 @@ var PoolUI = (function () {
           out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
         }).catch(function (e) {
           if (myGen !== gen) return; out.removeChild(status);
-          showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+          showError(doc, out,e,t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
           sendB.disabled = false; backB.disabled = false;
         });
       } });
@@ -438,9 +438,9 @@ var PoolUI = (function () {
     ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
     var filters = DOM.el(doc, "div", null, "pools-filters");
-    var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
+    var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
+    var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
     var sizeLab = DOM.el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");

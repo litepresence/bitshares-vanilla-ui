@@ -1008,7 +1008,7 @@ var InstantTradeUI = (function () {
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true; sendBtn.disabled = true;
-      var status = showStatus(doc, wrap, t("instant.signing", "Signing…"));
+      var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
