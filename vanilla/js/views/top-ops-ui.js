@@ -387,11 +387,11 @@ var TopOpsUI = (function () {
     if (typeof Chain === "undefined" || !Chain ||
         typeof Chain.db !== "function" || typeof Chain.call !== "function" ||
         typeof Format === "undefined" || !Format || typeof Format.pct1 !== "function") {
-      wrap.appendChild(DOM.el(doc, "h1", t("topops.title", "Top Operations")));
+      wrap.appendChild(DOM.pageHead(doc, t("topops.title", "Top Operations"), "fire"));
       showError(doc, wrap, "Chain backend missing: js/chain.js or js/format.js failed to load.");
       return;
     }
-    wrap.appendChild(DOM.el(doc, "h1", t("topops.title", "Top Operations")));
+    wrap.appendChild(DOM.pageHead(doc, t("topops.title", "Top Operations"), "fire"));
     wrap.appendChild(DOM.el(doc, "p",
       t("topops.scope", "Last 200 blocks on this node — a live sample, not a chain-wide ranking."),
       "muted"));

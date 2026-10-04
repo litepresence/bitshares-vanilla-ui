@@ -87,7 +87,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
     var wrap = el("div", "wrap wide"); root.appendChild(wrap);
     /* A11y delta 2026-10-01: h1 (was h2) — page title level matches every
      * other route (transfer/voting/proposals use h1). */
-    wrap.appendChild(el("h1", null, t("txbuilder.title", "Transaction Builder")));
+    wrap.appendChild(DOM.pageHead(document, t("txbuilder.title", "Transaction Builder"), "cogs"));
     var st = TxBuilder.state();
     if (!st.ops.length) {
       var empty = el("p", "empty", t("txbuilder.empty", "No operations queued. Build one from Transfer, Voting, or Pools — each confirm screen offers Add to TxBuilder — then review it here."));

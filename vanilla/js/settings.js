@@ -43,9 +43,7 @@ var SettingsPage = (function () {
     wrap.className = "wrap wide";
     rootEl.appendChild(wrap);
 
-    var h1 = doc.createElement("h1");
-    h1.textContent = t("settings.title", "Settings");
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, t("settings.title", "Settings"), "cog"));
 
     var netToggle = SettingsPrefs.buildNetwork(doc, settings, t);
     wrap.appendChild(netToggle);

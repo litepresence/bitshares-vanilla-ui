@@ -137,6 +137,7 @@ declare var DOM: {
   status: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
   error: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
   append: (wrap: HTMLElement, ...nodes: HTMLElement[]) => HTMLElement;
+  pageHead: (doc: Document, titleText: string, iconName?: string | null | undefined) => HTMLElement;
 };
 interface Window {
   touchable: <T extends HTMLElement>(el: T) => T;
@@ -155,6 +156,7 @@ interface Window {
     status: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
     error: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
     append: (wrap: HTMLElement, ...nodes: HTMLElement[]) => HTMLElement;
+    pageHead: (doc: Document, titleText: string, iconName?: string | null | undefined) => HTMLElement;
   };
 }
 declare var BRAINKEY_DICT: any;

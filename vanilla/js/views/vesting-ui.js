@@ -210,6 +210,14 @@ var VestingUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("vesting.vesting", "Vesting"), function () { renderVesting(root); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
+    /* M5 headings-icons: routeReady owns the h1 — retrofit via shared pageHead (same key). */
+    try {
+      if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
+        var _rd = root.ownerDocument || document;
+        var _oh = root.querySelector("h1");
+        if (_oh && _oh.parentNode) _oh.parentNode.replaceChild(DOM.pageHead(_rd, t("vesting.vesting", "Vesting"), "clock"), _oh);
+      }
+    } catch (e) { /* heading stands */ }
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("vesting.vesting_locks_funds_under_a_release_policy_cl", "Vesting locks funds under a release policy. Claim with op 33; genesis balances claim with op 37 (fee 0, owner-key signature — see below)."), "muted"));

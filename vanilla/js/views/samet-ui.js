@@ -82,6 +82,14 @@ var SametUI = (function () {
       return;
     }
     var ctx = ui.routeReady(root, t("samet.same_t_funds", "Same-T Funds"), function () { renderSamet(root); });
+    /* M5 headings-icons: routeReady owns the h1 — retrofit via shared pageHead (same key). */
+    try {
+      if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
+        var _rd = root.ownerDocument || document;
+        var _oh = root.querySelector("h1");
+        if (_oh && _oh.parentNode) _oh.parentNode.replaceChild(DOM.pageHead(_rd, t("samet.same_t_funds", "Same-T Funds"), "settle"), _oh);
+      }
+    } catch (e) { /* heading stands */ }
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     var lockedS = false;

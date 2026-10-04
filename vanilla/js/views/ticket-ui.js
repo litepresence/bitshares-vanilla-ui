@@ -120,6 +120,15 @@ var TicketUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("ticket.tickets", "Tickets"), function () { renderTickets(root); },
       ["Proposal", "ProposalTicket", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
+    /* M5 headings-icons: routeReady owns the h1 — retrofit text-only via shared
+     * pageHead (same key; null: ticket icon does not exist yet). */
+    try {
+      if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
+        var _rd = root.ownerDocument || document;
+        var _oh = root.querySelector("h1");
+        if (_oh && _oh.parentNode) _oh.parentNode.replaceChild(DOM.pageHead(_rd, t("ticket.tickets", "Tickets"), null), _oh);
+      }
+    } catch (e) { /* heading stands */ }
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.tickets_lock_funds_for_vote_weight_there_is_n", "Tickets lock funds for vote weight. There is no delete operation, so every ticket row is permanent."), "muted"));
@@ -210,6 +219,15 @@ var TicketUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("ticket.airdrop", "Airdrop"), function () { renderAirdrop(root); },
       ["Proposal", "ProposalTicket", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
+    /* M5 headings-icons: routeReady owns the h1 — retrofit text-only via shared
+     * pageHead (same key; null: ticket icon does not exist yet). */
+    try {
+      if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
+        var _rd2 = root.ownerDocument || document;
+        var _oh2 = root.querySelector("h1");
+        if (_oh2 && _oh2.parentNode) _oh2.parentNode.replaceChild(DOM.pageHead(_rd2, t("ticket.airdrop", "Airdrop"), null), _oh2);
+      }
+    } catch (e) { /* heading stands */ }
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("ticket.airdrop_note_tpl", "No airdrop operation exists on chain — this calculator emits batches of plain asset-issue (op 14). You must be the asset issuer. Batches chunk at %(n)s issues per transaction until testnet sizes them (ambiguity J).", { n: AIRDROP_CHUNK }), "muted"));

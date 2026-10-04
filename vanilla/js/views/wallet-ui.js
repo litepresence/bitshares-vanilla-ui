@@ -307,9 +307,7 @@ var WalletUI = (function () {
     var doc = root.ownerDocument;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    var h1 = doc.createElement("h1");
-    h1.textContent = t("wallet.title", "Wallet");
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, t("wallet.title", "Wallet"), "wallet"));
 
     if (backendMissing()) {
       var missing = makeError(doc);
@@ -422,9 +420,7 @@ var WalletUI = (function () {
       ["#/help/wallets", "How wallets work"],
       ["#/help/backups", "How backups work"]
     ]));
-    var h1 = doc.createElement("h1");
-    h1.textContent = t("wallet.s4", "Create Wallet (Brainkey)");
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, t("wallet.s4", "Create Wallet (Brainkey)"), "wallet"));
 
     if (backendMissing() || typeof Crypto === "undefined") {
       var missing = makeError(doc);
@@ -702,9 +698,7 @@ var WalletUI = (function () {
     var doc = root.ownerDocument;
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    var h1 = doc.createElement("h1");
-    h1.textContent = t("wallet.import_existing_account", "Import Existing Account");
-    wrap.appendChild(h1);
+    wrap.appendChild(DOM.pageHead(doc, t("wallet.import_existing_account", "Import Existing Account"), "wallet"));
 
     if (backendMissing() || typeof Crypto === "undefined") {
       var missing = makeError(doc);

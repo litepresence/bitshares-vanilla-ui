@@ -328,7 +328,7 @@ var TransferUI = (function () {
     }).catch(function (e) {
       DOM.clear(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(DOM.el(doc, "h1", t("transfer.title", "Transfer")));
+      failed.appendChild(DOM.pageHead(doc, t("transfer.title", "Transfer"), "transfer"));
       showError(doc, failed, e, t("transfer.load_account_failed", "Could not load your account."));
     });
   }
@@ -341,7 +341,7 @@ var TransferUI = (function () {
    * Errors stay inline above a preserved form — input is never wiped. */
   function showForm(doc, wrap, root, from, state) {
     var locked = (typeof Wallet.isUnlocked !== "function" || !Wallet.isUnlocked());
-    wrap.appendChild(DOM.el(doc, "h1", t("transfer.title", "Transfer")));
+    wrap.appendChild(DOM.pageHead(doc, t("transfer.title", "Transfer"), "transfer"));
     if (locked) {
       wrap.appendChild(DOM.el(doc, "p",
         t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: from.name, id: from.id }), "muted"));
@@ -1454,7 +1454,7 @@ var TransferUI = (function () {
   /* Proposal result: the re-read proposal id + head block + channel.
    * Links to the proposals page. Never blank. */
   function showProposeResult(doc, wrap, root, built, fh, res, head) {
-    wrap.appendChild(DOM.el(doc, "h1", t("transfer.proposal_sent_title", "Proposal sent")));
+    wrap.appendChild(DOM.pageHead(doc, t("transfer.proposal_sent_title", "Proposal sent"), "transfer"));
     var pid = "?";
     try {
       if (res && res.proof) {

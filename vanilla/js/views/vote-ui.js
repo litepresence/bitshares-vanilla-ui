@@ -187,7 +187,7 @@ var VoteUI = (function () {
     }
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      wrap.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
       wrap.appendChild(el(doc, "p", t("vote.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
       var settled = false;
@@ -205,7 +205,7 @@ var VoteUI = (function () {
         if (myGen !== gen) return;
         clearRoot(root);
         var failed = makeWrap(doc, root);
-        failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+        failed.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
         showError(doc, failed, new Error("not-connected"), t("vote.offline_short", "Network unavailable."));
         var vstat = el(doc, "p", "", "muted");
         try { vstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -252,7 +252,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      failed.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
       showError(doc, failed, e, t("vote.load_account_failed", "Could not load your account."));
       showAccountPicker(doc, failed, root, myGen, (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0");
     });
@@ -304,7 +304,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+      failed.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
       showError(doc, failed, e, t("vote.load_failed", "Could not load governance data."));
 var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
       failed.appendChild(retry);
@@ -329,7 +329,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     var st = VoteSlate.newState(me, lists, slate);
     st.supply = supplyRaw || "";
 
-    wrap.appendChild(el(doc, "h1", t("vote.title", "Voting")));
+    wrap.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
     var meLine = el(doc, "p", null, "muted");
     meLine.textContent = t("vote.voting_as", "Voting as: ") + me.name + " (" + me.id + ")";
     wrap.appendChild(meLine);
@@ -597,7 +597,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   async function preparePublish(doc, root, st, myGen) {
     clearRoot(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
+    wrap.appendChild(DOM.pageHead(doc, t("vote.confirm_title", "Confirm votes"), "voting"));
     var status = showStatus(doc, wrap, t("vote.estimating_fee", "Estimating fee…"));
     try {
       var dbId = await Chain.db();
@@ -633,7 +633,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       if (myGen !== gen) return;
       clearRoot(root);
       var failed = makeWrap(doc, root);
-      failed.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
+      failed.appendChild(DOM.pageHead(doc, t("vote.confirm_title", "Confirm votes"), "voting"));
       showError(doc, failed, e, t("vote.prepare_failed", "Could not prepare the vote."));
       var back = touchable(el(doc, "button", t("vote.back_to_voting", "Back to voting")));
       back.type = "button";
@@ -659,7 +659,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
    * slate preview stay public. */
   function showConfirm(doc, wrap, root, st, myGen, newOptions, feeRaw, feePrec, network) {
     var hasProxy = newOptions.voting_account !== PROXY_SENTINEL;
-    wrap.appendChild(el(doc, "h1", t("vote.confirm_title", "Confirm votes")));
+    wrap.appendChild(DOM.pageHead(doc, t("vote.confirm_title", "Confirm votes"), "voting"));
     var list = el(doc, "dl", null, "vote-confirm");
     function row(term, text, title) {
       var dt = el(doc, "dt", term);
@@ -866,7 +866,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
    * blank, never a fabricated txid. Reports which proxy mode the chain
    * accepted (the retry-rule outcome Task 4 records). */
   function showResult(doc, wrap, root, st, errText, res) {
-    wrap.appendChild(el(doc, "h1", errText ? t("vote.result_failed", "Vote failed") : t("vote.result_ok", "Votes published")));
+    wrap.appendChild(DOM.pageHead(doc, errText ? t("vote.result_failed", "Vote failed") : t("vote.result_ok", "Votes published"), "voting"));
     if (errText) {
       showError(doc, wrap, errText, t("vote.publish_failed", "Vote publish failed."));
     } else {
