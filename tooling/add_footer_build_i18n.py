@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-shot: footer build-info + network-prefix keys (2026-10-04).
 
-Adds 11 shell.* keys (footer_brand_vanilla, footer_ahead/_one,
+Adds 12 shell.* keys (footer_brand_vanilla, footer_ahead/_one, footer_at_build,
 footer_behind/_one, footer_dahead, footer_dbehind, footer_diverged,
 footer_net_host, footer_offbranch, footer_sync) to all 12
 vanilla/locales/*.json as honest English stubs (principle #10 -
@@ -60,7 +60,13 @@ STEPS = [
     (re.compile(r'^      "shell\.footer_brand",\n', re.MULTILINE),
      BEFORE_BLOCK, '"shell.footer_ahead"'),
     (re.compile(r'^      "shell\.footer_brand",\n', re.MULTILINE),
-     AFTER_BLOCK, '"shell.footer_sync"'),
+      AFTER_BLOCK, '"shell.footer_sync"'),
+    (re.compile(r'^    "footer_ahead_one": "1 commit ahead of",\n', re.MULTILINE),
+     '    "footer_ahead_one": "1 commit ahead of",\n    "footer_at_build": "at build %(date)s",\n',
+     '"footer_at_build"'),
+    (re.compile(r'^      "shell\.footer_ahead_one",\n', re.MULTILINE),
+     '      "shell.footer_ahead_one",\n      "shell.footer_at_build",\n',
+     '"shell.footer_at_build"'),
 ]
 
 # NOTE: step 2 inserts BEFORE the brand line and step 3 appends AFTER it;

@@ -7,7 +7,7 @@
 var assert = require("assert");
 var App = require("../vanilla/js/app.js");
 var T = App._test;
-["parseBuildInfo", "parseCompare", "compareUrl", "relationText", "netHostText", "currentNetwork"].forEach(function (k) {
+["parseBuildInfo", "parseCompare", "compareUrl", "relationText", "offbranchText", "netHostText", "currentNetwork"].forEach(function (k) {
   assert.ok(T && typeof T[k] === "function", "_test." + k + " exported");
 });
 
@@ -22,8 +22,8 @@ function deq(actual, expected, name) {
 }
 
 var SHA40 = "0123456789abcdef0123456789abcdef01234567";
-deq(T.parseBuildInfo({ repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z" }),
-  { repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456" }, "valid build info");
+deq(T.parseBuildInfo({ repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: null }),
+  { repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: null }, "valid build info");
 eq(T.parseBuildInfo(null), null, "null build info");
 eq(T.parseBuildInfo({}), null, "empty build info");
 eq(T.parseBuildInfo({ repo: "a/b", branch: "master", commit: "xyz" }), null, "short commit rejected");
@@ -52,5 +52,18 @@ eq(T.netHostText("mainnet", "dex.iobanker.com"), "mainnet - dex.iobanker.com", "
 eq(T.netHostText("testnet", "h"), "testnet - h", "testnet prefix");
 eq(T.netHostText("bogus", "h"), "mainnet - h", "unknown network defaults mainnet");
 eq(T.currentNetwork(), "mainnet", "no Store under node defaults mainnet");
+
+deq(T.parseBuildInfo({ repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: 5 }),
+  { repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: 5 }, "ahead count kept");
+deq(T.parseBuildInfo({ repo: "a/b", branch: "master", commit: SHA40 }),
+  { repo: "a/b", branch: "master", commit: SHA40, short: "0123456", generated_at: "", ahead_of_master: null }, "missing optionals default");
+deq(T.parseBuildInfo({ repo: "a/b", branch: "master", commit: SHA40, ahead_of_master: -2 }),
+  { repo: "a/b", branch: "master", commit: SHA40, short: "0123456", generated_at: "", ahead_of_master: null }, "negative ahead nulled");
+deq(T.offbranchText({ ahead_of_master: 3, generated_at: "2026-10-04T00:00:00Z" }), { rel: "3 commits ahead of", note: "at build 2026-10-04" }, "offbranch counted plural");
+deq(T.offbranchText({ ahead_of_master: 1, generated_at: "2026-10-04T00:00:00Z" }), { rel: "1 commit ahead of", note: "at build 2026-10-04" }, "offbranch counted singular");
+deq(T.offbranchText({ ahead_of_master: 0, generated_at: "2026-10-04T00:00:00Z" }), { rel: "not on Master", note: null }, "offbranch zero falls back");
+deq(T.offbranchText({ ahead_of_master: null, generated_at: "" }), { rel: "not on Master", note: null }, "offbranch null falls back");
+deq(T.offbranchText({ ahead_of_master: 2, generated_at: "garbage" }), { rel: "2 commits ahead of", note: null }, "offbranch bad date drops note");
+deq(T.offbranchText(null), { rel: "not on Master", note: null }, "offbranch null info");
 
 console.log("footer-build-test: " + passed + " passed, 0 failed");

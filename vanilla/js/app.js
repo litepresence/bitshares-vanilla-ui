@@ -615,7 +615,7 @@ var App = (function () {
   /**
    * version.json -> strict record or null (never throws, never partial).
    * @param {*} json parsed version.json
-   * @returns {{repo: string, branch: string, commit: string, short: string} | null} */
+   * @returns {{repo: string, branch: string, commit: string, short: string, generated_at: string, ahead_of_master: number | null} | null} */
   function parseBuildInfo(json) {
     try {
       if (!json || typeof json !== "object") return null;
@@ -626,7 +626,10 @@ var App = (function () {
       var branch = String(json.branch || "");
       if (!branch) return null;
       var low = commit.toLowerCase();
-      return { repo: repo, branch: branch, commit: low, short: low.slice(0, 7) };
+      var gen = (typeof json.generated_at === "string") ? json.generated_at : "";
+      var ah = json.ahead_of_master;
+      if (typeof ah !== "number" || !isFinite(ah) || Math.floor(ah) !== ah || ah < 0) ah = null;
+      return { repo: repo, branch: branch, commit: low, short: low.slice(0, 7), generated_at: gen, ahead_of_master: ah };
     } catch (e) { return null; }
   }
 
@@ -678,6 +681,27 @@ var App = (function () {
       return t("shell.footer_behind", "%(n)s commits behind", { n: String(b) });
     }
     return t("shell.footer_sync", "in sync with");
+  }
+
+  /**
+   * Offbranch relation for 404 builds (SHA unknown to GitHub): counted
+   * "N ahead of" from the generation-time git count when known, else the
+   * plain fallback. Caller appends the Master link, then .note in parens.
+   * @param {{ahead_of_master: number | null, generated_at: string}} info parsed build record
+   * @returns {{rel: string, note: string | null}} */
+  function offbranchText(info) {
+    try {
+      var a = info ? info.ahead_of_master : null;
+      if (typeof a === "number" && isFinite(a) && Math.floor(a) === a && a > 0) {
+        var rel = (a === 1) ? t("shell.footer_ahead_one", "1 commit ahead of") : t("shell.footer_ahead", "%(n)s commits ahead of", { n: String(a) });
+        var date = String((info && info.generated_at) || "").slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return { rel: rel, note: t("shell.footer_at_build", "at build %(date)s", { date: date }) };
+        }
+        return { rel: rel, note: null };
+      }
+    } catch (e) { /* fallback below */ }
+    return { rel: t("shell.footer_offbranch", "not on Master"), note: null };
   }
 
   /**
@@ -793,7 +817,7 @@ var App = (function () {
   /* paintVersion: bottom-LEFT build string "BITSHARES VANILLA UI <short7>
    * · <relation> Master" (Master = branch-name identifier, hyperlinked to
    * the repo root from version.json; chain prefix retired per spec).
-   * Ladder: full relation | offbranch "not on Master" | hash-only |
+   * Ladder: full relation | offbranch counted/plain | hash-only |
    * skeleton (no version.json — bootBuildInfo fails open, skeleton stands).
    * Called from paintFooter so every connection event refreshes it. */
   function paintVersion() {
@@ -806,17 +830,21 @@ var App = (function () {
       while (left.firstChild) left.removeChild(left.firstChild);
       var doc = left.ownerDocument || document;
       left.appendChild(doc.createTextNode(t("shell.footer_brand_vanilla", "BITSHARES VANILLA UI") + " " + buildInfo.short + " · "));
+      var cmpRel = null, cmpNote = null;
       if (buildCmp && buildCmp.offbranch) {
-        left.appendChild(doc.createTextNode(t("shell.footer_offbranch", "not on Master") + " "));
+        var ob = offbranchText(buildInfo);
+        cmpRel = ob.rel; cmpNote = ob.note;
       } else if (buildCmp) {
-        left.appendChild(doc.createTextNode(relationText(buildCmp) + " "));
+        cmpRel = relationText(buildCmp);
       }
+      if (cmpRel) left.appendChild(doc.createTextNode(cmpRel + " "));
       var a = doc.createElement("a");
       a.setAttribute("href", "https://github.com/" + buildInfo.repo);
       a.setAttribute("target", "_blank");
       a.setAttribute("rel", "noopener noreferrer");
       a.textContent = "Master";
       left.appendChild(a);
+      if (cmpNote) left.appendChild(doc.createTextNode(" (" + cmpNote + ")"));
     } catch (e) { /* static skeleton stands */ }
   }
 
@@ -1139,7 +1167,7 @@ var App = (function () {
   if (typeof document !== "undefined") boot();
 
   return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
-    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork } };
+    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }
