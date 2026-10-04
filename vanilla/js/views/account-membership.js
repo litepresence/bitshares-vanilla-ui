@@ -310,7 +310,10 @@ AccountUI._membership = AccountUI._membership || {};
       table.className = "node-table";
       var thead = doc.createElement("thead");
       var headRow = doc.createElement("tr");
-      ["Position", "Collateral", "Debt", "Borrower"].forEach(function (label) {
+      /* No Borrower column: this table lists one account's own positions,
+       * so every row would repeat the page account (the #/borrow desk
+       * table carries no borrower column for the same reason). */
+      ["Position", "Collateral", "Debt"].forEach(function (label) {
         var th = doc.createElement("th");
         th.textContent = label;
         headRow.appendChild(th);
@@ -324,18 +327,19 @@ AccountUI._membership = AccountUI._membership || {};
         idCell.textContent = r.call_id;
         tr.appendChild(idCell);
         var collCell = doc.createElement("td");
+        /* Principle #6: an unresolvable asset join must NEVER surface the
+         * raw chain integer as the cell value — the cell shows an honest
+         * dash, the raw integer + asset id ride the title (same contract
+         * as the rate-miss dashText below). */
         collCell.textContent = (r.coll_prec !== null && r.coll_prec !== undefined)
-          ? fmtRaw(r.coll_raw, r.coll_prec) + " " + r.coll_sym : String(r.coll_raw) + " (" + r.coll_id + ")";
-        collCell.title = t("account.raw_prefix", "raw ") + String(r.coll_raw);
+          ? fmtRaw(r.coll_raw, r.coll_prec) + " " + r.coll_sym : dashText();
+        collCell.title = t("account.raw_prefix", "raw ") + String(r.coll_raw) + " (" + r.coll_id + ")";
         tr.appendChild(collCell);
         var debtCell = doc.createElement("td");
         debtCell.textContent = (r.debt_prec !== null && r.debt_prec !== undefined)
-          ? fmtRaw(r.debt_raw, r.debt_prec) + " " + r.debt_sym : String(r.debt_raw) + " (" + r.debt_id + ")";
-        debtCell.title = t("account.raw_prefix", "raw ") + String(r.debt_raw);
+          ? fmtRaw(r.debt_raw, r.debt_prec) + " " + r.debt_sym : dashText();
+        debtCell.title = t("account.raw_prefix", "raw ") + String(r.debt_raw) + " (" + r.debt_id + ")";
         tr.appendChild(debtCell);
-        var borCell = doc.createElement("td");
-        borCell.textContent = r.borrower;
-        tr.appendChild(borCell);
         tbody.appendChild(tr);
       });
       table.appendChild(tbody);
@@ -411,12 +415,12 @@ AccountUI._membership = AccountUI._membership || {};
           tr.appendChild(symCell);
           var curCell = doc.createElement("td");
           curCell.textContent = (r.prec !== null && r.prec !== undefined)
-            ? fmtRaw(r.current_raw, r.prec) : String(r.current_raw);
+            ? fmtRaw(r.current_raw, r.prec) : dashText();
           curCell.title = t("account.raw_prefix", "raw ") + String(r.current_raw);
           tr.appendChild(curCell);
           var totCell = doc.createElement("td");
           totCell.textContent = (r.prec !== null && r.prec !== undefined)
-            ? fmtRaw(r.total_raw, r.prec) : String(r.total_raw);
+            ? fmtRaw(r.total_raw, r.prec) : dashText();
           totCell.title = t("account.raw_prefix", "raw ") + String(r.total_raw);
           tr.appendChild(totCell);
           var rateCell = doc.createElement("td");

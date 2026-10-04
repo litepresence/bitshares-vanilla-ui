@@ -124,15 +124,23 @@ var DOM = (function () {
    * iconName is a non-empty string AND the Icon global with img() exists;
    * any failure leaves the heading standing without the icon. Null,
    * undefined, or "" iconName (gap pages) returns a plain text-only h1.
-   * Params: doc (document), titleText (string, set textContent-only),
-   * iconName (string|null|undefined). Returns the h1 element. */
+   * Full-color PNG art (login "lock-blue") is marked icon-state so the
+   * theme invert skips it (img.icon-state in app.css); monochrome SVGs
+   * keep h-title-icon alone and follow --icon-filter. The .png check reads
+   * Icon.url() (no duplicated registry knowledge). Params: doc (document),
+   * titleText (string, set textContent-only), iconName (string|null|undefined).
+   * Returns the h1 element. */
   function pageHead(doc, titleText, iconName) {
     var h = el(doc, "h1", titleText);
     try {
       if (typeof iconName === "string" && iconName &&
           typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
         h.appendChild(doc.createTextNode(" "));
-        h.appendChild(Icon.img(iconName, "h-title-icon", ""));
+        var cls = "h-title-icon";
+        try {
+          if (typeof Icon.url === "function" && /\.png$/i.test(Icon.url(iconName))) cls += " icon-state";
+        } catch (e) { /* monochrome default stands */ }
+        h.appendChild(Icon.img(iconName, cls, ""));
       }
     } catch (e) { /* heading stands without the icon */ }
     return h;

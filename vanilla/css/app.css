@@ -346,20 +346,24 @@ details.raw > summary {
 /* Shell nav icons: 18px like #1 Header.jsx:478-488 icon-18px hamburger. */
 #nav a .nav-icon, #nav-toggle .nav-icon { width: 18px; height: 18px;
   vertical-align: middle; }
-/* The toggle sits on the header bar (blue/dark in every theme, light text)
- * so its glyph is always inverted to light — independent of --icon-filter. */
-#nav-toggle .nav-icon { filter: invert(1); }
+/* The toggle sits on the header bar (dark in every theme, light text)
+ * so its glyph follows --header-icon-filter (tracks --header-text per
+ * theme) — never a hardcoded white that mismatches cream text. */
+#nav-toggle .nav-icon { filter: var(--header-icon-filter, invert(1)); }
 /* Nav-link glyphs sit on var(--header-bg) — dark in ALL three themes
  * (chocolate #2A1A12 in vanilla-ui-theme, near-black in ref-ui, #131722 in
  * dex-ux) — while the vanilla light global --icon-filter is none (correct
- * for its light body panels). Without this, the black-filled vendored
- * glyphs (e.g. trade.svg IcoMoon paths, dashboard.svg — no fill attr, so
- * black) vanish on the chocolate bar (light-theme vision sweep 2026-10-01:
- * Dashboard/Exchange/Credit Offer/Liquidity Pools/Explore icons unreadable
- * at 1440px). Same precedent as the #nav-toggle/#lock-toggle inverts;
- * no-op in the two dark themes whose global filter already inverts. Covers
+ * for its light body panels). So nav glyphs follow --header-icon-filter
+ * (tracks --header-text per theme: pure white in ref/dex, warmed toward
+ * cream in vanilla) instead of a hardcoded white. Without this, the
+ * black-filled vendored glyphs (e.g. trade.svg IcoMoon paths,
+ * dashboard.svg — no fill attr, so black) vanish on the chocolate bar
+ * (light-theme vision sweep 2026-10-01: Dashboard/Exchange/Credit
+ * Offer/Liquidity Pools/Explore icons unreadable at 1440px). Same
+ * precedent as the #nav-toggle/#lock-toggle header filters; no-op change
+ * in the two dark themes whose header filter already inverts. Covers
  * #nav-directory links too (same buildNavLink nav-icon, inside #nav). */
-#nav a .nav-icon { filter: invert(1); }
+#nav a .nav-icon { filter: var(--header-icon-filter, invert(1)); }
 #nav a { font-weight: 700; }
 #nav a .nav-icon { margin-right: 8px; }
 /* Bell/star icons: image replaces emoji 1:1; star-off dims the
@@ -632,6 +636,29 @@ table.offers-table tbody tr[data-offer] { cursor: pointer; }
   border: 1px solid var(--border); border-radius: 8px;
   max-width: 560px; margin: 0 auto; padding: 16px; }
 .credit-loan-panel h2 { margin: 0 0 8px; font-size: 1.2rem; }
+/* Shared confirm dialog (ui/confirm.js): named rows + fee + Back/Send.
+ * Unstyled it rendered as adjacent bare buttons (the reported "merged"
+ * look). Skin here, not inline: panel tokens only, square buttons kept
+ * (retro parity — radius 0 by design, padding/gap is the fix). */
+.confirm-dialog { background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 16px; margin: 12px 0; }
+.confirm-dialog h3 { margin: 0 0 8px; font-size: 1.15rem; }
+dl.confirm { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 6px 12px; margin: 0 0 12px; }
+dl.confirm dt { color: var(--muted); overflow-wrap: break-word; }
+dl.confirm dd { margin: 0; overflow-wrap: break-word; word-break: break-word; }
+/* Legacy read-only confirm lists (credit/asset loan modals predate the
+ * shared dialog): same grid skin so review rows never render as bare text. */
+dl.xfer-confirm { display: grid; grid-template-columns: minmax(96px, auto) minmax(0, 1fr);
+  gap: 6px 12px; margin: 0 0 12px; }
+dl.xfer-confirm dt { color: var(--muted); overflow-wrap: break-word; }
+dl.xfer-confirm dd { margin: 0; overflow-wrap: break-word; word-break: break-word; }
+/* Review mount points: breathing room so stacked buttons never merge. */
+.xfer-out:empty { display: none; }
+.xfer-out:not(:empty) { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.confirm-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.confirm-actions button { padding: 0 20px; }
  * Choice: KEEP notify-ui.js host positioning inline as the pre-CSS
  * fallback; this stylesheet owns the skin (card, stripes, head/x layout,
  * alert rows, bell). Card has NO inline border/padding/background so these
@@ -910,22 +937,27 @@ img, canvas, pre { max-width: 100%; }
 #lock-toggle { display: inline-flex; align-items: center; justify-content: center;
   margin-left: 0; min-width: 44px; min-height: 44px; padding: 0 2px;
   color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
-#lock-toggle .nav-icon { width: 24px; height: 24px; filter: invert(1); }
+#lock-toggle .nav-icon { width: 24px; height: 24px; filter: var(--header-icon-filter, invert(1)); }
 /* Extension-signing badge: same metrics as the lock it sits beside —
  * always present (owner call — lock color answers locked?, shield color
  * answers extension-routed?). Inherits header color like the lock. */
 #ext-sign-badge { display: inline-flex; align-items: center; justify-content: center;
   min-width: 44px; min-height: 44px; padding: 0 2px; margin-right: -4px;
   color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
-#ext-sign-badge .nav-icon { width: 24px; height: 24px; filter: invert(1); }
+#ext-sign-badge .nav-icon { width: 24px; height: 24px; filter: var(--header-icon-filter, invert(1)); }
 /* Signing heading shield (owner blue-shield art, decorative): text-sized,
  * optically aligned with the h2 cap height. filter:none — like the header
  * icon-state badges, full-color art must not take the .icon-img theme
  * invert (it turns blue shields red). */
 .sign-title-icon { width: 22px; height: 22px; vertical-align: -4px; filter: none; }
-/* Page-heading icon (login h1 blue lock): portrait art keeps aspect via
- * height-only sizing; full-color bypasses the invert like the shields. */
-.h-title-icon { height: 24px; width: auto; vertical-align: -4px; filter: none; }
+/* Page-heading icon: monochrome SVG glyphs follow the theme via
+ * --icon-filter (light glyphs on dark themes, dark on light) so the icon
+ * reads as the heading text color; full-color PNG art (login h1 blue
+ * lock) keeps aspect via height-only sizing and bypasses the invert via
+ * img.icon-state below (it turns blue shields red). dom.js pageHead marks
+ * .png art with icon-state; img.icon-state (0,1,1) beats .h-title-icon
+ * (0,1,0) regardless of order. */
+.h-title-icon { height: 24px; width: auto; vertical-align: -4px; filter: var(--icon-filter, none); }
 /* Uniform heading ladder (page h1 1.35rem keeps its rule above): section h2
  * and subsection h3 were browser-default (h2 LARGER than the page h1 —
  * inverted hierarchy). Later-in-file wins the one tie
@@ -934,7 +966,12 @@ img, canvas, pre { max-width: 100%; }
 .wrap h3 { font-size: 1rem; margin: 8px 0 4px; }
 /* Colored state art (owner lock/shield PNGs) must NOT take the monochrome
  * invert above — green/red carries the state. icon-state marks the
- * full-color imgs (Icon.img cls slot, app.js paintLock/paintShieldBadge). */
+ * full-color imgs (Icon.img cls slot, app.js paintLock/paintShieldBadge,
+ * dom.js pageHead for .png art). The global img.icon-state rule carries
+ * the bypass everywhere; the header-scoped pair stays as documentation
+ * of the original contract. img.icon-state (0,1,1) beats .h-title-icon
+ * and .icon-img (0,1,0) regardless of order. */
+img.icon-state { filter: none; }
 #lock-toggle img.icon-state, #ext-sign-badge img.icon-state { filter: none; }
 /* The theme switcher sits before lock+hamburger on the bar; at 360px the four
  * items wrap instead of overflowing (principle #7). */

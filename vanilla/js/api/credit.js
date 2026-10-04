@@ -180,10 +180,42 @@ var Credit = (function () {
   async function offer(id) { return _getOne(id, OFFER_RE, "unknown-offer", _normOffer); }
   /* Single credit deal by 1.22.x id. Returns: the normalized row. Fails "unknown-deal". */
   async function deal(id) { return _getOne(id, DEAL_RE, "unknown-deal", _normDeal); }
-  /* Offer lists (all three share one join path): list / by-owner / by-asset. Chain resolves names itself. */
+  /* Offer lists (all three share one join path): list / by-owner / by-asset.
+   * Assets join via lookup_asset_symbols; owner ids join via get_accounts
+   * (batch, one round trip — names render as "name (id)", raw id in title).
+   * Collateral leg ids join too so the table shows symbols, not bare 1.3.x.
+   * Misses degrade honestly (bare id), never a crash. */
   async function _offerRows(rows) {
     var normed = rows.map(_normOffer), byId = await _joinAssets(normed, ["asset_id"]);
-    return normed.map(function (r) { var l = _legJoin(byId, r.asset_id); r.sym = l.sym; r.prec = l.prec; return r; });
+    /* Collateral leg join: flatten [[assetId, price]...] ids into the join. */
+    try {
+      var cids = [], seen = {};
+      normed.forEach(function (r) { (r.collateral_raw || []).forEach(function (c) {
+        var id = c && c[0]; if (typeof id === "string" && !seen[id]) { seen[id] = 1; cids.push(id); } }); });
+      if (cids.length) {
+        var cobjs = await _dbCall("lookup_asset_symbols", [cids]);
+        (cobjs || []).forEach(function (a) { if (a && a.id && !byId[a.id]) byId[a.id] = a; });
+      }
+    } catch (e) { /* collateral symbols stay bare ids */ }
+    /* Owner name join: batch get_accounts, id -> name. */
+    var acctById = {};
+    try {
+      var oids = [], oseen = {};
+      normed.forEach(function (r) { if (typeof r.owner === "string" && !oseen[r.owner]) { oseen[r.owner] = 1; oids.push(r.owner); } });
+      if (oids.length) {
+        var arows = await _dbCall("get_accounts", [oids]);
+        (arows || []).forEach(function (a) { if (a && a.id) acctById[a.id] = a.name || a.id; });
+      }
+    } catch (e) { /* owner names stay bare ids */ }
+    return normed.map(function (r) {
+      var l = _legJoin(byId, r.asset_id); r.sym = l.sym; r.prec = l.prec;
+      r.owner_name = acctById[r.owner] || r.owner;
+      r.collateral_syms = (r.collateral_raw || []).map(function (c) {
+        var id = c && c[0]; var a = (id && byId[id]) || {};
+        return (a.symbol || String(id));
+      });
+      return r;
+    });
   }
   /* Paged offer list + symbol join (plan: {limit?, startId?} -> rows). */
   async function offers(opts) {
@@ -201,13 +233,26 @@ var Credit = (function () {
     opts = opts || {};
     return _offerRows((await _dbCall("get_credit_offers_by_asset", [String(symOrId), opts.limit || null, opts.startId || null])) || []);
   }
-  /* Deal queries (by offer / borrower / offer-owner) with debt+collateral joins. */
+  /* Deal queries (by offer / borrower / offer-owner) with debt+collateral joins.
+   * Borrower ids join via get_accounts (batch) so tables render names. */
   async function _deals(method, key, opts) {
     opts = opts || {};
     var rows = (await _dbCall(method, [String(key), opts.limit || null, opts.startId || null])) || [];
     var normed = rows.map(_normDeal), byId = await _joinAssets(normed, ["debt_id", "coll_id"]);
+    var acctById = {};
+    try {
+      var bids = [], bseen = {};
+      normed.forEach(function (r) { [r.borrower, r.offer_owner].forEach(function (id) {
+        if (typeof id === "string" && !bseen[id]) { bseen[id] = 1; bids.push(id); } }); });
+      if (bids.length) {
+        var arows = await _dbCall("get_accounts", [bids]);
+        (arows || []).forEach(function (a) { if (a && a.id) acctById[a.id] = a.name || a.id; });
+      }
+    } catch (e) { /* borrower names stay bare ids */ }
     return normed.map(function (r) { var d = _legJoin(byId, r.debt_id), c = _legJoin(byId, r.coll_id);
-      r.debt_sym = d.sym; r.debt_prec = d.prec; r.coll_sym = c.sym; r.coll_prec = c.prec; return r; });
+      r.debt_sym = d.sym; r.debt_prec = d.prec; r.coll_sym = c.sym; r.coll_prec = c.prec;
+      r.borrower_name = acctById[r.borrower] || r.borrower;
+      r.offer_owner_name = acctById[r.offer_owner] || r.offer_owner; return r; });
   }
   /* Deals under one offer id (debt+collateral symbols joined). Params: offerId 1.21.x, opts {limit, startId}. */
   async function dealsByOffer(offerId, opts) { _assertId(offerId, OFFER_RE, "offerId"); return _deals("get_credit_deals_by_offer_id", offerId, opts); }

@@ -437,10 +437,41 @@ var PoolUI = (function () {
     ctx.wrap.className = "wrap wide";
     ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
+    var POOL_ID_RE = /^1\.19\.\d+$/;
+    /* Query seed (back-button-safe deep link, market-desk-query precedent):
+     * filters + size + page + page startId restore from Router.query();
+     * searches write back via history.replaceState (no re-render — leaving
+     * for a pool detail and pressing Back restores this URL with filters). */
+    function readQuery() {
+      var q = {};
+      try {
+        if (typeof Router !== "undefined" && Router && typeof Router.query === "function") q = Router.query() || {};
+      } catch (e) { q = {}; }
+      return q;
+    }
+    function writeQuery() {
+      try {
+        if (typeof history === "undefined" || typeof history.replaceState !== "function") return;
+        if (typeof window === "undefined" || !window.location) return;
+        var parts = [];
+        function put(k, v) {
+          v = String(v === undefined || v === null ? "" : v).trim();
+          if (v) parts.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
+        }
+        put("a", fA.input.value); put("b", fB.input.value); put("s", fS.input.value);
+        if (pager.size !== 10) put("size", String(pager.size));
+        if (pager.page > 0) {
+          put("page", String(pager.page));
+          if (pager.starts[pager.page]) put("start", pager.starts[pager.page]);
+        }
+        var base = String(window.location.href).split("#")[0];
+        history.replaceState(null, "", base + "#/pools" + (parts.length ? "?" + parts.join("&") : ""));
+      } catch (e) { /* URL stays unshared — list still works */ }
+    }
     var filters = DOM.el(doc, "div", null, "pools-filters");
     var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
-    var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
+    var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("pool.share_or_pool_hint", "symbol, 1.3.x, or pool 1.19.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
     var sizeLab = DOM.el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");
@@ -481,12 +512,14 @@ var PoolUI = (function () {
       prev.addEventListener("click", function () {
         if (myGen !== gen || pager.page === 0) return;
         pager.page -= 1;
+        writeQuery();
         loadPage();
       });
       next.addEventListener("click", function () {
         if (myGen !== gen || !hasNext || !pageRows.length) return;
         pager.page += 1;
         pager.starts[pager.page] = pageRows[pageRows.length - 1].id;
+        writeQuery();
         loadPage();
       });
       bar.appendChild(prev); bar.appendChild(note); bar.appendChild(next);
@@ -496,19 +529,32 @@ var PoolUI = (function () {
       if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox);
       showStatus(doc, listBox,t("pool.loading", "Loading pools…"));
       Promise.resolve().then(async function () {
+        /* Direct pool-id lookup: a 1.19.x in Share asset fetches the pool
+         * itself (Pool.get returns joined rows like list) — no asset
+         * describe, no pager. Unknown ids surface honestly, never blank. */
+        var rawS = String(fS.input.value || "").trim();
+        if (POOL_ID_RE.test(rawS)) return { direct: true, rows: [await Pool.get(rawS)] };
         var a = await resolveOpt(fA.input.value), b = await resolveOpt(fB.input.value), s = await resolveOpt(fS.input.value);
         var rows = await Pool.list({ assetA: a ? a.id : null, assetB: b ? b.id : null,
           share: s ? s.id : null, limit: pager.size + 2, startId: pager.starts[pager.page] });
-        return rows || [];
-      }).then(function (rows) {
+        return { direct: false, rows: rows || [] };
+      }).then(function (res) {
         if (myGen !== gen) return; DOM.clear(listBox);
+        var rows = res.rows;
+        if (res.direct) {
+          var scroller = DOM.el(doc, "div", null, "pools-scroll");
+          scroller.appendChild(poolTable(doc, rows));
+          listBox.appendChild(scroller);
+          listBox.appendChild(DOM.el(doc, "p", t("pool.direct_hit", "Direct pool lookup — pager hidden."), "muted"));
+          return;
+        }
         /* Drop the inclusive-start duplicate of the previous page's tail. */
         if (pager.page > 0 && rows.length && rows[0].id === pager.starts[pager.page]) rows.shift();
         var hasNext = rows.length > pager.size;
         var pageRows = hasNext ? rows.slice(0, pager.size) : rows;
-        var scroller = DOM.el(doc, "div", null, "pools-scroll");
-        scroller.appendChild(poolTable(doc, pageRows));
-        listBox.appendChild(scroller);
+        var scroller2 = DOM.el(doc, "div", null, "pools-scroll");
+        scroller2.appendChild(poolTable(doc, pageRows));
+        listBox.appendChild(scroller2);
         listBox.appendChild(pagerBar(pageRows, hasNext));
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox,e,t("pool.load_failed", "Could not load pools."));
@@ -517,14 +563,46 @@ var PoolUI = (function () {
     function resetAndLoad() {
       if (myGen !== gen) return;
       pager.page = 0; pager.starts = ["1.19.0"];
+      writeQuery();
       loadPage();
     }
     go.addEventListener("click", resetAndLoad);
+    /* Enter in any filter field runs the search (plain div, no form —
+     * implicit submission does not exist here). */
+    [fA, fB, fS].forEach(function (f) {
+      f.input.addEventListener("keydown", function (e) {
+        if ((e.key === "Enter" || e.keyCode === 13) && myGen === gen) {
+          if (e.preventDefault) e.preventDefault();
+          resetAndLoad();
+        }
+      });
+    });
     sizeSel.addEventListener("change", function () {
       var n = parseInt(sizeSel.value, 10);
       pager.size = (n === 25 || n === 50) ? n : 10;
       resetAndLoad();
     });
+    /* Restore a deep-linked search (Back from a pool detail lands here with
+     * the query intact): filters + size + page + page startId. Bad values
+     * fall back to defaults — never throw, never blank. */
+    (function restoreQuery() {
+      var q = readQuery();
+      if (q.a) fA.input.value = String(q.a).slice(0, 64);
+      if (q.b) fB.input.value = String(q.b).slice(0, 64);
+      if (q.s) fS.input.value = String(q.s).slice(0, 64);
+      var n = parseInt(q.size, 10);
+      if (n === 25 || n === 50) {
+        pager.size = n;
+        for (var i = 0; i < sizeSel.options.length; i++) {
+          if (sizeSel.options[i].value === String(n)) { sizeSel.selectedIndex = i; break; }
+        }
+      }
+      var p = parseInt(q.page, 10);
+      if (Number.isInteger(p) && p > 0 && p < 1000 && POOL_ID_RE.test(String(q.start || ""))) {
+        pager.page = p;
+        pager.starts[p] = String(q.start);
+      }
+    })();
     /* Public list loads locked or not. Mine resolves the wallet account when
      * unlocked, else defaults to committee-account 1.2.0 with an honest
      * notice — both are public get_liquidity_pools_by_owner reads, never throws. */

@@ -987,7 +987,16 @@ var App = (function () {
     try {
       var subtle = null;
       if (typeof crypto !== "undefined" && crypto) subtle = crypto.subtle || /** @type {any} */ (crypto).webkitSubtle;
-      if (!subtle || typeof subtle.digest !== "function") missing.push("WebCrypto");
+      if (!subtle || typeof subtle.digest !== "function") {
+        /* Secure-context false positive (tester report: latest Helium
+         * flagged "WebCrypto missing"): modern browsers withhold subtle on
+         * plain-http origins. Record the context so the banner can say what
+         * is actually wrong instead of blaming the browser. */
+        var insecure = false;
+        try { insecure = (typeof window !== "undefined" && window && typeof window.isSecureContext === "boolean") ? !window.isSecureContext : false; }
+        catch (e2) { insecure = false; }
+        missing.push(insecure ? "WebCrypto (insecure context)" : "WebCrypto");
+      }
     } catch (e) { missing.push("WebCrypto"); }
     try {
       if (typeof BigInt !== "function") missing.push("BigInt");
@@ -1109,8 +1118,10 @@ var App = (function () {
      *   shown ONLY when compatMissing() reports something genuinely absent.
      *   Dismissal persists in localStorage (view-state flags stay on direct
      *   localStorage by design — store.js seam). Copy is neutral (no browser
-     *   upsell, no google.com link — the link goes to #/help instead) and
-     *   resolves via t() with en-identical stubs in all 10 locale dicts.
+     *   upsell, no google.com link — the link goes to the #/help/browser
+     *   article, which explains secure contexts) and resolves via t() with
+     *   en-identical stubs in all 10 locale dicts. An insecure-context
+     *   WebCrypto miss appends the one-line remedy (compat.insecure_hint).
      *   Never throws — without DOM or storage the banner simply stays hidden. */
     try {
       var compat = document.getElementById("compat-banner");
@@ -1123,10 +1134,19 @@ var App = (function () {
           compat.removeAttribute("hidden");
           var cmsg = document.getElementById("compat-msg");
           if (cmsg) {
-            cmsg.textContent = /** @type {any} */ (t)("compat.msg", "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.", { missing: missing.join(", ") });
+            var ctext = /** @type {any} */ (t)("compat.msg", "Some features need a modern browser (WebSocket, WebCrypto, BigInt, local storage). Missing here: %(missing)s. Browsing still works — wallet signing may not.", { missing: missing.join(", ") });
+            var insecureHit = false;
+            for (var mi = 0; mi < missing.length; mi++) {
+              if (String(missing[mi]).indexOf("insecure context") !== -1) { insecureHit = true; break; }
+            }
+            if (insecureHit) ctext += " " + /** @type {any} */ (t)("compat.insecure_hint", "This address is not a secure context, so the browser withholds WebCrypto. The browser is current — serve over https or localhost, or open the file directly.");
+            cmsg.textContent = ctext;
           }
           var chelp = document.getElementById("compat-help");
-          if (chelp) chelp.textContent = t("help.help", "Help");
+          if (chelp) {
+            chelp.textContent = t("help.help", "Help");
+            try { chelp.setAttribute("href", "#/help/browser"); } catch (e2) { /* static href stands */ }
+          }
         } else {
           compat.setAttribute("hidden", "");
         }

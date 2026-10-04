@@ -18,6 +18,17 @@ assert.strictEqual(el.style.minHeight, "44px", "minHeight set");
 assert.strictEqual(el.style.minWidth, "44px", "minWidth set");
 assert.ok(window.touchable === touchable, "window.touchable exported");
 
+// Native check/radio inputs: skipped (the app.css 18px reset owns their
+// size; the wrapping label carries the 44px target). Inline 44px here
+// rendered giant boxes (tester report).
+var box = { tagName: "INPUT", type: "checkbox", style: {} };
+assert.strictEqual(touchable(box), box, "returns same checkbox");
+assert.strictEqual(box.style.minHeight, undefined, "checkbox minHeight untouched");
+assert.strictEqual(box.style.minWidth, undefined, "checkbox minWidth untouched");
+var radio = { tagName: "input", type: "radio", style: {} };
+assert.strictEqual(touchable(radio), radio, "returns same radio");
+assert.strictEqual(radio.style.minHeight, undefined, "radio minHeight untouched");
+
 console.log("touchable utility: 4 passed, 0 failed");
 
 // ===== CSS shape probe (Task 2) =====

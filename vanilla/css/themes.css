@@ -97,6 +97,10 @@
   --banner-bg: #4A3200; --banner-text: #ffffff; --banner-border: #fcab53;
   --warn-text: #fcab53;
   --icon-filter: invert(1);
+  /* --header-icon-filter: monochrome header/nav glyphs track --header-text.
+   * All three header bars are dark, so black-source SVGs invert to light.
+   * ref-ui header text is pure white, so plain invert(1) matches exactly. */
+  --header-icon-filter: invert(1);
 }
 /* vanilla-ui-theme (light): sampled from the user's DeConna Homemade Vanilla
  * tub photo (vanilla/notes/vanilla-theme/tub.jpg, viewed 2026-09-28) —
@@ -160,6 +164,12 @@
   --banner-bg: #F3E2B8; --banner-text: #2A1A12; --banner-border: #C8961E;
   --warn-text: #7A5A0A;
   --icon-filter: none;
+  /* --header-icon-filter: header bar is chocolate #2A1A12 with cream text
+   * #FAF6EA, so plain invert(1) would render pure-white glyphs against
+   * cream text (the reported mismatch). sepia(0.28) warms the inverted
+   * white toward cream — an approximation (black-source SVGs only; full-
+   * color state PNGs bypass via img.icon-state in app.css and are untouched). */
+  --header-icon-filter: invert(1) sepia(0.28);
 }
 /* dex-ux-theme (dark): resampled from the Crypo designer template
  * (/workspace/reference/crypo/crypo/Crypo/ — HEX VALUES ONLY, no code/markup/
@@ -252,6 +262,9 @@
    * fi-star, swap, hamburger) so no colored icon distorts; a colored
    * glyph stays unwired until the inline-SVG pass. */
   --icon-filter: invert(1);
+  /* --header-icon-filter tracks --header-text (pure white here, so plain
+   * invert matches exactly, same as ref-ui-theme). */
+  --header-icon-filter: invert(1);
 }
 /* Slice-16 toast shadow per theme (not a palette value — elevation only):
  * retro default, warm-tinted vanilla (chocolate shadow on cream), DEX-UX

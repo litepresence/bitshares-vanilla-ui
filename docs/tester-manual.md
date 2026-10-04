@@ -349,10 +349,10 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 
 ## 19. Help (`#/help`)
 
- 1. Open `#/help`. Expected: 49 topic links (new: Community history index),
-    no English-only note, no mention of any old UI; Documentation section
-    (2 links) and AI Assisted Help (deepwiki link) below the index — all
-    open new tabs.
+  1. Open `#/help`. Expected: 68 topic links (new: Browser support),
+     no English-only note, no mention of any old UI; Documentation section
+     (2 links) and AI Assisted Help (deepwiki link) below the index — all
+     open new tabs.
  2. Open 3 articles (one new: trollbox; one old: backups; glossary).
     Expected: headings, paragraphs, and bullet lists render as structured
     text (never one giant block, never a raw `help.topic_*` key id).

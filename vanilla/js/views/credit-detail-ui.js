@@ -70,7 +70,26 @@ var CreditDetailUI = (function () {
       var a = await Asset.describe(o.asset_id);
       var me = null;
       try { me = await Account.resolve(await Account.myAccountId()); } catch (e) { me = null; }
-      return { o: o, a: a, me: me };
+      /* Owner + collateral/borrower legs render as names/symbols (raw ids in
+       * title) — the list join in Credit._offerRows covers tables; the
+       * single-read detail resolves here with honest-id fallbacks. */
+      var ownerName = o.owner;
+      try { ownerName = (await Account.resolve(o.owner)).name; } catch (e) { ownerName = o.owner; }
+      var collSyms = [];
+      try {
+        collSyms = await Promise.all((o.collateral_raw || []).map(async function (c) {
+          var cid = c && c[0];
+          try { return (await Asset.describe(String(cid))).symbol; } catch (e) { return String(cid); }
+        }));
+      } catch (e) { collSyms = []; }
+      var borNames = [];
+      try {
+        borNames = await Promise.all((o.borrowers_raw || []).map(async function (b) {
+          var bid = b && b[0];
+          try { return (await Account.resolve(String(bid))).name; } catch (e) { return String(bid); }
+        }));
+      } catch (e) { borNames = []; }
+      return { o: o, a: a, me: me, ownerName: ownerName, collSyms: collSyms, borNames: borNames };
     }).then(function (R) {
       if (!live(myGen, uiGen)) return;
       ui.clearBox(ctx.wrap);
@@ -82,16 +101,16 @@ var CreditDetailUI = (function () {
       var cur = ui.amt(o.current_raw, a.precision, a.symbol, o.asset_id);
       var tot = ui.amt(o.total_raw, a.precision, a.symbol, o.asset_id);
       var rt = ui.rateText(o.rate_units);
-      ctx.wrap.appendChild(ui.confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
+      ctx.wrap.appendChild(ui.confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), R.ownerName, "raw " + o.owner],
         [t("credit.asset", "Asset"), a.symbol + " (" + o.asset_id + ")"],
         [t("credit.current_balance", "Current balance"), cur.text, "raw " + cur.raw], [t("credit.total_balance", "Total balance"), tot.text, "raw " + tot.raw],
         [t("credit.fee_rate", "Fee rate"), rt.text + " (denom 1,000,000)", "raw " + rt.raw],
         [t("credit.max_duration", "Max duration"), Credit.durToHuman(o.max_dur_sec)], [t("credit.enabled", "Enabled"), o.enabled ? t("credit.yes", "yes") : t("credit.no", "no")],
         [t("credit.auto_disable", "Auto-disable"), o.auto_disable_time || "—"]]));
       ctx.wrap.appendChild(ui.el(doc, "h2", t("credit.acceptable_collateral", "Acceptable collateral")));
-      ctx.wrap.appendChild(ui.el(doc, "p", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "Any collateral accepted.", "muted"));
+      ctx.wrap.appendChild(ui.el(doc, "p", (o.collateral_raw.length ? (R.collSyms.length ? R.collSyms : o.collateral_raw.map(function (c) { return c[0]; })).join(", ") : "Any collateral accepted."), "muted"));
       ctx.wrap.appendChild(ui.el(doc, "h2", t("credit.acceptable_borrowers", "Acceptable borrowers")));
-      ctx.wrap.appendChild(ui.el(doc, "p", o.borrowers_raw.length ? o.borrowers_raw.map(function (b) { return b[0]; }).join(", ") : "Any borrower accepted.", "muted"));
+      ctx.wrap.appendChild(ui.el(doc, "p", (o.borrowers_raw.length ? (R.borNames.length ? R.borNames : o.borrowers_raw.map(function (b) { return b[0]; })).join(", ") : "Any borrower accepted."), "muted"));
       ctx.wrap.appendChild(ui.el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)")));
       if (lockedD) ctx.wrap.appendChild(ui.signNotice(doc));
       acceptBox(doc, ctx.wrap, uiGen, o, a);
@@ -178,13 +197,13 @@ var CreditDetailUI = (function () {
       var rows = deals.map(function (d) {
         var debt = ui.amt(d.debt_raw, d.debt_prec, d.debt_sym, d.debt_id);
         var coll = ui.amt(d.coll_raw, d.coll_prec, d.coll_sym, d.coll_id);
-        return { d: d, cells: [{ text: d.id }, { text: d.borrower }, { text: debt.text, raw: debt.raw },
+        return { d: d, cells: [{ text: d.id }, { text: (d.borrower_name || d.borrower), raw: d.borrower }, { text: debt.text, raw: debt.raw },
           { text: coll.text, raw: coll.raw },
           { text: Credit.rateUnitsToHuman(d.rate_units) + "%", raw: String(d.rate_units) },
           { text: (d.auto_repay === null || d.auto_repay === undefined) ? "—" : Credit.autoRepayWord(d.auto_repay) }] };
       });
       box.appendChild(ui.deskTable(doc, [t("credit.deal", "Deal"), t("credit.borrower", "Borrower"), t("credit.debt", "Debt"), t("credit.collateral", "Collateral"), t("credit.rate", "Rate"), t("credit.auto_repay", "Auto-repay")], rows,
-        function (r) { return [r.d.id + " · borrower " + r.d.borrower, "Debt " + r.cells[2].text, "Collateral " + r.cells[3].text, "Rate " + r.cells[4].text]; }));
+        function (r) { return [r.d.id + " · borrower " + (r.d.borrower_name || r.d.borrower), "Debt " + r.cells[2].text, "Collateral " + r.cells[3].text, "Rate " + r.cells[4].text]; }));
       if (!deals.length) { box.appendChild(ui.el(doc, "p", t("credit.no_deals_on_this_offer_yet", "No deals on this offer yet.") + t("credit.deals_hint", " Deals appear after someone borrows against this offer."), "muted")); return; }
       var sel = doc.createElement("select"); ui.touchable(sel);
       deals.forEach(function (d) {

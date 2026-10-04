@@ -172,11 +172,14 @@ var BorrowUI = (function () {
    * sign-time gate + status + sendAndProve stay in the caller's onSend. */
   /* No local field builder — use Forms.labeledInput (row + input) or
    * Forms.fieldRow for caller-built fields (position select). */
-  /* Raw amount -> {text (human + sym, or raw + id fallback), raw}. Params: raw, prec (number|null), sym, id. */
+  /* Raw amount -> {text (human + sym, or honest dash fallback), raw}. Params: raw, prec (number|null), sym, id.
+   * Principle #6: the join-miss fallback must never render the raw chain
+   * integer as the value — dash primary, raw + id in .raw (callers title
+   * from it). Happy path keeps the id in .raw too, so titles stay precise. */
   function amt(raw, prec, sym, id) {
     if (typeof prec === "number" && /^-?\d+$/.test(String(raw)))
-      return { text: Format.formatAmount(String(raw), prec) + (sym ? " " + sym : ""), raw: String(raw) };
-    return { text: String(raw) + " (" + id + ")", raw: String(raw) };
+      return { text: Format.formatAmount(String(raw), prec) + (sym ? " " + sym : ""), raw: String(raw) + " (" + id + ")" };
+    return { text: t("settings.dash", "—"), raw: String(raw) + " (" + id + ")" };
   }
   /* Chain head block number (observation marker for result panels, never a txid). Returns: Promise of int. */
   async function headBlock() {

@@ -315,14 +315,14 @@ var CreditUI = (function () {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
       var rt = rateText(o.rate_units);
       return { o: o, href: "#/credit-offer/" + o.id,
-        cells: [{ text: o.id }, { text: o.owner }, { text: o.sym || o.asset_id },
+        cells: [{ text: o.id }, { text: (o.owner_name || o.owner), raw: o.owner }, { text: o.sym || o.asset_id },
           { text: cur.text, raw: cur.raw }, { text: tot.text, raw: tot.raw },
           { text: rt.text, raw: rt.raw }, { text: Credit.durToHuman(o.max_dur_sec) }, { text: o.enabled ? t("credit.yes", "yes") : t("credit.no", "no") }] };
     });
   }
   function offerCards(r) {
     var o = r.o;
-    return [o.id + " · " + (o.sym || o.asset_id), "Owner " + o.owner,
+    return [o.id + " · " + (o.sym || o.asset_id), "Owner " + (o.owner_name || o.owner),
       "Current " + r.cells[3].text + " / total " + r.cells[4].text,
       "Rate " + r.cells[5].text + " · " + r.cells[6].text + " · " + (o.enabled ? t("credit.enabled_2", "enabled") : t("credit.disabled", "disabled"))];
   }
@@ -366,14 +366,16 @@ var CreditUI = (function () {
       var tr = doc.createElement("tr"); tr.setAttribute("data-offer", o.id); tr.tabIndex = 0;
       tr.appendChild(DOM.el(doc, "td", o.id));
       tr.appendChild(DOM.el(doc, "td", o.sym || o.asset_id));
-      tr.appendChild(DOM.el(doc, "td", o.owner));
+      var ownerCell = DOM.el(doc, "td", o.owner_name || o.owner);
+      if (o.owner_name && o.owner_name !== o.owner) ownerCell.title = t("account.raw_prefix", "raw ") + o.owner;
+      tr.appendChild(ownerCell);
       var c1 = DOM.el(doc, "td", tot.text); if (tot.raw) c1.title = t("account.raw_prefix", "raw ") + tot.raw; tr.appendChild(c1);
       var c2 = DOM.el(doc, "td", avail.text); if (avail.raw) c2.title = t("account.raw_prefix", "raw ") + avail.raw; tr.appendChild(c2);
       var c3 = DOM.el(doc, "td", min.text); if (min.raw) c3.title = t("account.raw_prefix", "raw ") + min.raw; tr.appendChild(c3);
       var c4 = DOM.el(doc, "td", rt.text); if (rt.raw) c4.title = t("account.raw_prefix", "raw ") + rt.raw; tr.appendChild(c4);
       tr.appendChild(DOM.el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
       tr.appendChild(DOM.el(doc, "td", exp));
-      tr.appendChild(DOM.el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));
+      tr.appendChild(DOM.el(doc, "td", (o.collateral_syms && o.collateral_syms.length) ? o.collateral_syms.join(", ") : (o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—")));
       var tdB = doc.createElement("td");
       var bb = touchable(DOM.el(doc, "button", t("credit.borrow", "Borrow"))); bb.type = "button";
       bb.addEventListener("click", function (e) { e.stopPropagation(); openLoanModal(doc, hostBox, myGen, o); });
@@ -400,7 +402,7 @@ var CreditUI = (function () {
       var expC = (o.auto_disable_time && String(o.auto_disable_time).trim()) ? String(o.auto_disable_time).trim() : "—";
       var c = DOM.el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
       c.appendChild(DOM.el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
-      c.appendChild(DOM.el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
+      c.appendChild(DOM.el(doc, "div", t("credit.owner", "Owner") + " " + (o.owner_name || o.owner)));
       c.appendChild(DOM.el(doc, "div", t("credit.total_prefix", "Total ") + tot.text + t("credit.available_mid", " / Available ") + availC));
       c.appendChild(DOM.el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + t("credit.expiration_mid", " · Expiration ") + expC));
       var cb = touchable(DOM.el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
@@ -467,7 +469,7 @@ var CreditUI = (function () {
     body.appendChild(DOM.el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
     var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
     var rt = safeRate(o.rate_units);
-    body.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
+    body.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), (o.owner_name || o.owner), "raw " + o.owner],
       [t("credit.asset", "Asset"), (o.sym || o.asset_id)],
       [t("credit.current", "Current"), cur.text, "raw " + cur.raw], [t("credit.total", "Total"), tot.text, "raw " + tot.raw],
       [t("credit.fee_rate", "Fee rate"), rt.text + " (denom 1,000,000)", "raw " + rt.raw],

@@ -208,6 +208,7 @@ var TourUI = (function () {
         "#tour-card h2{margin:0 0 6px;font-size:1.05rem;}" +
         "#tour-card p{margin:0 0 10px;}" +
         "#tour-card .tour-eyebrow{font-size:0.8rem;opacity:0.75;margin:0 0 4px;}" +
+        "#tour-card .tour-away{font-size:0.85rem;font-style:italic;opacity:0.85;margin:0 0 8px;}" +
         "#tour-card .tour-links{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px;}" +
         "#tour-card .tour-cta{display:inline-block;margin:0 0 10px;min-height:44px;line-height:44px;}" +
         "#tour-card .tour-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}" +
@@ -276,6 +277,17 @@ var TourUI = (function () {
     var body = doc.createElement("p");
     body.textContent = t(step.body[0], step.body[1]);
     box.appendChild(body);
+    /* Honest fallback framing: a centered card with no live target is a
+     * preview of another page, not a pointer — say where the target lives
+     * (tester report: desk steps "pop up in the middle pointing at
+     * nothing"). The CTA below it navigates there; observers upgrade to
+     * a highlight on arrival. */
+    if (!target && step.cta) {
+      var away = doc.createElement("p");
+      away.className = "tour-away";
+      away.textContent = t("tour.away_note", "On the Exchange desk — open it to see this highlighted.");
+      box.appendChild(away);
+    }
     if (step.cta) {
       var cta = touchable(doc.createElement("a"));
       cta.className = "tour-cta";

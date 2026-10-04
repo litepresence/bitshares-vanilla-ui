@@ -131,12 +131,14 @@ var Pool = (function () {
     return rows;
   }
 
-  /* Single pool by 1.19.x id. Unknown id -> "unknown-pool" (never a raw RPC dump). */
+  /* Single pool by 1.19.x id, symbols joined like list rows (callers use
+   * sym_a/asset_a_id interchangeably with fallbacks — joined is a superset).
+   * Unknown id -> "unknown-pool" (never a raw RPC dump). */
   async function get(id) {
     _assertId(id, POOL_RE, "id");
     var rows = await _dbCall("get_objects", [[id]]);
     if (!rows || !rows[0]) throw new Error("unknown-pool (" + id + ")");
-    return _normPool(rows[0]);
+    return (await _join([rows[0]]))[0];
   }
   /* list_liquidity_pools arg-form probe (ambiguity B): header 2-arg first, #2's 3-arg on param rejection. */
   async function _listRaw(limit, startId) {

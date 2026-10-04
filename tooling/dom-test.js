@@ -78,5 +78,19 @@ var evil = DOM.pageHead(doc, "<b>x</b>", null);
 assert.strictEqual(evil.textContent, "<b>x</b>");
 assert.strictEqual(evil.children.length, 0);
 
+// vector 6: full-color PNG art is marked icon-state (theme invert skips it);
+// monochrome SVGs keep h-title-icon alone (follow --icon-filter)
+global.Icon = {
+  url: function(name) { return "assets/icons/" + name + (/lock-blue/.test(name) ? ".png" : ".svg"); },
+  img: function(name, cls, alt) {
+    return { tag: "img", iconName: name, className: cls, alt: alt, children: [], textContent: "" };
+  }
+};
+var headedPng = DOM.pageHead(doc, "Login", "lock-blue");
+assert.strictEqual(headedPng.children[1].className, "h-title-icon icon-state", "png marked icon-state");
+var headedSvg = DOM.pageHead(doc, "Explore (9)", "server");
+assert.strictEqual(headedSvg.children[1].className, "h-title-icon", "svg keeps theme filter");
+delete global.Icon;
+
 console.log("DOM utils: 7 passed, 0 failed");
 console.log("DOM pageHead: 6 passed, 0 failed");

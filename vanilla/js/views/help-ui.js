@@ -98,6 +98,7 @@ var HelpUI = (function () {
     ["direct-debit", "Direct Debit", "Authorize recurring withdrawals; claim and manage them.", "#/direct-debit"],
     ["api-lab", "API Lab", "Probe the connected node with a 29-call catalog.", "#/api-lab"],
     ["es-lab", "ES Lab", "Search the community history index with curated forms.", "#/es-lab"],
+    ["browser", "Browser support", "Which browsers run the wallet, and what the compatibility notice means.", null],
     ["charts", "Charts and indicators", "Candles, depth, and the 25-indicator catalog on the desk.", "#/market/BTS_USD"],
     ["dashboard", "Dashboard", "Locked splash vs your unlocked watched-account overview.", "#/"],
     ["register", "Creating an account", "Claim a name through the faucet registrar.", "#/create-account"],
@@ -681,8 +682,15 @@ var HelpUI = (function () {
       "# Curated forms plus raw console",
       "Every catalog search shows the exact query it runs; the raw console accepts arbitrary bodies against the allowlisted indexes for power users."
     ],
-    "charts": [
-      "# Price, depth, and oscillators",
+    "browser": [
+      "# Detected features, never brand names",
+      "This wallet never asks which browser you use — it probes the four platform features it genuinely needs: WebSocket (chain data), WebCrypto (keystore), BigInt (money math), and local storage (settings). Silence is a pass: no banner on a modern browser means everything is present.",
+      "# The most common cause: insecure context",
+      "Modern browsers expose WebCrypto only in secure contexts: https pages, localhost, and opened files. The same up-to-date browser served over plain http (for example a LAN address) reports WebCrypto missing — the browser is fine, the address is not. Serve the folder over https or localhost, or open index.html directly.",
+      "# What still works",
+      "Browsing always works: balances, markets, explorer, and voting read public chain data with no wallet features. Only local signing needs the missing piece. Dismissing the notice hides it on this machine; it never blocks a page."
+    ],
+    "charts": [      "# Price, depth, and oscillators",
       "The desk shows a price pane (candles plus moving averages) with stacked oscillator sub-panes on independent scales, a volume pane, and a cumulative depth chart beside the book.",
       "# Real candles, carried forward",
       "Candles come from chain history with timeframe-aware interpolation: gaps carry the last price forward and flag red/green, so thin markets never invent volume.",
@@ -949,7 +957,7 @@ var HelpUI = (function () {
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
     ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "assets-issue", "assets-feed", "topops", "fees", "charts", "history-index", "community"]],
-    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu", "about-making"]]
+    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "browser", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu", "about-making"]]
   ];
 
   function paintIndexList(doc, wrap) {
