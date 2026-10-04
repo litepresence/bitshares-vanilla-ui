@@ -594,6 +594,13 @@ table.pools-table td.num { text-align: right; }
  * --panel via the base rule above. */
 .node-table tbody tr:nth-child(even),
 table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
+/* Network-group dividers (settings node table + cards): thin background
+ * band between the mainnet / testnet / custom row blocks — reads as
+ * separate tables while the radios stay one set (single tbody, one
+ * name="node" group; dividers carry no data-url so probe/offline logic
+ * skips them). */
+.node-table tr.node-sep td { height: 8px; padding: 0; border: 0; border-top: 2px solid var(--border); background: var(--panel-deep); }
+.node-cards .node-sep { height: 8px; background: var(--panel-deep); border-top: 2px solid var(--border); border-radius: 4px; }
 .node-table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 /* Clickable offer rows (row click opens the loan modal; the per-row Borrow
  * button is the touch/keyboard path — no hover-dependent UI). */

@@ -1,5 +1,5 @@
 /* node-network-test.js — unit vectors for merged-table network helpers
- * (settings-nodes.js listNetwork/netFromChain/networkLabel/networkHealth).
+ * (settings-nodes.js listNetwork/netFromChain/networkLabel/networkHealth/groupOf).
  * Stdlib only: `node tooling/node-network-test.js` (exit 0 = green). Covers
  * list-vs-chain derivation, display labels, and the yellow-unless-4018
  * color rule. No DOM, no network, no deps (Store stubbed globally).
@@ -15,7 +15,7 @@ global.Store = {
 };
 var SN = require("../vanilla/js/settings-nodes.js");
 var T = SN._test;
-["listNetwork", "netFromChain", "networkLabel", "networkHealth"].forEach(function (k) {
+["listNetwork", "netFromChain", "networkLabel", "networkHealth", "groupOf"].forEach(function (k) {
   assert.ok(T && typeof T[k] === "function", "_test." + k + " exported");
 });
 function t(k, d) { return d; }
@@ -50,5 +50,8 @@ eq(T.networkHealth("", "ffff"), "warn", "custom unknown chain yellow");
 eq(T.networkHealth("", MID), "good", "custom mainnet green");
 eq(T.networkHealth("mainnet", null), "", "unprobed uncolored");
 eq(T.networkHealth("", null), "", "unknown uncolored");
+eq(T.groupOf("wss://m1"), "mainnet", "group mainnet");
+eq(T.groupOf("wss://t1"), "testnet", "group testnet");
+eq(T.groupOf("wss://x"), "custom", "group custom");
 delete global.Store;
 console.log("node-network-test: " + passed + " passed, 0 failed");

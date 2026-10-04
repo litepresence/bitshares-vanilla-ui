@@ -145,7 +145,19 @@ var SettingsNodes = (function () {
     tbody.id = "node-rows";
     table.appendChild(tbody);
 
+    var lastGroup = "";
     nodes.forEach(function (url) {
+      var grp = groupOf(url);
+      if (lastGroup && grp !== lastGroup) {
+        var sep = doc.createElement("tr");
+        sep.className = "node-sep";
+        sep.setAttribute("aria-hidden", "true");
+        var sepTd = doc.createElement("td");
+        sepTd.setAttribute("colspan", "12");
+        sep.appendChild(sepTd);
+        tbody.appendChild(sep);
+      }
+      lastGroup = grp;
       var tr = doc.createElement("tr");
       tr.setAttribute("data-url", url);
 
@@ -241,7 +253,16 @@ var SettingsNodes = (function () {
   function buildNodeCards(doc, settings, nodes, t) {
     var cards = doc.createElement("div");
     cards.className = "node-cards";
+    var lastGroup = "";
     nodes.forEach(function (url) {
+      var grp = groupOf(url);
+      if (lastGroup && grp !== lastGroup) {
+        var sep = doc.createElement("div");
+        sep.className = "node-sep";
+        sep.setAttribute("aria-hidden", "true");
+        cards.appendChild(sep);
+      }
+      lastGroup = grp;
       var card = doc.createElement("div");
       card.className = "node-card";
       card.setAttribute("data-url", url);
@@ -443,6 +464,7 @@ var SettingsNodes = (function () {
     if (!rows.length) { offline.hidden = true; return; }
     var allDown = true;
     for (var k = 0; k < rows.length; k++) {
+      if (!rows[k].getAttribute("data-url")) continue;
       if (rows[k].getAttribute("data-status") !== "down") { allDown = false; break; }
     }
     offline.hidden = !allDown;
@@ -670,6 +692,16 @@ var SettingsNodes = (function () {
       if (chainId.toLowerCase() === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
       return "warn";
     } catch (e) { return ""; }
+  }
+
+  /**
+   * Visual group for divider bands (mainnet / testnet / custom blocks).
+   * @param {string} url node URL
+   * @returns {string} "mainnet", "testnet", or "custom" */
+  function groupOf(url) {
+    var net = "";
+    try { net = listNetwork(url); } catch (e) { net = ""; }
+    return (net === "mainnet" || net === "testnet") ? net : "custom";
   }
 
   /* geoText: pure location-cell content. Params: t (injected lookup, dash
@@ -1030,7 +1062,7 @@ var SettingsNodes = (function () {
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth, groupOf: groupOf }
   };
 })();
 
