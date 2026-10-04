@@ -247,173 +247,59 @@ var TransferConfirm = (function () {
     };
   }
 
-  /* Confirm screen (Beet card layout per the header note: header context
-   * line + one card per op with title + human rows + per-card raw
-   * drill-down). Row order follows #3's op-0 table (popup.js:5717-5722):
-   * From / To / Amount / Memo, plus Fee and Network. Fee shows the human
-   * amount with the raw integer in title (same convention as balances).
-   * The header names the signing context honestly — wallet account + chain
-   * prefix + network (we have no dApp origin to name). Back is the
-   * fail-closed close: it never signs and never leaves anything pending —
-   * it only re-renders the form via onBack (form-route fallback when no
-   * closure was given). This file builds op 0 only, so the pager reads 1/1
-   * (the slot multi-op pagination would use). Back leaves via onBack (the
-   * form file's re-render closure) — this file never reaches back into
-   * transfer-ui.js. */
+  /* Confirm screen via the shared ConfirmDialog (ui/confirm.js): title +
+   * named rows render as div.confirm-dialog (h3 + dl.confirm with Back
+   * carrying btn-ghost + Sign & Send in div.confirm-actions). Row order
+   * follows #3's op-0 table (popup.js:5717-5722): From / To / Amount /
+   * Memo, plus Fee and Network. Fee rides feeHuman with the raw integer
+   * in feeRawTitle (principle #6: human terms with raw in title, same
+   * convention as balances); Amount keeps its raw in r[2]. The header
+   * context line (wallet account + chain prefix + network), the op title +
+   * pager slot (this file builds op 0 only, so 1/1), the per-card raw
+   * drill-down, the H3 suspicious-fee ack gate, and the TxBuilder outlet
+   * ride inside the dialog above its actions (old rows-then-notes-then-
+   * buttons order, textContent-only). Back is the fail-closed close: it
+   * never signs and never leaves anything pending — it only re-renders
+   * the form via onBack (form-route fallback when no closure was given).
+   * Back leaves via onBack (the form file's re-render closure) — this
+   * file never reaches back into transfer-ui.js. */
   function showConfirm(doc, wrap, root, from, ctx, onBack) {
-    wrap.appendChild(el(doc, "h1", t("confirm.title", "Confirm transfer")));
-    /* (1) header context line — existing keys only: confirm.from names the
-     * wallet account, txbuilder.chain_prefix the chain, confirm.network
-     * the network (" · " is punctuation, not a label). */
-    wrap.appendChild(el(doc, "p",
-      t("confirm.from", "From") + " " + from.name + " (" + from.id + ") · " +
-      t("txbuilder.chain_prefix", "Chain: ") + (ctx.chainPrefix || "unknown") + " · " +
-      t("confirm.network", "Network") + " " + ctx.network, "muted"));
-
-    /* (2) one card per op (a single op here — title + pager slot + rows).
-     * The row() builder below is unchanged; only the structure around it
-     * is new. */
     var ops = (ctx.unsigned && ctx.unsigned.operations) || [];
     var pair = ops[0] || [0, {}];
     var opId = pair[0];
-    var card = el(doc, "section", null, "op-card");
-    /* Title reuses the existing op-name key; the (op N) index is chain data
-     * (same "(op …)" shape as txbuilder.added_body_tpl), not a new label. */
-    card.appendChild(el(doc, "h2", t("proposal.op_0", "transfer") + " (op " + opId + ")"));
-    /* Pager slot: pure position data (multi-op pagination is a follow-up —
-     * this file builds op 0 only, so this reads 1/1). */
-    card.appendChild(el(doc, "div", "1/" + ops.length, "muted"));
-    var list = el(doc, "dl", null, "xfer-confirm");
-
-    function row(term, text, title) {
-      var dt = el(doc, "dt", term);
-      var dd = el(doc, "dd", text);
-      if (title) dd.title = title;
-      list.appendChild(dt);
-      list.appendChild(dd);
-    }
-
-    row(t("confirm.from", "From"), from.name + " (" + from.id + ")");
-    row(t("confirm.to", "To"), ctx.to.name + " (" + ctx.to.id + ")");
     var amountHuman = Format.formatAmount(ctx.amountInt, ctx.asset.precision) + " " + ctx.asset.symbol;
-    row(t("confirm.amount", "Amount"), amountHuman, ctx.amountInt);
-    if (ctx.memoKind === "encrypted") row(t("confirm.memo", "Memo"), t("confirm.memo_encrypted", "Encrypted"));
-    else if (ctx.memoKind === "plain") row(t("confirm.memo", "Memo"), t("confirm.memo_plain", "Plain: %(text)s", {text: ctx.memoText}));
-    else row(t("confirm.memo", "Memo"), t("confirm.memo_none", "(none)"));
+    var memoText;
+    if (ctx.memoKind === "encrypted") memoText = t("confirm.memo_encrypted", "Encrypted");
+    else if (ctx.memoKind === "plain") memoText = t("confirm.memo_plain", "Plain: %(text)s", {text: ctx.memoText});
+    else memoText = t("confirm.memo_none", "(none)");
     var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
-    row(t("confirm.fee", "Fee"), feeHuman, String(ctx.fee.amount));
-    row(t("confirm.network", "Network"), ctx.network);
-    /* Chain row keeps the visible prefix the sign-time re-pin checks against
-     * (term reuses txbuilder.chain_prefix — the old literal "Chain ID" is
-     * gone, same value shown). */
-    row(t("txbuilder.chain_prefix", "Chain: "), ctx.chainPrefix || "unknown");
-
-    card.appendChild(list);
-
-    /* (3) per-card raw drill-down (existing .raw family, moved inside the
-     * card so the bytes sit next to the rows they describe; shows this
-     * card's op pair — equivalent info to the old whole-operations dump). */
-    var detOp = doc.createElement("details");
-    detOp.className = "raw";
-    var sumOp = doc.createElement("summary");
-    /* A11y delta 2026-10-01: empty summary showed only a triangle to sighted
-     * keyboard users — visible text mirrors the aria-label (proposal-ui
-     * rawJson precedent), reusing the same key so check_i18n stays green. */
-    sumOp.textContent = t("confirm.op_json_label", "Show unsigned operation JSON");
-    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
-    detOp.appendChild(sumOp);
-    var preOp = doc.createElement("pre");
-    try { preOp.textContent = JSON.stringify(pair, null, 2); }
-    catch (e) { preOp.textContent = String(pair); }
-    detOp.appendChild(preOp);
-    card.appendChild(detOp);
-    wrap.appendChild(card);
-
-    /* H3: blocking suspicious-fee warning + explicit ack checkbox. The
-     * Sign & Send handler below refuses to sign until the box is ticked —
-     * a second, deliberate click — and nothing here ever auto-proceeds. */
+    /* Fee term stays the caller's keyed string (was the Fee row term);
+     * Chain row term reuses txbuilder.chain_prefix (the old literal
+     * "Chain ID" is gone, same value shown) and keeps the visible prefix
+     * the sign-time re-pin checks against. */
+    var rows = [
+      [t("confirm.from", "From"), from.name + " (" + from.id + ")"],
+      [t("confirm.to", "To"), ctx.to.name + " (" + ctx.to.id + ")"],
+      [t("confirm.amount", "Amount"), amountHuman, ctx.amountInt],
+      [t("confirm.memo", "Memo"), memoText],
+      [t("confirm.network", "Network"), ctx.network],
+      [t("txbuilder.chain_prefix", "Chain: "), ctx.chainPrefix || "unknown"]
+    ];
     var feeAckBox = null;
-    if (ctx.feeWarning) {
-      var feeWarn = el(doc, "div", null, "error");
-      feeWarn.setAttribute("aria-live", "assertive");
-      feeWarn.textContent = ctx.feeWarning + t("confirm.fee_hint", " Check the fee before signing — tick the box and click Sign & Send again to proceed.");
-      wrap.appendChild(feeWarn);
-      var ackRow = el(doc, "label", null, "xfer-field");
-      feeAckBox = doc.createElement("input");
-      feeAckBox.type = "checkbox";
-      feeAckBox.id = "xfer-fee-ack";
-      touchable(feeAckBox);
-      ackRow.appendChild(feeAckBox);
-      ackRow.appendChild(doc.createTextNode(t("confirm.fee_ack", " I understand this fee is unusually high.")));
-      wrap.appendChild(ackRow);
-    }
-
-    /* Buttons: Back is the fail-closed close (never signs — proof in the
-     * handler below); Sign & Send is the only path that signs. */
-    var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
-    backBtn.id = "xfer-back";
-    backBtn.type = "button";
-    backBtn.classList.add("btn-ghost");
-    wrap.appendChild(backBtn);
-    var sendBtn = touchable(el(doc, "button", t("confirm.sign_send", "Sign & Send")));
-    sendBtn.id = "xfer-send";
-    sendBtn.type = "button";
-    wrap.appendChild(sendBtn);
-
-    /* Fail-closed close proof: this handler is the ONLY thing Back does —
-     * it never touches Tx.sign/broadcast, never resolves anything, leaves
-     * no promise behind (review already settled before showConfirm ran).
-     * Closing = reject: the unsigned ctx is dropped with the DOM. The
-     * form-route fallback covers a missing onBack closure (previously a
-     * dead button with no way out); mid-sign both buttons stay disabled
-     * so the user cannot abandon the promise chain into an ambiguous
-     * state from here (browser-chrome navigation away still drops only the
-     * result screen — a broadcast already sent cannot be unsent, same as
-     * before, and nothing here auto-signs on close). */
-    backBtn.addEventListener("click", function () {
+    var dlg = null;
+    /* Fail-closed close: the ONLY thing Back does — it never touches
+     * Tx.sign/broadcast, never resolves anything, leaves no promise
+     * behind (review already settled before showConfirm ran). Closing =
+     * reject: the unsigned ctx is dropped with the DOM. The form-route
+     * fallback covers a missing onBack closure (previously a dead button
+     * with no way out). */
+    function doBack() {
       if (typeof onBack === "function") { onBack(); return; }
       try { location.hash = "#/transfer"; } catch (e) { /* no nav */ }
-    });
-
-    /* TxBuilder outlet (additive): queue this unsigned transfer without
-     * broadcasting. One-shot Sign & Send above is untouched — this block
-     * only reads ctx.unsigned.operations[0] as JS values (never into the
-     * DOM) and navigates to the desk. */
-    try {
-      if (typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function" &&
-          ctx && ctx.unsigned && ctx.unsigned.operations && ctx.unsigned.operations[0]) {
-        var tbAdd = touchable(el(doc, "button", t("txbuilder.add_transfer", "Add to TxBuilder")));
-        tbAdd.type = "button";
-        tbAdd.id = "xfer-tb-add";
-        var tbPair = ctx.unsigned.operations[0];
-        /* Locked-memo rule: when the encrypted-memo preview state excludes
-         * the memo (locked), the queued op would silently drop the memo —
-         * disable with the reason shown (same gating idiom as the form's
-         * gate box), never queue a memo-less op quietly. */
-        var tbLockedMemo = (ctx.memoKind === "locked-encrypted") || (ctx.lockedEnc === true) ||
-          (!!ctx.memoText && !(tbPair[1] && tbPair[1].memo));
-        if (tbLockedMemo) {
-          tbAdd.disabled = true;
-          tbAdd.title = t("txbuilder.unlock_memo_hint", "Unlock to include the encrypted memo");
-        } else {
-          tbAdd.addEventListener("click", function () {
-            var tbFrom = (from && from.name) || String((tbPair[1] && tbPair[1].from) || "?");
-            var tbTo = (ctx.to && ctx.to.name) || String((tbPair[1] && tbPair[1].to) || "?");
-            var tbSrc = "transfer:" + tbFrom + "->" + tbTo;
-            TxBuilder.addOp(tbPair[0], tbPair[1], tbSrc);
-            try {
-              if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
-                Notify.push("info", t("txbuilder.added_title", "Added to TxBuilder"), t("txbuilder.added_body_tpl", "%(src)s (op %(op)s) — %(n)s in queue", { src: tbSrc, op: tbPair[0], n: TxBuilder.count() }), {});
-              }
-            } catch (e2) { /* toast optional; the desk badge is the record */ }
-            location.hash = "#/txbuilder";
-          });
-        }
-        wrap.appendChild(tbAdd);
-      }
-    } catch (e) { /* outlet never breaks the one-shot path */ }
-
-    sendBtn.addEventListener("click", function () {
+    }
+    function doSend() {
+      var btns = dlg.getElementsByTagName("button");
+      var backBtn = btns[0], sendBtn = btns[1];
       /* H3: suspicious-fee transfers need the explicit acked second click. */
       if (ctx.feeWarning && !(feeAckBox && feeAckBox.checked)) {
         showError(doc, wrap,
@@ -435,6 +321,11 @@ var TransferConfirm = (function () {
           }
         }
       } catch (pinErr) { /* pin best-effort; signing continues */ }
+      /* Mid-sign both buttons stay disabled so the user cannot abandon
+       * the promise chain into an ambiguous state from here
+       * (browser-chrome navigation away still drops only the result
+       * screen — a broadcast already sent cannot be unsent, same as
+       * before, and nothing here auto-signs on close). */
       backBtn.disabled = true;
       sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("confirm.signing", "Signing…"));
@@ -465,7 +356,125 @@ var TransferConfirm = (function () {
           showError(doc, wrap, msg, t("confirm.transfer_failed", "Transfer failed."));
           backBtn.disabled = false;
         });
-    });
+    }
+    dlg = ConfirmDialog.show({ title: t("confirm.title", "Confirm transfer"),
+      rows: rows, feeHuman: feeHuman, feeTerm: t("confirm.fee", "Fee"),
+      feeRawTitle: String(ctx.fee.amount),
+      backLabel: t("confirm.back", "Back"), sendLabel: t("confirm.sign_send", "Sign & Send"),
+      doc: doc, onBack: doBack, onSend: doSend });
+    /* Stable hooks: the shared dialog owns the buttons — keep the old ids
+     * so automation/tests keep finding Back + Send. The outlet appended
+     * below lands third, so btns[0]/btns[1] stay Back/Send (pool-ui note). */
+    try {
+      var dlgBtns = dlg.getElementsByTagName("button");
+      if (dlgBtns[0]) dlgBtns[0].id = "xfer-back";
+      if (dlgBtns[1]) dlgBtns[1].id = "xfer-send";
+    } catch (idErr) { /* ids are hooks-only */ }
+    /* Slot notes above the actions (old rows-then-notes-then-buttons
+     * order, textContent-only; falls back to plain append when the
+     * actions row is unreachable). */
+    function beforeActions(node) {
+      var acts = null;
+      try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+      try {
+        if (acts && acts.parentNode) { acts.parentNode.insertBefore(node, acts); return; }
+      } catch (e2) { /* fallback below */ }
+      try { dlg.appendChild(node); } catch (e3) { /* display-only */ }
+    }
+    /* (1) header context line — existing keys only: confirm.from names the
+     * wallet account, txbuilder.chain_prefix the chain, confirm.network
+     * the network (" · " is punctuation, not a label). */
+    beforeActions(el(doc, "p",
+      t("confirm.from", "From") + " " + from.name + " (" + from.id + ") · " +
+      t("txbuilder.chain_prefix", "Chain: ") + (ctx.chainPrefix || "unknown") + " · " +
+      t("confirm.network", "Network") + " " + ctx.network, "muted"));
+    /* (2) op title + pager slot: title reuses the existing op-name key,
+     * the (op N) index is chain data (same "(op …)" shape as
+     * txbuilder.added_body_tpl), not a new label. Pure position data
+     * (multi-op pagination is a follow-up — this file builds op 0 only,
+     * so this reads 1/1). */
+    beforeActions(el(doc, "p",
+      t("proposal.op_0", "transfer") + " (op " + opId + ") · 1/" + ops.length, "muted"));
+    /* (3) per-card raw drill-down (existing .raw family; shows this
+     * card's op pair — equivalent info to the old whole-operations
+     * dump). */
+    var detOp = doc.createElement("details");
+    detOp.className = "raw";
+    var sumOp = doc.createElement("summary");
+    /* A11y delta 2026-10-01: empty summary showed only a triangle to sighted
+     * keyboard users — visible text mirrors the aria-label (proposal-ui
+     * rawJson precedent), reusing the same key so check_i18n stays green. */
+    sumOp.textContent = t("confirm.op_json_label", "Show unsigned operation JSON");
+    sumOp.setAttribute("aria-label", t("confirm.op_json_label", "Show unsigned operation JSON"));
+    detOp.appendChild(sumOp);
+    var preOp = doc.createElement("pre");
+    try { preOp.textContent = JSON.stringify(pair, null, 2); }
+    catch (e) { preOp.textContent = String(pair); }
+    detOp.appendChild(preOp);
+    beforeActions(detOp);
+    /* H3: blocking suspicious-fee warning + explicit ack checkbox. The
+     * Sign & Send handler above refuses to sign until the box is ticked —
+     * a second, deliberate click — and nothing here ever auto-proceeds. */
+    if (ctx.feeWarning) {
+      var feeWarn = el(doc, "div", null, "error");
+      feeWarn.setAttribute("aria-live", "assertive");
+      feeWarn.textContent = ctx.feeWarning + t("confirm.fee_hint", " Check the fee before signing — tick the box and click Sign & Send again to proceed.");
+      beforeActions(feeWarn);
+      var ackRow = el(doc, "label", null, "xfer-field");
+      feeAckBox = doc.createElement("input");
+      feeAckBox.type = "checkbox";
+      feeAckBox.id = "xfer-fee-ack";
+      touchable(feeAckBox);
+      ackRow.appendChild(feeAckBox);
+      ackRow.appendChild(doc.createTextNode(t("confirm.fee_ack", " I understand this fee is unusually high.")));
+      beforeActions(ackRow);
+    }
+    /* TxBuilder outlet (additive): queue this unsigned transfer without
+     * broadcasting. One-shot Sign & Send above is untouched — this block
+     * only reads ctx.unsigned.operations[0] as JS values (never into the
+     * DOM) and navigates to the desk. Rides the dialog's action row so
+     * Back + Sign & Send + Add to TxBuilder stay one row. */
+    try {
+      if (typeof TxBuilder !== "undefined" && TxBuilder && typeof TxBuilder.addOp === "function" &&
+          ctx && ctx.unsigned && ctx.unsigned.operations && ctx.unsigned.operations[0]) {
+        var tbAdd = touchable(el(doc, "button", t("txbuilder.add_transfer", "Add to TxBuilder")));
+        tbAdd.type = "button";
+        tbAdd.id = "xfer-tb-add";
+        var tbPair = ctx.unsigned.operations[0];
+        /* Locked-memo rule: when the encrypted-memo preview state excludes
+         * the memo (locked), the queued op would silently drop the memo —
+         * disable with the reason shown (same gating idiom as the form's
+         * gate box), never queue a memo-less op quietly. */
+        var tbLockedMemo = (ctx.memoKind === "locked-encrypted") || (ctx.lockedEnc === true) ||
+          (!!ctx.memoText && !(tbPair[1] && tbPair[1].memo));
+        if (tbLockedMemo) {
+          tbAdd.disabled = true;
+          tbAdd.title = t("txbuilder.unlock_memo_hint", "Unlock to include the encrypted memo");
+        } else {
+          tbAdd.addEventListener("click", function () {
+            var tbFrom = (from && from.name) || String((tbPair[1] && tbPair[1].from) || "?");
+            var tbTo = (ctx.to && ctx.to.name) || String((tbPair[1] && tbPair[1].to) || "?");
+            var tbSrc = "transfer:" + tbFrom + "->" + tbTo;
+            TxBuilder.addOp(tbPair[0], tbPair[1], tbSrc);
+            try {
+              if (typeof Notify !== "undefined" && Notify && typeof Notify.push === "function") {
+                Notify.push("info", t("txbuilder.added_title", "Added to TxBuilder"), t("txbuilder.added_body_tpl", "%(src)s (op %(op)s) — %(n)s in queue", { src: tbSrc, op: tbPair[0], n: TxBuilder.count() }), {});
+              }
+            } catch (e2) { /* toast optional; the desk badge is the record */ }
+            location.hash = "#/txbuilder";
+          });
+        }
+        (function () {
+          var acts = null;
+          try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+          try {
+            if (acts) { acts.appendChild(tbAdd); return; }
+          } catch (e2) { /* fallback below */ }
+          try { dlg.appendChild(tbAdd); } catch (e3) { /* outlet optional */ }
+        })();
+      }
+    } catch (e) { /* outlet never breaks the one-shot path */ }
+    wrap.appendChild(dlg);
   }
 
   /* Result screen: inclusion proof (block # + position) or the node error

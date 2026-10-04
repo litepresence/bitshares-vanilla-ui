@@ -73,6 +73,8 @@ var ConfirmDialog = (function () {
    *   feeHuman: string (human fee line; skipped when null/undefined),
    *   feeTerm?: string (caller's already-keyed fee dt, e.g.
    *   t("borrow.fee", "Fee"); fallback "Fee" when absent),
+   *   feeRawTitle?: string|null (raw fee integer for the fee dd title,
+   *   principle #6: human terms with raw in title; no title when absent),
    *   onBack: function, onSend: function,
    *   doc?: Document (Node-test seam; browsers omit it),
    *   backLabel?: string (default "Back"), sendLabel?: string
@@ -112,7 +114,9 @@ var ConfirmDialog = (function () {
     }
     if (cfg.feeHuman !== undefined && cfg.feeHuman !== null) {
       list.appendChild(mk(doc, "dt", feeTerm));
-      list.appendChild(mk(doc, "dd", cfg.feeHuman));
+      dd = mk(doc, "dd", cfg.feeHuman);
+      if (cfg.feeRawTitle) dd.title = cfg.feeRawTitle;
+      list.appendChild(dd);
     }
     if (D) D.append(box, list);
     else box.appendChild(list);

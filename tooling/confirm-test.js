@@ -172,4 +172,34 @@ assert.strictEqual(rawDds[0].title, "100000", "third element sets dd.title");
 assert.ok(!rawDds[1].title, "two-element row sets no title");
 passed += 2;
 
+// 10. Fee raw title: feeRawTitle present sets the fee dd.title (principle #6).
+var doc4 = fakeDoc();
+var feeRawBox = ConfirmDialog.show({
+  doc: doc4,
+  title: "Confirm",
+  rows: [],
+  feeHuman: feeHuman,
+  feeTerm: "Fee",
+  feeRawTitle: "12345",
+  onBack: function () {},
+  onSend: function () {}
+});
+var feeRawDds = findAll(feeRawBox, "dd");
+assert.strictEqual(feeRawDds[feeRawDds.length - 1].title, "12345", "feeRawTitle sets fee dd.title");
+passed += 1;
+
+// 11. Fee raw title absent: no title attr on the fee dd (feeTerm fallback unchanged).
+var doc5 = fakeDoc();
+var noRawBox = ConfirmDialog.show({
+  doc: doc5,
+  title: "Confirm",
+  rows: [],
+  feeHuman: feeHuman,
+  onBack: function () {},
+  onSend: function () {}
+});
+var noRawDds = findAll(noRawBox, "dd");
+assert.ok(!noRawDds[noRawDds.length - 1].title, "absent feeRawTitle sets no title");
+passed += 1;
+
 console.log("ConfirmDialog: " + passed + " passed, 0 failed");

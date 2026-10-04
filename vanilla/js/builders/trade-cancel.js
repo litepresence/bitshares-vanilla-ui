@@ -191,10 +191,19 @@ var TradeCancel = (function () {
     mount.appendChild(back);
   }
 
-  /* Inline per-order cancel confirm: order id 1.7.x + pair + warning, then a
-   * single-op cancel tx. Paints into the box market-orders.js provides;
-   * onDone re-renders the orders list (wired to a dismiss button so the
-   * result stays readable until the user leaves it). */
+  /* Inline per-order cancel confirm via the shared ConfirmDialog
+   * (ui/confirm.js): order id 1.7.x + pair + warning rows render as
+   * div.confirm-dialog (h3 + dl.confirm with Keep order carrying
+   * btn-ghost + Confirm cancel in div.confirm-actions). The warning line
+   * rides inside the dialog above its actions (old rows-then-notes-then-
+   * buttons order, textContent-only). No feeHuman here — the fee is
+   * resolved only after Confirm (inside doGo, same as before) and shown
+   * on the result panel. Unlock-gating (password only at signing),
+   * seller-ownership check, single-op cancel tx, proveGone inclusion
+   * proof, and the inline result + dismiss path below are unchanged.
+   * Paints into the box market-orders.js provides; onDone re-renders the
+   * orders list (wired to a dismiss button so the result stays readable
+   * until the user leaves it). */
   function orderCancelBox(doc, box, order, assets, onDone) {
     clearBox(box);
     if (typeof Tx === "undefined" || !Tx || typeof Chain === "undefined" || !Chain) {
@@ -206,27 +215,19 @@ var TradeCancel = (function () {
       showError(doc, box, "Not a limit order id (want 1.7.x): " + id);
       return;
     }
-    box.appendChild(el(doc, "h3", "Cancel order " + id + "?"));
     var view = cancelView(order, assets);
-    var list = el(doc, "dl", null, "xfer-confirm");
-    list.appendChild(el(doc, "dt", t("trade.co_orderid", "Order ID")));
-    list.appendChild(el(doc, "dd", id));
-    list.appendChild(el(doc, "dt", t("trade.co_market", "Market")));
-    list.appendChild(el(doc, "dd", view.pair));
-    list.appendChild(el(doc, "dt", t("trade.co_details", "Details")));
-    list.appendChild(el(doc, "dd", view.details));
-    box.appendChild(list);
-    box.appendChild(el(doc, "p",
-      t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted"));
-    var backBtn = touchable(el(doc, "button", t("trade.keep_order", "Keep order")));
-    backBtn.type = "button";
-    backBtn.classList.add("btn-ghost");
-    box.appendChild(backBtn);
-    var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel", "Confirm cancel")));
-    goBtn.type = "button";
-    box.appendChild(goBtn);
-    backBtn.addEventListener("click", function () { clearBox(box); });
-    goBtn.addEventListener("click", function () {
+    /* Row terms stay the caller's keyed strings; ids/pairs/details are
+     * chain/display data with no raw-integer slot (no r[2] — the order
+     * id is already the chain id, not a human amount). */
+    var rows = [
+      [t("trade.co_orderid", "Order ID"), id],
+      [t("trade.co_market", "Market"), view.pair],
+      [t("trade.co_details", "Details"), view.details]
+    ];
+    var dlg = null;
+    function doGo() {
+      var btns = dlg.getElementsByTagName("button");
+      var backBtn = btns[0], goBtn = btns[1];
       backBtn.disabled = true;
       goBtn.disabled = true;
       var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
@@ -290,7 +291,27 @@ var TradeCancel = (function () {
           goBtn.disabled = false;
         });
       });
-    });
+    }
+    dlg = ConfirmDialog.show({ title: "Cancel order " + id + "?",
+      rows: rows,
+      backLabel: t("trade.keep_order", "Keep order"), sendLabel: t("trade.confirm_cancel", "Confirm cancel"),
+      doc: doc,
+      onBack: function () { clearBox(box); },
+      onSend: doGo });
+    /* Warning rides between the rows and the actions (old position,
+     * textContent-only; falls back to plain append when the actions row
+     * is unreachable). */
+    (function () {
+      var warn = el(doc, "p",
+        t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted");
+      var acts = null;
+      try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+      try {
+        if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
+      } catch (e2) { /* fallback below */ }
+      try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
+    })();
+    box.appendChild(dlg);
   }
 
   /* One-line human summary of a raw order for cancel confirms (pair + side
@@ -316,8 +337,16 @@ var TradeCancel = (function () {
     return { pair: pair, details: details };
   }
 
-  /* Cancel-all box (rendered only when ≥2 orders): confirm lists the COUNT,
-   * then ONE N-op cancel tx. Same prove/dismiss pattern as single cancel. */
+  /* Cancel-all box (rendered only when ≥2 orders) via the shared
+   * ConfirmDialog (ui/confirm.js): the COUNT rides named rows (Market +
+   * Details) in div.confirm-dialog (h3 + dl.confirm with Keep orders
+   * carrying btn-ghost + Confirm cancel-all in div.confirm-actions); the
+   * ONE-transaction warning rides inside the dialog above its actions
+   * (old rows-then-notes-then-buttons order, textContent-only). No
+   * feeHuman here — the total fee is resolved only after Confirm (inside
+   * doGo, same as before) and shown on the result panel. Unlock-gating,
+   * N-op cancel tx, proveGone proof, and dismiss path below are unchanged.
+   * Same prove/dismiss pattern as single cancel. */
   function cancelAllBox(doc, box, orders, assets, onDone) {
     clearBox(box);
     var ids = [];
@@ -331,22 +360,16 @@ var TradeCancel = (function () {
     box.appendChild(btn);
     btn.addEventListener("click", function () {
       clearBox(box);
-      box.appendChild(el(doc, "h3", "Cancel all " + ids.length + " orders?"));
-      box.appendChild(el(doc, "p",
-        "This sends ONE transaction canceling " + ids.length +
-        " orders on " + assets.quote.symbol + "/" + assets.base.symbol +
-        ". Warning: canceling permanently removes these orders from the book.", "muted"));
-      var backBtn = touchable(el(doc, "button", t("trade.keep_orders", "Keep orders")));
-      backBtn.type = "button";
-      backBtn.classList.add("btn-ghost");
-      box.appendChild(backBtn);
-      var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel_all", "Confirm cancel-all")));
-      goBtn.type = "button";
-      box.appendChild(goBtn);
-      backBtn.addEventListener("click", function () {
-        cancelAllBox(doc, box, orders, assets, onDone);
-      });
-      goBtn.addEventListener("click", function () {
+      /* Row terms stay the caller's keyed strings; market/count are
+       * display data with no raw-integer slot (no r[2], no fee). */
+      var rows = [
+        [t("trade.co_market", "Market"), assets.quote.symbol + "/" + assets.base.symbol],
+        [t("trade.co_details", "Details"), ids.length + " orders"]
+      ];
+      var dlg = null;
+      function doGo() {
+        var btns = dlg.getElementsByTagName("button");
+        var backBtn = btns[0], goBtn = btns[1];
         backBtn.disabled = true;
         goBtn.disabled = true;
         var status = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
@@ -406,7 +429,29 @@ var TradeCancel = (function () {
           backBtn.disabled = false;
           goBtn.disabled = false;
         });
-      });
+      }
+      dlg = ConfirmDialog.show({ title: "Cancel all " + ids.length + " orders?",
+        rows: rows,
+        backLabel: t("trade.keep_orders", "Keep orders"), sendLabel: t("trade.confirm_cancel_all", "Confirm cancel-all"),
+        doc: doc,
+        onBack: function () { cancelAllBox(doc, box, orders, assets, onDone); },
+        onSend: doGo });
+      /* ONE-transaction warning rides between the rows and the actions
+       * (old position, textContent-only; falls back to plain append when
+       * the actions row is unreachable). */
+      (function () {
+        var warn = el(doc, "p",
+          "This sends ONE transaction canceling " + ids.length +
+          " orders on " + assets.quote.symbol + "/" + assets.base.symbol +
+          ". Warning: canceling permanently removes these orders from the book.", "muted");
+        var acts = null;
+        try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+        try {
+          if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
+        } catch (e2) { /* fallback below */ }
+        try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
+      })();
+      box.appendChild(dlg);
     });
   }
 
