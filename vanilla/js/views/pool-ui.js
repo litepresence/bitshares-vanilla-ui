@@ -252,17 +252,8 @@ var PoolUI = (function () {
           sendB.disabled = false; backB.disabled = false;
         });
       } });
-    /* Principle #6 (raw in title): ConfirmDialog's [term, text] row shape
-     * carries no raw-title slot (native r[2] support is owned by the
-     * sibling batch — see the Task 3.2 Batch B report). Restore r[2]
-     * titles post-show so human terms keep their raw chain values;
-     * mapping is 1:1 because no feeHuman is passed. Display-only. */
-    try {
-      var dds = dlg.querySelectorAll ? dlg.querySelectorAll("dd") : [];
-      (cfg.rows || []).forEach(function (r, i) {
-        if (r && r[2] && dds[i]) { try { dds[i].title = r[2]; } catch (e0) {} }
-      });
-    } catch (e) { /* titles are display-only */ }
+    /* Principle #6 (raw in title): rows carry native r[2] raw titles
+     * (ConfirmDialog.show sets dd.title); no post-show restore needed. */
     /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
      * deposit without broadcasting. Create/unstake/swap confirms render no
      * outlet. The pair passes as JS values only (never into the DOM); the

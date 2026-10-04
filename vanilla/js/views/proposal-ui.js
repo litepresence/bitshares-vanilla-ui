@@ -280,18 +280,9 @@ var ProposalUI = (function () {
       try { var ex = cfg.extra(doc); if (ex) beforeActions(ex); }
       catch (e) { beforeActions(DOM.el(doc, "p", "Enclosed-op detail unavailable (" + String((e && e.message) || e) + ") — the count row above still holds.", "muted")); }
     }
-    /* Principle #6 (raw in title): ConfirmDialog's [term, text] row shape
-     * carries no raw-title slot (native r[2] support is owned by the
-     * sibling batch — see the Task 3.2 Batch B report). Today's proposal
-     * confirm rows carry no r[2] (amounts render via confirmList-backed
-     * panels), so this loop is a no-op guard for future rows; mapping is
-     * 1:1 because no feeHuman is passed. Display-only. */
-    try {
-      var dds = dlg.querySelectorAll ? dlg.querySelectorAll("dd") : [];
-      (cfg.rows || []).forEach(function (r, i) {
-        if (r && r[2] && dds[i]) { try { dds[i].title = r[2]; } catch (e0) {} }
-      });
-    } catch (e) { /* titles are display-only */ }
+    /* Principle #6 (raw in title): confirm rows reaching here render via
+     * ConfirmDialog's native r[2] slot (dd.title); no post-show restore
+     * needed. Mapping stays 1:1 because no feeHuman is passed. */
     out.appendChild(dlg);
     /* Sign-time gate note: visible while locked so headless/returning users
      * see browsing is public and only signing needs the password. */

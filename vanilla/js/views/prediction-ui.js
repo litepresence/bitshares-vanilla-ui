@@ -1043,17 +1043,9 @@ var PredictionUI = (function () {
           sDlg = ConfirmDialog.show({ title: t("prediction.confirm_settle", "Confirm settle"), rows: sRows,
             backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
             onBack: sBack, onSend: sSend });
-          /* Principle #6 (raw in title): ConfirmDialog's [term, text] row
-           * shape carries no raw-title slot (native r[2] support is owned
-           * by the sibling batch — see the Task 3.2 Batch B report).
-           * Restore r[2] titles post-show; mapping is 1:1 because no
-           * feeHuman is passed. Display-only. */
-          try {
-            var sDds = sDlg.querySelectorAll ? sDlg.querySelectorAll("dd") : [];
-            sRows.forEach(function (r, i) {
-              if (r && r[2] && sDds[i]) { try { sDds[i].title = r[2]; } catch (e0) {} }
-            });
-          } catch (e) { /* titles are display-only */ }
+          /* Principle #6 (raw in title): sRows carry native r[2] raw
+           * titles (ConfirmDialog.show sets dd.title); no post-show
+           * restore needed. Mapping is 1:1 because no feeHuman is passed. */
           /* Fee-asset note rides between the rows and the actions (old position). */
           (function () {
             var note = DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted");
