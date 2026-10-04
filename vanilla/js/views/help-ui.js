@@ -2,7 +2,7 @@
  * Owns: /help/** (index at /help, one article view per topic key) and
  *   /community (the community link directory, split out 2026-10-04 —
  *   footer REPORT target). Topic list
- *   is curated for this wallet (65 topics: wallet basics plus every feature
+ *   is curated for this wallet (67 topics: wallet basics plus every feature
  *   this app ships — pools, HTLC, credit, samet, barter, spotlight, debit,
  *   trollbox, alerts, prediction/PMO, builder, labs, charts, dashboard,
  *   registration, URIs, and more — plus 4 cross-link topics (assets-issue,
