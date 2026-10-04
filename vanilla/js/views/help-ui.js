@@ -2,10 +2,11 @@
  * Owns: /help/** (index at /help, one article view per topic key) and
  *   /community (the community link directory, split out 2026-10-04 —
  *   footer REPORT target). Topic list
- *   is curated for this wallet (61 topics: wallet basics plus every feature
+ *   is curated for this wallet (65 topics: wallet basics plus every feature
  *   this app ships — pools, HTLC, credit, samet, barter, spotlight, debit,
  *   trollbox, alerts, prediction/PMO, builder, labs, charts, dashboard,
- *   registration, URIs, and more).
+ *   registration, URIs, and more — plus 4 cross-link topics (assets-issue,
+ *   assets-feed, community, menu) that point at their in-app screens.
  * Consumes: I18n.t for chrome, titles, guides, and full article bodies
  *   (help.topic_<key>_title/_text/_body). Bodies are lite-markdown blocks
  *   ("# " heading, "- " bullets, blank-line paragraphs) rendered via
@@ -56,6 +57,8 @@ var HelpUI = (function () {
     ["assets-mpa", "Market-pegged assets", "Smartcoins backed by collateral with price feeds from witnesses.", "#/assets"],
     ["assets-uia", "User-issued assets", "Anyone can issue a custom token; create and manage them under Assets.", "#/assets/create"],
     ["assets-private", "Privatized BitAssets", "Issuer-controlled assets with restricted transfer lists.", "#/assets"],
+    ["assets-issue", "Issuing assets", "Mint new supply of an asset you control from the Issue desk.", "#/assets/issue"],
+    ["assets-feed", "Publishing price feeds", "Publish price feeds for market-pegged assets you feed.", "#/assets/feed"],
     ["dex-intro", "Decentralized exchange", "Order books settle on-chain — the desk shows book, chart and your orders.", "#/market/BTS_USD"],
     ["dex-trading", "Trading", "Limit orders with exact prices; instant-trade wraps the same path in one screen.", "#/instant-trade"],
     ["dex-shorting", "Borrowing and shorting", "Borrow smartcoins against collateral; positions and margin calls under Borrow.", "#/borrow"],
@@ -102,7 +105,9 @@ var HelpUI = (function () {
     ["news", "News", "Why this wallet ships no in-app news feed.", "#/news"],
     ["uris", "Payment requests and exports", "BitShares links that prefill payments, plus CSV history export.", "#/invoice"],
     ["glossary", "Glossary", "Names used across this wallet: objects (1.x.y), operations, witnesses, committee.", null],
-    ["about-making", "Making of this wallet", "The build story behind this wallet — 413 exchanges across 14 sessions.", "#/about"]
+    ["about-making", "Making of this wallet", "The build story behind this wallet — 413 exchanges across 14 sessions.", "#/about"],
+    ["community", "Community", "Chats, forums, explorers, and code around BitShares.", "#/community"],
+    ["menu", "Site menu", "Every page in this wallet, grouped the way the navigation menu groups them.", "#/menu"]
   ];
 
   /* Article bodies: key -> sections. Section = [heading, [paragraphs], [bullets]?].
@@ -303,6 +308,14 @@ var HelpUI = (function () {
       "Exchanges and institutions with real-time price access use privatized assets to quote their own markets without waiting on witness feeds.",
       "# What it means for you",
       "You trade the issuer's price, not the witnesses': check who publishes feeds and what the fee schedule is before holding a privatized asset."
+    ],
+    "assets-issue": [
+      "# Issuing assets",
+      "Create new supply of an asset your account controls from the Issue desk; amounts use the asset's precision and the confirm dialog shows the exact fee before you sign."
+    ],
+    "assets-feed": [
+      "# Publishing price feeds",
+      "Publish the settlement price for a market-pegged asset from the Feed desk; the confirm dialog shows the exact fee before you sign."
     ],
     "dex-intro": [
       "# Exchange without the exchange company",
@@ -732,6 +745,14 @@ var HelpUI = (function () {
       "413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.",
       "# The full dialog archive",
       "The complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
+    ],
+    "community": [
+      "# Community",
+      "People and places around BitShares — homepage, code, explorers, forums, and chats — live on the Community page."
+    ],
+    "menu": [
+      "# Site menu",
+      "The Menu page lists every screen in this wallet by section, so any desk is one tap away."
     ]
   };
 
@@ -927,8 +948,8 @@ var HelpUI = (function () {
     ["menu.section_trade", "Trade", ["bitshares", "blockchain", "dex-intro", "dex-trading", "dex-shorting", "instant", "pools", "swap", "gateways", "gateways-xbts", "gateways-ioxbank", "borrow-extra", "samet", "barter", "spotlight"]],
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
-    ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "topops", "fees", "charts", "history-index"]],
-    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary"]]
+    ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "assets-issue", "assets-feed", "topops", "fees", "charts", "history-index", "community"]],
+    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu"]]
   ];
 
   function paintIndexList(doc, wrap) {

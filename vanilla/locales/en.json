@@ -3565,7 +3565,19 @@
       "wallet.write_down_brainkey_keep_safe",
       "wallet.wrote_it_down",
       "about.dlg_heading_c",
-      "about.dlg_showing_c"
+      "about.dlg_showing_c",
+      "help.topic_assets-feed_title",
+      "help.topic_assets-feed_text",
+      "help.topic_assets-feed_body",
+      "help.topic_assets-issue_title",
+      "help.topic_assets-issue_text",
+      "help.topic_assets-issue_body",
+      "help.topic_community_title",
+      "help.topic_community_text",
+      "help.topic_community_body",
+      "help.topic_menu_title",
+      "help.topic_menu_text",
+      "help.topic_menu_body"
     ]
   },
   "nav": {
@@ -5921,7 +5933,19 @@
     "topic_uris_body": "# Links that prefill payments\nBitShares URIs (bitshares:…) pack a payment request — recipient, asset, amount, memo — into a shareable link. Opening one prefills the transfer or invoice form; only review and sign remain.\n# Verify before signing\nLinks can lie about who they pay: check the recipient name yourself. The wallet never signs from a link alone.\n# CSV history export\nAccount history exports to CoinTracking-compatible CSV for taxes and records. Amounts export as display decimals with symbols; dates stay empty rather than guessed.",
     "community_hint": "Chats, forums, and explorers live on the Community page: ",
     "community_title": "Community",
-    "community_intro": "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."
+    "community_intro": "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab.",
+    "topic_assets-feed_title": "Publishing price feeds",
+    "topic_assets-feed_text": "Publish price feeds for market-pegged assets you feed.",
+    "topic_assets-feed_body": "# Publishing price feeds\nPublish the settlement price for a market-pegged asset from the Feed desk; the confirm dialog shows the exact fee before you sign.",
+    "topic_assets-issue_title": "Issuing assets",
+    "topic_assets-issue_text": "Mint new supply of an asset you control from the Issue desk.",
+    "topic_assets-issue_body": "# Issuing assets\nCreate new supply of an asset your account controls from the Issue desk; amounts use the asset's precision and the confirm dialog shows the exact fee before you sign.",
+    "topic_community_title": "Community",
+    "topic_community_text": "Chats, forums, explorers, and code around BitShares.",
+    "topic_community_body": "# Community\nPeople and places around BitShares — homepage, code, explorers, forums, and chats — live on the Community page.",
+    "topic_menu_title": "Site menu",
+    "topic_menu_text": "Every page in this wallet, grouped the way the navigation menu groups them.",
+    "topic_menu_body": "# Site menu\nThe Menu page lists every screen in this wallet by section, so any desk is one tap away."
   },
   "instant": {
     "amount": "Amount",

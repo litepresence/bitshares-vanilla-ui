@@ -3565,7 +3565,19 @@
       "about.dlg_heading_c",
       "about.dlg_showing_c",
       "about.dlg_bad_link",
-      "about.dlg_no_match"
+      "about.dlg_no_match",
+      "help.topic_assets-feed_title",
+      "help.topic_assets-feed_text",
+      "help.topic_assets-feed_body",
+      "help.topic_assets-issue_title",
+      "help.topic_assets-issue_text",
+      "help.topic_assets-issue_body",
+      "help.topic_community_title",
+      "help.topic_community_text",
+      "help.topic_community_body",
+      "help.topic_menu_title",
+      "help.topic_menu_text",
+      "help.topic_menu_body"
     ]
   },
   "nav": {
@@ -5921,7 +5933,19 @@
     "about_link": "About this wallet",
     "topic_about-making_title": "Making of this wallet",
     "topic_about-making_text": "The build story behind this wallet — 413 exchanges across 14 sessions.",
-    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N."
+    "topic_about-making_body": "# Making of this wallet\nWhat follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited.\nIt records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated.\n413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.\n# The full dialog archive\nThe complete exchange-by-exchange record lives on the About page (#/about). Expand the \"Full build dialog\" section there to browse all 413 exchanges, filter by keyword, or deep-link to a specific exchange with ?dialog=N.",
+    "topic_assets-feed_title": "Publishing price feeds",
+    "topic_assets-feed_text": "Publish price feeds for market-pegged assets you feed.",
+    "topic_assets-feed_body": "# Publishing price feeds\nPublish the settlement price for a market-pegged asset from the Feed desk; the confirm dialog shows the exact fee before you sign.",
+    "topic_assets-issue_title": "Issuing assets",
+    "topic_assets-issue_text": "Mint new supply of an asset you control from the Issue desk.",
+    "topic_assets-issue_body": "# Issuing assets\nCreate new supply of an asset your account controls from the Issue desk; amounts use the asset's precision and the confirm dialog shows the exact fee before you sign.",
+    "topic_community_title": "Community",
+    "topic_community_text": "Chats, forums, explorers, and code around BitShares.",
+    "topic_community_body": "# Community\nPeople and places around BitShares — homepage, code, explorers, forums, and chats — live on the Community page.",
+    "topic_menu_title": "Site menu",
+    "topic_menu_text": "Every page in this wallet, grouped the way the navigation menu groups them.",
+    "topic_menu_body": "# Site menu\nThe Menu page lists every screen in this wallet by section, so any desk is one tap away."
   },
   "instant": {
     "amount": "Importo",

@@ -58,12 +58,31 @@ var Router = (function () {
     };
   }
 
+  /* fourOhFourImg: theme-aware 404 art filename (owner-supplied PNGs, no new
+   *   assets). Reads the data-theme switch on <html> (app.js applyTheme owns
+   *   it): vanilla-ui-theme -> light, dex-ux-theme -> midnight, anything else
+   *   (ref-ui-theme default, unknown, or no DOM) -> dark. Params: none.
+   *   Returns the PNG filename. Fails: never. */
+  function fourOhFourImg() {
+    var theme = "";
+    try {
+      if (typeof document !== "undefined" && document.documentElement &&
+          typeof document.documentElement.getAttribute === "function") {
+        theme = document.documentElement.getAttribute("data-theme") || "";
+      }
+    } catch (e) { /* default below */ }
+    if (theme === "vanilla-ui-theme") return "logo-404-light.png";
+    if (theme === "dex-ux-theme") return "logo-404-midnight.png";
+    return "logo-404-dark.png";
+  }
+
   /* render404: unknown-route page with a dashboard link. Params: root
    *   (element). Returns nothing. Fails: never — a missing root is a no-op. */
   function render404(root) {
     if (!root) return;
     root.innerHTML =
-      '<div class="wrap"><h1>' + escapeHtml(t("shell.page_not_found", "Page Not Found")) + "</h1>" +
+      '<div class="wrap"><img src="assets/' + fourOhFourImg() + '" alt="">' +
+      '<h1>' + escapeHtml(t("shell.page_not_found", "Page Not Found")) + "</h1>" +
       '<p class="muted">' + escapeHtml(t("shell.unknown_route", "Unknown route. ")) +
       '<a href="#/">' + escapeHtml(t("shell.go_dashboard", "Go to Dashboard")) + "</a></p></div>";
   }
