@@ -90,22 +90,16 @@ var FeesUI = (function () {
     price_per_kbyte: "Price per KByte", price_per_byte: "Price per byte",
     price_per_output: "Price per output", fee_per_day: "Fee per day", fee_per_kb: "Fee per KB" };
 
-  /* textContent-only element (chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) msg = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg); return err;
   }
   /* typeLabel: fee-param key -> short row label (unknown future keys prettify, never blank). */
   function typeLabel(key) {
@@ -177,11 +171,11 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
    * ltmReq (id->true set). Returns missing-op count. */
   function groupTable(doc, box, gname, ids, byId, s, ltmReq) {
     var prec = s.fee_asset_precision, scale = s.scale, netPct = s.network_percent_of_fee;
-    box.appendChild(el(doc, "h2", GROUP_NAMES[gname] || gname));
-    var sc = el(doc, "div", null, null); sc.style.overflowX = "auto";
+    box.appendChild(DOM.el(doc, "h2", GROUP_NAMES[gname] || gname));
+    var sc = DOM.el(doc, "div", null, null); sc.style.overflowX = "auto";
     var tb = doc.createElement("table"), thead = doc.createElement("thead"), hr = doc.createElement("tr");
     ["#", "Operation", "Type", "Standard fee", "LTM fee"].forEach(function (h, hi) {
-      var th = el(doc, "th", h);
+      var th = DOM.el(doc, "th", h);
       if (hi >= 3) th.style.textAlign = "right";
       hr.appendChild(th);
     });
@@ -197,13 +191,13 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
          * A dash row beats silence: the op exists, the schedule is quiet. */
         missing += 1;
         var tr0 = doc.createElement("tr");
-        var tdId0 = el(doc, "td", String(id)); tdId0.title = title; tr0.appendChild(tdId0);
-        var tdOp0 = el(doc, "td", lab.name); tdOp0.title = title; tr0.appendChild(tdOp0);
-        tr0.appendChild(el(doc, "td", "—"));
-        var tdM = el(doc, "td", t("fees.not_in_schedule", "Not in schedule"));
+        var tdId0 = DOM.el(doc, "td", String(id)); tdId0.title = title; tr0.appendChild(tdId0);
+        var tdOp0 = DOM.el(doc, "td", lab.name); tdOp0.title = title; tr0.appendChild(tdOp0);
+        tr0.appendChild(DOM.el(doc, "td", "—"));
+        var tdM = DOM.el(doc, "td", t("fees.not_in_schedule", "Not in schedule"));
         tdM.title = t("fees.no_entry_for_op", "No entry for op ") + id + t("fees.in_the_current_fee_schedule_the_chain_falls_b", " in the current fee schedule — the chain falls back to a related operation's fee.");
         tdM.style.textAlign = "right"; tr0.appendChild(tdM);
-        var tdL0 = el(doc, "td", "—"); tdL0.style.textAlign = "right"; tr0.appendChild(tdL0);
+        var tdL0 = DOM.el(doc, "td", "—"); tdL0.style.textAlign = "right"; tr0.appendChild(tdL0);
         tb2.appendChild(tr0);
         continue;
       }
@@ -214,33 +208,33 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
          * credit deals) and balance claims carry NO fee parameters — they
          * cost nothing and are never signed directly. */
         var tr1 = doc.createElement("tr");
-        var tdId1 = el(doc, "td", String(id)); tdId1.title = title; tr1.appendChild(tdId1);
-        var tdOp1 = el(doc, "td", lab.name); tdOp1.title = title; tr1.appendChild(tdOp1);
-        tr1.appendChild(el(doc, "td", "—"));
-        var tdF = el(doc, "td", t("fees.free_of_charge", "Free of charge"));
+        var tdId1 = DOM.el(doc, "td", String(id)); tdId1.title = title; tr1.appendChild(tdId1);
+        var tdOp1 = DOM.el(doc, "td", lab.name); tdOp1.title = title; tr1.appendChild(tdOp1);
+        tr1.appendChild(DOM.el(doc, "td", "—"));
+        var tdF = DOM.el(doc, "td", t("fees.free_of_charge", "Free of charge"));
         tdF.title = lab.virtual
           ? "Virtual execution event (op " + id + "): produced by the chain, never signed, no fee parameter."
           : "No fee parameters for op " + id + " on chain (balance claims are always free).";
         tdF.style.textAlign = "right"; tr1.appendChild(tdF);
-        var tdL = el(doc, "td", "—"); tdL.style.textAlign = "right"; tr1.appendChild(tdL);
+        var tdL = DOM.el(doc, "td", "—"); tdL.style.textAlign = "right"; tr1.appendChild(tdL);
         tb2.appendChild(tr1);
         continue;
       }
       keys.forEach(function (k, ki) {
         var tr = doc.createElement("tr");
         if (ki === 0) {
-          var tdId = el(doc, "td", String(id)); tdId.title = title;
+          var tdId = DOM.el(doc, "td", String(id)); tdId.title = title;
           tdId.setAttribute("rowspan", String(keys.length)); tr.appendChild(tdId);
-          var tdOp = el(doc, "td", lab.name); tdOp.title = title;
+          var tdOp = DOM.el(doc, "td", lab.name); tdOp.title = title;
           tdOp.setAttribute("rowspan", String(keys.length)); tr.appendChild(tdOp);
         }
-        tr.appendChild(el(doc, "td", typeLabel(k)));
+        tr.appendChild(DOM.el(doc, "td", typeLabel(k)));
         var rawK = row.raw[k], scaledK = (row.scaled && row.scaled[k] !== undefined) ? row.scaled[k] : rawK;
         var prov = "raw " + rawK + " · scale " + scale;
         if (ltmReq[id]) {
           /* LTM-required (#1 Fees.jsx:182-199): registrar-paid op — no
            * standard fee exists, dash-starred; the member column carries it. */
-          var tdD = el(doc, "td", "— *");
+          var tdD = DOM.el(doc, "td", "— *");
           tdD.title = t("fees.lifetime_membership_required_no_standard_fee", "Lifetime membership required — no standard fee for op ") + id + ".";
           tdD.style.textAlign = "right"; tr.appendChild(tdD);
         } else {
@@ -249,7 +243,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         var ltm = ltmFor(scaledK, id, netPct);
         var tdLtm;
         if (ltm === null) {
-          tdLtm = el(doc, "td", "—");
+          tdLtm = DOM.el(doc, "td", "—");
           if (netPct === null || netPct === undefined) tdLtm.title = t("fees.network_percent_of_fee_unavailable_member_cos", "network_percent_of_fee unavailable — member cost unknown.");
         } else {
           tdLtm = moneyCell(doc, ltm, prec, "member cost = " + prov + " · net " + netPct + "/10000" + (id === 10 ? " · half registrar/half network" : ""));
@@ -270,26 +264,26 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Asset === "undefined" || !Asset || typeof Asset.feeSchedule !== "function") {
       showError(doc, wrap, t("fees.fee_backend_missing_js_asset_js_failed_to_loa", "Fee backend missing: js/asset.js failed to load."));
       return;
     }
-    wrap.appendChild(el(doc, "h1", t("fees.network_fees", "Network fees")));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "h1", t("fees.network_fees", "Network fees")));
+    wrap.appendChild(DOM.el(doc, "p",
       "Every operation fee charged by the network, fetched live from the chain's fee schedule. " +
       "Fees are shown in the core asset; each amount's title (hover or long-press) carries the raw chain value and the schedule scale.",
       "muted"));
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("fees.connecting_to_network", "Connecting to network…"), "muted"));
-      var fstat = el(doc, "p", "", "muted");
+      wrap.appendChild(DOM.el(doc, "p", t("fees.connecting_to_network", "Connecting to network…"), "muted"));
+      var fstat = DOM.el(doc, "p", "", "muted");
       try { fstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(fstat);
-      var frow = el(doc, "div", null, "pools-offline-row");
+      var frow = DOM.el(doc, "div", null, "pools-offline-row");
       wrap.appendChild(frow);
-      var retry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+      var retry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
       retry.type = "button"; frow.appendChild(retry);
       var foff = null;
       try { foff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { foff = null; }
@@ -307,7 +301,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         try { flink = foff.settingsLink(doc, t); } catch (e) { flink = null; }
       }
       if (!flink) {
-        flink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        flink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { flink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(flink);
       }
@@ -335,10 +329,10 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     }
     var box = doc.createElement("div");
     wrap.appendChild(box);
-    box.appendChild(el(doc, "p", t("fees.loading_fee_schedule", "Loading fee schedule…"), "muted"));
+    box.appendChild(DOM.el(doc, "p", t("fees.loading_fee_schedule", "Loading fee schedule…"), "muted"));
     Asset.feeSchedule().then(function (s) {
       if (myGen !== gen) return;
-      clearRoot(box);
+      DOM.clear(box);
       var byId = {}, i;
       (s.fees || []).forEach(function (f) { byId[f.opId] = f; });
       var ltmReq = {};
@@ -347,7 +341,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         ? "an unavailable rebate — the node omitted network_percent_of_fee, so member costs show as dashes"
         : "a " + pctText(s.network_percent_of_fee) + " network share (member-effective cost = fee × " +
           s.network_percent_of_fee + "/10000; asset creation splits half registrar / half network)";
-      box.appendChild(el(doc, "p",
+      box.appendChild(DOM.el(doc, "p",
         "Schedule scale ×" + s.scale + "/10000 already applied to every figure below. " +
         "The member column shows the lifetime-member effective cost at " + rebate + ". " +
         "Operations marked * require lifetime membership — no standard fee applies to them.",
@@ -359,26 +353,26 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         if (!ids.length) return;
         missingTotal += groupTable(doc, box, gname, ids, byId, s, ltmReq);
       });
-      box.appendChild(el(doc, "p",
+      box.appendChild(DOM.el(doc, "p",
         "Operations with no fee parameters — chain execution events (order fills, settlement cancels, " +
         "FBA distributions, bid executions, HTLC redemptions/refunds, expired credit deals) and balance " +
         "claims — cost nothing and are never signed directly.",
         "muted"));
       if (missingTotal > 0) {
-        box.appendChild(el(doc, "p",
+        box.appendChild(DOM.el(doc, "p",
           missingTotal + " operation(s) have no entry in this schedule — the chain prices them via a " +
           "related operation's fee (e.g. collateral bids fall back to the margin-update fee).",
           "muted"));
       }
-      var more = el(doc, "p", null, "muted");
+      var more = DOM.el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/assets"; a.textContent = t("fees.back_to_assets", "Back to Assets");
       more.appendChild(a); box.appendChild(more);
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearRoot(box);
+      DOM.clear(box);
       showError(doc, box, e, t("asset.fees_failed", "Could not load fees."));
-      var retry2 = touchable(el(doc, "button", t("fees.retry", "Retry")));
+      var retry2 = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
       retry2.type = "button"; box.appendChild(retry2);
       retry2.addEventListener("click", function () { if (myGen === gen) renderFees(root); });
     });

@@ -34,12 +34,8 @@ var GatewayUI = (function () {
   var openSubs = [];
   var coinCache = {}; /* session coin lists per gateway id (never persisted) */
   var ORDER = ["XBTSX", "IOB", "GDEX", "BIT20"];
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+  /* No local el — use DOM.el */
+/* clearBox removed — use DOM.clear */
   /* showError: named Gateway errors -> human text. gateway-rejected stays
    * VERBATIM (the host's own reason — never rewritten, never forged). */
   function showError(doc, box, e, fallback) {
@@ -50,25 +46,25 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     else if (m.indexOf("bad-account") !== -1) m = t("gateway.bad_account", "Enter a BitShares account name first.");
     else if (m.indexOf("bad-coin") !== -1) m = t("gateway.bad_coin", "Unknown coin for this gateway.");
     else if (m.indexOf("not-connected") !== -1) m = t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry.");
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); box.appendChild(err); return err;
+    var err = DOM.error(box, m); return err;
   }
   function showStatus(doc, box, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); box.appendChild(p); return p;
+    var p = DOM.status(box, text); return p;
   }
   function offlineBox(doc, box, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
     * the network is down). Retry handshakes via the shared Offline helper
     * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
-    box.appendChild(el(doc, "p", open
+    box.appendChild(DOM.el(doc, "p", open
       ? t("gateway.retry_load", "Retry loading.")
       : t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-    var status = el(doc, "p", "", "muted");
+    var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     box.appendChild(status);
-    var row = el(doc, "div", null, "pools-offline-row");
+    var row = DOM.el(doc, "div", null, "pools-offline-row");
     box.appendChild(row);
-    var b = touchable(el(doc, "button", t("gateway.retry", "Retry"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("gateway.retry", "Retry"))); b.type = "button";
     row.appendChild(b);
     var off = null;
     try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
@@ -82,7 +78,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
     }
     if (!link) {
-      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      link = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       touchable(link);
     }
@@ -105,11 +101,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * prefill links; #/transfer gates the wallet itself when signing. */
   function routeGate(root, title, retry) {
     var doc = root.ownerDocument || document, myGen = ++gen, miss = null;
-    dropSubs(); root.innerHTML = "";
+    dropSubs(); DOM.clear(root);
     ["Gateway", "Chain", "Store", "Format"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + t("gateway.backend_missing", " backend missing: ") + miss + t("gateway.load_failed", " failed to load.")); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
@@ -129,7 +125,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     return list[0] || null;
   }
   function copyBtn(doc, text) {
-    var b = touchable(el(doc, "button", t("gateway.copy", "Copy"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("gateway.copy", "Copy"))); b.type = "button";
     b.addEventListener("click", function () {
       function done(ok) { b.textContent = ok ? t("gateway.copied", "Copied") : t("gateway.copy_failed", "Copy failed — select manually"); }
       var c = (typeof navigator !== "undefined" && navigator.clipboard) || null;
@@ -139,7 +135,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     return b;
   }
   function copyRow(doc, label, value) {
-    var row = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", label + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", label + " ");
     var inp = doc.createElement("input");
     inp.readOnly = true; inp.value = value; touchable(inp);
     lab.appendChild(inp); row.appendChild(lab); row.appendChild(copyBtn(doc, value));
@@ -148,8 +144,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function factList(doc, pairs) {
     var dl = doc.createElement("dl"); dl.className = "xfer-confirm";
     pairs.forEach(function (p) {
-      dl.appendChild(el(doc, "dt", p[0]));
-      var dd = el(doc, "dd", p[1]); if (p[2]) dd.title = p[2]; dl.appendChild(dd); });
+      dl.appendChild(DOM.el(doc, "dt", p[0]));
+      var dd = DOM.el(doc, "dd", p[1]); if (p[2]) dd.title = p[2]; dl.appendChild(dd); });
     return dl;
   }
   /* Route entry: renderDesk(root, gatewayParam). Tab clicks navigate the hash
@@ -161,7 +157,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     if (!ctx) return;
     ctx.tab = findEntry(gatewayParam).id;
     ctx.action = "deposit"; ctx.account = ""; ctx.coin = null;
-    ctx.wrap.appendChild(el(ctx.doc, "p",
+    ctx.wrap.appendChild(DOM.el(ctx.doc, "p",
       t("gateway.intro_a", "Deposits never broadcast — you send external coins to the shown address. ") +
       t("gateway.intro_b", "Withdraws continue in the standard transfer form with its live fee and confirm."), "muted"));
     /* LOW punchlist: per-service display toggles (persisted viewSettings) +
@@ -199,26 +195,26 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         lab.appendChild(ctx.doc.createTextNode(t("gateway.show_mid", " Show ") + id + " "));
         det.appendChild(lab);
       });
-      var terms = el(ctx.doc, "p", t("gateway.use_at_your_own_risk_external_hosts_set_", "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed."), "muted");
+      var terms = DOM.el(ctx.doc, "p", t("gateway.use_at_your_own_risk_external_hosts_set_", "Gateway use is at your own risk: external hosts set fees, minimums and addresses. Verify every address and memo before sending — deposits cannot be reversed."), "muted");
       det.appendChild(terms);
       ctx.wrap.appendChild(det);
     })();
-    ctx.tabsBox = el(ctx.doc, "div", null, "gw-tabs"); ctx.wrap.appendChild(ctx.tabsBox);
-    ctx.healthBox = el(ctx.doc, "div", null, "muted"); ctx.wrap.appendChild(ctx.healthBox);
-    ctx.bodyBox = el(ctx.doc, "div"); ctx.wrap.appendChild(ctx.bodyBox);
+    ctx.tabsBox = DOM.el(ctx.doc, "div", null, "gw-tabs"); ctx.wrap.appendChild(ctx.tabsBox);
+    ctx.healthBox = DOM.el(ctx.doc, "div", null, "muted"); ctx.wrap.appendChild(ctx.healthBox);
+    ctx.bodyBox = DOM.el(ctx.doc, "div"); ctx.wrap.appendChild(ctx.bodyBox);
     paintTabs(ctx);
     refreshHealth(ctx);
     loadTab(ctx);
   }
   function paintTabs(ctx) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    clearBox(ctx.tabsBox);
+    DOM.clear(ctx.tabsBox);
     ctx.dots = {};
     ORDER.forEach(function (id) {
       if (ctx.gwShow && ctx.gwShow[id] === false) return;
-      var b = touchable(el(doc, "button", id)); b.type = "button";
+      var b = touchable(DOM.el(doc, "button", id)); b.type = "button";
       if (id === ctx.tab) b.disabled = true;
-      var dot = el(doc, "span", " ○"); dot.title = t("gateway.health_unknown", "health unknown");
+      var dot = DOM.el(doc, "span", " ○"); dot.title = t("gateway.health_unknown", "health unknown");
       b.appendChild(dot); ctx.dots[id] = dot;
       b.addEventListener("click", function () {
         if (myGen !== gen) return;
@@ -232,7 +228,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * dots + one status line + Re-check update only while current. */
   function refreshHealth(ctx) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    clearBox(ctx.healthBox);
+    DOM.clear(ctx.healthBox);
     showStatus(doc, ctx.healthBox, t("gateway.checking_health", "Checking gateway health…"));
     var pending = ORDER.length, parts = {};
     ORDER.forEach(function (id) {
@@ -242,11 +238,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         var dot = ctx.dots && ctx.dots[id];
         if (dot) { dot.textContent = h.ok ? " ●" : " ✕"; dot.title = (h.ok ? t("gateway.health_ok", "ok ") + (h.ms || "?") + "ms" : (h.reason || t("gateway.down", "down"))) + " · " + fmtTime(h.at); }
         if (--pending !== 0) return;
-        clearBox(ctx.healthBox);
-        ctx.healthBox.appendChild(el(doc, "p", ORDER.map(function (g) {
+        DOM.clear(ctx.healthBox);
+        ctx.healthBox.appendChild(DOM.el(doc, "p", ORDER.map(function (g) {
           var r = parts[g];
           return g + ": " + (r.ok ? t("gateway.health_ok", "ok ") + r.ms + "ms" : (r.reason || t("gateway.down", "down"))) + " · " + fmtTime(r.at); }).join("  |  "), "muted"));
-        var re = touchable(el(doc, "button", t("gateway.recheck", "Re-check"))); re.type = "button";
+        var re = touchable(DOM.el(doc, "button", t("gateway.recheck", "Re-check"))); re.type = "button";
         re.addEventListener("click", function () {
           if (myGen !== gen) return;
           var n = ORDER.length; /* force-probe all, then refresh dots + tab */
@@ -262,7 +258,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * a fetch); live entries load coins (session cache) or degrade with Retry. */
   function loadTab(ctx) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    clearBox(ctx.bodyBox);
+    DOM.clear(ctx.bodyBox);
     var entry = findEntry(ctx.tab);
     ctx.tab = entry.id;
     if (!entry.enabled) { disabledPanel(ctx, entry); return; }
@@ -272,12 +268,12 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       : Gateway.coins(entry.id).then(function (rows) { coinCache[entry.id] = rows; return rows; });
     job.then(function (rows) {
       if (myGen !== gen) return;
-      clearBox(ctx.bodyBox);
+      DOM.clear(ctx.bodyBox);
       if (!rows || !rows.length) return coinsFailed(ctx, entry, "empty coin list");
       liveTab(ctx, entry, rows);
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearBox(ctx.bodyBox);
+      DOM.clear(ctx.bodyBox);
       showError(doc, ctx.bodyBox, e, t("gateway.coins_failed_prefix", "Could not load ") + entry.id + t("gateway.coins_failed_suffix", " coins."));
       coinsFailed(ctx, entry, null);
     });
@@ -285,7 +281,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function coinsFailed(ctx, entry, msg) {
     var doc = ctx.doc, myGen = ctx.myGen;
     if (msg) showError(doc, ctx.bodyBox, entry.id + t("gateway.reported_an", " reported an ") + msg + ".", null);
-    var re = touchable(el(doc, "button", t("gateway.retry", "Retry"))); re.type = "button";
+    var re = touchable(DOM.el(doc, "button", t("gateway.retry", "Retry"))); re.type = "button";
     re.addEventListener("click", function () { if (myGen !== gen) return; delete coinCache[entry.id]; loadTab(ctx); });
     ctx.bodyBox.appendChild(re);
   }
@@ -293,10 +289,10 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * BIT20 (never fetched until discovery proves a host — no host Retry). */
   function disabledPanel(ctx, entry) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    ctx.bodyBox.appendChild(el(doc, "h2", entry.id + t("gateway.unavailable_suffix", " — unavailable")));
-    ctx.bodyBox.appendChild(el(doc, "p", entry.reason || t("gateway.disabled_fallback", "This gateway is disabled."), "muted"));
+    ctx.bodyBox.appendChild(DOM.el(doc, "h2", entry.id + t("gateway.unavailable_suffix", " — unavailable")));
+    ctx.bodyBox.appendChild(DOM.el(doc, "p", entry.reason || t("gateway.disabled_fallback", "This gateway is disabled."), "muted"));
     if (entry.id === "GDEX") {
-      ctx.bodyBox.appendChild(el(doc, "p",
+      ctx.bodyBox.appendChild(DOM.el(doc, "p",
         t("gateway.gdex_manual_a", "Only manual deposit / withdraw (per the gateway's own status in the reference UI). ") +
         t("gateway.gdex_manual_b", "Automatic lookup stays off until a probe answers."), "muted"));
       if (entry.landing) {
@@ -304,14 +300,14 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         a.setAttribute("rel", "noreferrer"); a.textContent = t("gateway.status_thread", "Gateway status thread");
         ctx.bodyBox.appendChild(a);
       }
-      var re = touchable(el(doc, "button", t("gateway.retry_probe", "Retry probe"))); re.type = "button";
+      var re = touchable(DOM.el(doc, "button", t("gateway.retry_probe", "Retry probe"))); re.type = "button";
       re.addEventListener("click", function () {
         if (myGen !== gen) return;
         Gateway.health("GDEX", { force: true }).then(function () { if (myGen === gen) { refreshHealth(ctx); loadTab(ctx); } });
       });
       ctx.bodyBox.appendChild(re);
     } else if (entry.id === "BIT20") {
-      ctx.bodyBox.appendChild(el(doc, "p",
+      ctx.bodyBox.appendChild(DOM.el(doc, "p",
         t("gateway.bit20_a", "What unblocks this tab: on-chain discovery of a BIT20-prefixed asset family ") +
         t("gateway.bit20_b", "and issuer account (see parity note). No endpoint is guessed, so there is ") +
         t("gateway.bit20_c", "nothing to retry against yet."), "muted"));
@@ -323,12 +319,12 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function liveTab(ctx, entry, rows) {
     var doc = ctx.doc, myGen = ctx.myGen;
     var wantDeposit = ctx.action !== "withdraw";
-    var bar = el(doc, "div", null, "gw-toggle");
-    var depB = touchable(el(doc, "button", t("gateway.deposit_tab", "DEPOSIT")));
-    var witB = touchable(el(doc, "button", t("gateway.withdraw_tab", "WITHDRAW")));
+    var bar = DOM.el(doc, "div", null, "gw-toggle");
+    var depB = touchable(DOM.el(doc, "button", t("gateway.deposit_tab", "DEPOSIT")));
+    var witB = touchable(DOM.el(doc, "button", t("gateway.withdraw_tab", "WITHDRAW")));
     depB.type = "button"; witB.type = "button";
     if (wantDeposit) depB.disabled = true; else witB.disabled = true;
-    function switchTo(a) { return function () { if (myGen !== gen) return; ctx.action = a; clearBox(ctx.bodyBox); liveTab(ctx, entry, rows); }; }
+    function switchTo(a) { return function () { if (myGen !== gen) return; ctx.action = a; DOM.clear(ctx.bodyBox); liveTab(ctx, entry, rows); }; }
     depB.addEventListener("click", switchTo("deposit"));
     witB.addEventListener("click", switchTo("withdraw"));
     bar.appendChild(depB); bar.appendChild(witB); ctx.bodyBox.appendChild(bar);
@@ -338,7 +334,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       return;
     }
     if (!ctx.coin || !pool.some(function (r) { return r.symbol === ctx.coin; })) ctx.coin = pool[0].symbol;
-    var selRow = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", t("gateway.coin_label", "Coin "));
+    var selRow = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", t("gateway.coin_label", "Coin "));
     var sel = doc.createElement("select"); touchable(sel);
     pool.forEach(function (r) {
       var o = doc.createElement("option"); o.value = r.symbol;
@@ -346,7 +342,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       sel.appendChild(o);
     });
     sel.value = ctx.coin;
-    sel.addEventListener("change", function () { if (myGen !== gen) return; ctx.coin = sel.value; clearBox(ctx.bodyBox); liveTab(ctx, entry, rows); });
+    sel.addEventListener("change", function () { if (myGen !== gen) return; ctx.coin = sel.value; DOM.clear(ctx.bodyBox); liveTab(ctx, entry, rows); });
     lab.appendChild(sel); selRow.appendChild(lab); ctx.bodyBox.appendChild(selRow);
     var row = null, i;
     for (i = 0; i < pool.length; i++) if (pool[i].symbol === ctx.coin) row = pool[i];
@@ -358,7 +354,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * host errors with Retry. Nothing here signs or broadcasts — ever. */
   function depositPanel(ctx, entry, row) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    ctx.bodyBox.appendChild(el(doc, "h2", t("gateway.deposit_prefix", "Deposit ") + row.symbol + t("gateway.via", " via ") + entry.id));
+    ctx.bodyBox.appendChild(DOM.el(doc, "h2", t("gateway.deposit_prefix", "Deposit ") + row.symbol + t("gateway.via", " via ") + entry.id));
     ctx.bodyBox.appendChild(factList(doc, [
       [t("gateway.coin_fact", "Coin"), row.symbol],
       [t("gateway.backing_fact", "Backing coin"), row.backingCoin || "—"],
@@ -366,37 +362,37 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       [t("gateway.deposit_fee", "Deposit fee (gateway-stated)"), fmtMoney(row.gateFeeRaw, row.precision), row.gateFeeRaw === null ? null : t("gateway.raw_prefix", "raw: ") + row.gateFeeRaw],
       [t("gateway.issuer_fact", "Issuer / intermediate"), row.gatewayWallet || row.issuer || "—"]
     ]));
-    ctx.bodyBox.appendChild(el(doc, "p",
+    ctx.bodyBox.appendChild(DOM.el(doc, "p",
       t("gateway.no_qr_a", "No QR code is shown: the reference UI renders QR via an npm component ") +
       t("gateway.no_qr_b", "with no zero-dependency replacement on disk — copy the text below instead."), "muted"));
-    var acctRow = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", t("gateway.your_account", "Your BitShares account "));
+    var acctRow = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", t("gateway.your_account", "Your BitShares account "));
     var acct = doc.createElement("input");
     acct.setAttribute("placeholder", t("gateway.account_ph", "account name")); acct.setAttribute("autocomplete", "off");
     acct.value = ctx.account || ""; touchable(acct);
     acct.addEventListener("input", function () { ctx.account = acct.value; });
     lab.appendChild(acct); acctRow.appendChild(lab); ctx.bodyBox.appendChild(acctRow);
-    var out = el(doc, "div"); ctx.bodyBox.appendChild(out);
-    var go = touchable(el(doc, "button", t("gateway.get_address", "Get deposit address"))); go.type = "button";
+    var out = DOM.el(doc, "div"); ctx.bodyBox.appendChild(out);
+    var go = touchable(DOM.el(doc, "button", t("gateway.get_address", "Get deposit address"))); go.type = "button";
     function doDeposit() {
       if (myGen !== gen) return;
-      clearBox(out);
+      DOM.clear(out);
       var account = (acct.value || "").trim();
       if (!account) { showError(doc, out, new Error("bad-account"), null); return; }
       go.disabled = true;
       showStatus(doc, out, t("gateway.asking_prefix", "Asking ") + entry.id + t("gateway.asking_deposit_mid", " for a ") + row.symbol + t("gateway.asking_deposit_end", " deposit address…"));
       Gateway.depositAddress(entry.id, { coin: row.symbol, account: account }).then(function (res) {
         if (myGen !== gen) return;
-        go.disabled = false; clearBox(out);
+        go.disabled = false; DOM.clear(out);
         if (res.cached) showStatus(doc, out, t("gateway.cached_note", "Last address (cached) — no new address minted."));
         out.appendChild(copyRow(doc, t("gateway.send_to", "Send to address"), res.address));
         if (res.memo) out.appendChild(copyRow(doc, t("gateway.with_memo", "With memo"), res.memo));
-        else out.appendChild(el(doc, "p", t("gateway.no_memo", "No memo required for this deposit."), "muted"));
-        out.appendChild(el(doc, "p", t("gateway.send_external_prefix", "Send your external ") + row.symbol + t("gateway.send_external_suffix", " there. This page broadcasts nothing."), "muted"));
+        else out.appendChild(DOM.el(doc, "p", t("gateway.no_memo", "No memo required for this deposit."), "muted"));
+        out.appendChild(DOM.el(doc, "p", t("gateway.send_external_prefix", "Send your external ") + row.symbol + t("gateway.send_external_suffix", " there. This page broadcasts nothing."), "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return;
-        go.disabled = false; clearBox(out);
+        go.disabled = false; DOM.clear(out);
         showError(doc, out, e, t("gateway.deposit_failed", "Deposit lookup failed."));
-        var re = touchable(el(doc, "button", t("gateway.retry", "Retry"))); re.type = "button";
+        var re = touchable(DOM.el(doc, "button", t("gateway.retry", "Retry"))); re.type = "button";
         re.addEventListener("click", doDeposit);
         out.appendChild(re);
       });
@@ -410,53 +406,53 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * fee, confirm, sign and broadcast. This slice never presses broadcast. */
   function withdrawPanel(ctx, entry, row) {
     var doc = ctx.doc, myGen = ctx.myGen;
-    ctx.bodyBox.appendChild(el(doc, "h2", t("gateway.withdraw_prefix", "Withdraw ") + row.symbol + t("gateway.via", " via ") + entry.id));
+    ctx.bodyBox.appendChild(DOM.el(doc, "h2", t("gateway.withdraw_prefix", "Withdraw ") + row.symbol + t("gateway.via", " via ") + entry.id));
     ctx.bodyBox.appendChild(factList(doc, [
       [t("gateway.coin_fact", "Coin"), row.symbol],
       [t("gateway.withdraw_fee", "Withdraw fee (gateway-stated)"), fmtMoney(row.withdrawFeeRaw, row.precision), row.withdrawFeeRaw === null ? null : t("gateway.raw_prefix", "raw: ") + row.withdrawFeeRaw],
       [t("gateway.min_withdraw", "Minimum withdrawal (gateway-stated)"), fmtMoney(row.minAmountRaw, row.precision), row.minAmountRaw === null ? null : t("gateway.raw_prefix", "raw: ") + row.minAmountRaw],
       [t("gateway.pays_to", "Pays to (gateway-stated)"), row.gatewayWallet || row.issuer || "—"]
     ]));
-    var destRow = el(doc, "div", null, "xfer-field"), dlab = el(doc, "label", t("gateway.dest_label", "Destination external address "));
+    var destRow = DOM.el(doc, "div", null, "xfer-field"), dlab = DOM.el(doc, "label", t("gateway.dest_label", "Destination external address "));
     var dest = doc.createElement("input");
     dest.setAttribute("placeholder", t("gateway.dest_ph_prefix", "external ") + (row.backingCoin || row.symbol) + t("gateway.dest_ph_suffix", " address"));
     dest.setAttribute("autocomplete", "off"); touchable(dest);
     dlab.appendChild(dest); destRow.appendChild(dlab); ctx.bodyBox.appendChild(destRow);
-    var memoOut = el(doc, "div"); ctx.bodyBox.appendChild(memoOut);
-    var validOut = el(doc, "div"); ctx.bodyBox.appendChild(validOut);
+    var memoOut = DOM.el(doc, "div"); ctx.bodyBox.appendChild(memoOut);
+    var validOut = DOM.el(doc, "div"); ctx.bodyBox.appendChild(validOut);
     function prefix() { return entry.id === "XBTSX" ? ((row.backingCoin || row.symbol) + ":") : entry.id === "IOB" ? "dex:" : ""; }
     function preview() {
       if (myGen !== gen) return;
-      clearBox(memoOut);
+      DOM.clear(memoOut);
       var memo = prefix() + (dest.value || "").trim();
       memoOut.appendChild(copyRow(doc, t("gateway.memo_label", "Transfer memo"), memo === prefix() ? prefix() + "…" : memo));
     }
     preview(); dest.addEventListener("input", preview);
     if (entry.id === "XBTSX" && row.walletType) {
-      var chk = touchable(el(doc, "button", t("gateway.validate_btn", "Validate address with gateway"))); chk.type = "button";
+      var chk = touchable(DOM.el(doc, "button", t("gateway.validate_btn", "Validate address with gateway"))); chk.type = "button";
       chk.addEventListener("click", function () {
         if (myGen !== gen) return;
-        clearBox(validOut);
+        DOM.clear(validOut);
         var addr = (dest.value || "").trim();
         if (!addr) { showError(doc, validOut, t("gateway.dest_needed", "Enter the destination external address first."), null); return; }
         showStatus(doc, validOut, t("gateway.asking_prefix", "Asking ") + entry.id + "…");
         Gateway.validateWithdrawAddress(entry.id, { walletType: row.walletType, address: addr }).then(function (r) {
           if (myGen !== gen) return;
-          clearBox(validOut);
+          DOM.clear(validOut);
           showStatus(doc, validOut, t("gateway.addr_prefix", "Gateway reports the address looks ") + (r.valid ? t("gateway.addr_valid", "valid") : t("gateway.addr_invalid", "INVALID")) + t("gateway.addr_suffix", " (advisory only)."));
         }).catch(function (e) {
           if (myGen !== gen) return;
-          clearBox(validOut);
+          DOM.clear(validOut);
           showStatus(doc, validOut, t("gateway.validation_prefix", "Validation unavailable: ") + ((e && e.message) || e) + t("gateway.validation_suffix", " — you may still continue."));
         });
       });
       ctx.bodyBox.appendChild(chk);
     }
-    var go = touchable(el(doc, "button", t("gateway.continue_transfer", "Continue to transfer →"))); go.type = "button";
+    var go = touchable(DOM.el(doc, "button", t("gateway.continue_transfer", "Continue to transfer →"))); go.type = "button";
     go.addEventListener("click", function () {
       if (myGen !== gen) return;
       var addr = (dest.value || "").trim();
-      clearBox(validOut);
+      DOM.clear(validOut);
       if (!addr) { showError(doc, validOut, t("gateway.dest_needed", "Enter the destination external address first."), null); return; }
       go.disabled = true;
       Gateway.withdrawPrefill(entry.id, row.symbol).then(function (pre) {
@@ -470,7 +466,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       });
     });
     ctx.bodyBox.appendChild(go);
-    ctx.bodyBox.appendChild(el(doc, "p",
+    ctx.bodyBox.appendChild(DOM.el(doc, "p",
       t("gateway.withdraw_note_a", "Amount, live chain fee, confirm, sign and broadcast all happen in the ") +
       t("gateway.withdraw_note_b", "transfer form — this page never broadcasts a gateway withdraw."), "muted"));
   }

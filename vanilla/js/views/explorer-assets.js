@@ -179,20 +179,11 @@ var ExplorerAssets = (function () {
     return false;
   }
 
-  /* Create an element with optional text + class (textContent only — user
-   * and chain strings never reach innerHTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. */
-function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
+/* clearRoot removed — use DOM.clear */
 
   /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
    * ≥1200px; children span full width via app.css .wide contract. */
@@ -204,7 +195,7 @@ function clearRoot(root) {
   }
 
   function anchor(doc, text, href) {
-    var a = el(doc, "a", text);
+    var a = DOM.el(doc, "a", text);
     a.setAttribute("href", href);
     touchable(a);
     a.style.display = "inline-block";
@@ -219,13 +210,13 @@ function clearRoot(root) {
    * the result reads inline via aria-live, never a dialog. textContent
    * only. Params: doc, hash ("#/…"). Returns the row div. Never throws. */
   function shareRow(doc, hash) {
-    var row = el(doc, "div", null, "xplore-share");
-    var btn = touchable(el(doc, "button", "Copy link", "subtle-btn"));
+    var row = DOM.el(doc, "div", null, "xplore-share");
+    var btn = touchable(DOM.el(doc, "button", "Copy link", "subtle-btn"));
     btn.type = "button";
-    var note = el(doc, "span", "", "muted");
+    var note = DOM.el(doc, "span", "", "muted");
     note.setAttribute("aria-live", "polite");
     row.appendChild(btn);
-    row.appendChild(el(doc, "span", " "));
+    row.appendChild(DOM.el(doc, "span", " "));
     row.appendChild(note);
     btn.addEventListener("click", function () {
       btn.disabled = true;
@@ -272,8 +263,7 @@ function clearRoot(root) {
   /* Inline error panel that is never blank: thrown values map to human
    * sentences; unknown shapes fall back to a generic message. */
   function showError(doc, wrap, e, fallback) {
-    var box = el(doc, "div", null, "error");
-    box.setAttribute("aria-live", "polite");
+    var box = null; /* created via DOM.error below — use DOM.el, DOM.clear */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
@@ -284,15 +274,12 @@ function clearRoot(root) {
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    box.textContent = msg;
-    wrap.appendChild(box);
+    box = DOM.error(wrap, msg);
     return box;
   }
 
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p);
+    var p = DOM.status(wrap, text);
     return p;
   }
 
@@ -326,13 +313,13 @@ function clearRoot(root) {
   /* Scrollable table shell (principle #7: dense tables scroll horizontally
    * on phones instead of squeezing; no new CSS — inline overflow only). */
   function scrollTable(doc, headers, rows) {
-    var scroller = el(doc, "div", null, "xplore-scroll");
+    var scroller = DOM.el(doc, "div", null, "xplore-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    headers.forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+    headers.forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tb = doc.createElement("tbody");
@@ -396,11 +383,11 @@ function clearRoot(root) {
    *   resolveObject now accepts space 2 (was space-1 only, hence dashes).
    *   Bitasset 2.4.x joins ride the same flow for the prediction filter. */
   function assetsTab(doc, body, root, myGen, lower, stack) {
-    while (body.firstChild) body.removeChild(body.firstChild);
+    DOM.clear(body);
     /* Filter bar (rebuilt per page turn with state values preserved; table
      * repaints below it so typing never loses focus). New labels are plain
      * literals (no new t() keys) per the file-scope i18n note above. */
-    var bar = el(doc, "div", null, "xplore-filters");
+    var bar = DOM.el(doc, "div", null, "xplore-filters");
     /* Inline flex (no new CSS): wraps on 360px phones, one row on desktop.
      * Principle #7 — no hover-dependent UI, everything tap-sized. */
     try {
@@ -417,11 +404,11 @@ function clearRoot(root) {
     search.style.minWidth = "180px";
     bar.appendChild(search);
     var modes = [["market", "SmartCoins"], ["user", "User-Issued"], ["prediction", "Prediction"]];
-    var radioWrap = el(doc, "span", null, "xplore-radios");
+    var radioWrap = DOM.el(doc, "span", null, "xplore-radios");
     radioWrap.setAttribute("role", "radiogroup");
     radioWrap.setAttribute("aria-label", t("explorer.asset_type_filter", "Asset type filter"));
     modes.forEach(function (m) {
-      var lab = el(doc, "label", null, "xplore-radio");
+      var lab = DOM.el(doc, "label", null, "xplore-radio");
       touchable(lab);
       var inp = doc.createElement("input");
       inp.type = "radio";
@@ -433,11 +420,11 @@ function clearRoot(root) {
         paintCached();
       });
       lab.appendChild(inp);
-      lab.appendChild(el(doc, "span", " " + m[1]));
+      lab.appendChild(DOM.el(doc, "span", " " + m[1]));
       radioWrap.appendChild(lab);
     });
     bar.appendChild(radioWrap);
-    var perLab = el(doc, "label", t("explorer.rows", " Rows "));
+    var perLab = DOM.el(doc, "label", t("explorer.rows", " Rows "));
     var perSel = doc.createElement("select");
     perSel.setAttribute("aria-label", t("explorer.rows_per_page", "Rows per page"));
     touchable(perSel);
@@ -458,9 +445,9 @@ function clearRoot(root) {
     perLab.appendChild(perSel);
     bar.appendChild(perLab);
     body.appendChild(bar);
-    var tableWrap = el(doc, "div", null, "xplore-tablewrap");
+    var tableWrap = DOM.el(doc, "div", null, "xplore-tablewrap");
     body.appendChild(tableWrap);
-    var navWrap = el(doc, "div", null, "xplore-nav");
+    var navWrap = DOM.el(doc, "div", null, "xplore-nav");
     body.appendChild(navWrap);
     var allRows = null; /* enriched rows for client-side filter/sort */
     var lastRows = []; /* raw page rows for Next paging */
@@ -573,13 +560,13 @@ function clearRoot(root) {
     function paintCached() {
       if (!isCurrent(myGen)) return;
       if (!allRows) return;
-      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
-      while (navWrap.firstChild) navWrap.removeChild(navWrap.firstChild);
+      DOM.clear(tableWrap);
+      DOM.clear(navWrap);
       var view = filteredSorted();
       if (view.length === 0) {
-        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
+        tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
       } else {
-        var scroller = el(doc, "div", null, "xplore-scroll");
+        var scroller = DOM.el(doc, "div", null, "xplore-scroll");
         scroller.style.overflowX = "auto";
         var table = doc.createElement("table");
         table.className = "node-table";
@@ -596,7 +583,7 @@ function clearRoot(root) {
           th.setAttribute("scope", "col");
           if (isCurrent(myGen)) th.setAttribute("aria-sort",
             assetState.sortKey === key ? (assetState.sortDir >= 0 ? "ascending" : "descending") : "none");
-          var b = touchable(el(doc, "button", label + sortMark(key)));
+          var b = touchable(DOM.el(doc, "button", label + sortMark(key)));
           b.type = "button";
           b.addEventListener("click", function () {
             if (assetState.sortKey === key) assetState.sortDir = -assetState.sortDir;
@@ -609,7 +596,7 @@ function clearRoot(root) {
         hr.appendChild(sortTh("symbol", t("explorer.th_symbol", "Symbol")));
         hr.appendChild(sortTh("issuer", t("explorer.th_issuer", "Issuer")));
         hr.appendChild(sortTh("supply", t("explorer.th_supply", "Supply")));
-        hr.appendChild(el(doc, "th", t("explorer.market_3", "Market")));
+        hr.appendChild(DOM.el(doc, "th", t("explorer.market_3", "Market")));
         thead.appendChild(hr);
         table.appendChild(thead);
         var tb = doc.createElement("tbody");
@@ -623,7 +610,7 @@ function clearRoot(root) {
           tr.appendChild(tdS);
           var tdI = doc.createElement("td");
           var issuer = (typeof a.issuer === "string" && ACCT_RE.test(a.issuer))
-            ? ExplorerRender.accountLink(doc, a.issuer, myGen) : el(doc, "span", String(a.issuer));
+            ? ExplorerRender.accountLink(doc, a.issuer, myGen) : DOM.el(doc, "span", String(a.issuer));
           if (typeof issuer === "string") tdI.textContent = issuer;
           else tdI.appendChild(issuer);
           tr.appendChild(tdI);
@@ -647,7 +634,7 @@ function clearRoot(root) {
         tableWrap.appendChild(scroller);
       }
       if ((stack || []).length > 0) {
-        var prev = touchable(el(doc, "button", t("explorer.prev", "← Prev")));
+        var prev = touchable(DOM.el(doc, "button", t("explorer.prev", "← Prev")));
         prev.type = "button";
         prev.addEventListener("click", function () {
           var back = (stack || []).slice(0, -1);
@@ -657,7 +644,7 @@ function clearRoot(root) {
         navWrap.appendChild(prev);
       }
       if (lastRows.length >= assetState.perPage && lastRows.length > 0) {
-        var next = touchable(el(doc, "button", t("explorer.next", "Next →")));
+        var next = touchable(DOM.el(doc, "button", t("explorer.next", "Next →")));
         next.type = "button";
         next.addEventListener("click", function () {
           assetsTab(doc, body, root, myGen, lastRows[lastRows.length - 1].symbol, (stack || []).concat([lower]));
@@ -669,16 +656,16 @@ function clearRoot(root) {
       if (!isCurrent(myGen)) return;
       rows = rows || [];
       if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
-        while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
-        tableWrap.appendChild(el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
+        DOM.clear(tableWrap);
+        tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
         return;
       }
       enrichAndStore(rows);
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
-      while (tableWrap.firstChild) tableWrap.removeChild(tableWrap.firstChild);
+      DOM.clear(tableWrap);
       showError(doc, tableWrap, e, t("explorer.assets_failed", "Could not load assets."));
-      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+      var retry = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
         assetsTab(doc, body, root, myGen, lower, stack);
@@ -704,7 +691,7 @@ function clearRoot(root) {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = bumpGen();
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
       showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
@@ -712,11 +699,11 @@ function clearRoot(root) {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderAsset(root, symbol); })) return;
     if (typeof symbol !== "string" || !symbol) {
-      wrap.appendChild(el(doc, "h1", t("explorer.asset_title", "Asset")));
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_title", "Asset")));
       showError(doc, wrap, new Error("unknown-asset"), t("explorer.unknown_asset", "Unknown asset."));
       return;
     }
-    wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+    wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
     showStatus(doc, wrap, t("explorer.loading_asset", "Loading asset…"));
     Explorer.asset(symbol).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -729,8 +716,8 @@ function clearRoot(root) {
         : isSmart ? "SmartCoin (MPA)" : "User-Issued (UIA)";
       var descParsed = parseDesc(a.options && a.options.description);
       var marketID = marketIdFor(a.symbol, a.options && a.options.description);
-      while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
+      DOM.clear(wrap);
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
       var marketBtn = anchor(doc, t("explorer.market_2", "MARKET →"), "#/market/" + marketID);
       marketBtn.title = marketID;
       marketBtn.setAttribute("aria-label", t("explorer.open_preferred_market", "Open preferred market ") + marketID);
@@ -739,19 +726,19 @@ function clearRoot(root) {
       /* Tabs (shared .xplore-tab underline treatment with explorer-ui.js —
        * grey caps, active accent underline; same bar so all tab rows agree).
        * #1 Tabs info/actions (Asset.jsx:2337-2403). */
-      var tabBar = el(doc, "div", null, "xplore-tabs");
+      var tabBar = DOM.el(doc, "div", null, "xplore-tabs");
       tabBar.setAttribute("role", "tablist");
-      var infoBtn = touchable(el(doc, "button", t("explorer.asset_info", "ASSET INFO"), "xplore-tab active"));
+      var infoBtn = touchable(DOM.el(doc, "button", t("explorer.asset_info", "ASSET INFO"), "xplore-tab active"));
       infoBtn.type = "button";
       infoBtn.setAttribute("role", "tab");
-      var actBtn = touchable(el(doc, "button", t("explorer.actions", "ACTIONS"), "xplore-tab"));
+      var actBtn = touchable(DOM.el(doc, "button", t("explorer.actions", "ACTIONS"), "xplore-tab"));
       actBtn.type = "button";
       actBtn.setAttribute("role", "tab");
       tabBar.appendChild(infoBtn);
       tabBar.appendChild(actBtn);
       wrap.appendChild(tabBar);
-      var infoBox = el(doc, "div", null, "xplore-tabinfo");
-      var actBox = el(doc, "div", null, "xplore-tabact");
+      var infoBox = DOM.el(doc, "div", null, "xplore-tabinfo");
+      var actBox = DOM.el(doc, "div", null, "xplore-tabact");
       actBox.style.display = "none";
       wrap.appendChild(infoBox);
       wrap.appendChild(actBox);
@@ -773,12 +760,12 @@ function clearRoot(root) {
       infoBtn.addEventListener("click", function () { selectTab("info"); });
       actBtn.addEventListener("click", function () { selectTab("actions"); });
       selectTab("info");
-      var dl = el(doc, "dl", null, "xplore-fields");
+      var dl = DOM.el(doc, "dl", null, "xplore-fields");
       /* humanRowInto: append a dt/dd row with a Format-human amount (raw in title).
        * WHY helper: asset-page rows share the dash-on-missing contract (principle #6).
        * Params target, term, raw (chain int string); no return, never throws. */
       function humanRowInto(target, term, raw) {
-        target.appendChild(el(doc, "dt", term));
+        target.appendChild(DOM.el(doc, "dt", term));
         var dd = doc.createElement("dd");
         if (raw === undefined || raw === null) dd.textContent = "—";
         else {
@@ -793,7 +780,7 @@ function clearRoot(root) {
        * uses core precision; #2 shows feePoolBalance in CORE_PRECISION).
        * Using prec here would misplace the decimal on any p!=5 asset. */
       function coreRowInto(target, term, raw) {
-        target.appendChild(el(doc, "dt", term));
+        target.appendChild(DOM.el(doc, "dt", term));
         var dd = doc.createElement("dd");
         if (raw === undefined || raw === null) dd.textContent = "—";
         else {
@@ -803,30 +790,30 @@ function clearRoot(root) {
         }
         target.appendChild(dd);
       }
-      dl.appendChild(el(doc, "dt", t("explorer.id_row", "ID")));
+      dl.appendChild(DOM.el(doc, "dt", t("explorer.id_row", "ID")));
       var idDd = doc.createElement("dd");
       idDd.textContent = a.id;
       dl.appendChild(idDd);
-      dl.appendChild(el(doc, "dt", t("explorer.issuer_row", "Issuer")));
+      dl.appendChild(DOM.el(doc, "dt", t("explorer.issuer_row", "Issuer")));
       var issuerDd = doc.createElement("dd");
       issuerDd.appendChild((typeof a.issuer === "string" && ACCT_RE.test(a.issuer))
-        ? ExplorerRender.accountLink(doc, a.issuer, myGen) : el(doc, "span", String(a.issuer)));
+        ? ExplorerRender.accountLink(doc, a.issuer, myGen) : DOM.el(doc, "span", String(a.issuer)));
       dl.appendChild(issuerDd);
-      dl.appendChild(el(doc, "dt", t("explorer.precision_row", "Precision")));
+      dl.appendChild(DOM.el(doc, "dt", t("explorer.precision_row", "Precision")));
       var pDd = doc.createElement("dd");
       pDd.textContent = String(prec);
       dl.appendChild(pDd);
-      dl.appendChild(el(doc, "dt", t("explorer.asset_type", "Asset type")));
+      dl.appendChild(DOM.el(doc, "dt", t("explorer.asset_type", "Asset type")));
       var tyDd = doc.createElement("dd");
       tyDd.textContent = typeLabel;
       dl.appendChild(tyDd);
       infoBox.appendChild(dl);
       /* Asset-type/flags section (chain truth: protocol/types.hpp permission
        * bits; raw ints in titles, human lists via flagBitNames). */
-      infoBox.appendChild(el(doc, "h3", t("explorer.asset_type_and_permissions", "Asset type and permissions")));
-      var dlF = el(doc, "dl", null, "xplore-fields");
+      infoBox.appendChild(DOM.el(doc, "h3", t("explorer.asset_type_and_permissions", "Asset type and permissions")));
+      var dlF = DOM.el(doc, "dl", null, "xplore-fields");
       function flagRow(term, raw) {
-        dlF.appendChild(el(doc, "dt", term));
+        dlF.appendChild(DOM.el(doc, "dt", term));
         var dd = doc.createElement("dd");
         var names = flagBitNames(raw);
         dd.textContent = names || "—";
@@ -841,19 +828,19 @@ function clearRoot(root) {
         feeDd.textContent = pctHundredths(String(feeKey));
         feeDd.title = String(feeKey);
       } else feeDd.textContent = "—";
-      dlF.appendChild(el(doc, "dt", t("explorer.market_fee", "Market fee")));
+      dlF.appendChild(DOM.el(doc, "dt", t("explorer.market_fee", "Market fee")));
       dlF.appendChild(feeDd);
       infoBox.appendChild(dlF);
       /* Description box with grouped amounts (main text + short_name +
        * max/current/fees/fee-pool human — #1 AboutBox + Summary grouped). */
-      var descBox = el(doc, "div", null, "xplore-descbox");
-      descBox.appendChild(el(doc, "h3", t("explorer.description", "Description")));
+      var descBox = DOM.el(doc, "div", null, "xplore-descbox");
+      descBox.appendChild(DOM.el(doc, "h3", t("explorer.description", "Description")));
       var mainText = (descParsed.main && descParsed.main.trim())
         ? descParsed.main : "(no description)";
-      descBox.appendChild(el(doc, "p", mainText));
-      if (descParsed.shortName) descBox.appendChild(el(doc, "p", t("explorer.short", "Short: ") + descParsed.shortName));
-      if (descParsed.market) descBox.appendChild(el(doc, "p", t("explorer.market", "Market: ") + descParsed.market));
-      var dl2 = el(doc, "dl", null, "xplore-fields");
+      descBox.appendChild(DOM.el(doc, "p", mainText));
+      if (descParsed.shortName) descBox.appendChild(DOM.el(doc, "p", t("explorer.short", "Short: ") + descParsed.shortName));
+      if (descParsed.market) descBox.appendChild(DOM.el(doc, "p", t("explorer.market", "Market: ") + descParsed.market));
+      var dl2 = DOM.el(doc, "dl", null, "xplore-fields");
       descBox.appendChild(dl2);
       humanRowInto(dl2, t("explorer.max_supply", "Max supply"), a.options && a.options.max_supply);
       humanRowInto(dl2, t("explorer.current_supply", "Current supply"), dyn.current_supply);
@@ -871,18 +858,18 @@ function clearRoot(root) {
        * reject -> keyed one-line notice + HistoryNotice settings link.
        * Never blank, never throws. */
       (function holdersSection() {
-        var box = el(doc, "div", null, "xplore-holders");
+        var box = DOM.el(doc, "div", null, "xplore-holders");
         infoBox.appendChild(box);
-        box.appendChild(el(doc, "h3", t("asset.holders_title", "Top holders")));
-        var listBox = el(doc, "div", null, "xplore-holders-list");
+        box.appendChild(DOM.el(doc, "h3", t("asset.holders_title", "Top holders")));
+        var listBox = DOM.el(doc, "div", null, "xplore-holders-list");
         box.appendChild(listBox);
         showStatus(doc, listBox, t("explorer.loading_prefix", "Loading ") + t("asset.holders_title", "Top holders") + "…");
         /* holdersUnavailable: keyed one-line notice + Settings action link.
          * WHY helper: three failure paths (pref off, missing seam, ES reject)
          * share this honest panel; display-only, never throws. No params. */
         function holdersUnavailable() {
-          while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
-          listBox.appendChild(el(doc, "p",
+          DOM.clear(listBox);
+          listBox.appendChild(DOM.el(doc, "p",
             t("asset.holders_unavailable", "Top holders unavailable — the community index is off or unreachable; check Settings."), "muted"));
           try {
             if (typeof HistoryNotice !== "undefined" && HistoryNotice &&
@@ -910,16 +897,16 @@ function clearRoot(root) {
              * headless shooter, so fail-soft here instead of upstream). */
             try {
               var rows = _parseHolders(esJson);
-              while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+              DOM.clear(listBox);
               if (rows.length === 0) { holdersUnavailable(); return; }
-              var scroller = el(doc, "div", null, "xplore-scroll");
+              var scroller = DOM.el(doc, "div", null, "xplore-scroll");
               scroller.style.overflowX = "auto";
               var table = doc.createElement("table");
               table.className = "node-table";
               var thead = doc.createElement("thead");
               var hr = doc.createElement("tr");
-              hr.appendChild(el(doc, "th", t("asset.holders_account", "Account")));
-              hr.appendChild(el(doc, "th", t("asset.holders_balance", "Balance")));
+              hr.appendChild(DOM.el(doc, "th", t("asset.holders_account", "Account")));
+              hr.appendChild(DOM.el(doc, "th", t("asset.holders_balance", "Balance")));
               thead.appendChild(hr);
               table.appendChild(thead);
               var tb = doc.createElement("tbody");
@@ -957,11 +944,11 @@ function clearRoot(root) {
        * renderFeePoolFunding + FeePoolOperation fund path and #2
        * AssetIssuerActions fund-fee-pool dialog (current pool + amount +
        * confirm); vanilla uses named confirm rows, never raw JSON. */
-      actBox.appendChild(el(doc, "h3", t("explorer.asset_actions", "Asset actions")));
+      actBox.appendChild(DOM.el(doc, "h3", t("explorer.asset_actions", "Asset actions")));
       var mLink = anchor(doc, t("explorer.open_market", "Open market ") + marketID, "#/market/" + marketID);
       mLink.title = marketID;
       actBox.appendChild(mLink);
-      actBox.appendChild(el(doc, "p", t("explorer.trade_and_transfer_this_asset_from_its_prefer", "Trade and transfer this asset from its preferred market."), "muted"));
+      actBox.appendChild(DOM.el(doc, "p", t("explorer.trade_and_transfer_this_asset_from_its_prefer", "Trade and transfer this asset from its preferred market."), "muted"));
       var tLink = anchor(doc, t("explorer.transfer", "Transfer ") + a.symbol, "#/transfer");
       tLink.title = t("explorer.pill_transfer", "Transfer");
       actBox.appendChild(tLink);
@@ -970,22 +957,22 @@ function clearRoot(root) {
        * (publish gates on the fresh WIF, same as asset-manage-ui). Batch-7
        * i18n: labels keyed via t() under explorer dot fund, confirm, plus suffixes. */
       (function fundSection() {
-        actBox.appendChild(el(doc, "h3", t("explorer.fund_fee_pool_h", "Fund fee pool (op 16)")));
+        actBox.appendChild(DOM.el(doc, "h3", t("explorer.fund_fee_pool_h", "Fund fee pool (op 16)")));
         var poolHuman = "—", poolRaw = (dyn && dyn.fee_pool !== undefined && dyn.fee_pool !== null)
           ? String(dyn.fee_pool) : null;
         try { poolHuman = poolRaw === null ? "—" : Format.formatAmount(poolRaw, CORE_PRECISION) + t("explorer.core_suffix", " (core)"); }
           catch (e) { poolHuman = String(poolRaw); }
-        var pPool = el(doc, "p", t("explorer.current_pool_prefix", "Current pool: ") + poolHuman, "muted");
+        var pPool = DOM.el(doc, "p", t("explorer.current_pool_prefix", "Current pool: ") + poolHuman, "muted");
         if (poolRaw !== null) pPool.title = poolRaw;
         actBox.appendChild(pPool);
         try {
           if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
             var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-            actBox.appendChild(el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+            actBox.appendChild(DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
           }
         } catch (e) { /* notice is display-only */ }
         function fundField(label, val, mode, ph) {
-          var row = el(doc, "div", null, "xfer-field"), lab = el(doc, "label", label + " ");
+          var row = DOM.el(doc, "div", null, "xfer-field"), lab = DOM.el(doc, "label", label + " ");
           var inp = doc.createElement("input");
           inp.type = "text"; if (mode) inp.setAttribute("inputmode", mode);
           inp.value = val || ""; if (ph) inp.setAttribute("placeholder", ph);
@@ -995,16 +982,16 @@ function clearRoot(root) {
         var amtF = fundField(t("explorer.fund_amount_label", "Amount (core, human — e.g. 0.1)"), "0.1", "decimal", "0.1");
         var whoF = fundField(t("explorer.fund_from_label", "From account (name or 1.2.N)"), (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0", null, "1.2.0");
         actBox.appendChild(amtF.row); actBox.appendChild(whoF.row);
-        var review = touchable(el(doc, "button", t("explorer.review_funding", "Review funding")));
+        var review = touchable(DOM.el(doc, "button", t("explorer.review_funding", "Review funding")));
         review.type = "button"; actBox.appendChild(review);
-        var msgBox = el(doc, "div", null, "xplore-fundmsg");
+        var msgBox = DOM.el(doc, "div", null, "xplore-fundmsg");
         actBox.appendChild(msgBox);
         /* fundMsg: replace the fee-pool form notice (aria-live, error vs muted).
          * WHY helper: review errors and hints share this slot; display-only.
          * Params text, isErr; returns the notice node. */
         function fundMsg(text, isErr) {
-          while (msgBox.firstChild) msgBox.removeChild(msgBox.firstChild);
-          var n = el(doc, "p", text, isErr ? "error" : "muted");
+          DOM.clear(msgBox);
+          var n = DOM.el(doc, "p", text, isErr ? "error" : "muted");
           n.setAttribute("aria-live", "polite"); msgBox.appendChild(n); return n;
         }
         review.addEventListener("click", function () {
@@ -1027,15 +1014,15 @@ function clearRoot(root) {
             var f = await AssetOps.fee(pair, "1.3.0");
             pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
             if (!isCurrent(myGen)) return;
-            while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
-            actBox.appendChild(el(doc, "h3", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
-            var dl = el(doc, "dl", null, "xfer-confirm");
+            DOM.clear(actBox);
+            actBox.appendChild(DOM.el(doc, "h3", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
+            var dl = DOM.el(doc, "dl", null, "xfer-confirm");
             /* confRow: append a confirm dt/dd row (human visible, raw in title).
              * WHY helper: fee-pool confirm rows share the human+raw contract (#6).
              * Params term, human, rawTitle; no return. */
             function confRow(term, human, rawTitle) {
-              dl.appendChild(el(doc, "dt", term));
-              var dd = el(doc, "dd", human); if (rawTitle) dd.title = rawTitle;
+              dl.appendChild(DOM.el(doc, "dt", term));
+              var dd = DOM.el(doc, "dd", human); if (rawTitle) dd.title = rawTitle;
               dl.appendChild(dd);
             }
             var amtHuman;
@@ -1053,13 +1040,13 @@ function clearRoot(root) {
             catch (e) { /* display-only */ }
             confRow(t("explorer.confirm_network", "Network"), netName);
             actBox.appendChild(dl);
-            var back = touchable(el(doc, "button", t("explorer.fund_back", "Back"))); back.type = "button";
-            var send = touchable(el(doc, "button", t("explorer.fund_sign_send", "Sign & Send"))); send.type = "button";
+            var back = touchable(DOM.el(doc, "button", t("explorer.fund_back", "Back"))); back.type = "button";
+            var send = touchable(DOM.el(doc, "button", t("explorer.fund_sign_send", "Sign & Send"))); send.type = "button";
             actBox.appendChild(back); actBox.appendChild(send);
             back.addEventListener("click", function () { renderAsset(root, symbol); });
             send.addEventListener("click", function () {
               back.disabled = true; send.disabled = true;
-              var st = el(doc, "p", t("explorer.fund_signing", "Signing…"), "muted");
+              var st = DOM.el(doc, "p", t("explorer.fund_signing", "Signing…"), "muted");
               st.setAttribute("aria-live", "polite"); actBox.appendChild(st);
               (async function () {
                 var unsigned = await Tx.buildTx([pair]);
@@ -1082,12 +1069,12 @@ function clearRoot(root) {
                   headN = (gp && gp.head_block_number) || 0;
                 } catch (e) { /* head is display-only */ }
                 if (!isCurrent(myGen)) return;
-                while (actBox.firstChild) actBox.removeChild(actBox.firstChild);
-                actBox.appendChild(el(doc, "h1", t("explorer.funded_h", "Fee pool funded")));
-                var okP = el(doc, "p",
+                DOM.clear(actBox);
+                actBox.appendChild(DOM.el(doc, "h1", t("explorer.funded_h", "Fee pool funded")));
+                var okP = DOM.el(doc, "p",
                   t("explorer.observed_prefix", "Observed at head block #") + headN + " (" + r.via + ").", "xfer-ok");
                 okP.setAttribute("aria-live", "polite"); actBox.appendChild(okP);
-                actBox.appendChild(el(doc, "p",
+                actBox.appendChild(DOM.el(doc, "p",
                   amtHuman + " → " + a.symbol + t("explorer.pool_delta_suffix", " pool (re-read delta matches)."), "muted"));
                 var backLink = anchor(doc, t("explorer.open_prefix", "Open ") + a.symbol, "#/asset/" + a.symbol);
                 actBox.appendChild(backLink);
@@ -1108,22 +1095,22 @@ function clearRoot(root) {
           });
         });
       })();
-      actBox.appendChild(el(doc, "p",
+      actBox.appendChild(DOM.el(doc, "p",
         t("explorer.claim_deferred", "Fee-pool claiming (issuer) stays deferred here — no claim serializer in this view."), "muted"));
       if (!j.is_smartcoin) {
-        infoBox.appendChild(el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
+        infoBox.appendChild(DOM.el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;
       }
-      infoBox.appendChild(el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
-      var feedBox = el(doc, "div", null, "xplore-feed");
+      infoBox.appendChild(DOM.el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
+      var feedBox = DOM.el(doc, "div", null, "xplore-feed");
       infoBox.appendChild(feedBox);
       showStatus(doc, feedBox, t("explorer.loading_feeds", "Loading feeds…"));
       Explorer.feeds([a.symbol]).then(function (rows) {
         if (!isCurrent(myGen)) return;
-        while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild);
+        DOM.clear(feedBox);
         var f = (rows || [])[0];
         if (!f || !f.is_smartcoin || !f.settlement_raw) {
-          feedBox.appendChild(el(doc, "p", t("explorer.no_feeds", "No live feeds published.") + t("explorer.feeds_hint", " Feeds appear once publishers publish for an asset."), "muted"));
+          feedBox.appendChild(DOM.el(doc, "p", t("explorer.no_feeds", "No live feeds published.") + t("explorer.feeds_hint", " Feeds appear once publishers publish for an asset."), "muted"));
           return;
         }
         /* Feed health strip (survey verdict ADAPT: witness-monitor
@@ -1141,7 +1128,7 @@ function clearRoot(root) {
         (function feedHealth() {
           var bo = bitObj || {};
           var cur = (bo.current_feed && typeof bo.current_feed === "object") ? bo.current_feed : null;
-          var health = el(doc, "div", null, "xplore-feed-health");
+          var health = DOM.el(doc, "div", null, "xplore-feed-health");
           /* Badge: LIVE / STALE / AGE UNKNOWN. The "No live feeds" empty
            * state above owns the missing-feed case — this badge only ages
            * an existing settlement price, never invents one. */
@@ -1153,7 +1140,7 @@ function clearRoot(root) {
           try { pubMs = pubRaw ? Date.parse(/Z$/.test(pubRaw) ? pubRaw : pubRaw + "Z") : NaN; }
           catch (e) { pubMs = NaN; }
           var lifeOk = /^\d+$/.test(String((lifeRaw === undefined || lifeRaw === null) ? "" : lifeRaw));
-          var badge = el(doc, "p", null, null);
+          var badge = DOM.el(doc, "p", null, null);
           var strong = doc.createElement("strong");
           if (isFinite(pubMs) && lifeOk) {
             var fresh = Date.now() < pubMs + parseInt(String(lifeRaw), 10) * 1000;
@@ -1168,14 +1155,14 @@ function clearRoot(root) {
           }
           badge.appendChild(strong);
           health.appendChild(badge);
-          var hdl = el(doc, "dl", null, "xplore-fields");
+          var hdl = DOM.el(doc, "dl", null, "xplore-fields");
           health.appendChild(hdl);
           /* rowInto: dt + dd with human text + raw title (dash-on-missing
            * contract shared with humanRowInto above). Params term, human,
            * rawTitle; never throws. */
           function rowInto(term, human, rawTitle) {
-            hdl.appendChild(el(doc, "dt", term));
-            var dd = el(doc, "dd", human);
+            hdl.appendChild(DOM.el(doc, "dt", term));
+            var dd = DOM.el(doc, "dd", human);
             if (rawTitle !== undefined && rawTitle !== null) dd.title = String(rawTitle);
             hdl.appendChild(dd);
           }
@@ -1252,7 +1239,7 @@ function clearRoot(root) {
             var s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
             return lifetimeText(String(s)) + t("explorer.feed_ago_suffix", " ago");
           }
-          hdl.appendChild(el(doc, "dt", t("explorer.feed_last_update", "Last update")));
+          hdl.appendChild(DOM.el(doc, "dt", t("explorer.feed_last_update", "Last update")));
           var luDd = doc.createElement("dd");
           if (isFinite(pubMs)) { luDd.textContent = ageText(pubMs); luDd.title = String(pubRaw); }
           else { luDd.textContent = "—"; luDd.title = t("explorer.feed_pubtime_missing", "current_feed_publication_time missing"); }
@@ -1278,7 +1265,7 @@ function clearRoot(root) {
             catch (e2) { ms = NaN; }
             if (isFinite(ms) && !(ms <= latestMs)) { latestMs = ms; latestId = pid; latestRaw = ts; }
           });
-          hdl.appendChild(el(doc, "dt", t("explorer.feed_publishers", "Publishers")));
+          hdl.appendChild(DOM.el(doc, "dt", t("explorer.feed_publishers", "Publishers")));
           var pubDd = doc.createElement("dd");
           if (count > 0 && latestId) {
             pubDd.appendChild(doc.createTextNode(String(count) + " — latest "));
@@ -1289,9 +1276,9 @@ function clearRoot(root) {
           hdl.appendChild(pubDd);
           feedBox.appendChild(health);
         })();
-        var fdl = el(doc, "dl", null, "xplore-fields");
+        var fdl = DOM.el(doc, "dl", null, "xplore-fields");
         function priceRow(term, pair) {
-          fdl.appendChild(el(doc, "dt", term));
+          fdl.appendChild(DOM.el(doc, "dt", term));
           var dd = doc.createElement("dd");
           if (!pair || f.quote_precision === null || f.quote_precision === undefined) {
             dd.textContent = t("explorer.unavailable_quote", "unavailable (quote precision unknown)");
@@ -1314,14 +1301,14 @@ function clearRoot(root) {
           ExplorerRender.fieldRow(doc, fdl, "maintenance_collateral_ratio", f.mcr, ctx, 0);
         }
         if (f.feed_lifetime_sec !== null && f.feed_lifetime_sec !== undefined) {
-          fdl.appendChild(el(doc, "dt", t("explorer.feed_lifetime", "Feed lifetime")));
+          fdl.appendChild(DOM.el(doc, "dt", t("explorer.feed_lifetime", "Feed lifetime")));
           var lt = doc.createElement("dd");
           lt.textContent = lifetimeText(f.feed_lifetime_sec);
           lt.title = String(f.feed_lifetime_sec) + t("explorer.seconds_unit", " seconds");
           fdl.appendChild(lt);
         }
         if (f.min_feeds !== null && f.min_feeds !== undefined) {
-          fdl.appendChild(el(doc, "dt", t("explorer.min_feeds", "Minimum feeds")));
+          fdl.appendChild(DOM.el(doc, "dt", t("explorer.min_feeds", "Minimum feeds")));
           var mf = doc.createElement("dd");
           mf.textContent = String(f.min_feeds);
           fdl.appendChild(mf);
@@ -1329,13 +1316,13 @@ function clearRoot(root) {
         feedBox.appendChild(fdl);
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
-        while (feedBox.firstChild) feedBox.removeChild(feedBox.firstChild);
+        DOM.clear(feedBox);
         showError(doc, feedBox, e, t("explorer.feeds_failed", "Could not load feeds."));
       });
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
-      while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+      DOM.clear(wrap);
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
       showError(doc, wrap, e, t("explorer.unknown_asset", "Unknown asset."));
     });
   }
@@ -1362,21 +1349,21 @@ function clearRoot(root) {
         paint();
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
-        while (body.firstChild) body.removeChild(body.firstChild);
+        DOM.clear(body);
         showError(doc, body, e, t("explorer.scan_failed", "Could not scan assets."));
       });
     }
     function paint() {
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       if (found.length === 0) {
-        body.appendChild(el(doc, "p",
+        body.appendChild(DOM.el(doc, "p",
           t("explorer.no_smartcoins", "No smartcoins with feeds found on this node. User-issued assets show here once they publish feeds."), "muted"));
         return;
       }
       showStatus(doc, body, t("explorer.loading_feeds_for", "Loading feeds for ") + found.length + t("explorer.asset_count_suffix", " asset(s)…"));
       Explorer.feeds(found).then(function (rows) {
         if (!isCurrent(myGen)) return;
-        while (body.firstChild) body.removeChild(body.firstChild);
+        DOM.clear(body);
         var tableRows = (rows || []).map(function (f) {
           var sym = anchor(doc, f.symbol, "#/asset/" + f.symbol);
           function priceCell(pair) {
@@ -1394,7 +1381,7 @@ function clearRoot(root) {
           [t("explorer.th_symbol", "Symbol"), t("explorer.th_settlement", "Settlement"), t("explorer.th_feed", "Feed"), t("explorer.th_mssr", "MSSR")], tableRows));
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
-        while (body.firstChild) body.removeChild(body.firstChild);
+        DOM.clear(body);
         showError(doc, body, e, t("explorer.feeds_failed", "Could not load feeds."));
       });
     }

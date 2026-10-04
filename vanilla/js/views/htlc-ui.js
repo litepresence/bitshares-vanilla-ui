@@ -33,13 +33,9 @@ var HtlcUI = (function () {
   }
   var gen = 0;
   var PRESETS = [["1 hour", 3600], ["12 hours", 43200], ["1 day", 86400], ["7 days", 604800], ["30 days", 2592000]];
-  function el(doc, tag, text, cls) { /* textContent-only element (no HTML injection) */
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
+  /* No local el — use DOM.el */
 /* touch floor: >=44px one dim */
-  function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
+  /* clearBox removed — use DOM.clear */
   function shortHash(hex) { hex = String(hex || ""); return hex.length > 18 ? hex.slice(0, 12) + "…" + hex.slice(-6) : hex; }
   function showError(doc, wrap, e, fallback) { /* any throw -> text, never blank */
     var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
@@ -48,26 +44,26 @@ var HtlcUI = (function () {
       ["hash-mismatch", t("htlc.hash_mismatch", "Preimage does not match the locked hash.")], ["bad-preimage", t("htlc.enter_preimage", "Enter a non-empty preimage.")]], i;
     if (m.indexOf("not connected") !== -1) m = map[0][1];
     for (i = 0; i < map.length; i++) if (m.indexOf(map[i][0]) !== -1) { m = map[i][1]; break; }
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m); return err;
   }
   /* Status line (aria-live, muted): progress text so panels never sit blank. Params: doc, wrap (appended to), text. Returns: the p. */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text); return p;
   }
   function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
     * the network is down). Retry handshakes via the shared Offline helper
     * (js/api/offline.js); Open Settings links to #/settings for failover. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
-    wrap.appendChild(el(doc, "p", open
+    wrap.appendChild(DOM.el(doc, "p", open
       ? t("htlc.retry_load", "Retry loading.")
       : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-    var status = el(doc, "p", "", "muted");
+    var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
-    var row = el(doc, "div", null, "pools-offline-row");
+    var row = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(row);
-    var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
     row.appendChild(b);
     var off = null;
     try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
@@ -81,7 +77,7 @@ var HtlcUI = (function () {
       try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
     }
     if (!link) {
-      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      link = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       touchable(link);
     }
@@ -100,19 +96,19 @@ var HtlcUI = (function () {
   }
   function viewingAsNotice(doc) {
     var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
+    return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
     inp.setAttribute("placeholder", t("barter.password", "password")); inp.setAttribute("aria-label", t("htlc.password_ph", "Password"));
     touchable(inp); row.appendChild(inp);
-    var b = touchable(el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; row.appendChild(b);
+    var b = touchable(DOM.el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; row.appendChild(b);
     parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
@@ -149,17 +145,17 @@ var HtlcUI = (function () {
     PUBLIC-FIRST: no wallet gate here — lists/details/previews render locked. */
     var doc = root.ownerDocument || document, myGen = ++gen, miss = missingBackends();
     dropOpenSubs();
-    root.innerHTML = "";
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    DOM.clear(root);
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetryOnOpen(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function routeFail(root, title, e, fallback, retry) { /* shared load-failure page */
-    root.innerHTML = "";
-    var doc = root.ownerDocument || document, failed = el(doc, "div", null, "wrap");
-    root.appendChild(failed); failed.appendChild(el(doc, "h1", title));
+    DOM.clear(root);
+    var doc = root.ownerDocument || document, failed = DOM.el(doc, "div", null, "wrap");
+    root.appendChild(failed); failed.appendChild(DOM.el(doc, "h1", title));
     showError(doc, failed, e, fallback); offlineBox(doc, failed, retry);
   }
   function loadAccount(myGen, loader) { /* wallet account when unlocked, else committee-account 1.2.0; stale gens bail */
@@ -169,16 +165,16 @@ var HtlcUI = (function () {
       return loader(me).then(function (data) { return { me: me, data: data }; }); });
   }
   function confirmList(doc, rows) { /* NAMED rows: human term + raw in title, never raw-only */
-    var list = el(doc, "dl", null, "xfer-confirm");
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     rows.forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
+      list.appendChild(DOM.el(doc, "dt", r[0]));
+      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
     });
     return list;
   }
   function field(doc, labelText, opts) { /* labeled touch-sized input row */
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -197,8 +193,8 @@ var HtlcUI = (function () {
     sel.appendChild(customOpt);
     var custom = doc.createElement("input");
     custom.setAttribute("placeholder", t("vesting.seconds", "seconds")); custom.setAttribute("inputmode", "numeric");
-    touchable(custom); custom.style.display = "none"; var row = el(doc, "div", null, "xfer-field");
-    row.appendChild(el(doc, "span", labelText + ": ")); row.appendChild(sel); row.appendChild(custom);
+    touchable(custom); custom.style.display = "none"; var row = DOM.el(doc, "div", null, "xfer-field");
+    row.appendChild(DOM.el(doc, "span", labelText + ": ")); row.appendChild(sel); row.appendChild(custom);
     sel.addEventListener("change", function () { custom.style.display = sel.value === "custom" ? "" : "none"; });
     return { row: row, sel: sel, custom: custom, secs: function () {
       return sel.value === "custom" ? parseInt(String(custom.value).trim(), 10) : parseInt(sel.value, 10);
@@ -206,7 +202,7 @@ var HtlcUI = (function () {
   }
   function tableHead(doc, titles) { /* shared thead builder */
     var hr = doc.createElement("tr");
-    titles.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    titles.forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); return thead;
   }
   async function feeText(fee) { /* fee -> human + raw (lookup failure falls back to raw) */
@@ -225,12 +221,12 @@ var HtlcUI = (function () {
     return { text: String(raw) + " (" + assetId + ")", raw: String(raw) };
   }
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
-    clearBox(out);
-    out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button";
-    var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
+    DOM.clear(out);
+    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
+    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button";
+    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
-    back.addEventListener("click", function () { clearBox(out); });
+    back.addEventListener("click", function () { DOM.clear(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, "Signing…");
@@ -238,9 +234,9 @@ var HtlcUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         out.removeChild(status);
         if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
-          out.appendChild(el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
+          out.appendChild(DOM.el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
         unlockInline(doc, out, function () {
-          out.appendChild(el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
         });
         send.disabled = false; back.disabled = false; return; }
       Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
@@ -248,9 +244,9 @@ var HtlcUI = (function () {
         return Htlc.sendAndProve(unsigned, wif, cfg.prove);
       }).then(async function (res) {
         if (myGen !== gen) return;
-        clearBox(out);
-        out.appendChild(el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+        DOM.clear(out);
+        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
         (cfg.clear || []).forEach(function (inp) { inp.value = ""; }); /* secrecy: drop secret fields */
       }).catch(function (e) {
         if (myGen !== gen) return;
@@ -269,7 +265,7 @@ var HtlcUI = (function () {
    * @param {any} cfg {build, rows, title, ok, fail, clear?, btn?}
    * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
-    clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
+    DOM.clear(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out,t("account.resolving_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
@@ -280,15 +276,15 @@ var HtlcUI = (function () {
           makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
           prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built), clear: cfg.clear || [] }, myGen);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(out); showError(doc, out,e,t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
+      DOM.clear(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
   function reviewSection(doc, box, myGen, label, cfg) { /* review button + output box + gen-checked wiring */
-    var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    var btn = touchable(DOM.el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
     return btn;
@@ -299,18 +295,18 @@ var HtlcUI = (function () {
     if (!root) return;
     var ctx = routeReady(root, t("htlc.list_title", "Hashed Timelock Contracts"), function () { renderHtlc(root); });
     if (!ctx) return;
-    var doc = ctx.doc, myGen = ctx.myGen; ctx.wrap.appendChild(el(doc, "p", t("htlc.loading", "Loading contracts…"), "muted"));
+    var doc = ctx.doc, myGen = ctx.myGen; ctx.wrap.appendChild(DOM.el(doc, "p", t("htlc.loading", "Loading contracts…"), "muted"));
     if (!isUnlockedNow()) ctx.wrap.appendChild(viewingAsNotice(doc));
     loadAccount(myGen, function (me) { return Htlc.mine(me.id); }).then(function (found) {
       if (!found || myGen !== gen) return;
-      root.innerHTML = "";
-      var box = el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(el(doc, "h1", t("htlc.list_title", "Hashed Timelock Contracts")));
+      DOM.clear(root);
+      var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
+      box.appendChild(DOM.el(doc, "h1", t("htlc.list_title", "Hashed Timelock Contracts")));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
-      box.appendChild(el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
-      box.appendChild(el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
+      box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
+      box.appendChild(DOM.el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
       box.appendChild(htlcTable(doc, found.data.sent, found.data.received));
-      box.appendChild(el(doc, "h2", t("htlc.new_title", "New HTLC")));
+      box.appendChild(DOM.el(doc, "h2", t("htlc.new_title", "New HTLC")));
       createBox(doc, box, found.me, myGen);
     }).catch(function (e) {
       if (myGen !== gen) return; routeFail(root, "Hashed Timelock Contracts", e, t("htlc.load_failed", "Could not load contracts."), function () { renderHtlc(root); }); });
@@ -325,7 +321,7 @@ var HtlcUI = (function () {
    * i18n keys per punchlist rules); pre-existing t() keys below are reused.
    * Batch-3 i18n: new strings keyed via t(). */
   function htlcTable(doc, sent, received) {
-    var box = el(doc, "div", null, "htlc-all");
+    var box = DOM.el(doc, "div", null, "htlc-all");
     var filter = doc.createElement("input");
     filter.type = "search";
     filter.setAttribute("placeholder", t("htlc.filter_ph", "Filter by id, account, or hash…"));
@@ -338,7 +334,7 @@ var HtlcUI = (function () {
     var tbody = doc.createElement("tbody");
     table.appendChild(tbody);
     box.appendChild(table);
-    var note = el(doc, "p", "", "muted");
+    var note = DOM.el(doc, "p", "", "muted");
     note.setAttribute("aria-live", "polite");
     box.appendChild(note);
     var all = (Array.isArray(sent) ? sent : []).map(function (r) { return { r: r, dir: t("htlc.sent", "Sent") }; })
@@ -347,7 +343,7 @@ var HtlcUI = (function () {
      * WHY helper: the filter input and the initial load share this render;
      * empty matches show an honest muted line, never blank. Param q; no return. */
     function paint(q) {
-      while (tbody.firstChild) tbody.removeChild(tbody.firstChild);
+      DOM.clear(tbody);
       if (!all.length) {
         note.textContent = t("htlc.no_contracts", "No contracts.") + t("htlc.create_hint", " Create one from the New HTLC form below — sent and received contracts list here.");
         return;
@@ -360,19 +356,19 @@ var HtlcUI = (function () {
         if (q && hay.toLowerCase().indexOf(q) === -1) return;
         n++;
         var tr = doc.createElement("tr"), a = amtText(r.amount_raw, r.asset_id, r.precision), exp, link, td;
-        var dirTd = el(doc, "td", item.dir);
-        var fromTd = el(doc, "td", String(r.from_id || "—"));
+        var dirTd = DOM.el(doc, "td", item.dir);
+        var fromTd = DOM.el(doc, "td", String(r.from_id || "—"));
         fromTd.title = String(r.from_id || "");
-        var toTd = el(doc, "td", String(r.to_id || "—"));
+        var toTd = DOM.el(doc, "td", String(r.to_id || "—"));
         toTd.title = String(r.to_id || "");
-        var ac = el(doc, "td", a.text); ac.title = t("account.raw_prefix", "raw ") + a.raw;
-        var hc = el(doc, "td", r.algo + " — " + shortHash(r.hash_hex)); hc.title = r.hash_hex;
+        var ac = DOM.el(doc, "td", a.text); ac.title = t("account.raw_prefix", "raw ") + a.raw;
+        var hc = DOM.el(doc, "td", r.algo + " — " + shortHash(r.hash_hex)); hc.title = r.hash_hex;
         try { exp = Htlc.formatDateTime(r.expiration_iso); } catch (e) { exp = String(r.expiration_iso || "unknown"); }
-        link = el(doc, "a", t("credit.open", "Open")); link.setAttribute("href", "#/htlc/" + r.id);
+        link = DOM.el(doc, "a", t("credit.open", "Open")); link.setAttribute("href", "#/htlc/" + r.id);
         td = doc.createElement("td"); td.appendChild(link);
-        tr.appendChild(el(doc, "td", r.id)); tr.appendChild(dirTd);
+        tr.appendChild(DOM.el(doc, "td", r.id)); tr.appendChild(dirTd);
         tr.appendChild(fromTd); tr.appendChild(toTd); tr.appendChild(ac); tr.appendChild(hc);
-        tr.appendChild(el(doc, "td", r.expired ? exp + t("htlc.expired_suffix", " (expired)") : exp)); tr.appendChild(td);
+        tr.appendChild(DOM.el(doc, "td", r.expired ? exp + t("htlc.expired_suffix", " (expired)") : exp)); tr.appendChild(td);
         tbody.appendChild(tr);
       });
       note.textContent = q ? (t("htlc.showing_prefix", "Showing ") + n + t("htlc.of_mid", " of ") + all.length + t("htlc.contracts_suffix", " contracts.")) : "";
@@ -388,13 +384,13 @@ var HtlcUI = (function () {
     var fAmount = field(doc, t("confirm.amount", "Amount"), { inputmode: "decimal", placeholder: "1.23456" });
     [fTo, fAsset, fAmount].forEach(function (f) { box.appendChild(f.row); });
     var algoSel = selectOpts(doc, touchable(doc.createElement("select")), [["sha256", "sha256"], ["ripemd160", "ripemd160"]]);
-    var algoRow = el(doc, "div", null, "xfer-field");
-    algoRow.appendChild(el(doc, "span", t("htlc.hash_label", "Hash: "))); algoRow.appendChild(algoSel);
-    algoRow.appendChild(el(doc, "span", t("htlc.ripemd_note", " (ripemd160: paste a hash — hashing is sha256-only)"), "muted"));
+    var algoRow = DOM.el(doc, "div", null, "xfer-field");
+    algoRow.appendChild(DOM.el(doc, "span", t("htlc.hash_label", "Hash: "))); algoRow.appendChild(algoSel);
+    algoRow.appendChild(DOM.el(doc, "span", t("htlc.ripemd_note", " (ripemd160: paste a hash — hashing is sha256-only)"), "muted"));
     box.appendChild(algoRow);
     var modeSel = selectOpts(doc, touchable(doc.createElement("select")), [["type", t("htlc.secret_type", "Type a new preimage")], ["paste", t("htlc.secret_paste", "Paste an existing hash")]]);
-    var modeRow = el(doc, "div", null, "xfer-field");
-    modeRow.appendChild(el(doc, "span", t("htlc.secret_label", "Secret: "))); modeRow.appendChild(modeSel); box.appendChild(modeRow);
+    var modeRow = DOM.el(doc, "div", null, "xfer-field");
+    modeRow.appendChild(DOM.el(doc, "span", t("htlc.secret_label", "Secret: "))); modeRow.appendChild(modeSel); box.appendChild(modeRow);
     var fSecret = field(doc, t("htlc.preimage_label", "Preimage"), { placeholder: t("htlc.secret_ph", "secret words") });
     var fHash = field(doc, t("htlc.hash_field", "Hash hex"), { placeholder: t("htlc.hash_ph", "hex of the preimage hash") });
     var fSize = field(doc, t("htlc.size_field", "Preimage size (bytes)"), { inputmode: "numeric" });
@@ -450,42 +446,42 @@ var HtlcUI = (function () {
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
     if (typeof id !== "string" || !/^1\.16\.\d+$/.test(id)) {
-      ctx.wrap.appendChild(el(doc, "p", t("htlc.unknown_contract", "Unknown HTLC contract."), "muted"));
-      var back = el(doc, "a", t("htlc.back_link", "Back to HTLCs")); back.setAttribute("href", "#/htlc"); ctx.wrap.appendChild(back); return;
+      ctx.wrap.appendChild(DOM.el(doc, "p", t("htlc.unknown_contract", "Unknown HTLC contract."), "muted"));
+      var back = DOM.el(doc, "a", t("htlc.back_link", "Back to HTLCs")); back.setAttribute("href", "#/htlc"); ctx.wrap.appendChild(back); return;
     }
-    ctx.wrap.appendChild(el(doc, "p", t("htlc.loading_detail", "Loading contract…"), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("htlc.loading_detail", "Loading contract…"), "muted"));
     if (!isUnlockedNow()) ctx.wrap.appendChild(viewingAsNotice(doc));
     loadAccount(myGen, function () { return Htlc.htlc(id); }).then(function (found) {
       if (!found || myGen !== gen) return;
       var me = found.me, row = found.data, a = amtText(row.amount_raw, row.asset_id, row.precision), exp;
-      root.innerHTML = "";
-      var box = el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(el(doc, "h1", "HTLC " + row.id));
+      DOM.clear(root);
+      var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
+      box.appendChild(DOM.el(doc, "h1", "HTLC " + row.id));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       try { exp = Htlc.formatDateTime(row.expiration_iso); } catch (e) { exp = String(row.expiration_iso || "unknown"); }
       box.appendChild(confirmList(doc, [[t("htlc.contract_col", "Contract"),  row.id], [t("confirm.from", "From"),  row.from_id], [t("confirm.to", "To"),  row.to_id],
         [t("confirm.amount", "Amount"),  a.text, "raw " + a.raw], [t("htlc.algo_row", "Hash algorithm"),  row.algo], [t("htlc.hash_row", "Preimage hash"),  row.hash_hex],
         [t("htlc.size_row", "Preimage size"),  String(row.preimage_size) + " bytes"], [t("proposal.expires", "Expires"),  row.expired ? exp + " (expired)" : exp]]));
-      if (row.expired) box.appendChild(el(doc, "p", t("htlc.expired_note", "Expired: the sender is refunded automatically; no redeem is possible."), "muted"));
+      if (row.expired) box.appendChild(DOM.el(doc, "p", t("htlc.expired_note", "Expired: the sender is refunded automatically; no redeem is possible."), "muted"));
       if (me.id === row.to_id && !row.expired) redeemBox(doc, box, me, row, myGen);
-      else if (me.id === row.to_id) box.appendChild(el(doc, "p", t("htlc.receiver_expired_note", "You are the receiver, but this contract expired."), "muted"));
+      else if (me.id === row.to_id) box.appendChild(DOM.el(doc, "p", t("htlc.receiver_expired_note", "You are the receiver, but this contract expired."), "muted"));
       if (me.id === row.from_id && !row.expired) extendBox(doc, box, me, row, myGen);
       else if (me.id !== row.from_id && me.id !== row.to_id) {
-        box.appendChild(el(doc, "p", t("htlc.readonly_note", "You are neither sender nor receiver: read-only for you."), "muted"));
+        box.appendChild(DOM.el(doc, "p", t("htlc.readonly_note", "You are neither sender nor receiver: read-only for you."), "muted"));
       }
-      var back2 = el(doc, "a", t("htlc.back_link", "Back to HTLCs")); back2.setAttribute("href", "#/htlc"); box.appendChild(back2);
+      var back2 = DOM.el(doc, "a", t("htlc.back_link", "Back to HTLCs")); back2.setAttribute("href", "#/htlc"); box.appendChild(back2);
     }).catch(function (e) {
       if (myGen !== gen) return; routeFail(root, "HTLC " + String(id || ""), e, t("htlc.detail_failed", "Could not load the contract."), retry); });
   }
   function redeemBox(doc, box, me, row, myGen) { /* password input + LIVE hash-match; LENGTH ONLY in confirm */
-    box.appendChild(el(doc, "h2", t("htlc.redeem_title", "Redeem")));
+    box.appendChild(DOM.el(doc, "h2", t("htlc.redeem_title", "Redeem")));
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var typeId = row.algo === "sha256" ? 2 : (row.algo === "ripemd160" ? 0 : -1);
-    if (typeId < 0) { box.appendChild(el(doc, "p", "Unsupported hash (" + row.algo + "): redeem is disabled.", "muted")); return; }
+    if (typeId < 0) { box.appendChild(DOM.el(doc, "p", "Unsupported hash (" + row.algo + "): redeem is disabled.", "muted")); return; }
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("placeholder", t("htlc.preimage_ph", "preimage")); inp.setAttribute("aria-label", t("htlc.preimage_label", "Preimage"));
     touchable(inp); box.appendChild(inp);
-    var match = el(doc, "p", t("htlc.s4", "Type the preimage to check it against the locked hash."), "muted");
+    var match = DOM.el(doc, "p", t("htlc.s4", "Type the preimage to check it against the locked hash."), "muted");
     match.setAttribute("aria-live", "polite"); box.appendChild(match);
     var timer = null, lastOk = "";
     inp.addEventListener("input", function () {
@@ -521,11 +517,11 @@ var HtlcUI = (function () {
     reviewBtn.disabled = true;
   }
   function extendBox(doc, box, me, row, myGen) { /* presets + custom, new-expiry preview, live fee */
-    box.appendChild(el(doc, "h2", t("htlc.extend_title", "Extend timelock")));
+    box.appendChild(DOM.el(doc, "h2", t("htlc.extend_title", "Extend timelock")));
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var picker = secsPicker(doc, PRESETS.map(function (p) { return [String(p[1]), "+" + p[0]]; }), t("settings.add", "Add"));
     box.appendChild(picker.row);
-    var preview = el(doc, "p", "", "muted"); preview.setAttribute("aria-live", "polite"); box.appendChild(preview);
+    var preview = DOM.el(doc, "p", "", "muted"); preview.setAttribute("aria-live", "polite"); box.appendChild(preview);
     var oldSecs = Math.floor(new Date(row.expiration_iso + "Z").getTime() / 1000);
     function humanAdded(n) { var dur, when; /* {dur, when, line} for preview + confirm rows */
       try { dur = Htlc.formatDuration(n) + " (" + n + " s)"; } catch (e) { dur = n + " s"; }
@@ -556,7 +552,7 @@ var HtlcUI = (function () {
         title: t("htlc.confirm_extend", "Confirm extend"), ok: function (R) { return "Extended by " + R.n + " seconds."; }, fail: t("htlc.extend_fee_failed", "Could not estimate the extend fee.") });
   }
   return { renderHtlc: renderHtlc, renderHtlcDetail: renderHtlcDetail, _ui: {
-      el: el, touchable: touchable, clearBox: clearBox, shortHash: shortHash, showError: showError, showStatus: showStatus,
+      el: DOM.el, touchable: touchable, clearBox: DOM.clear, shortHash: shortHash, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, confirmList: confirmList, field: field, selectOpts: selectOpts, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady, routeFail: routeFail, loadAccount: loadAccount, amtText: amtText, secsPicker: secsPicker,

@@ -43,14 +43,9 @@ var FavouritesUI = (function () {
   var MARKETS_KEY = "bts-vanilla-fav-markets-v1";
   var ASSETS_KEY = "bts-vanilla-fav-assets-v1";
   var ACCOUNTS_KEY = "bts-vanilla-fav-accounts-v1";
-  /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
 
@@ -107,10 +102,10 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("favourites.favourites", "Favourites")));
-    wrap.appendChild(el(doc, "p", t("favourites.intro", "Your starred markets, assets, and accounts on this device. Star a market from any market page picker; add assets and accounts below. Stored locally — never synced, never broadcast."),
+    wrap.appendChild(DOM.el(doc, "h1", t("favourites.favourites", "Favourites")));
+    wrap.appendChild(DOM.el(doc, "p", t("favourites.intro", "Your starred markets, assets, and accounts on this device. Star a market from any market page picker; add assets and accounts below. Stored locally — never synced, never broadcast."),
       "muted"));
     marketSection(doc, wrap, myGen, root);
     assetSection(doc, wrap, myGen, root);
@@ -121,11 +116,11 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   function row(doc, ul, href, label, sub, onRemove) {
     var li = doc.createElement("li");
     li.className = "mkt-picker-row";
-    var a = el(doc, "a", label);
+    var a = DOM.el(doc, "a", label);
     a.setAttribute("href", href); touchable(a);
     li.appendChild(a);
-    if (sub) li.appendChild(el(doc, "span", " " + sub, "muted"));
-    var rm = touchable(el(doc, "button", t("favourites.remove", "Remove")));
+    if (sub) li.appendChild(DOM.el(doc, "span", " " + sub, "muted"));
+    var rm = touchable(DOM.el(doc, "button", t("favourites.remove", "Remove")));
     rm.type = "button";
     rm.setAttribute("aria-label", t("favourites.remove", "Remove") + " " + label);
     rm.addEventListener("click", onRemove);
@@ -134,7 +129,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   }
   /* Empty state for a section (never a blank list). */
   function empty(doc, section, text) {
-    section.appendChild(el(doc, "p", text, "muted"));
+    section.appendChild(DOM.el(doc, "p", text, "muted"));
   }
   /* Add-form row: text input + button + inline error slot. */
   function addForm(doc, section, inputId, btnId, btnText, placeholder) {
@@ -147,10 +142,10 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     input.setAttribute("autocapitalize", "characters");
     input.setAttribute("spellcheck", "false");
     touchable(input); form.appendChild(input);
-    var btn = touchable(el(doc, "button", btnText));
+    var btn = touchable(DOM.el(doc, "button", btnText));
     btn.id = btnId; btn.type = "submit"; form.appendChild(btn);
     section.appendChild(form);
-    var err = el(doc, "div", null, "error");
+    var err = DOM.el(doc, "div", null, "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none";
     section.appendChild(err);
     return { form: form, input: input, btn: btn, err: err };
@@ -167,7 +162,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   function marketSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadStrings(MARKETS_KEY);
-    section.appendChild(el(doc, "h3", "Markets" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h3", "Markets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below."));
     } else {
@@ -223,7 +218,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   function assetSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadPairs(ASSETS_KEY, "symbol");
-    section.appendChild(el(doc, "h3", "Assets" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h3", "Assets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_assets_yet_add_one_by_symbol_bel", "No favourite assets yet. Add one by symbol below."));
     } else {
@@ -268,7 +263,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
   function accountSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadPairs(ACCOUNTS_KEY, "name");
-    section.appendChild(el(doc, "h3", "Accounts" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h3", "Accounts" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_accounts_yet_add_one_by_name_bel", "No favourite accounts yet. Add one by name below."));
     } else {

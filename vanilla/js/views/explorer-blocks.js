@@ -175,7 +175,7 @@ var ExplorerBlocks = (function () {
         typeof ExplorerAssets.opSection === "function") {
       return ExplorerAssets.opSection(doc, op, ctx, label);
     }
-    return el(doc, "p", t("explorer.op_unavailable", "Operation view unavailable."), "muted");
+    return DOM.el(doc, "p", t("explorer.op_unavailable", "Operation view unavailable."), "muted");
   }
 
   /* Account-id link (canonical implementation in explorer-assets.js). Falls
@@ -185,23 +185,14 @@ var ExplorerBlocks = (function () {
         typeof ExplorerAssets.accountLink === "function") {
       return ExplorerAssets.accountLink(doc, id, myGen);
     }
-    return el(doc, "span", id);
+    return DOM.el(doc, "span", id);
   }
 
-  /* Create an element with optional text + class (textContent only — user
-   * and chain strings never reach innerHTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. */
-function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
+/* clearRoot removed — use DOM.clear */
 
   /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
    * ≥1200px; children span full width via app.css .wide contract. */
@@ -213,7 +204,7 @@ function clearRoot(root) {
   }
 
   function anchor(doc, text, href) {
-    var a = el(doc, "a", text);
+    var a = DOM.el(doc, "a", text);
     a.setAttribute("href", href);
     touchable(a);
     a.style.display = "inline-block";
@@ -229,13 +220,13 @@ function clearRoot(root) {
    * reads inline via aria-live, never a dialog. textContent only.
    * Params: doc, hash ("#/…"). Returns the row div. Never throws. */
   function shareRow(doc, hash) {
-    var row = el(doc, "div", null, "xplore-share");
-    var btn = touchable(el(doc, "button", "Copy link", "subtle-btn"));
+    var row = DOM.el(doc, "div", null, "xplore-share");
+    var btn = touchable(DOM.el(doc, "button", "Copy link", "subtle-btn"));
     btn.type = "button";
-    var note = el(doc, "span", "", "muted");
+    var note = DOM.el(doc, "span", "", "muted");
     note.setAttribute("aria-live", "polite");
     row.appendChild(btn);
-    row.appendChild(el(doc, "span", " "));
+    row.appendChild(DOM.el(doc, "span", " "));
     row.appendChild(note);
     btn.addEventListener("click", function () {
       btn.disabled = true;
@@ -282,8 +273,7 @@ function clearRoot(root) {
   /* Inline error panel that is never blank: thrown values map to human
    * sentences; unknown shapes fall back to a generic message. */
   function showError(doc, wrap, e, fallback) {
-    var box = el(doc, "div", null, "error");
-    box.setAttribute("aria-live", "polite");
+    var box = null; /* created via DOM.error below — use DOM.el, DOM.clear */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
@@ -294,28 +284,25 @@ function clearRoot(root) {
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    box.textContent = msg;
-    wrap.appendChild(box);
+    box = DOM.error(wrap, msg);
     return box;
   }
 
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p);
+    var p = DOM.status(wrap, text);
     return p;
   }
 
   /* Scrollable table shell (principle #7: dense tables scroll horizontally
    * on phones instead of squeezing; no new CSS — inline overflow only). */
   function scrollTable(doc, headers, rows) {
-    var scroller = el(doc, "div", null, "xplore-scroll");
+    var scroller = DOM.el(doc, "div", null, "xplore-scroll");
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    headers.forEach(function (h) { hr.appendChild(el(doc, "th", h)); });
+    headers.forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tb = doc.createElement("tbody");
@@ -339,7 +326,7 @@ function clearRoot(root) {
   function witnessCell(doc, witnessId, myGen) {
     if (!witnessId) return "—";
     if (ACCT_RE.test(witnessId)) return accountLink(doc, witnessId, myGen);
-    var s = el(doc, "span", witnessId);
+    var s = DOM.el(doc, "span", witnessId);
     Explorer.resolveObject(witnessId).then(function (entry) {
       if (!isCurrent(myGen)) return;
       var obj = entry.object || {};
@@ -425,9 +412,9 @@ function clearRoot(root) {
   /* One stats-grid cell: label (small caps) + value node (returned for live
    * repaints). Value starts as an honest dash, never blank. */
   function statCell(doc, label, valCls) {
-    var cell = el(doc, "div", null, "xplore-stat");
-    cell.appendChild(el(doc, "span", label, "xplore-stat-label"));
-    var val = el(doc, "span", "—", "xplore-stat-val" + (valCls ? " " + valCls : ""));
+    var cell = DOM.el(doc, "div", null, "xplore-stat");
+    cell.appendChild(DOM.el(doc, "span", label, "xplore-stat-label"));
+    var val = DOM.el(doc, "span", "—", "xplore-stat-val" + (valCls ? " " + valCls : ""));
     cell.appendChild(val);
     return { cell: cell, val: val };
   }
@@ -501,7 +488,7 @@ function clearRoot(root) {
    * file needs no new cross-module surface). Raw int + "(raw)" meanwhile,
    * raw in the title always. */
   function amtSpan(doc, raw, assetId, myGen) {
-    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
+    var s = DOM.el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
     s.title = String(raw) + " " + assetId;
     if (typeof Explorer === "undefined" || !Explorer || typeof Explorer.asset !== "function") return s;
     Explorer.asset(assetId).then(function (j) {
@@ -526,11 +513,11 @@ function clearRoot(root) {
     var idx = (typeof op.type_idx === "number") ? op.type_idx : parseInt(op.type_idx, 10);
     var known = (typeof op.type_name === "string" && op.type_name && op.type_name !== "unknown");
     var pill;
-    if (idx === 1) pill = el(doc, "span", t("explorer.pill_place", "Place order"), "xplore-pill xplore-pill-place");
-    else if (idx === 2) pill = el(doc, "span", t("explorer.pill_cancel", "Cancel order"), "xplore-pill xplore-pill-cancel");
-    else if (idx === 0) pill = el(doc, "span", t("explorer.pill_transfer", "Transfer"), "xplore-pill xplore-pill-transfer");
-    else if (known) pill = el(doc, "span", String(op.type_name).replace(/_/g, " "), "xplore-pill xplore-pill-muted");
-    else pill = el(doc, "span", "op " + (isFinite(idx) ? idx : "?"), "xplore-pill xplore-pill-muted xplore-pill-raw");
+    if (idx === 1) pill = DOM.el(doc, "span", t("explorer.pill_place", "Place order"), "xplore-pill xplore-pill-place");
+    else if (idx === 2) pill = DOM.el(doc, "span", t("explorer.pill_cancel", "Cancel order"), "xplore-pill xplore-pill-cancel");
+    else if (idx === 0) pill = DOM.el(doc, "span", t("explorer.pill_transfer", "Transfer"), "xplore-pill xplore-pill-transfer");
+    else if (known) pill = DOM.el(doc, "span", String(op.type_name).replace(/_/g, " "), "xplore-pill xplore-pill-muted");
+    else pill = DOM.el(doc, "span", "op " + (isFinite(idx) ? idx : "?"), "xplore-pill xplore-pill-muted xplore-pill-raw");
     if (isFinite(idx) && VIRTUAL_IDX[idx]) pill.textContent += " (virtual)";
     return pill;
   }
@@ -569,7 +556,7 @@ function clearRoot(root) {
    * trimmed); raw meanwhile, raw in the title. No block suffix — the
    * original rows carry no block number either. */
   function orderSentence(doc, f, myGen) {
-    var sent = el(doc, "span", null, "xplore-act-sent");
+    var sent = DOM.el(doc, "span", null, "xplore-act-sent");
     var sell = (f.amount_to_sell && typeof f.amount_to_sell === "object") ? f.amount_to_sell : {};
     var buy = (f.min_to_receive && typeof f.min_to_receive === "object") ? f.min_to_receive : {};
     var sellId = String(sell.asset_id || ""), buyId = String(buy.asset_id || "");
@@ -577,16 +564,16 @@ function clearRoot(root) {
     var buyN = parseInt(buyId.split(".")[2] || "x", 10);
     var isBuy = (isFinite(sellN) && isFinite(buyN)) ? (sellN < buyN) : false;
     sent.appendChild(accountLink(doc, String(f.seller || opAccount(f) || "—"), myGen));
-    sent.appendChild(el(doc, "span", isBuy ? " placed order to buy " : " placed order to sell "));
+    sent.appendChild(DOM.el(doc, "span", isBuy ? " placed order to buy " : " placed order to sell "));
     var amtRaw0 = String((isBuy ? buy.amount : sell.amount) ?? "—");
-    var amtPh = el(doc, "span", amtRaw0 + t("explorer.raw_mark", " (raw)"));
+    var amtPh = DOM.el(doc, "span", amtRaw0 + t("explorer.raw_mark", " (raw)"));
     amtPh.title = amtRaw0;
     sent.appendChild(amtPh);
-    sent.appendChild(el(doc, "span", " at "));
-    var pricePh = el(doc, "span", "…");
+    sent.appendChild(DOM.el(doc, "span", " at "));
+    var pricePh = DOM.el(doc, "span", "…");
     sent.appendChild(pricePh);
-    sent.appendChild(el(doc, "span", " "));
-    sent.appendChild(el(doc, "span", (sellId || "?") + "/" + (buyId || "?")));
+    sent.appendChild(DOM.el(doc, "span", " "));
+    sent.appendChild(DOM.el(doc, "span", (sellId || "?") + "/" + (buyId || "?")));
     if (!sellId || !buyId || typeof Explorer === "undefined" || !Explorer ||
         typeof Explorer.asset !== "function") return sent;
     var pairPh = sent.lastChild;
@@ -623,7 +610,7 @@ function clearRoot(root) {
     if (o && typeof o === "object" && typeof o.asset_id === "string") {
       return amtSpan(doc, String(o.amount), o.asset_id, myGen);
     }
-    return el(doc, "span", "—", "muted");
+    return DOM.el(doc, "span", "—", "muted");
   }
 
   /* Proposed-op index -> name via explorer.js OP_NAMES when present (that
@@ -670,7 +657,7 @@ function clearRoot(root) {
    * pool/samet/credit/ticket/custom-authority ops keep the generic fallback
    * (name + block link) — their full views live in the owning slices. */
   function sentenceFor(doc, op, myGen) {
-    var sent = el(doc, "span", null, "xplore-act-sent");
+    var sent = DOM.el(doc, "span", null, "xplore-act-sent");
     try {
       var f = (op.fields && typeof op.fields === "object") ? op.fields : {};
       var idx = (typeof op.type_idx === "number") ? op.type_idx : parseInt(op.type_idx, 10);
@@ -678,9 +665,9 @@ function clearRoot(root) {
       blkLink.title = t("explorer.block_prefix", "Block #") + op.block;
       if (idx === 0 && f.amount && typeof f.amount.asset_id === "string") {
         sent.appendChild(accountLink(doc, String(f.from || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " transferred "));
+        sent.appendChild(DOM.el(doc, "span", " transferred "));
         sent.appendChild(amtSpan(doc, String(f.amount.amount), f.amount.asset_id, myGen));
-        sent.appendChild(el(doc, "span", " to "));
+        sent.appendChild(DOM.el(doc, "span", " to "));
         sent.appendChild(accountLink(doc, String(f.to || "—"), myGen));
         return sent;
       }
@@ -689,54 +676,54 @@ function clearRoot(root) {
       }
       if (idx === 2) {
         sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " cancelled order #" + orderNum(f.order)));
+        sent.appendChild(DOM.el(doc, "span", " cancelled order #" + orderNum(f.order)));
         return sent;
       }
       if (idx === 3) {
         sent.appendChild(accountLink(doc, String(f.funding_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.updated_margin_position", " updated margin position")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.updated_margin_position", " updated margin position")));
         if (f.delta_collateral && typeof f.delta_collateral === "object") {
-          sent.appendChild(el(doc, "span", t("explorer.collateral_prefix", " (+collateral ")));
+          sent.appendChild(DOM.el(doc, "span", t("explorer.collateral_prefix", " (+collateral ")));
           sent.appendChild(amtObj(doc, f.delta_collateral, myGen));
-          sent.appendChild(el(doc, "span", ")"));
+          sent.appendChild(DOM.el(doc, "span", ")"));
         }
         if (f.delta_debt && typeof f.delta_debt === "object") {
-          sent.appendChild(el(doc, "span", t("explorer.debt_prefix", " (+debt ")));
+          sent.appendChild(DOM.el(doc, "span", t("explorer.debt_prefix", " (+debt ")));
           sent.appendChild(amtObj(doc, f.delta_debt, myGen));
-          sent.appendChild(el(doc, "span", ")"));
+          sent.appendChild(DOM.el(doc, "span", ")"));
         }
         return sent;
       }
       if (idx === 4) {
         sent.appendChild(accountLink(doc, String(f.account_id || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.filled_order_prefix", " filled order: ")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.filled_order_prefix", " filled order: ")));
         sent.appendChild(amtObj(doc, f.pays, myGen));
-        sent.appendChild(el(doc, "span", " → "));
+        sent.appendChild(DOM.el(doc, "span", " → "));
         sent.appendChild(amtObj(doc, f.receives, myGen));
-        sent.appendChild(el(doc, "span", " (virtual)", "muted"));
+        sent.appendChild(DOM.el(doc, "span", " (virtual)", "muted"));
         return sent;
       }
       if (idx === 5) {
         sent.appendChild(accountLink(doc, String(f.registrar || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.created_account_prefix", " created account ") + String(f.name || "—")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.created_account_prefix", " created account ") + String(f.name || "—")));
         return sent;
       }
       if (idx === 6) {
         sent.appendChild(accountLink(doc, String(f.account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.updated_account", " updated account")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.updated_account", " updated account")));
         return sent;
       }
       if (idx === 14) {
         sent.appendChild(accountLink(doc, String(f.issuer || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.issued_mid", " issued ")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.issued_mid", " issued ")));
         sent.appendChild(amtObj(doc, f.asset_to_issue, myGen));
-        sent.appendChild(el(doc, "span", t("explorer.to_mid", " to ")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.to_mid", " to ")));
         sent.appendChild(accountLink(doc, String(f.issue_to_account || "—"), myGen));
         return sent;
       }
       if (idx === 19) {
         sent.appendChild(accountLink(doc, String(f.publisher || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", t("explorer.published_feed_for_prefix", " published feed for ") + String(f.asset_id || "—")));
+        sent.appendChild(DOM.el(doc, "span", t("explorer.published_feed_for_prefix", " published feed for ") + String(f.asset_id || "—")));
         return sent;
       }
       if (idx === 22) {
@@ -746,7 +733,7 @@ function clearRoot(root) {
           var pi = Array.isArray(p) ? p[0] : (p && (p.type !== undefined ? p.type : p.op));
           return opName(pi).replace(/_/g, " ");
         }).join(", ");
-        sent.appendChild(el(doc, "span", t("explorer.proposed_prefix", " proposed ") + pops.length + t("explorer.operation_mid", " operation") +
+        sent.appendChild(DOM.el(doc, "span", t("explorer.proposed_prefix", " proposed ") + pops.length + t("explorer.operation_mid", " operation") +
           (pops.length === 1 ? "" : "s") + (names ? " (" + names + ")" : "")));
         return sent;
       }
@@ -757,13 +744,13 @@ function clearRoot(root) {
         if (listing === 1) word = "whitelisted";
         else if (listing === 2) word = "blacklisted";
         else if (listing === 3) word = "whitelisted and blacklisted";
-        sent.appendChild(el(doc, "span", " " + word + " "));
+        sent.appendChild(DOM.el(doc, "span", " " + word + " "));
         sent.appendChild(accountLink(doc, String(f.account_to_list || "—"), myGen));
         return sent;
       }
       if (idx === 8) {
         sent.appendChild(accountLink(doc, String(f.account_to_upgrade || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", f.upgrade_to_lifetime_member === true
+        sent.appendChild(DOM.el(doc, "span", f.upgrade_to_lifetime_member === true
           ? " upgraded to lifetime membership" : " renewed annual membership"));
         return sent;
       }
@@ -771,94 +758,94 @@ function clearRoot(root) {
         sent.appendChild(accountLink(doc, String(f.issuer || opAccount(f) || "—"), myGen));
         var sym10 = String(f.symbol || "—");
         var prec10 = (typeof f.precision === "number") ? " (precision " + f.precision + ")" : "";
-        sent.appendChild(el(doc, "span", " created asset " + sym10 + prec10));
+        sent.appendChild(DOM.el(doc, "span", " created asset " + sym10 + prec10));
         return sent;
       }
       if (idx === 11) {
         sent.appendChild(accountLink(doc, String(f.issuer || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " updated asset " + String(f.asset_to_update || "—")));
+        sent.appendChild(DOM.el(doc, "span", " updated asset " + String(f.asset_to_update || "—")));
         return sent;
       }
       if (idx === 15) {
         sent.appendChild(accountLink(doc, String(f.payer || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " reserved "));
+        sent.appendChild(DOM.el(doc, "span", " reserved "));
         sent.appendChild(amtObj(doc, f.amount_to_reserve, myGen));
         return sent;
       }
       if (idx === 16) {
         sent.appendChild(accountLink(doc, String(f.from_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " funded the fee pool of " + String(f.asset_id || "—") + " with "));
+        sent.appendChild(DOM.el(doc, "span", " funded the fee pool of " + String(f.asset_id || "—") + " with "));
         var raw16 = (f.amount !== undefined && f.amount !== null) ? String(f.amount) : null;
         if (raw16 !== null && /^\d+$/.test(raw16)) {
-          var fund16 = el(doc, "span", null);
+          var fund16 = DOM.el(doc, "span", null);
           try {
             fund16.textContent = Format.formatAmount(raw16, CORE_PRECISION) + " (core)";
           } catch (e) { fund16.textContent = raw16 + " (raw)"; }
           fund16.title = raw16;
           sent.appendChild(fund16);
         } else {
-          sent.appendChild(el(doc, "span", "—", "muted"));
+          sent.appendChild(DOM.el(doc, "span", "—", "muted"));
         }
         return sent;
       }
       if (idx === 17) {
         sent.appendChild(accountLink(doc, String(f.account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " requested settlement of "));
+        sent.appendChild(DOM.el(doc, "span", " requested settlement of "));
         sent.appendChild(amtObj(doc, f.amount, myGen));
         return sent;
       }
       if (idx === 23) {
         sent.appendChild(accountLink(doc, String(f.fee_paying_account || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " updated proposal " + String(f.proposal || "—")));
+        sent.appendChild(DOM.el(doc, "span", " updated proposal " + String(f.proposal || "—")));
         var adds = Array.isArray(f.active_approvals_to_add) ? f.active_approvals_to_add.length : 0;
         var rems = Array.isArray(f.active_approvals_to_remove) ? f.active_approvals_to_remove.length : 0;
         if (adds > 0 || rems > 0) {
-          sent.appendChild(el(doc, "span", " (+" + adds + "/−" + rems + " approvals)"));
+          sent.appendChild(DOM.el(doc, "span", " (+" + adds + "/−" + rems + " approvals)"));
         }
         return sent;
       }
       if (idx === 33) {
         sent.appendChild(accountLink(doc, String(f.owner || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " withdrew "));
+        sent.appendChild(DOM.el(doc, "span", " withdrew "));
         sent.appendChild(amtObj(doc, f.amount, myGen));
-        sent.appendChild(el(doc, "span", " from vesting " + String(f.vesting_balance || "—")));
+        sent.appendChild(DOM.el(doc, "span", " from vesting " + String(f.vesting_balance || "—")));
         return sent;
       }
       if (idx === 49) {
         sent.appendChild(accountLink(doc, String(f.from || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " locked "));
+        sent.appendChild(DOM.el(doc, "span", " locked "));
         sent.appendChild(amtObj(doc, f.amount, myGen));
-        sent.appendChild(el(doc, "span", " for "));
+        sent.appendChild(DOM.el(doc, "span", " for "));
         sent.appendChild(accountLink(doc, String(f.to || "—"), myGen));
         return sent;
       }
       if (idx === 50) {
         sent.appendChild(accountLink(doc, String(f.redeemer || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " claimed HTLC " + String(f.htlc_id || "—")));
+        sent.appendChild(DOM.el(doc, "span", " claimed HTLC " + String(f.htlc_id || "—")));
         return sent;
       }
       if (idx === 77) {
         sent.appendChild(accountLink(doc, String(f.seller || opAccount(f) || "—"), myGen));
-        sent.appendChild(el(doc, "span", " updated order #" + orderNum(f.order)));
+        sent.appendChild(DOM.el(doc, "span", " updated order #" + orderNum(f.order)));
         return sent;
       }
       var who = opAccount(f);
       if (who) sent.appendChild(accountLink(doc, who, myGen));
-      else sent.appendChild(el(doc, "span", (typeof op.type_name === "string" && op.type_name !== "unknown")
+      else sent.appendChild(DOM.el(doc, "span", (typeof op.type_name === "string" && op.type_name !== "unknown")
         ? op.type_name.replace(/_/g, " ") : "op " + (isFinite(idx) ? idx : "?")));
       if (who) {
-        sent.appendChild(el(doc, "span", " " + ((typeof op.type_name === "string" && op.type_name !== "unknown")
+        sent.appendChild(DOM.el(doc, "span", " " + ((typeof op.type_name === "string" && op.type_name !== "unknown")
           ? op.type_name.replace(/_/g, " ") : "op " + (isFinite(idx) ? idx : "?"))));
       }
       if (isFinite(idx) && VIRTUAL_IDX[idx]) {
-        sent.appendChild(el(doc, "span", " (virtual)", "muted"));
+        sent.appendChild(DOM.el(doc, "span", " (virtual)", "muted"));
       }
-      sent.appendChild(el(doc, "span", " · "));
+      sent.appendChild(DOM.el(doc, "span", " · "));
       sent.appendChild(blkLink);
       return sent;
     } catch (e) {
-      while (sent.firstChild) sent.removeChild(sent.firstChild);
-      sent.appendChild(el(doc, "span", "op ? · #" + (op.block || "?")));
+      DOM.clear(sent);
+      sent.appendChild(DOM.el(doc, "span", "op ? · #" + (op.block || "?")));
       return sent;
     }
   }
@@ -917,11 +904,11 @@ function clearRoot(root) {
           stalled: t("explorer.state_stalled", "Stalled"),
           paused: t("explorer.state_paused", "Paused")
         };
-        while (liveEl.firstChild) liveEl.removeChild(liveEl.firstChild);
-        var dot = el(doc, "span", "●", "xplore-live-dot");
+        DOM.clear(liveEl);
+        var dot = DOM.el(doc, "span", "●", "xplore-live-dot");
         dot.setAttribute("aria-hidden", "true");
         liveEl.appendChild(dot);
-        liveEl.appendChild(el(doc, "span", " " + (words[state] || words.live), "xplore-live-text"));
+        liveEl.appendChild(DOM.el(doc, "span", " " + (words[state] || words.live), "xplore-live-text"));
         liveEl.setAttribute("data-state", state || "live");
       } catch (e) { /* prior paint stands */ }
     }
@@ -1027,9 +1014,9 @@ function clearRoot(root) {
      * history API says so explicitly (historyDown) instead of mimicking a
      * quiet chain. Never throws. */
     function paintActivity(doc, host, list, myGen, historyDown) {
-      try { while (host.firstChild) host.removeChild(host.firstChild); } catch (e) { return; }
+      try { DOM.clear(host); } catch (e) { return; }
       if (!list || list.length === 0) {
-        host.appendChild(el(doc, "p", historyDown
+        host.appendChild(DOM.el(doc, "p", historyDown
           ? t("explorer.history_down", "History unavailable on this node — switch nodes in Settings to see recent activity.")
           : (t("explorer.no_activity", "No recent activity.") + t("explorer.activity_hint", " New chain operations list here as they arrive.")), "muted"));
         if (historyDown) {
@@ -1044,7 +1031,7 @@ function clearRoot(root) {
       }
       list.slice(0, 12).forEach(function (op) {
         try {
-          var row = el(doc, "div", null, "xplore-act-row");
+          var row = DOM.el(doc, "div", null, "xplore-act-row");
           row.appendChild(pillFor(doc, op));
           row.appendChild(sentenceFor(doc, op, myGen));
           host.appendChild(row);
@@ -1065,11 +1052,11 @@ function clearRoot(root) {
       var G = (typeof GovAnalytics !== "undefined" && GovAnalytics) ? GovAnalytics : null;
       var label = G ? G.sampleLabel(list.length, headNum)
         : ("Largest in last " + list.length + " blocks — sample, not all-time.");
-      var panel = el(doc, "div", null, "xplore-panel");
-      panel.appendChild(el(doc, "div", "Largest blocks & transactions", "xplore-panel-h"));
-      panel.appendChild(el(doc, "p", label, "muted"));
+      var panel = DOM.el(doc, "div", null, "xplore-panel");
+      panel.appendChild(DOM.el(doc, "div", "Largest blocks & transactions", "xplore-panel-h"));
+      panel.appendChild(DOM.el(doc, "p", label, "muted"));
       if (list.length === 0) {
-        panel.appendChild(el(doc, "p", "No blocks in this sample.", "muted"));
+        panel.appendChild(DOM.el(doc, "p", "No blocks in this sample.", "muted"));
         body.appendChild(panel);
         return;
       }
@@ -1099,7 +1086,7 @@ function clearRoot(root) {
         return { height: r.height, body: r.body || null };
       }), 5) : txs.slice(0, 5));
       if (topT.length === 0) {
-        panel.appendChild(el(doc, "p", "No transactions in this sample — empty blocks carry none.", "muted"));
+        panel.appendChild(DOM.el(doc, "p", "No transactions in this sample — empty blocks carry none.", "muted"));
       } else {
         var tRows = topT.map(function (x) {
           return [anchor(doc, "#" + x.height + " / tx " + x.txIndex, "#/block/" + x.height + "/" + x.txIndex),
@@ -1116,9 +1103,9 @@ function clearRoot(root) {
      * plain divs like the original's block-content-header, so the page keeps
      * exactly one h1 (the shell title, visually folded away in explorer-ui). */
     function paintTip(rows, hd, sets, sup, ops, historyDown) {
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       var topBox = { top: rows[0].height };
-      var liveEl = el(doc, "p", null, "xplore-live");
+      var liveEl = DOM.el(doc, "p", null, "xplore-live");
       liveEl.setAttribute("aria-live", "polite");
       body.appendChild(liveEl);
       paintLive(liveEl, topBox.top);
@@ -1143,7 +1130,7 @@ function clearRoot(root) {
       }
 
       var headNum = (hd && typeof hd.head_block_number === "number") ? hd.head_block_number : rows[0].height;
-      var statsBox = el(doc, "div", null, "xplore-stats");
+      var statsBox = DOM.el(doc, "div", null, "xplore-stats");
       statsBox.setAttribute("aria-live", "off");
       var cCur = statCell(doc, t("explorer.stat_current", "Current block"));
       var cLast = statCell(doc, t("explorer.stat_last", "Last block"), "xplore-green");
@@ -1176,11 +1163,11 @@ function clearRoot(root) {
       function ensureStall() {
         if (retryBtn) return;
         try {
-          retryBtn = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+          retryBtn = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
           retryBtn.type = "button";
           retryBtn.addEventListener("click", function () {
             stopLive();
-            while (body.firstChild) body.removeChild(body.firstChild);
+            DOM.clear(body);
             blocksTab(doc, body, root, myGen, null);
           });
           body.insertBefore(retryBtn, statsBox.nextSibling);
@@ -1212,7 +1199,7 @@ function clearRoot(root) {
           if (s2 !== null) { cStl.val.textContent = s2; cStl.val.title = String(sup.stealth_raw); }
         }
         var ivals = stripIntervals().slice(0, 20);
-        while (cBt.val.firstChild) cBt.val.removeChild(cBt.val.firstChild);
+        DOM.clear(cBt.val);
         if (ivals.length > 0) {
           var cv = doc.createElement("canvas");
           cv.width = 300; cv.height = 84;
@@ -1230,7 +1217,7 @@ function clearRoot(root) {
          * together on every head). Single accent token — per-count hues from
          * the original are deliberately omitted (no hex literals in slice
          * JS; tokens only per the audit). */
-        while (cTxc.val.firstChild) cTxc.val.removeChild(cTxc.val.firstChild);
+        DOM.clear(cTxc.val);
         var txVals = data.slice(0, 20).map(function (d) {
           return (typeof d.txs === "number" && d.txs >= 0) ? d.txs : 0;
         });
@@ -1274,10 +1261,10 @@ function clearRoot(root) {
       } catch (e) { /* static label stands */ }
 
       /* Two-column activity + blocks (side by side ≥1200px, stacked below). */
-      var split = el(doc, "div", null, "xplore-split");
-      var actPanel = el(doc, "div", null, "xplore-panel");
-      actPanel.appendChild(el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
-      actPanel.appendChild(el(doc, "div", t("explorer.info_h", "INFO"), "xplore-subh"));
+      var split = DOM.el(doc, "div", null, "xplore-split");
+      var actPanel = DOM.el(doc, "div", null, "xplore-panel");
+      actPanel.appendChild(DOM.el(doc, "div", t("explorer.recent_activity", "Recent activity"), "xplore-panel-h"));
+      actPanel.appendChild(DOM.el(doc, "div", t("explorer.info_h", "INFO"), "xplore-subh"));
       /* Live activity list: starts as the initial recentOps window, then
        * every new head prepends its own ops (ZERO new RPCs — the body was
        * already fetched for the table) capped at 12. Previously the panel
@@ -1296,8 +1283,8 @@ function clearRoot(root) {
         } catch (e) { /* panel keeps prior rows */ }
       }
       split.appendChild(actPanel);
-      var blkPanel = el(doc, "div", null, "xplore-panel");
-      blkPanel.appendChild(el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
+      var blkPanel = DOM.el(doc, "div", null, "xplore-panel");
+      blkPanel.appendChild(DOM.el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
       var shown = rows.slice(0, TABLE_ROWS);
       var tableRows = shown.map(function (r) {
         var n = r.tx_count;
@@ -1324,11 +1311,11 @@ function clearRoot(root) {
       try { tbody = scroller.querySelector("tbody"); } catch (e) { tbody = null; }
       var oldestRow = shown[shown.length - 1];
       if (oldestRow && oldestRow.height > 1) {
-        var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
+        var older = touchable(DOM.el(doc, "button", t("explorer.older", "Older blocks")));
         older.type = "button";
         older.addEventListener("click", function () {
           stopLive();
-          while (body.firstChild) body.removeChild(body.firstChild);
+          DOM.clear(body);
           blocksTab(doc, body, root, myGen, oldestRow.height);
         });
         body.appendChild(older);
@@ -1360,9 +1347,9 @@ function clearRoot(root) {
     }
     rowsFor(oldest).then(function (rows) {
       if (!isCurrent(myGen)) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       if (rows.length === 0) {
-        body.appendChild(el(doc, "p", t("explorer.no_blocks", "No blocks found.") + t("explorer.blocks_hint", " The node returned nothing in this range — try Older blocks or check Settings → Nodes."), "muted"));
+        body.appendChild(DOM.el(doc, "p", t("explorer.no_blocks", "No blocks found.") + t("explorer.blocks_hint", " The node returned nothing in this range — try Older blocks or check Settings → Nodes."), "muted"));
         return;
       }
       var isTip = (oldest === null || oldest === undefined);
@@ -1377,11 +1364,11 @@ function clearRoot(root) {
         body.appendChild(scroller);
         var oldestRow = rows[rows.length - 1];
         if (oldestRow.height > 1) {
-          var older = touchable(el(doc, "button", t("explorer.older", "Older blocks")));
+          var older = touchable(DOM.el(doc, "button", t("explorer.older", "Older blocks")));
           older.type = "button";
           older.addEventListener("click", function () {
             stopLive();
-            while (body.firstChild) body.removeChild(body.firstChild);
+            DOM.clear(body);
             blocksTab(doc, body, root, myGen, oldestRow.height);
           });
           body.appendChild(older);
@@ -1421,13 +1408,13 @@ function clearRoot(root) {
       });
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
-      while (body.firstChild) body.removeChild(body.firstChild);
+      DOM.clear(body);
       showError(doc, body, e, t("explorer.blocks_failed", "Could not load blocks."));
-      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+      var retry = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       retry.addEventListener("click", function () {
         stopLive();
-        while (body.firstChild) body.removeChild(body.firstChild);
+        DOM.clear(body);
         blocksTab(doc, body, root, myGen, oldest);
       });
       body.appendChild(retry);
@@ -1442,7 +1429,7 @@ function clearRoot(root) {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = bumpGen();
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
       showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
@@ -1451,19 +1438,19 @@ function clearRoot(root) {
     if (waitForOpen(doc, wrap, root, myGen, function () { renderBlock(root, height); })) return;
     var h = parseInt(height, 10);
     if (!(h >= 1)) {
-      wrap.appendChild(el(doc, "h1", t("explorer.block_title", "Block")));
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_title", "Block")));
       showError(doc, wrap, new Error("unknown-block"), t("explorer.unknown_block", "Unknown block."));
       return;
     }
-    wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+    wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
     /* Block-jump input (original Block.jsx toggleInput/_onKeyDown concept):
      * height -> #/block/N. Plain literals only (no new i18n keys). Invalid
      * input flags aria-invalid instead of navigating anywhere. Built by a
      * function because the success/error paths below clear the wrap and must
      * re-add it (otherwise the pre-load row is wiped on paint). Batch-3 i18n: keyed. */
     function buildJump() {
-      var jumpRow = el(doc, "div", null, "xplore-jump");
-      jumpRow.appendChild(el(doc, "span", t("explorer.go_to_block_prefix", "Go to block: ")));
+      var jumpRow = DOM.el(doc, "div", null, "xplore-jump");
+      jumpRow.appendChild(DOM.el(doc, "span", t("explorer.go_to_block_prefix", "Go to block: ")));
       var jumpInput = doc.createElement("input");
       jumpInput.type = "number";
       jumpInput.min = "1";
@@ -1471,7 +1458,7 @@ function clearRoot(root) {
       jumpInput.setAttribute("placeholder", t("explorer.height_ph", "height"));
       jumpInput.setAttribute("aria-label", t("explorer.block_height_aria", "Block height"));
       touchable(jumpInput);
-      var jumpBtn = touchable(el(doc, "button", t("explorer.go", "Go")));
+      var jumpBtn = touchable(DOM.el(doc, "button", t("explorer.go", "Go")));
       jumpBtn.type = "button";
       jumpRow.appendChild(jumpInput);
       jumpRow.appendChild(jumpBtn);
@@ -1493,8 +1480,8 @@ function clearRoot(root) {
       .then(function (pair) {
         if (!isCurrent(myGen)) return;
         var b = pair[0], head = pair[1];
-        while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-        wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + b.height));
+        DOM.clear(wrap);
+        wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + b.height));
         wrap.appendChild(buildJump());
         /* Prev/next arrows (original Block.jsx _previousBlock/_nextBlock
          * concept: prev = height - 1, next = height + 1 clamped at head).
@@ -1502,16 +1489,16 @@ function clearRoot(root) {
          * parent-hash row would also satisfy it; the backend strips that
          * field, so height navigation stands). A next past head renders an
          * honest muted note instead of a dead link. Batch-3 i18n: keyed. */
-        var nav = el(doc, "div", null, "xplore-blocknav");
+        var nav = DOM.el(doc, "div", null, "xplore-blocknav");
         if (b.height > 1) {
           nav.appendChild(anchor(doc, t("explorer.prev_block", "← Prev block"), "#/block/" + (b.height - 1)));
         } else {
-          nav.appendChild(el(doc, "span", t("explorer.genesis_first_block", "← Genesis (first block)"), "muted"));
+          nav.appendChild(DOM.el(doc, "span", t("explorer.genesis_first_block", "← Genesis (first block)"), "muted"));
         }
-        nav.appendChild(el(doc, "span", " "));
+        nav.appendChild(DOM.el(doc, "span", " "));
         var headNum = (head && typeof head.head_block_number === "number") ? head.head_block_number : null;
         if (headNum !== null && b.height >= headNum) {
-          nav.appendChild(el(doc, "span", t("explorer.next_no_newer_block", "Next → (no newer block yet)"), "muted"));
+          nav.appendChild(DOM.el(doc, "span", t("explorer.next_no_newer_block", "Next → (no newer block yet)"), "muted"));
         } else {
           var nx = anchor(doc, t("explorer.next", "Next →"), "#/block/" + (b.height + 1));
           if (headNum !== null) nx.title = t("explorer.head_prefix", "Head #") + headNum;
@@ -1519,9 +1506,9 @@ function clearRoot(root) {
         }
         wrap.appendChild(nav);
         wrap.appendChild(shareRow(doc, "#/block/" + b.height));
-        var dl = el(doc, "dl", null, "xplore-fields");
+        var dl = DOM.el(doc, "dl", null, "xplore-fields");
         function row(t, node) {
-          dl.appendChild(el(doc, "dt", t));
+          dl.appendChild(DOM.el(doc, "dt", t));
           var dd = doc.createElement("dd");
           if (typeof node === "string") dd.textContent = node;
           else if (node) dd.appendChild(node);
@@ -1529,7 +1516,7 @@ function clearRoot(root) {
         }
         /* Localized full date (original FormattedDate format="full"
          * concept): human string on screen, raw ISO kept in the title. */
-        var timeSpan = el(doc, "span", fmtFullDate(b.timestamp || "—"));
+        var timeSpan = DOM.el(doc, "span", fmtFullDate(b.timestamp || "—"));
         try { timeSpan.title = String(b.timestamp || ""); } catch (e) { /* text stands */ }
         row(t("explorer.time_row", "Time"), timeSpan);
         row(t("explorer.witness_row", "Witness"), witnessCell(doc, b.witness_account_id, myGen));
@@ -1540,7 +1527,7 @@ function clearRoot(root) {
         wrap.appendChild(dl);
         /* Return-to-top link (original Block.jsx scrollToTop concept): plain
          * button, smooth scroll with instant fallback. Batch-3 i18n: keyed. */
-        var topBtn = touchable(el(doc, "button", t("explorer.return_to_top", "Return to top")));
+        var topBtn = touchable(DOM.el(doc, "button", t("explorer.return_to_top", "Return to top")));
         topBtn.type = "button";
         topBtn.addEventListener("click", function () {
           try {
@@ -1554,27 +1541,27 @@ function clearRoot(root) {
           }
         });
         if (b.transactions.length === 0) {
-          wrap.appendChild(el(doc, "p", t("explorer.no_txs", "No transactions in this block.") + t("explorer.txs_hint", " Empty blocks carry no transactions — open another block from Recent blocks."), "muted"));
+          wrap.appendChild(DOM.el(doc, "p", t("explorer.no_txs", "No transactions in this block.") + t("explorer.txs_hint", " Empty blocks carry no transactions — open another block from Recent blocks."), "muted"));
           wrap.appendChild(topBtn);
           return;
         }
         var ctx = { gen: myGen, root: root, tab: "blocks" };
         b.transactions.forEach(function (tx) {
-          var line = el(doc, "div", null, "xplore-txline");
+          var line = DOM.el(doc, "div", null, "xplore-txline");
           line.appendChild(anchor(doc, t("explorer.tx_prefix", "Tx ") + tx.index + " (" + tx.op_count + " op" +
             (tx.op_count === 1 ? "" : "s") + ")", "#/block/" + b.height + "/" + tx.index));
           var chips = tx.ops.map(function (o) {
             return o.type_name + (o.virtual ? " (virtual)" : "");
           }).join(", ");
-          line.appendChild(el(doc, "span", chips ? " — " + chips : "", "muted"));
+          line.appendChild(DOM.el(doc, "span", chips ? " — " + chips : "", "muted"));
           wrap.appendChild(line);
         });
         wrap.appendChild(topBtn);
         void ctx;
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
-        while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-        wrap.appendChild(el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+        DOM.clear(wrap);
+        wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
         wrap.appendChild(buildJump());
         showError(doc, wrap, e, t("explorer.unknown_block", "Unknown block."));
       });
@@ -1586,7 +1573,7 @@ function clearRoot(root) {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = bumpGen();
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer) {
       showError(doc, wrap, t("explorer.backend_missing_core", "Explorer backend missing: js/explorer.js failed to load."));
@@ -1594,7 +1581,7 @@ function clearRoot(root) {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderTx(root, height, txIndex); })) return;
     var h = parseInt(height, 10), ix = parseInt(txIndex, 10);
-    wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
+    wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
     if (!(h >= 1) || !(ix >= 0)) {
       showError(doc, wrap, new Error("unknown-tx"), t("explorer.unknown_tx", "Unknown transaction."));
       return;
@@ -1602,27 +1589,27 @@ function clearRoot(root) {
     showStatus(doc, wrap, t("explorer.loading_tx", "Loading transaction…"));
     Explorer.tx(h, ix).then(function (tx) {
       if (!isCurrent(myGen)) return;
-      while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index));
+      DOM.clear(wrap);
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index));
       wrap.appendChild(anchor(doc, t("explorer.back_to_block_prefix", "← Block #") + tx.block, "#/block/" + tx.block));
       wrap.appendChild(shareRow(doc, "#/block/" + tx.block + "/" + tx.index));
       var ctx = { gen: myGen, root: root, tab: "blocks" };
-      if (tx.ops.length === 0) wrap.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") + t("explorer.ops_hint", " Nothing was enclosed — valid, not an error."), "muted"));
+      if (tx.ops.length === 0) wrap.appendChild(DOM.el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") + t("explorer.ops_hint", " Nothing was enclosed — valid, not an error."), "muted"));
       tx.ops.forEach(function (op, k) {
         wrap.appendChild(opSection(doc, op, ctx, t("explorer.op_prefix", "Op ") + k));
       });
       if (tx.signatures.length > 0) {
-        wrap.appendChild(el(doc, "h3", t("explorer.signatures_prefix", "Signatures (") + tx.signatures.length + ")"));
+        wrap.appendChild(DOM.el(doc, "h3", t("explorer.signatures_prefix", "Signatures (") + tx.signatures.length + ")"));
         var ul = doc.createElement("ul");
         tx.signatures.forEach(function (sig) {
-          ul.appendChild(el(doc, "li", String(sig), "muted"));
+          ul.appendChild(DOM.el(doc, "li", String(sig), "muted"));
         });
         wrap.appendChild(ul);
       }
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
-      while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-      wrap.appendChild(el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
+      DOM.clear(wrap);
+      wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
       showError(doc, wrap, e, t("explorer.unknown_tx", "Unknown transaction."));
     });
   }

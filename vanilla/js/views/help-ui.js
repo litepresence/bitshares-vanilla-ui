@@ -738,13 +738,8 @@ var HelpUI = (function () {
   function topicByKey(key) {
     for (var i = 0; i < TOPICS.length; i++) if (TOPICS[i][0] === key) return TOPICS[i];
     return null; }
-  /* textContent-only element (topic strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el — use DOM.el */
+  /* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
 
@@ -753,14 +748,14 @@ var HelpUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     var key = params && typeof params.wildcard === "string" ? params.wildcard.replace(/^\/+|\/+$/g, "") : "";
     if (!key) { paintIndex(doc, wrap); return; }
     var hit = topicByKey(key);
     if (!hit) {
-      wrap.appendChild(el(doc, "h1", t("help.help", "Help")));
-      wrap.appendChild(el(doc, "p", "No help topic named “" + key + "”. Pick one from the index.", "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("help.help", "Help")));
+      wrap.appendChild(DOM.el(doc, "p", "No help topic named “" + key + "”. Pick one from the index.", "muted"));
       paintIndexList(doc, wrap);
       return;
     }
@@ -775,7 +770,7 @@ var HelpUI = (function () {
   function paintBlock(doc, wrap, items) {
     var list = null, para = [], i;
     function flushPara() {
-      if (para.length) wrap.appendChild(el(doc, "p", para.join(" ")));
+      if (para.length) wrap.appendChild(DOM.el(doc, "p", para.join(" ")));
       para = [];
     }
     function closeList() {
@@ -794,7 +789,7 @@ var HelpUI = (function () {
       String(raw === undefined || raw === null ? "" : raw).split("\n").forEach(function (ln) {
         var s = ln.trim();
         if (!s) { flushPara(); closeList(); return; }
-        if (s.indexOf("# ") === 0) { flushPara(); closeList(); wrap.appendChild(el(doc, "h2", s.slice(2))); return; }
+        if (s.indexOf("# ") === 0) { flushPara(); closeList(); wrap.appendChild(DOM.el(doc, "h2", s.slice(2))); return; }
         if (s.indexOf("- ") === 0) {
           flushPara();
           if (!list) list = [];
@@ -822,12 +817,12 @@ var HelpUI = (function () {
 
   /* Index: every topic as a link (mirrors the #1 toc structure). */
   function paintIndex(doc, wrap) {
-    wrap.appendChild(el(doc, "h1", t("help.help", "Help")));
-    wrap.appendChild(el(doc, "p", t("help.index_intro", "Short guides for every part of the wallet, each opening into a full article."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h1", t("help.help", "Help")));
+    wrap.appendChild(DOM.el(doc, "p", t("help.index_intro", "Short guides for every part of the wallet, each opening into a full article."), "muted"));
     paintIndexList(doc, wrap);
     /* Pointer to the Community page (help/community split 2026-10-04):
      * chats, forums, and explorers live there now, not here. */
-    var hint = el(doc, "p", null, "muted");
+    var hint = DOM.el(doc, "p", null, "muted");
     hint.appendChild(doc.createTextNode(t("help.community_hint", "Chats, forums, and explorers live on the Community page: ")));
     var link = doc.createElement("a");
     link.setAttribute("href", "#/community");
@@ -836,7 +831,7 @@ var HelpUI = (function () {
     wrap.appendChild(hint);
     /* Documentation: chain-level references beyond this wallet. External
      * links open a new tab (target _blank + noopener); textContent-only. */
-    wrap.appendChild(el(doc, "h2", t("help.documentation", "Documentation")));
+    wrap.appendChild(DOM.el(doc, "h2", t("help.documentation", "Documentation")));
     var docs = doc.createElement("ul");
     [["https://docs.bitshares.org", t("help.docs_org", "BitShares Docs (docs.bitshares.org)")],
      ["https://docs.bitshares.dev", t("help.docs_dev", "BitShares Developer Docs (docs.bitshares.dev)")]].forEach(function (pair) {
@@ -848,8 +843,8 @@ var HelpUI = (function () {
     wrap.appendChild(docs);
     /* AI-assisted help: machine-readable mirror of this project for
      * AI assistants and researchers. Same external-link treatment. */
-    wrap.appendChild(el(doc, "h2", t("help.ai_help", "AI Assisted Help")));
-    wrap.appendChild(el(doc, "p", t("help.ai_help_hint", "Ask an AI assistant about BitShares against a structured mirror of this repository."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h2", t("help.ai_help", "AI Assisted Help")));
+    wrap.appendChild(DOM.el(doc, "p", t("help.ai_help_hint", "Ask an AI assistant about BitShares against a structured mirror of this repository."), "muted"));
     var aiul = doc.createElement("ul");
     var aili = doc.createElement("li"), aia = doc.createElement("a");
     aia.href = "https://deepwiki.com/bitshares/bitshares-vanilla-ui";
@@ -867,12 +862,12 @@ var HelpUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("help.community_title", "Community")));
-    wrap.appendChild(el(doc, "p", t("help.community_intro", "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h1", t("help.community_title", "Community")));
+    wrap.appendChild(DOM.el(doc, "p", t("help.community_intro", "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."), "muted"));
     paintCommunityDir(doc, wrap);
-    var back = el(doc, "p", null, "muted"), b = doc.createElement("a");
+    var back = DOM.el(doc, "p", null, "muted"), b = doc.createElement("a");
     b.href = "#/help"; b.textContent = t("help.help", "Help");
     back.appendChild(b);
     back.appendChild(doc.createTextNode(" · "));
@@ -912,7 +907,7 @@ var HelpUI = (function () {
       ["help.chat_cn", "Chinese Chat", [
         ["https://t.me/BitsharesDEXcn", "help.link_tg_cn", "Chinese community (t.me/BitsharesDEXcn)"]]]];
     SECTIONS.forEach(function (sec) {
-      wrap.appendChild(el(doc, "h2", t(sec[0], sec[1])));
+      wrap.appendChild(DOM.el(doc, "h2", t(sec[0], sec[1])));
       var ul = doc.createElement("ul");
       sec[2].forEach(function (pair) {
         var li = doc.createElement("li"), a = doc.createElement("a");
@@ -978,17 +973,17 @@ var HelpUI = (function () {
    * lines stay readable at desk widths. Display-only class, no strings. */
   function paintTopic(doc, wrap, topic) {
     try { wrap.classList.add("help-article"); } catch (e) { /* class best-effort */ }
-    wrap.appendChild(el(doc, "h1", t("help.topic_" + topic[0] + "_title", topic[1])));
-    wrap.appendChild(el(doc, "p", t("help.topic_" + topic[0] + "_text", topic[2])));
+    wrap.appendChild(DOM.el(doc, "h1", t("help.topic_" + topic[0] + "_title", topic[1])));
+    wrap.appendChild(DOM.el(doc, "p", t("help.topic_" + topic[0] + "_text", topic[2])));
     paintBody(doc, wrap, topic[0]);
     if (topic[3]) {
-      var p = el(doc, "p", null, "muted"), a = doc.createElement("a");
+      var p = DOM.el(doc, "p", null, "muted"), a = doc.createElement("a");
       a.href = topic[3]; a.textContent = t("help.open_in_the_wallet", "Open in the wallet");
       p.appendChild(a); wrap.appendChild(p);
     } else {
-      wrap.appendChild(el(doc, "p", t("help.background_reading", "Background reading."), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("help.background_reading", "Background reading."), "muted"));
     }
-    var back = el(doc, "p", null, "muted"), b = doc.createElement("a");
+    var back = DOM.el(doc, "p", null, "muted"), b = doc.createElement("a");
     b.href = "#/help"; b.textContent = t("help.all_help_topics", "All help topics");
     back.appendChild(b); wrap.appendChild(back);
   }

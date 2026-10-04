@@ -88,19 +88,13 @@ var EsLabUI = (function () {
     return base;
   }
 
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el — use DOM.el */
+  /* clearRoot removed — use DOM.clear */
 
   /* showError: inline error panel, never blank. Same contract as api-lab. */
   function showError(doc, wrap, e) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || "Unexpected error");
-    var box = el(doc, "div", msg, "error");
-    box.setAttribute("aria-live", "polite"); wrap.appendChild(box); return box;
+    var box = DOM.error(wrap, msg); return box;
   }
 
   /* entryKey: stable identity for selection/history/deep-link (the catalog
@@ -129,17 +123,17 @@ var EsLabUI = (function () {
     var myGen = gen;
     var doc = (typeof document !== "undefined") ? document : null;
     if (!doc || !root) return;
-    clearRoot(root);
-    var wrap = el(doc, "div", null, "wrap wide"); root.appendChild(wrap);
+    DOM.clear(root);
+    var wrap = DOM.el(doc, "div", null, "wrap wide"); root.appendChild(wrap);
 
-    wrap.appendChild(el(doc, "h1", t("eslab.title", "ES Lab")));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "h1", t("eslab.title", "ES Lab")));
+    wrap.appendChild(DOM.el(doc, "p",
       t("eslab.subtitle", "Search the community index by hand: pick a query, fill the boxes, read parsed rows + raw JSON. Reads only — nothing here can move funds."),
       "muted"));
-    wrap.appendChild(el(doc, "p",
+    wrap.appendChild(DOM.el(doc, "p",
       t("eslab.mainnet_only", "Community index covers mainnet only — testnet accounts and new objects may be missing."),
       "muted"));
-    var strip = el(doc, "p", "", "muted");
+    var strip = DOM.el(doc, "p", "", "muted");
     wrap.appendChild(strip);
 
     /* paintStrip: reachability line from best-knowledge state. Never throws. */
@@ -176,11 +170,11 @@ var EsLabUI = (function () {
     if (!startEntry) startEntry = EsLab.byKey("fills-by-market");
 
     /* Template pulldown with group optgroups + filter box. */
-    var pickRow = el(doc, "p", null, null);
-    var filter = el(doc, "input", null, null);
+    var pickRow = DOM.el(doc, "p", null, null);
+    var filter = DOM.el(doc, "input", null, null);
     filter.type = "search"; filter.placeholder = t("eslab.filter", "Filter templates…");
     filter.setAttribute("aria-label", t("eslab.filter", "Filter templates…"));
-    var sel = el(doc, "select", null, null);
+    var sel = DOM.el(doc, "select", null, null);
     sel.setAttribute("aria-label", t("eslab.template", "Query template"));
     sel.classList.add("touchable");
     pickRow.appendChild(filter); pickRow.appendChild(sel); wrap.appendChild(pickRow);
@@ -193,7 +187,7 @@ var EsLabUI = (function () {
     }
 
     function fillPick(ftext) {
-      while (sel.firstChild) sel.removeChild(sel.firstChild);
+      DOM.clear(sel);
       var ft = (ftext || "").toLowerCase();
       EsLab.GROUPS.concat(["Raw console"]).forEach(function (g) {
         var og = doc.createElement("optgroup"); og.label = g;
@@ -215,7 +209,7 @@ var EsLabUI = (function () {
     fillPick("");
     filter.addEventListener("input", function () { fillPick(filter.value); });
 
-    var card = el(doc, "div", null, "card"); wrap.appendChild(card);
+    var card = DOM.el(doc, "div", null, "card"); wrap.appendChild(card);
     var entry = startEntry;
     var inputEls = [];
     var rawBox = null, rawIndexSel = null, resultPre = null, hintP = null, histBox = null;
@@ -225,17 +219,17 @@ var EsLabUI = (function () {
 
     /* renderForm: template card body for the current entry. */
     function renderForm(prefill) {
-      while (card.firstChild) card.removeChild(card.firstChild);
+      DOM.clear(card);
       inputEls = [];
       rawOverride = false;
       lastGood = null;
-      card.appendChild(el(doc, "h3", entry.title || entry.key, null));
-      card.appendChild(el(doc, "p", entry.desc || "", "muted"));
+      card.appendChild(DOM.el(doc, "h3", entry.title || entry.key, null));
+      card.appendChild(DOM.el(doc, "p", entry.desc || "", "muted"));
       if (!isRaw(entry.key)) {
-        card.appendChild(el(doc, "p", entry.index + "  ·  " + (entry.sourceRef || ""), "muted"));
+        card.appendChild(DOM.el(doc, "p", entry.index + "  ·  " + (entry.sourceRef || ""), "muted"));
       }
       if (isRaw(entry.key)) {
-        var idxLab = el(doc, "label", t("eslab.raw_index", "Index"), null);
+        var idxLab = DOM.el(doc, "label", t("eslab.raw_index", "Index"), null);
         try { idxLab.style.display = "block"; idxLab.style.margin = "10px 0 2px"; } catch (e) { /* stands */ }
         rawIndexSel = doc.createElement("select");
         indexes().forEach(function (ix) {
@@ -249,7 +243,7 @@ var EsLabUI = (function () {
         card.appendChild(idxLab);
       }
       (entry.fields || []).forEach(function (p, i) {
-        var lab = el(doc, "label", p.name + (p.required ? " *" : "") + (p.hint ? " — " + p.hint : ""), null);
+        var lab = DOM.el(doc, "label", p.name + (p.required ? " *" : "") + (p.hint ? " — " + p.hint : ""), null);
         try { lab.style.display = "block"; lab.style.margin = "10px 0 2px"; } catch (e) { /* stands */ }
         var inp;
         if (p.type === "json" || p.type === "strlist") {
@@ -270,7 +264,7 @@ var EsLabUI = (function () {
         card.appendChild(lab);
         inputEls.push(inp);
       });
-      var rawLab = el(doc, "label", isRaw(entry.key) ?
+      var rawLab = DOM.el(doc, "label", isRaw(entry.key) ?
         t("eslab.raw_body", "Query body JSON") :
         t("eslab.raw_dsl", "Raw query JSON (mirrors the boxes)"), "subtle-btn");
       rawBox = doc.createElement("textarea"); rawBox.rows = isRaw(entry.key) ? 8 : 4;
@@ -293,14 +287,14 @@ var EsLabUI = (function () {
       });
       if (!isRaw(entry.key)) rawBox.addEventListener("input", syncCurated);
 
-      var btnRow = el(doc, "p", null, null);
-      var runB = el(doc, "button", t("eslab.run", "Run"));
+      var btnRow = DOM.el(doc, "p", null, null);
+      var runB = DOM.el(doc, "button", t("eslab.run", "Run"));
       runB.type = "button";
       runB.classList.add("touchable");
-      var resetB = el(doc, "button", t("eslab.reset", "Reset"));
+      var resetB = DOM.el(doc, "button", t("eslab.reset", "Reset"));
       resetB.type = "button";
       resetB.classList.add("btn-ghost", "touchable");
-      var copyB = el(doc, "button", t("eslab.copy_link", "Copy link"));
+      var copyB = DOM.el(doc, "button", t("eslab.copy_link", "Copy link"));
       copyB.type = "button";
       copyB.classList.add("btn-ghost", "touchable");
       try { resetB.style.marginLeft = "8px"; copyB.style.marginLeft = "8px"; } catch (e) { /* stands */ }
@@ -319,15 +313,15 @@ var EsLabUI = (function () {
       btnRow.appendChild(runB); btnRow.appendChild(resetB); btnRow.appendChild(copyB);
       card.appendChild(btnRow);
 
-      tablesBox = el(doc, "div", null, null);
+      tablesBox = DOM.el(doc, "div", null, null);
       card.appendChild(tablesBox);
 
-      resultPre = el(doc, "pre", t("eslab.no_result", "No result yet — fill the boxes and press Run."), null);
+      resultPre = DOM.el(doc, "pre", t("eslab.no_result", "No result yet — fill the boxes and press Run."), null);
       try { resultPre.style.whiteSpace = "pre-wrap"; resultPre.style.wordBreak = "break-word"; } catch (e) { /* stands */ }
       card.appendChild(resultPre);
-      hintP = el(doc, "p", "", "muted"); card.appendChild(hintP);
+      hintP = DOM.el(doc, "p", "", "muted"); card.appendChild(hintP);
 
-      histBox = el(doc, "div", null, null);
+      histBox = DOM.el(doc, "div", null, null);
       card.appendChild(histBox);
       renderHistory();
     }
@@ -379,7 +373,7 @@ var EsLabUI = (function () {
           (outcome.json === undefined ? outcome.raw : outcome.json) :
           { error: (outcome.error && outcome.error.message) || String(outcome.error) }, null, 2);
       } catch (e) { resultPre.textContent = String(outcome.json || outcome.raw || outcome.error); }
-      if (tablesBox) { while (tablesBox.firstChild) tablesBox.removeChild(tablesBox.firstChild); }
+      if (tablesBox) { DOM.clear(tablesBox); }
       if (!isNote) {
         try {
           if (typeof EsLabResults !== "undefined" && EsLabResults &&
@@ -396,11 +390,11 @@ var EsLabUI = (function () {
     /* renderHistory: in-session run buttons (re-load entry+params). */
     function renderHistory() {
       if (!histBox) return;
-      while (histBox.firstChild) histBox.removeChild(histBox.firstChild);
+      DOM.clear(histBox);
       if (!callLog.length) return;
-      histBox.appendChild(el(doc, "h4", t("eslab.history", "This session")));
+      histBox.appendChild(DOM.el(doc, "h4", t("eslab.history", "This session")));
       callLog.forEach(function (h) {
-        var b = el(doc, "button", h.label, null);
+        var b = DOM.el(doc, "button", h.label, null);
         b.type = "button";
         b.addEventListener("click", function () {
           var e = findEntry(h.key);
@@ -446,7 +440,7 @@ var EsLabUI = (function () {
       var vals = readCurated(inputEls);
       var ai = accountField();
       if (ai !== -1 && vals[ai] && !ACCOUNT_RE.test(vals[ai])) {
-        var note = el(doc, "p", t("eslab.resolving", "Resolving account name…"), "muted");
+        var note = DOM.el(doc, "p", t("eslab.resolving", "Resolving account name…"), "muted");
         note.setAttribute("aria-live", "polite"); card.appendChild(note);
         EsLabRun.resolveAccount(vals[ai]).then(function (id) {
           if (myGen !== gen) return;
@@ -518,7 +512,7 @@ var EsLabUI = (function () {
     /* doRun: template run (paged for row kinds, single for agg) + deep-link
      * the URL (replaceState: no re-render) + history push. */
     function doRun(vals) {
-      var running = el(doc, "p", t("eslab.running", "Running…"), "muted");
+      var running = DOM.el(doc, "p", t("eslab.running", "Running…"), "muted");
       running.setAttribute("aria-live", "polite"); card.appendChild(running);
       var call = (entry.kind === "agg") ?
         EsLabRun.run(entry.key, vals, {}) :
@@ -545,7 +539,7 @@ var EsLabUI = (function () {
     /* doRawRun: verbatim body against an index (console + override path).
      * Task 6 renders parsed rows where possible; this stub shows raw. */
     function doRawRun(index, body, vals) {
-      var running = el(doc, "p", t("eslab.running", "Running…"), "muted");
+      var running = DOM.el(doc, "p", t("eslab.running", "Running…"), "muted");
       running.setAttribute("aria-live", "polite"); card.appendChild(running);
       var HC = null;
       try {

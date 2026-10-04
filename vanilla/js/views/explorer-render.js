@@ -85,20 +85,13 @@ var ExplorerRender = (function () {
     return myGen === localGen;
   }
 
-  /* Create an element with optional text + class (textContent only — user
-   * and chain strings never reach innerHTML). Verbatim copy. */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. Verbatim copy. */
 /* Link helper (textContent only, touch-sized, inline-block). Verbatim copy. */
   function anchor(doc, text, href) {
-    var a = el(doc, "a", text);
+    var a = DOM.el(doc, "a", text);
     a.setAttribute("href", href);
     touchable(a);
     a.style.display = "inline-block";
@@ -115,7 +108,7 @@ var ExplorerRender = (function () {
   /* Sync human amount span via Format only (never float); raw int stays in
    * the title. Throws on bad input — callers fall back to raw + marker. */
   function humanAmount(doc, raw, precision) {
-    var s = el(doc, "span", Format.formatAmount(String(raw), precision));
+    var s = DOM.el(doc, "span", Format.formatAmount(String(raw), precision));
     s.title = String(raw);
     return s;
   }
@@ -123,7 +116,7 @@ var ExplorerRender = (function () {
   /* Owning-asset amount span with async precision resolve (Explorer.asset):
    * shows raw + " (raw)" meanwhile, and keeps it when unresolvable. */
   function ownedAmountSpan(doc, raw, assetId, myGen) {
-    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
+    var s = DOM.el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
     s.title = String(raw) + " " + assetId;
     Explorer.asset(assetId).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -139,7 +132,7 @@ var ExplorerRender = (function () {
    * resolves. Shows the raw int meanwhile (with a "raw" marker, never as
    * a final money display). */
   function amountSpan(doc, raw, assetId, myGen) {
-    var s = el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
+    var s = DOM.el(doc, "span", String(raw) + t("explorer.raw_mark", " (raw)"));
     s.title = String(raw) + " " + assetId;
     Explorer.asset(assetId).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -156,7 +149,7 @@ var ExplorerRender = (function () {
 
   /* Price-pair leaf -> span filled in once both precisions resolve. */
   function priceSpan(doc, base, quote, myGen) {
-    var s = el(doc, "span", "…");
+    var s = DOM.el(doc, "span", "…");
     s.title = t("explorer.price_base", "base ") + base.amount + " " + base.asset_id + t("explorer.price_quote", " / quote ") + quote.amount + " " + quote.asset_id;
     var pb = Explorer.asset(base.asset_id).then(function (j) { return j.asset.precision; });
     var pq = Explorer.asset(quote.asset_id).then(function (j) { return j.asset.precision; });
@@ -175,7 +168,7 @@ var ExplorerRender = (function () {
   /* Account-id string -> link to the slice-3 account route (name resolved
    * first so the URL reads like the old UI); falls back to plain text. */
   function accountLink(doc, id, myGen) {
-    var s = el(doc, "span", id);
+    var s = DOM.el(doc, "span", id);
     if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return s;
     Account.resolve(id).then(function (a) {
       if (!isCurrent(myGen)) return;
@@ -188,7 +181,7 @@ var ExplorerRender = (function () {
 
   /* Asset-id string -> link to #/asset/:symbol once the symbol resolves. */
   function assetLink(doc, id, myGen) {
-    var s = el(doc, "span", id);
+    var s = DOM.el(doc, "span", id);
     Explorer.asset(id).then(function (j) {
       if (!isCurrent(myGen)) return;
       /* L1: chain symbols ride in a URL — encode them. */
@@ -232,7 +225,7 @@ var ExplorerRender = (function () {
    * Returns nothing — the pair is appended. Fails: never (fillValue's
    *   final branch stringifies anything left over). */
   function fieldRow(doc, dl, key, value, ctx, depth) {
-    var dt = el(doc, "dt", key);
+    var dt = DOM.el(doc, "dt", key);
     var dd = doc.createElement("dd");
     dl.appendChild(dt);
     dl.appendChild(dd);
@@ -295,13 +288,13 @@ var ExplorerRender = (function () {
       return;
     }
     if (typeof key === "string" && HUNDREDTH_KEYS[key] && /^\d+$/.test(String(value))) {
-      var pct = el(doc, "span", pctHundredths(String(value)));
+      var pct = DOM.el(doc, "span", pctHundredths(String(value)));
       pct.title = String(value);
       dd.appendChild(pct);
       return;
     }
     if (typeof key === "string" && RATIO1000_KEYS[key] && /^\d+$/.test(String(value))) {
-      var ratio = el(doc, "span", ratio1000(String(value)));
+      var ratio = DOM.el(doc, "span", ratio1000(String(value)));
       ratio.title = String(value);
       dd.appendChild(ratio);
       return;
@@ -312,7 +305,7 @@ var ExplorerRender = (function () {
       var coreSpan;
       try { coreSpan = humanAmount(doc, String(value), CORE_PRECISION); }
       catch (e) {
-        coreSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
+        coreSpan = DOM.el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
         coreSpan.title = String(value);
       }
       dd.appendChild(coreSpan);
@@ -325,27 +318,27 @@ var ExplorerRender = (function () {
         var ownSpan;
         try { ownSpan = humanAmount(doc, String(value), ctx.assetPrecision); }
         catch (e) {
-          ownSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
+          ownSpan = DOM.el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
           ownSpan.title = String(value);
         }
         dd.appendChild(ownSpan);
       } else if (ctx && typeof ctx.assetId === "string" && ctx.assetId) {
         dd.appendChild(ownedAmountSpan(doc, String(value), ctx.assetId, myGen));
       } else {
-        var rawSpan = el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
+        var rawSpan = DOM.el(doc, "span", String(value) + t("explorer.raw_mark", " (raw)"));
         rawSpan.title = String(value);
         dd.appendChild(rawSpan);
       }
       return;
     }
     if (Array.isArray(value)) {
-      if (value.length === 0) { dd.appendChild(el(doc, "span", "—", "muted")); return; }
-      if (depth >= 2) { dd.appendChild(el(doc, "span", value.length + t("explorer.items_unit", " items"), "muted")); return; }
+      if (value.length === 0) { dd.appendChild(DOM.el(doc, "span", "—", "muted")); return; }
+      if (depth >= 2) { dd.appendChild(DOM.el(doc, "span", value.length + t("explorer.items_unit", " items"), "muted")); return; }
       var ul = doc.createElement("ul");
       value.forEach(function (item, i) {
         var li = doc.createElement("li");
         if (item && typeof item === "object") {
-          var sub = el(doc, "dl", null, "xplore-sub");
+          var sub = DOM.el(doc, "dl", null, "xplore-sub");
           Object.keys(item).forEach(function (k) { fieldRow(doc, sub, k, item[k], ctx, depth + 1); });
           li.appendChild(sub);
         } else {
@@ -357,8 +350,8 @@ var ExplorerRender = (function () {
       return;
     }
     if (value && typeof value === "object") {
-      if (depth >= 2) { dd.appendChild(el(doc, "span", "…", "muted")); return; }
-      var sub2 = el(doc, "dl", null, "xplore-sub");
+      if (depth >= 2) { dd.appendChild(DOM.el(doc, "span", "…", "muted")); return; }
+      var sub2 = DOM.el(doc, "dl", null, "xplore-sub");
       Object.keys(value).forEach(function (k) { fieldRow(doc, sub2, k, value[k], ctx, depth + 1); });
       dd.appendChild(sub2);
       return;
@@ -393,14 +386,14 @@ var ExplorerRender = (function () {
    *   (fillValue shape), label (default "Operation"). Returns: the section
    *   div. Fails: never (missing fields render "No fields."). */
   function opSection(doc, op, ctx, label) {
-    var box = el(doc, "div", null, "xplore-op");
-    var head = el(doc, "h3", (label || t("explorer.op_label", "Operation")) + ": " + op.type_name +
+    var box = DOM.el(doc, "div", null, "xplore-op");
+    var head = DOM.el(doc, "h3", (label || t("explorer.op_label", "Operation")) + ": " + op.type_name +
       (op.virtual ? t("explorer.virtual_mark", " (virtual)") : "") + t("explorer.op_badge_prefix", " [op ") + op.type_idx + "]");
     box.appendChild(head);
-    var dl = el(doc, "dl", null, "xplore-fields");
+    var dl = DOM.el(doc, "dl", null, "xplore-fields");
     var fields = (op.fields && typeof op.fields === "object") ? op.fields : {};
     var keys = Object.keys(fields);
-    if (keys.length === 0) box.appendChild(el(doc, "p", t("explorer.no_fields", "No fields.") + t("explorer.fields_hint", " The object carries no displayable properties."), "muted"));
+    if (keys.length === 0) box.appendChild(DOM.el(doc, "p", t("explorer.no_fields", "No fields.") + t("explorer.fields_hint", " The object carries no displayable properties."), "muted"));
     keys.forEach(function (k) { fieldRow(doc, dl, k, fields[k], ctx, 0); });
     box.appendChild(dl);
     /* Punchlist: raw-JSON toggle (Transaction.jsx:42-73 concept) — the
@@ -429,7 +422,7 @@ var ExplorerRender = (function () {
    * Returns: the panel div. Fails: never (vote header failures keep id +
    *   type; field failures render per-leaf inside fillValue). */
   function renderObjectPanel(doc, entry, ctx) {
-    var box = el(doc, "div", null, "xplore-object-rows");
+    var box = DOM.el(doc, "div", null, "xplore-object-rows");
     var title = entry.id + ": " + entry.typeName;
     /* Header also names human votes when present (witness/committee/worker
      * total_votes at core precision) — sync Format math, never float. */
@@ -438,9 +431,9 @@ var ExplorerRender = (function () {
       try { title += " · " + Format.formatAmount(String(votes), CORE_PRECISION) + t("explorer.votes_unit", " votes"); }
       catch (e) { /* header stays id + type */ }
     }
-    box.appendChild(el(doc, "h3", title));
+    box.appendChild(DOM.el(doc, "h3", title));
     if (entry.op) box.appendChild(opSection(doc, entry.op, ctx, t("explorer.history_op", "History op")));
-    var dl = el(doc, "dl", null, "xplore-fields");
+    var dl = DOM.el(doc, "dl", null, "xplore-fields");
     var obj = entry.object || {};
     /* Owning-asset hint for bare supply/fee leaves: asset objects carry
      * their own precision; anything else resolves via ctx or stays raw. */
@@ -459,7 +452,7 @@ var ExplorerRender = (function () {
     if (entry.space === 1 && (entry.type === 7 || entry.type === 8)) note += t("explorer.note_orders", " (orders: trading slice)");
     else if (entry.space === 1 && entry.type === 10) note += t("explorer.note_proposals", " (proposals: governance slice)");
     else if (entry.space === 1 && entry.type === 16) note += t("explorer.note_htlc", " (HTLC: transfers slice)");
-    box.appendChild(el(doc, "p", note, "muted"));
+    box.appendChild(DOM.el(doc, "p", note, "muted"));
     return box;
   }
 

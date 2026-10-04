@@ -88,26 +88,17 @@ var ExplorerUI = (function () {
     pendingTab = (typeof tab === "string" && tab) ? tab : "blocks";
   }
 
-  /* Create an element with optional text + class (textContent only — user
-   * and chain strings never reach innerHTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. */
-function clearRoot(root) {
-    while (root.firstChild) root.removeChild(root.firstChild);
-  }
+/* clearRoot removed — use DOM.clear */
 
   /* Shell title (original Blocks.jsx renders NO h1 — tabs sit directly
    * under the header; vanilla keeps exactly one h1 for a11y but folds it
    * visually away via .xplore-sr so spacing matches the original). */
   function shellTitle(doc) {
-    return el(doc, "h1", t("explorer.title", "Explore"), "xplore-sr");
+    return DOM.el(doc, "h1", t("explorer.title", "Explore"), "xplore-sr");
   }
 
   /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
@@ -122,8 +113,7 @@ function clearRoot(root) {
   /* Inline error panel that is never blank: thrown values map to human
    * sentences; unknown shapes fall back to a generic message. */
   function showError(doc, wrap, e, fallback) {
-    var box = el(doc, "div", null, "error");
-    box.setAttribute("aria-live", "polite");
+    var box = null; /* created via DOM.error below — use DOM.el, DOM.clear */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
@@ -134,15 +124,12 @@ function clearRoot(root) {
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
       msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
     }
-    box.textContent = msg;
-    wrap.appendChild(box);
+    box = DOM.error(wrap, msg);
     return box;
   }
 
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted");
-    p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p);
+    var p = DOM.status(wrap, text);
     return p;
   }
 
@@ -156,7 +143,7 @@ function clearRoot(root) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
     wrap.appendChild(shellTitle(doc));
-    wrap.appendChild(el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false;
     var off = function () {};
@@ -173,16 +160,16 @@ function clearRoot(root) {
       if (settled || myGen !== gen) return;
       settled = true; off();
       if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-      clearRoot(root);
+      DOM.clear(root);
       var failed = makeWrap(doc, root);
       failed.appendChild(shellTitle(doc));
       showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
-      var xstat = el(doc, "p", "", "muted");
+      var xstat = DOM.el(doc, "p", "", "muted");
       try { xstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       failed.appendChild(xstat);
-      var xrow = el(doc, "div", null, "pools-offline-row");
+      var xrow = DOM.el(doc, "div", null, "pools-offline-row");
       failed.appendChild(xrow);
-      var retry = touchable(el(doc, "button", t("explorer.retry", "Retry")));
+      var retry = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
       retry.type = "button";
       xrow.appendChild(retry);
       var xoff = null;
@@ -197,7 +184,7 @@ function clearRoot(root) {
         try { xlink = xoff.settingsLink(doc, t); } catch (e) { xlink = null; }
       }
       if (!xlink) {
-        xlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        xlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { xlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(xlink);
       }
@@ -213,14 +200,14 @@ function clearRoot(root) {
   function loadHeadStrip(doc, box, myGen) {
     Explorer.head().then(function (h) {
       if (myGen !== gen) return;
-      while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "p",
+      DOM.clear(box);
+      box.appendChild(DOM.el(doc, "p",
         t("explorer.head_prefix", "Head #") + h.head_block_number + " · " + h.head_block_time +
         t("explorer.head_lib", " · irreversible #") + h.last_irreversible_block_num, "muted"));
     }).catch(function () {
       if (myGen !== gen) return;
-      while (box.firstChild) box.removeChild(box.firstChild);
-      box.appendChild(el(doc, "p", t("explorer.head_unavailable", "Head block unavailable."), "muted"));
+      DOM.clear(box);
+      box.appendChild(DOM.el(doc, "p", t("explorer.head_unavailable", "Head block unavailable."), "muted"));
     });
   }
 
@@ -230,9 +217,9 @@ function clearRoot(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", title));
+    wrap.appendChild(DOM.el(doc, "h1", title));
     showError(doc, wrap, t("explorer.view_missing_prefix", "Explorer view missing: ") + file + t("explorer.view_missing_suffix", " failed to load."));
   }
 
@@ -248,7 +235,7 @@ function clearRoot(root) {
     var myGen = ++gen;
     var want = (typeof tab === "string" && TABS.indexOf(tab) !== -1) ? tab : "blocks";
     var noted = (typeof tab === "string" && tab && TABS.indexOf(tab) === -1) ? tab : null;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer ||
         typeof Format === "undefined" || !Format) {
@@ -258,7 +245,7 @@ function clearRoot(root) {
     if (waitForOpen(doc, wrap, root, myGen, function () { renderExplorer(root, want); })) return;
 
     wrap.appendChild(shellTitle(doc));
-    if (noted) wrap.appendChild(el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
+    if (noted) wrap.appendChild(DOM.el(doc, "p", t("explorer.unknown_tab_prefix", "Unknown tab “") + noted + t("explorer.unknown_tab_suffix", "” — showing Blockchain."), "muted"));
 
     /* Search: single box, 1.x.y / account / symbol / tx hash,
      * keyboard-submit. Typeahead (plain literals only, no new t() keys —
@@ -283,13 +270,13 @@ function clearRoot(root) {
     touchable(input);
     input.style.minWidth = "220px";
     form.appendChild(input);
-    var go = touchable(el(doc, "button", t("explorer.search", "Search")));
+    var go = touchable(DOM.el(doc, "button", t("explorer.search", "Search")));
     go.type = "submit";
     form.appendChild(go);
-    var msg = el(doc, "div", "", "error");
+    var msg = DOM.el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     wrap.appendChild(form);
-    var suggestBox = el(doc, "div", null, "xplore-suggest");
+    var suggestBox = DOM.el(doc, "div", null, "xplore-suggest");
     suggestBox.setAttribute("role", "listbox");
     suggestBox.setAttribute("aria-label", t("explorer.search_suggestions_aria", "Search suggestions"));
     wrap.appendChild(suggestBox);
@@ -297,23 +284,23 @@ function clearRoot(root) {
     /* Hash-path result host (txhash submit only): the WS location-less panel
      * and the keyed not-found notice paint here, never in msg (msg stays
      * the text-search error slot). Cleared on every submit. */
-    var hashBox = el(doc, "div", null, "xplore-hash");
+    var hashBox = DOM.el(doc, "div", null, "xplore-hash");
     hashBox.setAttribute("aria-live", "polite");
     wrap.appendChild(hashBox);
     /* Clear the hash-path host (never throws — a detached host is a no-op). */
     function clearHashBox() {
-      try { while (hashBox.firstChild) hashBox.removeChild(hashBox.firstChild); } catch (e) { /* host gone */ }
+      try { DOM.clear(hashBox); } catch (e) { /* host gone */ }
     }
     var sugTimer = null, sugItems = [], sugActive = -1;
     /* Clear the suggestion listbox (timer-safe, never throws). */
     function clearSuggest() {
       sugItems = [];
       sugActive = -1;
-      try { while (suggestBox.firstChild) suggestBox.removeChild(suggestBox.firstChild); } catch (e) { /* gone */ }
+      try { DOM.clear(suggestBox); } catch (e) { /* gone */ }
     }
     /* Paint one suggestion button (textContent only, touch-sized). */
     function suggestBtn(label, hash) {
-      var b = touchable(el(doc, "button", label, "xplore-suggest-row"));
+      var b = touchable(DOM.el(doc, "button", label, "xplore-suggest-row"));
       b.type = "button";
       b.setAttribute("role", "option");
       b.setAttribute("aria-selected", "false");
@@ -443,7 +430,7 @@ function clearRoot(root) {
             return;
           }
           clearHashBox();
-          var box = el(doc, "div", null, "error");
+          var box = DOM.el(doc, "div", null, "error");
           box.setAttribute("aria-live", "polite");
           box.textContent = t("explorer.tx_not_found",
             "Transaction not found on this node or the community index.");
@@ -482,10 +469,10 @@ function clearRoot(root) {
     });
 
     /* Tabs: real buttons (keyboard + touch, never hover-only). */
-    var bar = el(doc, "div", null, "xplore-tabs");
+    var bar = DOM.el(doc, "div", null, "xplore-tabs");
     bar.setAttribute("role", "tablist");
     TABS.forEach(function (t) {
-      var b = touchable(el(doc, "button", tabLabel(t),
+      var b = touchable(DOM.el(doc, "button", tabLabel(t),
         want === t ? "xplore-tab active" : "xplore-tab"));
       b.type = "button";
       b.setAttribute("role", "tab");
@@ -499,7 +486,7 @@ function clearRoot(root) {
     });
     wrap.appendChild(bar);
 
-    var headBox = el(doc, "div", null, "xplore-head");
+    var headBox = DOM.el(doc, "div", null, "xplore-head");
     wrap.appendChild(headBox);
     loadHeadStrip(doc, headBox, myGen);
 
@@ -507,12 +494,12 @@ function clearRoot(root) {
     if (pendingObject) {
       var id = pendingObject;
       pendingObject = null;
-      var panel = el(doc, "div", null, "xplore-object");
+      var panel = DOM.el(doc, "div", null, "xplore-object");
       wrap.appendChild(panel);
       showStatus(doc, panel, t("explorer.loading_prefix", "Loading ") + id + "…");
       Explorer.resolveObject(id).then(function (entry) {
         if (myGen !== gen) return;
-        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        DOM.clear(panel);
         if (typeof ExplorerAssets === "undefined" || !ExplorerAssets ||
             typeof ExplorerAssets.renderObjectPanel !== "function") {
           showError(doc, panel, t("explorer.object_missing", "Explorer object view missing: js/explorer-assets.js failed to load."));
@@ -521,12 +508,12 @@ function clearRoot(root) {
         panel.appendChild(ExplorerAssets.renderObjectPanel(doc, entry, { gen: myGen, root: root, tab: want }));
       }).catch(function (e) {
         if (myGen !== gen) return;
-        while (panel.firstChild) panel.removeChild(panel.firstChild);
+        DOM.clear(panel);
         showError(doc, panel, e, t("explorer.object_failed_prefix", "Could not load ") + id + ".");
       });
     }
 
-    var body = el(doc, "div", null, "xplore-body");
+    var body = DOM.el(doc, "div", null, "xplore-body");
     wrap.appendChild(body);
     if (want === "blocks") {
       if (typeof ExplorerBlocks !== "undefined" && ExplorerBlocks &&
@@ -581,15 +568,15 @@ function clearRoot(root) {
    * the existing prefix key. Params: doc, host, myGen, root, tab, hash,
    * tx (Explorer.recentTxById shape). Never throws. */
   function paintTxHash(doc, host, myGen, root, tab, hash, tx) {
-    try { while (host.firstChild) host.removeChild(host.firstChild); } catch (e) { return; }
+    try { DOM.clear(host); } catch (e) { return; }
     try {
-      host.appendChild(el(doc, "h2",
+      host.appendChild(DOM.el(doc, "h2",
         t("explorer.tx_title_prefix", "Transaction ") + hash));
-      host.appendChild(el(doc, "p", t("explorer.unknown_block", "Unknown block."), "muted"));
+      host.appendChild(DOM.el(doc, "p", t("explorer.unknown_block", "Unknown block."), "muted"));
       var ctx = { gen: myGen, root: root, tab: tab };
       var ops = (tx && Array.isArray(tx.ops)) ? tx.ops : [];
       if (ops.length === 0) {
-        host.appendChild(el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") +
+        host.appendChild(DOM.el(doc, "p", t("explorer.no_ops", "No operations in this transaction.") +
           t("explorer.ops_hint", " Nothing was enclosed — valid, not an error."), "muted"));
       }
       ops.forEach(function (op, k) {
@@ -601,16 +588,16 @@ function clearRoot(root) {
             return;
           }
         } catch (e) { /* fallback below */ }
-        host.appendChild(el(doc, "p",
+        host.appendChild(DOM.el(doc, "p",
           t("explorer.op_unavailable", "Operation view unavailable."), "muted"));
       });
       var sigs = (tx && Array.isArray(tx.signatures)) ? tx.signatures : [];
       if (sigs.length > 0) {
-        host.appendChild(el(doc, "h3",
+        host.appendChild(DOM.el(doc, "h3",
           t("explorer.signatures_prefix", "Signatures (") + sigs.length + ")"));
         var ul = doc.createElement("ul");
         sigs.forEach(function (sig) {
-          ul.appendChild(el(doc, "li", String(sig), "muted"));
+          ul.appendChild(DOM.el(doc, "li", String(sig), "muted"));
         });
         host.appendChild(ul);
       }
