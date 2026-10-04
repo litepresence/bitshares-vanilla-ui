@@ -2,6 +2,7 @@
 
 Author: the vanilla build agent. Audience: a working web developer.
 Status: PROPOSAL — post-v1 hardening, not started, not a ship blocker.
+**Superseded:** Tier 1/2 wired 2026-10-04, human drills gate v1. This proposal's rationale (threat model, patterns-not-chassis) remains the reference.
 Date: 2026-09-28.
 
 ## 0. TL;DR

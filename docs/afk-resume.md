@@ -1,3 +1,5 @@
+**Superseded by SLICES.md** (current build status); this doc frozen at 2026-10-01.
+
 # Ship-day state (rewritten 2026-10-01 — supersedes the 2026-09-27 AFK note)
 
 Project: `bitshares-vanilla-ui` (repo name; shipped code lives in `vanilla/`).
