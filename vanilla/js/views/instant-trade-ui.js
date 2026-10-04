@@ -278,7 +278,7 @@ var InstantTradeUI = (function () {
     return ratioToDec(r * pow10(sellPrec), s * pow10(receivePrec), PRICE_PLACES);
   }
 
-  /* Market-fee trio (trade-form.js:322-367, duplicated — TradeForm exports
+  /* Market-fee trio (trade-core.js, duplicated — TradeForm exports
    * only renderDual; see header). Display-only BigInt, fail-silent (null). */
   function marketPctLabel(pct) {
     var p = Number(pct);
