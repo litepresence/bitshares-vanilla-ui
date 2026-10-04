@@ -678,9 +678,7 @@ var PoolGraph = (function () {
     try { canvas._graphBase = base; } catch (e) {}
     try { canvas._graphRepaint = { doc: doc, graph: graph, opts: opts }; } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
-    /* Owner-spec map text (supersedes the old top provenance banner +
-     * nodePaintRole/edgePaintRole, removed with their vectors): corner
-     * verdicts per leg, bottom pair verdict, all from one mapTheme call. */
+    /* Map text contract: corner verdicts per leg + bottom pair verdict, all from one mapTheme call. */
     var theme = null;
     try { theme = mapTheme(graph, assetA, assetB); } catch (e) { theme = null; }
     /* Corner + bottom text painter (haloed like node labels; bold reds). */

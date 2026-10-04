@@ -353,26 +353,6 @@ var GovAnalytics = (function () {
     };
   }
 
-  /* Largest-in-sample join (bounded: ONE Explorer.recentBlocks(N<=50,
-   * withBodies=true) — get_dynamic_global_properties + get_block_header_batch
-   * + get_block, the same methods the tip already calls). Returns {n, head,
-   * label, blocks: biggestBlocks top-5, txs: biggestTxs top-5}. The label is
-   * ALWAYS the sample sentence (never all-time). Fails: "not-connected". */
-  async function biggestSample(n) {
-    var count = _clampN(n, SAMPLE_DEFAULT, 1, SAMPLE_MAX);
-    var rows = await Explorer.recentBlocks(count, true);
-    var list = Array.isArray(rows) ? rows : [];
-    var head = list.length > 0 ? list[0].height : null;
-    var bodies = list.map(function (r) { return { height: r.height, body: r.body || null }; });
-    return {
-      n: list.length,
-      head: head,
-      label: sampleLabel(list.length, head),
-      blocks: biggestBlocks(list, TOP_K),
-      txs: biggestTxs(bodies, TOP_K)
-    };
-  }
-
   return {
     TOP_VOTERS_DEFAULT: TOP_VOTERS_DEFAULT,
     TOP_VOTERS_MAX: TOP_VOTERS_MAX,
@@ -388,8 +368,7 @@ var GovAnalytics = (function () {
     workerFunding: workerFunding,
     splits: splits,
     topVoters: topVoters,
-    proxyMatrix: proxyMatrix,
-    biggestSample: biggestSample
+    proxyMatrix: proxyMatrix
   };
 })();
 

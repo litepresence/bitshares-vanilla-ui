@@ -77,6 +77,8 @@ var Offline = (function () {
     armOpenWatch();
     try {
       var st = state();
+      /* Reachable, not dead: ensure()/Retry clicks while open or mid-handshake
+       * take this exit (wire() also guards state()==="open" above). */
       if (st === "open" || st === "connecting") return null;
       var now = Date.now();
       if (now - lastTryMs < THROTTLE_MS) return null;

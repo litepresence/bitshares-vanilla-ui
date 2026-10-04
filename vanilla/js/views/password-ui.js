@@ -35,7 +35,6 @@ var PasswordUI = (function () {
   var gen = 0;
   /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-/* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error line (aria-live so failures are announced). */

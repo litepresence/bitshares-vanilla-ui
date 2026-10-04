@@ -67,7 +67,6 @@ var ProposalUI = (function () {
     ["blind-disabled", "Blind transfers are disabled: they need vendored commitment/range-proof crypto (read-only lookup only)."],
     ["method-missing", "This node lacks the read method. Try another node."]];
   /* No local el — use DOM.el */
-/* clearBox removed — use DOM.clear */
   /* showError: human error line (ERRMAP maps chain codes to dict strings,
    * aria-live). Returns the node. Never throws. */
   function showError(doc, wrap, e, fallback) {

@@ -18,8 +18,8 @@ var Router = (function () {
 
   var view = null;
 
-  /* Batch-1 i18n (slice-17 Task 2): shell chrome strings only (404, home,
-   * not-ported suffix). Route titles + per-view placeholders stay hardcoded
+  /* Batch-1 i18n (slice-17 Task 2): shell chrome strings only (404, home).
+   * Route titles + per-view placeholders stay hardcoded
    * English for later per-view batches. Same t() fallback shape as
    * settings.js: I18n when loaded, verbatim default otherwise. */
   function t(key, dflt) {
@@ -29,32 +29,16 @@ var Router = (function () {
     return dflt;
   }
 
-  /* Function (not const): the suffix re-resolves on every render so a locale
-   * switch re-renders it without reload. Default holds a literal em-dash to
-   * match en.json verbatim (drift check compares source text, not \\uXXXX). */
-  function notPortedSuffix() { return t("shell.not_ported_suffix", " — not yet ported; tracked in slice N"); }
-
-  /* escapeHtml: &-<>"' escaping for interpolated shell strings. Params: s
-   * (any, stringified). Returns the escaped string. Fails: never. */
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      if (c === "&") return "&amp;";
-      if (c === "<") return "&lt;";
-      if (c === ">") return "&gt;";
-      if (c === '"') return "&quot;";
-      return "&#39;";
-    });
-  }
-
-  /* placeholder: stub renderer for not-yet-ported routes. Params: title
-   *   (string). Returns a render function (root) -> void. Fails: never — a
-   *   missing root is a no-op, strings are HTML-escaped. */
+  /* placeholder: INTENTIONAL fallback renderer for view-script load failure
+   *   (not dead code — About/Menu/Settings/Exchange routes call it when their
+   *   view global is absent). Params: title (string). Returns a render
+   *   function (root) -> void. Fails: never — a missing root is a no-op,
+   *   strings are HTML-escaped. */
   function placeholder(title) {
     return function (root) {
       if (!root) return;
       root.innerHTML =
-        '<div class="wrap"><h1>' + escapeHtml(title) + "</h1>" +
-        '<p class="muted">' + escapeHtml(title + notPortedSuffix()) + "</p></div>";
+        '<div class="wrap"><h1>' + escapeHtml(title) + "</h1></div>";
     };
   }
 
@@ -302,7 +286,6 @@ var Router = (function () {
    *   :params or trailing /**), path (string). Returns {params} or null.
    *   Fails: never throws — bad-decode segments fall back to the raw text. */
   function matchPattern(pattern, path) {
-    if (pattern === "*") return null;
     if (pattern === "/") return path === "/" || path === "" ? { params: {} } : null;
     var patSegs = splitSegments(pattern);
     var pathSegs = splitSegments(path);
