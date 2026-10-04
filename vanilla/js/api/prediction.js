@@ -139,8 +139,14 @@ var Prediction = (function () {
    * "5m 10s", "10s", "1d"). Zero-past with all units zero (sub-second
    * future) shapes "1s"? No: future diff<1000ms has secs 0 -> "0s". Keep
    * honest: "<1s" never invented; "0s" stands for sub-second futures.
+   * Single-owner funnel (R-A-W6 V8): canonical shaping lives in
+   * Duration.countdownText; delegates when duration.js loaded, else the
+   * verbatim fallback below (this file stays require-free for node vectors).
    * Params: parts from countdownParts(). Returns the string. Never throws. */
   function countdownText(parts) {
+    try {
+      if (typeof Duration !== "undefined" && Duration && typeof Duration.countdownText === "function") return Duration.countdownText(parts);
+    } catch (e) { return "No expiry"; }
     try {
       parts = parts || {};
       if (parts.state === "none") return "No expiry";

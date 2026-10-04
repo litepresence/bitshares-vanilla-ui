@@ -394,10 +394,14 @@ var Htlc = (function () {
     }
   }
   /** Seconds -> human duration ("86400" -> "1 day"; 90000 -> "1 day 1 hour"). Integer math only.
-   * Views show this AND raw seconds in confirms (both, never raw-only — principle #6).
-   * @param {any} sec
-   * @returns {string} */
+    * Views show this AND raw seconds in confirms (both, never raw-only — principle #6).
+    * Single-owner funnel (R-A-W6 V8): canonical shaping lives in Duration.formatFull;
+    * this wrapper delegates when duration.js loaded, else the verbatim fallback below
+    * (byte-identical logic — node-alone vectors still pass). No locale keys.
+    * @param {any} sec
+    * @returns {string} */
   function formatDuration(sec) {
+    if (typeof Duration !== "undefined" && Duration && typeof Duration.formatFull === "function") return Duration.formatFull(sec);
     var n = (typeof sec === "string") ? parseInt(sec, 10) : sec;
     if (!Number.isInteger(n) || n < 0) throw new Error("bad duration seconds: " + JSON.stringify(sec));
     var parts = [], u = [[86400, "day"], [3600, "hour"], [60, "minute"], [1, "second"]], i, q;

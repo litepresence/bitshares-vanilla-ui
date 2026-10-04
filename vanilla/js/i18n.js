@@ -141,21 +141,33 @@ var I18n = (function () {
     }, function () { return { ok: false, reason: "fetch-failed" }; });
   }
 
+  /* applyLang: mirror the active locale tag onto <html lang> (R-A-W6 html
+   * lang: a11y/SEO hint for screen readers + search. Guarded try/catch —
+   * never throws, even headless (no document) or on exotic DOMs. */
+  function applyLang(code) {
+    try {
+      if (typeof document !== "undefined" && document && document.documentElement &&
+          typeof document.documentElement.setAttribute === "function") {
+        document.documentElement.setAttribute("lang", code);
+      }
+    } catch (e) { /* hint only: locale still applies in memory */ }
+  }
+
   /* setLocale(code) -> Promise. 'bad-locale' unless shipped; memory+cache
    * first, fetch on miss (file://+uncached -> {ok:false}, caller toasts). */
   function setLocale(code, fetcher) {
     if (CODES.indexOf(code) === -1) return Promise.resolve({ ok: false, reason: "bad-locale" });
     var hit = (code === "en") ? registry.en : (code === current ? registry[code] : null);
-    if (hit) { current = code; writePref(code); return Promise.resolve({ ok: true, code: code }); }
+    if (hit) { current = code; writePref(code); applyLang(code); return Promise.resolve({ ok: true, code: code }); }
     var cached = readCache(code);
     if (cached) {
-      registry[code] = cached; current = code; writePref(code);
+      registry[code] = cached; current = code; writePref(code); applyLang(code);
       return Promise.resolve({ ok: true, code: code });
     }
     return fetchDict(code, fetcher).then(function (r) {
       if (!r.ok) return r;
       registry[code] = r.dict; writeCache(code, r.dict);
-      current = code; writePref(code);
+      current = code; writePref(code); applyLang(code);
       return { ok: true, code: code };
     });
   }
@@ -184,6 +196,7 @@ var I18n = (function () {
   function loadCached(fetcher) {
     current = readPref();
     writePref(current);
+    applyLang(current); /* boot hint: <html lang> matches the pref immediately */
     var codes = (current === "en") ? ["en"] : ["en", current];
     var chain = Promise.resolve();
     codes.forEach(function (code) {

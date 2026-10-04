@@ -117,7 +117,15 @@ var GatewayUI = (function () {
     if (typeof prec === "number" && /^\d+$/.test(String(raw))) { try { return Format.formatAmount(String(raw), prec); } catch (e) {} }
     return String(raw);
   }
-  function fmtTime(at) { try { return new Date(at).toLocaleString(); } catch (e) { return String(at); } }
+  /* Health timestamp -> locale date-time via I18n.date (R-A-W6 V9 funnel:
+   * prefs-locale tag, medium date+time; falls back to the old bare call when
+   * i18n.js failed to load). h.at is Date.now() epoch ms — new Date() parses
+   * it the same inside I18n.date. Never throws. */
+  function fmtTime(at) {
+    try {
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") return I18n.date(at);
+    } catch (e) { /* fallback below */ }
+    try { return new Date(at).toLocaleString(); } catch (e2) { return String(at); } }
   function findEntry(id) {
     var list = Gateway.list(), want = String(id || "XBTSX").toUpperCase(), i;
     for (i = 0; i < list.length; i++) if (list[i].id === want) return list[i];

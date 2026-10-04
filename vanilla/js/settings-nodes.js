@@ -485,8 +485,14 @@ var SettingsNodes = (function () {
     return null;
   }
   /* Minutes-since text for a last-good stamp (whole minutes, floor).
+   * Single-owner funnel (R-A-W6 V8): canonical shaping lives in
+   * Duration.agoMinutes; delegates when duration.js loaded, else the
+   * verbatim fallback below (byte-identical — vectors still pass standalone).
    * Params: t epoch ms (or null). Returns e.g. "5m ago" or null. */
   function agoMinutes(t) {
+    try {
+      if (typeof Duration !== "undefined" && Duration && typeof Duration.agoMinutes === "function") return Duration.agoMinutes(t);
+    } catch (e) { return null; }
     if (!(typeof t === "number" && isFinite(t))) return null;
     var m = Math.floor(Math.max(0, Date.now() - t) / 60000);
     return (m < 1) ? "just now" : (m + "m ago");
