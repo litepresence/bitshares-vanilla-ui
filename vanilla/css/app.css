@@ -608,7 +608,16 @@ table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
  * buttons need an explicit 44px box (text buttons size themselves; a
  * bare × would miss the touch floor). --danger follows the footer
  * closed-host precedent for small red text. */
-.node-table .node-remove, .node-card .node-remove { min-width: 44px; color: var(--danger); font-weight: 700; font-size: 1.1rem; }
+/* Remove column ×: speaks the subtle-button language (transparent,
+ * borderless, text-colored like .toast-x) instead of the solid primary
+ * button chrome. Neutral at rest; the red (destructive meaning) appears
+ * on hover only. --text reads near-white in the dark themes and dark ink
+ * in the light theme, where a literal white × would vanish — hence the
+ * token, not #fff. */
+.node-table .node-remove, .node-card .node-remove { min-width: 44px; background: transparent; border: 0; color: var(--text); font-weight: 700; font-size: 1.1rem; }
+@media (hover:hover) {
+  .node-table .node-remove:hover, .node-card .node-remove:hover { color: var(--danger); transition: color 120ms ease; }
+}
 .node-table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 /* Clickable offer rows (row click opens the loan modal; the per-row Borrow
  * button is the touch/keyboard path — no hover-dependent UI). */
