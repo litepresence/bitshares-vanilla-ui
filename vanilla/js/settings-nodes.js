@@ -591,9 +591,9 @@ var SettingsNodes = (function () {
     } catch (e) { /* "" below */ }
     return "";
   }
-  /* listNetwork: which default list owns a URL (customs return "").
-   * Params: url string. Returns "mainnet"|"testnet"|"". Never throws
-   * (Store missing -> ""). */
+  /** listNetwork: which default list owns a URL (customs return "").
+   * @param {string} url - node URL string.
+   * @returns {"mainnet"|"testnet"|""} owning default list, or "" for customs. Never throws (Store missing -> ""). */
   function listNetwork(url) {
     try {
       if (typeof url !== "string" || !url) return "";
@@ -606,9 +606,9 @@ var SettingsNodes = (function () {
     return "";
   }
 
-  /* netFromChain: network for an observed chain id (customs after probe).
-   * Params: chainId string|null. Returns "mainnet"|"testnet"|"".
-   * Never throws (ids missing -> ""). */
+  /** netFromChain: network for an observed chain id (customs after probe).
+   * @param {string|null} chainId - observed chain id string or null.
+   * @returns {"mainnet"|"testnet"|""} matching network, or "". Never throws (ids missing -> ""). */
   function netFromChain(chainId) {
     try {
       if (typeof chainId !== "string" || !chainId) return "";
@@ -620,10 +620,11 @@ var SettingsNodes = (function () {
     return "";
   }
 
-  /* networkLabel: NETWORK cell text. Params: t (injected lookup), net
-   * ("mainnet"|"testnet"|""), chainId (observed or null). Returns the
-   * keyed network name, the 4-char chain prefix, or the keyed dash.
-   * Never throws. */
+  /** networkLabel: NETWORK cell text.
+   * @param {Function} t - injected lookup.
+   * @param {string} net - "mainnet"|"testnet"|"".
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} the keyed network name, the 4-char chain prefix, or the keyed dash. Never throws. */
   function networkLabel(t, net, chainId) {
     var dash = "—";
     try { dash = String(t("settings.dash", "—")); } catch (e) { /* dash stands */ }
@@ -635,11 +636,10 @@ var SettingsNodes = (function () {
     return dash;
   }
 
-  /* networkHealth: NETWORK cell color. Params: net, chainId (observed or
-   * null). Returns "good" (mainnet chain) | "warn" (testnet or any other
-   * chain — owner rule: yellow unless 4018) | "bad" (listed default
-   * answering a foreign chain) | "" (unprobed: unknown never guesses).
-   * Never throws. */
+  /** networkHealth: NETWORK cell color.
+   * @param {string} net - "mainnet"|"testnet"|"".
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} "good" (mainnet chain) | "warn" (testnet or any other chain — owner rule: yellow unless 4018) | "bad" (listed default answering a foreign chain) | "" (unprobed: unknown never guesses). Never throws. */
   function networkHealth(net, chainId) {
     try {
       if (typeof chainId !== "string" || !chainId) return "";
@@ -654,6 +654,7 @@ var SettingsNodes = (function () {
       return "warn";
     } catch (e) { return ""; }
   }
+
   /* geoText: pure location-cell content. Params: t (injected lookup, dash
    *   only), label (Geo.lookup "City, Region" string or null). Returns the
    *   label verbatim (user/chain string — textContent-only downstream) or
