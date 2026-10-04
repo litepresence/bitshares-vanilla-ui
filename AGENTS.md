@@ -73,7 +73,7 @@
 > - **#9 — BROWSE AS ANYONE, SIGN AS YOURSELF.** It is a public blockchain:
 >   every page renders any account's data with NO login — reads never gate on
 >   unlock. The password is asked ONLY at signing. Acting-as defaults to
->   `committee-account` (`1.2.0`, verified on both chains; `1.2.5` is
+>   `committee-account` (`1.2.0`, verified on both chains — see parity note `vanilla/notes/committee-account.md`; `1.2.5` is
 >   proxy-to-self, not the default) with an honest viewing-as notice.
 > - **#10 — EVERY LANGUAGE, FULLY.** BitShares is global; the wallet speaks
 >   every supported language completely — every display string keyed, every
