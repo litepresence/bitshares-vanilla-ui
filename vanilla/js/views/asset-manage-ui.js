@@ -273,7 +273,7 @@ var AssetManageUI = (function () {
           })().catch(function (e) { r2.disabled = false; err(d, v,e,t("asset.bitasset_prepare_failed", "Could not prepare the bitasset update.")); }); });
       }
       /* op-13 producers */
-      v.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op 13)")));
+      v.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op %(op)s)", { op: 13 })));
       var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
       pa.input.setAttribute("autocomplete", "off");
       v.appendChild(pa.row);

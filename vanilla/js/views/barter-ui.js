@@ -169,7 +169,7 @@ var BarterUI = (function () {
     /* PUBLIC-FIRST: no wallet gate — form + preview render locked. */
     var lockedBar = !isUnlockedNow();
     if (lockedBar) DOM.append(wrap, viewingAsNotice(doc));
-    DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
+    DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op %(op)s, fee-payer = Peer A).", { op: 22 }), "muted"));
     var fA = Forms.labeledInput(doc, t("barter.peer_a_account", "Peer A account") + " ", lockedBar
       ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
@@ -220,7 +220,7 @@ var BarterUI = (function () {
     var fExp = Forms.labeledInput(doc, t("barter.proposal_expiration", "Proposal expiration") + " ", { type: "datetime-local", value: defaultExpiration() });
     var fRev = Forms.labeledInput(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric" });
     DOM.append(wrap, fExp.row); DOM.append(wrap, fRev.row);
-    var propose = touchable(DOM.el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op 22)")));
+    var propose = touchable(DOM.el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op %(op)s)", { op: 22 })));
     propose.type = "button"; propose.disabled = true;
     propose.title = t("barter.preview_the_barter_first_proposing_needs_reso", "Preview the barter first — proposing needs resolved legs.");
     DOM.append(wrap, propose);
@@ -313,7 +313,7 @@ var BarterUI = (function () {
      [t("barter.expiration", "Expiration"), built.pair[1].expiration_time],
      [t("barter.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("barter.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
      [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)]];
-    var dlg = ConfirmDialog.show({ title: t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)"),
+    var dlg = ConfirmDialog.show({ title: t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op %(op)s)", { op: 22 }),
       rows: rows, feeHuman: feeHuman, feeTerm: t("common.fee_live", "Fee (live)"),
       backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },

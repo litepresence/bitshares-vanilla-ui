@@ -508,8 +508,9 @@ var TransferUI = (function () {
     wrap.appendChild(proposerF.row);
     wrap.appendChild(expiryF.row);
     wrap.appendChild(reviewPeriodF.row);
+    var _pv = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
     var proposeNotice = DOM.el(doc, "p",
-      t("transfer.propose_notice_locked", "Proposer defaults to committee-account (1.2.0) while locked — unlock to act as yourself.") + " " + t("transfer.propose_notice_fee", "Proposal fee is quoted live in the core asset at review."), "muted");
+      t("transfer.propose_notice_locked", "Proposer defaults to %(name)s (%(id)s) while locked — unlock to act as yourself.", { name: _pv.name, id: _pv.id }) + " " + t("transfer.propose_notice_fee", "Proposal fee is quoted live in the core asset at review."), "muted");
     wrap.appendChild(proposeNotice);
 
     /* Toggle refresh: button emphasis + propose-field visibility + Review
@@ -1370,14 +1371,14 @@ var TransferUI = (function () {
         Format.formatAmount(leg.amountInt, leg.asset.precision) + " " + leg.asset.symbol, leg.amountInt],
       [t("confirm.memo", "Memo"), memoText],
       [t("confirm.network", "Network"), networkNameLocal()]];
-    var dlg = ConfirmDialog.show({ title: t("transfer.confirm_proposal_title", "Confirm proposal (op 22)"),
+    var dlg = ConfirmDialog.show({ title: t("transfer.confirm_proposal_title", "Confirm proposal (op %(op)s)", { op: 22 }),
       rows: rows, feeHuman: fh.text, feeTerm: t("common.fee_live", "Fee (live)"),
       backLabel: t("confirm.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { if (typeof onBack === "function") onBack(); },
       onSend: function () { doPropSend(); } });
     /* Enclosed-op note + raw op JSON ride inside the dialog above its
      * actions (old rows-then-notes-then-buttons order, textContent-only). */
-    var noteEl = DOM.el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op 0) — executes only after approvals."), "muted");
+    var noteEl = DOM.el(doc, "p", t("transfer.enclosed_op_note", "Enclosed op: transfer (op %(op)s) — executes only after approvals.", { op: 0 }), "muted");
     var detOp = doc.createElement("details");
     detOp.className = "raw";
     var sumOp = doc.createElement("summary");

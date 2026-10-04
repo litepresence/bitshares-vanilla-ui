@@ -944,7 +944,7 @@ var InstantTradeUI = (function () {
     });
     var previewWarn = null;
     if (locked) {
-      previewWarn = t("instant.preview_balances_note", "Previewing as committee-account (1.2.0) — balances not checked. Unlock to validate yours before signing.");
+      previewWarn = t("instant.preview_balances_note", "Previewing as %(name)s (%(id)s) — balances not checked. Unlock to validate yours before signing.", { name: me.name, id: me.id });
     } else if (!sellBal || BigInt(sellBal.raw) < BigInt(sellRaw)) {
       throw new Error("Insufficient balance: have " + (sellBal ? Format.formatAmount(sellBal.raw, sellBal.precision) + " " + sellBal.symbol : "0") + ".");
     }

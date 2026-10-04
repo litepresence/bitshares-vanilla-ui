@@ -190,21 +190,21 @@ var BorrowUI = (function () {
     var doc = ctx.doc, myGen = ctx.myGen;
     var lockedB = !isUnlockedNow();
     if (lockedB) ctx.wrap.appendChild(viewingAsNotice(doc));
-    ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op 3 (call_order_update) on your call order."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op %(op)s (call_order_update) on your call order.", { op: 3 }), "muted"));
     var fAcct = Forms.labeledInput(doc, t("borrow.account", "Account") + " ", lockedB
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     ctx.wrap.appendChild(fAcct.row);
     var go = touchable(DOM.el(doc, "button", t("borrow.load_positions", "Load positions"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
-    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.adjust_position_op_3", "Adjust position (op 3)")));
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.adjust_position_op_3", "Adjust position (op %(op)s)", { op: 3 })));
     if (lockedB) ctx.wrap.appendChild(signNotice(doc));
     var formBox = DOM.el(doc, "div"); ctx.wrap.appendChild(formBox);
     /* Punchlist HIGH: borrow-to-create lives here — always offered, needs no
      * position (the gap was adjust-only). New-form words are literals until
      * the next locale batch mints borrow.* keys; dicts untouched, check_i18n
      * stays green. */
-    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.open_a_new_position_op_3", "Open a new position (op 3)")));
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.open_a_new_position_op_3", "Open a new position (op %(op)s)", { op: 3 })));
     ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.no_position_yet_lock_collateral_to_borrow_a_b", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above."), "muted"));
     var openBoxEl = DOM.el(doc, "div"); ctx.wrap.appendChild(openBoxEl);
     openBox(doc, openBoxEl, myGen);
@@ -778,7 +778,7 @@ var BorrowUI = (function () {
    * Layout: asset input + Check button, then fund line + existing-bids table
    * (get_collateral_bids) always, bid form only while a fund exists. */
   function settleSection(doc, wrap, myGen) {
-    wrap.appendChild(DOM.el(doc, "h2", t("borrow.settlement_bids_op_45", "Settlement bids (op 45)")));
+    wrap.appendChild(DOM.el(doc, "h2", t("borrow.settlement_bids_op_45", "Settlement bids (op %(op)s)", { op: 45 })));
     wrap.appendChild(DOM.el(doc, "p", t("borrow.after_a_bitasset_globally_settles_anyone_can", "After a bitasset globally settles, anyone can bid collateral to take over part of the debt and the settlement fund (BSIP-0018). Enter the settled asset: the fund and existing bids always read; the bid form appears only while a settlement fund exists."), "muted"));
     var fAsset = Forms.labeledInput(doc, t("borrow.settled_asset_symbol_or_1_3_x", "Settled asset (symbol or 1.3.x)") + " ", { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
     wrap.appendChild(fAsset.row);

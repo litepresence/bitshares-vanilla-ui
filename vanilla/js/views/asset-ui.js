@@ -276,7 +276,7 @@ var AssetUI = (function () {
      * the viewing-as account; opening it from an account page keeps context.
      * Batch-3 i18n: keyed. */
     (function issuerNote() {
-      var p = el(d, "p", t("asset.issuer_defaults_to_the_viewing_as_accoun", "Issuer defaults to the viewing-as account (1.2.0 locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here."), "muted");
+      var p = el(d, "p", t("asset.issuer_defaults_to_the_viewing_as_accoun", "Issuer defaults to the viewing-as account (%(id)s locked, your account unlocked) — type any issuer you control. Opened from an account page, paste that account name here.", { id: issuerDef }), "muted");
       var a = el(d, "a", t("asset.open_an_account", "Open an account"));
       a.setAttribute("href", "#/accounts");
       touch(a);

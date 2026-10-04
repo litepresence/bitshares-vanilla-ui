@@ -162,7 +162,7 @@ var CreateWorkerUI = (function () {
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(DOM.pageHead(doc, t("createworker.create_worker", "Create Worker"), null));
-    wrap.appendChild(DOM.el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op 34). Preview is live; review quotes the live fee, then Sign & Send broadcasts op 34 directly — workers are created by direct op, not by proposal."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op %(op)s). Preview is live; review quotes the live fee, then Sign & Send broadcasts op %(op)s directly — workers are created by direct op, not by proposal.", { op: 34 }), "muted"));
     /* LOW punchlist: lifetime-member requirement note + per-field helper
      * texts (CreateWorker concept). Batch-3 i18n: keyed, no new routes. */
     wrap.appendChild(DOM.el(doc, "p", t("createworker.publishing_a_worker_requires_a_lifeti", "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded."), "muted"));
@@ -313,7 +313,7 @@ var CreateWorkerUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.pageHead(doc, t("createworker.worker_preview_op_34", "Worker preview (op 34)"), null));
+    wrap.appendChild(DOM.pageHead(doc, t("createworker.worker_preview_op_34", "Worker preview (op %(op)s)", { op: 34 }), null));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));
@@ -369,7 +369,7 @@ var CreateWorkerUI = (function () {
    * review button; onSent locks it so a created worker can never be
    * double-signed from a stale confirm. */
   function paintConfirm(doc, box, myGen, P, R, opData, onBack, onSent) {
-    box.appendChild(DOM.el(doc, "h2", t("createworker.confirm_worker_op_34", "Confirm worker (op 34)")));
+    box.appendChild(DOM.el(doc, "h2", t("createworker.confirm_worker_op_34", "Confirm worker (op %(op)s)", { op: 34 })));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));

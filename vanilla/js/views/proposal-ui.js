@@ -593,8 +593,10 @@ var ProposalUI = (function () {
     /* Public-by-default (gate-repair): locked viewers browse as the
      * committee-account until they unlock and act as themselves. */
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     var fA = Forms.labeledInput(doc, t("proposal.account_for_approvals", "Account for approvals") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
@@ -684,7 +686,7 @@ var ProposalUI = (function () {
             return now.length > before ? now[now.length - 1] : null;
           } };
       },
-      title: t("proposal.confirm_proposal_create_op_22", "Confirm proposal create (op 22)"),
+      title: t("proposal.confirm_proposal_create_op_22", "Confirm proposal create (op %(op)s)", { op: 22 }),
       rows: function (built, f) {
         return [[t("proposal.fee_payer", "Fee payer"), built.pair[1].fee_paying_account], [t("proposal.expiration", "Expiration"), timeHuman(built.pair[1].expiration_time)],
           [t("proposal.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("proposal.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
@@ -752,8 +754,10 @@ var ProposalUI = (function () {
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v2 = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     showStatus(doc, ctx.wrap, t("proposal.loading_proposal", "Loading proposal…"));
     Proposal.proposal(id).then(function (p) {
@@ -818,14 +822,14 @@ var ProposalUI = (function () {
           },
           ok: function () { return "Approval " + (ab[1] ? "removed" : "recorded") + " and re-read on chain."; } });
       });
-      ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op 24)")));
+      ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op %(op)s)", { op: 24 })));
       var fD = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fD.row);
       var chk = doc.createElement("input"); chk.type = "checkbox"; touchable(chk);
       var chkRow = Forms.fieldRow(doc, t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "), chk);
       ctx.wrap.appendChild(chkRow);
       var dbox = DOM.el(doc, "div"); ctx.wrap.appendChild(dbox);
-      reviewSection(doc, dbox, myGen, t("proposal.delete_proposal_op_24", "Delete proposal (op 24)"), {
+      reviewSection(doc, dbox, myGen, t("proposal.delete_proposal_op_24", "Delete proposal (op %(op)s)", { op: 24 }), {
         build: async function () {
           var payer = await Account.resolve(fD.input.value.trim() || "1.2.0");
           var pair = Proposal.buildDelete({ feePayerId: payer.id, proposalId: String(p.id), usingOwner: !!chk.checked });
@@ -836,7 +840,7 @@ var ProposalUI = (function () {
               catch (e) { return (String((e && e.message) || e).indexOf("unknown-proposal") !== -1) ? { gone: true } : null; }
             } };
         },
-        title: t("proposal.confirm_proposal_delete_op_24", "Confirm proposal delete (op 24)"),
+        title: t("proposal.confirm_proposal_delete_op_24", "Confirm proposal delete (op %(op)s)", { op: 24 }),
         rows: function (built, f) {
           return [[t("proposal.proposal", "Proposal"), String(p.id)], [t("proposal.owner_authority", "Owner authority"), chk.checked ? t("proposal.yes_veto", "yes (veto)") : t("proposal.no", "no")], [t("common.fee_live", "Fee (live)"), f]];
         },

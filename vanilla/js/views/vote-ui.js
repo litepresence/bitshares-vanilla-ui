@@ -770,7 +770,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       var sendRejected = e && e.sendRejected === true;
       var isSentinel = (newOptions.voting_account || PROXY_SENTINEL) === PROXY_SENTINEL;
       if (!sendRejected || !isSentinel) throw e;
-      onStep(t("vote.retry_self", "Node rejected the 1.2.5 proxy mode — retrying once as self…"));
+      onStep(t("vote.retry_self", "Node rejected the %(mode)s proxy mode — retrying once as self…", { mode: PROXY_SENTINEL }));
       var selfOptions = {
         memo_key: newOptions.memo_key,
         voting_account: st.me.id,
@@ -876,8 +876,8 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       wrap.appendChild(ok);
       wrap.appendChild(el(doc, "p",
         res.retried
-          ? t("vote.retried_prefix", "The node rejected proxy mode 1.2.5, so the vote was published as self (voting_account ") + st.me.id + ")."
-          : t("vote.direct_note", "Published voting directly (voting_account 1.2.5)."), "muted"));
+          ? t("vote.retried_prefix", "The node rejected proxy mode %(mode)s, so the vote was published as self (voting_account %(id)s).", { mode: PROXY_SENTINEL, id: st.me.id })
+          : t("vote.direct_note", "Published voting directly (voting_account %(id)s).", { id: PROXY_SENTINEL }), "muted"));
     }
     var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
     back.setAttribute("href", "#/voting");
@@ -1209,7 +1209,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
    *   myGen, spec {kind, opId, isUpdate, account {id,name}, opData, feeRaw}. */
   function showJoinConfirm(doc, box, root, st, myGen, spec) {
     while (box.firstChild) box.removeChild(box.firstChild);
-    box.appendChild(el(doc, "h2", spec.isUpdate ? t("vote.confirm_witness_update_op_21", "Confirm witness update (op 21)")
+    box.appendChild(el(doc, "h2", spec.isUpdate ? t("vote.confirm_witness_update_op_21", "Confirm witness update (op %(op)s)", { op: 21 })
       : (spec.kind === "witness" ? "Confirm witness join (op 20)" : "Confirm committee join (op 29)")));
     var list = el(doc, "dl", null, "vote-confirm");
     function row(term, text, title) {

@@ -20,10 +20,13 @@ var AssetFeedUI = (function () {
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
    * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
   var CORE = "1.3.0", PLACES = 8;
@@ -153,8 +156,10 @@ var AssetFeedUI = (function () {
     /* No entry unlock gate: reads are public; signing gates at send time. */
     w.appendChild(DOM.pageHead(d, t("asset.feed_title", "Publish feed"), "assets"));
     try {
-      if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
-        w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as committee-account (1.2.0) — unlock to sign."), "muted"));
+      if (typeof Wallet === "undefined" || !Wallet.isUnlocked()) {
+        var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
+        w.appendChild(el(d, "p", t("asset.viewing_notice", "Viewing as %(name)s (%(id)s) — unlock to sign.", { name: _v.name, id: _v.id }), "muted"));
+      }
     } catch (e) { /* notice is display-only */ }
     var s = Forms.labeledInput(d, t("asset.smartcoin_field", "Smartcoin symbol") + " ", { id: "af-sym", value: "", placeholder: "e.g. TESTMPA", autocomplete: "off" });
     w.appendChild(s.row);
@@ -205,7 +210,7 @@ var AssetFeedUI = (function () {
    * Publisher defaults to public 1.2.0 (gate-repair); blank also falls back
    * to 1.2.0 — never myAccountId at render; the WIF throw at send is the gate. */
   function publishForm(d, body, root, g, info, backing, backingPrec) {
-    body.appendChild(el(d, "h2", t("asset.publish_op19_title", "Publish feed (op 19)")));
+    body.appendChild(el(d, "h2", t("asset.publish_op19_title", "Publish feed (op %(op)s)", { op: 19 })));
     var pub = Forms.labeledInput(d, t("asset.publisher_field", "Publisher (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
     var sb = Forms.labeledInput(d, "Settlement base (human, " + info.symbol + ")" + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
     var sq = Forms.labeledInput(d, t("asset.settle_quote_field", "Settlement quote (human, backing)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
@@ -288,7 +293,7 @@ var AssetFeedUI = (function () {
    * Acting account is explicit (public 1.2.0 default, gate-repair) — never
    * myAccountId at render; issuer check + WIF throw gate the write path. */
   function producerForm(d, body, root, g, info) {
-    body.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op 13)")));
+    body.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op %(op)s)", { op: 13 })));
     var whoF = Forms.labeledInput(d, t("asset.acting_field", "Acting account (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
     body.appendChild(whoF.row);
     var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
