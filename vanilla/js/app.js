@@ -551,7 +551,7 @@ var App = (function () {
    *   refreshes on its TTL regardless of this skip). */
   var lastFootKey = null;
   function paintFooter(status) {
-    paintVersion(status);
+    paintVersion();
     var foot = document.getElementById("appfoot-status");
     if (!foot) return;
     var s = status || {};

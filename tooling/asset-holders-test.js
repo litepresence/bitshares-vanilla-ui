@@ -96,7 +96,10 @@ ok(SRC.indexOf('t("asset.holders_account", "Account")') !== -1, "keyed holders_a
 ok(SRC.indexOf('t("asset.holders_balance", "Balance")') !== -1, "keyed holders_balance");
 ok(SRC.indexOf('t("asset.holders_unavailable", "Top holders unavailable — the community index is off or unreachable; check Settings.")') !== -1, "keyed holders_unavailable");
 
-/* Locale contracts: 4 keys in all 10 dicts, en values byte-identical. */
+/* Locale contracts: en values byte-identical; every dict carries the keys
+ * (translated values owned by translators — check_i18n.py requires
+ * allowlisted translations to DIFFER from en, so byte-equality everywhere
+ * would contradict the binding gate). */
 var NEW_KEYS = {
   holders_title: "Top holders",
   holders_account: "Account",
@@ -107,7 +110,8 @@ var NEW_KEYS = {
   var d = JSON.parse(fs.readFileSync(
     path.join(__dirname, "..", "vanilla", "locales", code + ".json"), "utf8"));
   Object.keys(NEW_KEYS).forEach(function (k) {
-    eq(d.asset[k], NEW_KEYS[k], code + ".json asset." + k);
+    ok(typeof d.asset[k] === "string" && d.asset[k], code + ".json asset." + k + " present");
+    if (code === "en") eq(d.asset[k], NEW_KEYS[k], "en.json asset." + k + " byte-identical");
   });
 });
 var en = JSON.parse(fs.readFileSync(

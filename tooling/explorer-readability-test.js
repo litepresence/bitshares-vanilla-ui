@@ -9,6 +9,13 @@
  */
 "use strict";
 var assert = require("assert");
+// Activity module first (mirrors index.html script order): the facade
+// resolves sentenceFor/pillFor via globalThis at CALL time, so the module
+// must be on globalThis in Node just as the script tag puts it in browsers.
+global.ExplorerBlocksActivity = global.ExplorerBlocksActivity ||
+  require("../vanilla/js/views/explorer-blocks-activity.js");
+global.DOM = global.DOM || require("../vanilla/js/utils/dom.js");
+global.touchable = global.touchable || require("../vanilla/js/utils/touchable.js");
 var ExplorerBlocks = require("../vanilla/js/views/explorer-blocks.js");
 var Explorer = require("../vanilla/js/api/explorer.js");
 global.Format = global.Format || require("../vanilla/js/api/format.js");
