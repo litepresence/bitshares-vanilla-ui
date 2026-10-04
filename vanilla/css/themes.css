@@ -64,6 +64,10 @@
    * status glow, which is what reporters flagged). */
   --flash: #6b6b6b;
 --border: rgba(128, 128, 128, 0.45); --header-bg: rgba(0, 0, 0, 0.6); --header-text: #ffffff;
+  /* --hover-wash: header/nav hover tint (white 8% over the dark header bar —
+   * same value in all three themes: every header bar is dark, see --header-bg).
+   * Brand/burger hover + nav link hover/current + directory hover in app.css. */
+  --hover-wash: rgba(255, 255, 255, 0.08);
   --plot-bg: #1e1e1e;
   /* --panel-deep: alternating-row stripe (pools + credit open-offers tables).
    * #373737 = PALETTE.md dark settings-menu-hover-bg ($settings-menu-hover-bg):
@@ -130,6 +134,8 @@
   /* --flash: same old-UI #6b6b6b row flash as ref-ui-theme (parity value). */
   --flash: #6b6b6b;
   --border: #E5DCC8; --header-bg: #2A1A12; --header-text: #FAF6EA;
+  /* --hover-wash: same dark-bar wash as ref-ui-theme (header bar is chocolate). */
+  --hover-wash: rgba(255, 255, 255, 0.08);
   --plot-bg: #ffffff;
   /* --panel-deep: warm stripe between cream ground --bg #FAF6EA and the
    * cream-darkened --border #E5DCC8 (both tub-derived) — reads as shadowed
@@ -216,6 +222,8 @@
   /* --flash: same old-UI #6b6b6b row flash as ref-ui-theme (parity value). */
   --flash: #6b6b6b;
   --border: #2a2e39; --header-bg: #131722; --header-text: #ffffff;
+  /* --hover-wash: same dark-bar wash as ref-ui-theme (header bar is near-black). */
+  --hover-wash: rgba(255, 255, 255, 0.08);
   /* --panel-deep: Crypo nav-strip surface #1c2030 (style.css:1869/.market-pairs
    * .nav, :1883/.heading, :1914/.market-history .nav). DEVIATION recorded:
    * --bg == --panel here, so no darker Crypo surface exists; even rows LIFT

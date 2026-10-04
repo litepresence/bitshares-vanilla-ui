@@ -107,8 +107,6 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
   font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.05em; }
-a.btn-ghost { background: transparent; color: var(--accent);
-  border: 1px solid var(--accent); }
 /* Depth scale toggles (price/vol log-lin, session-only). */
 .mkt-scalerow { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 8px; }
 .mkt-scalerow button { min-height: 44px; padding: 6px 14px; border: 1px solid var(--border);
@@ -181,7 +179,7 @@ a.btn-ghost { background: transparent; color: var(--accent);
   #nav { display: none; flex-direction: column; }
   #nav.open { display: flex; }
 }
-.node-table { width: 100%; border-collapse: collapse; background: var(--panel); }
+.node-table, .xplore-scroll table { width: 100%; border-collapse: collapse; background: var(--panel); }
 .node-table th, .node-table td { padding: 12px; border-bottom: 1px solid var(--border);
   text-align: left; }
 /* Node-table health signals: the SAME tokens as the lower-left footer host
@@ -253,8 +251,14 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
 /* Touch floor class (fallback for non-JS or missed elements) */
 .touchable { min-height: 44px; min-width: 44px; }
 
-/* Ghost — secondary/destructive: transparent + accent border → solid accent on hover */
-.btn-ghost {
+/* Ghost — secondary/destructive: transparent + accent border → solid accent on hover.
+ * One shared base (was 4 identical triples: .btn-ghost, dashboard a.btn-ghost,
+ * .menu-card CTA, transfer Send/Propose inactive side). Grouped selectors keep
+ * their own specificity; .menu-card:hover + .btn-ghost:hover below still win. */
+.btn-ghost,
+a.btn-ghost,
+.menu-card,
+.xfer-mode button[aria-pressed="false"] {
   background: transparent;
   color: var(--accent);
   border: 1px solid var(--accent);
@@ -267,8 +271,22 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
   }
 }
 
-/* Subtle — tabs/pagers/inline/icon-only: transparent text → accent color + underline */
-.subtle-btn {
+/* Subtle — tabs/pagers/inline/icon-only: transparent text → accent color + underline.
+ * One shared base (was 4 identical blocks: .subtle-btn + trade/mkt tab group +
+ * pager/quotes/scalerow/indmenu/star/bell/toast-x group + raw summary). Grouped
+ * selectors keep their own specificity; later base rules (tab muted, toast-x
+ * muted, indmenu panel, bell card) still win where they differ. */
+.subtle-btn,
+.trade-tabs button,
+.mkt-tabs button,
+.pools-pager button,
+.mkt-quotes button,
+.mkt-scalerow button,
+.mkt-indmenu-btn,
+.mkt-star,
+.mkt-bell,
+.toast-x,
+details.raw > summary {
   background: transparent;
   color: var(--text);
   border: 0;
@@ -294,7 +312,6 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
   .btn-ghost:hover,
   .subtle-btn:hover,
   .trade-tabs button:hover,
-  .order-tabs a:hover,
   .mkt-tabs button:hover,
   .mkt-bell:hover,
   .mkt-star:hover,
@@ -305,12 +322,7 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
   }
 }
 
-/* Menu cards are CTAs → ghost variant semantics */
-.menu-card {
-  background: transparent;
-  color: var(--accent);
-  border: 1px solid var(--accent);
-}
+/* Menu cards ride the shared .btn-ghost base above (transparent + accent border) */
 @media (hover:hover) {
   .menu-card:hover {
     background: var(--accent);
@@ -321,38 +333,9 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
   }
 }
 
-/* Trade/order/mkt tabs → subtle variant (transparent, underline on hover via existing gradient) */
-.trade-tabs button,
-.order-tabs a,
-.mkt-tabs button {
-  background: transparent;
-  color: var(--text);
-  border: 0;
-}
-
-/* Pools pager / mkt-quotes / scalerow / indmenu / star / bell / toast-x → subtle */
-.pools-pager button,
-.mkt-quotes button,
-.mkt-scalerow button,
-.mkt-indmenu-btn,
-.mkt-star,
-.mkt-bell,
-.toast-x {
-  background: transparent;
-  color: var(--text);
-  border: 0;
-}
-
-/* Raw summary → subtle */
-details.raw > summary {
-  background: transparent;
-  color: var(--text);
-  border: 0;
-}
-
 /* Table headers match the original: uppercase, small, letterspaced
  * (account/pools captures: ASSET/QTY/IN ORDERS/… grey caps row). */
-.node-table th { text-transform: uppercase; font-size: 0.78rem;
+.node-table th, .xplore-scroll table th { text-transform: uppercase; font-size: 0.78rem;
   letter-spacing: 0.05em; font-weight: 600; }
 /* Vendored icons (js/icon.js <img>): 1em box, baseline-aligned; monochrome
  * glyphs follow the theme via --icon-filter (themes.css). Text fallback
@@ -379,14 +362,13 @@ details.raw > summary {
 #nav a .nav-icon { filter: invert(1); }
 #nav a { font-weight: 700; }
 #nav a .nav-icon { margin-right: 8px; }
-/* Bell/star/cell icons: image replaces emoji 1:1; star-off dims the
+/* Bell/star icons: image replaces emoji 1:1; star-off dims the
  * un-favorited state (shape carries state; aria-pressed is the source). */
 .mkt-bell .bell-icon { width: 1.2em; height: 1.2em; }
 .mkt-bell .bell-dot { color: var(--accent); font-size: 0.8em; margin-left: 2px; }
 .mkt-star .star-icon { width: 1.2em; height: 1.2em; }
 .mkt-star .star-off { opacity: 0.35; }
 .mkt-picker-row .star-icon { width: 1em; height: 1em; margin-right: 4px; }
-td .cell-icon { width: 1.1em; height: 1.1em; }
 .error { color: var(--danger); } .muted { color: var(--muted); }
 /* Retro round 3 — picker CHANGE colors (text only, no layout shift):
  * positive green / negative red / zero muted via theme tokens. (0,2,0)
@@ -416,7 +398,7 @@ td .cell-icon { width: 1.1em; height: 1.1em; }
 .mkt-stat { white-space: nowrap; }
 .mkt-stat strong { font-weight: 600; }
 /* Chart control rows: timeframe radios, indicator checkboxes, osc radios. */
-.mkt-tfrow, .mkt-indrow, .mkt-oscrow { display: flex; flex-wrap: wrap;
+.mkt-tfrow, .mkt-indrow { display: flex; flex-wrap: wrap;
   align-items: center; gap: 4px 12px; margin: 6px 0; }
 .mkt-tf, .mkt-ind, .mkt-kind { display: inline-flex; align-items: center;
   gap: 6px; min-height: 44px; padding: 0 8px 0 0; }
@@ -546,27 +528,22 @@ body { padding-bottom: 64px; }
 
 /* Buy/sell order tabs (dexux-ref LIMIT/SCALED shape: uppercase text tabs,
  * active tab = accent text + 2px underline). Buttons keep their ids and
- * behavior; this is skin only. */
-.trade-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
-  margin: 8px 0 12px; }
-.trade-tabs button { background: transparent; color: var(--muted); border: 0;
+ * behavior; this is skin only. Containers + button base are shared with the
+ * pool/vote/explorer tab rows below (one declaration site; per-variant gap /
+ * wrap deltas kept separate because trade/mkt don't wrap while vote/xplore do;
+ * hover/active rules stay per-variant). */
+.trade-tabs, .mkt-tabs, .vote-tabs, .xplore-tabs { display: flex;
+  border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
+.trade-tabs, .mkt-tabs { gap: 16px; }
+.vote-tabs, .xplore-tabs { flex-wrap: wrap; gap: 0 16px; }
+.trade-tabs button, .mkt-tabs button, .vote-tabs .vote-tab, .xplore-tab {
+  background: transparent; color: var(--muted); border: 0;
   border-radius: 0; border-bottom: 2px solid transparent;
   padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
   letter-spacing: 0.06em; text-transform: uppercase; }
 .trade-tabs button:hover { color: var(--text); }
 .trade-tabs button[aria-current="true"] { color: var(--accent);
   border-bottom-color: var(--accent); }
-/* Instant-trade LIMIT/SCALED strip: same shape; SCALED is a plain anchor to
- * the full desk (instant trade itself is limit-only). */
-.order-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
-  margin: 8px 0 12px; font-size: 0.85rem; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; }
-.order-tabs .order-tab-active { color: var(--accent); padding: 8px 4px;
-  border-bottom: 2px solid var(--accent); }
-.order-tabs a { color: var(--muted); text-decoration: none; padding: 8px 4px;
-  border-bottom: 2px solid transparent; min-height: 44px;
-  display: inline-flex; align-items: center; }
-.order-tabs a:hover { color: var(--text); }
 
 /* Input unit suffixes (dexux-ref: "0.0  BITUSD / BTS" — unit box inside the
  * input row). The input keeps its id/value behavior; the suffix is a
@@ -944,7 +921,7 @@ img, canvas, pre { max-width: 100%; }
  * Touch devices ignore hover and tap straight through — no hover-dependent
  * UI (principle #7). Theme tokens only, all three themes keep working.
  * (Header theme select removed with its copies — rule deleted.) */
-.brand:hover, #nav-toggle:hover { background: rgba(255, 255, 255, 0.08); }
+.brand:hover, #nav-toggle:hover { background: var(--hover-wash); }
 .brand, #nav-toggle { border-radius: 6px; }
 .brand:focus-visible, #nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -957,13 +934,13 @@ img, canvas, pre { max-width: 100%; }
 #nav { background: var(--header-bg); color: var(--header-text);
   border-bottom: 1px solid var(--border); }
 #nav a { color: var(--header-text); }
-#nav a:hover { background: rgba(255, 255, 255, 0.08); }
-#nav a[aria-current="page"] { outline: none; background: rgba(255, 255, 255, 0.08); }
+#nav a:hover { background: var(--hover-wash); }
+#nav a[aria-current="page"] { outline: none; background: var(--hover-wash); }
 #nav a[aria-current="page"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 #nav-directory { background: var(--header-bg); color: var(--header-text);
   border-top: 1px solid var(--border); }
 #nav-directory a { color: var(--header-text); }
-#nav-directory a:hover { background: rgba(255, 255, 255, 0.08); }
+#nav-directory a:hover { background: var(--hover-wash); }
 
 /* Pair stats strip type (target: big white values, small grey labels beneath).
  * DOM order (market-ind.js renderStrip, pool-detail-ui.js detailFill) is
@@ -995,13 +972,8 @@ img, canvas, pre { max-width: 100%; }
  * pool-detail-ui.js:606, market-desk.js:422, dashboard-ui.js:461,
  * market-picker.js (All/Starred), account-ui.js (acct-tabs) — previously
  * unstyled): same uppercase accent-underline treatment as .trade-tabs, so the
- * swap page's Pool/My history toggle reads like the desk. Buttons keep ids. */
-.mkt-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
-  margin: 8px 0 12px; }
-.mkt-tabs button { background: transparent; color: var(--muted); border: 0;
-  border-radius: 0; border-bottom: 2px solid transparent;
-  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; }
+ * swap page's Pool/My history toggle reads like the desk. Buttons keep ids.
+ * (Container + button base live in the shared tab rule by .trade-tabs.) */
 .mkt-tabs button:hover { color: var(--text); }
 .mkt-tabs button[aria-pressed="true"], .mkt-tabs button[aria-selected="true"] {
   color: var(--accent); border-bottom-color: var(--accent); }
@@ -1010,13 +982,8 @@ img, canvas, pre { max-width: 100%; }
  * rendered as a generic solid primary button and the active tab was
  * indistinguishable from the rest): same uppercase accent-underline
  * treatment as .mkt-tabs/.trade-tabs. vote-slate sets aria-selected AND
- * .active; asset-ui sets .active only — match both. Tokens only. */
-.vote-tabs { display: flex; gap: 16px; border-bottom: 1px solid var(--border);
-  margin: 8px 0 12px; flex-wrap: wrap; row-gap: 0; }
-.vote-tabs .vote-tab { background: transparent; color: var(--muted); border: 0;
-  border-radius: 0; border-bottom: 2px solid transparent;
-  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; }
+ * .active; asset-ui sets .active only — match both. Tokens only.
+ * (Container + button base live in the shared tab rule by .trade-tabs.) */
 .vote-tabs .vote-tab:hover { color: var(--text); }
 .vote-tabs .vote-tab.active, .vote-tabs .vote-tab[aria-selected="true"] {
   color: var(--accent); border-bottom-color: var(--accent); }
@@ -1065,13 +1032,8 @@ img, canvas, pre { max-width: 100%; }
   clip: rect(0 0 0 0); white-space: nowrap; }
 /* Explorer subtab bar: dark underline tabs like the original (grey caps,
  * active accent underline) — same treatment as .mkt-tabs so all tab rows
- * agree; wraps on phones so every tab stays visible at 360px. */
-.xplore-tabs { display: flex; flex-wrap: wrap; gap: 0 16px;
-  border-bottom: 1px solid var(--border); margin: 8px 0 12px; }
-.xplore-tab { background: transparent; color: var(--muted); border: 0;
-  border-radius: 0; border-bottom: 2px solid transparent;
-  padding: 8px 4px; min-height: 44px; font-size: 0.85rem; font-weight: 600;
-  letter-spacing: 0.06em; text-transform: uppercase; }
+ * agree; wraps on phones so every tab stays visible at 360px.
+ * (Container + button base live in the shared tab rule by .trade-tabs.) */
 .xplore-tab:hover { color: var(--text); }
 .xplore-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .xplore-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1203,7 +1165,7 @@ a#appfoot-status { text-decoration: none; color: inherit; }
    * as bordered pills, where a bottom gradient would hide under the border —
    * they get an accent border-color shift instead (same no-shift contract). */
   #nav a, .menu-card, .mkt-picker-list a,
-  .trade-tabs button, .order-tabs a {
+  .trade-tabs button {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 0% 2px;
     background-position: left bottom;
@@ -1212,7 +1174,7 @@ a#appfoot-status { text-decoration: none; color: inherit; }
       background-color 120ms ease;
   }
   #nav a:hover, .menu-card:hover, .mkt-picker-list a:hover,
-  .trade-tabs button:hover, .order-tabs a:hover {
+  .trade-tabs button:hover {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 100% 2px;
   }
@@ -1281,7 +1243,7 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
   .node-table tbody tr, table.pools-table tbody tr,
   tr.book-row, .book-row-card,
   #nav a, .menu-card, .mkt-picker-list a,
-  .trade-tabs button, .order-tabs a, .mkt-tabs button,
+  .trade-tabs button, .mkt-tabs button,
   .node-card, .dashboard-gate, .alert-row,
   .mkt-statstrip, .mkt-chart-empty,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
@@ -1305,12 +1267,12 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
  * striping; .xplore-scroll fallback covers plain tables like the fee
  * schedule), green live indicator with pulsing dot + landing bump on each
  * head (CSS keyframes only, reduced-motion safe), flashing new-block row
- * (CSS animation, reduced-motion safe). Tokens only — all three themes. */
-.xplore-scroll table { width: 100%; border-collapse: collapse; background: var(--panel); }
+ * (CSS animation, reduced-motion safe). Tokens only — all three themes.
+ * Base + header type ride the shared .node-table rules above (identical
+ * values); only the fallback padding (8px vs 12px) and striping stay here —
+ * the fee-schedule table (asset-feed-ui.js) is classless and depends on them. */
 .xplore-scroll table th, .xplore-scroll table td { padding: 8px 12px;
   border-bottom: 1px solid var(--border); text-align: left; }
-.xplore-scroll table th { text-transform: uppercase; font-size: 0.78rem;
-  letter-spacing: 0.05em; font-weight: 600; }
 .xplore-scroll table tbody tr:nth-child(even),
 .xplore-scroll table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 .xplore-live { display: flex; align-items: center; gap: 8px; margin: 8px 0;
@@ -1348,8 +1310,7 @@ tr.xplore-flash { animation: xplore-flash 1.25s ease-out 1; }
  * the solid --button-bg. No behavior, no strings. */
 .xfer-mode { display: flex; gap: 8px; }
 .xfer-mode button { flex: 1 1 0; }
-.xfer-mode button[aria-pressed="false"] { background: transparent;
-  color: var(--accent); border: 1px solid var(--accent); }
+/* Inactive side rides the shared .btn-ghost base above. */
 
 /* Evening vision sweep (2026-09-30): help index two-column at desktop.
  * Mirrors #1 help.png (left topic list beside the intro copy) without
