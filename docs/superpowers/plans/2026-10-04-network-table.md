@@ -35,7 +35,7 @@
   - `listNetwork(url)` → `"mainnet" | "testnet" | ""`
   - `netFromChain(chainId)` → `"mainnet" | "testnet" | ""`
   - `networkLabel(t, net, chainId)` → `string`
-  - `networkHealth(net, chainId)` → `"good" | "warn" | ""`
+  - `networkHealth(net, chainId)` → `"good" | "warn" | "bad" | ""`
 
 - [ ] **Step 1: Write the failing test** — create `tooling/node-network-test.js` with exactly:
 
