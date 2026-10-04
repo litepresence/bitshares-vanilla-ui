@@ -270,7 +270,7 @@ var FeesUI = (function () {
       showError(doc, wrap, t("fees.fee_backend_missing_js_asset_js_failed_to_loa", "Fee backend missing: js/asset.js failed to load."));
       return;
     }
-    wrap.appendChild(DOM.el(doc, "h1", t("fees.network_fees", "Network fees")));
+    wrap.appendChild(DOM.pageHead(doc, t("fees.network_fees", "Network fees"), "dollar"));
     wrap.appendChild(DOM.el(doc, "p",
       "Every operation fee charged by the network, fetched live from the chain's fee schedule. " +
       "Fees are shown in the core asset; each amount's title (hover or long-press) carries the raw chain value and the schedule scale.",

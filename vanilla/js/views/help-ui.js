@@ -754,7 +754,7 @@ var HelpUI = (function () {
     if (!key) { paintIndex(doc, wrap); return; }
     var hit = topicByKey(key);
     if (!hit) {
-      wrap.appendChild(DOM.el(doc, "h1", t("help.help", "Help")));
+      wrap.appendChild(DOM.pageHead(doc, t("help.help", "Help"), "question-circle"));
       wrap.appendChild(DOM.el(doc, "p", "No help topic named “" + key + "”. Pick one from the index.", "muted"));
       paintIndexList(doc, wrap);
       return;
@@ -817,7 +817,7 @@ var HelpUI = (function () {
 
   /* Index: every topic as a link (mirrors the #1 toc structure). */
   function paintIndex(doc, wrap) {
-    wrap.appendChild(DOM.el(doc, "h1", t("help.help", "Help")));
+    wrap.appendChild(DOM.pageHead(doc, t("help.help", "Help"), "question-circle"));
     wrap.appendChild(DOM.el(doc, "p", t("help.index_intro", "Short guides for every part of the wallet, each opening into a full article."), "muted"));
     paintIndexList(doc, wrap);
     /* Pointer to the Community page (help/community split 2026-10-04):
@@ -864,7 +864,7 @@ var HelpUI = (function () {
     if (!doc) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("help.community_title", "Community")));
+    wrap.appendChild(DOM.pageHead(doc, t("help.community_title", "Community"), "share"));
     wrap.appendChild(DOM.el(doc, "p", t("help.community_intro", "People and places around BitShares: homepage, code, explorers, forums, and chats. External links open in a new tab."), "muted"));
     paintCommunityDir(doc, wrap);
     var back = DOM.el(doc, "p", null, "muted"), b = doc.createElement("a");
@@ -973,7 +973,7 @@ var HelpUI = (function () {
    * lines stay readable at desk widths. Display-only class, no strings. */
   function paintTopic(doc, wrap, topic) {
     try { wrap.classList.add("help-article"); } catch (e) { /* class best-effort */ }
-    wrap.appendChild(DOM.el(doc, "h1", t("help.topic_" + topic[0] + "_title", topic[1])));
+    wrap.appendChild(DOM.pageHead(doc, t("help.topic_" + topic[0] + "_title", topic[1]), "question-circle"));
     wrap.appendChild(DOM.el(doc, "p", t("help.topic_" + topic[0] + "_text", topic[2])));
     paintBody(doc, wrap, topic[0]);
     if (topic[3]) {

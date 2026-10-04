@@ -147,7 +147,7 @@ var HtlcUI = (function () {
     dropOpenSubs();
     DOM.clear(root);
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "htlc"));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetryOnOpen(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
@@ -155,7 +155,7 @@ var HtlcUI = (function () {
   function routeFail(root, title, e, fallback, retry) { /* shared load-failure page */
     DOM.clear(root);
     var doc = root.ownerDocument || document, failed = DOM.el(doc, "div", null, "wrap");
-    root.appendChild(failed); failed.appendChild(DOM.el(doc, "h1", title));
+    root.appendChild(failed); failed.appendChild(DOM.pageHead(doc, title, "htlc"));
     showError(doc, failed, e, fallback); offlineBox(doc, failed, retry);
   }
   function loadAccount(myGen, loader) { /* wallet account when unlocked, else committee-account 1.2.0; stale gens bail */
@@ -311,7 +311,7 @@ var HtlcUI = (function () {
       if (!found || myGen !== gen) return;
       DOM.clear(root);
       var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(DOM.el(doc, "h1", t("htlc.list_title", "Hashed Timelock Contracts")));
+       box.appendChild(DOM.pageHead(doc, t("htlc.list_title", "Hashed Timelock Contracts"), "htlc"));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Locked transfers redeemable with a secret preimage before expiry."), "muted"));
       box.appendChild(DOM.el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
@@ -466,7 +466,7 @@ var HtlcUI = (function () {
       var me = found.me, row = found.data, a = amtText(row.amount_raw, row.asset_id, row.precision), exp;
       DOM.clear(root);
       var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(DOM.el(doc, "h1", "HTLC " + row.id));
+       box.appendChild(DOM.pageHead(doc, "HTLC " + row.id, "htlc"));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
       try { exp = Htlc.formatDateTime(row.expiration_iso); } catch (e) { exp = String(row.expiration_iso || "unknown"); }
       box.appendChild(confirmList(doc, [[t("htlc.contract_col", "Contract"),  row.id], [t("confirm.from", "From"),  row.from_id], [t("confirm.to", "To"),  row.to_id],

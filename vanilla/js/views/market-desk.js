@@ -316,7 +316,7 @@ var MarketDesk = (function () {
       return;
     }
     if (typeof marketID !== "string" || !marketID) {
-      wrap.appendChild(DOM.el(doc, "h1", t("market.title", "Exchange")));
+      wrap.appendChild(DOM.pageHead(doc, t("market.title", "Exchange"), "trade"));
       wrap.appendChild(DOM.el(doc, "p", t("market.pick_to_start", "Pick a market to start."), "muted"));
       var emptySec = doc.createElement("section");
       emptySec.className = "mkt-side";
@@ -328,7 +328,7 @@ var MarketDesk = (function () {
     try {
       pair = Market.parseId(marketID);
     } catch (e) {
-      wrap.appendChild(DOM.el(doc, "h1", t("market.not_found", "Market not found")));
+      wrap.appendChild(DOM.pageHead(doc, t("market.not_found", "Market not found"), "trade"));
       showError(doc, wrap, e, t("market.err_unknown", "Unknown market."));
       return;
     }
@@ -356,7 +356,7 @@ var MarketDesk = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failed = makeWrap(doc, root);
-        failed.appendChild(DOM.el(doc, "h1", t("market.title", "Exchange")));
+        failed.appendChild(DOM.pageHead(doc, t("market.title", "Exchange"), "trade"));
         showError(doc, failed, new Error("not connected"), t("market.err_offline_short", "Network unavailable."));
         var mstat = DOM.el(doc, "p", "", "muted");
         try { mstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -444,7 +444,7 @@ var MarketDesk = (function () {
     var head = doc.createElement("section");
     head.className = "mkt-head";
     desk.appendChild(head);
-    head.appendChild(DOM.el(doc, "h1", pair.quote + " / " + pair.base));
+    head.appendChild(DOM.pageHead(doc, pair.quote + " / " + pair.base, "trade"));
     var sub = DOM.el(doc, "p", t("market.loading", "Loading market…"), "muted");
     head.appendChild(sub);
     /* LOW punchlist: header star favourite next to the pair (same FAV_KEY the

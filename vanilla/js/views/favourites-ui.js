@@ -104,7 +104,7 @@ var FavouritesUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("favourites.favourites", "Favourites")));
+    wrap.appendChild(DOM.pageHead(doc, t("favourites.favourites", "Favourites"), "fi-star"));
     wrap.appendChild(DOM.el(doc, "p", t("favourites.intro", "Your starred markets, assets, and accounts on this device. Star a market from any market page picker; add assets and accounts below. Stored locally — never synced, never broadcast."),
       "muted"));
     marketSection(doc, wrap, myGen, root);

@@ -350,7 +350,7 @@ var InstantTradeUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+      wrap.appendChild(DOM.pageHead(doc, t("instant.instant_trade", "Instant Trade"), "instant-trade"));
       wrap.appendChild(DOM.el(doc, "p", t("instant.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -366,7 +366,7 @@ var InstantTradeUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+        failWrap.appendChild(DOM.pageHead(doc, t("instant.instant_trade", "Instant Trade"), "instant-trade"));
         showError(doc, failWrap, new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
         var istat = DOM.el(doc, "p", "", "muted");
         try { istat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -980,7 +980,7 @@ var InstantTradeUI = (function () {
     var M = P.M, ctx = M.ctx;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("instant.confirm_order", "Confirm order")));
+    wrap.appendChild(DOM.pageHead(doc, t("instant.confirm_order", "Confirm order"), "instant-trade"));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));
@@ -1034,7 +1034,7 @@ var InstantTradeUI = (function () {
           if (myGen !== gen) return;
           DOM.clear(root);
           var done = makeWrap(doc, root);
-          done.appendChild(DOM.el(doc, "h1", t("instant.order_placed", "Order placed")));
+           done.appendChild(DOM.pageHead(doc, t("instant.order_placed", "Order placed"), "instant-trade"));
           done.appendChild(DOM.el(doc, "p", t("instant.order_prefix", "Order ") + res.found.id + t("instant.on_the_book_mid", " is on the book (") + ctx.sellSym + "/" + ctx.receiveSym + ")."));
           done.appendChild(DOM.el(doc, "p", t("instant.observed_head_prefix", "Observed at head block #") + String(res.head) + t("instant.via_mid", " via ") + res.via + ".", "muted"));
           var again = touchable(DOM.el(doc, "button", t("instant.trade_again", "Trade again")));

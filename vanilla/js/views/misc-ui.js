@@ -50,6 +50,19 @@ var MiscUI = (function () {
     if (myGen !== gen) return false;
     try { return U().live(uiGen); } catch (e) { return false; }
   }
+  /* headIcon: swap the shared-gate plain h1 for a DOM.pageHead one carrying
+   * this route's icon (heading-icons batch M3). WHY post-hoc: the h1 is
+   * painted inside ProposalUI routeReady (shared owner, out of batch scope),
+   * so the icon is applied here with identical text — t() keys/defaults stay
+   * byte-identical and textContent-only holds. No-op when no h1 is present;
+   * never throws (heading stands without the icon). */
+  function headIcon(doc, scope, iconName) {
+    try {
+      var h = scope && scope.querySelector ? scope.querySelector("h1") : null;
+      if (!h || !h.parentNode) return;
+      h.parentNode.replaceChild(DOM.pageHead(doc, h.textContent || "", iconName), h);
+    } catch (e) { /* heading stands without the icon */ }
+  }
   /* Resolve the shared _ui or paint the missing-backend box; returns ui or null. */
   function entry(root) {
     try { return U(); } catch (e) {
@@ -82,7 +95,8 @@ var MiscUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("misc.custom_authorities", "Custom Authorities"), function () { renderAuthorities(root); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
-    if (!ctx) return;
+    if (!ctx) { headIcon(root.ownerDocument || document, root, "key"); return; }
+    headIcon(ctx.doc, ctx.wrap, "key");
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.custom_authorities_restrict_which_operations", "Custom authorities restrict which operations an account key may sign. The chain has no list method — look authorities up by explicit 1.17.x id. Issuer-only override_transfer (op 38) is not offered here."), "muted"));
     try {
@@ -238,7 +252,8 @@ var MiscUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("misc.account_lists", "Account Lists"), function () { renderLists(root); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
-    if (!ctx) return;
+    if (!ctx) { headIcon(root.ownerDocument || document, root, "list"); return; }
+    headIcon(ctx.doc, ctx.wrap, "list");
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.appendChild(ui.el(doc, "p", t("misc.listing_is_a_bitfield_none_0_whitelisted_1_bl", "Listing is a bitfield: none 0, whitelisted 1, blacklisted 2, both 3. Adding ORs the bit; removing subtracts it."), "muted"));
     try {
@@ -325,7 +340,8 @@ var MiscUI = (function () {
     if (!ui) return;
     var ctx = ui.routeReady(root, t("misc.invoice", "Invoice"), function () { renderInvoice(root, data); },
       ["Proposal", "ProposalMisc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"]);
-    if (!ctx) return;
+    if (!ctx) { headIcon(root.ownerDocument || document, root, "clippy"); return; }
+    headIcon(ctx.doc, ctx.wrap, "clippy");
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     /* Checkout query reader (this function owns the contract — router.js
      * currentPath() strips queries, so the hash is re-read here). Returns the

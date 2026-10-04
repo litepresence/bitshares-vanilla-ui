@@ -105,7 +105,7 @@ var GatewayUI = (function () {
     ["Gateway", "Chain", "Store", "Format"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "deposit"));
     if (miss) { showError(doc, wrap, title + t("gateway.backend_missing", " backend missing: ") + miss + t("gateway.load_failed", " failed to load.")); return null; }
     if (Chain.status().state !== "open") { offlineBox(doc, wrap, retry); autoRetry(myGen, retry); try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* manual Retry remains */ } return null; }
     return { doc: doc, wrap: wrap, myGen: myGen };
