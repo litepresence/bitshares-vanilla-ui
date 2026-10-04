@@ -52,24 +52,30 @@ var Icon = (function () {
     "arrow-up-down": 1, pools: 1, "qr-scan": 1, "deployment-unit": 1
   };
 
+  /* PNGS: raster state badges (owner-supplied lock/shield art — full
+   *   color, so they bypass the --icon-filter invert via img.icon-state
+   *   in app.css; see assets/PROVENANCE.md). Same VALID guard as above. */
+  var PNGS = { "lock-closed": 1, "lock-open": 1, "shield-ok": 1, "shield-bad": 1, "shield-blue": 1 };
   /* warmed: fetch-once Map (name -> true). The <img> load itself is the real
    * fetch; this one-time fetch() only warms the HTTP cache ahead of first
    * paint. Best-effort: file:// and offline failures are swallowed — the
    * <img> src below is always assigned, so icons still resolve normally. */
   var warmed = new Map();
 
-  /* url: name -> asset path. Params: name string. Returns path string.
+  /* url: name -> asset path (.png for the raster state badges, .svg for
+   * the set). Params: name string. Returns path string.
    * Fails: never throws — invalid names fall back to "question-circle". */
   function url(name) {
     var n = String(name || "");
-    if (!VALID.test(n) || !KNOWN[n]) return BASE + "question-circle.svg";
-    return BASE + n + ".svg";
+    if (!VALID.test(n) || (!KNOWN[n] && !PNGS[n])) return BASE + "question-circle.svg";
+    return BASE + n + (PNGS[n] ? ".png" : ".svg");
   }
 
-  /* known: is this a wired vendored name? Params: name. Returns bool. */
+  /* known: is this a wired name (svg set or png badges)? Params: name.
+   * Returns bool. */
   function known(name) {
     var n = String(name || "");
-    return VALID.test(n) && !!KNOWN[n];
+    return VALID.test(n) && (!!KNOWN[n] || !!PNGS[n]);
   }
 
   /* fallback: text node shown when an icon cannot load. Params: doc, text.

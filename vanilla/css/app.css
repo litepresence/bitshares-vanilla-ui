@@ -17,18 +17,27 @@ body { margin: 0; background: var(--bg); color: var(--text);
   font: 16px/1.45 "Roboto-Regular", "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif; }
 .topbar { display: flex; align-items: center; gap: 12px; padding: 0 16px;
   min-height: 56px; background: var(--header-bg); color: var(--header-text); }
-/* Acting account left of the lock (owner): plain header text, ellipsis past
- * ~180px so long names never push the lock off a phone screen. */
-#acting-as { margin-left: auto; font-size: 0.9rem; max-width: 180px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Acting account left of the lock (owner): two sizes by name length —
+ * short names ride one line at 0.9rem; 20+ chars (chain allows 63) drop to
+ * 0.72rem and wrap anywhere instead of ellipsis, so long names are never
+ * cut off — the topbar wraps (flex-wrap) so the lock stays reachable on a
+ * 360px phone. data-long is painted by paintActingAs (app.js). */
+#acting-as { margin-left: auto; font-size: 0.9rem; max-width: 44vw; text-align: right; }
+#acting-as[data-long="false"] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#acting-as[data-long="true"] { font-size: 0.72rem; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
 /* Header view-as button (Task 2): reset native button chrome so the <button>
  * reuses the existing header text style — one rule, no theme change. */
-.acting-as { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; min-height: 44px; }
+.acting-as { background: none; border: 0; font: inherit; color: inherit; cursor: pointer; min-height: 44px;
+  text-transform: none; letter-spacing: normal; }
 /* Node ops row (owner: probe/add/discover share one desktop line, stack on
  * phones). Note/progress/results/offline stay full-width below the row. */
 .node-ops-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; margin: 8px 0; }
 .node-ops-row .custom-node { display: flex; gap: 8px; align-items: end; }
 .node-discover-btns { display: flex; gap: 8px; }
+/* Node-page footnotes (geo + discover notes): single-spaced stack, not the
+ * default 1em paragraph gaps — they read as one footnote block. */
+.node-note { margin: 6px 0 0; }
+.node-note + .node-note { margin-top: 2px; }
 @media (max-width: 719px) {
   .node-ops-row { flex-direction: column; align-items: stretch; }
   .node-ops-row .custom-node { flex-wrap: wrap; }
@@ -175,6 +184,15 @@ a.btn-ghost { background: transparent; color: var(--accent);
 .node-table { width: 100%; border-collapse: collapse; background: var(--panel); }
 .node-table th, .node-table td { padding: 12px; border-bottom: 1px solid var(--border);
   text-align: left; }
+/* Node-table health signals: the SAME tokens as the lower-left footer host
+ * (vivid --live green when connected, --danger red otherwise); --warn-text
+ * is the small-text-safe amber in all three themes. Bold mirrors the
+ * footer host emphasis. data-h is painted per cell by setRow/paintHistory
+ * (settings-nodes.js healthFor bands) and cleared on re-probe, so colors
+ * never go stale. */
+.node-table [data-h="good"], .node-card [data-h="good"] { color: var(--live); font-weight: 700; }
+.node-table [data-h="warn"], .node-card [data-h="warn"] { color: var(--warn-text); font-weight: 700; }
+.node-table [data-h="bad"], .node-card [data-h="bad"] { color: var(--danger); font-weight: 700; }
 .node-table th:first-child, .node-table td:first-child { position: sticky; left: 0;
   background: var(--panel); }
 .node-cards { display: none; }
@@ -183,7 +201,9 @@ a.btn-ghost { background: transparent; color: var(--accent);
   .node-cards { display: grid; gap: 12px; }
   .node-card { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px; }
-  .node-card .latency { margin-right: 8px; }
+  .node-card .latency, .node-card .ping, .node-card .part, .node-card .node-head,
+  .node-card .node-chain, .node-card .node-history, .node-card .node-geo,
+  .node-card .node-provider { margin-right: 8px; }
 }
 button, select, input { min-height: 44px; font-size: 1rem; }
 /* #1 form controls are square like its buttons (foundation input radius 0);
@@ -887,20 +907,38 @@ img, canvas, pre { max-width: 100%; }
  * anchor to #/login when locked (works without JS); app.js enhances it to a
  * lock toggle + vendored icon when Wallet is present. 44px target. */
 #lock-toggle { display: inline-flex; align-items: center; justify-content: center;
-  margin-left: auto; min-width: 44px; min-height: 44px; padding: 0 8px;
+  margin-left: 0; min-width: 44px; min-height: 44px; padding: 0 2px;
   color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
-#lock-toggle .nav-icon { width: 18px; height: 18px; filter: invert(1); }
-/* Extension-signing badge (Tier 2): same metrics as the lock it sits
- * beside — renders only when the route is extension, so in-browser users
- * pay zero header pixels. Inherits header color like the lock. */
+#lock-toggle .nav-icon { width: 24px; height: 24px; filter: invert(1); }
+/* Extension-signing badge: same metrics as the lock it sits beside —
+ * always present (owner call — lock color answers locked?, shield color
+ * answers extension-routed?). Inherits header color like the lock. */
 #ext-sign-badge { display: inline-flex; align-items: center; justify-content: center;
-  min-width: 44px; min-height: 44px; padding: 0 8px;
+  min-width: 44px; min-height: 44px; padding: 0 2px; margin-right: -4px;
   color: var(--header-text); text-decoration: none; font-size: 1.2rem; }
-#ext-sign-badge .nav-icon { width: 18px; height: 18px; filter: invert(1); }
+#ext-sign-badge .nav-icon { width: 24px; height: 24px; filter: invert(1); }
+/* Signing heading shield (owner blue-shield art, decorative): text-sized,
+ * optically aligned with the h2 cap height. filter:none — like the header
+ * icon-state badges, full-color art must not take the .icon-img theme
+ * invert (it turns blue shields red). */
+.sign-title-icon { width: 22px; height: 22px; vertical-align: -4px; filter: none; }
+/* Colored state art (owner lock/shield PNGs) must NOT take the monochrome
+ * invert above — green/red carries the state. icon-state marks the
+ * full-color imgs (Icon.img cls slot, app.js paintLock/paintShieldBadge). */
+#lock-toggle img.icon-state, #ext-sign-badge img.icon-state { filter: none; }
 /* The theme switcher sits before lock+hamburger on the bar; at 360px the four
  * items wrap instead of overflowing (principle #7). */
 .topbar { flex-wrap: wrap; }
 #nav-toggle { margin-left: 0; }
+/* Header hover affordances (brand logo, burger, theme select): same subtle
+ * wash as the header nav links above; keyboard users get the accent ring.
+ * Touch devices ignore hover and tap straight through — no hover-dependent
+ * UI (principle #7). Theme tokens only, all three themes keep working. */
+.brand:hover, #nav-toggle:hover { background: rgba(255, 255, 255, 0.08); }
+.brand, #nav-toggle { border-radius: 6px; }
+.theme-switcher-select:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.08); }
+.brand:focus-visible, #nav-toggle:focus-visible,
+.theme-switcher-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Black nav bar (target: single black strip, white icon+label items in
  * Exchange / Credit Offer / Liquidity Pools / Explore order): #nav reuses the

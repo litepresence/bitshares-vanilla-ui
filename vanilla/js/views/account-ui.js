@@ -1449,6 +1449,48 @@ var AccountUI = (function () {
    * table). Balances is the default tab like #1. Sections fill
    * independently and fail inline (never blank, never wiping each other);
    * hidden tabs keep filling so switching never shows a stale loader. */
+  /* Account deep-link state (?tab=<slug>&hist=<mode>): active tab +
+   * history filter survive reload and share links. Slugs are stable
+   * identifiers (balances/orders/history/membership/equity/margin/credit);
+   * hist modes are the select values (all/0/4). Unknown values fall back
+   * to balances/all — never throw, never blank. Module scope (exported
+   * via _test); only syncAcctUrl's callers live in showAccount. */
+  var ACCT_TABS = ["balances", "orders", "history", "membership", "equity", "margin", "credit"];
+  var ACCT_HIST = ["all", "0", "4"];
+  /* parseAcctQuery: URL query -> {tab, hist} (unit-tested). Params: raw
+   * (Router.query() object or null). Returns validated slugs (tab null =
+   * default balances, hist "all" = default). Never throws. */
+  function parseAcctQuery(raw) {
+    var out = { tab: null, hist: "all" };
+    try {
+      var q = (raw && typeof raw === "object") ? raw : {};
+      if (ACCT_TABS.indexOf(q.tab) !== -1 && q.tab !== "balances") out.tab = q.tab;
+      if (ACCT_HIST.indexOf(q.hist) !== -1) out.hist = q.hist;
+    } catch (e) { /* defaults stand */ }
+    return out;
+  }
+  /* buildAcctQuery: (tab, hist) -> "" or "?tab=&hist=" (unit-tested).
+   * Defaults vanish (balances/all = bare account path). Pure. */
+  function buildAcctQuery(tab, hist) {
+    var parts = [];
+    try {
+      if (ACCT_TABS.indexOf(tab) !== -1 && tab !== "balances") parts.push("tab=" + tab);
+      if (ACCT_HIST.indexOf(hist) !== -1 && hist !== "all") parts.push("hist=" + hist);
+    } catch (e) { /* parts stand */ }
+    return parts.length ? ("?" + parts.join("&")) : "";
+  }
+  /* syncAcctUrl: write tab/filter into the hash without re-rendering
+   * (replaceState never fires hashchange — no render loop). Preserves
+   * the current account path. Never throws. */
+  function syncAcctUrl(tab, hist) {
+    try {
+      if (typeof location === "undefined" || !location.href) return;
+      if (typeof history === "undefined" || typeof history.replaceState !== "function") return;
+      var path = "#/account";
+      try { path = String(location.hash || "").split("?")[0] || path; } catch (e) { /* default stands */ }
+      history.replaceState(null, "", location.href.split("#")[0] + path + buildAcctQuery(tab, hist));
+    } catch (e) { /* URL stays; view unaffected */ }
+  }
   function showAccount(doc, wrap, root, acct) {
     var h1 = doc.createElement("h1");
     h1.textContent = acct.name;
@@ -1482,6 +1524,14 @@ var AccountUI = (function () {
         btn.addEventListener("click", function () {
           btn.disabled = true;
           note.textContent = t("misc.copying", "Copying…");
+          /* Live hash (tab/filter state rides replaceState — the shared
+           * link preserves the view, not just the account). Falls back to
+           * the bare account path when unreadable. */
+          try {
+            if (typeof location !== "undefined" && typeof location.hash === "string" && location.hash) {
+              hash = location.hash;
+            }
+          } catch (e) { /* static hash stands */ }
           var url = hash;
           try {
             if (typeof Explorer !== "undefined" && Explorer &&
@@ -1730,26 +1780,41 @@ var AccountUI = (function () {
      * row keeps the round-2 tabs plus Margin Positions + Credit Management;
      * #/proposals stays reachable from the credit tab's link line. */
     var tabDefs = [
-      { label: t("account.s7", "Balances"), sec: balSection },
-      { label: t("account.orders_title", "Open orders"), sec: ordSection },
-      { label: t("account.history_title", "History"), sec: histSection },
-      { label: t("account.membership", "Membership"), sec: memSection },
-      { label: t("account.equity_tab", "Equity"), sec: eqSection },
-      { label: "Margin Positions", sec: marSection },
-      { label: "Credit Management", sec: creSection }
+      { key: "balances", label: t("account.s7", "Balances"), sec: balSection },
+      { key: "orders", label: t("account.orders_title", "Open orders"), sec: ordSection },
+      { key: "history", label: t("account.history_title", "History"), sec: histSection },
+      { key: "membership", label: t("account.membership", "Membership"), sec: memSection },
+      { key: "equity", label: t("account.equity_tab", "Equity"), sec: eqSection },
+      { key: "margin", label: "Margin Positions", sec: marSection },
+      { key: "credit", label: "Credit Management", sec: creSection }
     ];
+    /* Deep-link seed: ?tab= picks the initial tab (?hist= seeds the filter
+     * below); unknown slugs stay on Balances. */
+    var acctSeed = (function () {
+      try {
+        if (typeof Router !== "undefined" && Router && typeof Router.query === "function") {
+          return parseAcctQuery(Router.query());
+        }
+      } catch (e) { /* defaults below */ }
+      return parseAcctQuery(null);
+    })();
+    var activeTabKey = acctSeed.tab || "balances";
+    var activeIdx = 0;
+    tabDefs.forEach(function (def, i) {
+      if (def.key === activeTabKey) activeIdx = i;
+    });
     var tabBar = doc.createElement("div");
     tabBar.className = "mkt-tabs acct-tabs";
     tabBar.setAttribute("role", "tablist");
     tabBar.setAttribute("aria-label", t("account.title", "Account"));
     tabDefs.forEach(function (def, i) {
       try { def.sec.setAttribute("role", "tabpanel"); } catch (e) { /* sections stand */ }
-      if (i !== 0) def.sec.style.display = "none";
+      if (i !== activeIdx) def.sec.style.display = "none";
       var b = doc.createElement("button");
       b.type = "button";
       b.textContent = def.label;
       b.setAttribute("role", "tab");
-      b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      b.setAttribute("aria-selected", i === activeIdx ? "true" : "false");
       b.addEventListener("click", function () {
         tabDefs.forEach(function (d) {
           d.sec.style.display = (d === def) ? "" : "none";
@@ -1757,6 +1822,8 @@ var AccountUI = (function () {
         Array.prototype.forEach.call(tabBar.querySelectorAll("button"), function (x) {
           x.setAttribute("aria-selected", x === b ? "true" : "false");
         });
+        activeTabKey = def.key;
+        try { syncAcctUrl(activeTabKey, histFilter.value); } catch (e) { /* URL stays */ }
       });
       tabBar.appendChild(b);
     });
@@ -1839,8 +1906,12 @@ var AccountUI = (function () {
         showError(doc, histBody, e, t("account.err_history", "History unavailable on this node."));
       });
     }
-    histFilter.addEventListener("change", function () { loadHist(histFilter.value); });
-    loadHist("all");
+    histFilter.addEventListener("change", function () {
+      loadHist(histFilter.value);
+      try { syncAcctUrl(activeTabKey, histFilter.value); } catch (e) { /* URL stays */ }
+    });
+    try { histFilter.value = acctSeed.hist; } catch (e) { /* "all" stands */ }
+    loadHist(acctSeed.hist);
 
     /* Public read: any account's open orders render with NO login (#1 shows
      * them for every viewed account; only cancel requires ownership, and
@@ -1978,7 +2049,8 @@ var AccountUI = (function () {
 
   return {
     renderAccount: renderAccount,
-    OP_LABELS: OP_LABELS
+    OP_LABELS: OP_LABELS,
+    _test: { parseAcctQuery: parseAcctQuery, buildAcctQuery: buildAcctQuery }
   };
 })();
 

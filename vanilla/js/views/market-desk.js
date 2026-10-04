@@ -125,6 +125,118 @@ var MarketDesk = (function () {
     } catch (e) { /* private mode: desk still works, just not remembered */ }
   }
 
+  /* Desk deep-link state (?tf=&over=&osc=&log=&vwap=&depth=&pmap=&dx=&dy=&
+   * trades=&group= — shareable links, back-button-safe). Indicator keys are
+   * stable identifiers (OSC_ORDER/OVERLAY_DEFS symbols); only non-default
+   * values serialize so plain pairs stay clean (#/market/BTS_USD). Unknown
+   * or malformed values fall back to current defaults — never throw, never
+   * blank. Overlay instances serialize as bare keys (default params on
+   * open — documented limitation, same class as the invoice worker). */
+  var GROUP_CHOICES = [8, 6, 4, 2];
+  var KEY_RE = /^[a-z0-9]+$/;
+  /* indKeys: valid indicator keys from the MarketInd def tables (guarded —
+   * tests inject fakes; absent MarketInd drops both lists, never throws). */
+  function indKeys(indApi) {
+    var over = {}, osc = {};
+    try {
+      var api = indApi || ((typeof MarketInd !== "undefined" && MarketInd) ? MarketInd : null);
+      if (api) {
+        (api.OVERLAY_DEFS || []).forEach(function (def) {
+          if (def && KEY_RE.test(def[0])) over[def[0]] = true;
+        });
+        (api.OSC_ORDER || []).forEach(function (def) {
+          if (def && KEY_RE.test(def[0])) osc[def[0]] = true;
+        });
+      }
+    } catch (e) { /* empty sets below */ }
+    return { over: over, osc: osc };
+  }
+  function flag01(v, dflt) {
+    if (v === "1") return true;
+    if (v === "0") return false;
+    return dflt;
+  }
+  function keyList(raw, valid) {
+    var out = [];
+    try {
+      String(raw || "").split(",").forEach(function (k) {
+        k = k.trim().toLowerCase();
+        if (k && KEY_RE.test(k) && valid[k] && out.indexOf(k) === -1) out.push(k);
+      });
+    } catch (e) { /* out stands */ }
+    return out;
+  }
+  /* readDeskQuery: URL -> desk seed (unit-tested). Params: raw (query object
+   * from Router.query(), or null), indApi (optional MarketInd override for
+   * tests). Returns a full seed with defaults filled. Bucket bounds are
+   * advisory (live reconcile corrects against the node list); indicator
+   * keys outside the def tables are dropped. Never throws. */
+  function readDeskQuery(raw, indApi) {
+    var q = (raw && typeof raw === "object") ? raw : {};
+    var keys = indKeys(indApi);
+    var seed = {
+      bucket: 3600, over: {}, osc: {},
+      logScale: false, showVwap: false, showDepth: false, showPoolMap: true,
+      depthLogX: true, depthLogY: true, tradesTab: "recent", groupDec: null
+    };
+    try {
+      var tf = parseInt(q.tf, 10);
+      if (Number.isInteger(tf) && tf > 0 && tf <= 86400 * 30) seed.bucket = tf;
+      keyList(q.over, keys.over).forEach(function (k) { seed.over[k] = [{}]; });
+      keyList(q.osc, keys.osc).forEach(function (k) { seed.osc[k] = true; });
+      seed.logScale = flag01(q.log, false);
+      seed.showVwap = flag01(q.vwap, false);
+      seed.showDepth = flag01(q.depth, false);
+      seed.showPoolMap = flag01(q.pmap, true);
+      seed.depthLogX = flag01(q.dx, true);
+      seed.depthLogY = flag01(q.dy, true);
+      if (q.trades === "my" || q.trades === "recent") seed.tradesTab = q.trades;
+      var g = parseInt(q.group, 10);
+      if (GROUP_CHOICES.indexOf(g) !== -1) seed.groupDec = g;
+    } catch (e) { /* defaults stand */ }
+    return seed;
+  }
+  /* buildDeskQuery: desk state -> "?k=v" (unit-tested). Params: state (desk
+   * state object). Returns "" when everything is default, else the query
+   * string with leading "?". Pure, never throws. */
+  function buildDeskQuery(state) {
+    var parts = [];
+    try {
+      var s = state || {};
+      if (Number.isInteger(s.bucket) && s.bucket > 0 && s.bucket !== 3600) parts.push("tf=" + s.bucket);
+      var ol = Object.keys(s.over || {}).filter(function (k) {
+        return KEY_RE.test(k) && s.over[k] && s.over[k].length;
+      });
+      if (ol.length) parts.push("over=" + ol.join(","));
+      var sl = Object.keys(s.osc || {}).filter(function (k) {
+        return KEY_RE.test(k) && !!s.osc[k];
+      });
+      if (sl.length) parts.push("osc=" + sl.join(","));
+      if (s.logScale) parts.push("log=1");
+      if (s.showVwap) parts.push("vwap=1");
+      if (s.showDepth) parts.push("depth=1");
+      if (s.showPoolMap === false) parts.push("pmap=0");
+      if (s.depthLogX === false) parts.push("dx=0");
+      if (s.depthLogY === false) parts.push("dy=0");
+      if (s.tradesTab === "my") parts.push("trades=my");
+      if (GROUP_CHOICES.indexOf(s.groupDec) !== -1) parts.push("group=" + s.groupDec);
+    } catch (e) { /* parts stand */ }
+    return parts.length ? ("?" + parts.join("&")) : "";
+  }
+  /* syncUrl: write current desk state into the hash without re-rendering
+   * (api-lab deepLink precedent — replaceState never fires hashchange, so
+   * no render loop). Params: state (desk state, needs .id). Returns
+   * nothing. Fails: never (every DOM/history touch guarded — the desk
+   * works identically with the URL untouched). */
+  function syncUrl(state) {
+    try {
+      if (!state || typeof state.id !== "string" || !state.id) return;
+      if (typeof location === "undefined" || !location.href) return;
+      if (typeof history === "undefined" || typeof history.replaceState !== "function") return;
+      history.replaceState(null, "", location.href.split("#")[0] + "#/market/" + state.id + buildDeskQuery(state));
+    } catch (e) { /* URL stays; view unaffected */ }
+  }
+
   /* Inline error panel (aria-live); chain error shapes map to sentences.
    * History fallback keeps its byte-identical message key and gains a linked
    * "Open Settings" action (HistoryNotice.actionLink, pure DOM). */
@@ -282,6 +394,17 @@ var MarketDesk = (function () {
    * Each section fills independently and fails inline; Refresh + 15s timer
    * re-run the fill; the timer self-clears when the hash moves away. */
   function showDesk(doc, wrap, root, pair, id, hashAtEntry) {
+    /* Deep-link seed (?tf=&over=&osc=&…): unknown values already fell back
+     * to defaults in readDeskQuery; bucket bounds re-reconcile against the
+     * live node list at first fill (existing behavior, unchanged). */
+    var seed = (function () {
+      try {
+        if (typeof Router !== "undefined" && Router && typeof Router.query === "function") {
+          return readDeskQuery(Router.query());
+        }
+      } catch (e) { /* defaults below */ }
+      return readDeskQuery(null);
+    })();
     var state = {
       id: id, pair: pair, root: root, doc: doc, wrap: wrap,
       assets: null, loading: false, redraw: null,
@@ -289,28 +412,28 @@ var MarketDesk = (function () {
        * live list on first fill; logScale is a pure priceScale mode switch
        * (no refetch); overlays default OFF (price + pool map only — every
        * overlay stays available in the Indicators pulldown). */
-      bucket: 3600, tfInit: false, logScale: false,
+      bucket: seed.bucket, tfInit: false, logScale: seed.logScale,
       /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice + pool map.
        * Only the price pane is always on; pool map defaults on, depth + VWAP
        * default off (all three stay toggleable in the Indicators pulldown). */
-      showVwap: false, showDepth: false, showPoolMap: true,
+      showVwap: seed.showVwap, showDepth: seed.showDepth, showPoolMap: seed.showPoolMap,
       /* Depth scales ship log/log (far-spam prices + dust volumes stay
        * legible); toggles in the depth cell flip either axis. */
-      depthLogX: true, depthLogY: true,
-      over: {},
+      depthLogX: seed.depthLogX, depthLogY: seed.depthLogY,
+      over: seed.over,
       /* Stacked panes: every oscillator defaults OFF (price + pool map only).
        * Each key in MarketInd.OSC_ORDER stays available via the Indicators
        * pulldown; panes.oscs maps key -> pane handle from drawOscPane;
        * paneEls maps key -> {wrap, body} DOM nodes; oscBoxes maps key ->
        * checkbox input (x buttons uncheck through it). */
-      osc: {},
+      osc: seed.osc,
       panes: { price: null, oscs: {} },
       paneEls: {}, oscBoxes: {},
       ticker: null, countNote: null, tfBox: null, oscNote: null,
       /* Grouped book (client-side bucketing, no refetch): groupDec null =
        * exact levels; else 8/6/4/2 decimals floor via MarketBook.groupBook.
        * bookRaw caches the last fetched get_order_book pair for repaints. */
-      groupDec: null, bookRaw: null,
+      groupDec: seed.groupDec, bookRaw: null,
       /* Pool-map provenance slice (2-layer BTS-core map, own canvas — never blocks desk). */
       graphWrap: null, graphCanvas: null, graphNote: null, graphData: null
     };
@@ -384,6 +507,58 @@ var MarketDesk = (function () {
       });
       head.appendChild(flipBtn);
     } catch (e) { /* header works without the flip */ }
+    /* Copy-link share (account shareRow precedent — copy-link only, no QR
+     * by decision). Reads the LIVE hash at tap time: desk state rides
+     * replaceState, so the link preserves pair + indicators + bucket. */
+    try {
+      var shareBtn = doc.createElement("button");
+      shareBtn.type = "button";
+      shareBtn.id = "mkt-head-share";
+      shareBtn.textContent = t("misc.copy_link", "Copy link");
+      shareBtn.title = t("misc.shareable_link", "Shareable link");
+      shareBtn.setAttribute("aria-label", t("misc.shareable_link", "Shareable link"));
+      touchable(shareBtn);
+      var shareNote = DOM.el(doc, "span", "", "muted");
+      try { shareNote.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      shareBtn.addEventListener("click", function () {
+        shareBtn.disabled = true;
+        shareNote.textContent = t("misc.copying", "Copying…");
+        var hash = "#/market/" + id, url = hash;
+        try {
+          if (typeof location !== "undefined" && typeof location.hash === "string" && location.hash) {
+            hash = location.hash;
+          }
+          if (typeof Explorer !== "undefined" && Explorer && typeof Explorer.currentShareUrl === "function") {
+            url = Explorer.currentShareUrl(hash);
+          } else if (typeof location !== "undefined" && location.href) {
+            url = location.href.split("#")[0] + hash;
+          }
+        } catch (e) { url = hash; }
+        function done(ok) {
+          try { shareBtn.disabled = false; } catch (e2) { /* stands */ }
+          shareNote.textContent = ok ? t("misc.copied", "Copied")
+            : t("misc.copy_failed_select_manually", "Copy failed — select the link manually");
+        }
+        function fallback() {
+          try {
+            var ta = doc.createElement("textarea");
+            ta.value = url; doc.body.appendChild(ta); ta.select();
+            var ok = false;
+            try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+            try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+            done(!!ok);
+          } catch (e) { done(false); }
+        }
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard &&
+              typeof navigator.clipboard.writeText === "function") {
+            navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+          } else fallback();
+        } catch (e) { fallback(); }
+      });
+      head.appendChild(shareBtn);
+      head.appendChild(shareNote);
+    } catch (e) { /* header works without share */ }
     try {
       var gearBtn = doc.createElement("button");
       gearBtn.type = "button";
@@ -446,6 +621,7 @@ var MarketDesk = (function () {
           if (typeof MarketInd !== "undefined" && MarketInd &&
               typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
         } catch (e) { /* book stands without the chart */ }
+        try { syncUrl(state); } catch (e) { /* URL stays */ }
       });
       groupRow.appendChild(groupSel);
       head.appendChild(groupRow);
@@ -511,6 +687,7 @@ var MarketDesk = (function () {
     logBox.addEventListener("change", function () {
       state.logScale = logBox.checked;
       MarketInd.drawCharts(state);
+      try { syncUrl(state); } catch (e) { /* URL stays */ }
     });
     logLab.appendChild(logBox);
     logLab.appendChild(DOM.el(doc, "span", t("market.log_label", "Log")));
@@ -619,7 +796,7 @@ var MarketDesk = (function () {
     myBody.id = "mkt-trades-my";
     myBody.setAttribute("role", "tabpanel");
     tradesSec.appendChild(myBody);
-    state.tradesTab = "recent";
+    state.tradesTab = seed.tradesTab || "recent";
     state.tabRecent = tabRecent;
     state.tabMy = tabMy;
     state.recentBody = recentBody;
@@ -638,11 +815,13 @@ var MarketDesk = (function () {
     tabRecent.addEventListener("click", function () {
       state.tradesTab = "recent";
       paintTradesTab();
+      try { syncUrl(state); } catch (e) { /* URL stays */ }
     });
     tabMy.addEventListener("click", function () {
       state.tradesTab = "my";
       paintTradesTab();
       renderMyTrades(doc, state);
+      try { syncUrl(state); } catch (e) { /* URL stays */ }
     });
     paintTradesTab();
 
@@ -712,6 +891,7 @@ var MarketDesk = (function () {
          * scale); price scale only redraws the chart. */
         if (redrawBars) fill(state);
         else MarketInd.drawCharts(state);
+        try { syncUrl(state); } catch (e) { /* URL stays */ }
       });
       scaleRow.appendChild(b);
       return { repaint: paint };
@@ -1731,7 +1911,9 @@ var MarketDesk = (function () {
   }
 
   return {
-    renderMarket: renderMarket
+    renderMarket: renderMarket,
+    syncUrl: syncUrl,
+    _test: { readDeskQuery: readDeskQuery, buildDeskQuery: buildDeskQuery }
   };
 })();
 

@@ -813,6 +813,9 @@ var MarketInd = (function () {
         state.bucket = b;
         paintCountNote(state);
         onBucket();
+        try {
+          if (typeof MarketDesk !== "undefined" && MarketDesk && typeof MarketDesk.syncUrl === "function") MarketDesk.syncUrl(state);
+        } catch (e) { /* URL stays */ }
       });
       lab.appendChild(radio);
       lab.appendChild(DOM.el(doc, "span", bucketLabel(b)));
@@ -1231,6 +1234,9 @@ var MarketInd = (function () {
         box.addEventListener("change", function () {
           store[key] = box.checked;
           drawCharts(state);
+          try {
+            if (typeof MarketDesk !== "undefined" && MarketDesk && typeof MarketDesk.syncUrl === "function") MarketDesk.syncUrl(state);
+          } catch (e) { /* URL stays */ }
         });
         lab.appendChild(box);
         lab.appendChild(DOM.el(doc, "span", label));

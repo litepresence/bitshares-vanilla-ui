@@ -3,7 +3,8 @@
  *   caches (_dbId/_historyId/_netId) + the _historyOk flag (hasHistory() for
  *   the active connection), connect/probe/call/disconnect/db/history/net,
  *   plus keepalive (block-push feed tracking the ~3s tip with zero extra RPC,
- *   20s heartbeat refreshing RTT latency as backup) and capped same-node
+ *   per-call RTT piggyback refreshing footer latency on every successful RPC,
+ *   20s heartbeat as backup) and capped same-node
  *   auto-reconnect. Status fans out via Store.emitConnection (the footer is
  *   the connectivity signal — no topbar badge, #1 parity).
  * Consumes: Store.emitConnection (status fan-out, read-only). Side effects:
@@ -47,17 +48,43 @@ var Chain = (function () {
     Store.emitConnection(lastStatus);
   }
 
+  /* Per-call RTT telemetry (footer piggyback): every successful RPC carries
+   *   a free latency sample (send->reply round-trip). noteLatency records it
+   *   and repaints the footer at most once per LATENCY_EMIT_MIN_MS — a busy
+   *   market page fires many calls per second and the ~30 connection
+   *   subscribers must never be woken per call (they are one-shot or
+   *   headBlock-guarded, but repaint storms are still jank). Between emits
+   *   the value stays fresh on lastStatus for status() readers. Guards: only
+   *   successful replies while open (timeouts/errors would lie), never throws.
+   *   Params: rtt (ms number). Returns nothing. */
+  var lastLatencyEmit = 0;
+  var LATENCY_EMIT_MIN_MS = 1000;
+  function noteLatency(rtt) {
+    try {
+      if (typeof rtt !== "number" || !isFinite(rtt) || rtt < 0) return;
+      if (!ws || ws.readyState !== 1 || !lastStatus || lastStatus.state !== "open") return;
+      lastStatus.latencyMs = Math.round(rtt);
+      var now = Date.now();
+      if (now - lastLatencyEmit >= LATENCY_EMIT_MIN_MS) {
+        lastLatencyEmit = now;
+        setStatus({latencyMs: lastStatus.latencyMs});
+      }
+    } catch (e) { /* telemetry never breaks calls */ }
+  }
+
   /* call: one JSON-RPC "call" on the shared socket. Params: apiId (number),
    *   method (string), params (array), timeoutMs (number, default 8000).
    *   Returns a Promise for msg.result. Fails: rejects "not connected" when
    *   the socket is down, "call timeout: <method>" on timeout, or the node's
-   *   error payload. */
+   *   error payload. Side effect: a successful reply refreshes the footer
+   *   latency via noteLatency (throttled — see above); failures never do. */
   function call(apiId, method, params, timeoutMs) {
     return new Promise(function (resolve, reject) {
       if (!ws || ws.readyState !== 1) { reject(new Error("not connected")); return; }
       var id = nextId++;
+      var t0 = Date.now();
       var timer = setTimeout(function () { delete pending[id]; reject(new Error("call timeout: " + method)); }, timeoutMs || 8000);
-      pending[id] = {resolve: resolve, reject: reject, timer: timer};
+      pending[id] = {resolve: resolve, reject: reject, timer: timer, t0: t0};
       ws.send(JSON.stringify({id: id, method: "call", params: [apiId, method, params || []]}));
     });
   }
@@ -140,6 +167,7 @@ var Chain = (function () {
       try { assertPropsShape(props); } catch (shapeErr) { return; /* next beat retries */ }
       if (props && props.head_block_number && ws && ws.readyState === 1) {
         var cur = lastStatus.headBlock;
+        lastLatencyEmit = Date.now();
         if (typeof cur !== "number" || props.head_block_number > cur) {
           setStatus({headBlock: props.head_block_number, latencyMs: Date.now() - t0});
         } else {
@@ -171,12 +199,17 @@ var Chain = (function () {
   }
 
   /* scheduleReconnect: same-node redial with capped backoff after an
-   * UNEXPECTED close (manual disconnects never redial). The backoff caps at
-   * the last delay and retries indefinitely — a dropped socket almost always
-   * heals with a fresh login->database handshake, and users read a stuck
-   * "closed" footer as buggy software. The footer carries each attempt via
-   * the connecting state; the user picks another node (failover) whenever
-   * the active one stays down. */
+   * UNEXPECTED close or a failed connect (connect timeout, pre-handshake
+   * close, handshake-call failure — a single failed redial must never
+   * park the app silent; the stuck-DISCONNECTED fix). Manual disconnects
+   * never redial (manualClose guard). The backoff caps at the last delay
+   * and retries indefinitely — a dropped socket almost always heals with
+   * a fresh login->database handshake, and users read a stuck "closed"
+   * footer as buggy software. The footer carries each attempt via the
+   * connecting state; the user picks another node (failover) whenever
+   * the active one stays down. Deliberately NOT used for bad-head-shape
+   * rejections (deterministic node fault, security gate) or oversize
+   * frames (hostile node — never redial blindly). */
   function scheduleReconnect() {
     if (manualClose || !lastUrl) return;
     var delays = (lastOpts && lastOpts.reconnectDelays) || RECONNECT_DELAYS;
@@ -254,11 +287,14 @@ var Chain = (function () {
    * (null unless both are safe ints). hasHistory answers "does this node
    * serve the history api" (probe's fail-soft history check via extra;
    * extra is optional — omitted means unknown, reported false, so old
-   * 3-arg callers keep working). Never throws. */
+   * 3-arg callers keep working). pingMs is the single-RTT sample from the
+   * probe's fail-soft ping call (via extra.pingMs; omitted/non-numeric
+   * means unknown, reported null — never guessed). Never throws. */
   function enrichProbe(chainId, props, latencyMs, extra) {
     var out = { chainId: chainId || null, latencyMs: latencyMs,
       headBlock: null, headAgeS: null, participation: null, irrevLag: null,
-      hasHistory: !!(extra && extra.hasHistory === true) };
+      hasHistory: !!(extra && extra.hasHistory === true),
+      pingMs: (extra && typeof extra.pingMs === "number" && isFinite(extra.pingMs) && extra.pingMs >= 0) ? extra.pingMs : null };
     try {
       if (!props || typeof props !== "object") return out;
       if (Number.isSafeInteger(props.head_block_number) && props.head_block_number > 0) {
@@ -283,7 +319,7 @@ var Chain = (function () {
   /* Probe: latency + chain ID + health signals on a throwaway socket. Never
      touches the shared connection, emits no status — safe to run for every
      node in a list. Resolves enrichProbe() results (chainId, latencyMs,
-     headBlock, headAgeS, participation, irrevLag, hasHistory). */
+     headBlock, headAgeS, participation, irrevLag, hasHistory, pingMs). */
   function probe(url, timeoutMs) {
     timeoutMs = timeoutMs || 6000;
     var t0 = Date.now();
@@ -328,6 +364,37 @@ var Chain = (function () {
           catch (e) { fin(false); }
         });
       }
+      /* pingRTT: fail-soft single round-trip on the open probe socket (one
+       * get_dynamic_global_properties, timed send->reply). The handshake
+       * latencyMs above conflates TCP/TLS/connect with server speed; this
+       * isolates the RTT so the settings table can show both (Handshake +
+       * Ping columns). Unlike send(), NEVER fails the probe: any
+       * error/timeout resolves null (handshake data still stands — Ping
+       * shows "—"). Own sub-budget (half the probe timeout, min 1.5s, same
+       * rule as softHistory) so a hung reply can't eat the probe window;
+       * rides the shared waiting map with soft:true so onmessage routes it
+       * around fail(). Params: dbId (numeric database api id). Resolves a
+       * non-negative finite ms number or null. */
+      function pingRTT(dbId) {
+        return new Promise(function (res) {
+          var settled = false, id = ids++;
+          var tPing0 = Date.now();
+          function fin(v) {
+            if (settled) return; settled = true;
+            try { clearTimeout(timer); } catch (e) { /* timer gone */ }
+            delete waiting[id];
+            res(v);
+          }
+          var timer = setTimeout(function () { fin(null); }, Math.max(1500, Math.floor(timeoutMs / 2)));
+          waiting[id] = {soft: true, resolve: function (v) {
+            try {
+              fin((v && typeof v === "object") ? Math.max(0, Date.now() - tPing0) : null);
+            } catch (e) { fin(null); }
+          }, reject: function () { fin(null); }, timer: timer};
+          try { sock.send(JSON.stringify({id: id, method: "call", params: [dbId, "get_dynamic_global_properties", []]})); }
+          catch (e) { fin(null); }
+        });
+      }
       sock.onopen = function () {
         send(1, "login", ["", ""]).then(function () { return send(1, "database", []); }).then(function (dbId) {
           return send(dbId, "get_chain_id", []).then(function (chainId) {
@@ -337,16 +404,24 @@ var Chain = (function () {
              * chain-id answered, the node is UP with unknown health details
              * (classifier verdicts GOOD — only the enrichment is missing). */
             return send(dbId, "get_dynamic_global_properties", []).then(function (g) {
-              return { chainId: chainId, props: (g && typeof g === "object") ? g : null };
-            }, function () { return { chainId: chainId, props: null }; });
+              return { chainId: chainId, props: (g && typeof g === "object") ? g : null, dbId: dbId };
+            }, function () { return { chainId: chainId, props: null, dbId: dbId }; });
           });
         }).then(function (r) {
-          pendingR = r; softMode = true;
-          return softHistory().then(function (h) {
-            if (done) return; done = true; clearTimeout(guard);
-            var latencyMs = Date.now() - t0;
-            try { sock.close(); } catch (e) {}
-            resolve(enrichProbe(r.chainId, r.props, latencyMs, {hasHistory: h}));
+          pendingR = r;
+          /* Single-RTT ping on the already-open socket (fail-soft — a dead
+           * ping still leaves a usable handshake result). pendingR carries
+           * it so a close during the soft history phase below still reports
+           * the measured ping instead of unknown. */
+          return pingRTT(r.dbId).then(function (ping) {
+            try { pendingR.pingMs = (typeof ping === "number") ? ping : null; } catch (e) { /* unknown stands */ }
+            softMode = true;
+            return softHistory().then(function (h) {
+              if (done) return; done = true; clearTimeout(guard);
+              var latencyMs = Date.now() - t0;
+              try { sock.close(); } catch (e) {}
+              resolve(enrichProbe(r.chainId, r.props, latencyMs, {hasHistory: h, pingMs: pendingR.pingMs}));
+            });
           });
         }).catch(fail);
       };
@@ -373,7 +448,9 @@ var Chain = (function () {
          * close here always has props to shape. */
         if (softMode && pendingR) {
           done = true; clearTimeout(guard);
-          resolve(enrichProbe(pendingR.chainId, pendingR.props, Date.now() - t0, {hasHistory: false}));
+          var pm = null;
+          try { pm = (typeof pendingR.pingMs === "number") ? pendingR.pingMs : null; } catch (pmErr) { pm = null; }
+          resolve(enrichProbe(pendingR.chainId, pendingR.props, Date.now() - t0, {hasHistory: false, pingMs: pm}));
           return;
         }
         fail(new Error("probe socket closed"));
@@ -386,7 +463,11 @@ var Chain = (function () {
    *   head-block fetch, block-push subscribe best-effort). Params: url string,
    *   opts {timeoutMs, heartbeatMs, reconnectDelays} optional. Returns a Promise
    *   for {chainId, headBlockTime, latencyMs}. Fails: rejects on timeout, socket
-   *   error, or bad-head-shape (malformed dynamic props — no tx on garbage). */
+   *   error, or bad-head-shape (malformed dynamic props — no tx on garbage).
+   *   Network failures (timeout, pre-handshake close, handshake-call error)
+   *   ALSO schedule a same-node redial (never silent — the footer re-attempts
+   *   until it connects or the user picks another node); only manual
+   *   disconnects and bad-head-shape rejections stay terminal. */
   function connect(url, opts) {    var timeoutMs = (opts && opts.timeoutMs) || 12000;
     stopHeartbeat(); clearReconnect(); resetApiIds();
     manualClose = false; lastUrl = url; lastOpts = opts || null;
@@ -396,7 +477,7 @@ var Chain = (function () {
     return new Promise(function (resolve, reject) {
       var done = false;
       try { ws = new WebSocket(url); } catch (e) { setStatus({state: "error", node: url}); reject(e); return; }
-      var guard = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (e) {} setStatus({state: "error", node: url}); reject(new Error("connect timeout")); } }, timeoutMs);
+      var guard = setTimeout(function () { if (!done) { done = true; try { ws.close(); } catch (e) {} setStatus({state: "error", node: url}); reject(new Error("connect timeout")); scheduleReconnect(); } }, timeoutMs);
       ws.onopen = function () {
         var opDbId = null;
         call(1, "login", ["", ""]).then(function () { return call(1, "database", []); }).then(function (dbId) {
@@ -418,6 +499,7 @@ var Chain = (function () {
           /* Head block stashed from the ALREADY-fetched dynamic props (footer
            * paint reads it; no extra RPC — same Promise.all as before). */
           var headBlock = (res[1] && res[1].head_block_number) || null;
+          lastLatencyEmit = Date.now();
           setStatus({state: "open", node: url, latencyMs: latencyMs, chainId: res[0], headBlock: headBlock});
           reconnectTries = 0;
           startHeartbeat(opts && opts.heartbeatMs);
@@ -432,7 +514,7 @@ var Chain = (function () {
         }).catch(function (e) {
           if (done) return; done = true; clearTimeout(guard);
           try { ws.close(); } catch (err) {}
-          setStatus({state: "error", node: url}); reject(e);
+          setStatus({state: "error", node: url}); reject(e); scheduleReconnect();
         });
       };
       ws.onmessage = function (ev) {
@@ -467,14 +549,20 @@ var Chain = (function () {
         }
         if (msg.id !== undefined && pending[msg.id]) {
           var p = pending[msg.id]; delete pending[msg.id]; clearTimeout(p.timer);
-          if (msg.error) p.reject(new Error(JSON.stringify(msg.error))); else p.resolve(msg.result);
+          if (msg.error) p.reject(new Error(JSON.stringify(msg.error)));
+          else {
+            var rtt = null;
+            try { rtt = (typeof p.t0 === "number") ? Date.now() - p.t0 : null; } catch (clockErr) { rtt = null; }
+            p.resolve(msg.result);
+            if (rtt !== null) noteLatency(rtt);
+          }
         }
       };
       ws.onclose = function () {
         stopHeartbeat(); failPending("not connected"); resetApiIds();
         if (!done) {
           done = true; clearTimeout(guard);
-          setStatus({state: "closed", node: url}); reject(new Error("socket closed"));
+          setStatus({state: "closed", node: url}); reject(new Error("socket closed")); scheduleReconnect();
         } else if (lastStatus.state === "open") {
           setStatus({state: "closed", node: url});
           scheduleReconnect();

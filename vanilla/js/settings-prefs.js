@@ -157,6 +157,14 @@ var SettingsPrefs = (function () {
     wrap.id = "sign-block";
     var title = doc.createElement("h2");
     title.textContent = t("settings.sign_title", "Signing");
+    /* Owner-supplied blue shield beside the heading (same art family as
+     * the header badges; decorative — the h2 text stays the name). */
+    try {
+      if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+        title.appendChild(doc.createTextNode(" "));
+        title.appendChild(Icon.img("shield-blue", "sign-title-icon", ""));
+      }
+    } catch (e) { /* heading stands without the icon */ }
     wrap.appendChild(title);
     var mode = "browser", cap = "none";
     try {
@@ -169,14 +177,45 @@ var SettingsPrefs = (function () {
     var status = doc.createElement("p");
     status.className = "muted";
     status.setAttribute("aria-live", "polite");
-    if (mode === "extension" && cap === "extension-page") {
-      status.textContent = t("settings.sign_mode_ext_page", "Signatures stay in the extension — isolated from websites.");
-    } else if (mode === "extension") {
-      status.textContent = t("settings.sign_mode_ext", "Signatures are approved in the extension window.");
-    } else {
-      status.textContent = t("settings.sign_mode_browser", "Signatures happen in this page's memory.");
+    /* Single state line (mode + install facts combined — two stacked
+     * notices read as a contradiction). Per state, one honest sentence
+     * pair at most, reusing existing keys only:
+     * extension route implies a channel, so the mode sentence stands
+     * alone; browser route appends the install sentence, except the
+     * no-extension sentence already covers in-page signing on its own.
+     * Provider injection can land after boot, so one delayed re-read
+     * settles late arrivals; after that the line stands until the next
+     * settings render — display-only, never gates signing. */
+    function paintState() {
+      var m = "browser", c = "none";
+      try {
+        if (typeof SignMode !== "undefined" && SignMode) {
+          if (typeof SignMode.effectiveMode === "function") m = SignMode.effectiveMode();
+          if (typeof SignMode.capable === "function") c = SignMode.capable();
+        }
+      } catch (e) { /* browser display below */ }
+      if (m !== "extension" && m !== "browser") m = "browser";
+      var detected = (c === "extension-page" || c === "provider");
+      try {
+        if (m === "extension" && c === "extension-page") {
+          status.textContent = t("settings.sign_mode_ext_page", "Signatures stay in the extension — isolated from websites.");
+        } else if (m === "extension") {
+          status.textContent = t("settings.sign_mode_ext", "Signatures are approved in the extension window.");
+        } else if (detected) {
+          status.textContent = t("settings.sign_ext_present", "Extension detected on this device.") + " " +
+            t("settings.sign_mode_browser", "Signatures happen in this page's memory.");
+        } else {
+          status.textContent = t("settings.sign_ext_absent", "No extension detected on this device — signatures happen in this page.");
+        }
+      } catch (e) { /* prior text stands */ }
     }
+    paintState();
     wrap.appendChild(status);
+    try {
+      setTimeout(function () {
+        try { if (status.parentNode) paintState(); } catch (e) { /* line stands */ }
+      }, 3000);
+    } catch (e) { /* single paint stands */ }
     var pin = "auto";
     try {
       if (settings && (settings.signing === "extension" || settings.signing === "browser" ||
@@ -212,6 +251,20 @@ var SettingsPrefs = (function () {
     var sitesTitle = doc.createElement("h3");
     sitesTitle.textContent = t("settings.sign_sites", "Connected sites");
     wrap.appendChild(sitesTitle);
+    /* Concrete example (owner request): a fictional dice game shows what a
+     * row means. The link is intentionally dead (RFC 2606 .example — it can
+     * never resolve); the sentence says so. */
+    try {
+      var story = doc.createElement("p");
+      story.className = "muted";
+      story.appendChild(doc.createTextNode(t("settings.sign_sites_story_a", "Example: a dice game at ")));
+      var storyLink = doc.createElement("a");
+      try { storyLink.setAttribute("href", "https://dice-game.example"); } catch (e) { /* text stands */ }
+      storyLink.textContent = "dice-game.example";
+      story.appendChild(storyLink);
+      story.appendChild(doc.createTextNode(t("settings.sign_sites_story_b", " asks to play as your account — approving lists it here, bound to that account only. Signatures still prompt every time. (That link goes nowhere — it is a fictional example.)")));
+      wrap.appendChild(story);
+    } catch (e) { /* section stands without the story */ }
     var listBox = doc.createElement("div");
     listBox.className = "sign-sites";
     wrap.appendChild(listBox);

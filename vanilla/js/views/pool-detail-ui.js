@@ -64,6 +64,56 @@ var PoolDetailUI = (function () {
       var desk = u.el(doc, "div", null, "mkt mkt-pool"); wrap.appendChild(desk);
       var head = doc.createElement("section"); head.className = "mkt-head"; desk.appendChild(head);
       head.appendChild(u.el(doc, "h1", "Pool " + row.id));
+      /* Copy-link share (account shareRow precedent — copy-link only, no QR
+       * by decision). Static pool hash; the router resolves #/pools/:id. */
+      try {
+        (function poolShare() {
+          var srow = u.el(doc, "div", null, "xplore-share");
+          var sbtn = doc.createElement("button");
+          sbtn.type = "button";
+          sbtn.textContent = t("misc.copy_link", "Copy link");
+          if (typeof u.touchable === "function") u.touchable(sbtn);
+          else if (typeof touchable === "function") touchable(sbtn);
+          var snote = u.el(doc, "span", "", "muted");
+          try { snote.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+          srow.appendChild(sbtn);
+          srow.appendChild(doc.createTextNode(" "));
+          srow.appendChild(snote);
+          var hash = "#/pools/" + row.id;
+          sbtn.addEventListener("click", function () {
+            if (!live(myGen, uiGen)) return;
+            sbtn.disabled = true;
+            snote.textContent = t("misc.copying", "Copying…");
+            var url = hash;
+            try {
+              if (typeof location !== "undefined" && location.href) url = location.href.split("#")[0] + hash;
+            } catch (e) { url = hash; }
+            function done(ok) {
+              if (!live(myGen, uiGen)) return;
+              try { sbtn.disabled = false; } catch (e2) { /* stands */ }
+              snote.textContent = ok ? t("misc.copied", "Copied")
+                : t("misc.copy_failed_select_manually", "Copy failed — select the link manually");
+            }
+            function fallback() {
+              try {
+                var ta = doc.createElement("textarea");
+                ta.value = url; doc.body.appendChild(ta); ta.select();
+                var ok = false;
+                try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+                try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+                done(!!ok);
+              } catch (e) { done(false); }
+            }
+            try {
+              if (typeof navigator !== "undefined" && navigator.clipboard &&
+                  typeof navigator.clipboard.writeText === "function") {
+                navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+              } else fallback();
+            } catch (e) { fallback(); }
+          });
+          head.appendChild(srow);
+        })();
+      } catch (e) { /* detail stands without share */ }
       var strip = doc.createElement("div"); strip.className = "mkt-statstrip"; strip.setAttribute("aria-live", "polite");
       head.appendChild(strip);
       detailFill(doc, desk, head, strip, row, myGen, uiGen);

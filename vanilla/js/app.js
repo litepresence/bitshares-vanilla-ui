@@ -347,6 +347,11 @@ var App = (function () {
       try {
         el.textContent = name;
         el.setAttribute("title", title);
+        /* Two-size rule (app.css #acting-as): 20+ char names (chain allows
+         * 63) get the small wrapping style instead of the ellipsis. */
+        try {
+          el.setAttribute("data-long", String(name).length >= 20 ? "true" : "false");
+        } catch (e) { /* size stands */ }
       } catch (e) { /* name stands */ }
     }
     if (!walletUnlockedNow()) {
@@ -402,9 +407,11 @@ var App = (function () {
     }
   }
   /* paintLock: lock affordance next to the hamburger (Header.jsx:663-681).
-   *   Unlocked -> vendored unlocked glyph, click locks in place; locked ->
-   *   locked glyph linking to #/login. Params: none. Returns nothing. Fails:
-   *   never throws — missing Wallet/Icon keeps the static 🔒 login link. */
+   *   Unlocked -> green open-padlock PNG, click locks in place; locked ->
+   *   red locked-padlock PNG linking to #/login (owner-supplied state art —
+   *   color carries the state, same contract as the shield badge).
+   *   Params: none. Returns nothing. Fails: never throws — missing
+   *   Wallet/Icon keeps the static 🔒 login link. */
   function paintLock() {
     if (typeof document === "undefined") return;
     var lock = document.getElementById("lock-toggle");
@@ -413,7 +420,7 @@ var App = (function () {
     var iconOK = (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function");
     try {
       while (lock.firstChild) lock.removeChild(lock.firstChild);
-      if (iconOK) lock.appendChild(Icon.img(open ? "unlocked" : "locked", "nav-icon", ""));
+      if (iconOK) lock.appendChild(Icon.img(open ? "lock-open" : "lock-closed", "nav-icon icon-state", ""));
       else lock.textContent = open ? "🔓" : "🔒";
     } catch (e) { lock.textContent = open ? "🔓" : "🔒"; }
     lock.setAttribute("aria-label", open ? t("shell.lock", "Lock") : t("shell.unlock", "Unlock"));
@@ -548,8 +555,7 @@ var App = (function () {
     wrap.className = "theme-switcher";
     try { wrap.style.display = "inline-flex"; wrap.style.alignItems = "center"; wrap.style.gap = "6px"; } catch (e) { /* unstyled stands */ }
     var label = doc.createElement("label");
-    label.textContent = t("settings.theme_label", "Theme ");
-    try { label.style.color = fg; label.style.fontSize = "0.9rem"; } catch (e) { /* inherit stands */ }
+    try { label.style.fontSize = "0.9rem"; } catch (e) { /* inherit stands */ }
     var select = doc.createElement("select");
     select.id = "theme-switch-" + suffix;
     select.className = "theme-switcher-select";
@@ -812,14 +818,17 @@ var App = (function () {
     return missing;
   }
 
-  /* Signing-route badge (Tier 2): shield-check immediately left of the
-   * lock — lock answers "locked?", shield answers "extension-routed?".
-   * Renders ONLY when the effective route is extension (in-browser users
-   * pay zero header pixels; the settings warning covers them). Taps to the
-   * settings signing section (indicators navigate, never mutate). Label via
-   * settings.sign_badge; Icon.img carries its own text fallback so a
-   * missing glyph degrades to "EXT"-ish text, never a broken image.
-   * Params: none (reads SignMode + document). Returns nothing. Never throws. */
+  /* Signing-route badge (owner-supplied art): shield immediately left of
+   * the lock — lock answers "locked?" (red locked / green open PNG),
+   * shield answers "extension-routed?" (green check / red X PNG). BOTH
+   * badges always present (owner call — no zero-pixel mode); color carries
+   * the state. Taps to the settings signing section (indicators navigate,
+   * never mutate). Labels via settings.sign_badge (routed) /
+   * settings.sign_badge_local (in-page); Icon.img carries its own text
+   * fallback so a missing file degrades to text, never a broken image.
+   * Colored PNGs skip the --icon-filter invert via img.icon-state
+   * (app.css). Params: none (reads SignMode + document). Returns nothing.
+   * Never throws. */
   function paintShieldBadge() {
     if (typeof document === "undefined") return;
     try {
@@ -833,27 +842,27 @@ var App = (function () {
           routed = SignMode.effectiveMode() === "extension";
         }
       } catch (e) { routed = false; }
-      if (!routed) {
-        if (old) {
-          try { old.parentNode.removeChild(old); } catch (e) { /* stays hidden */ }
-        }
-        return;
-      }
-      var label = t("settings.sign_badge", "Extension signing active — details in Settings");
+      var label = routed
+        ? t("settings.sign_badge", "Extension signing active — details in Settings")
+        : t("settings.sign_badge_local", "In-page signing — details in Settings");
+      var icon = routed ? "shield-ok" : "shield-bad";
       if (!old) {
         var a = document.createElement("a");
         a.id = "ext-sign-badge";
         try { a.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-        try {
-          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
-            a.appendChild(Icon.img("shield-check", "nav-icon", "EXT"));
-          } else {
-            a.textContent = "EXT";
-          }
-        } catch (e) { a.textContent = "EXT"; }
         try { a.style.minHeight = "44px"; } catch (e) { /* native stands */ }
         lock.parentNode.insertBefore(a, lock);
         old = a;
+      }
+      try {
+        while (old.firstChild) old.removeChild(old.firstChild);
+        if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+          old.appendChild(Icon.img(icon, "nav-icon icon-state", routed ? "EXT" : "SIG"));
+        } else {
+          old.textContent = routed ? "EXT" : "SIG";
+        }
+      } catch (e) {
+        try { old.textContent = routed ? "EXT" : "SIG"; } catch (e2) { /* badge stands */ }
       }
       try {
         old.setAttribute("aria-label", label);

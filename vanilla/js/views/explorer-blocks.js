@@ -912,8 +912,41 @@ var ExplorerBlocks = (function () {
    * extra socket) prepends each new head row with a flash highlight and
    * refreshes the green live indicator. The one-shot load + Older paging +
    * Retry below stay as the stall fallback; feed-down never blanks. */
+  /* fromQuery helpers (unit-tested): ?from=<height> page cursor for the
+   * blocks table. parseFromHeight(raw) -> positive int or null (garbage
+   * never pages); syncFromUrl(h) writes ?from=H (or strips it for the
+   * tip) via replaceState — no re-render, no history spam. Both never
+   * throw; unknown heights fall back to the tip downstream. */
+  function parseFromHeight(raw) {
+    try {
+      var h = parseInt(String(raw), 10);
+      if (Number.isInteger(h) && h > 0) return h;
+    } catch (e) { /* null below */ }
+    return null;
+  }
+  function syncFromUrl(h) {
+    try {
+      if (typeof location === "undefined" || !location.href) return;
+      if (typeof history === "undefined" || typeof history.replaceState !== "function") return;
+      var path = "#/explorer/blocks";
+      try { path = String(location.hash || "").split("?")[0] || path; } catch (e) { /* default stands */ }
+      var q = (typeof h === "number" && h > 0) ? ("?from=" + h) : "";
+      history.replaceState(null, "", location.href.split("#")[0] + path + q);
+    } catch (e) { /* URL stays; table unaffected */ }
+  }
   function blocksTab(doc, body, root, myGen, oldest) {
     stopLive();
+    /* Deep-link cursor (?from=<height>): a null oldest re-reads the query
+     * so pasted links, reloads, and the stall Retry keep the page. Tab
+     * clicks navigate to a clean hash (no query) so they always reset to
+     * the live tip. Garbage heights fall back to the tip, never blank. */
+    if (oldest === null || oldest === undefined) {
+      try {
+        var qq = (typeof Router !== "undefined" && Router && typeof Router.query === "function") ? (Router.query() || {}) : {};
+        var ff = parseFromHeight(qq.from);
+        if (ff !== null) oldest = ff;
+      } catch (e) { /* tip below */ }
+    }
     showStatus(doc, body, t("explorer.loading_blocks", "Loading blocks…"));
     function rowsFor(top) {
       if (top === null || top === undefined) return Explorer.recentBlocks(TIP_ROWS, true);
@@ -1369,6 +1402,7 @@ var ExplorerBlocks = (function () {
           stopLive();
           DOM.clear(body);
           blocksTab(doc, body, root, myGen, oldestRow.height);
+          try { syncFromUrl(oldestRow.height); } catch (e) { /* URL stays */ }
         });
         body.appendChild(older);
       }
@@ -1420,6 +1454,7 @@ var ExplorerBlocks = (function () {
             stopLive();
             DOM.clear(body);
             blocksTab(doc, body, root, myGen, oldestRow.height);
+            try { syncFromUrl(oldestRow.height); } catch (e) { /* URL stays */ }
           });
           body.appendChild(older);
         }
@@ -1669,7 +1704,8 @@ var ExplorerBlocks = (function () {
     renderBlock: renderBlock,
     renderTx: renderTx,
     _test: { agoTextAt: agoTextAt, parseChainTime: parseChainTime, freshState: freshState,
-      sentenceFor: sentenceFor, pillFor: pillFor, opAccount: opAccount, orderNum: orderNum }
+      sentenceFor: sentenceFor, pillFor: pillFor, opAccount: opAccount, orderNum: orderNum,
+      parseFromHeight: parseFromHeight }
   };
 })();
 

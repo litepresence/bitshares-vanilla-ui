@@ -143,6 +143,10 @@ var Asset = (function () {
    * "unknown-asset" / "not-connected". */
   async function describe(symbolOrId) {
     if (typeof symbolOrId !== "string" || !symbolOrId) throw new Error("unknown-asset");
+    /* Chain truth: asset symbols are always UPPERCASE — user input is
+     * uppercased here (centrally, so every asset field is case-forgiving);
+     * object ids match ASSET_RE either way and pass through unchanged. */
+    if (!ASSET_RE.test(symbolOrId)) symbolOrId = symbolOrId.toUpperCase();
     if (Object.prototype.hasOwnProperty.call(_describePending, symbolOrId)) {
       return _describePending[symbolOrId];
     }

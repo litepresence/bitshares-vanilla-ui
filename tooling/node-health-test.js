@@ -67,6 +67,16 @@ eq(e4.hasHistory, false, "extra.hasHistory false passes");
 var e5 = Chain.enrichProbe("abc", null, 10, {});
 eq(e5.hasHistory, false, "empty extra -> false, never guessed");
 
+/* enrichProbe pingMs (Handshake/Ping columns): optional extra field,
+ * omitted/garbage -> null, never guessed. */
+eq(Chain.enrichProbe("abc", null, 10).pingMs, null, "omitted extra -> pingMs null");
+eq(e2.pingMs, null, "omitted extra -> null on full props too");
+eq(Chain.enrichProbe("abc", null, 10, {pingMs: 42}).pingMs, 42, "extra.pingMs passes");
+eq(Chain.enrichProbe("abc", null, 10, {pingMs: 0}).pingMs, 0, "zero ping passes");
+eq(Chain.enrichProbe("abc", null, 10, {pingMs: -1}).pingMs, null, "negative ping -> null");
+eq(Chain.enrichProbe("abc", null, 10, {pingMs: "42"}).pingMs, null, "string ping -> null, never guessed");
+eq(Chain.enrichProbe("abc", null, 10, {hasHistory: true, pingMs: 7}).hasHistory, true, "pingMs rides alongside hasHistory");
+
 /* SettingsNodes history — in-memory localStorage stub. */
 var store = {};
 global.localStorage = {
@@ -91,11 +101,10 @@ for (var i = 0; i < 20; i++) T.pushSample("wss://c", { ms: i, status: "GOOD" });
 eq(T.readHist()["wss://c"].length, 12, "history capped at 12");
 delete global.localStorage;
 
-/* histInfo — pure pill content (Phase 3). Leading space + parens wrap keyed
- * labels in code (layout owns the separator, keys stay clean). */
+/* histInfo — pure cell content (own History column: bare YES / NO). */
 function tk(k, d) { return d; }
-eq(SN._test.histInfo(tk, true).text, " (History)", "true -> ' (History)'");
-eq(SN._test.histInfo(tk, false).text, " (No history)", "false -> ' (No history)'");
+eq(SN._test.histInfo(tk, true).text, "YES", "true -> 'YES'");
+eq(SN._test.histInfo(tk, false).text, "NO", "false -> 'NO'");
 eq(SN._test.histInfo(tk, null).text, "", "null -> empty, never '?'");
 eq(SN._test.histInfo(tk, undefined).text, "", "undefined -> empty");
 eq(SN._test.histInfo(tk, true).cls, "node-history yes", "yes class");
@@ -116,5 +125,74 @@ eq(SN._test.latencyText(tl, 87, 1.26), "87ms · 1.3s", "age toFixed(1) rounding"
 eq(SN._test.latencyText(tl, 87, 0), "87ms · 0.0s", "zero age still shown");
 eq(SN._test.latencyText(function () { return "%(n)s sec"; }, 50, 2), "50ms · 2.0 sec", "translated template owns the unit");
 eq(SN._test.latencyText(null, 50, 2), "50ms", "throwing t -> latency only, never throws");
+
+/* pingText / partText — pure Ping + Participation cell content. */
+function tp(k, d) { return d; }
+eq(SN._test.pingText(tp, 45), "45ms", "ping number");
+eq(SN._test.pingText(tp, 45.6), "46ms", "ping rounds");
+eq(SN._test.pingText(tp, 0), "0ms", "zero ping stands");
+eq(SN._test.pingText(tp, null), "—", "null ping -> dash");
+eq(SN._test.pingText(tp, -1), "—", "negative ping -> dash");
+eq(SN._test.pingText(tp, "45"), "—", "string ping -> dash, never guessed");
+eq(SN._test.pingText(null, null), "—", "throwing t -> dash, never throws");
+eq(SN._test.partText(tp, 99.21875), "99.2%", "participation one decimal");
+eq(SN._test.partText(tp, 100), "100.0%", "participation 100");
+eq(SN._test.partText(tp, 0), "0.0%", "zero participation stands");
+eq(SN._test.partText(tp, null), "—", "null part -> dash");
+eq(SN._test.partText(tp, NaN), "—", "NaN part -> dash");
+eq(SN._test.partText(tp, "99"), "—", "string part -> dash, never guessed");
+eq(SN._test.partText(null, 50), "50.0%", "value stands without t");
+
+/* headText — pure head-age cell content (split from the handshake cell). */
+function th(k, d) {
+  return String(d).split("%(n)s").join("1.0");
+}
+eq(SN._test.headText(tl, 1.26), "1.3s", "age rounds to 0.1s");
+eq(SN._test.headText(tl, 0), "0.0s", "zero age stands");
+eq(SN._test.headText(tl, null), "—", "null age -> dash");
+eq(SN._test.headText(tl, NaN), "—", "NaN age -> dash");
+eq(SN._test.headText(tl, "1.2"), "—", "string age -> dash, never guessed");
+eq(SN._test.headText(null, null), "—", "throwing t -> dash, never throws");
+eq(SN._test.headText(th, 5), "1.0s", "translated template owns the unit");
+
+/* geoText / provText — pure Location + Provider cell content. */
+eq(SN._test.geoText(tl, "Frankfurt, Hesse"), "Frankfurt, Hesse", "label verbatim");
+eq(SN._test.geoText(tl, null), "—", "null label -> dash");
+eq(SN._test.geoText(tl, ""), "—", "empty label -> dash");
+eq(SN._test.geoText(null, null), "—", "throwing t -> dash, never throws");
+eq(SN._test.provText(tl, "Hetzner Online GmbH"), "Hetzner Online GmbH", "name verbatim, never prettified");
+eq(SN._test.provText(tl, null), "—", "null provider -> dash");
+eq(SN._test.provText(tl, ""), "—", "empty provider -> dash");
+eq(SN._test.provText(null, null), "—", "throwing t -> dash, never throws");
+
+/* healthFor — per-cell signal bands (good/warn/bad/""). */
+var hf = SN._test.healthFor;
+eq(hf("ping", 45), "good", "ping <100 green");
+eq(hf("ping", 100), "warn", "ping boundary 100 yellow");
+eq(hf("ping", 400), "warn", "ping boundary 400 yellow");
+eq(hf("ping", 401), "bad", "ping slow red");
+eq(hf("ping", null), "", "null ping uncolored");
+eq(hf("hs", 800), "good", "handshake <1s green");
+eq(hf("hs", 3000), "warn", "handshake 3s yellow");
+eq(hf("hs", 3001), "bad", "handshake over 3s red");
+eq(hf("part", 99), "good", "participation high green");
+eq(hf("part", 80), "warn", "participation 80 yellow");
+eq(hf("part", 79.9), "bad", "participation low red");
+eq(hf("head", 5), "good", "fresh head green");
+eq(hf("head", 30), "warn", "head 30s yellow");
+eq(hf("head", 31), "bad", "stale head red");
+eq(hf("chain", null, { network: "mainnet", match: true }), "good", "mainnet match green");
+eq(hf("chain", null, { network: "testnet", match: true }), "warn", "testnet match always yellow");
+eq(hf("chain", null, { network: "mainnet", match: false }), "bad", "mismatch red");
+eq(hf("chain", null, {}), "bad", "no match red");
+eq(hf("hist", true), "good", "YES green");
+eq(hf("hist", false), "warn", "NO yellow");
+eq(hf("hist", null), "", "unknown history uncolored");
+eq(hf("nope", 1), "", "unknown kind uncolored, never throws");
+
+/* histInfo carries its signal verdict for the data-h paint. */
+eq(SN._test.histInfo(tk, true).h, "good", "YES verdict good");
+eq(SN._test.histInfo(tk, false).h, "warn", "NO verdict warn");
+eq(SN._test.histInfo(tk, null).h, "", "unknown verdict empty");
 
 console.log("node-health-test: " + passed + " passed, 0 failed");

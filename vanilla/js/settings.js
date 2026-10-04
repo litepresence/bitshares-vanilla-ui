@@ -85,6 +85,14 @@ var SettingsPage = (function () {
     } catch (e) { opsRow.appendChild(disc.btn); }
     wrap.appendChild(opsRow);
     wrap.appendChild(probe.offline);
+    /* Geo note first: it footnotes the Location/Provider columns higher on
+     * the page; the Find-nodes note follows its own button block below. */
+    try {
+      if (typeof SettingsNodes !== "undefined" && SettingsNodes &&
+          typeof SettingsNodes.buildGeoNote === "function") {
+        wrap.appendChild(SettingsNodes.buildGeoNote(doc, t));
+      }
+    } catch (e) { /* note best-effort; the table works without it */ }
     wrap.appendChild(disc.note);
     wrap.appendChild(disc.progress);
     wrap.appendChild(disc.list);

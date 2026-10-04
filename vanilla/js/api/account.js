@@ -33,18 +33,21 @@ var Account = (function () {
   var _resolvePending = {};
 
   /* Resolve an account name or 1.2.N id to {id, name}.
-   * Params: nameOrId non-empty string.
+   * Chain truth: account names are always lowercase — user input is
+   * lowercased here (centrally, so every search/transfer/import field is
+   * case-forgiving); object ids are unaffected (lowercase is identity
+   * for "1.2.N"). Params: nameOrId non-empty string.
    * Returns: Promise of {id, name}.
    * Fails: "unknown-account" when the node returns null/empty. */
   async function resolve(nameOrId) {
     if (typeof nameOrId !== "string" || !nameOrId) {
       throw new Error("unknown-account");
     }
-    var key = nameOrId;
+    var key = nameOrId.toLowerCase();
     if (Object.prototype.hasOwnProperty.call(_resolvePending, key)) {
       return _resolvePending[key];
     }
-    var p = _resolveInner(nameOrId);
+    var p = _resolveInner(key);
     _resolvePending[key] = p;
     /* Clear on settle (both paths — a rejected entry must never poison). */
     p.then(function () { delete _resolvePending[key]; },

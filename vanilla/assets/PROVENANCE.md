@@ -43,5 +43,19 @@ Hand-drawn addition (Tier 2):
 - `icons/shield-check.svg` (32×32 stroke shield + check, `#929292` to take
   the existing `--icon-filter` theming like the set) is ORIGINAL art drawn
   for the extension-signing header badge — no source, no license surface.
-  Same viewBox/stroke convention as the set so it sits evenly beside
+  Same   viewBox/stroke convention as the set so it sits evenly beside
   `locked.svg` at 18px.
+- `icons/shield-blue.png` (owner-supplied 2026-10-04, blue shield + white
+  check, transparent) beside the Signing section heading
+  (`settings-prefs.js` buildSigning). Same family as the state shields.
+
+Owner-supplied state icons (2026-10-04):
+- `icons/_source-lock-shield-4up.png` is the owner's 2×2 sheet (green-check
+  shield, red-X shield, red locked padlock, green open padlock on white).
+  Split by `tooling/split_lock_shield_icons.py` (PIL edge flood-fill, white
+  glyphs preserved) into `icons/shield-ok.png`, `icons/shield-bad.png`,
+  `icons/lock-closed.png`, `icons/lock-open.png` (RGBA, transparent).
+  Wired in `app.js` paintLock/paintShieldBadge: BOTH badges always present —
+  lock color carries locked (red) vs unlocked (green), shield color carries
+  extension-routed (green check) vs browser signing (red X). Colored PNGs
+  bypass the `--icon-filter` invert (app.css exempts `img.icon-state`).

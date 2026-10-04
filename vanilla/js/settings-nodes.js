@@ -55,42 +55,67 @@ var SettingsNodes = (function () {
   }
 
   /* Paint one table row AND its mirrored phone card with the same
-   * latency/status text. Status is tracked as a canonical id on data-status
+   * cell texts. Status is tracked as a canonical id on data-status
    * (up|connecting|down plus health ids stale|suspect|forked — the offline
    * panel treats anything-not-up as unusable EXCEPT it only shows when every
    * row is exactly "down"; the visible text may be translated (settings.
    * connecting/down are load-bearing Spanish in es mode) so
    * paintOfflineIfAllDown compares the id below, never the translated text.
+   * The History cell is NOT painted here — paintHistory owns .node-history
+   * from HistoryCap truth (snapshot at build, live after probe).
    * Params: row (tr, may be null — no-op except the card lookup needs its
-   *   data-url), latencyText/statusText strings, statusId (canonical,
-   *   optional), titleText (tooltip, optional — clears stale titles when
-   *   omitted). Fails: never (missing cells are skipped). */
-  function setRow(row, latencyText, statusText, statusId, titleText) {
-    if (row) {
-      var lat = row.querySelector(".latency");
-      var st = row.querySelector(".node-status");
-      if (lat) lat.textContent = latencyText;
-      if (st) st.textContent = statusText;
-      if (statusId) row.setAttribute("data-status", statusId);
-      if (titleText) row.setAttribute("title", titleText);
-      else { try { row.removeAttribute("title"); } catch (titleErr) { /* keeps prior */ } }
+   *   data-url), cells ({lat, ping, part, head, chain, geo, prov} strings —
+   *   any missing key leaves that cell untouched), statusId (canonical, optional),
+   *   titleText (tooltip, optional — clears stale titles when omitted),
+   *   health ({lat, ping, part, head, chain} "good"|"warn"|"bad" — painted
+   *   as data-h for the CSS signal colors; a missing key CLEARS that cell's
+   *   color so re-probes never inherit stale signals).
+   *   Fails: never (missing cells are skipped). */
+  function setRow(row, cells, statusId, titleText, health) {
+    var c = (cells && typeof cells === "object") ? cells : {};
+    var hh = (health && typeof health === "object") ? health : {};
+    function hue(el, key) {
+      try {
+        if (!el || typeof el.setAttribute !== "function") return;
+        if (hh[key] === "good" || hh[key] === "warn" || hh[key] === "bad") el.setAttribute("data-h", hh[key]);
+        else { try { el.removeAttribute("data-h"); } catch (e) { /* unstained stands */ } }
+      } catch (e) { /* color best-effort */ }
     }
+    function paint(root) {
+      if (!root || typeof root.querySelector !== "function") return;
+      var lat = root.querySelector(".latency");
+      var png = root.querySelector(".ping");
+      var prt = root.querySelector(".part");
+      var hed = root.querySelector(".node-head");
+      var chn = root.querySelector(".node-chain");
+      var geo = root.querySelector(".node-geo");
+      var prv = root.querySelector(".node-provider");
+      if (lat && typeof c.lat === "string") lat.textContent = c.lat;
+      if (png && typeof c.ping === "string") png.textContent = c.ping;
+      if (prt && typeof c.part === "string") prt.textContent = c.part;
+      if (hed && typeof c.head === "string") hed.textContent = c.head;
+      if (chn && typeof c.chain === "string") chn.textContent = c.chain;
+      if (geo && typeof c.geo === "string") geo.textContent = c.geo;
+      if (prv && typeof c.prov === "string") prv.textContent = c.prov;
+      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain");
+    }
+    function tag(root) {
+      if (!root || typeof root.setAttribute !== "function") return;
+      if (statusId) root.setAttribute("data-status", statusId);
+      if (titleText) root.setAttribute("title", titleText);
+      else { try { root.removeAttribute("title"); } catch (titleErr) { /* keeps prior */ } }
+    }
+    if (row) { paint(row); tag(row); }
     var url = null;
     try { url = row ? row.getAttribute("data-url") : null; } catch (attrErr) { url = null; }
     if (url && row && row.ownerDocument) {
       /* M2: card lookup by getAttribute compare, same rule as findRow. */
       var cards = row.ownerDocument.querySelectorAll(".node-card");
-      for (var c = 0; c < cards.length; c++) {
-        var card = cards[c], cu = null;
+      for (var k = 0; k < cards.length; k++) {
+        var card = cards[k], cu = null;
         try { cu = card.getAttribute("data-url"); } catch (ce) { cu = null; }
         if (cu !== url) continue;
-        var cLat = card.querySelector(".latency");
-        var cSt = card.querySelector(".node-status");
-        if (cLat) cLat.textContent = latencyText;
-        if (cSt) cSt.textContent = statusText;
-        if (statusId) card.setAttribute("data-status", statusId);
-        if (titleText) card.setAttribute("title", titleText);
-        else { try { card.removeAttribute("title"); } catch (ctErr) { /* keeps prior */ } }
+        paint(card); tag(card);
       }
     }
   }
@@ -104,7 +129,7 @@ var SettingsNodes = (function () {
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var headRow = doc.createElement("tr");
-    ["", t("settings.th_node", "Node"), t("settings.th_latency", "Latency"), t("settings.th_status", "Status"), ""].forEach(function (t) {
+    ["", t("settings.th_node", "Node"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), ""].forEach(function (t) {
       var th = doc.createElement("th");
       th.textContent = t;
       headRow.appendChild(th);
@@ -132,23 +157,54 @@ var SettingsNodes = (function () {
       tdUrl.textContent = url;
       tr.appendChild(tdUrl);
 
+      var tdGeo = doc.createElement("td");
+      var geoSpan = doc.createElement("span");
+      geoSpan.className = "node-geo";
+      geoSpan.textContent = t("settings.pending", "…");
+      tdGeo.appendChild(geoSpan);
+      tr.appendChild(tdGeo);
+
+      var tdProv = doc.createElement("td");
+      var provSpan = doc.createElement("span");
+      provSpan.className = "node-provider";
+      provSpan.textContent = t("settings.pending", "…");
+      tdProv.appendChild(provSpan);
+      tr.appendChild(tdProv);
+
       var tdLat = doc.createElement("td");
       tdLat.className = "latency";
       tdLat.textContent = t("settings.pending", "…");
       tr.appendChild(tdLat);
 
+      var tdPing = doc.createElement("td");
+      tdPing.className = "ping";
+      tdPing.textContent = t("settings.pending", "…");
+      tr.appendChild(tdPing);
+
+      var tdPart = doc.createElement("td");
+      tdPart.className = "part";
+      tdPart.textContent = t("settings.pending", "…");
+      tr.appendChild(tdPart);
+
       var tdSt = doc.createElement("td");
       var stSpan = doc.createElement("span");
-      stSpan.className = "node-status";
+      stSpan.className = "node-head";
       stSpan.textContent = t("settings.pending", "…");
       tdSt.appendChild(stSpan);
-      /* History pill (Phase 3): second span in the Status cell — painted by
-       * paintHistory from HistoryCap (snapshot at build, live after probe).
-       * setRow's .node-status lookup is unaffected (class moved to the span). */
+      tr.appendChild(tdSt);
+
+      var tdChain = doc.createElement("td");
+      var chainSpan = doc.createElement("span");
+      chainSpan.className = "node-chain";
+      chainSpan.textContent = t("settings.pending", "…");
+      tdChain.appendChild(chainSpan);
+      tr.appendChild(tdChain);
+
+      var tdHist = doc.createElement("td");
       var histSpan = doc.createElement("span");
       histSpan.className = "node-history";
-      tdSt.appendChild(histSpan);
-      tr.appendChild(tdSt);
+      tdHist.appendChild(histSpan);
+      tr.appendChild(tdHist);
 
       var tdAct = doc.createElement("td");
       if (isCustom(url, settings)) {
@@ -183,15 +239,40 @@ var SettingsNodes = (function () {
       urlDiv.textContent = url;
       card.appendChild(urlDiv);
 
+      var geoSpan = doc.createElement("span");
+      geoSpan.className = "node-geo";
+      geoSpan.textContent = t("settings.pending", "…");
+      card.appendChild(geoSpan);
+
+      var provSpan = doc.createElement("span");
+      provSpan.className = "node-provider";
+      provSpan.textContent = t("settings.pending", "…");
+      card.appendChild(provSpan);
+
       var latSpan = doc.createElement("span");
       latSpan.className = "latency";
       latSpan.textContent = t("settings.pending", "…");
       card.appendChild(latSpan);
 
+      var pingSpan = doc.createElement("span");
+      pingSpan.className = "ping";
+      pingSpan.textContent = t("settings.pending", "…");
+      card.appendChild(pingSpan);
+
+      var partSpan = doc.createElement("span");
+      partSpan.className = "part";
+      partSpan.textContent = t("settings.pending", "…");
+      card.appendChild(partSpan);
+
       var stSpan = doc.createElement("span");
-      stSpan.className = "node-status";
+      stSpan.className = "node-head";
       stSpan.textContent = t("settings.pending", "…");
       card.appendChild(stSpan);
+
+      var chainSpan = doc.createElement("span");
+      chainSpan.className = "node-chain";
+      chainSpan.textContent = t("settings.pending", "…");
+      card.appendChild(chainSpan);
 
       var histSpan = doc.createElement("span");
       histSpan.className = "node-history";
@@ -261,7 +342,7 @@ var SettingsNodes = (function () {
     var btn = doc.createElement("button");
     btn.id = "discover-btn";
     btn.type = "button";
-    btn.textContent = t("settings.discover", "Find nodes");
+    btn.textContent = t("settings.discover", "Find nodes **");
     wrap.appendChild(btn);
     var cancel = doc.createElement("button");
     cancel.id = "discover-cancel";
@@ -270,7 +351,7 @@ var SettingsNodes = (function () {
     cancel.hidden = true;
     wrap.appendChild(cancel);
     var note = el(doc, "p",
-      t("settings.discover_note", "Optional: searches GitHub for node lists, then probes what it finds. GitHub and probed nodes see your network address. Results are candidates for your review — nothing is added automatically."), "muted");
+      t("settings.discover_note", "**Find nodes searches GitHub for node lists, then probes what it finds. GitHub and probed nodes see your network address. Results are candidates for your review — nothing is added automatically."), "muted node-note");
     wrap.appendChild(note);
     var progress = doc.createElement("p");
     progress.className = "muted";
@@ -283,8 +364,8 @@ var SettingsNodes = (function () {
   }
 
   /* One candidate row: url + health pill + source repos + Add button.
-   * Params: doc, t, row ({url, sources[], latencyMs, status}), onAdd(url).
-   * Returns the row element. Never throws. */
+   * Params: doc, t, row ({url, sources[], latencyMs, pingMs, participation,
+   * headAgeS, status}), onAdd(url). Returns the row element. Never throws. */
   function discoverRow(doc, t, row, onAdd) {
     var d = doc.createElement("div");
     d.className = "node-discover-row";
@@ -295,7 +376,10 @@ var SettingsNodes = (function () {
     meta.className = "muted";
     var bits = [];
     try {
-      bits.push((row.latencyMs === null || row.latencyMs === undefined) ? "—" : (row.latencyMs + "ms"));
+      bits.push((row.latencyMs === null || row.latencyMs === undefined) ? "—" : (Math.round(row.latencyMs) + "ms"));
+      bits.push("ping " + ((typeof row.pingMs !== "number" || !isFinite(row.pingMs)) ? "—" : (Math.round(row.pingMs) + "ms")));
+      bits.push("part " + ((typeof row.participation !== "number" || !isFinite(row.participation)) ? "—" : (row.participation.toFixed(1) + "%")));
+      bits.push("head " + ((typeof row.headAgeS !== "number" || !isFinite(row.headAgeS)) ? "—" : (row.headAgeS.toFixed(1) + "s")));
       bits.push(row.status || "DOWN");
       if (row.sources && row.sources.length) bits.push(row.sources.slice(0, 2).join(", "));
     } catch (e) { /* url stands alone */ }
@@ -408,20 +492,208 @@ var SettingsNodes = (function () {
     return (m < 1) ? "just now" : (m + "m ago");
   }
 
-  /* histInfo: pure history-pill content (unit-tested). Params: t, h (the
-   *   true/false/null from HistoryCap.nodeHistory). Returns {text, cls}:
-   *   leading space + parens wrap the keyed label in code (batch-2b glue
-   *   precedent — keys stay clean "History"/"No history", layout owns the
-   *   separator); unknown renders "" (nothing shown, never a "?").
-   *   Never throws. */
+  /* histInfo: pure history-cell content (unit-tested). Params: t, h (the
+   *   true/false/null from HistoryCap.nodeHistory). Returns {text, cls, h}
+   *   with the keyed settings.hist_yes/hist_no label ("YES"/"NO") and the
+   *   signal verdict (good/warn/"") painted as data-h by paintHistory;
+   *   unknown renders "" uncolored (nothing shown, never a "?"). Never throws. */
   function histInfo(t, h) {
     try {
-      if (h === true) return {text: " (" + t("settings.hist_yes", "History") + ")", cls: "node-history yes"};
-      if (h === false) return {text: " (" + t("settings.hist_no", "No history") + ")", cls: "node-history no"};
+      if (h === true) return {text: t("settings.hist_yes", "YES"), cls: "node-history yes", h: "good"};
+      if (h === false) return {text: t("settings.hist_no", "NO"), cls: "node-history no", h: "warn"};
     } catch (e) { /* empty below */ }
-    return {text: "", cls: "node-history"};
+    return {text: "", cls: "node-history", h: ""};
   }
 
+  /* pingText: pure ping-cell content (unit-tested). Params: t (the
+   *   injected settings lookup, 2-arg wrapper — used for the dash only),
+   *   ms (probe pingMs number or null/unknown). Returns "NNNms", or the
+   *   keyed dash when the ping never answered (fail-soft pingRTT). Fails:
+   *   never (a throwing t still returns a bare "—"). */
+  function pingText(t, ms) {
+    try {
+      if (typeof ms === "number" && isFinite(ms) && ms >= 0) return Math.round(ms) + "ms";
+    } catch (e) { /* dash below */ }
+    try {
+      return String(t("settings.dash", "—"));
+    } catch (e) {
+      return "—";
+    }
+  }
+
+  /* partText: pure participation-cell content (unit-tested, latencyTEST.py
+   *   participation-rate signal). Params: t (injected lookup, dash only),
+   *   pct (probe participation 0-100 or null/unknown). Returns "NN.N%".
+   *   Fails: never. */
+  function partText(t, pct) {
+    try {
+      if (typeof pct === "number" && isFinite(pct) && pct >= 0) return pct.toFixed(1) + "%";
+    } catch (e) { /* dash below */ }
+    try {
+      return String(t("settings.dash", "—"));
+    } catch (e) {
+      return "—";
+    }
+  }
+  /* headText: pure head-age cell content (unit-tested). Params: t (the
+   *   injected settings lookup, 2-arg wrapper that drops vars), ageS (probe
+   *   headAgeS seconds or null/unknown). Returns e.g. "1.2s" through the
+   *   keyed settings.age_s template ("%(n)ss", unit owned by the template so
+   *   translators can reposition it — same split/join workaround as
+   *   latencyText), or the keyed dash when the age is unknown. Fails: never.
+   *   (Split out of the old "NNNms · X.Xs" handshake cell 2026-10-04 —
+   *   Head is its own column now.) */
+  function headText(t, ageS) {
+    try {
+      if (typeof ageS === "number" && isFinite(ageS)) {
+        return String(t("settings.age_s", "%(n)ss")).split("%(n)s").join(ageS.toFixed(1));
+      }
+    } catch (e) { /* dash below */ }
+    try {
+      return String(t("settings.dash", "—"));
+    } catch (e) {
+      return "—";
+    }
+  }
+  /* healthFor: pure per-cell health verdict (unit-tested). Params: kind
+   * ("ping"|"hs"|"part"|"head"|"chain"|"hist"), value (number or null),
+   * extra (for chain: {network, match}). Returns "good"|"warn"|"bad"|""
+   * ("" = no color, unknown data never guesses). Bands:
+   * ping RTT <100/≤400ms; handshake <1000/≤3000ms (>3s red per spec);
+   * participation ≥95/≥80 (classifyHealth bands); head age ≤10/≤30s;
+   * chain mainnet-match green, testnet-match yellow, mismatch red;
+   * history YES green, NO yellow (reduced, not faulty). Never throws. */
+  function healthFor(kind, value, extra) {
+    try {
+      if (kind === "hist") {
+        if (value === true) return "good";
+        if (value === false) return "warn";
+        return "";
+      }
+      if (kind === "chain") {
+        var x = (extra && typeof extra === "object") ? extra : {};
+        if (!x.match) return "bad";
+        if (x.network === "testnet") return "warn";
+        if (x.network === "mainnet") return "good";
+        return "";
+      }
+      if (typeof value !== "number" || !isFinite(value) || value < 0) return "";
+      if (kind === "ping") return value < 100 ? "good" : (value <= 400 ? "warn" : "bad");
+      if (kind === "hs") return value < 1000 ? "good" : (value <= 3000 ? "warn" : "bad");
+      if (kind === "part") return value >= 95 ? "good" : (value >= 80 ? "warn" : "bad");
+      if (kind === "head") return value <= 10 ? "good" : (value <= 30 ? "warn" : "bad");
+    } catch (e) { /* "" below */ }
+    return "";
+  }
+  /* geoText: pure location-cell content. Params: t (injected lookup, dash
+   *   only), label (Geo.lookup "City, Region" string or null). Returns the
+   *   label verbatim (user/chain string — textContent-only downstream) or
+   *   the keyed dash when unknown. Fails: never. */
+  function geoText(t, label) {
+    try {
+      if (typeof label === "string" && label) return label;
+    } catch (e) { /* dash below */ }
+    try {
+      return String(t("settings.dash", "—"));
+    } catch (e) {
+      return "—";
+    }
+  }
+
+  /* provText: pure provider-cell content. Params: t (injected lookup,
+   *   dash only), name (Geo.provider string or null). Returns the name
+   *   verbatim or the keyed dash when unknown. Fails: never. */
+  function provText(t, name) {
+    try {
+      if (typeof name === "string" && name) return name;
+    } catch (e) { /* dash below */ }
+    try {
+      return String(t("settings.dash", "—"));
+    } catch (e) {
+      return "—";
+    }
+  }
+  /* paintGeo: fire-and-forget location + provider fill for one row and its
+   * mirrored card. Display-only (Geo data is never read by health/sort/
+   * selection logic): one cached Geo.details() fetch paints .node-geo and
+   * .node-provider, or the dash in both when the lookup answers null
+   * (https page, ip-api down, unknown host — every null path is honest,
+   * never blank, never blocking). Stale-guard: rows detached since
+   * (re-render, route leave) are skipped via isConnected.
+   * Params: row (tr), url (node URL string), t (settings lookup).
+   * Returns nothing. Fails: never throws. */
+  function paintGeo(row, url, t) {
+    var geoApi = null;
+    try {
+      geoApi = (typeof Geo !== "undefined" && Geo && typeof Geo.details === "function") ? Geo : null;
+    } catch (e) { geoApi = null; }
+    if (!geoApi) return;
+    function dashes() {
+      var g = "—", p = "—";
+      try { g = geoText(t, null); } catch (e) { /* dash stands */ }
+      try { p = provText(t, null); } catch (e) { /* dash stands */ }
+      return { geo: g, prov: p };
+    }
+    function live(target) {
+      try {
+        if (!target) return false;
+        if (typeof target.isConnected === "boolean") return target.isConnected;
+        var doc = target.ownerDocument;
+        return !!(doc && typeof doc.contains === "function" && doc.contains(target));
+      } catch (e) { return false; }
+    }
+    function paintOne(root, cells) {
+      try {
+        if (!live(root) || typeof root.querySelector !== "function") return;
+        var s = root.querySelector(".node-geo");
+        if (s) s.textContent = cells.geo;
+        var q = root.querySelector(".node-provider");
+        if (q) q.textContent = cells.prov;
+      } catch (e) { /* this node stands */ }
+    }
+    function paintAll(cells) {
+      paintOne(row, cells);
+      try {
+        var doc = row && row.ownerDocument ? row.ownerDocument : null;
+        if (!doc || typeof doc.querySelectorAll !== "function") return;
+        var cards = doc.querySelectorAll(".node-card");
+        for (var k = 0; k < cards.length; k++) {
+          var cu = null;
+          try { cu = cards[k].getAttribute("data-url"); } catch (ce) { cu = null; }
+          if (cu === url) paintOne(cards[k], cells);
+        }
+      } catch (e) { /* row paint stands */ }
+    }
+    try {
+      geoApi.details(url).then(function (d) {
+        var cells = dashes();
+        try {
+          if (d && typeof d === "object") {
+            cells = { geo: geoText(t, d.label), prov: provText(t, d.provider) };
+          }
+        } catch (e) { cells = dashes(); }
+        paintAll(cells);
+      }, function () {
+        paintAll(dashes());
+      });
+    } catch (e) { /* geo stays pending — never load-bearing */ }
+  }
+
+  /* buildGeoNote: one muted privacy line under the node ops (owner: DOM
+   * only — settings.js appends it with the other notes). Discloses the
+   * ip-api.com location/provider lookup (plain http, sees the visitor's
+   * address, answers cached 24 hours). Params: doc, t. Returns the <p>.
+   * Never throws. */
+  function buildGeoNote(doc, t) {
+    var p = doc.createElement("p");
+    p.className = "muted node-note";
+    try {
+      p.textContent = t("settings.geo_note", "*Locations and providers come from ipaddress.to (https, no key) — it sees your address when asked; answers cache on this device for 24 hours.");
+    } catch (e) {
+      try { p.textContent = "Node locations come from ip-api.com."; } catch (e2) { /* empty stands */ }
+    }
+    return p;
+  }
   /* latencyText: pure latency-cell content (unit-tested). Params: t (the
    *   injected settings lookup), ms (probe latency number), ageS (r.headAgeS
    *   seconds, or null/unknown). Returns "NNNms · X.Xs" — the age segment
@@ -458,7 +730,11 @@ var SettingsNodes = (function () {
       try {
         if (!node || typeof node.querySelector !== "function") return;
         var s = node.querySelector(".node-history");
-        if (s) { s.textContent = info.text; s.className = info.cls; }
+        if (s) {
+          s.textContent = info.text; s.className = info.cls;
+          if (info.h === "good" || info.h === "warn") s.setAttribute("data-h", info.h);
+          else { try { s.removeAttribute("data-h"); } catch (e2) { /* unstained stands */ } }
+        }
       } catch (e) { /* this node stands */ }
     }
     one(row);
@@ -490,6 +766,8 @@ var SettingsNodes = (function () {
     function detailText(r, prefix, extra) {
       var bits = [];
       try {
+        bits.push("handshake " + ((r && typeof r.latencyMs === "number") ? Math.round(r.latencyMs) + "ms" : "—"));
+        bits.push("ping " + ((r && typeof r.pingMs === "number") ? Math.round(r.pingMs) + "ms" : "—"));
         if (r && typeof r.headBlock === "number") bits.push("head " + r.headBlock);
         bits.push("age " + ((r && typeof r.headAgeS === "number") ? r.headAgeS.toFixed(1) + "s" : "—"));
         bits.push("participation " + ((r && typeof r.participation === "number") ? r.participation.toFixed(1) + "%" : "—"));
@@ -504,13 +782,19 @@ var SettingsNodes = (function () {
     function next() {
       if (i >= nodes.length) { paintOfflineIfAllDown(tbody, offline); return; }
       var url = nodes[i], row = findRow(tbody, url);
-      setRow(row, t("settings.pending", "…"), t("settings.connecting", "connecting"), "connecting");
+      var pend = "";
+      try { pend = String(t("settings.pending", "…")); } catch (e) { pend = "…"; }
+      var conn = "";
+      try { conn = String(t("settings.connecting", "connecting")); } catch (e) { conn = "connecting"; }
+      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, geo: pend, prov: pend }, "connecting");
       Chain.probe(url, 6000).then(function (r) {
         /* H1: a probe hit on the wrong chain paints as a mismatch (down),
          * never as a healthy row — selecting it would sign wrong-chain. */
         var mismatch = false;
+        var netName = "";
         try {
           var st = Store.loadSettings();
+          netName = (st && st.network) || "";
           var exp = Store.CHAIN_IDS && Store.CHAIN_IDS[st.network];
           if (exp && r && r.chainId &&
               String(r.chainId).toLowerCase() !== String(exp).toLowerCase()) mismatch = true;
@@ -519,8 +803,11 @@ var SettingsNodes = (function () {
         try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
         if (mismatch) {
           pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
-          setRow(row, latencyText(t, r.latencyMs, r.headAgeS), "mismatch " + prefix, "down",
-            detailText(r, prefix, "wrong chain for this network"));
+          var mChain4 = "";
+          try { mChain4 = String(prefix || "").slice(0, 4); } catch (sliceErr) { mChain4 = ""; }
+          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4 }, "down",
+            detailText(r, prefix, "wrong chain for this network"),
+            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: "bad" });
           /* History truth is recorded even for mismatches (the probe found
            * it) — the row is unselectable anyway, the pill stays honest. */
           try {
@@ -555,8 +842,11 @@ var SettingsNodes = (function () {
             var ago = agoMinutes(lg.t);
             if (ago) extra = "last good " + ago;
           }
-          setRow(row, latencyText(t, r.latencyMs, r.headAgeS), (v.status === "GOOD") ? prefix : (pill + " · " + prefix),
-            id, detailText(r, prefix, extra));
+          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS),
+            chain: (v.status === "GOOD") ? prefix.slice(0, 4) : (pill + " · " + prefix.slice(0, 4)) },
+            id, detailText(r, prefix, extra),
+            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS),
+              chain: healthFor("chain", null, { network: netName, match: true }) });
           /* Live history truth overwrites the snapshot (Phase-1 matrix). */
           try {
             if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
@@ -571,13 +861,19 @@ var SettingsNodes = (function () {
         var lg = lastGood(url);
         var extra = "";
         if (lg) { var ago = agoMinutes(lg.t); if (ago) extra = "last good " + ago; }
-        setRow(row, t("settings.dash", "—"),
-          timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"),
-          "down", extra || undefined);
+        setRow(row, { lat: t("settings.dash", "—"), ping: t("settings.dash", "—"), part: t("settings.dash", "—"), head: t("settings.dash", "—"),
+          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down") },
+          "down", extra || undefined, { chain: "bad" });
         /* No probe data — snapshot (or unknown) stands, still repaint so a
          * retried-then-failed row never shows a stale live pill. */
         paintHistory(row, url, t);
-      }).then(function () { i++; next(); });
+      }).then(function () {
+        /* Location + provider fill (display-only, hostname-based — runs for
+         * reached AND down rows; resolves async without holding the probe
+         * sequence, paints "—" on every null path). */
+        try { paintGeo(row, url, t); } catch (e) { /* geo never blocks probes */ }
+        i++; next();
+      });
     }
     next();
   }
@@ -603,10 +899,11 @@ var SettingsNodes = (function () {
     buildCustom: buildCustom,
     buildDiscover: buildDiscover,
     discoverRow: discoverRow,
+    buildGeoNote: buildGeoNote,
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor }
   };
 })();
 

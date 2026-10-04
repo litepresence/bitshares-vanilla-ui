@@ -193,9 +193,11 @@ var TransferUI = (function () {
     f.err.style.display = "";
   }
 
-  /* hashQuery(): ?asset= / ?memo= prefill for gateway withdraw delegation
-   * (slice-15) — parsed from location.hash, plain decode, no deps. A query
-   * memo forces plaintext (gateways cannot read encrypted memos). */
+  /* hashQuery(): ?to= (via path :to) ?asset= ?amount= ?memo= prefill —
+   * parsed from location.hash, plain decode, no deps. A query memo forces
+   * plaintext (gateways cannot read encrypted memos). Amount is gated by
+   * AMOUNT_RE below (same shape as the invoice worker) — precision is
+   * enforced later at review via Format.parseAmount, never here. */
   function hashQuery() {
     var out = {};
     try {
@@ -208,6 +210,31 @@ var TransferUI = (function () {
       });
     } catch (e) { /* malformed query: prefill empty */ }
     return out;
+  }
+  /* AMOUNT_RE: share-link/invoice amount shape (digits, optional decimals).
+   * Gate only — precision is enforced at review (Format.parseAmount). */
+  var AMOUNT_RE = /^\d+(\.\d+)?$/;
+  /* shareAmount: query amount string or "" (unit-tested). Params: raw
+   * (anything). Returns the string when it matches AMOUNT_RE and is
+   * nonzero, else "". Never throws. */
+  function shareAmount(raw) {
+    try {
+      if (typeof raw === "string" && AMOUNT_RE.test(raw) && Number(raw) > 0) return raw;
+    } catch (e) { /* "" below */ }
+    return "";
+  }
+  /* shareHash: pre-filled transfer deep link (unit-tested). Params: to,
+   * asset, amount, memo strings (any may be ""). Returns "#/transfer?..."
+   * with only non-empty params, encodeURIComponent-encoded. Pure. */
+  function shareHash(to, asset, amount, memo) {
+    var parts = [];
+    try {
+      if (to) parts.push("to=" + encodeURIComponent(to));
+      if (asset) parts.push("asset=" + encodeURIComponent(asset));
+      if (amount) parts.push("amount=" + encodeURIComponent(amount));
+      if (memo) parts.push("memo=" + encodeURIComponent(memo));
+    } catch (e) { /* partial stands */ }
+    return "#/transfer" + (parts.length ? ("?" + parts.join("&")) : "");
   }
   /** Route entry: #/transfer (form + confirm + propose wiring).
    * @param {HTMLElement} root router mount element
@@ -292,7 +319,7 @@ var TransferUI = (function () {
         from: from.name,
         to: typeof prefillTo === "string" ? prefillTo : "",
         asset: q.asset || coreSymbol(),
-        amount: "",
+        amount: shareAmount(q.amount),
         memo: q.memo || "",
         encrypted: !q.memo,
         feeAsset: null,
@@ -499,6 +526,66 @@ var TransferUI = (function () {
     wrap.appendChild(gateBox);
     var previewBox = DOM.el(doc, "div", null, "xfer-out");
     wrap.appendChild(previewBox);
+
+    /* Shareable link (invoice share-row precedent, misc-ui.js:512-579 —
+     * copy-link only, no QR by decision). Reads the LIVE inputs at tap
+     * time so the link reflects the form, not the entry query. Requires
+     * recipient + amount; precision stays a review-time check. */
+    wrap.appendChild(DOM.el(doc, "h2", t("misc.shareable_link", "Shareable link")));
+    var shareTa = doc.createElement("textarea");
+    shareTa.value = "";
+    shareTa.setAttribute("rows", "2"); shareTa.readOnly = true;
+    try { shareTa.style.width = "100%"; } catch (e) { /* unstyled stands */ }
+    touchable(shareTa);
+    wrap.appendChild(shareTa);
+    var shareCopy = touchable(DOM.el(doc, "button", t("misc.copy_link", "Copy link")));
+    shareCopy.type = "button";
+    wrap.appendChild(shareCopy);
+    wrap.appendChild(doc.createTextNode(" "));
+    var shareNote = DOM.el(doc, "span", "", "muted");
+    try { shareNote.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    wrap.appendChild(shareNote);
+    shareCopy.addEventListener("click", function () {
+      var to = "", asset = "", amt = "", memo = "";
+      try {
+        to = toF.input.value.trim();
+        asset = assetF.input.value.trim() || coreSymbol();
+        amt = amountF.input.value.trim();
+        memo = memoF.input.value.trim();
+      } catch (e) { /* empties stand */ }
+      if (!to || !shareAmount(amt)) {
+        shareNote.textContent = t("transfer.share_needs_to_amount", "A shareable link needs a recipient and an amount.");
+        return;
+      }
+      var hash = shareHash(to, asset, amt, memo), url = hash;
+      try {
+        if (typeof location !== "undefined" && location.href) url = location.href.split("#")[0] + hash;
+      } catch (e) { url = hash; }
+      shareTa.value = url;
+      shareCopy.disabled = true;
+      shareNote.textContent = t("misc.copying", "Copying…");
+      function done(ok) {
+        try { shareCopy.disabled = false; } catch (e) { /* stands */ }
+        shareNote.textContent = ok ? t("misc.copied", "Copied")
+          : t("misc.copy_failed_select_manually", "Copy failed — select the link manually");
+      }
+      function fallback() {
+        try {
+          var ta = doc.createElement("textarea");
+          ta.value = url; doc.body.appendChild(ta); ta.select();
+          var ok = false;
+          try { ok = doc.execCommand("copy"); } catch (e) { ok = false; }
+          try { ta.parentNode.removeChild(ta); } catch (e2) { /* gone */ }
+          done(!!ok);
+        } catch (e) { done(false); }
+      }
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard &&
+            typeof navigator.clipboard.writeText === "function") {
+          navigator.clipboard.writeText(url).then(function () { done(true); }, function () { fallback(); });
+        } else fallback();
+      } catch (e) { fallback(); }
+    });
 
     /* Toggle refresh: button emphasis (bold + aria-pressed, SendModal
      * primary/ghost concept) + propose-field visibility + Review label.
@@ -1569,7 +1656,8 @@ var TransferUI = (function () {
    * (confirm side) — called above as TransferConfirm.*. */
 
   return {
-    renderTransfer: renderTransfer
+    renderTransfer: renderTransfer,
+    _test: { shareHash: shareHash, shareAmount: shareAmount }
   };
 })();
 

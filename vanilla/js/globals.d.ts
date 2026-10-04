@@ -49,6 +49,7 @@ declare var Format: any;
 declare var Forms: any;
 declare var Gateway: any;
 declare var GatewayUI: any;
+declare var Geo: any;
 declare var GovAnalytics: any;
 declare var HelpUI: any;
 declare var HistoryCap: any;

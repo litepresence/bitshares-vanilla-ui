@@ -121,7 +121,8 @@ var NodeDiscover = (function () {
   /* Full run: search -> configs -> extract -> dedupe -> probe+classify each
    * fresh candidate sequentially (polite to third parties; cancellable).
    * Params: opts {known, maxRepos, onProgress(msg), isCancelled(), onCandidate(row)}.
-   * Row: {url, sources[], latencyMs, status, detail}. Resolves to row list.
+   * Row: {url, sources[], latencyMs, pingMs, participation, headAgeS, status,
+   * detail}. Resolves to row list.
    * Never throws (partial results on cancel/failure). */
   function run(opts) {
     var o = opts || {};
@@ -159,13 +160,16 @@ var NodeDiscover = (function () {
         chain = chain.then(function () {
           if (cancelled()) return;
           progress((idx + 1) + "/" + fresh.length);
-          var row = { url: url, sources: found[url] || [], latencyMs: null, status: "DOWN", detail: "" };
+          var row = { url: url, sources: found[url] || [], latencyMs: null, pingMs: null, participation: null, headAgeS: null, status: "DOWN", detail: "" };
           if (typeof Chain === "undefined" || !Chain || typeof Chain.probe !== "function") {
             rows.push(row);
             return;
           }
           return Chain.probe(url, 8000).then(function (r) {
             row.latencyMs = (r && typeof r.latencyMs === "number") ? r.latencyMs : null;
+            row.pingMs = (r && typeof r.pingMs === "number") ? r.pingMs : null;
+            row.participation = (r && typeof r.participation === "number") ? r.participation : null;
+            row.headAgeS = (r && typeof r.headAgeS === "number") ? r.headAgeS : null;
             var v = { status: "GOOD", detail: "ok" };
             try {
               if (Chain.classifyHealth) {
