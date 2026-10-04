@@ -423,6 +423,12 @@ var Router = (function () {
    *   (view errors themselves propagate). No-op before start(). */
   function render() {
     if (!view) return;
+    /* Router scrolls first, then the view renders and performs its own
+     * scrolling (deep-link `?dialog=` expand+scroll, explorer Return-to-top,
+     * tour targets) — so view-level scrolls always win. Never throws. */
+    try {
+      if (typeof window !== "undefined" && typeof window.scrollTo === "function") window.scrollTo(0, 0);
+    } catch (e) { /* scroll stands */ }
     var path = currentPath();
     var m = match(path);
     var title, fn, params;
