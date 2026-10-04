@@ -89,12 +89,7 @@ var TradeForm = (function () {
   }
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  function clearBox(box) {
+function clearBox(box) {
     while (box.firstChild) box.removeChild(box.firstChild);
   }
 

@@ -148,12 +148,7 @@ var TransferUI = (function () {
 
   /* Touch target floor (principle #7): every interactive element is ≥44px
    * in at least one dimension. Inline style keeps this view self-contained. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  function clearRoot(root) {
+function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 

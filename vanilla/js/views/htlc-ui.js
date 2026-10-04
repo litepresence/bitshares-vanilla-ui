@@ -38,7 +38,7 @@ var HtlcUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; } /* touch floor: >=44px one dim */
+/* touch floor: >=44px one dim */
   function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
   function shortHash(hex) { hex = String(hex || ""); return hex.length > 18 ? hex.slice(0, 12) + "…" + hex.slice(-6) : hex; }
   function showError(doc, wrap, e, fallback) { /* any throw -> text, never blank */

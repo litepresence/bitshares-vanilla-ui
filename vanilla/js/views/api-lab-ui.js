@@ -63,7 +63,6 @@ var ApiLabUI = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) { try { n.style.minHeight = "44px"; } catch (e) { /* stands */ } return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
 
   /* showError: inline error panel, never blank. Same contract as ops-ui. */
@@ -88,7 +87,8 @@ var ApiLabUI = (function () {
     wrap.appendChild(astat);
     var arow = el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(arow);
-    var retry = touchable(el(doc, "button", t("apilab.retry", "Retry")));
+    var retry = el(doc, "button", t("apilab.retry", "Retry"));
+    retry.classList.add("touchable");
     retry.type = "button"; arow.appendChild(retry);
     var aoff = null;
     try { aoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { aoff = null; }
@@ -108,7 +108,7 @@ var ApiLabUI = (function () {
     if (!alink) {
       alink = el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { alink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-      touchable(alink);
+      alink.classList.add("touchable");
     }
     arow.appendChild(alink);
     var settled = false, off = function () {};
@@ -174,10 +174,12 @@ var ApiLabUI = (function () {
       : t("apilab.gate_body", "This page sends hand-built API calls to a public node and shows raw chain JSON. Reads are safe; broadcasts move real funds. Only proceed if you know what you are doing.");
     box.appendChild(el(doc, "p", body));
     var row = el(doc, "p", null, null);
-    var ack = touchable(el(doc, "button", t("apilab.gate_ack", "I understand — open the API lab")));
+    var ack = el(doc, "button", t("apilab.gate_ack", "I understand — open the API lab"));
     ack.type = "button";
-    var back = touchable(el(doc, "a", t("apilab.gate_back", "Back to Explorer")));
+    ack.classList.add("touchable");
+    var back = el(doc, "a", t("apilab.gate_back", "Back to Explorer"));
     back.href = "#/explorer";
+    back.classList.add("btn-ghost", "touchable");
     try { back.style.display = "inline-flex"; back.style.alignItems = "center"; back.style.marginLeft = "12px"; } catch (e) { /* stands */ }
     ack.addEventListener("click", function () {
       if (myGen !== gen) return;
@@ -239,7 +241,7 @@ var ApiLabUI = (function () {
     filter.setAttribute("aria-label", t("apilab.filter", "Filter methods…"));
     var sel = el(doc, "select", null, null);
     sel.setAttribute("aria-label", t("apilab.method", "API method"));
-    touchable(sel);
+    sel.classList.add("touchable");
     pickRow.appendChild(filter); pickRow.appendChild(sel); wrap.appendChild(pickRow);
 
     function fillPick(ftext) {
@@ -304,18 +306,18 @@ var ApiLabUI = (function () {
           inp.value = (prefill && prefill[i] !== undefined) ? prefill[i] : "";
           if (!inp.value && p.example && (entry.method === "get_account_by_name" || entry.method === "get_chain_id")) inp.value = p.example;
         }
-        touchable(inp);
+        inp.classList.add("touchable");
         try { inp.style.display = "block"; inp.style.width = "100%"; inp.style.maxWidth = "560px"; inp.style.boxSizing = "border-box"; inp.style.marginTop = "4px"; } catch (e) { /* stands */ }
         lab.appendChild(inp);
         card.appendChild(lab);
         inputEls.push(inp);
       });
-      var rawLab = el(doc, "label", t("apilab.raw_params", "Raw params JSON (mirrors the boxes)"), null);
+      var rawLab = el(doc, "label", t("apilab.raw_params", "Raw params JSON (mirrors the boxes)"), "subtle-btn");
       rawBox = doc.createElement("textarea"); rawBox.rows = 3;
       try { rawLab.style.display = "block"; rawLab.style.margin = "10px 0 2px";
         rawBox.style.display = "block"; rawBox.style.width = "100%"; rawBox.style.maxWidth = "560px";
         rawBox.style.boxSizing = "border-box"; rawBox.style.marginTop = "4px"; } catch (e) { /* stands */ }
-      touchable(rawLab);
+      rawLab.classList.add("touchable");
       rawLab.appendChild(rawBox); card.appendChild(rawLab);
       syncRaw();
       inputEls.forEach(function (inp) {
@@ -325,12 +327,15 @@ var ApiLabUI = (function () {
       rawBox.addEventListener("input", syncCurated);
 
       var btnRow = el(doc, "p", null, null);
-      var runB = touchable(el(doc, "button", t("apilab.run", "Run")));
+      var runB = el(doc, "button", t("apilab.run", "Run"));
       runB.type = "button";
-      var resetB = touchable(el(doc, "button", t("apilab.reset", "Reset")));
+      runB.classList.add("touchable");
+      var resetB = el(doc, "button", t("apilab.reset", "Reset"));
       resetB.type = "button";
-      var copyB = touchable(el(doc, "button", t("apilab.copy_link", "Copy link")));
+      resetB.classList.add("btn-ghost", "touchable");
+      var copyB = el(doc, "button", t("apilab.copy_link", "Copy link"));
       copyB.type = "button";
+      copyB.classList.add("btn-ghost", "touchable");
       try { resetB.style.marginLeft = "8px"; copyB.style.marginLeft = "8px"; } catch (e) { /* stands */ }
       runB.addEventListener("click", onRun);
       resetB.addEventListener("click", function () { if (myGen === gen) renderForm(null); });
@@ -458,10 +463,12 @@ var ApiLabUI = (function () {
         } catch (e) { pre.textContent = vals.join(", "); }
         box.appendChild(pre);
         var row = el(doc, "p", null, null);
-        var yes = touchable(el(doc, "button", t("apilab.confirm_yes", "Broadcast now")));
+        var yes = el(doc, "button", t("apilab.confirm_yes", "Broadcast now"));
         yes.type = "button";
-        var no = touchable(el(doc, "button", t("apilab.confirm_no", "Cancel")));
+        yes.classList.add("touchable");
+        var no = el(doc, "button", t("apilab.confirm_no", "Cancel"));
         no.type = "button";
+        no.classList.add("btn-ghost", "touchable");
         try { no.style.marginLeft = "8px"; } catch (e) { /* stands */ }
         no.addEventListener("click", function () { try { box.remove(); } catch (e) { /* stands */ } });
         yes.addEventListener("click", function () {

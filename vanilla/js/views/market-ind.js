@@ -119,12 +119,7 @@ var MarketInd = (function () {
   }
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  /* Short label for a bucket size in seconds (label text only, not money). */
+/* Short label for a bucket size in seconds (label text only, not money). */
   function bucketLabel(b) {
     var known = { 60: "1m", 300: "5m", 900: "15m", 1800: "30m", 3600: "1h", 14400: "4h", 86400: "1D", 604800: "1W" };
     if (known[b]) return known[b];
@@ -952,7 +947,8 @@ var MarketInd = (function () {
           head.className = "mkt-osc-head";
           head.appendChild(el(doc, "span", label, "mkt-osc-title"));
           /* Every pane (incl. Volume) gets an x that unchecks its menu box. */
-          var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
+          var x = el(doc, "button", "✕", "mkt-osc-x subtle-btn");
+          x.classList.add("touchable");
           x.type = "button";
           x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " pane");
           /* forEach scope gives each closure its own key — no IIFE needed. */
@@ -1118,7 +1114,8 @@ var MarketInd = (function () {
       var row = doc.createElement("div");
       row.className = "mkt-indmenu-item";
       row.appendChild(el(doc, "span", label));
-      var add = touchable(el(doc, "button", "＋"));
+      var add = el(doc, "button", "＋", "subtle-btn");
+      add.classList.add("touchable");
       add.type = "button";
       add.setAttribute("aria-label", t("settings.add", "Add") + " " + label + " overlay");
       add.addEventListener("click", function () {
@@ -1158,7 +1155,8 @@ var MarketInd = (function () {
             drawCharts(state);
           });
           chip.appendChild(num);
-          var x = touchable(el(doc, "button", "✕", "mkt-osc-x"));
+          var x = el(doc, "button", "✕", "mkt-osc-x subtle-btn");
+          x.classList.add("touchable");
           x.type = "button";
           x.setAttribute("aria-label", t("settings.remove", "Remove") + " " + label + " " + num.value);
           x.addEventListener("click", function () {

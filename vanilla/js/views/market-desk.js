@@ -84,12 +84,7 @@ var MarketDesk = (function () {
   }
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  function clearRoot(root) {
+function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 
@@ -712,7 +707,7 @@ var MarketDesk = (function () {
     scaleRow.className = "mkt-scalerow";
     controls.appendChild(scaleRow);
     function scaleBtn(key, logKey, linKey, redrawBars) {
-      var b = touchable(el(doc, "button", ""));
+      var b = touchable(el(doc, "button", "", "subtle-btn"));
       b.type = "button";
       /* paint: relabel this scale toggle from state (log/lin pair). */
       function paint() {

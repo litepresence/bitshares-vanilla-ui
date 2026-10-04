@@ -88,8 +88,7 @@ var PredictionUI = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
-  function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
+function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
 
   function missingBackends() {
     var need = ["Explorer", "Asset", "Format", "Chain", "Store"], miss = null;

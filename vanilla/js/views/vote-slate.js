@@ -59,12 +59,7 @@ var VoteSlate = (function () {
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. Verbatim copy of vote-ui.js. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  /* Raw core-precision int string -> "12.34%" via integer hundredths math.
+/* Raw core-precision int string -> "12.34%" via integer hundredths math.
    * Params: totalRaw digit string, supplyRaw digit string (chain supply).
    * Returns "" when the supply is missing/zero (column renders "—").
    * Fails: never (garbage in yields "", never a throw). */

@@ -122,8 +122,7 @@ var OpsUI = (function () {
     return n;
   }
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
   }
@@ -288,7 +287,7 @@ var OpsUI = (function () {
     num.setAttribute("aria-label", t("ops.blocks_sampled_aria", "Blocks sampled"));
     touchable(num); num.style.maxWidth = "120px";
     lab.appendChild(num); form.appendChild(lab);
-    var apply = touchable(el(doc, "button", "Apply"));
+    var apply = touchable(el(doc, "button", "Apply", "subtle-btn"));
     apply.type = "submit"; form.appendChild(apply);
     wrap.appendChild(form);
     form.addEventListener("submit", function (ev) {

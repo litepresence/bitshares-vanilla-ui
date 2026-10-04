@@ -71,8 +71,7 @@ var ProposalUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
-  function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   /* showError: human error line (ERRMAP maps chain codes to dict strings,
    * aria-live). Returns the node. Never throws. */
   function showError(doc, wrap, e, fallback) {

@@ -48,8 +48,7 @@ var CreditUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
-  function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   /* Thrown values -> human sentences; unknown shapes fall back generic. */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("credit.unexpected_error", "Unexpected error"));

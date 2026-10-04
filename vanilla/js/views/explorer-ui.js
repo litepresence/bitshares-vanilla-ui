@@ -99,12 +99,7 @@ var ExplorerUI = (function () {
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  function clearRoot(root) {
+function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 

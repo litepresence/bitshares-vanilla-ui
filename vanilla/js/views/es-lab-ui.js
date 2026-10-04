@@ -94,7 +94,6 @@ var EsLabUI = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) { try { n.style.minHeight = "44px"; } catch (e) { /* stands */ } return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
 
   /* showError: inline error panel, never blank. Same contract as api-lab. */
@@ -183,7 +182,7 @@ var EsLabUI = (function () {
     filter.setAttribute("aria-label", t("eslab.filter", "Filter templates…"));
     var sel = el(doc, "select", null, null);
     sel.setAttribute("aria-label", t("eslab.template", "Query template"));
-    touchable(sel);
+    sel.classList.add("touchable");
     pickRow.appendChild(filter); pickRow.appendChild(sel); wrap.appendChild(pickRow);
 
     function allEntries() {
@@ -244,7 +243,7 @@ var EsLabUI = (function () {
           rawIndexSel.appendChild(o);
         });
         if (prefill && prefill[0]) { try { rawIndexSel.value = prefill[0]; } catch (e2) { /* first stands */ } }
-        touchable(rawIndexSel);
+        rawIndexSel.classList.add("touchable");
         try { rawIndexSel.style.display = "block"; rawIndexSel.style.marginTop = "4px"; } catch (e) { /* stands */ }
         idxLab.appendChild(rawIndexSel);
         card.appendChild(idxLab);
@@ -265,7 +264,7 @@ var EsLabUI = (function () {
           inp.value = (prefill && prefill[i] !== undefined) ? prefill[i] : "";
           if (!inp.value && p.example && entry.key === "holders-by-asset") inp.value = p.example;
         }
-        touchable(inp);
+        inp.classList.add("touchable");
         try { inp.style.display = "block"; inp.style.width = "100%"; inp.style.maxWidth = "560px"; inp.style.boxSizing = "border-box"; inp.style.marginTop = "4px"; } catch (e) { /* stands */ }
         lab.appendChild(inp);
         card.appendChild(lab);
@@ -273,13 +272,13 @@ var EsLabUI = (function () {
       });
       var rawLab = el(doc, "label", isRaw(entry.key) ?
         t("eslab.raw_body", "Query body JSON") :
-        t("eslab.raw_dsl", "Raw query JSON (mirrors the boxes)"), null);
+        t("eslab.raw_dsl", "Raw query JSON (mirrors the boxes)"), "subtle-btn");
       rawBox = doc.createElement("textarea"); rawBox.rows = isRaw(entry.key) ? 8 : 4;
       try { rawLab.style.display = "block"; rawLab.style.margin = "10px 0 2px";
         rawBox.style.display = "block"; rawBox.style.width = "100%"; rawBox.style.maxWidth = "560px";
         rawBox.style.boxSizing = "border-box"; rawBox.style.marginTop = "4px";
         rawBox.style.fontFamily = "monospace"; } catch (e) { /* stands */ }
-      touchable(rawLab);
+      rawLab.classList.add("touchable");
       if (isRaw(entry.key)) {
         rawBox.value = (prefill && prefill[1] !== undefined) ? prefill[1] :
           "{\n  \"size\": 10,\n  \"query\": { \"match_all\": {} }\n}";
@@ -295,12 +294,15 @@ var EsLabUI = (function () {
       if (!isRaw(entry.key)) rawBox.addEventListener("input", syncCurated);
 
       var btnRow = el(doc, "p", null, null);
-      var runB = touchable(el(doc, "button", t("eslab.run", "Run")));
+      var runB = el(doc, "button", t("eslab.run", "Run"));
       runB.type = "button";
-      var resetB = touchable(el(doc, "button", t("eslab.reset", "Reset")));
+      runB.classList.add("touchable");
+      var resetB = el(doc, "button", t("eslab.reset", "Reset"));
       resetB.type = "button";
-      var copyB = touchable(el(doc, "button", t("eslab.copy_link", "Copy link")));
+      resetB.classList.add("btn-ghost", "touchable");
+      var copyB = el(doc, "button", t("eslab.copy_link", "Copy link"));
       copyB.type = "button";
+      copyB.classList.add("btn-ghost", "touchable");
       try { resetB.style.marginLeft = "8px"; copyB.style.marginLeft = "8px"; } catch (e) { /* stands */ }
       runB.addEventListener("click", onRun);
       resetB.addEventListener("click", function () { if (myGen === gen) renderForm(null); });

@@ -132,12 +132,6 @@ var WalletUI = (function () {
     return row;
   }
 
-  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(node) {
-    node.style.minHeight = "44px";
-    return node;
-  }
-
   /* Muted paragraph of internal links (href + text pairs). */
   function helpPara(doc, pairs) {
     var p = doc.createElement("p");
@@ -465,10 +459,12 @@ var WalletUI = (function () {
     bkArea.addEventListener("input", refreshBkHint);
 
     var regenRow = doc.createElement("p");
-    var genBtn = touchable(actionButton(doc, "create-regen", t("wallet.generate_new_brainkey", "Generate new brainkey")));
+    var genBtn = actionButton(doc, "create-regen", t("wallet.generate_new_brainkey", "Generate new brainkey"));
+    genBtn.classList.add("touchable");
     regenRow.appendChild(genBtn);
     regenRow.appendChild(doc.createTextNode(" "));
-    var customBtn = touchable(actionButton(doc, "create-custom", t("wallet.use_custom_brainkey_instead", "Use custom brainkey instead")));
+    var customBtn = actionButton(doc, "create-custom", t("wallet.use_custom_brainkey_instead", "Use custom brainkey instead"));
+    customBtn.classList.add("btn-ghost", "touchable");
     regenRow.appendChild(customBtn);
     wrap.appendChild(regenRow);
     var err = makeError(doc);
@@ -521,10 +517,12 @@ var WalletUI = (function () {
     wrap.appendChild(fieldRow(doc, t("wallet.confirm_password", "Confirm password"), confirmInput));
 
     var actionRow = doc.createElement("p");
-    var createBtn = touchable(actionButton(doc, "create-do", t("wallet.create_wallet", "Create wallet")));
+    var createBtn = actionButton(doc, "create-do", t("wallet.create_wallet", "Create wallet"));
+    createBtn.classList.add("touchable");
     actionRow.appendChild(createBtn);
     actionRow.appendChild(doc.createTextNode(" "));
-    var cancelBtn = touchable(actionButton(doc, "create-cancel", t("wallet.cancel", "Cancel")));
+    var cancelBtn = actionButton(doc, "create-cancel", t("wallet.cancel", "Cancel"));
+    cancelBtn.classList.add("btn-ghost", "touchable");
     actionRow.appendChild(cancelBtn);
     wrap.appendChild(actionRow);
 

@@ -190,12 +190,7 @@ var ExplorerAssets = (function () {
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  function clearRoot(root) {
+function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
 
@@ -225,7 +220,7 @@ var ExplorerAssets = (function () {
    * only. Params: doc, hash ("#/…"). Returns the row div. Never throws. */
   function shareRow(doc, hash) {
     var row = el(doc, "div", null, "xplore-share");
-    var btn = touchable(el(doc, "button", "Copy link"));
+    var btn = touchable(el(doc, "button", "Copy link", "subtle-btn"));
     btn.type = "button";
     var note = el(doc, "span", "", "muted");
     note.setAttribute("aria-live", "polite");

@@ -39,7 +39,6 @@ var TrollboxUI = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) { try { n.style.minHeight = "44px"; } catch (e) {} return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function stopPoll() { try { if (timer !== null) clearInterval(timer); } catch (e) {} timer = null; }
 
@@ -117,7 +116,7 @@ var TrollboxUI = (function () {
     var tabsRow = doc.createElement("div"); tabsRow.className = "trollbox-tabs"; chanBox.appendChild(tabsRow);
     var langLabel = el(doc, "label", t("trollbox.language_label", "Language") + " ");
     var langSel = doc.createElement("select");
-    touchable(langSel);
+    langSel.classList.add("touchable");
     langSel.setAttribute("aria-label", t("trollbox.language_label", "Language"));
     T.LANGS.forEach(function (code) {
       var opt = doc.createElement("option");
@@ -132,8 +131,9 @@ var TrollboxUI = (function () {
     function paintTabs() {
       while (tabsRow.firstChild) tabsRow.removeChild(tabsRow.firstChild);
       T.CHANNELS.forEach(function (id) {
-        var b = touchable(el(doc, "button", "#" + id, "trollbox-tab"));
+        var b = el(doc, "button", "#" + id, "trollbox-tab subtle-btn");
         b.type = "button";
+        b.classList.add("touchable");
         b.setAttribute("aria-pressed", id === S.channel ? "true" : "false");
         if (id === S.channel) b.classList.add("active");
         b.addEventListener("click", function () {
@@ -178,8 +178,9 @@ var TrollboxUI = (function () {
       }
       if (S.loadError) {
         listNote.textContent = String(S.loadError);
-        var retry = touchable(el(doc, "button", t("trollbox.retry", "Retry")));
+        var retry = el(doc, "button", t("trollbox.retry", "Retry"));
         retry.type = "button";
+        retry.classList.add("touchable");
         retry.addEventListener("click", function () { loadMessages(); });
         list.appendChild(retry);
         return;
@@ -220,8 +221,9 @@ var TrollboxUI = (function () {
           : t("trollbox.error_body", "The connected node did not answer the plugin probe. Check your connection and retry.");
         S.loadError = body;
         paintList();
-        var go = touchable(el(doc, "a", t("trollbox.change_node", "Go to node settings"), "btn"));
+        var go = el(doc, "a", t("trollbox.change_node", "Go to node settings"), "btn btn-ghost");
         go.href = "#/settings";
+        go.classList.add("touchable");
         wrap.appendChild(go);
       }
     }
@@ -258,9 +260,10 @@ var TrollboxUI = (function () {
     pwInput.type = "password";
     pwInput.setAttribute("aria-label", t("trollbox.password_label", "Wallet password"));
     pwInput.placeholder = t("trollbox.password_label", "Wallet password");
-    touchable(pwInput);
-    var unlockBtn = touchable(el(doc, "button", t("trollbox.unlock", "Unlock")));
+    pwInput.classList.add("touchable");
+    var unlockBtn = el(doc, "button", t("trollbox.unlock", "Unlock"));
     unlockBtn.type = "button";
+    unlockBtn.classList.add("touchable");
     pwRow.appendChild(pwInput); pwRow.appendChild(unlockBtn);
     wrap.appendChild(pwRow);
     var area = doc.createElement("textarea");
@@ -268,11 +271,12 @@ var TrollboxUI = (function () {
     area.maxLength = 1024;
     area.placeholder = t("trollbox.composer_placeholder", "Write a plain-text message…");
     area.setAttribute("aria-label", t("trollbox.composer_title", "Post a message"));
-    touchable(area);
+    area.classList.add("touchable");
     wrap.appendChild(area);
     var budgetLine = el(doc, "p", "", "muted"); wrap.appendChild(budgetLine);
     var feeLine = el(doc, "p", "", "muted"); feeLine.setAttribute("aria-live", "polite"); wrap.appendChild(feeLine);
-    var postBtn = touchable(el(doc, "button", t("trollbox.post", "Post on-chain"), "btn"));
+    var postBtn = el(doc, "button", t("trollbox.post", "Post on-chain"), "btn");
+    postBtn.classList.add("touchable");
     postBtn.type = "button";
     wrap.appendChild(postBtn);
     var note = el(doc, "p", "", "muted"); note.setAttribute("aria-live", "polite"); wrap.appendChild(note);

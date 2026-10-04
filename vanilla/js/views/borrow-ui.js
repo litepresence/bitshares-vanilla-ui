@@ -62,8 +62,7 @@ var BorrowUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
-  function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("borrow.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");

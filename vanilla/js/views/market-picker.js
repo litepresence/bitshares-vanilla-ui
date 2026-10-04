@@ -45,12 +45,7 @@ var MarketPicker = (function () {
   }
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  /* Display-only 6-decimal trim (retro round 2 D1 — same rule as the strip):
+/* Display-only 6-decimal trim (retro round 2 D1 — same rule as the strip):
    * ticker latest strings can carry 16 decimals; the original table shows 6.
    * Pure string truncation at RENDER, full string stays on title. Plain
    * duplicate of the market-ind.js helper (doctrine: duplication). */

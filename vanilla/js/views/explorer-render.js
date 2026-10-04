@@ -96,12 +96,7 @@ var ExplorerRender = (function () {
 
   /* Touch target floor (principle #7): interactive elements are >=44px in
    * at least one dimension. Verbatim copy. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
-  /* Link helper (textContent only, touch-sized, inline-block). Verbatim copy. */
+/* Link helper (textContent only, touch-sized, inline-block). Verbatim copy. */
   function anchor(doc, text, href) {
     var a = el(doc, "a", text);
     a.setAttribute("href", href);
