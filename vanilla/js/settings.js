@@ -150,17 +150,42 @@ var SettingsPage = (function () {
       }
     } catch (e) { /* settings stand without viewing */ }
 
-    // Events: node radios
+    /* Card Select/Selected labels go stale without a rerender (radios flip
+     * natively). Refresh after every selection; full render only when the
+     * network flipped (testnet note visibility). Params: none (closure).
+     * Returns nothing. Never throws. */
+    function refreshSelectLabels() {
+      var active = "";
+      try { active = Store.loadSettings().activeNode || ""; } catch (e) { /* labels stand */ }
+      Array.prototype.forEach.call(cards.querySelectorAll(".node-select"), function (b) {
+        var on = false;
+        try { on = b.getAttribute("data-url") === active; } catch (e) { /* keep */ }
+        b.textContent = on ? t("settings.selected", "Selected") : t("settings.select", "Select");
+      });
+    }
+
+    // Events: node radios (selection may flip networks -> rerender then)
     Array.prototype.forEach.call(tbody.querySelectorAll('input[name="node"]'), function (r) {
       r.addEventListener("change", function () {
-        if (r.checked) SettingsNodes.selectNode(r.value);
+        if (!r.checked) return;
+        try {
+          SettingsNodes.selectNode(r.value).then(function (flipped) {
+            try { refreshSelectLabels(); } catch (e) { /* labels stand */ }
+            if (flipped) render(rootEl);
+          });
+        } catch (e) { /* selection stands */ }
       });
     });
 
-    // Events: card select buttons
+    // Events: card select buttons (selection may flip networks -> rerender then)
     Array.prototype.forEach.call(cards.querySelectorAll(".node-select"), function (b) {
       b.addEventListener("click", function () {
-        SettingsNodes.selectNode(b.getAttribute("data-url"));
+        try {
+          SettingsNodes.selectNode(b.getAttribute("data-url")).then(function (flipped) {
+            try { refreshSelectLabels(); } catch (e) { /* labels stand */ }
+            if (flipped) render(rootEl);
+          });
+        } catch (e) { /* selection stands */ }
       });
     });
 

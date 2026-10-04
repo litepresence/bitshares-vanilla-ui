@@ -17,15 +17,18 @@
 var SettingsNodes = (function () {
   "use strict";
 
-  /* Defaults + customs joined, de-duplicated, order-stable (defaults first).
-   * Params: settings (Store.loadSettings shape: {network, customNodes}).
-   * Returns: array of wss:// URL strings. Fails: never (garbage entries drop). */
+  /* Both networks' defaults + customs joined, de-duplicated, order-stable
+   * (mainnet defaults, testnet defaults, customs). The table owns network
+   * switching, so every row is always listed. Params: settings
+   * (Store.loadSettings shape: {network, customNodes}). Returns: array of
+   * wss:// URL strings. Fails: never (garbage entries drop). */
   function allNodes(settings) {
-    var defaults = (Store.DEFAULT_NODES && Store.DEFAULT_NODES[settings.network]) || [];
+    var mains = (Store.DEFAULT_NODES && Store.DEFAULT_NODES.mainnet) || [];
+    var tests = (Store.DEFAULT_NODES && Store.DEFAULT_NODES.testnet) || [];
     var customs = Array.isArray(settings.customNodes) ? settings.customNodes : [];
     var seen = {};
     var out = [];
-    defaults.concat(customs).forEach(function (u) {
+    mains.concat(tests).concat(customs).forEach(function (u) {
       if (typeof u !== "string" || !u) return;
       if (seen[u]) return;
       seen[u] = true;
@@ -88,6 +91,7 @@ var SettingsNodes = (function () {
       var prt = root.querySelector(".part");
       var hed = root.querySelector(".node-head");
       var chn = root.querySelector(".node-chain");
+      var nnet = root.querySelector(".node-network");
       var geo = root.querySelector(".node-geo");
       var prv = root.querySelector(".node-provider");
       if (lat && typeof c.lat === "string") lat.textContent = c.lat;
@@ -95,9 +99,10 @@ var SettingsNodes = (function () {
       if (prt && typeof c.part === "string") prt.textContent = c.part;
       if (hed && typeof c.head === "string") hed.textContent = c.head;
       if (chn && typeof c.chain === "string") chn.textContent = c.chain;
+      if (nnet && typeof c.network === "string") nnet.textContent = c.network;
       if (geo && typeof c.geo === "string") geo.textContent = c.geo;
       if (prv && typeof c.prov === "string") prv.textContent = c.prov;
-      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain");
+      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain"); hue(nnet, "network");
     }
     function tag(root) {
       if (!root || typeof root.setAttribute !== "function") return;
@@ -129,7 +134,7 @@ var SettingsNodes = (function () {
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var headRow = doc.createElement("tr");
-    ["", t("settings.th_node", "Node"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), ""].forEach(function (t) {
+    ["", t("settings.th_node", "Node"), t("settings.th_network", "Network"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), ""].forEach(function (t) {
       var th = doc.createElement("th");
       th.textContent = t;
       headRow.appendChild(th);
@@ -156,6 +161,13 @@ var SettingsNodes = (function () {
       var tdUrl = doc.createElement("td");
       tdUrl.textContent = url;
       tr.appendChild(tdUrl);
+
+      var tdNet = doc.createElement("td");
+      var netSpan = doc.createElement("span");
+      netSpan.className = "node-network";
+      netSpan.textContent = networkLabel(t, listNetwork(url), null);
+      tdNet.appendChild(netSpan);
+      tr.appendChild(tdNet);
 
       var tdGeo = doc.createElement("td");
       var geoSpan = doc.createElement("span");
@@ -238,6 +250,11 @@ var SettingsNodes = (function () {
       urlDiv.className = "node-card-url";
       urlDiv.textContent = url;
       card.appendChild(urlDiv);
+
+      var netSpan = doc.createElement("span");
+      netSpan.className = "node-network";
+      netSpan.textContent = networkLabel(t, listNetwork(url), null);
+      card.appendChild(netSpan);
 
       var geoSpan = doc.createElement("span");
       geoSpan.className = "node-geo";
@@ -820,6 +837,17 @@ var SettingsNodes = (function () {
     } catch (e) { /* row paint stands */ }
   }
 
+  /* Observed chain ids per URL, this page-load only (lets selectNode reuse
+   * a probe this session ran instead of re-probing; no storage churn —
+   * absence just means probe-first). Never read before write fails: a
+   * missing entry is "". */
+  var seenChain = {};
+  function noteChain(url, chainId) {
+    try {
+      if (typeof url === "string" && url && typeof chainId === "string" && chainId) seenChain[url] = chainId;
+    } catch (e) { /* memory best-effort */ }
+  }
+
   /* Sequential health probe over the node list (one socket at a time —
    * parallel probes race the shared Chain socket). Rows paint connecting →
    * a taxonomy pill (GOOD/STALE/SUSPECT/FORKED/mismatch/TIMEOUT/DOWN —
@@ -858,26 +886,28 @@ var SettingsNodes = (function () {
       try { conn = String(t("settings.connecting", "connecting")); } catch (e) { conn = "connecting"; }
       setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, geo: pend, prov: pend }, "connecting");
       Chain.probe(url, 6000).then(function (r) {
-        /* H1: a probe hit on the wrong chain paints as a mismatch (down),
-         * never as a healthy row — selecting it would sign wrong-chain. */
+        var cid = "";
+        try { cid = (r && typeof r.chainId === "string") ? r.chainId : ""; } catch (cidErr) { cid = ""; }
+        noteChain(url, cid);
+        /* Per-row expectation: listed defaults answer their list's chain
+         * (a foreign answer stays a red mismatch); customs answer anything
+         * and are labeled by what they show. */
+        var rowNet = listNetwork(url);
         var mismatch = false;
-        var netName = "";
         try {
-          var st = Store.loadSettings();
-          netName = (st && st.network) || "";
-          var exp = Store.CHAIN_IDS && Store.CHAIN_IDS[st.network];
-          if (exp && r && r.chainId &&
-              String(r.chainId).toLowerCase() !== String(exp).toLowerCase()) mismatch = true;
+          var exp = (rowNet && Store.CHAIN_IDS) ? Store.CHAIN_IDS[rowNet] : null;
+          if (exp && cid && cid.toLowerCase() !== String(exp).toLowerCase()) mismatch = true;
         } catch (pinErr) { mismatch = false; }
+        var dispNet = rowNet || netFromChain(cid);
         var prefix = "";
         try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
         if (mismatch) {
           pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
           var mChain4 = "";
           try { mChain4 = String(prefix || "").slice(0, 4); } catch (sliceErr) { mChain4 = ""; }
-          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4 }, "down",
+          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4, network: networkLabel(t, dispNet, cid) }, "down",
             detailText(r, prefix, "wrong chain for this network"),
-            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: "bad" });
+            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: "bad", network: networkHealth(dispNet, cid) });
           /* History truth is recorded even for mismatches (the probe found
            * it) — the row is unselectable anyway, the pill stays honest. */
           try {
@@ -913,10 +943,10 @@ var SettingsNodes = (function () {
             if (ago) extra = "last good " + ago;
           }
           setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS),
-            chain: (v.status === "GOOD") ? prefix.slice(0, 4) : (pill + " · " + prefix.slice(0, 4)) },
+            chain: (v.status === "GOOD") ? prefix.slice(0, 4) : (pill + " · " + prefix.slice(0, 4)), network: networkLabel(t, dispNet, cid) },
             id, detailText(r, prefix, extra),
             { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS),
-              chain: healthFor("chain", null, { network: netName, match: true }) });
+              chain: networkHealth(dispNet, cid) });
           /* Live history truth overwrites the snapshot (Phase-1 matrix). */
           try {
             if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
@@ -932,7 +962,7 @@ var SettingsNodes = (function () {
         var extra = "";
         if (lg) { var ago = agoMinutes(lg.t); if (ago) extra = "last good " + ago; }
         setRow(row, { lat: t("settings.dash", "—"), ping: t("settings.dash", "—"), part: t("settings.dash", "—"), head: t("settings.dash", "—"),
-          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down") },
+          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"), network: networkLabel(t, listNetwork(url), null) },
           "down", extra || undefined, { chain: "bad" });
         /* No probe data — snapshot (or unknown) stands, still repaint so a
          * retried-then-failed row never shows a stale live pill. */
@@ -948,14 +978,40 @@ var SettingsNodes = (function () {
     next();
   }
 
-  /* Persist the active node and reconnect the shared socket now (the badge
-   * + next probe pass carry any error — never a throw here).
-   * Params: url string. Fails: never (connect errors are swallowed). */
+  /* Persist the active node (+ network when the row determines one) and
+   * reconnect now (badge + next probe carry any error). Customs with no
+   * observed chain probe first (tap = consent); a failed first probe falls
+   * back to node-only (the connect chain-id pin guards wrong-chain).
+   * Params: url string. Returns a Promise resolving true when the network
+   * flipped (caller rerenders for the testnet note), false otherwise.
+   * Never throws. */
   function selectNode(url) {
-    Store.saveSettings({activeNode: url});
-    if (typeof Chain !== "undefined" && Chain && Chain.connect) {
-      try { Chain.connect(url); } catch (e) { /* probe/badge carries the error */ }
+    function apply(net) {
+      var prev = "";
+      try {
+        var st = Store.loadSettings();
+        prev = (st && st.network) || "";
+      } catch (e) { /* prev stands */ }
+      var patch = { activeNode: url };
+      if (net === "mainnet" || net === "testnet") patch.network = net;
+      try { Store.saveSettings(patch); } catch (e) { return Promise.resolve(false); }
+      if (typeof Chain !== "undefined" && Chain && Chain.connect) {
+        try { Chain.connect(url); } catch (e) { /* badge carries the error */ }
+      }
+      return Promise.resolve((net === "mainnet" || net === "testnet") ? net !== prev : false);
     }
+    try {
+      var known = listNetwork(url) || netFromChain(seenChain[url] || "");
+      if (known) return apply(known);
+      if (typeof Chain !== "undefined" && Chain && typeof Chain.probe === "function") {
+        return Chain.probe(url, 6000).then(function (r) {
+          var cid = (r && typeof r.chainId === "string") ? r.chainId : "";
+          noteChain(url, cid);
+          return apply(netFromChain(cid));
+        }).then(null, function () { return apply(""); });
+      }
+      return apply("");
+    } catch (e) { return Promise.resolve(false); }
   }
 
   return {

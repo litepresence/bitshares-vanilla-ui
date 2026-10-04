@@ -200,7 +200,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   .node-card { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px; }
   .node-card .latency, .node-card .ping, .node-card .part, .node-card .node-head,
-  .node-card .node-chain, .node-card .node-history, .node-card .node-geo,
+  .node-card .node-chain, .node-card .node-network, .node-card .node-history, .node-card .node-geo,
   .node-card .node-provider { margin-right: 8px; }
 }
 button, select, input { min-height: 44px; font-size: 1rem; }
