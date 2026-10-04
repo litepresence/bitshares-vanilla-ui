@@ -132,7 +132,7 @@ var AccountUI = (function () {
     var isHist = raw.indexOf("history-unavailable") !== -1;
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
       msg = fallback || t("transfer.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
@@ -142,7 +142,7 @@ var AccountUI = (function () {
     } else if (msg.indexOf("bad-asset-shape") !== -1) {
       msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("transfer.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -1234,7 +1234,7 @@ var AccountUI = (function () {
         lookViewBtn.disabled = false;
         var m = (e && e.message) ? e.message : "";
         if (m.indexOf("unknown-account") !== -1) lookErr.textContent = t("viewing.unknown_account", "Unknown account name.");
-        else lookErr.textContent = t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry.");
+        else lookErr.textContent = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
       });
     });
     var lookResetLine = doc.createElement("p");
@@ -1392,12 +1392,12 @@ var AccountUI = (function () {
                 back.disabled = true;
                 var bs = doc.createElement("p");
                 bs.className = "muted";
-                bs.textContent = t("transfer.s1", "Broadcasting…");
+                bs.textContent = t("common.status_broadcasting", "Broadcasting…");
                 out.appendChild(bs);
                 var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
                 if (!wif) {
                   out.removeChild(bs);
-                  showError(doc, out, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
+                  showError(doc, out, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
                   send.disabled = false;
                   back.disabled = false;
                   return;
@@ -1950,7 +1950,7 @@ var AccountUI = (function () {
         Chain.status().state !== "open") {
       var waiting = doc.createElement("p");
       waiting.className = "muted";
-      waiting.textContent = t("transfer.connecting", "Connecting to network…");
+      waiting.textContent = t("common.status_connecting", "Connecting to network…");
       wrap.appendChild(waiting);
       var settled = false;
       var off = Store.subscribe("connection", function (st) {

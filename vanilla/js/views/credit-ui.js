@@ -46,9 +46,9 @@ var CreditUI = (function () {
   /* No local el/clearBox — use DOM.el, DOM.clear */
   /* Thrown values -> human sentences; unknown shapes fall back generic. */
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("credit.unexpected_error", "Unexpected error"));
-    if (m.indexOf("not-connected") !== -1) m = t("credit.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    else if (m.indexOf("wallet-locked") !== -1) m = t("credit.wallet_is_locked", "Wallet is locked.");
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
     else if (m.indexOf("unknown-offer") !== -1) m = t("credit.unknown_credit_offer", "Unknown credit offer.");
     else if (m.indexOf("unknown-fund") !== -1) m = t("credit.unknown_same_t_fund", "Unknown Same-T fund.");
     else if (m.indexOf("unknown-deal") !== -1) m = t("credit.unknown_credit_deal", "Unknown credit deal.");
@@ -70,7 +70,7 @@ var CreditUI = (function () {
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(DOM.el(doc, "p", open
       ? t("credit.retry_load", "Retry loading.")
-      : t("credit.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      : t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
@@ -258,7 +258,7 @@ var CreditUI = (function () {
           });
           sendB.disabled = false; backB.disabled = false; return; }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-          status.textContent = t("credit.broadcasting", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Credit.sendAndProve(unsigned, wif, cfg.prove);
         }).then(async function (res) {
           if (myGen !== gen) return; DOM.clear(out);

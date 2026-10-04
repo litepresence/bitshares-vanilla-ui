@@ -66,9 +66,9 @@ var BarterUI = (function () {
   }
 
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("barter.unexpected_error", "Unexpected error"));
-    if (m.indexOf("not-connected") !== -1) m = t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    else if (m.indexOf("wallet-locked") !== -1) m = t("barter.wallet_is_locked", "Wallet is locked.");
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
     else if (m.indexOf("unknown-account") !== -1) m = t("barter.unknown_account", "Unknown account.");
     else if (m.indexOf("unknown-asset") !== -1) m = t("barter.unknown_asset", "Unknown asset.");
     var err = DOM.error(wrap, m);
@@ -135,7 +135,7 @@ var BarterUI = (function () {
       return typeof globalThis[g] === "undefined"; });
     if (miss.length) { showError(doc, wrap, "Barter backend missing: " + miss.join(", ") + " failed to load."); return; }
     if (Chain.status().state !== "open") {
-      DOM.append(wrap, DOM.el(doc, "p", t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      DOM.append(wrap, DOM.el(doc, "p", t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
       var bastat = DOM.el(doc, "p", "", "muted");
       try { bastat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       DOM.append(wrap, bastat);
@@ -363,7 +363,7 @@ var BarterUI = (function () {
         });
         send.disabled = false; back.disabled = false; return; }
       Tx.buildTx([built.pair]).then(function (unsigned) {
-        status.textContent = t("barter.broadcasting", "Broadcasting…");
+        status.textContent = t("common.status_broadcasting", "Broadcasting…");
         return Proposal.sendAndProve(unsigned, wif, async function () {
           var now = await Proposal.proposalsFor(prev.A.acct.name || prev.A.acct.id);
           return now.length > built.before ? now[now.length - 1] : null;

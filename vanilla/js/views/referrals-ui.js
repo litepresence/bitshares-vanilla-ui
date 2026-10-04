@@ -46,9 +46,9 @@ var ReferralsUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("referrals.unexpected_error", "Unexpected error"));
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("referrals.unknown_account", "Unknown account.");
-    else if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) msg = t("referrals.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     var err = DOM.error(wrap, msg); return err;
   }
   /* Hundredths-of-a-percent uint16 -> human "x.yy%" string (integer math:
@@ -104,7 +104,7 @@ var ReferralsUI = (function () {
       return;
     }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("referrals.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var rstat = DOM.el(doc, "p", "", "muted");
       try { rstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(rstat);
@@ -171,7 +171,7 @@ var ReferralsUI = (function () {
       err.textContent = "";
       var msg = (e && e.message) ? e.message : String(e || fallback || t("referrals.lookup_failed", "Lookup failed"));
       if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("referrals.unknown_account", "Unknown account.");
-      else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) msg = t("referrals.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+      else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
       else if (msg.indexOf("wallet-locked") !== -1) msg = t("referrals.wallet_is_locked_enter_the_name_manually_inst", "Wallet is locked — enter the name manually instead.");
       else if (msg.indexOf("no-account") !== -1) msg = t("referrals.the_unlocked_wallet_controls_no_on_chain_acco", "The unlocked wallet controls no on-chain account yet.");
       err.textContent = msg;

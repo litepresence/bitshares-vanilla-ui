@@ -58,7 +58,7 @@ var ProposalUI = (function () {
     if (OP_NAMES[t]) return t("proposal.op_" + t, OP_NAMES[t]);
     return t("proposal.op_unknown", "operation type %(n)s", { n: t });
   }
-  var ERRMAP = [["not-connected", "Network unavailable. Check Settings → Nodes and retry."], ["wallet-locked", "Wallet is locked."],
+  var ERRMAP = [["not-connected", "Network unavailable. Check Settings → Nodes and retry.", "common.network_unavailable"], ["wallet-locked", "Wallet is locked.", "common.wallet_locked"],
     ["unknown-proposal", "Unknown proposal."], ["unknown-ticket", "Unknown ticket."], ["unknown-vesting", "Unknown vesting balance."],
     ["unknown-authority", "Unknown custom authority."], ["unknown-account", "Unknown account."], ["unknown-asset", "Unknown asset."],
     ["bad-lock-type", "Bad lock type — pick one of the five."], ["no-claimables", "Nothing claimable for this account."],
@@ -71,8 +71,8 @@ var ProposalUI = (function () {
   /* showError: human error line (ERRMAP maps chain codes to dict strings,
    * aria-live). Returns the node. Never throws. */
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("proposal.unexpected_error", "Unexpected error"));
-    ERRMAP.forEach(function (p) { if (m.indexOf(p[0]) !== -1) m = t("proposal.err_" + p[0].replace(/-/g, "_"), p[1]); });
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    ERRMAP.forEach(function (p) { if (m.indexOf(p[0]) !== -1) m = t(p[2] || ("proposal.err_" + p[0].replace(/-/g, "_")), p[1]); });
     var err = DOM.error(wrap, m); return err;
   }
   /* showStatus: muted aria-live status line. Returns the node. */
@@ -86,7 +86,7 @@ var ProposalUI = (function () {
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(DOM.el(doc, "p", open
       ? t("proposal.retry_load", "Retry loading.")
-      : t("proposal.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      : t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
@@ -264,7 +264,7 @@ var ProposalUI = (function () {
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); sendB.disabled = false; backB.disabled = false; return; }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-          status.textContent = t("proposal.broadcasting", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Proposal.sendAndProve(unsigned, wif, cfg.prove);
         }).then(async function (res) {
           if (myGen !== gen) return; DOM.clear(out);

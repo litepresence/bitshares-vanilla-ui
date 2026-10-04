@@ -65,11 +65,11 @@ var TradeCancel = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) {
-      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("market.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
@@ -235,7 +235,7 @@ var TradeCancel = (function () {
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
         box.removeChild(status);
-        showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
+        showError(doc, box, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         goBtn.disabled = false;
         return;
@@ -376,7 +376,7 @@ var TradeCancel = (function () {
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
           box.removeChild(status);
-          showError(doc, box, new Error("wallet-locked"), t("market.err_locked", "Wallet is locked."));
+          showError(doc, box, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
           backBtn.disabled = false;
           goBtn.disabled = false;
           return;

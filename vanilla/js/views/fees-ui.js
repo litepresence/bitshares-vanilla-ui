@@ -97,8 +97,8 @@ var FeesUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
-    if (msg.indexOf("not connected") !== -1) msg = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     var err = DOM.error(wrap, msg); return err;
   }
   /* typeLabel: fee-param key -> short row label (unknown future keys prettify, never blank). */
@@ -277,7 +277,7 @@ var FeesUI = (function () {
       "muted"));
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("fees.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var fstat = DOM.el(doc, "p", "", "muted");
       try { fstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(fstat);

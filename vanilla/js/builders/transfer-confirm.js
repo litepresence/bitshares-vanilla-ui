@@ -93,15 +93,15 @@ var TransferConfirm = (function () {
     err.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
       msg = fallback || t("transfer.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("transfer.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err.textContent = msg;
     wrap.appendChild(err);
@@ -332,14 +332,14 @@ var TransferConfirm = (function () {
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(activeWIF) : !activeWIF) {
         wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
+        showError(doc, wrap, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
       Promise.resolve()
         .then(function () { return Tx.signRouted(ctx.unsigned, activeWIF, {}); })
         .then(function (r) {
-          status.textContent = t("transfer.s1", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           /* Extension mode: the SW already broadcast behind approval. */
           if (r.delegated) return { proof: r.proof, viaDelegated: true, signed: r.signed };
           return Tx.broadcast(r.signed).then(function (proof) {

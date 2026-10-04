@@ -76,8 +76,8 @@ var DashboardUI = (function () {
   function showError(doc, wrap, e, fallback) {
     var raw = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "");
     var isHist = raw.indexOf("history-unavailable") !== -1;
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
-    if (msg.indexOf("not connected") !== -1) msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     else if (msg.indexOf("history-unavailable") !== -1) msg = t("account.err_history", "History unavailable on this node.");
     else if (msg.indexOf("bad-asset-shape") !== -1) msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("transfer.unknown_account", "Unknown account.");
@@ -291,7 +291,7 @@ var DashboardUI = (function () {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
       wrap.appendChild(DOM.pageHead(doc, t("shell.dashboard", "Dashboard"), "dashboard"));
-      wrap.appendChild(DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;

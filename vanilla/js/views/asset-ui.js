@@ -103,14 +103,14 @@ var AssetUI = (function () {
   /* showError: never-blank human panel for named chain errors. */
   function err(d, w, e, fb) {
     var b = el(d, "div", null, "error"); b.setAttribute("aria-live", "polite");
-    var m = (e && e.message) ? e.message : String(e || fb || t("fees.unexpected_error", "Unexpected error"));
+    var m = (e && e.message) ? e.message : String(e || fb || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("unknown-asset") !== -1) m = fb || t("barter.unknown_asset", "Unknown asset.");
     else if (m.indexOf("unknown-account") !== -1) m = fb || t("barter.unknown_account", "Unknown account.");
     else if (m.indexOf("symbol-taken") !== -1) m = t("asset.symbol_taken", "Symbol is already taken.");
     else if (m.indexOf("not-issuer") !== -1) m = t("asset.only_issuer", "Only the issuer can change this.");
     else if (m.indexOf("not-market-issued") !== -1) m = t("asset.not_market_issued", "Not a market-issued asset.");
-    else if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
-    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
+    else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     b.textContent = m; w.appendChild(b); return b;
   }
   function status(d, w, t) { var p = el(d, "p", t, "muted"); p.setAttribute("aria-live", "polite"); w.appendChild(p); return p; }

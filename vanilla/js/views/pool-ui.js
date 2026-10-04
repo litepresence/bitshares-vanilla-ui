@@ -45,9 +45,9 @@ var PoolUI = (function () {
   /* No local el — use DOM.el */
   /* clearBox removed — use DOM.clear */
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
-    if (m.indexOf("not-connected") !== -1) m = t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    if (m.indexOf("wallet-locked") !== -1) m = t("debit.s2", "Wallet is locked.");
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+    if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
     if (m.indexOf("unknown-pool") !== -1) m = t("pool.unknown_pool", "Unknown pool.");
     var err = DOM.error(wrap, m); return err;
   }
@@ -92,7 +92,7 @@ var PoolUI = (function () {
     var open = offlineState() === "open";
     wrap.appendChild(DOM.el(doc, "p", open
       ? t("pool.retry_load", "Retry loading.")
-      : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      : t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
@@ -240,7 +240,7 @@ var PoolUI = (function () {
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
         if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); sendB.disabled = false; backB.disabled = false; return; }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-          status.textContent = t("htlc.s2", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Pool.sendAndProve(unsigned, wif, cfg.prove);
         }).then(async function (res) {
           if (myGen !== gen) return; DOM.clear(out);

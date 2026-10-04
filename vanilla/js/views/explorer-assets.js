@@ -265,14 +265,14 @@ var ExplorerAssets = (function () {
   function showError(doc, wrap, e, fallback) {
     var box = null; /* created via DOM.error below — use DOM.el, DOM.clear */
     var msg = (e && typeof e.message === "string" && e.message)
-      ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
+      ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
     else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
     else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
     else if (msg.indexOf("unknown-object") !== -1) msg = fallback || (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry.");
     else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     box = DOM.error(wrap, msg);
     return box;
@@ -1053,7 +1053,7 @@ var ExplorerAssets = (function () {
                 var unsigned = await Tx.buildTx([pair]);
                 var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
                 if (!wif) throw new Error("wallet-locked");
-                st.textContent = t("explorer.fund_broadcasting", "Broadcasting…");
+                st.textContent = t("common.status_broadcasting", "Broadcasting…");
                 var r = await AssetOps.sendAndProve(unsigned, wif, async function () {
                   try {
                     var n = await Explorer.asset(a.symbol);
@@ -1082,9 +1082,9 @@ var ExplorerAssets = (function () {
               })().catch(function (e) {
                 try { actBox.removeChild(st); } catch (x) { /* gone */ }
                 var m = (e && e.message) ? e.message : String(e || t("explorer.send_failed", "Send failed."));
-                if (m.indexOf("wallet-locked") !== -1) m = t("explorer.wallet_locked_msg", "Wallet is locked.");
+                if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
                 else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) {
-                  m = t("explorer.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+                  m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
                 }
                 fundMsg(m, true); back.disabled = false;
               });

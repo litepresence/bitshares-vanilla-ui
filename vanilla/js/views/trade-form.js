@@ -102,11 +102,11 @@ var TradeForm = (function () {
     var err = null; /* created via DOM.error below */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) {
-      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("market.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
@@ -755,7 +755,7 @@ var TradeForm = (function () {
 
   /* Desk entry: renderDual(doc, buyMount, sellMount, ctx). Guards backends,
    * then paints TWO always-visible panels (retro 2x3 row 1: Buy QUOTE |
-   * Sell QUOTE — reference vanilla/notes/original-buy-sell-2x3 shot): the
+   * Sell QUOTE — reference docs/parity/original-buy-sell-2x3 shot): the
    * buy panel owns a Buy/Scaled tab row (existing .trade-tabs skin +
    * trade.tab_buy/trade.tab_scaled keys — Scaled swaps the scaled form into
    * the buy panel in place of the single form, Buy swaps back); the sell
@@ -1236,7 +1236,7 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = t("trade.s1", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return sendTx(signed, proveNewOrder(P.me.id, before, R.sellAssetId, R.sellRaw));
         })
         .then(function (res) {
@@ -1572,7 +1572,7 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = t("trade.s1", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return sendTx(signed, async function () {
             var dbId = await Chain.db();
             var rows = await Chain.call(dbId, "get_limit_orders_by_account", [P.me.id, 100]);

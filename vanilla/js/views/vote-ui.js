@@ -147,12 +147,12 @@ var VoteUI = (function () {
     box.setAttribute("aria-live", "polite");
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("vote.unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("vote.unknown_account", "Unknown account.");
     else if (msg.indexOf("no-account") !== -1) msg = t("vote.no_account", "No on-chain account found for the wallet's active key. Enter an account name below.");
-    else if (msg.indexOf("wallet-locked") !== -1) msg = t("vote.wallet_locked", "Wallet is locked.");
+    else if (msg.indexOf("wallet-locked") !== -1) msg = t("common.wallet_locked", "Wallet is locked.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = t("vote.offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("empty-list") !== -1) msg = t("vote.empty_list", "The node returned no witnesses or committee members.");
     box.textContent = msg;
     wrap.appendChild(box);
@@ -188,7 +188,7 @@ var VoteUI = (function () {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
       wrap.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
-      wrap.appendChild(el(doc, "p", t("vote.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -734,7 +734,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), t("vote.wallet_locked", "Wallet is locked."));
+        showError(doc, wrap, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
@@ -763,7 +763,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   async function publishWithRetry(st, newOptions, feeRaw, onStep) {
     var attempt = await buildSigned(st.me.id, newOptions, feeRaw);
     try {
-      onStep(t("vote.broadcasting", "Broadcasting…"));
+      onStep(t("common.status_broadcasting", "Broadcasting…"));
       var proof = await sendAndProve(st, attempt, newOptions);
       return { blockNum: proof.head, via: proof.via, retried: false };
     } catch (e) {
@@ -1265,7 +1265,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) {
         box.removeChild(status);
-        showError(doc, box, new Error("wallet-locked"), t("vote.wallet_locked", "Wallet is locked."));
+        showError(doc, box, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         return;
       }
@@ -1297,7 +1297,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     var unsigned = await Tx.buildTx([[spec.opId, spec.opData]]);
     var routed = await Tx.signRouted(unsigned, wif, {});
     var txSigned = routed.signed;
-    onStep(t("vote.broadcasting", "Broadcasting…"));
+    onStep(t("common.status_broadcasting", "Broadcasting…"));
     var via;
     if (routed.delegated) {
       /* Extension mode: the SW signed + broadcast behind approval. */

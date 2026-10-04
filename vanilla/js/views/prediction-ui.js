@@ -91,8 +91,8 @@ var PredictionUI = (function () {
     return miss;
   }
   function showError(doc, wrap, e, fallback) {
-    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("prediction.unexpected_error", "Unexpected error"));
-    var map = [["not-connected", t("prediction.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.")],
+    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    var map = [["not-connected", t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.")],
       ["unknown-asset", t("prediction.asset_not_found_on_this_network", "Asset not found on this network.")],
       ["not-a-pma", t("prediction.that_asset_is_not_a_prediction_market_no_is_p", "That asset is not a prediction market (no is_prediction_market flag).")]];
     if (m.indexOf("not connected") !== -1) m = map[0][1];
@@ -1009,7 +1009,7 @@ var PredictionUI = (function () {
             var btns = sDlg.getElementsByTagName("button");
             var backB = btns[0], sendB = btns[1];
             sendB.disabled = true; backB.disabled = true;
-            var st = showStatus(doc, pfConfirm, t("borrow.broadcasting", "Broadcasting…"));
+            var st = showStatus(doc, pfConfirm, t("common.status_broadcasting", "Broadcasting…"));
             var wif = (typeof Wallet !== "undefined" && Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
             if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {

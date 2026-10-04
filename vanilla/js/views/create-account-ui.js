@@ -43,8 +43,8 @@ var CreateAccountUI = (function () {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to text. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("createaccount.unexpected_error", "Unexpected error"));
-    if (msg.indexOf("not connected") !== -1) msg = t("createaccount.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     var err = DOM.error(wrap, msg);
     return err;
   }
@@ -94,7 +94,7 @@ var CreateAccountUI = (function () {
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
       wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
-      wrap.appendChild(DOM.el(doc, "p", t("createaccount.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;

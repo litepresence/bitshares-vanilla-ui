@@ -143,7 +143,7 @@ var ViewingAs = (function () {
         go.disabled = false;
         var m = (e && e.message) ? e.message : "";
         if (m.indexOf("unknown-account") !== -1) err.textContent = t("viewing.unknown_account", "Unknown account name.");
-        else err.textContent = t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry.");
+        else err.textContent = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
       });
     });
     try { input.focus(); } catch (e) { /* display-only */ }

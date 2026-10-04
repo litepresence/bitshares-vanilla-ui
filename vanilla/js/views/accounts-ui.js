@@ -27,9 +27,9 @@ var AccountsUI = (function () {
   }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
   function showError(doc, wrap, e, fallback) {
-    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
-    if (msg.indexOf("not connected") !== -1) msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
-    else if (msg.indexOf("wallet-locked") !== -1) msg = t("transfer.err_locked", "Wallet is locked.");
+    var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (msg.indexOf("wallet-locked") !== -1) msg = t("common.wallet_locked", "Wallet is locked.");
     else if (msg.indexOf("no-account") !== -1) msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("account.unknown_name", "Unknown account name.");
     var err = DOM.error(wrap, msg);
@@ -62,7 +62,7 @@ var AccountsUI = (function () {
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
       DOM.append(wrap, DOM.pageHead(doc, t("account.manager_title", "Accounts"), "user"));
-      DOM.append(wrap, DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
+      DOM.append(wrap, DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -222,7 +222,7 @@ var AccountsUI = (function () {
         viewBtn.disabled = false;
         var m = (e && e.message) ? e.message : "";
         if (m.indexOf("unknown-account") !== -1) setFieldError(nameF, t("viewing.unknown_account", "Unknown account name."));
-        else setFieldError(nameF, t("viewing.network_error", "Network unavailable. Check Settings → Nodes and retry."));
+        else setFieldError(nameF, t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."));
       });
     });
     var resetLine = DOM.el(doc, "p", null, "muted");

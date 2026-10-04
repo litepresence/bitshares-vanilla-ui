@@ -72,7 +72,7 @@ var ApiLabUI = (function () {
   function waitForOpen(doc, wrap, root, myGen, rerun) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
-    DOM.status(wrap, t("apilab.connecting", "Connecting to network…")).className = "muted";
+    DOM.status(wrap, t("common.status_connecting", "Connecting to network…")).className = "muted";
     var astat = DOM.el(doc, "p", "", "muted");
     try { astat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     DOM.append(wrap, astat);

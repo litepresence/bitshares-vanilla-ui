@@ -59,9 +59,9 @@ var BorrowUI = (function () {
   var gen = 0, subs = [];
   /* No local el/clearBox — use DOM.el, DOM.clear */
   function showError(doc, wrap, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("borrow.unexpected_error", "Unexpected error"));
-    if (m.indexOf("not-connected") !== -1) m = t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    else if (m.indexOf("wallet-locked") !== -1) m = t("borrow.wallet_is_locked", "Wallet is locked.");
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
     else if (m.indexOf("unknown-account") !== -1) m = t("borrow.unknown_account", "Unknown account.");
     var err = DOM.error(wrap, m);
     return err;
@@ -128,7 +128,7 @@ var BorrowUI = (function () {
     wrap.appendChild(DOM.pageHead(doc, title, "borrow"));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
       var bstat = DOM.el(doc, "p", "", "muted");
       try { bstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(bstat);
@@ -407,7 +407,7 @@ var BorrowUI = (function () {
             var btns = adjDlg.getElementsByTagName("button");
             var back = btns[0], send = btns[1];
             send.disabled = true; back.disabled = true;
-            var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
+            var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
@@ -625,7 +625,7 @@ var BorrowUI = (function () {
             var btns = openDlg.getElementsByTagName("button");
             var back = btns[0], send = btns[1];
             send.disabled = true; back.disabled = true;
-            var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
+            var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
@@ -966,7 +966,7 @@ var BorrowUI = (function () {
             var btns = bidDlg.getElementsByTagName("button");
             var back = btns[0], send = btns[1];
             send.disabled = true; back.disabled = true;
-            var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
+            var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
             if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {

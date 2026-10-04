@@ -170,7 +170,7 @@ var Offline = (function () {
           return;
         }
         try { btn.disabled = true; } catch (e) { /* label stands */ }
-        say(tt("market.connecting", "Connecting to network…"));
+        say(tt("common.status_connecting", "Connecting to network…"));
         attempt.then(function () {
           try { btn.disabled = false; } catch (e) { /* stands */ }
           say("");
@@ -179,7 +179,7 @@ var Offline = (function () {
           try { btn.disabled = false; } catch (e) { /* stands */ }
           var url = nodeUrl();
           var n = url ? failsFor(url) : 0;
-          var base = tt("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
+          var base = tt("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
           if (n >= 2) {
             say(tt("fees.retry", "Retry") + " " + String(n) + " — " + base);
           } else {

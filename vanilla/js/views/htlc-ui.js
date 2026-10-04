@@ -38,8 +38,8 @@ var HtlcUI = (function () {
   /* clearBox removed — use DOM.clear */
   function shortHash(hex) { hex = String(hex || ""); return hex.length > 18 ? hex.slice(0, 12) + "…" + hex.slice(-6) : hex; }
   function showError(doc, wrap, e, fallback) { /* any throw -> text, never blank */
-    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
-    var map = [["not-connected", t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.")], ["wallet-locked", t("debit.s2", "Wallet is locked.")],
+    var m = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    var map = [["not-connected", t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.")], ["wallet-locked", t("common.wallet_locked", "Wallet is locked.")],
       ["unknown-htlc", t("htlc.unknown_contract", "Unknown HTLC contract.")], ["unknown-account", t("htlc.unknown_account", "Account not found.")],
       ["hash-mismatch", t("htlc.hash_mismatch", "Preimage does not match the locked hash.")], ["bad-preimage", t("htlc.enter_preimage", "Enter a non-empty preimage.")]], i;
     if (m.indexOf("not connected") !== -1) m = map[0][1];
@@ -57,7 +57,7 @@ var HtlcUI = (function () {
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     wrap.appendChild(DOM.el(doc, "p", open
       ? t("htlc.retry_load", "Retry loading.")
-      : t("fees.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      : t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
@@ -247,7 +247,7 @@ var HtlcUI = (function () {
           });
           sendB.disabled = false; backB.disabled = false; return; }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-          status.textContent = t("htlc.s2", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Htlc.sendAndProve(unsigned, wif, cfg.prove);
         }).then(async function (res) {
           if (myGen !== gen) return;

@@ -117,14 +117,14 @@ var ExplorerUI = (function () {
   function showError(doc, wrap, e, fallback) {
     var box = null; /* created via DOM.error below — use DOM.el, DOM.clear */
     var msg = (e && typeof e.message === "string" && e.message)
-      ? e.message : String(e || fallback || t("explorer.unexpected", "Unexpected error"));
+      ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-block") !== -1) msg = t("explorer.unknown_block", "Unknown block.");
     else if (msg.indexOf("unknown-tx") !== -1) msg = t("explorer.unknown_tx", "Unknown transaction.");
     else if (msg.indexOf("unknown-asset") !== -1) msg = fallback || t("explorer.unknown_asset", "Unknown asset.");
     else if (msg.indexOf("unknown-object") !== -1) msg = fallback || (t("explorer.not_found", "Nothing found for that search.") + " Check the id shape (1.x.x) or name spelling and retry.");
     else if (msg.indexOf("tx-expired-or-unknown") !== -1) msg = t("explorer.tx_expired", "Transaction hash lookup covers recent transactions only — this one is expired or unknown.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
-      msg = t("explorer.offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     box = DOM.error(wrap, msg);
     return box;
@@ -145,7 +145,7 @@ var ExplorerUI = (function () {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
     wrap.appendChild(shellTitle(doc));
-    wrap.appendChild(DOM.el(doc, "p", t("explorer.connecting", "Connecting to network…"), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     var settled = false;
     var off = function () {};
@@ -448,7 +448,7 @@ var ExplorerUI = (function () {
           if (myGen !== gen) return;
           go.disabled = false;
           clearHashBox();
-          showError(doc, hashBox, e, t("explorer.unexpected", "Unexpected error"));
+          showError(doc, hashBox, e, t("common.unexpected_error", "Unexpected error"));
         });
         return;
       }
@@ -554,10 +554,10 @@ var ExplorerUI = (function () {
         try {
           ExplorerTabs[fn](doc, body, function () { return myGen === gen; });
         } catch (e) {
-          showError(doc, body, e, t("explorer.unexpected", "Unexpected error"));
+          showError(doc, body, e, t("common.unexpected_error", "Unexpected error"));
         }
       } else {
-        showError(doc, body, t("explorer.unexpected", "Unexpected error"));
+        showError(doc, body, t("common.unexpected_error", "Unexpected error"));
       }
     }
   }
@@ -604,7 +604,7 @@ var ExplorerUI = (function () {
         host.appendChild(ul);
       }
     } catch (e) {
-      try { showError(doc, host, e, t("explorer.unexpected", "Unexpected error")); }
+      try { showError(doc, host, e, t("common.unexpected_error", "Unexpected error")); }
       catch (e2) { /* panel stands */ }
     }
   }

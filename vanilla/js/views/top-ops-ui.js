@@ -179,7 +179,7 @@ var TopOpsUI = (function () {
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || "Unexpected error");
     if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) {
-      msg = t("topops.offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     var box = DOM.error(wrap, msg); return box;
   }

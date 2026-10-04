@@ -156,15 +156,15 @@ var TransferUI = (function () {
     var err = null; /* created via DOM.error below */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("transfer.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
       msg = fallback || t("transfer.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("transfer.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = t("transfer.err_network", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     err = DOM.error(wrap, msg);
     return err;
@@ -261,7 +261,7 @@ var TransferUI = (function () {
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled) return;
@@ -1410,7 +1410,7 @@ var TransferUI = (function () {
       var activeWIF = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!activeWIF) {
         wrap.removeChild(status);
-        showError(doc, wrap, new Error("wallet-locked"), t("transfer.err_locked", "Wallet is locked."));
+        showError(doc, wrap, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
         backBtn.disabled = false;
         sendBtn.disabled = false;
         return;
@@ -1422,7 +1422,7 @@ var TransferUI = (function () {
             built.proposer.name + " (" + built.proposer.id + t("transfer.proposer_mismatch_wallet_mid", "), wallet is ") + wid + ".");
         }
         var unsigned = await Tx.buildTx([built.pair]);
-        status.textContent = t("transfer.s1", "Broadcasting…");
+        status.textContent = t("common.status_broadcasting", "Broadcasting…");
         return Proposal.sendAndProve(unsigned, activeWIF, async function () {
           var now = await Proposal.proposalsFor(built.proposer.name || built.proposer.id);
           if (!now || now.length <= built.before) return null;

@@ -39,13 +39,13 @@ var GatewayUI = (function () {
   /* showError: named Gateway errors -> human text. gateway-rejected stays
    * VERBATIM (the host's own reason — never rewritten, never forged). */
   function showError(doc, box, e, fallback) {
-    var m = (e && e.message) ? e.message : String(e || fallback || t("gateway.unexpected", "Unexpected error"));
+    var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("gateway-rejected:") === 0) m = t("gateway.refused_prefix", "Gateway refused: ") + m.slice(18).trim();
     else if (m.indexOf("gateway-down:") === 0) m = t("gateway.unreachable_prefix", "Gateway unreachable (") + m.slice(14).trim() + t("gateway.unreachable_suffix", "). Try Re-check.");
     else if (m.indexOf("disabled:") === 0) m = m.slice(9).trim();
     else if (m.indexOf("bad-account") !== -1) m = t("gateway.bad_account", "Enter a BitShares account name first.");
     else if (m.indexOf("bad-coin") !== -1) m = t("gateway.bad_coin", "Unknown coin for this gateway.");
-    else if (m.indexOf("not-connected") !== -1) m = t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry.");
+    else if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     var err = DOM.error(box, m); return err;
   }
   function showStatus(doc, box, text) {
@@ -58,7 +58,7 @@ var GatewayUI = (function () {
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
     box.appendChild(DOM.el(doc, "p", open
       ? t("gateway.retry_load", "Retry loading.")
-      : t("gateway.offline", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      : t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
     var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     box.appendChild(status);
