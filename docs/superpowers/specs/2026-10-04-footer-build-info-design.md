@@ -15,8 +15,10 @@ with "Master" hyperlinked to the canonical GitHub repo.
   via the existing footer Help action).
 - Hybrid data source: own hash baked at build time, ahead/behind fetched
   live from the GitHub compare API.
-- Repo identity: `litepresence/bitshares-vanilla-ui` for now; the eventual
-  `bitshares/` move is a one-constant edit (recorded in §6).
+- Repo identity: `litepresence/bitshares-vanilla-ui` for now, carried in
+  `version.json` (generator default, `--repo` override); the app reads it
+  from there and keeps no separate constant, so the eventual `bitshares/`
+  move is regenerate-with-`--repo` (recorded in § Future migration).
 
 ## Display states
 
@@ -30,9 +32,14 @@ only the word "Master" hyperlinked (repo root URL).
   CSS ellipsis clips the tail on narrow screens, the word "diverged"
   (the load-bearing part) always survives.
 - Degradation ladder (never blank, never false):
-  1. version.json + API reachable → full string.
-  2. version.json present, API unreachable/offline → hash only, no count.
-  3. No version.json (or `file://` fetch blocked) → leave the static
+  1. version.json + compare 200 → full string
+     (identical / ahead / behind / diverged via `ahead_by`/`behind_by`).
+  2. version.json + compare 404 → `{short} · not on Master` (the build's
+     SHA is unknown to GitHub — e.g. local unpushed work. Verified
+     2026-10-04: SHA-as-head works for pushed SHAs, 404s otherwise).
+  3. version.json + API unreachable / offline / rate-limited → hash only,
+     no count, no link text change.
+  4. No version.json (or `file://` fetch blocked) → leave the static
      skeleton untouched; same skeleton is the no-JS fallback.
 
 ## Data flow
@@ -44,7 +51,9 @@ only the word "Master" hyperlinked (repo root URL).
 2. App boot fetches `version.json` same-origin (CSP `connect-src` already
    allows `https:` + `'self'`; `file://` failure falls to ladder step 3).
 3. Single live call `GET /repos/{repo}/compare/{branch}...{commit}` →
-   `ahead_by` / `behind_by`. Result cached in memory + `localStorage`
+   `ahead_by` / `behind_by` / `status`. A 404 means the build SHA is not
+   on GitHub → offbranch state (no second call; nothing else to compare).
+   Result cached in memory + `localStorage`
    with a TTL (10 minutes) so `paintVersion()` repaints on every
    connection event never re-fetch (respects 60/hr unauthenticated limit).
 4. Implementation verifies at build time whether the compare endpoint
@@ -112,6 +121,7 @@ first, other locales carry honest English stubs until human-verified.
 
 ## Future migration
 
-When the repo lands at `bitshares/bitshares-vanilla-ui`: change the one
-repo constant (generator + app), regenerate `version.json`, done. No
-other file references the owner.
+When the repo lands at `bitshares/bitshares-vanilla-ui`: regenerate with
+`python3 tooling/generate_version.py --repo bitshares/bitshares-vanilla-ui`.
+No other file references the owner (the Master hyperlink is built from the
+`repo` field at render time).
