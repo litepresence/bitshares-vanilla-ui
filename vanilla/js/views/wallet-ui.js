@@ -110,7 +110,8 @@ var WalletUI = (function () {
   }
 
   /* Labeled row: <label>text <field></label>. Kept for the single-field
-   * manager/import screens; the create screen uses fieldRow below. */
+   * manager/import screens (label-only contract: no div.xfer-field wrapper,
+   * so Forms.fieldRow cannot express it — see fieldRow removal below). */
   function labeledRow(doc, labelText, field) {
     var label = doc.createElement("label");
     label.appendChild(doc.createTextNode(labelText + " "));
@@ -118,19 +119,10 @@ var WalletUI = (function () {
     return label;
   }
 
-  /* Stacked form row: div.xfer-field > label(text + field). app.css section
-   * (a) stacks these below ~720px and grids them label|input above — bare
-   * appends share one inline line and overlap, so every create-screen field
-   * goes through here (same DOM contract as transfer-ui.js fieldRow). */
-  function fieldRow(doc, labelText, field) {
-    var row = doc.createElement("div");
-    row.className = "xfer-field";
-    var label = doc.createElement("label");
-    label.appendChild(doc.createTextNode(labelText + " "));
-    label.appendChild(field);
-    row.appendChild(label);
-    return row;
-  }
+  /* Stacked form rows (div.xfer-field > label(text + field)) build on
+   * Forms.fieldRow directly at each create-screen call site (same DOM
+   * contract as transfer-ui.js; app.css section (a) stacks them below
+   * ~720px and grids them label|input above). */
 
   /* Muted paragraph of internal links (href + text pairs). */
   function helpPara(doc, pairs) {
@@ -449,7 +441,7 @@ var WalletUI = (function () {
     var bkArea = brainkeyField(doc, "create-brainkey", true);
     bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…");
     bkArea.style.width = "100%";
-    wrap.appendChild(fieldRow(doc, t("wallet.brainkey", "Brainkey"), bkArea));
+    wrap.appendChild(Forms.fieldRow(doc, t("wallet.brainkey", "Brainkey") + " ", bkArea));
     var bkHint = doc.createElement("p");
     bkHint.className = "muted";
     bkHint.setAttribute("aria-live", "polite");
@@ -495,7 +487,7 @@ var WalletUI = (function () {
         var v = nameInput.value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
         if (v !== nameInput.value) nameInput.value = v;
       });
-      wrap.appendChild(fieldRow(doc, t("wallet.wallet_name", "Wallet name"), nameInput));
+      wrap.appendChild(Forms.fieldRow(doc, t("wallet.wallet_name", "Wallet name") + " ", nameInput));
       var overwrite = doc.createElement("p");
       overwrite.className = "muted";
       overwrite.textContent = t("wallet.a_wallet_already_exists_on_this_device", "A wallet already exists on this device — ") +
@@ -504,7 +496,7 @@ var WalletUI = (function () {
     }
 
     var pwInput = passwordField(doc, "create-password");
-    wrap.appendChild(fieldRow(doc, t("wallet.password", "Password"), pwInput));
+    wrap.appendChild(Forms.fieldRow(doc, t("wallet.password", "Password") + " ", pwInput));
     var pwMeter = doc.createElement("p");
     pwMeter.className = "muted";
     pwMeter.setAttribute("aria-live", "polite");
@@ -514,7 +506,7 @@ var WalletUI = (function () {
       pwMeter.textContent = passwordHint(pwInput.value);
     });
     var confirmInput = passwordField(doc, "create-confirm");
-    wrap.appendChild(fieldRow(doc, t("wallet.confirm_password", "Confirm password"), confirmInput));
+    wrap.appendChild(Forms.fieldRow(doc, t("wallet.confirm_password", "Confirm password") + " ", confirmInput));
 
     var actionRow = doc.createElement("p");
     var createBtn = actionButton(doc, "create-do", t("wallet.create_wallet", "Create wallet"));

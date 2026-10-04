@@ -150,15 +150,17 @@ var ProposalUI = (function () {
     });
     return list;
   }
-  /* field: labeled touch-sized input row. Returns {row, input}. */
+  /* field: labeled touch-sized input row (Forms-delegating _ui export).
+   * The row shell comes from Forms.labeledInput (no local DOM duplication);
+   * retained under this name/signature because ProposalUI._ui.field is
+   * consumed by misc-ui.js + vesting-ui.js (sibling-batch files). */
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
+    var built = Forms.labeledInput(doc, labelText + " ", {
+      type: opts.type, value: opts.value,
+      placeholder: opts.placeholder || undefined, inputmode: opts.inputmode || undefined
+    });
+    return { row: built.row, input: built.input };
   }
   /* Table (desktop) + cards (phone) with sticky-first-col CSS; href links col 0, action buttons ride cards. */
   function deskTable(doc, headers, rows) {
@@ -573,14 +575,14 @@ var ProposalUI = (function () {
       if (typeof Wallet === "undefined" || !Wallet.isUnlocked())
         ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as committee-account (1.2.0) — unlock to act as yourself."), "muted"));
     } catch (e) { /* notice is display-only */ }
-    var fA = field(doc, t("proposal.account_for_approvals", "Account for approvals"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fA = Forms.labeledInput(doc, t("proposal.account_for_approvals", "Account for approvals") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
     var go = touchable(DOM.el(doc, "button", t("proposal.list_proposals", "List proposals"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
     ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.create_proposal", "Create proposal")));
-    var fP = field(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
-    var fE = field(doc, t("proposal.expiration", "Expiration"), { type: "datetime-local" });
-    var fR = field(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)"), { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
+    var fP = Forms.labeledInput(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+    var fE = Forms.labeledInput(doc, t("proposal.expiration", "Expiration") + " ", { type: "datetime-local" });
+    var fR = Forms.labeledInput(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
     ctx.wrap.appendChild(fP.row); ctx.wrap.appendChild(fE.row); ctx.wrap.appendChild(fR.row);
     var kindSel = doc.createElement("select"); touchable(kindSel);
     /* A11y delta 2026-10-01: unnamed <select> announced only "combobox" —
@@ -615,7 +617,7 @@ var ProposalUI = (function () {
         // untranslated: they are example values / input types, not language.
         var ph = d[1] || "";
         if (ph !== "" && ph !== "1.5" && ph !== "180" && ph !== "white") ph = t("proposal.innerph_" + kind + "_" + i, ph);
-        var x = field(doc, t("proposal.inner_" + kind + "_" + i, d[0]), { placeholder: ph, inputmode: d[2] || null });
+        var x = Forms.labeledInput(doc, t("proposal.inner_" + kind + "_" + i, d[0]) + " ", { placeholder: ph || undefined, inputmode: d[2] || undefined });
         innerBox.appendChild(x.row); return x.input;
       });
       var btn = touchable(DOM.el(doc, "button", "Add " + kind + " inner op")); btn.type = "button"; innerBox.appendChild(btn);
@@ -759,8 +761,8 @@ var ProposalUI = (function () {
         });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, t("proposal.could_not_join_asset_symbols", "Could not join asset symbols.")); });
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.approve_reject", "Approve / reject")));
-      var fW = field(doc, t("proposal.approver_account", "Approver account"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
-      var fP2 = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+      var fW = Forms.labeledInput(doc, t("proposal.approver_account", "Approver account") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+      var fP2 = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
       var ow = doc.createElement("select"); touchable(ow);
       try { ow.setAttribute("aria-label", t("misc.authority", "Authority")); } catch (e) { /* options stand */ }
@@ -790,11 +792,11 @@ var ProposalUI = (function () {
           ok: function () { return "Approval " + (ab[1] ? "removed" : "recorded") + " and re-read on chain."; } });
       });
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op 24)")));
-      var fD = field(doc, t("proposal.fee_payer", "Fee payer"), { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
+      var fD = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fD.row);
       var chk = doc.createElement("input"); chk.type = "checkbox"; touchable(chk);
-      var chkRow = DOM.el(doc, "div", null, "xfer-field"), chkL = DOM.el(doc, "label", t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "));
-      chkL.appendChild(chk); chkRow.appendChild(chkL); ctx.wrap.appendChild(chkRow);
+      var chkRow = Forms.fieldRow(doc, t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "), chk);
+      ctx.wrap.appendChild(chkRow);
       var dbox = DOM.el(doc, "div"); ctx.wrap.appendChild(dbox);
       reviewSection(doc, dbox, myGen, t("proposal.delete_proposal_op_24", "Delete proposal (op 24)"), {
         build: async function () {

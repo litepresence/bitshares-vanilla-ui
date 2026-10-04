@@ -261,16 +261,10 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   /* Fallback account picker (no wallet-bound account, or lookup failed):
    * name/id input + resolve, then load the view as that account. */
   function showAccountPicker(doc, wrap, root, myGen, preset) {
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", t("vote.vote_as_label", "Vote as (name or 1.2.N) "));
-    var input = doc.createElement("input");
-    input.type = "text";
-    input.setAttribute("autocomplete", "off");
-    input.value = preset || "";
-    touchable(input);
-    label.appendChild(input);
-    row.appendChild(label);
-    wrap.appendChild(row);
+    var pickerF = Forms.labeledInput(doc, t("vote.vote_as_label", "Vote as (name or 1.2.N) "),
+      { value: preset || "", autocomplete: "off" });
+    wrap.appendChild(pickerF.row);
+    var input = pickerF.input;
     var btn = touchable(el(doc, "button", t("vote.load_votes", "Load votes")));
     btn.type = "button";
     wrap.appendChild(btn);
@@ -1078,23 +1072,6 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     catch (e) { return String(raw); }
   }
 
-  /* Labeled text input row for the join forms (xfer-field convention, same
-   * touch floor as the rest of the page). Returns the input element. */
-  function joinField(doc, box, labelText, value, placeholder) {
-    var row = el(doc, "div", null, "xfer-field");
-    var label = el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    input.type = "text";
-    input.setAttribute("autocomplete", "off");
-    if (value) input.value = value;
-    if (placeholder) input.setAttribute("placeholder", placeholder);
-    touchable(input);
-    label.appendChild(input);
-    row.appendChild(label);
-    box.appendChild(row);
-    return input;
-  }
-
   /* Join/Update-witness entry form (reference Witnesses.jsx:57-66 +
    * JoinWitnessesModal field set: account, url, block signing key).
    * Reads stay public; the fee is a live chain estimate; the password gate
@@ -1106,9 +1083,13 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   function renderJoinWitness(doc, box, root, st, myGen, isUpdate) {
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el(doc, "h2", isUpdate ? t("vote.update_witness", "Update witness") : t("vote.join_as_witness", "Join as witness")));
-    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, t("vote.name_or_1_2_n", "name or 1.2.N"));
-    var urlIn = joinField(doc, box, t("vote.url", "URL"), "", "https://example.com");
-    var keyIn = joinField(doc, box, t("vote.block_signing_key", "Block signing key"), "", "BTS…");
+    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("vote.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off" });
+    box.appendChild(acctF.row);
+    var urlF = Forms.labeledInput(doc, t("vote.url", "URL") + " ", { value: "", placeholder: "https://example.com", autocomplete: "off" });
+    box.appendChild(urlF.row);
+    var keyF = Forms.labeledInput(doc, t("vote.block_signing_key", "Block signing key") + " ", { value: "", placeholder: "BTS…", autocomplete: "off" });
+    box.appendChild(keyF.row);
+    var acctIn = acctF.input, urlIn = urlF.input, keyIn = keyF.input;
     var msg = el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     box.appendChild(msg);
@@ -1186,8 +1167,11 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
   function renderJoinCommittee(doc, box, root, st, myGen) {
     while (box.firstChild) box.removeChild(box.firstChild);
     box.appendChild(el(doc, "h2", t("vote.join_committee", "Join committee")));
-    var acctIn = joinField(doc, box, t("vote.account_row", "Account"), st.me.name, t("vote.name_or_1_2_n", "name or 1.2.N"));
-    var urlIn = joinField(doc, box, t("vote.url", "URL"), "", "https://example.com");
+    var acctF = Forms.labeledInput(doc, t("vote.account_row", "Account") + " ", { value: st.me.name, placeholder: t("vote.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off" });
+    box.appendChild(acctF.row);
+    var urlF = Forms.labeledInput(doc, t("vote.url", "URL") + " ", { value: "", placeholder: "https://example.com", autocomplete: "off" });
+    box.appendChild(urlF.row);
+    var acctIn = acctF.input, urlIn = urlF.input;
     var msg = el(doc, "div", "", "error");
     msg.setAttribute("aria-live", "polite");
     box.appendChild(msg);

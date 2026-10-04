@@ -197,25 +197,18 @@ var PoolUI = (function () {
     });
     return list;
   }
+  /* field: labeled touch-sized input row (Forms-delegating _ui export).
+   * The row shell comes from Forms.labeledInput (no local DOM duplication);
+   * retained under this name/signature because PoolUI._ui.field is consumed
+   * by pool-detail-ui.js + pool-swap-ui.js (sibling-batch files). Returns
+   * {row, input, suffix} — suffix stays null (no unit-wrap site remains). */
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    touchable(input);
-    var suffix = null;
-    if (opts.unit) {
-      var wrap = doc.createElement("span"); wrap.className = "unit-wrap";
-      wrap.appendChild(input);
-      suffix = DOM.el(doc, "span", opts.unit, "unit-suffix");
-      wrap.appendChild(suffix);
-      label.appendChild(wrap);
-    } else {
-      label.appendChild(input);
-    }
-    row.appendChild(label); return { row: row, input: input, suffix: suffix };
+    var built = Forms.labeledInput(doc, labelText + " ", {
+      type: opts.type, value: opts.value,
+      placeholder: opts.placeholder || undefined, inputmode: opts.inputmode || undefined
+    });
+    return { row: built.row, input: built.input, suffix: null };
   }
   function tableHead(doc, titles) {
     var hr = doc.createElement("tr");
@@ -446,9 +439,9 @@ var PoolUI = (function () {
     ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
     var filters = DOM.el(doc, "div", null, "pools-filters");
-    var fA = field(doc, t("pool.asset_a_field", "Asset A"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fB = field(doc, t("pool.asset_b_field", "Asset B"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fS = field(doc, t("pool.share_asset_field", "Share asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
     var sizeLab = DOM.el(doc, "label", t("pool.per_page", "Per page "));
     var sizeSel = doc.createElement("select");
@@ -550,11 +543,11 @@ var PoolUI = (function () {
     })();
   }
   function createBox(doc, box, myGen) { /* op-59 create: a/b/share resolves, human percents, orientation preview */
-    var fA = field(doc, t("pool.asset_a_field", "Asset A"), { placeholder: "BTS" });
-    var fB = field(doc, t("pool.asset_b_field", "Asset B"), { placeholder: "CNY" });
-    var fSh = field(doc, t("pool.share_asset_field", "Share asset"), { placeholder: t("pool.share_ph", "fresh UIA symbol") });
-    var fT = field(doc, t("pool.taker_pct_field", "Taker fee %"), { value: "0.5", inputmode: "decimal" });
-    var fW = field(doc, t("pool.withdrawal_pct_field", "Withdrawal fee %"), { value: "0", inputmode: "decimal" });
+    var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: "BTS" });
+    var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: "CNY" });
+    var fSh = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("pool.share_ph", "fresh UIA symbol") });
+    var fT = Forms.labeledInput(doc, t("pool.taker_pct_field", "Taker fee %") + " ", { value: "0.5", inputmode: "decimal" });
+    var fW = Forms.labeledInput(doc, t("pool.withdrawal_pct_field", "Withdrawal fee %") + " ", { value: "0", inputmode: "decimal" });
     [fA, fB, fSh, fT, fW].forEach(function (f) { box.appendChild(f.row); });
     /* Virgin-mint rule (slice-12 proven: max(raw)): first deposit into an
      * empty pool mints the larger leg — inline so nobody learns it by failing. */

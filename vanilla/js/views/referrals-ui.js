@@ -150,15 +150,15 @@ var ReferralsUI = (function () {
       try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", t("referrals.account", "Account "));
     var input = doc.createElement("input");
     input.id = "ref-lookup"; input.type = "text";
     input.setAttribute("placeholder", t("referrals.account_name_or_1_2_n", "account name or 1.2.N"));
     input.setAttribute("autocomplete", "off");
     input.setAttribute("autocapitalize", "off");
     input.setAttribute("spellcheck", "false");
-    touchable(input); label.appendChild(input); row.appendChild(label);
+    /* autocapitalize/spellcheck have no Forms attribute-bag slot, so the
+     * input stays hand-built; only the row shell comes from Forms. */
+    var row = Forms.fieldRow(doc, t("referrals.account", "Account "), input);
     wrap.appendChild(row);
     var go = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
     go.id = "ref-go"; go.type = "button"; wrap.appendChild(go);

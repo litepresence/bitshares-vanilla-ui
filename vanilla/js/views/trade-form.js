@@ -119,40 +119,12 @@ var TradeForm = (function () {
     var p = DOM.status(wrap, text); return p;
   }
 
-  /* Labeled input row with its own inline error slot. Returns refs.
-   * opts.unit (dexux-ref): unit suffix label rendered in a span after the
-   * input (e.g. "BTS", "BITUSD / BTS") — textContent only, never read back. */
-  function fieldRow(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", labelText + " ");
-    var input = doc.createElement("input");
-    input.type = opts.type || "text";
-    if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-    if (opts.id) input.id = opts.id;
-    if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    if (opts.min !== undefined) input.setAttribute("min", opts.min);
-    if (opts.max !== undefined) input.setAttribute("max", opts.max);
-    touchable(input);
-    var suffix = null;
-    if (opts.unit) {
-      var wrap = doc.createElement("span");
-      wrap.className = "unit-wrap";
-      wrap.appendChild(input);
-      suffix = DOM.el(doc, "span", opts.unit, "unit-suffix");
-      wrap.appendChild(suffix);
-      label.appendChild(wrap);
-    } else {
-      label.appendChild(input);
-    }
-    row.appendChild(label);
-    var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite");
-    err.style.display = "none";
-    row.appendChild(err);
-    return { row: row, input: input, err: err, suffix: suffix };
-  }
+  /* Inline error slots live on each Forms-built field object as .err
+   * (created at the call site right after Forms.labeledInput/labeledSelect,
+   * same div.error + aria-live + display:none contract as the old fieldRow).
+   * Unit-suffix rows (dexux-ref, opts.unit before): the input is reparented
+   * into a span.unit-wrap with a textContent-only suffix span after
+   * Forms.labeledInput nests it — textContent only, never read back. */
 
   /* Show (or clear) the inline validation message under a field row. */
   function setFieldError(f, msg) {
@@ -211,20 +183,11 @@ var TradeForm = (function () {
    * side namespaces the ids: both panels live at once (trade-expiry-buy vs
    * trade-expiry-sell). */
   function renderExpiry(doc, wrap, st, side) {
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", t("trade.expiration", "Expiration "));
-    var sel = doc.createElement("select");
+    var expF = Forms.labeledSelect(doc, t("trade.expiration", "Expiration "),
+      EXPIRATIONS.map(function (p) { return [p.key, p.title]; }), st.key || "YEAR");
+    var row = expF.row;
+    var sel = expF.select;
     sel.id = "trade-expiry-" + side;
-    EXPIRATIONS.forEach(function (p) {
-      var o = doc.createElement("option");
-      o.value = p.key;
-      o.textContent = p.title;
-      if (p.key === (st.key || "YEAR")) o.selected = true;
-      sel.appendChild(o);
-    });
-    touchable(sel);
-    label.appendChild(sel);
-    row.appendChild(label);
     var custom = doc.createElement("input");
     custom.type = "datetime-local";
     custom.id = "trade-expiry-custom-" + side;
@@ -703,9 +666,13 @@ var TradeForm = (function () {
    * as the old renderUnlock form shape so help docs keep reading true).
    * Returns refs. */
   function lockedPasswordRow(doc, wrap, side) {
-    var f = fieldRow(doc, t("trade.password_label", "Password "), {
+    var f = Forms.labeledInput(doc, t("trade.password_label", "Password ") + " ", {
       id: "trade-unlock-password-" + side, type: "password"
     });
+    f.err = DOM.el(doc, "div", "", "error");
+    f.err.setAttribute("aria-live", "polite");
+    f.err.style.display = "none";
+    f.row.appendChild(f.err);
     wrap.appendChild(f.row);
     var errBox = DOM.el(doc, "div", null, "error");
     errBox.setAttribute("aria-live", "polite");
@@ -969,35 +936,52 @@ var TradeForm = (function () {
     var st = P[side];
     if (st.total === undefined || st.total === null) st.total = "";
     var locked = isLockedView(P);
-    var amountF = fieldRow(doc, "Amount (" + ctx.quoteSym + ") ", {
-      id: sid("trade-amount", side), value: st.amount, placeholder: "0.00", inputmode: "decimal",
-      unit: ctx.quoteSym
+    var amountF = Forms.labeledInput(doc, "Amount (" + ctx.quoteSym + ") " + " ", {
+      id: sid("trade-amount", side), value: st.amount, placeholder: "0.00", inputmode: "decimal"
     });
+    amountF.wrap = doc.createElement("span"); amountF.wrap.className = "unit-wrap";
+    amountF.input.parentNode.insertBefore(amountF.wrap, amountF.input);
+    amountF.wrap.appendChild(amountF.input);
+    amountF.wrap.appendChild(DOM.el(doc, "span", ctx.quoteSym, "unit-suffix"));
+    amountF.err = DOM.el(doc, "div", "", "error");
+    amountF.err.setAttribute("aria-live", "polite");
+    amountF.err.style.display = "none";
+    amountF.row.appendChild(amountF.err);
     body.appendChild(amountF.row);
-    var priceF = fieldRow(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: sid("trade-price", side), value: st.price, placeholder: "0.00", inputmode: "decimal",
-      unit: ctx.baseSym + " / " + ctx.quoteSym
+    var priceF = Forms.labeledInput(doc, "Price (" + ctx.baseSym + " per " + ctx.quoteSym + ") " + " ", {
+      id: sid("trade-price", side), value: st.price, placeholder: "0.00", inputmode: "decimal"
     });
+    priceF.wrap = doc.createElement("span"); priceF.wrap.className = "unit-wrap";
+    priceF.input.parentNode.insertBefore(priceF.wrap, priceF.input);
+    priceF.wrap.appendChild(priceF.input);
+    priceF.wrap.appendChild(DOM.el(doc, "span", ctx.baseSym + " / " + ctx.quoteSym, "unit-suffix"));
+    priceF.err = DOM.el(doc, "div", "", "error");
+    priceF.err.setAttribute("aria-live", "polite");
+    priceF.err.style.display = "none";
+    priceF.row.appendChild(priceF.err);
     body.appendChild(priceF.row);
-    var totalF = fieldRow(doc, "Total (" + ctx.baseSym + ") ", {
-      id: sid("trade-total", side), value: st.total, placeholder: "0.00", inputmode: "decimal",
-      unit: ctx.baseSym
+    var totalF = Forms.labeledInput(doc, "Total (" + ctx.baseSym + ") " + " ", {
+      id: sid("trade-total", side), value: st.total, placeholder: "0.00", inputmode: "decimal"
     });
+    totalF.wrap = doc.createElement("span"); totalF.wrap.className = "unit-wrap";
+    totalF.input.parentNode.insertBefore(totalF.wrap, totalF.input);
+    totalF.wrap.appendChild(totalF.input);
+    totalF.wrap.appendChild(DOM.el(doc, "span", ctx.baseSym, "unit-suffix"));
+    totalF.err = DOM.el(doc, "div", "", "error");
+    totalF.err.setAttribute("aria-live", "polite");
+    totalF.err.style.display = "none";
+    totalF.row.appendChild(totalF.err);
     body.appendChild(totalF.row);
     mountBalanceLine(doc, body, P, side);
     /* LOW punchlist: lowest-ask / highest-bid helper line under each form.
      * The book owns the live best prices (market-book.js spread lines), so
      * the forms link there instead of duplicating a second price source. */
     body.appendChild(DOM.el(doc, "p", side === "buy" ? t("trade.lowest_ask_lives_in_the_order_book_above", "Lowest ask lives in the order book above — click an ask row to fill the price.") : t("trade.highest_bid_lives_in_the_order_book_above", "Highest bid lives in the order book above — click a bid row to fill the price."), "muted"));
-    var fokRow = DOM.el(doc, "div", null, "xfer-field");
-    var fokLabel = DOM.el(doc, "label", t("trade.fok_label", "Fill or kill "));
     var fokBox = doc.createElement("input");
     fokBox.type = "checkbox";
     fokBox.id = sid("trade-fok", side);
     fokBox.checked = !!st.fok;
-    touchable(fokBox);
-    fokLabel.appendChild(fokBox);
-    fokRow.appendChild(fokLabel);
+    var fokRow = Forms.fieldRow(doc, t("trade.fok_label", "Fill or kill "), fokBox);
     fokRow.appendChild(DOM.el(doc, "span",
       t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
     body.appendChild(fokRow);
@@ -1293,42 +1277,58 @@ var TradeForm = (function () {
     var st = P.scaled;
     var lockedScaled = isLockedView(P);
     body.appendChild(DOM.el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
-    var sideRow = DOM.el(doc, "div", null, "xfer-field");
-    var sideLabel = DOM.el(doc, "label", t("trade.side_label", "Side "));
-    var sideSel = doc.createElement("select");
+    var sideF = Forms.labeledSelect(doc, t("trade.side_label", "Side "),
+      [["sell", "Sell " + ctx.quoteSym + " (spend " + ctx.quoteSym + ")"],
+       ["buy", "Buy " + ctx.quoteSym + " (spend " + ctx.baseSym + ")"]], st.side);
+    var sideRow = sideF.row;
+    var sideSel = sideF.select;
     sideSel.id = "trade-scaled-side-buy";
-    [["sell", "Sell " + ctx.quoteSym + " (spend " + ctx.quoteSym + ")"],
-     ["buy", "Buy " + ctx.quoteSym + " (spend " + ctx.baseSym + ")"]].forEach(function (o) {
-      var opt = doc.createElement("option");
-      opt.value = o[0];
-      opt.textContent = o[1];
-      if (o[0] === st.side) opt.selected = true;
-      sideSel.appendChild(opt);
-    });
-    touchable(sideSel);
-    sideLabel.appendChild(sideSel);
-    sideRow.appendChild(sideLabel);
     body.appendChild(sideRow);
-    var nF = fieldRow(doc, t("trade.count_label", "Order count (2-20) "), {
+    var nF = Forms.labeledInput(doc, t("trade.count_label", "Order count (2-20) ") + " ", {
       id: sid("trade-n", "buy"), value: st.n, placeholder: "3", inputmode: "numeric"
     });
+    nF.err = DOM.el(doc, "div", "", "error");
+    nF.err.setAttribute("aria-live", "polite");
+    nF.err.style.display = "none";
+    nF.row.appendChild(nF.err);
     body.appendChild(nF.row);
     var priceUnit = ctx.baseSym + " / " + ctx.quoteSym;
-    var lowF = fieldRow(doc, "Price low (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: sid("trade-low", "buy"), value: st.low, placeholder: "0.00", inputmode: "decimal",
-      unit: priceUnit
+    var lowF = Forms.labeledInput(doc, "Price low (" + ctx.baseSym + " per " + ctx.quoteSym + ") " + " ", {
+      id: sid("trade-low", "buy"), value: st.low, placeholder: "0.00", inputmode: "decimal"
     });
+    lowF.wrap = doc.createElement("span"); lowF.wrap.className = "unit-wrap";
+    lowF.input.parentNode.insertBefore(lowF.wrap, lowF.input);
+    lowF.wrap.appendChild(lowF.input);
+    lowF.wrap.appendChild(DOM.el(doc, "span", priceUnit, "unit-suffix"));
+    lowF.err = DOM.el(doc, "div", "", "error");
+    lowF.err.setAttribute("aria-live", "polite");
+    lowF.err.style.display = "none";
+    lowF.row.appendChild(lowF.err);
     body.appendChild(lowF.row);
-    var highF = fieldRow(doc, "Price high (" + ctx.baseSym + " per " + ctx.quoteSym + ") ", {
-      id: sid("trade-high", "buy"), value: st.high, placeholder: "0.00", inputmode: "decimal",
-      unit: priceUnit
+    var highF = Forms.labeledInput(doc, "Price high (" + ctx.baseSym + " per " + ctx.quoteSym + ") " + " ", {
+      id: sid("trade-high", "buy"), value: st.high, placeholder: "0.00", inputmode: "decimal"
     });
+    highF.wrap = doc.createElement("span"); highF.wrap.className = "unit-wrap";
+    highF.input.parentNode.insertBefore(highF.wrap, highF.input);
+    highF.wrap.appendChild(highF.input);
+    highF.wrap.appendChild(DOM.el(doc, "span", priceUnit, "unit-suffix"));
+    highF.err = DOM.el(doc, "div", "", "error");
+    highF.err.setAttribute("aria-live", "polite");
+    highF.err.style.display = "none";
+    highF.row.appendChild(highF.err);
     body.appendChild(highF.row);
     var sellS = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
-    var totalF = fieldRow(doc, "Total to sell (" + sellS + ") ", {
-      id: sid("trade-total", "buy"), value: st.total, placeholder: "0.00", inputmode: "decimal",
-      unit: sellS
+    var totalF = Forms.labeledInput(doc, "Total to sell (" + sellS + ") " + " ", {
+      id: sid("trade-total", "buy"), value: st.total, placeholder: "0.00", inputmode: "decimal"
     });
+    totalF.wrap = doc.createElement("span"); totalF.wrap.className = "unit-wrap";
+    totalF.input.parentNode.insertBefore(totalF.wrap, totalF.input);
+    totalF.wrap.appendChild(totalF.input);
+    totalF.wrap.appendChild(DOM.el(doc, "span", sellS, "unit-suffix"));
+    totalF.err = DOM.el(doc, "div", "", "error");
+    totalF.err.setAttribute("aria-live", "polite");
+    totalF.err.style.display = "none";
+    totalF.row.appendChild(totalF.err);
     body.appendChild(totalF.row);
     sideSel.addEventListener("change", function () {
       scrapeScaled(mount, st);

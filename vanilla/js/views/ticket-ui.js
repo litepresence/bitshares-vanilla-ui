@@ -69,15 +69,10 @@ var TicketUI = (function () {
   }
   /* Lock-type select (5 lock words, defaults to 1) wrapped in a labeled row. Returns: the select. */
   function lockSel(ui, doc, box, label) {
-    var sel = doc.createElement("select"); ui.touchable(sel);
-    [0, 1, 2, 3, 4].forEach(function (t) {
-      var o = doc.createElement("option"); o.value = String(t);
-      o.textContent = ProposalTicket.lockLabel(t); sel.appendChild(o);
-    });
-    sel.value = "1";
-    var row = ui.el(doc, "div", null, "xfer-field"), lab = ui.el(doc, "label", label + " ");
-    lab.appendChild(sel); row.appendChild(lab); box.appendChild(row);
-    return sel;
+    var built = Forms.labeledSelect(doc, label + " ",
+      [0, 1, 2, 3, 4].map(function (n) { return [String(n), ProposalTicket.lockLabel(n)]; }), "1");
+    box.appendChild(built.row);
+    return built.select;
   }
   /* Per-row Update button + review box (downgrades blocked client-side until testnet proves them). Params: ui, doc, box, myGen, uiGen, t (ticket row). */
   function updateBox(ui, doc, box, myGen, uiGen, tk) {
@@ -89,7 +84,7 @@ var TicketUI = (function () {
       out.appendChild(ui.el(doc, "p", "Current lock: " + tk.lock_word + ". Downgrades are blocked until testnet proves them (ambiguity D).", "muted"));
       var sel = lockSel(ui, doc, out, t("ticket.new_lock", "New lock"));
       sel.value = String(tk.target_type);
-      var fM = ui.field(doc, t("ticket.new_amount_optional_blank_keep", "New amount (optional, blank = keep)"), { placeholder: t("ticket.blank_keep", "blank = keep"), inputmode: "decimal" });
+      var fM = Forms.labeledInput(doc, t("ticket.new_amount_optional_blank_keep", "New amount (optional, blank = keep)") + " ", { placeholder: t("ticket.blank_keep", "blank = keep"), inputmode: "decimal" });
       out.appendChild(fM.row);
       var ibox = ui.el(doc, "div"); out.appendChild(ibox);
       ui.reviewSection(doc, ibox, uiGen, t("ticket.review_update", "Review update"), {
@@ -136,14 +131,14 @@ var TicketUI = (function () {
     } catch (e) { /* notice is display-only */ }
     var go = ui.touchable(ui.el(doc, "button", t("ticket.load_leaderboard", "Load leaderboard"))); go.type = "button"; ctx.wrap.appendChild(go);
     var boardBox = ui.el(doc, "div"); ctx.wrap.appendChild(boardBox);
-    var fM = ui.field(doc, t("ticket.my_account", "My account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fM = Forms.labeledInput(doc, t("ticket.my_account", "My account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
     ctx.wrap.appendChild(fM.row);
     var mine = ui.touchable(ui.el(doc, "button", t("ticket.my_tickets", "My tickets"))); mine.type = "button"; ctx.wrap.appendChild(mine);
     var mineBox = ui.el(doc, "div"); ctx.wrap.appendChild(mineBox);
     ctx.wrap.appendChild(ui.el(doc, "h2", t("ticket.create_ticket", "Create ticket")));
-    var fA = ui.field(doc, t("ticket.account", "Account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fS = ui.field(doc, t("ticket.asset", "Asset"), { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
-    var fQ = ui.field(doc, t("ticket.amount", "Amount"), { placeholder: "1.5", inputmode: "decimal" });
+    var fA = Forms.labeledInput(doc, t("ticket.account", "Account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x"), value: "BTS" });
+    var fQ = Forms.labeledInput(doc, t("ticket.amount", "Amount") + " ", { placeholder: "1.5", inputmode: "decimal" });
     ctx.wrap.appendChild(fA.row); ctx.wrap.appendChild(fS.row); ctx.wrap.appendChild(fQ.row);
     var lock = lockSel(ui, doc, ctx.wrap, t("ticket.lock", "Lock"));
     var cbox = ui.el(doc, "div"); ctx.wrap.appendChild(cbox);
@@ -224,8 +219,8 @@ var TicketUI = (function () {
         ctx.wrap.appendChild(ui.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v2.name, id: _v2.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
-    var fI = ui.field(doc, t("ticket.issuer_account", "Issuer account"), { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
-    var fS = ui.field(doc, t("ticket.asset", "Asset"), { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fI = Forms.labeledInput(doc, t("ticket.issuer_account", "Issuer account") + " ", { placeholder: t("ticket.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" });
+    var fS = Forms.labeledInput(doc, t("ticket.asset", "Asset") + " ", { placeholder: t("ticket.symbol_or_1_3_x", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fI.row); ctx.wrap.appendChild(fS.row);
     var area = doc.createElement("textarea");
     area.setAttribute("placeholder", t("ticket.airdrop_example_ph", "alice,10\nbob,2.5")); area.setAttribute("rows", "6");

@@ -178,34 +178,10 @@ var TransferUI = (function () {
   /* UTF-8 memo hex + account/asset lookups moved verbatim to
    * transfer-confirm.js (review side) — private copies there. */
 
-  /* Labeled text input row. Returns {row, input}. */
-  function fieldRow(doc, labelText, opts) {
-    opts = opts || {};
-    var row = DOM.el(doc, "div", null, "xfer-field");
-    var label = DOM.el(doc, "label", labelText + " ");
-    var input;
-    if (opts.textarea) {
-      input = doc.createElement("textarea");
-      input.rows = 2;
-    } else {
-      input = doc.createElement("input");
-      input.type = opts.type || "text";
-      if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-      if (opts.autocomplete) input.setAttribute("autocomplete", opts.autocomplete);
-    }
-    if (opts.id) input.id = opts.id;
-    if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
-    if (opts.readonly) input.setAttribute("readonly", "readonly");
-    if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-    touchable(input);
-    label.appendChild(input);
-    row.appendChild(label);
-    var err = DOM.el(doc, "div", "", "error");
-    err.setAttribute("aria-live", "polite");
-    err.style.display = "none";
-    row.appendChild(err);
-    return { row: row, input: input, err: err };
-  }
+  /* Inline error slots live on each Forms-built field object as .err
+   * (created at the call site right after Forms.labeledInput/
+   * labeledTextarea, same div.error + aria-live + display:none contract
+   * as the old fieldRow). */
 
   function setFieldError(f, msg) {
     if (!msg) {
@@ -346,9 +322,13 @@ var TransferUI = (function () {
 
     if (state.error) showError(doc, wrap, state.error, t("transfer.prepare_failed", "Could not prepare the transfer."));
 
-    var fromF = fieldRow(doc, t("transfer.from_label", "From (name or 1.2.N) "), {
+    var fromF = Forms.labeledInput(doc, t("transfer.from_label", "From (name or 1.2.N) ") + " ", {
       id: "xfer-from", value: state.from || from.name, placeholder: t("transfer.from_placeholder", "sender"), autocomplete: "off"
     });
+    fromF.err = DOM.el(doc, "div", "", "error");
+    fromF.err.setAttribute("aria-live", "polite");
+    fromF.err.style.display = "none";
+    fromF.row.appendChild(fromF.err);
     wrap.appendChild(fromF.row);
     /* Non-blocking blur check: warns early, submit still decides. */
     fromF.input.addEventListener("blur", function () {
@@ -364,9 +344,13 @@ var TransferUI = (function () {
       if (!locked && v !== balWho) loadBalancesForSender();
     });
 
-    var toF = fieldRow(doc, t("transfer.to_label", "To (name or 1.2.N) "), {
+    var toF = Forms.labeledInput(doc, t("transfer.to_label", "To (name or 1.2.N) ") + " ", {
       id: "xfer-to", value: state.to, placeholder: t("transfer.to_placeholder", "recipient"), autocomplete: "off"
     });
+    toF.err = DOM.el(doc, "div", "", "error");
+    toF.err.setAttribute("aria-live", "polite");
+    toF.err.style.display = "none";
+    toF.row.appendChild(toF.err);
     wrap.appendChild(toF.row);
     /* LOW punchlist: known-scammer flag (AccountSelector concept). No scam
      * registry is vendored, so this stays an honest hint, not a verdict. */
@@ -387,9 +371,13 @@ var TransferUI = (function () {
      * they load (free-text fallback when locked or when the load fails, so
      * the form never blocks). Every reader below uses assetF.input at event
      * time, never a cached node. */
-    var assetF = fieldRow(doc, t("transfer.asset_label", "Asset "), {
+    var assetF = Forms.labeledInput(doc, t("transfer.asset_label", "Asset ") + " ", {
       id: "xfer-asset", value: state.asset, placeholder: coreSymbol(), autocomplete: "off"
     });
+    assetF.err = DOM.el(doc, "div", "", "error");
+    assetF.err.setAttribute("aria-live", "polite");
+    assetF.err.style.display = "none";
+    assetF.row.appendChild(assetF.err);
     wrap.appendChild(assetF.row);
 
     /* Available balance (punchlist MED): a click-to-fill button when the
@@ -398,37 +386,37 @@ var TransferUI = (function () {
     var availBox = DOM.el(doc, "div", null, "xfer-avail");
     wrap.appendChild(availBox);
 
-    var amountF = fieldRow(doc, t("transfer.amount_label", "Amount "), {
+    var amountF = Forms.labeledInput(doc, t("transfer.amount_label", "Amount ") + " ", {
       id: "xfer-amount", value: state.amount, placeholder: "0.00", inputmode: "decimal", autocomplete: "off"
     });
+    amountF.err = DOM.el(doc, "div", "", "error");
+    amountF.err.setAttribute("aria-live", "polite");
+    amountF.err.style.display = "none";
+    amountF.row.appendChild(amountF.err);
     wrap.appendChild(amountF.row);
 
-    var memoF = fieldRow(doc, t("transfer.memo_label", "Memo (optional) "), {
-      id: "xfer-memo", value: state.memo, textarea: true
+    var memoF = Forms.labeledTextarea(doc, t("transfer.memo_label", "Memo (optional) ") + " ", {
+      id: "xfer-memo", value: state.memo, rows: 2
     });
+    memoF.err = DOM.el(doc, "div", "", "error");
+    memoF.err.setAttribute("aria-live", "polite");
+    memoF.err.style.display = "none";
+    memoF.row.appendChild(memoF.err);
     wrap.appendChild(memoF.row);
 
-    var encRow = DOM.el(doc, "div", null, "xfer-field");
-    var encLabel = DOM.el(doc, "label", t("transfer.encrypted_label", "Encrypted memo "));
     var encBox = doc.createElement("input");
     encBox.type = "checkbox";
     encBox.id = "xfer-encrypted";
     encBox.checked = !!state.encrypted;
-    touchable(encBox);
-    encLabel.appendChild(encBox);
-    encRow.appendChild(encLabel);
+    var encRow = Forms.fieldRow(doc, t("transfer.encrypted_label", "Encrypted memo "), encBox);
     wrap.appendChild(encRow);
 
     /* Fee asset (punchlist MED): the transfer asset plus the sender's
      * non-zero balances when unlocked, the transfer asset alone when
      * locked. The choice follows the transfer asset until touched. */
-    var feeRow = DOM.el(doc, "div", null, "xfer-field");
-    var feeLabel = DOM.el(doc, "label", t("confirm.fee", "Fee") + " ");
     var feeSel = doc.createElement("select");
     feeSel.id = "xfer-fee-asset";
-    touchable(feeSel);
-    feeLabel.appendChild(feeSel);
-    feeRow.appendChild(feeLabel);
+    var feeRow = Forms.fieldRow(doc, t("confirm.fee", "Fee") + " ", feeSel);
     wrap.appendChild(feeRow);
     /* Equivalent-fee quote in an alternate fee asset (unlocked only, hidden
      * otherwise and on any lookup failure — the confirm stays the source
@@ -464,20 +452,32 @@ var TransferUI = (function () {
 
     /* Proposer (fee-payer) defaults to 1.2.0 while locked (public viewing
      * object) else the wallet sender; expiry defaults +24h; review blank. */
-    var proposerF = fieldRow(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)"), {
+    var proposerF = Forms.labeledInput(doc, t("proposal.fee_payer_proposer", "Fee payer (proposer)") + " ", {
       id: "xfer-proposer",
       value: (state && state.proposer) || (locked ? (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" : (state.from || from.name)),
       placeholder: t("proposal.name_or_1_2_n", "name or 1.2.N"), autocomplete: "off"
     });
-    var expiryF = fieldRow(doc, t("barter.proposal_expiration", "Proposal expiration"), {
+    proposerF.err = DOM.el(doc, "div", "", "error");
+    proposerF.err.setAttribute("aria-live", "polite");
+    proposerF.err.style.display = "none";
+    proposerF.row.appendChild(proposerF.err);
+    var expiryF = Forms.labeledInput(doc, t("barter.proposal_expiration", "Proposal expiration") + " ", {
       id: "xfer-expiry", type: "datetime-local",
       value: (state && state.expiration) || defaultExpirationLocal()
     });
-    var reviewPeriodF = fieldRow(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)"), {
+    expiryF.err = DOM.el(doc, "div", "", "error");
+    expiryF.err.setAttribute("aria-live", "polite");
+    expiryF.err.style.display = "none";
+    expiryF.row.appendChild(expiryF.err);
+    var reviewPeriodF = Forms.labeledInput(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)") + " ", {
       id: "xfer-review-period",
       value: (state && state.reviewPeriod) || "",
       placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric", autocomplete: "off"
     });
+    reviewPeriodF.err = DOM.el(doc, "div", "", "error");
+    reviewPeriodF.err.setAttribute("aria-live", "polite");
+    reviewPeriodF.err.style.display = "none";
+    reviewPeriodF.row.appendChild(reviewPeriodF.err);
     wrap.appendChild(proposerF.row);
     wrap.appendChild(expiryF.row);
     wrap.appendChild(reviewPeriodF.row);

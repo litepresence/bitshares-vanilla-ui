@@ -187,9 +187,9 @@ var SametUI = (function () {
        * op-67 is rejected verbatim `Unpaid SameT Fund debt detected`; only
        * the combined tx is accepted (proven block 100930730). Blank repay =
        * repay exactly what was borrowed (unpaid returns to its prior level). */
-      var fB = ui.field(doc, t("samet.borrow_amt_tpl", "Borrow amount (%(s)s)", { s: f.sym || f.asset_id }), { placeholder: "0.0", inputmode: "decimal" });
-      var fRP = ui.field(doc, t("samet.repay_amount_blank_same_as_borrow", "Repay amount (blank = same as borrow)"), { placeholder: "0.0", inputmode: "decimal" });
-      var fFF = ui.field(doc, t("samet.fund_fee", "Fund fee"), { placeholder: "0.0", inputmode: "decimal" });
+      var fB = Forms.labeledInput(doc, t("samet.borrow_amt_tpl", "Borrow amount (%(s)s)", { s: f.sym || f.asset_id }) + " ", { placeholder: "0.0", inputmode: "decimal" });
+      var fRP = Forms.labeledInput(doc, t("samet.repay_amount_blank_same_as_borrow", "Repay amount (blank = same as borrow)") + " ", { placeholder: "0.0", inputmode: "decimal" });
+      var fFF = Forms.labeledInput(doc, t("samet.fund_fee", "Fund fee") + " ", { placeholder: "0.0", inputmode: "decimal" });
       out.appendChild(fB.row); out.appendChild(fRP.row); out.appendChild(fFF.row);
       out.appendChild(ui.el(doc, "p", "Hint: quoted fund fee = ceil(repay × " + Credit.rateUnitsToHuman(f.rate_units) + "%). One transaction carries BOTH legs; each leg pays its own fee.", "muted"));
       var goBtn = ui.touchable(ui.el(doc, "button", t("samet.review_borrow_repay", "Review borrow+repay"))); goBtn.type = "button"; out.appendChild(goBtn);
@@ -257,8 +257,8 @@ var SametUI = (function () {
           gate.appendChild(ui.el(doc, "p", "No unpaid debt on " + f.id + " — nothing to repay alone. Use Borrow+Repay to borrow and repay in one transaction.", "muted"));
           return;
         }
-        var fR = ui.field(doc, t("samet.repay_amount", "Repay amount"), { placeholder: "0.0", inputmode: "decimal" });
-        var fF = ui.field(doc, t("samet.fund_fee", "Fund fee"), { placeholder: "0.0", inputmode: "decimal" });
+        var fR = Forms.labeledInput(doc, t("samet.repay_amount", "Repay amount") + " ", { placeholder: "0.0", inputmode: "decimal" });
+        var fF = Forms.labeledInput(doc, t("samet.fund_fee", "Fund fee") + " ", { placeholder: "0.0", inputmode: "decimal" });
         gate.appendChild(fR.row); gate.appendChild(fF.row);
         gate.appendChild(ui.el(doc, "p", "Unpaid now: " + now.text + ". Hint: quoted fee = ceil(amount × " + Credit.rateUnitsToHuman(f.rate_units) + "%).", "muted"));
         ui.reviewSection(doc, gate, uiGen, t("samet.review_repay", "Review repay"), {
@@ -287,8 +287,8 @@ var SametUI = (function () {
         ui.clearBox(gate); ui.showError(doc, gate, e, t("samet.could_not_read_the_fund", "Could not read the fund."));
       });
     } else if (kind === "update") {
-      var fD = ui.field(doc, t("samet.delta_amount_signed", "Delta amount (signed)"), { placeholder: t("samet.blank_unchanged", "blank = unchanged"), inputmode: "decimal" });
-      var fN = ui.field(doc, t("samet.new_fee_rate", "New fee rate %"), { placeholder: t("samet.blank_unchanged", "blank = unchanged"), inputmode: "decimal" });
+      var fD = Forms.labeledInput(doc, t("samet.delta_amount_signed", "Delta amount (signed)") + " ", { placeholder: t("samet.blank_unchanged", "blank = unchanged"), inputmode: "decimal" });
+      var fN = Forms.labeledInput(doc, t("samet.new_fee_rate", "New fee rate %") + " ", { placeholder: t("samet.blank_unchanged", "blank = unchanged"), inputmode: "decimal" });
       out.appendChild(fD.row); out.appendChild(fN.row);
       ui.reviewSection(doc, out, uiGen, t("samet.review_update", "Review update"), {
         build: async function () {
@@ -334,9 +334,9 @@ var SametUI = (function () {
   /* Op-64 Same-T create form. */
   function sametCreateBox(doc, box, uiGen) {
     var ui = U();
-    var fAsset = ui.field(doc, t("samet.asset", "Asset"), { placeholder: t("samet.symbol_or_1_3_x", "symbol or 1.3.x") });
-    var fBal = ui.field(doc, t("samet.balance", "Balance"), { placeholder: "0.0", inputmode: "decimal" });
-    var fRate = ui.field(doc, t("samet.fee_rate_2", "Fee rate %"), { placeholder: "0.1", inputmode: "decimal" });
+    var fAsset = Forms.labeledInput(doc, t("samet.asset", "Asset") + " ", { placeholder: t("samet.symbol_or_1_3_x", "symbol or 1.3.x") });
+    var fBal = Forms.labeledInput(doc, t("samet.balance", "Balance") + " ", { placeholder: "0.0", inputmode: "decimal" });
+    var fRate = Forms.labeledInput(doc, t("samet.fee_rate_2", "Fee rate %") + " ", { placeholder: "0.1", inputmode: "decimal" });
     [fAsset, fBal, fRate].forEach(function (f) { box.appendChild(f.row); });
     ui.reviewSection(doc, box, uiGen, t("samet.review_create", "Review create"), {
       build: async function () {

@@ -672,15 +672,6 @@ var PredictionUI = (function () {
       });
       return list;
     }
-    function pField(labelText, opts) {
-      opts = opts || {};
-      var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
-      var input = doc.createElement("input");
-      if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
-      if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
-      if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
-      touchable(input); label.appendChild(input); row.appendChild(label); return { row: row, input: input };
-    }
     function unlockInlineP(parent, onUnlock) {
       if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
       var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
@@ -731,7 +722,7 @@ var PredictionUI = (function () {
     }
     wrap.appendChild(DOM.el(doc, "p", t("prediction.portfolio_hint", "Holdings are PMA balances joined to the scan; avg cost replays fill history (chain-history only)."), "muted"));
     wrap.appendChild(DOM.el(doc, "p", t("prediction.filter_hint", "Active = unexpired and unsettled (closing soon first); Expired = past expiry awaiting resolution; My = created or held by the wallet account."), "muted"));
-    var pfAccount = pField(t("borrow.account", "Account"), !isUnlockedNow()
+    var pfAccount = Forms.labeledInput(doc, t("borrow.account", "Account") + " ", !isUnlockedNow()
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(pfAccount.row);
