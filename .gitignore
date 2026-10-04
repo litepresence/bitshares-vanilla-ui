@@ -34,3 +34,6 @@ __pycache__/
 
 # Subagent scratch reports (task drafts/reviews). Never shipped, never committed.
 .superpowers/
+
+# Footer build-info (generated, optional - app falls back without it).
+vanilla/version.json
