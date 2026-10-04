@@ -51,6 +51,28 @@ only the word "Master" hyperlinked (repo root URL).
    accepts a raw SHA as head; if not, fallback is tip-fetch
    (`GET /repos/{repo}/commits/{branch}`) then `compare/{tip}...{commit}`.
 
+## Network prefix (amendment 2026-10-04)
+
+Footer-right line 1 (node host, `paintFooter()` in `vanilla/js/app.js`) is
+prefixed with the active network: `MAINNET - {host}` / `TESTNET - {host}`.
+
+- Source of truth: `Store.loadSettings().network` (validated
+  `"mainnet"`/`"testnet"`, defaults to mainnet). Custom nodes inherit the
+  setting; the chain-id pin (`connect()`) guards wrong-chain lies.
+- Labels: new format key `shell.footer_net_host` (`%(net)s - %(host)s`)
+  reusing the existing `settings.network_mainnet` / `settings.network_testnet`
+  labels (no new translatable words; rendered caps by the existing
+  `.appfoot-host { text-transform: uppercase }`).
+- Color: open + mainnet keeps the existing green glow
+  (`data-state="open"`). Open + testnet uses a new state
+  (`data-state="open-testnet"`): text `--warn-text` (small-text contrast
+  contract, cf. node-table `warn`), halo `text-shadow: 0 0 8px var(--warn)`,
+  same `candy-glow` pulse, and the `prefers-reduced-motion` stilling rule
+  extended to cover it. Closed / error / mismatch states keep current
+  red/grey colors but still carry the prefix.
+- Verify alongside the build-info matrix: toggle Settings network
+  mainnet↔testnet, observe prefix + green/yellow swap at 360px + 1440px.
+
 ## Files touched
 
 - New: `tooling/generate_version.py`, (generated, gitignored)
