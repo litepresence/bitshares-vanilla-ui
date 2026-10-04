@@ -949,7 +949,7 @@ var HelpUI = (function () {
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
     ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "assets-issue", "assets-feed", "topops", "fees", "charts", "history-index", "community"]],
-    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu"]]
+    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu", "about-making"]]
   ];
 
   function paintIndexList(doc, wrap) {

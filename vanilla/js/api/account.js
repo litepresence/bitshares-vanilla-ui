@@ -197,7 +197,7 @@ var Account = (function () {
     return rows || [];
   }
 
-  /* Paged history walk (dex-ux plot proposal 4 source — vanilla/notes/
+  /* Paged history walk (dex-ux plot proposal 4 source — docs/parity/
    * dexux-plots.md section 4; chain-history ONLY, ES refused). Start ids are
    * inclusive on most nodes, so a leading duplicate of the previous page's
    * tail is dropped. Params: id account id string; perPage/maxPages optional

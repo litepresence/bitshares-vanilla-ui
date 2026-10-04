@@ -155,7 +155,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - DEX-UX (`reference/bitshares-dex-ux`, squidKid-deluxe, Python/Falcon — behavior-only, never a dependency) consulted for: market-selector patterns (two-round search, MPA/UIA/LPT/POOL/BTS filters), networkx-plot ideas (plots TBD — Kibana/ES transport refused; chain-history plots only). NOT consulted for dark-theme values (those are Crypo-sourced, see Themes line). #1 (React-16 wallet) vs #5 (Python dashboard) are UNIQUE projects — never confuse them.
 - Serializer grows one op-set per slice inside `vanilla/js/tx.js`: op 0 (slice 4); ops 1+2 (slice 6); op 6 (slice 8); ops 10/11/12/13/14/15/19 (slice 10); ops 25/26/27/28 + 49/50/52 (slice 11; 51/53 VIRTUAL never signed). Nothing generated, so nothing to regenerate.
 - Headless visual iteration: `tooling/visual/shot.mjs` (dev-only aid; human browser pass stays the gate).
-- Image assets vendored: `vanilla/assets/` (459 files: 84 SVG icons, 105 token logos, 243 flags, button-state SVGs, app art — byte-copies per `PROVENANCE.md`, MIT). Styling that applies them lands per-slice.
+- Image assets vendored: `vanilla/assets/` (361 files: 91 icons (84 SVG + 7 PNG), 243 flags, button-state SVGs, app art — byte-copies per `PROVENANCE.md`, MIT). Styling that applies them lands per-slice.
 - Full palette extracted: `vanilla/assets/PALETTE.md` (93 variables × dark/light/midnight, all `$refs` + `darken()`/`lighten()` resolved to final values incl. rgba, via `tooling/extract_palette.py`) + font stacks. Per-slice pixel-matching consumes exact values from here.
 - Original-page screenshot arsenal: `docs/parity/original-pages/` (35 routes captured headless + README index) — side-by-side reference for retro parity.
 - Tracked debt: roelandp node proven DNS-dead GLOBALLY (DoH NXDOMAIN 2026-09-30) → replaced by probe-verified `wss://api.bts.mobi/ws` (mainnet chain-id match); 2 pre-existing `#fff` literals in `app.css` (theme trio must catch); slice-02 fixture brainkey provenance open (does not derive fixture keys — our classic derivation proven independently).
@@ -175,6 +175,6 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - R5 extension: Tier-1 human install drill gates v1; Tier-2 approval/signing-gate is follow-up. Documented in `docs/parity/extension-wrapper.md`.
 - R6 tester document: `docs/tester-manual.md` (junior-dev click-by-click, full coverage incl. new features).
 - R7 proposal-wrap non-broadcast stands; `1.10.1492` stays uncounted.
-- R8 hygiene: `build/` gitignored; footer version stamp `v1.0.0`; `docs/afk-resume.md` refreshed ship-day.
+- R8 hygiene: `build/` gitignored; footer version stamp `v1.0.0`.
 - Splash (2026-10-01, Option B): `/` shows the landing while locked (motto hero + live strip + 5-call chain pulse + labeled single-market top-vol + cards/trust/steps/CTA), dashboard unchanged when unlocked. Aggregate DEX volume omitted (no chain call; summing rows violates #6). §3.1 deviation recorded in slice-01 delta.
 - Layer move (2026-10-01): `vanilla/js/` flat → `sdk/` (chain, crypto, vendor, data) · `api/` (tx, data reads, format, wallet) · `builders/` (op construction) · `views/` (`*-ui` + desk/book/tab renders) + shell at root. Pure moves via `tooling/move-to-layers.py` (saved record); old `file:line`s in dated notes stay as history.

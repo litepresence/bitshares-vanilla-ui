@@ -9,7 +9,7 @@ var passed = 0;
 function eq(a, e, n) { assert.strictEqual(a, e, n + " (got " + JSON.stringify(a) + ")"); passed++; }
 function ok(c, n) { assert.ok(c, n); passed++; }
 var T = HelpUI.TOPICS;
-eq(T.length, 61, "61 topics");
+eq(T.length, 67, "67 topics");
 var keys = T.map(function (r) { return r[0]; });
 eq(new Set(keys).size, keys.length, "topic keys unique");
 keys.forEach(function (k) {

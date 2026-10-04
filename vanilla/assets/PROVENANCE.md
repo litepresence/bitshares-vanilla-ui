@@ -7,13 +7,11 @@ token logos, flags, and app art must be pixel-identical to the original.
 
 | Dir | Files | Contents |
 |---|---|---|
-| `icons/` | 84 SVG | UI icon set (nav, buttons, status, actions) |
-| `asset-symbols/` | 105 PNG | Token/asset logos |
+| `icons/` | 91 (84 SVG + 7 PNG) | UI icon set (nav, buttons, status, actions) |
 | `language-dropdown/` | 245 (243 PNG + 2 JS) | Flag icons for the language picker |
 | `bin-file/` | 5 SVG | Button-state graphics (default/hover/error/rounded-arrow/downloaded) |
 | `model-type-images/` | 6 | Model-type illustrations |
-| root (`favicon.ico`, `logo-*.png`, `qr.png`, `ul-arrow*.png`, `fresh-bolt2.png`) | 9 | Favicons, logos, misc art |
-| `resources/` | 5 | Electron app art (backgrounds, window icons) |
+| root (`favicon.ico`, `logo-*.png`, `qr.png`, `ul-arrow*.png`, `fresh-bolt2.png`, `hero.webp`) | 10 | Favicons, logos, misc art |
 
 Deliberately NOT copied:
 - `icons-loader.js`, `symbols.js` (webpack-era loader shims — dead weight; filenames are the registry).
