@@ -329,7 +329,8 @@ async function generate(url) {
       }
       if (page.length < PAGE) break;
       const next = bumpPoolId(page[page.length - 1].id);
-      if (next <= start) throw new Error("paging did not advance at " + start);
+      if (parseInt(next.split(".")[2], 10) <= parseInt(start.split(".")[2], 10))
+        throw new Error("paging did not advance at " + start);
       start = next;
     }
 
@@ -346,6 +347,7 @@ async function generate(url) {
     const objs = union.length ? await rpc(dbId, "lookup_asset_symbols", [union]) : [];
     const assets = {};
     let missing = 0;
+    if ((objs || []).length < union.length) missing += union.length - (objs || []).length;
     (objs || []).forEach((a, i) => {
       if (a && typeof a.symbol === "string" && Number.isInteger(a.precision)) {
         assets[union[i]] = { sym: a.symbol, prec: a.precision };
