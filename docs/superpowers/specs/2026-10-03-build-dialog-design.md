@@ -29,7 +29,7 @@ wallet, with the assistant's replies, ending after issue #1 was addressed
 - Strings serialized with `JSON.stringify` semantics. Short keys documented
   in the file header.
 - Provenance header comment: what it is, generated-when, generated-by
-  (`tooling/collate_vanilla_prompts.py`), 413 exchanges / 14 sessions, the 6
+  (`tooling/collate_vanilla_prompts.py`), 413 exchanges / 14 sessions (13 distinct titles — two sessions share one title), the 6
   excluded off-topic protocol prompts + excluded sessions, archival rule:
   byte-verbatim English, never translated (translating history falsifies it).
 - Generation: collate script gains a third output; docs + asset regenerate

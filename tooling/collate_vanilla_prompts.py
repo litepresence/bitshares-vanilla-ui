@@ -161,7 +161,7 @@ def main() -> None:
     lines.append("")
     lines.append(
         f"Generated {utc(int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000))} "
-        f"from opencode.db: {len(prompts)} prompts across {len(sessions)} sessions. "
+        f"from opencode.db: {len(prompts)} prompts across {len(sessions)} sessions (13 distinct titles — two sessions share one title). "
         "1505 `@general subagent` worker sessions excluded (agent-generated, "
         "not user prompts)."
     )
@@ -213,7 +213,7 @@ def main() -> None:
     dlines.append("")
     dlines.append(
         f"Generated {utc(int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000))} "
-        f"from opencode.db: {len(prompts)} exchanges across {len(sessions)} sessions."
+        f"from opencode.db: {len(prompts)} exchanges across {len(sessions)} sessions (13 distinct titles — two sessions share one title)."
     )
     dlines.append("")
     dlines.append("---")
