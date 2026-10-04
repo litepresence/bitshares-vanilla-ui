@@ -616,7 +616,7 @@ table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
  * token, not #fff. */
 .node-table .node-remove, .node-card .node-remove { min-width: 44px; background: transparent; border: 0; color: var(--text); font-weight: 700; font-size: 1.1rem; }
 @media (hover:hover) {
-  .node-table .node-remove:hover, .node-card .node-remove:hover { color: var(--danger); transition: color 120ms ease; }
+  .node-table .node-remove:hover, .node-card .node-remove:hover { background: var(--danger); color: #fff; transition: background-color 120ms ease, color 120ms ease; }
 }
 .node-table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 /* Clickable offer rows (row click opens the loan modal; the per-row Borrow
