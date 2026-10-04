@@ -66,7 +66,7 @@ var PasswordUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("password.change_wallet_password", "Change wallet password")));
+    wrap.appendChild(DOM.pageHead(doc, t("password.change_wallet_password", "Change wallet password"), "key"));
     if (backendMissing()) {
       var missing = makeError(doc);
       missing.textContent = t("password.wallet_backend_missing_js_wallet_js_failed_to", "Wallet backend missing: js/wallet.js failed to load.");

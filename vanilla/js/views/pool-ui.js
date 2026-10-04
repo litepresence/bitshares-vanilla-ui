@@ -166,7 +166,7 @@ var PoolUI = (function () {
     ["Pool", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "pools"));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       offlineBox(doc, wrap, retry);
@@ -186,7 +186,7 @@ var PoolUI = (function () {
   function routeFail(root, title, e, retry) {
     root.innerHTML = "";
     var doc = root.ownerDocument || document, box = DOM.el(doc, "div", null, "wrap");
-    root.appendChild(box); box.appendChild(DOM.el(doc, "h1", title));
+    root.appendChild(box); box.appendChild(DOM.pageHead(doc, title, "pools"));
     showError(doc, box,e,t("pool.load_failed", "Could not load pools.")); offlineBox(doc, box, retry);
   }
   /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/

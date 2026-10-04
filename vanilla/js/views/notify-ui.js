@@ -120,7 +120,7 @@ var NotifyUI = (function () {
     var N = Notify;
     var touchable = host.touchable; /* el() calls use DOM.el directly */
     var uiGen = host.mark();
-    wrap.appendChild(DOM.el(doc, "h1", t("notify.title", "Price Alerts")));
+    wrap.appendChild(DOM.pageHead(doc, t("notify.title", "Price Alerts"), "alarm"));
     var honesty = t("notify.honesty", "Rules are checked while this page is open. Timers die with the page — alerts never fire while the app is closed.");
     wrap.appendChild(DOM.el(doc, "p", honesty, "muted"));
     host.mountToasts();

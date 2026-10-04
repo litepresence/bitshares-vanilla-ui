@@ -63,7 +63,7 @@ var PoolDetailUI = (function () {
       var wrap = u.el(doc, "div", null, "wrap mkt-wrap"); root.appendChild(wrap);
       var desk = u.el(doc, "div", null, "mkt mkt-pool"); wrap.appendChild(desk);
       var head = doc.createElement("section"); head.className = "mkt-head"; desk.appendChild(head);
-      head.appendChild(u.el(doc, "h1", "Pool " + row.id));
+      head.appendChild(DOM.pageHead(doc, "Pool " + row.id, "pools"));
       /* Copy-link share (account shareRow precedent — copy-link only, no QR
        * by decision). Static pool hash; the router resolves #/pools/:id. */
       try {

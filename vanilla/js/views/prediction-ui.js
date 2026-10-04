@@ -527,7 +527,7 @@ var PredictionUI = (function () {
     dropOpenSubs();
     DOM.clear(root);
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", t("prediction.prediction_markets", "Prediction Markets")));
+    wrap.appendChild(DOM.pageHead(doc, t("prediction.prediction_markets", "Prediction Markets"), "prediction"));
     wrap.appendChild(DOM.el(doc, "p", t("prediction.prediction_market_assets_yes_no_shares_positi", "Prediction-market assets (YES/NO shares). Positions are ordinary limit orders on the asset's market — open a market below and trade from the desk."), "muted"));
     /* PMO org section (parent assets group markets; tallies cover the same
      * bounded scan as the PMA list below — scanPMOs returns both, one scan).
@@ -1305,7 +1305,7 @@ var PredictionUI = (function () {
    * caller's catch — this function owns its own status line instead). */
   function renderOrgDetail(doc, wrap, info, pmo, myGen) {
     DOM.clear(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", "Organization: " + info.symbol));
+    wrap.appendChild(DOM.pageHead(doc, "Organization: " + info.symbol, "prediction"));
     var ident = (pmo && pmo.identity) || {}, gov = (pmo && pmo.governance) || {};
     function dash(s) { return (typeof s === "string" && s) ? s : "—"; }
     var dl = doc.createElement("dl");
@@ -1393,7 +1393,7 @@ var PredictionUI = (function () {
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
     var key = (market !== undefined && market !== null) ? String(market) : "";
     try { key = decodeURIComponent(key); } catch (e) { /* raw key stands */ }
-    wrap.appendChild(DOM.el(doc, "h1", "Prediction Market" + (key ? ": " + key : "")));
+    wrap.appendChild(DOM.pageHead(doc, "Prediction Market" + (key ? ": " + key : ""), "prediction"));
     if (miss) { showError(doc, wrap, "Prediction backend missing: " + miss + " failed to load."); return; }
     if (!key) { showError(doc, wrap, "unknown-asset", t("prediction.no_market_given", "No market given.")); return; }
     var self = function () { if (myGen === gen) renderDetail(root, market); };
@@ -1417,7 +1417,7 @@ var PredictionUI = (function () {
         return backingSymbol(backId).then(function (backSym) {
           if (myGen !== gen) return;
           DOM.clear(wrap);
-          wrap.appendChild(DOM.el(doc, "h1", "Prediction Market: " + info.symbol));
+          wrap.appendChild(DOM.pageHead(doc, "Prediction Market: " + info.symbol, "prediction"));
           var d = parsePMADescription(info.description || "");
           if (d.main) wrap.appendChild(DOM.el(doc, "p", d.main));
           if (d.condition) wrap.appendChild(DOM.el(doc, "p", "Condition: " + d.condition));

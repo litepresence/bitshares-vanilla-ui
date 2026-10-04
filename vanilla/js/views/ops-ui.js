@@ -286,11 +286,11 @@ var OpsUI = (function () {
     var wrap = makeWrap(doc, root);
     if (typeof Explorer === "undefined" || !Explorer ||
         typeof Explorer.head !== "function" || typeof Explorer.block !== "function") {
-      wrap.appendChild(DOM.el(doc, "h1", "Top operations"));
+      wrap.appendChild(DOM.pageHead(doc, "Top operations", "fire"));
       showError(doc, wrap, "Explorer backend missing: js/explorer.js failed to load.");
       return;
     }
-    wrap.appendChild(DOM.el(doc, "h1", "Top operations"));
+    wrap.appendChild(DOM.pageHead(doc, "Top operations", "fire"));
     wrap.appendChild(DOM.el(doc, "p",
       "Recent-block sample, not a chain-wide ranking: counts come from the N " +
       "most recent blocks read live from your connected node. No external index exists.",

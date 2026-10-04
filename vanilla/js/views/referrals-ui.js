@@ -96,7 +96,7 @@ var ReferralsUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("referrals.referrals", "Referrals")));
+    wrap.appendChild(DOM.pageHead(doc, t("referrals.referrals", "Referrals"), "people"));
     wrap.appendChild(DOM.el(doc, "p", t("referrals.intro", "Who registered and referred an account, the fee-split percents, and any pending cashback. Read-only: referral COUNTS need an off-chain history service the reference UI used, so counts are not shown here."),
       "muted"));
     if (typeof Chain === "undefined" || !Chain) {

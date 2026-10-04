@@ -60,7 +60,7 @@ var NewsUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = doc.createElement("div"); wrap.className = "wrap"; root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", t("news.news", "News")));
+    wrap.appendChild(DOM.pageHead(doc, t("news.news", "News"), "news"));
     wrap.appendChild(DOM.el(doc, "p", t("news.this_wallet_ships_no_in_app_news_feed_the_ref", "This wallet ships no in-app news feed: the reference UI pulled headlines from an external blog service, and bundling a hosted feed would break the day its owner moves it. Chain status and the pages below are always current."), "muted"));
     wrap.appendChild(DOM.el(doc, "p", t("news.no_feed_fetch_is_attempted_so_there_is_no", "No feed fetch is attempted, so there is no feed loading spinner or fetch-error panel — the live connection line below is the loading/error indicator for this page."), "muted"));
     var conn = DOM.el(doc, "p", t("news.checking_connection", "Checking connection…"), "muted");
