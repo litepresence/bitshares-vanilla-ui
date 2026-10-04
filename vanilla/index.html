@@ -102,7 +102,10 @@
 <script src="js/api/history-notice.js"></script>
 <script src="js/api/offline.js"></script>
 <script src="js/api/market.js"></script>
-<script src="js/sdk/vendor/lightweight-charts.standalone.production.js"></script>
+<!-- lightweight-charts NOT tagged here (193K saved on boot): charts-lwc.js
+  paints the canvas fallback immediately and lazy-loads the vendor build
+  behind first chart use via ensureLightweight (same dynamic-script
+  precedent as about-ui.js ensureBuildDialog; relative URL, file:// + http). -->
 <script src="js/api/charts-lwc.js"></script>
 <script src="js/api/market-charts.js"></script>
 <script src="js/api/market-book.js"></script>

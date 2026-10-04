@@ -470,6 +470,32 @@ var PoolDetailUI = (function () {
       } catch (e) { /* live tip skips */ }
     }
     var poolTimer = null;
+    /* Leave-cleanup: the gen guard below is the backstop, but a route leave
+     * for a NON-pool page never re-enters renderPoolDetail, so the 3.5s
+     * poll would tick orphaned until its next live() check. Register the
+     * interval in _cleanups (pool->pool navigation drains it on entry) AND
+     * arm a one-shot hashchange guard that clears it the moment the hash
+     * leaves this pool's detail and then removes itself. Never throws. */
+    (function armLeaveCleanup() {
+      var wantHash = "#/pools/" + String(r.id);
+      function clearPoolTimer() {
+        try { if (poolTimer !== null) clearInterval(poolTimer); } catch (e) { /* gone */ }
+        poolTimer = null;
+      }
+      _cleanups.push(clearPoolTimer);
+      try {
+        if (typeof window === "undefined" || typeof window.addEventListener !== "function") return;
+        var onLeave = function () {
+          var h = "";
+          try { h = String((typeof location !== "undefined" && location.hash) || ""); } catch (e) { h = ""; }
+          if (h.indexOf(wantHash) === 0) return;
+          clearPoolTimer();
+          try { window.removeEventListener("hashchange", onLeave); } catch (e) { /* gone */ }
+        };
+        window.addEventListener("hashchange", onLeave);
+        _cleanups.push(function () { try { window.removeEventListener("hashchange", onLeave); } catch (e) { /* gone */ } });
+      } catch (e) { /* gen guard below still covers */ }
+    })();
     function watchHead() {
       try {
         if (!live(myGen, uiGen)) { try { clearInterval(poolTimer); } catch (e) {} return; }

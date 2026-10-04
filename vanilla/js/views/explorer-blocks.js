@@ -576,10 +576,14 @@ var ExplorerBlocks = (function () {
     }
     /* Paint a freshness state: dot + word in the state's color. The word
      * rides xplore-live-text (+25% size); the dot is 1.25rem (+25%).
-     * Params: liveEl, state (freshState word). Never blank, never throws. */
+     * Params: liveEl, state (freshState word). Never blank, never throws.
+     * Change-gated: an unchanged state reuses the existing nodes (the 150ms
+     * ticker must not rebuild DOM 6.7x/sec for an identical label). */
     function paintFresh(liveEl, state) {
       if (!liveEl) return;
       try {
+        if (liveEl.getAttribute("data-state") === (state || "live") &&
+            liveEl.getElementsByClassName("xplore-live-dot").length > 0) return;
         var words = {
           live: t("explorer.state_live", "Live"),
           stale: t("explorer.state_stale", "Stale"),
@@ -928,7 +932,13 @@ var ExplorerBlocks = (function () {
         clearStatTick();
         statTimer = setInterval(function () {
           if (!isCurrent(myGen)) { clearStatTick(); return; }
-          try { cLast.val.textContent = agoText(newestTs.ts); } catch (e) { /* next tick */ }
+          /* Hidden tabs do no work: heads arrive on return via the push
+           * feed + repaint below; the ticker only repaints the label. */
+          try { if (typeof document !== "undefined" && document.hidden) return; } catch (e) { /* visible path below */ }
+          try {
+            var ago = agoText(newestTs.ts);
+            if (cLast.val.textContent !== ago) cLast.val.textContent = ago;
+          } catch (e) { /* next tick */ }
           try {
             var ch = chainHead();
             var open = !!(ch && ch.state === "open");
@@ -960,7 +970,37 @@ var ExplorerBlocks = (function () {
         try {
           if (Array.isArray(fresh) && fresh.length) {
             actOps = fresh.concat(actOps).slice(0, 12);
-            paintActivity(doc, actList, actOps, myGen, historyDown);
+            /* Incremental: prepend new rows, drop overflow from the bottom
+             * (cap 12) — no full list rebuild per head. Same row cells as
+             * paintActivity (pill + sentence, per-row fail-open). When the
+             * panel holds the empty/history note instead of rows, fall back
+             * to the full paint so the note never lingers under new rows. */
+            var hasRows = false;
+            try {
+              hasRows = actList.getElementsByClassName("xplore-act-row").length > 0;
+            } catch (e) { hasRows = false; }
+            if (!hasRows) {
+              paintActivity(doc, actList, actOps, myGen, historyDown);
+              return;
+            }
+            for (var ri = fresh.length - 1; ri >= 0; ri--) {
+              var nr = null;
+              try {
+                nr = DOM.el(doc, "div", null, "xplore-act-row");
+                nr.appendChild(actPill(doc, fresh[ri]));
+                nr.appendChild(actSentence(doc, fresh[ri], myGen));
+              } catch (e) { nr = null; }
+              if (!nr) continue;
+              try {
+                if (actList.firstChild) actList.insertBefore(nr, actList.firstChild);
+                else actList.appendChild(nr);
+              } catch (e2) { /* panel keeps prior rows */ }
+            }
+            try {
+              while (actList.children && actList.children.length > 12 && actList.lastChild) {
+                actList.removeChild(actList.lastChild);
+              }
+            } catch (e3) { /* extra rows stand */ }
           }
         } catch (e) { /* panel keeps prior rows */ }
       }

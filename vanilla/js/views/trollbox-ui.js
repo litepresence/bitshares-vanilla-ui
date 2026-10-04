@@ -18,6 +18,25 @@ var TrollboxUI = (function () {
 
   var gen = 0;
   var timer = null;
+  /* visibilitychange handle for the active mount (single live mount at a
+   * time — same contract as the poll timer above). Removed by stopPoll so
+   * route leave never leaks a listener. Null when idle. */
+  var visFn = null;
+  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* Drop the poll timer AND the visibility hook. Safe to call when idle;
+   * renderTrollbox calls it on every entry, and an orphaned tick calls it
+   * on itself after a route leave (ownership-guarded, never killing a newer
+   * mount's timer). Never throws. */
+  function stopPoll() {
+    try { if (timer !== null) clearInterval(timer); } catch (e) {}
+    timer = null;
+    try {
+      if (visFn && typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+        document.removeEventListener("visibilitychange", visFn);
+      }
+    } catch (e) { /* listener gone */ }
+    visFn = null;
+  }
   var NATIVE = { en: "English", da: "Dansk", de: "Deutsch", es: "Español",
     et: "Eesti", fr: "Français", it: "Italiano", ja: "日本語", ko: "한국어",
     pt: "Português", th: "ไทย" };
@@ -40,7 +59,6 @@ var TrollboxUI = (function () {
     return n;
   }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
-  function stopPoll() { try { if (timer !== null) clearInterval(timer); } catch (e) {} timer = null; }
 
   /* broadcastPost: send a signed op-35 tx (callback-first, plain fallback —
    * same wire as Tx.broadcast) then prove inclusion by a DIRECT storage
@@ -97,13 +115,17 @@ var TrollboxUI = (function () {
       return;
     }
 
-    /* State for this mount. */
+    /* State for this mount. errCount/hiddenSince/slow drive the poll
+     * backoff (15s fast, 60s slow); feeSeq guards the fee preview. */
     var S = {
       channel: "general", lang: "en", probeState: "probing",
       messages: [], loading: false, loadError: null,
       maxBytes: T.maxMessageBytes(), draft: "",
-      feeText: "", feeTimer: null, posting: false, postNote: ""
+      feeText: "", feeTimer: null, feeSeq: 0, posting: false, postNote: "",
+      errCount: 0, hiddenSince: 0, slow: false, myTimer: null
     };
+    var SLOW_MS = 60000;
+    var HIDDEN_SLOW_MS = 60000;
 
     /* Status badge (honest empty states live here). */
     var badge = el(doc, "p", t("trollbox.status_checking", "Checking node…"), "muted");
@@ -237,10 +259,13 @@ var TrollboxUI = (function () {
         var msgs = await T.fetchChannelMessages(catalog, 1);
         if (myGen !== gen) return;
         S.messages = msgs; S.loading = false;
+        S.errCount = 0;
         paintList(); paintBudget();
       } catch (e) {
         if (myGen !== gen) return;
         S.loading = false;
+        S.errCount = (S.errCount || 0) + 1;
+        if (S.errCount >= 2) setSlow(true);
         if (T.isPluginMissingError(e)) {
           S.probeState = "unsupported"; paintBadge();
           S.loadError = t("trollbox.unsupported_body", "This node does not run the custom_operations plugin, so chat history cannot be read here. Broadcasting still works from any node; switch to a node with the plugin enabled in Settings → Nodes to read history.");
@@ -301,13 +326,18 @@ var TrollboxUI = (function () {
 
     /* Fee preview: ONE live get_required_fees call per draft pause (never
      * estimated). Needs a payer id — the unlocked account when available,
-     * else the 1.2.0 placeholder (fee depends on data bytes, not payer). */
+     * else the 1.2.0 placeholder (fee depends on data bytes, not payer).
+     * Sequence-guarded (market-desk tipSeq pattern): overlapping previews
+     * paint only when still latest — a slow older fetch never overwrites a
+     * newer line. */
     function scheduleFee() {
       try { if (S.feeTimer !== null) clearTimeout(S.feeTimer); } catch (e) {}
-      S.feeTimer = setTimeout(previewFee, 500);
+      S.feeSeq = (S.feeSeq || 0) + 1;
+      var s = S.feeSeq;
+      S.feeTimer = setTimeout(function () { previewFee(s); }, 500);
     }
-    async function previewFee() {
-      if (myGen !== gen) return;
+    async function previewFee(s) {
+      if (myGen !== gen || s !== S.feeSeq) return;
       var text = (area.value || "").trim();
       if (!text) { feeLine.textContent = ""; return; }
       if (text.length > T.TEXT_MAX_CHARS) {
@@ -320,7 +350,7 @@ var TrollboxUI = (function () {
           payer = await Account.myAccountId();
         }
       } catch (e) { payer = "1.2.0"; }
-      if (myGen !== gen) return;
+      if (myGen !== gen || s !== S.feeSeq) return;
       var built;
       try {
         built = T.buildPost({ payerId: payer, username: "preview", channel: S.channel, lang: S.lang, text: text, maxBytes: S.maxBytes });
@@ -330,14 +360,15 @@ var TrollboxUI = (function () {
       }
       try {
         var fee = await Tx.fee(T.CUSTOM_OP_ID, built.opData, "1.3.0");
-        if (myGen !== gen) return;
+        if (myGen !== gen || s !== S.feeSeq) return;
         var dbId = await Chain.db();
         var rows = await Chain.call(dbId, "get_assets", [[fee.asset_id || "1.3.0"]]);
+        if (myGen !== gen || s !== S.feeSeq) return;
         var prec = (rows && rows[0] && typeof rows[0].precision === "number") ? rows[0].precision : 5;
         feeLine.textContent = t("trollbox.fee_prefix", "Network fee: ") +
           Format.formatAmount(String(fee.amount), prec) + " (" + String(fee.amount) + " raw)";
       } catch (e) {
-        if (myGen !== gen) return;
+        if (myGen !== gen || s !== S.feeSeq) return;
         feeLine.textContent = "";
       }
     }
@@ -397,19 +428,69 @@ var TrollboxUI = (function () {
       });
     });
 
+    /* Poll backoff (fast 15s, slow 60s): hidden-over-a-minute and
+     * error-streak (2+) drop to the slow cadence; visible + clean restore
+     * fast. Stale-mount ticks self-clear (route-leave wiring — an orphaned
+     * tick never kills a newer mount's timer: ownership-guarded). */
+    function setSlow(on) {
+      if (myGen !== gen) return;
+      if (!!S.slow === !!on) return;
+      S.slow = !!on;
+      if (timer === S.myTimer) { stopPoll(); armPoll(); }
+    }
+    function armPoll() {
+      /* Timer-only re-arm (slow/fast switch): the visibility hook survives —
+       * stopPoll (full teardown incl. the hook) runs on route leave only. */
+      try { if (timer !== null) clearInterval(timer); } catch (e) { /* gone */ }
+      timer = null;
+      try {
+        timer = setInterval(tick, S.slow ? SLOW_MS : T.POLL_MS);
+        S.myTimer = timer;
+      } catch (e) { timer = null; S.myTimer = null; }
+    }
+    function tick() {
+      if (myGen !== gen) {
+        if (timer !== null && timer === S.myTimer) stopPoll();
+        return;
+      }
+      var hidden = false;
+      try { hidden = !!(typeof document !== "undefined" && document.hidden); } catch (e) { hidden = false; }
+      if (hidden) {
+        if (!S.hiddenSince) S.hiddenSince = Date.now();
+        try {
+          if (Date.now() - S.hiddenSince > HIDDEN_SLOW_MS) setSlow(true);
+        } catch (e) { /* next tick decides */ }
+        return;
+      }
+      S.hiddenSince = 0;
+      if (S.slow && !S.errCount) setSlow(false);
+      if (S.probeState === "live" && !S.posting) loadMessages();
+    }
+
     /* Boot: tabs, budget, probe; 15s poll gated on visibility. */
     paintTabs(); paintBadge(); paintBudget(); refreshGate();
     runProbe();
-    stopPoll();
+    armPoll();
     try {
-      timer = setInterval(function () {
-        if (myGen !== gen) return;
+      if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
         try {
-          if (typeof document !== "undefined" && document.hidden) return;
-        } catch (e) {}
-        if (S.probeState === "live" && !S.posting) loadMessages();
-      }, T.POLL_MS);
-    } catch (e) { timer = null; }
+          if (visFn && typeof document.removeEventListener === "function") {
+            document.removeEventListener("visibilitychange", visFn);
+          }
+        } catch (e) { /* fresh hook below */ }
+        visFn = function () {
+          if (myGen !== gen) { stopPoll(); return; }
+          var hidden = false;
+          try { hidden = !!document.hidden; } catch (e) { hidden = false; }
+          if (!hidden) {
+            S.hiddenSince = 0;
+            if (S.slow && !S.errCount) setSlow(false);
+            tick();
+          }
+        };
+        document.addEventListener("visibilitychange", visFn);
+      }
+    } catch (e) { /* poll stands without the hook */ }
   }
 
   return { renderTrollbox: renderTrollbox };

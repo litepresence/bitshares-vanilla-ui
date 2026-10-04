@@ -201,6 +201,189 @@ var ChartsLwc = (function () {
     return logScale ? 1 : 0;
   }
 
+  /* Lightweight-Charts lazy loader (index.html no longer carries the 193K
+   * vendor tag — dynamic script like the build-dialog ensureBuildDialog
+   * precedent in about-ui.js; relative URL only, never CDN; works on
+   * file:// AND http). The first chart draw paints the canvas fallback
+   * immediately, then upgrades to LWC in place once loaded (per-host
+   * token-guarded: only the latest draw per host upgrades). A failed load
+   * goes quiet (canvas stands) — never a retry storm. Params: cb(bool).
+   * Never throws. */
+  var _lwLoading = false, _lwDead = false, _lwWaiters = [];
+  function _lwSrc() {
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL("js/sdk/vendor/lightweight-charts.standalone.production.js", document.baseURI).toString();
+      }
+    } catch (e) { /* relative fallback below */ }
+    return "js/sdk/vendor/lightweight-charts.standalone.production.js";
+  }
+  function ensureLightweight(cb) {
+    try {
+      if (hasLightweight()) { cb(true); return; }
+    } catch (e) { /* load below */ }
+    if (typeof document === "undefined" || _lwDead) { try { cb(false); } catch (e2) {} return; }
+    _lwWaiters.push(cb);
+    if (_lwLoading) return;
+    _lwLoading = true;
+    try {
+      var s = document.createElement("script");
+      s.src = _lwSrc();
+      s.async = true;
+      s.onload = function () {
+        _lwLoading = false;
+        var ok = hasLightweight();
+        var w = _lwWaiters; _lwWaiters = [];
+        w.forEach(function (f) { try { f(ok); } catch (e) {} });
+      };
+      s.onerror = function () {
+        _lwLoading = false; _lwDead = true;
+        var w = _lwWaiters; _lwWaiters = [];
+        w.forEach(function (f) { try { f(false); } catch (e) {} });
+      };
+      (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
+    } catch (e) {
+      _lwLoading = false; _lwDead = true;
+      var w = _lwWaiters; _lwWaiters = [];
+      w.forEach(function (f) { try { f(false); } catch (x) {} });
+    }
+  }
+
+  /* Per-host draw token: each drawPricePane/drawOscPane call bumps it; the
+   * lazy-upgrade redraw fires only when its token is still latest AND the
+   * host is still mounted — a stale load never repaints a reused host. */
+  function drawToken(hostEl) {
+    try {
+      hostEl._lwcToken = (hostEl._lwcToken || 0) + 1;
+      return hostEl._lwcToken;
+    } catch (e) { return 0; }
+  }
+  /* Kick the lazy LWC load after a canvas-fallback paint. Params: hostEl,
+   * token (drawToken above), redraw (re-invokes the same draw). Never throws. */
+  function kickUpgrade(hostEl, token, redraw) {
+    try {
+      ensureLightweight(function (ok) {
+        if (!ok) return;
+        try {
+          if (hostEl._lwcToken !== token) return;
+          if (typeof hostEl.isConnected === "boolean" && !hostEl.isConnected) return;
+        } catch (e) { return; }
+        try { redraw(); } catch (e) { /* canvas stands */ }
+      });
+    } catch (e) { /* canvas stands */ }
+  }
+
+  /* ohlcKey: identity of one LWC bar (tip-move detection, pixels never see
+   * it). ovShape: overlay structural identity (names+colors+count — value
+   * changes ride the tail update below, shape changes rebuild). mkBar: LWC
+   * candle row from a toLwcCandles row. All pure, never throw. */
+  function ohlcKey(b) {
+    try { return b.time + "|" + b.open + "|" + b.high + "|" + b.low + "|" + b.close; }
+    catch (e) { return ""; }
+  }
+  function ovShape(ovs) {
+    try {
+      var parts = [(ovs || []).length];
+      for (var i = 0; i < (ovs || []).length; i++) {
+        var o = ovs[i] || {};
+        parts.push(o.name || ("#" + i), (typeof o.color === "string" && o.color) ? o.color : "");
+      }
+      return parts.join("|");
+    } catch (e) { return "?"; }
+  }
+  function mkBar(b) { return { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close }; }
+
+  /* Tail-update one overlay line entry ({series, tail:{n, lv}}): skip when
+   * the raw values are untouched; series.update(last point) when the tail
+   * only moved/appended; full setData otherwise. Same pixels as a rebuild
+   * for identical data. Never throws. */
+  function updateLineTail(entry, times, values) {
+    if (!entry || !entry.series) return;
+    var vals = Array.isArray(values) ? values : [];
+    var lv = vals.length ? vals[vals.length - 1] : null;
+    var t = entry.tail;
+    if (t && t.n === vals.length && t.lv === lv) return;
+    var pts = lineData(times, vals);
+    try {
+      if (t && typeof entry.series.update === "function" &&
+          (t.n === vals.length || t.n + 1 === vals.length) && pts.length) {
+        entry.series.update(pts[pts.length - 1]);
+      } else if (typeof entry.series.setData === "function") {
+        entry.series.setData(pts);
+      } else {
+        return;
+      }
+      entry.tail = { n: vals.length, lv: lv };
+    } catch (e) { /* line keeps its prior paint */ }
+  }
+
+  /* In-place price update on the previous handle's LIVE chart (the tip
+   * path): same window -> series.update(lastBar); one appended bar ->
+   * update appends; shifted window/bucket/count -> full setData on the
+   * existing series (chart object — and its zoom — survive; only data
+   * swaps). Returns true when painted in place (caller returns prev),
+   * false when the caller must rebuild (dead chart, other host, theme/
+   * logScale/overlay-shape change, overlay series mismatch). Never throws. */
+  function tryPriceUpdate(hostEl, prev, bars, opts, colors, times) {
+    try {
+      if (!prev || prev.kind !== "lwc" || !prev.chart || prev.host !== hostEl) return false;
+      if (!prev.candle || typeof prev.candle.setData !== "function") return false;
+      try {
+        if (!prev.chart.timeScale || typeof prev.chart.timeScale !== "function") return false;
+        prev.chart.timeScale();
+      } catch (e) { return false; }
+      var ck = prev.key;
+      if (!ck) return false;
+      var ovs = Array.isArray(opts.overlays) ? opts.overlays : [];
+      var frame = (colors.paneBg || "") + "|" + (colors.grid || "") + "|" +
+        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin");
+      if (ck.frame !== frame || ck.ovShape !== ovShape(ovs)) return false;
+      /* Overlay/series alignment: an overlay that gained (or lost) array
+       * values needs a real rebuild (series set differs). */
+      var c;
+      for (c = 0; c < ovs.length; c++) {
+        var hasVals = Array.isArray((ovs[c] || {}).values);
+        var hasSeries = !!(prev.lines && prev.lines[c] && prev.lines[c].series);
+        if (hasVals !== hasSeries) return false;
+      }
+      var last = bars[bars.length - 1];
+      if (typeof prev.candle.update !== "function") return false;
+      if (ck.n === bars.length && ck.first === bars[0].time && ck.last === last.time) {
+        if (ck.lastOhlc !== ohlcKey(last)) {
+          prev.candle.update(mkBar(last));
+          ck.lastOhlc = ohlcKey(last);
+        }
+        for (c = 0; c < ovs.length; c++) {
+          updateLineTail(prev.lines[c], times, (ovs[c] || {}).values);
+        }
+        return true;
+      }
+      if (ck.n + 1 === bars.length && ck.first === bars[0].time &&
+          ck.last === bars[bars.length - 2].time) {
+        prev.candle.update(mkBar(last));
+        ck.n = bars.length; ck.last = last.time; ck.lastOhlc = ohlcKey(last);
+        for (c = 0; c < ovs.length; c++) {
+          updateLineTail(prev.lines[c], times, (ovs[c] || {}).values);
+        }
+        return true;
+      }
+      prev.candle.setData(bars.map(mkBar));
+      for (c = 0; c < ovs.length; c++) {
+        var e2 = prev.lines[c];
+        try {
+          if (e2 && e2.series && typeof e2.series.setData === "function") {
+            var vv = (ovs[c] || {}).values;
+            e2.series.setData(lineData(times, vv));
+            e2.tail = { n: Array.isArray(vv) ? vv.length : 0,
+              lv: (Array.isArray(vv) && vv.length) ? vv[vv.length - 1] : null };
+          }
+        } catch (e3) { /* line keeps its prior paint */ }
+      }
+      prev.key = { n: bars.length, first: bars[0].time, last: last.time,
+        lastOhlc: ohlcKey(last), frame: frame, ovShape: ovShape(ovs) };
+      return true;
+    } catch (e) { return false; }
+  }
   /* Muted centered empty-state div; panes never render blank. */
   function emptyPane(doc, hostEl, text) {
     var d = doc.createElement("div");
@@ -302,16 +485,19 @@ var ChartsLwc = (function () {
     opts = opts || {};
     var handle = { kind: "none", chart: null };
     if (!hostEl) return handle;
-    var keep = savedRange(opts.previous);
-    clearHost(hostEl, opts.previous);
     var colors = paneColors(opts.colors);
     var bars = toLwcCandles(opts.candles);
     if (bars.length === 0) {
+      clearHost(hostEl, opts.previous);
+      drawToken(hostEl); /* retire any pending lazy upgrade from an older draw */
       if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_price_history", "No price history on this market.") + t("market.fills_line_hint", " Fills draw this line — place an order or try another pair.")));
       return handle;
     }
+    var times = bars.map(function (b) { return b.time; });
     var LW = hasLightweight() ? lw() : null;
     if (!LW) {
+      clearHost(hostEl, opts.previous);
+      var token0 = drawToken(hostEl);
       var canvas = doc ? doc.createElement("canvas") : null;
       if (!canvas) return handle;
       canvas.className = "mkt-canvas";
@@ -326,9 +512,20 @@ var ChartsLwc = (function () {
           { max: null, min: null }, opts.emptyText);
       }
       handle.kind = "canvas";
+      /* Lazy upgrade: the vendor script loads behind first chart use; when
+       * it lands, this same draw re-runs in place (token-guarded). */
+      kickUpgrade(hostEl, token0, function () { drawPricePane(doc, hostEl, opts); });
       return handle;
     }
-    var times = bars.map(function (b) { return b.time; });
+    /* Tip path: keep the chart instance across redraws — series.update on
+     * the live last bar, full setData only on bucket/count/window change
+     * (tryPriceUpdate decides; false falls through to the rebuild below). */
+    if (tryPriceUpdate(hostEl, opts.previous, bars, opts, colors, times)) {
+      return opts.previous;
+    }
+    var keep = savedRange(opts.previous);
+    clearHost(hostEl, opts.previous);
+    drawToken(hostEl);
     var crossMode = 0;
     try {
       if (LW.CrosshairMode) crossMode = LW.CrosshairMode.Normal;
@@ -352,9 +549,10 @@ var ChartsLwc = (function () {
     }));
     var ovs2 = Array.isArray(opts.overlays) ? opts.overlays : [];
     var i;
+    var lines = [];
     for (i = 0; i < ovs2.length; i++) {
       var ov = ovs2[i] || {};
-      if (!Array.isArray(ov.values)) continue;
+      if (!Array.isArray(ov.values)) { lines.push({ series: null, tail: null }); continue; }
       var line = chart.addSeries(LW.LineSeries, {
         color: (typeof ov.color === "string" && ov.color) ? ov.color : colors.text,
         lineWidth: 1,
@@ -363,10 +561,24 @@ var ChartsLwc = (function () {
         crosshairMarkerVisible: false
       });
       line.setData(lineData(times, ov.values));
+      lines.push({ series: line,
+        tail: { n: ov.values.length, lv: ov.values.length ? ov.values[ov.values.length - 1] : null } });
     }
     restoreRange(chart, keep);
     handle.kind = "lwc";
     handle.chart = chart;
+    /* Tip-update cache (tryPriceUpdate above): host identity, live candle
+     * series, per-overlay line entries, and the data/frame key. Plain
+     * fields on the caller-held handle — removePane/linkTimeScales only
+     * read kind/chart, so they are unaffected. */
+    handle.host = hostEl;
+    handle.candle = series;
+    handle.lines = lines;
+    handle.key = { n: bars.length, first: bars[0].time, last: times[times.length - 1],
+      lastOhlc: ohlcKey(bars[bars.length - 1]),
+      frame: (colors.paneBg || "") + "|" + (colors.grid || "") + "|" +
+        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin"),
+      ovShape: ovShape(ovs2) };
     return handle;
   }
 
@@ -399,6 +611,7 @@ var ChartsLwc = (function () {
       if (anyPts) break;
     }
     if (!anyPts) {
+      drawToken(hostEl); /* retire any pending lazy upgrade from an older draw */
       if (doc) emptyPane(doc, hostEl, opts.emptyText || (t("market.no_osc_data", "No oscillator data.") + t("market.osc_hint", " Values compute once this market has price history.")));
       return handle;
     }
@@ -437,8 +650,16 @@ var ChartsLwc = (function () {
       }
       legend(g, names, null, null, colors.text);
       handle.kind = "canvas";
+      /* Lazy upgrade (price-pane contract): reload the vendor build behind
+       * first use, then redraw this same pane in place when it is still
+       * the host's latest draw. */
+      (function () {
+        var tok = drawToken(hostEl);
+        kickUpgrade(hostEl, tok, function () { drawOscPane(doc, hostEl, opts); });
+      })();
       return handle;
     }
+    drawToken(hostEl); /* a live LWC paint retires any pending canvas-era upgrade */
     var crossMode = 0;
     try {
       if (LW.CrosshairMode) crossMode = LW.CrosshairMode.Normal;

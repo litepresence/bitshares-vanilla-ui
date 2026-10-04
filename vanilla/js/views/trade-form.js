@@ -547,9 +547,11 @@ var TradeForm = (function () {
     }
     /* paintMkt: render the market-fee row for a receive-leg raw amount
      * (null/zero -> dash with the pct label; no-fee/unreadable asset ->
-     * row hidden). Params: recvRaw (int string or null). Never throws. */
-    function paintMkt(recvRaw) {
+     * row hidden). Params: recvRaw (int string or null). Never throws.
+     * Sequence-guarded like update: stale paints never land. */
+    function paintMkt(recvRaw, s) {
       mktOpts().then(function (opt) {
+        if (s !== seq) return;
         if (!opt) {
           try { mktLine.style.display = "none"; } catch (e) { /* hidden stands */ }
           return;
@@ -576,16 +578,24 @@ var TradeForm = (function () {
       }).catch(function () { /* preview best-effort: row keeps its state */ });
     }
     var timer = null;
+    /* Sequence guard (market-desk tipSeq pattern): overlapping previews
+     * paint only when still latest — a slow older fee fetch must never
+     * overwrite a newer line. */
+    var seq = 0;
     /* schedule: debounce the fee preview 400ms (resets on each keystroke;
      * timers-unavailable keeps the last preview). Never throws. */
     function schedule() {
       try { if (timer !== null) clearTimeout(timer); } catch (e) { /* gone */ }
+      seq++;
+      var s = seq;
       try {
-        timer = setTimeout(update, 400);
+        timer = setTimeout(function () { update(s); }, 400);
       } catch (e) { /* timers unavailable: preview stands */ }
     }
-    async function update() {
+    async function update(s) {
       timer = null;
+      if (s === undefined) s = seq; /* direct callers run as latest */
+      if (s !== seq) return;
       var vals;
       try { vals = getVals(); }
       catch (e) { return; }
@@ -595,7 +605,7 @@ var TradeForm = (function () {
       if (!a || !p) {
         line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
         try { line.title = ""; } catch (e) { /* title best-effort */ }
-        paintMkt(null);
+        paintMkt(null, s);
         return;
       }
       try {
@@ -621,14 +631,17 @@ var TradeForm = (function () {
         var expWire = previewExpiryWire({ key: vals.key, custom: vals.custom });
         var op = createOp(seller, sellAssetId, sellRaw, recvAssetId, recvRaw, expWire, !!vals.fok);
         var feeRes = await Tx.feeMulti([op], FEE_ASSET);
+        if (s !== seq) return;
         var feeMeta = await feeAssetMeta(op[1].fee.asset_id);
+        if (s !== seq) return;
         line.textContent = t("trade.fee_preview", "Fee (preview): ") + humanFee(feeRes.totalRaw, feeMeta);
         try { line.title = String(feeRes.totalRaw); } catch (e) { /* title best-effort */ }
-        paintMkt(recvRaw);
+        paintMkt(recvRaw, s);
       } catch (e) {
+        if (s !== seq) return;
         line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
         try { line.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
-        paintMkt(null);
+        paintMkt(null, s);
       }
     }
     schedule();

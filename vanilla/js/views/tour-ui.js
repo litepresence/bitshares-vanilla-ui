@@ -407,10 +407,12 @@ var TourUI = (function () {
       if (upkeepObs) { try { upkeepObs.disconnect(); } catch (e3) { /* gone */ } upkeepObs = null; }
     } catch (e) { /* listeners best-effort */ }
     if (placeTimer) { try { clearTimeout(placeTimer); } catch (e) { /* done */ } placeTimer = null; }
+    stopBootWait();
+    clearReplayTimers();
     try { ensureReplay(); } catch (e) { /* retry below */ }
     try {
-      setTimeout(function () { try { ensureReplay(); } catch (e) { /* dashboard stands */ } }, 1500);
-      setTimeout(function () { try { ensureReplay(); } catch (e) { /* dashboard stands */ } }, 4000);
+      replayTimers.push(setTimeout(function () { try { ensureReplay(); } catch (e) { /* dashboard stands */ } }, 1500));
+      replayTimers.push(setTimeout(function () { try { ensureReplay(); } catch (e) { /* dashboard stands */ } }, 4000));
     } catch (e) { /* immediate attempt stands */ }
   }
 
@@ -514,6 +516,7 @@ var TourUI = (function () {
     if (!force && dismissed()) return;
     try {
       stopBootWait();
+      clearReplayTimers();
       if (active) end();
       active = true;
       stepIdx = 0;
@@ -542,6 +545,21 @@ var TourUI = (function () {
   function stopBootWait() {
     try { if (bootObs) { bootObs.disconnect(); bootObs = null; } } catch (e) { /* gone */ }
     try { if (bootTimer) { clearTimeout(bootTimer); bootTimer = null; } } catch (e) { /* done */ }
+  }
+
+  /* Dashboard-replay retries scheduled by end() (1.5s/4s second chances for
+   * an async dashboard repaint). Tracked — never anonymous — so start/end
+   * transitions clear stale ones instead of stacking overlapping replays.
+   * Single-boot-timer discipline: at most one pending pair per exit, all
+   * cleared on tour exit (end) and on replay start. Never throws. */
+  var replayTimers = [];
+  function clearReplayTimers() {
+    try {
+      for (var i = 0; i < replayTimers.length; i++) {
+        try { clearTimeout(replayTimers[i]); } catch (e) { /* done */ }
+      }
+    } catch (e) { /* list stands cleared below */ }
+    replayTimers = [];
   }
 
   /* Boot: dismissed profiles only get the replay injector; fresh profiles
