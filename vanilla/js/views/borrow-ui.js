@@ -57,22 +57,18 @@ var BorrowUI = (function () {
     return dflt;
   }
   var gen = 0, subs = [];
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+  /* No local el/clearBox — use DOM.el, DOM.clear */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("borrow.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     else if (m.indexOf("wallet-locked") !== -1) m = t("borrow.wallet_is_locked", "Wallet is locked.");
     else if (m.indexOf("unknown-account") !== -1) m = t("borrow.unknown_account", "Unknown account.");
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite");
-    wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m);
+    return err;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text);
+    return p;
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet, verified live 2026-09-28). Reads stay
@@ -86,19 +82,19 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   }
   function viewingAsNotice(doc) {
     var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
+    return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("borrow.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
     inp.setAttribute("placeholder", t("borrow.password", "password")); inp.setAttribute("aria-label", t("borrow.password", "password"));
     touchable(inp); row.appendChild(inp);
-    var b = touchable(el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
+    var b = touchable(DOM.el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
     parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
@@ -112,33 +108,33 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * the rebuilt transaction uses the wallet account, never a stale 1.2.0. */
   function signGateLocked(doc, out, sendBtn, backBtn) {
     if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-      var note = el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+      var note = DOM.el(doc, "p", t("borrow.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
       note.className = "muted xfer-sign-note"; out.appendChild(note);
     }
     unlockInline(doc, out, function () {
-      out.appendChild(el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+      out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
     });
     sendBtn.disabled = false; backBtn.disabled = false;
   }
   function routeReady(root, title, retry) {
     var doc = root.ownerDocument || document, myGen = ++gen, miss = null;
     subs.forEach(function (off) { try { off(); } catch (e) {} }); subs = [];
-    root.innerHTML = "";
+    DOM.clear(root);
     ["Credit", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
     /* borrow-prose hook (app.css): direct-child explainer paragraphs cap at
      * ~75ch like help articles. Display-only class; forms/tables untouched. */
-    var wrap = el(doc, "div", null, "wrap borrow-prose"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    var wrap = DOM.el(doc, "div", null, "wrap borrow-prose"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-      var bstat = el(doc, "p", "", "muted");
+      wrap.appendChild(DOM.el(doc, "p", t("borrow.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      var bstat = DOM.el(doc, "p", "", "muted");
       try { bstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       wrap.appendChild(bstat);
-      var brow = el(doc, "div", null, "pools-offline-row");
+      var brow = DOM.el(doc, "div", null, "pools-offline-row");
       wrap.appendChild(brow);
-      var b = touchable(el(doc, "button", t("borrow.retry", "Retry"))); b.type = "button";
+      var b = touchable(DOM.el(doc, "button", t("borrow.retry", "Retry"))); b.type = "button";
       brow.appendChild(b);
       var boff = null;
       try { boff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { boff = null; }
@@ -152,7 +148,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         try { blink = boff.settingsLink(doc, t); } catch (e) { blink = null; }
       }
       if (!blink) {
-        blink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        blink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { blink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(blink);
       }
@@ -172,16 +168,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function confirmList(doc, rows) {
-    var list = el(doc, "dl", null, "xfer-confirm");
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     rows.forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
+      list.appendChild(DOM.el(doc, "dt", r[0]));
+      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
     });
     return list;
   }
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -206,30 +202,30 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var doc = ctx.doc, myGen = ctx.myGen;
     var lockedB = !isUnlockedNow();
     if (lockedB) ctx.wrap.appendChild(viewingAsNotice(doc));
-    ctx.wrap.appendChild(el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op 3 (call_order_update) on your call order."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.margin_positions_borrow_a_bitasset_against_co", "Margin positions borrow a bitasset against collateral. Topping up collateral or repaying debt adjusts op 3 (call_order_update) on your call order."), "muted"));
     var fAcct = field(doc, t("borrow.account", "Account"), lockedB
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     ctx.wrap.appendChild(fAcct.row);
-    var go = touchable(el(doc, "button", t("borrow.load_positions", "Load positions"))); go.type = "button"; ctx.wrap.appendChild(go);
-    var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
-    ctx.wrap.appendChild(el(doc, "h2", t("borrow.adjust_position_op_3", "Adjust position (op 3)")));
+    var go = touchable(DOM.el(doc, "button", t("borrow.load_positions", "Load positions"))); go.type = "button"; ctx.wrap.appendChild(go);
+    var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.adjust_position_op_3", "Adjust position (op 3)")));
     if (lockedB) ctx.wrap.appendChild(signNotice(doc));
-    var formBox = el(doc, "div"); ctx.wrap.appendChild(formBox);
+    var formBox = DOM.el(doc, "div"); ctx.wrap.appendChild(formBox);
     /* Punchlist HIGH: borrow-to-create lives here — always offered, needs no
      * position (the gap was adjust-only). New-form words are literals until
      * the next locale batch mints borrow.* keys; dicts untouched, check_i18n
      * stays green. */
-    ctx.wrap.appendChild(el(doc, "h2", t("borrow.open_a_new_position_op_3", "Open a new position (op 3)")));
-    ctx.wrap.appendChild(el(doc, "p", t("borrow.no_position_yet_lock_collateral_to_borrow_a_b", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above."), "muted"));
-    var openBoxEl = el(doc, "div"); ctx.wrap.appendChild(openBoxEl);
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.open_a_new_position_op_3", "Open a new position (op 3)")));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("borrow.no_position_yet_lock_collateral_to_borrow_a_b", "No position yet? Lock collateral to borrow a bitasset in one op-3 call_order_update: collateral locks first, the new debt is issued against it. A pair you already hold keeps using Adjust above."), "muted"));
+    var openBoxEl = DOM.el(doc, "div"); ctx.wrap.appendChild(openBoxEl);
     openBox(doc, openBoxEl, myGen);
-    ctx.wrap.appendChild(el(doc, "h2", t("borrow.how_borrowing_works", "How borrowing works")));
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("borrow.how_borrowing_works", "How borrowing works")));
     howStepper(doc, ctx.wrap);
     settleSection(doc, ctx.wrap, myGen);
     mySettleSection(doc, ctx.wrap, myGen);
     go.addEventListener("click", function () {
-      if (myGen !== gen) return; go.disabled = true; clearBox(listBox); clearBox(formBox);
+      if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox); DOM.clear(formBox);
       showStatus(doc, listBox, t("borrow.loading_positions", "Loading positions…"));
       Promise.resolve().then(async function () {
         var me = fAcct.input.value.trim() ? await Account.resolve(fAcct.input.value.trim())
@@ -271,15 +267,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         } catch (e) { /* enrichment best-effort; table still renders balances */ }
         return { me: me, rows: rows };
       }).then(function (R) {
-        if (myGen !== gen) return; clearBox(listBox);
+        if (myGen !== gen) return; DOM.clear(listBox);
         if (!R.rows.length) {
-          listBox.appendChild(el(doc, "p", "No margin positions for " + R.me.name + ". The adjust form stays disabled until a position exists (no safe target, no broadcast).", "muted"));
+          listBox.appendChild(DOM.el(doc, "p", "No margin positions for " + R.me.name + ". The adjust form stays disabled until a position exists (no safe target, no broadcast).", "muted"));
           return;
         }
         listBox.appendChild(posTable(doc, R.rows));
         adjustBox(doc, formBox, myGen, R.me, R.rows);
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("borrow.could_not_load_positions", "Could not load positions."));
+        if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("borrow.could_not_load_positions", "Could not load positions."));
       }).then(function () { go.disabled = false; });
     });
     Account.myAccountId().then(function (id) {
@@ -293,7 +289,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * Missing feed -> "—" with MCR title when known. No float here — Format owns
    * integers; this only paints strings. */
   function posTable(doc, rows) {
-    var box = el(doc, "div");
+    var box = DOM.el(doc, "div");
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
     [t("borrow.hdr_order", "Order"), t("borrow.hdr_collateral", "Collateral"), t("borrow.hdr_debt", "Debt"), t("borrow.hdr_target_ratio", "Target ratio"), t("borrow.hdr_cr", "Collateral ratio"), ""].forEach(function (h) {
@@ -316,27 +312,27 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         try { crTitle = "MCR " + Format.mcrUnitsToHuman(p._mcr) + "%"; } catch (e) { crTitle = null; }
       }
       [[p.call_id], [c.text, c.raw], [d.text, d.raw], [tcr]].forEach(function (x) {
-        var td = el(doc, "td", x[0]); if (x[1]) td.title = t("account.raw_prefix", "raw ") + x[1]; tr.appendChild(td); });
-      var tdCr = el(doc, "td", cr);
+        var td = DOM.el(doc, "td", x[0]); if (x[1]) td.title = t("account.raw_prefix", "raw ") + x[1]; tr.appendChild(td); });
+      var tdCr = DOM.el(doc, "td", cr);
       if (crTitle) tdCr.title = crTitle;
       if (p._cr && p._cr.belowMcr) tdCr.className = "cr-danger";
       else if (p._cr && p._cr.warn) tdCr.className = "cr-warn";
       tr.appendChild(tdCr);
       var link = doc.createElement("td");
-      var a = el(doc, "a", t("borrow.market", "Market")); a.setAttribute("href", "#/market/" + p.coll_sym + "_" + p.debt_sym);
+      var a = DOM.el(doc, "a", t("borrow.market", "Market")); a.setAttribute("href", "#/market/" + p.coll_sym + "_" + p.debt_sym);
       link.appendChild(a); tr.appendChild(link); tbody.appendChild(tr);
     });
     table.appendChild(tbody); box.appendChild(table);
-    var cards = el(doc, "div", null, "node-cards");
+    var cards = DOM.el(doc, "div", null, "node-cards");
     rows.forEach(function (p) {
-      var c = el(doc, "div", null, "node-card");
+      var c = DOM.el(doc, "div", null, "node-card");
       var col = amt(p.coll_raw, p.coll_prec, p.coll_sym, p.coll_id);
       var debt = amt(p.debt_raw, p.debt_prec, p.debt_sym, p.debt_id);
-      c.appendChild(el(doc, "div", p.call_id));
-      c.appendChild(el(doc, "div", "Collateral " + col.text));
-      c.appendChild(el(doc, "div", "Debt " + debt.text));
+      c.appendChild(DOM.el(doc, "div", p.call_id));
+      c.appendChild(DOM.el(doc, "div", "Collateral " + col.text));
+      c.appendChild(DOM.el(doc, "div", "Debt " + debt.text));
       var crLine = (p._cr && p._cr.x) ? p._cr.x : t("borrow.hdr_cr", "Collateral ratio") + " —";
-      c.appendChild(el(doc, "div", crLine));
+      c.appendChild(DOM.el(doc, "div", crLine));
       box.appendChild(cards); cards.appendChild(c);
     });
     return box;
@@ -348,19 +344,19 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       var op = doc.createElement("option"); op.value = p.call_id;
       op.textContent = p.call_id + " (" + (p.coll_sym || p.coll_id) + "/" + (p.debt_sym || p.debt_id) + ")";
       sel.appendChild(op); });
-    var selRow = el(doc, "div", null, "xfer-field"), selLab = el(doc, "label", t("borrow.position", "Position "));
+    var selRow = DOM.el(doc, "div", null, "xfer-field"), selLab = DOM.el(doc, "label", t("borrow.position", "Position "));
     selLab.appendChild(sel); selRow.appendChild(selLab); box.appendChild(selRow);
     var fColl = field(doc, t("borrow.delta_collateral_signed_collateral_asset", "Delta collateral (signed, collateral asset)"), { placeholder: t("borrow.1_0_adds_1_0_removes", "+1.0 adds, -1.0 removes"), inputmode: "decimal" });
     var fDebt = field(doc, t("borrow.delta_debt_signed_debt_asset", "Delta debt (signed, debt asset)"), { placeholder: t("borrow.1_0_borrows_more_risk", "-1.0 borrows MORE (risk!)"), inputmode: "decimal" });
     var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
     [fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
-    box.appendChild(el(doc, "p", t("borrow.warning_a_negative_debt_delta_borrows_more_ag", "Warning: a negative debt delta borrows more against the same collateral and moves the position closer to margin call."), "muted"));
+    box.appendChild(DOM.el(doc, "p", t("borrow.warning_a_negative_debt_delta_borrows_more_ag", "Warning: a negative debt delta borrows more against the same collateral and moves the position closer to margin call."), "muted"));
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
-    var btn = touchable(el(doc, "button", t("borrow.review_adjust", "Review adjust"))); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    var btn = touchable(DOM.el(doc, "button", t("borrow.review_adjust", "Review adjust"))); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(out); btn.disabled = true;
+      DOM.clear(out); btn.disabled = true;
       showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       Promise.resolve().then(async function () {
         var pos = null;
@@ -390,8 +386,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           var op = R.pair[1];
           var tcrRow = (R.tcr === null) ? "unchanged"
             : ((R.pos.tcr_units === null || R.pos.tcr_units === undefined ? "—" : Credit.tcrUnitsToHuman(R.pos.tcr_units) + "%") + " → " + Credit.tcrUnitsToHuman(R.tcr) + "%");
-          clearBox(out);
-          out.appendChild(el(doc, "h3", t("borrow.confirm_margin_adjust", "Confirm margin adjust")));
+          DOM.clear(out);
+          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_margin_adjust", "Confirm margin adjust")));
           var crRow = "—";
           try {
             if (R.pos._cr && R.pos._cr.x) {
@@ -407,11 +403,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
             [t("borrow.delta_collateral", "Delta collateral"), (op.delta_collateral.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_collateral.amount, R.cPrec), "raw " + op.delta_collateral.amount],
             [t("borrow.delta_debt", "Delta debt"), (op.delta_debt.amount.charAt(0) === "-" ? "" : "+") + Format.formatAmount(op.delta_debt.amount, R.dPrec) + (op.delta_debt.amount.charAt(0) === "-" ? " — NEW DEBT, warned" : ""), "raw " + op.delta_debt.amount],
             [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
+          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
+          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
+          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { clearBox(out); btn.disabled = false; });
+          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
           send.addEventListener("click", function () {
             if (myGen !== gen) return; send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
@@ -425,9 +421,9 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
                 } catch (e) { return null; } return null;
               });
             }).then(async function (res) {
-              if (myGen !== gen) return; clearBox(out);
-              out.appendChild(el(doc, "p", t("borrow.adjust_broadcast", "Adjust broadcast."), "xfer-ok"));
-              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              if (myGen !== gen) return; DOM.clear(out);
+              out.appendChild(DOM.el(doc, "p", t("borrow.adjust_broadcast", "Adjust broadcast."), "xfer-ok"));
+              out.appendChild(DOM.el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
@@ -438,7 +434,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           btn.disabled = false;
         });
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(out);
+        if (myGen !== gen) return; DOM.clear(out);
         showError(doc, out, e, t("borrow.could_not_prepare_the_adjust", "Could not prepare the adjust.")); btn.disabled = false;
       });
     });
@@ -456,13 +452,13 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       t("borrow.how_4", "4. Negative debt delta means borrowing MORE — it raises your liquidation risk.")
     ];
     var idx = 0;
-    var p = el(doc, "p", steps[0], "muted"); wrap.appendChild(p);
+    var p = DOM.el(doc, "p", steps[0], "muted"); wrap.appendChild(p);
     /* borrow-stepnav hook (app.css): flex + gap so the "Step N of 4" counter
      * never jams against the Previous/Next buttons. Display-only class. */
-    var nav = el(doc, "div", null, "xfer-field borrow-stepnav");
-    var prev = touchable(el(doc, "button", t("borrow.previous", "Previous"))); prev.type = "button";
-    var count = el(doc, "span", "", "muted");
-    var next = touchable(el(doc, "button", t("borrow.next", "Next"))); next.type = "button";
+    var nav = DOM.el(doc, "div", null, "xfer-field borrow-stepnav");
+    var prev = touchable(DOM.el(doc, "button", t("borrow.previous", "Previous"))); prev.type = "button";
+    var count = DOM.el(doc, "span", "", "muted");
+    var next = touchable(DOM.el(doc, "button", t("borrow.next", "Next"))); next.type = "button";
     nav.appendChild(prev); nav.appendChild(count); nav.appendChild(next); wrap.appendChild(nav);
     /* draw: repaint the how-it-works stepper text + counter + prev/next disabled.
      * WHY helper: both nav buttons share this state flip; display-only, never throws.
@@ -547,15 +543,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var fDebt = field(doc, t("borrow.amount_to_borrow_debt_units", "Amount to borrow (debt units)"), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
     var fTcr = field(doc, t("borrow.target_ratio_blank_unchanged", "Target ratio % (blank = unchanged)"), { placeholder: t("borrow.e_g_175", "e.g. 175"), inputmode: "decimal" });
     [fAcct, fCollA, fDebtA, fColl, fDebt, fTcr].forEach(function (f) { box.appendChild(f.row); });
-    box.appendChild(el(doc, "p", t("borrow.new_debt_is_issued_against_the_locked_collate", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it."), "muted"));
-    var btn = touchable(el(doc, "button", t("borrow.review_borrow", "Review borrow"))); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    box.appendChild(DOM.el(doc, "p", t("borrow.new_debt_is_issued_against_the_locked_collate", "New debt is issued against the locked collateral in the same operation. The chain margin-calls the position when the feed-valued ratio falls below maintenance — borrow well above it."), "muted"));
+    var btn = touchable(DOM.el(doc, "button", t("borrow.review_borrow", "Review borrow"))); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     Account.myAccountId().then(function (id) {
       if (myGen === gen && !fAcct.input.value) fAcct.input.value = id;
     }).catch(function () { /* manual account entry remains */ });
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(out); btn.disabled = true;
+      DOM.clear(out); btn.disabled = true;
       showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       Promise.resolve().then(async function () {
         if (!fCollA.input.value.trim() || !fDebtA.input.value.trim())
@@ -606,8 +602,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           if (myGen !== gen) return;
           var feeHuman = fa ? Format.formatAmount(String(R.fee.amount), fa.precision) + " " + fa.symbol : String(R.fee.amount);
           var tcrRow = (R.tcr === null) ? "unchanged" : Credit.tcrUnitsToHuman(R.tcr) + "%";
-          clearBox(out);
-          out.appendChild(el(doc, "h3", t("borrow.confirm_new_borrow", "Confirm new borrow")));
+          DOM.clear(out);
+          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_new_borrow", "Confirm new borrow")));
           out.appendChild(confirmList(doc, [
             [t("borrow.account", "Account"), R.acct.name + " (" + R.acct.id + ")"],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(R.collRaw, R.coll.precision) + " " + R.coll.symbol, "raw " + R.collRaw],
@@ -617,11 +613,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
             [t("borrow.target_ratio", "Target ratio"), tcrRow],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(R.fee.amount)],
             [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
+          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
+          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
+          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { clearBox(out); btn.disabled = false; });
+          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
           send.addEventListener("click", function () {
             if (myGen !== gen) return; send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
@@ -642,9 +638,9 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
                 } catch (e) { return null; } return null;
               });
             }).then(async function (res) {
-              if (myGen !== gen) return; clearBox(out);
-              out.appendChild(el(doc, "p", t("borrow.borrow_broadcast", "Borrow broadcast."), "xfer-ok"));
-              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              if (myGen !== gen) return; DOM.clear(out);
+              out.appendChild(DOM.el(doc, "p", t("borrow.borrow_broadcast", "Borrow broadcast."), "xfer-ok"));
+              out.appendChild(DOM.el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
@@ -655,7 +651,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           btn.disabled = false;
         });
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(out);
+        if (myGen !== gen) return; DOM.clear(out);
         showError(doc, out, e, t("borrow.could_not_prepare_the_borrow", "Could not prepare the borrow.")); btn.disabled = false;
       });
     });
@@ -672,16 +668,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * handled HERE with a keyed notice + Settings link (borrow showError has
    * no history mapping — never delegated). Never throws outward. */
   function mySettleSection(doc, wrap, myGen) {
-    wrap.appendChild(el(doc, "h2", t("borrow.my_settlements", "My settlements")));
-    wrap.appendChild(el(doc, "p", t("borrow.my_settlements_hint", "Force-settlement orders waiting at the feed price — yours or any account's, reads are public."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h2", t("borrow.my_settlements", "My settlements")));
+    wrap.appendChild(DOM.el(doc, "p", t("borrow.my_settlements_hint", "Force-settlement orders waiting at the feed price — yours or any account's, reads are public."), "muted"));
     var f = field(doc, t("borrow.account", "Account"), { placeholder: t("borrow.blank_wallet_account", "blank = wallet account") });
     wrap.appendChild(f.row);
-    var go = touchable(el(doc, "button", t("referrals.look_up", "Look up"))); go.type = "button";
+    var go = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up"))); go.type = "button";
     wrap.appendChild(go);
-    var box = el(doc, "div"); wrap.appendChild(box);
+    var box = DOM.el(doc, "div"); wrap.appendChild(box);
     go.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(box);
+      DOM.clear(box);
       showStatus(doc, box, t("market.loading_settle", "Loading settlement orders…"));
       Promise.resolve().then(async function () {
         var input = f.input.value.trim(), id = null;
@@ -714,32 +710,32 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         return { rows: sorted, precById: precById, symById: symById };
       }).then(function (R) {
         if (myGen !== gen) return;
-        clearBox(box);
+        DOM.clear(box);
         if (!R || R.empty) {
-          box.appendChild(el(doc, "p", t("borrow.my_settlements_empty", "No open settlements for this account."), "muted"));
+          box.appendChild(DOM.el(doc, "p", t("borrow.my_settlements_empty", "No open settlements for this account."), "muted"));
           return;
         }
         var table = doc.createElement("table"); table.className = "node-table";
         var hr = doc.createElement("tr");
-        hr.appendChild(el(doc, "th", t("account.asset_th", "Asset")));
-        hr.appendChild(el(doc, "th", t("market.th_amount", "Amount")));
-        hr.appendChild(el(doc, "th", t("market.th_settle_date", "Settlement date")));
+        hr.appendChild(DOM.el(doc, "th", t("account.asset_th", "Asset")));
+        hr.appendChild(DOM.el(doc, "th", t("market.th_amount", "Amount")));
+        hr.appendChild(DOM.el(doc, "th", t("market.th_settle_date", "Settlement date")));
         table.appendChild(hr);
         R.rows.forEach(function (r) {
           var tr = doc.createElement("tr");
           var aid = (r && r.balance && r.balance.asset_id) || "";
           var sym = R.symById[aid] || aid;
-          tr.appendChild(el(doc, "td", sym));
+          tr.appendChild(DOM.el(doc, "td", sym));
           var raw = (r && r.balance && r.balance.amount !== undefined && r.balance.amount !== null) ? String(r.balance.amount) : null;
           var prec = R.precById[aid];
           var td = null;
           if (raw !== null && typeof prec === "number") {
             try {
-              td = el(doc, "td", Format.formatAmount(raw, prec));
+              td = DOM.el(doc, "td", Format.formatAmount(raw, prec));
               td.title = raw;
-            } catch (e) { td = el(doc, "td", raw); }
+            } catch (e) { td = DOM.el(doc, "td", raw); }
           } else {
-            td = el(doc, "td", raw === null ? "—" : raw);
+            td = DOM.el(doc, "td", raw === null ? "—" : raw);
           }
           tr.appendChild(td);
           var dt = (r && r.settlement_date) || "";
@@ -747,16 +743,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           try {
             if (dt && typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") dHuman = I18n.date(dt);
           } catch (e) { dHuman = dt; }
-          tr.appendChild(el(doc, "td", dHuman || "—"));
+          tr.appendChild(DOM.el(doc, "td", dHuman || "—"));
           table.appendChild(tr);
         });
         box.appendChild(table);
       }).catch(function (e) {
         if (myGen !== gen) return;
-        clearBox(box);
+        DOM.clear(box);
         var m = (e && e.message) ? e.message : "";
         if (m.indexOf("history-unavailable") !== -1) {
-          box.appendChild(el(doc, "p", t("borrow.settlements_unavailable", "Settlements unavailable on this node — switch nodes in Settings."), "muted"));
+          box.appendChild(DOM.el(doc, "p", t("borrow.settlements_unavailable", "Settlements unavailable on this node — switch nodes in Settings."), "muted"));
           try {
             if (typeof HistoryNotice !== "undefined" && HistoryNotice &&
                 typeof HistoryNotice.actionLink === "function") {
@@ -778,13 +774,13 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * Layout: asset input + Check button, then fund line + existing-bids table
    * (get_collateral_bids) always, bid form only while a fund exists. */
   function settleSection(doc, wrap, myGen) {
-    wrap.appendChild(el(doc, "h2", t("borrow.settlement_bids_op_45", "Settlement bids (op 45)")));
-    wrap.appendChild(el(doc, "p", t("borrow.after_a_bitasset_globally_settles_anyone_can", "After a bitasset globally settles, anyone can bid collateral to take over part of the debt and the settlement fund (BSIP-0018). Enter the settled asset: the fund and existing bids always read; the bid form appears only while a settlement fund exists."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h2", t("borrow.settlement_bids_op_45", "Settlement bids (op 45)")));
+    wrap.appendChild(DOM.el(doc, "p", t("borrow.after_a_bitasset_globally_settles_anyone_can", "After a bitasset globally settles, anyone can bid collateral to take over part of the debt and the settlement fund (BSIP-0018). Enter the settled asset: the fund and existing bids always read; the bid form appears only while a settlement fund exists."), "muted"));
     var fAsset = field(doc, t("borrow.settled_asset_symbol_or_1_3_x", "Settled asset (symbol or 1.3.x)"), { placeholder: t("borrow.e_g_bitusd", "e.g. bitUSD") });
     wrap.appendChild(fAsset.row);
-    var chk = touchable(el(doc, "button", t("borrow.check_settlement_fund", "Check settlement fund"))); chk.type = "button";
+    var chk = touchable(DOM.el(doc, "button", t("borrow.check_settlement_fund", "Check settlement fund"))); chk.type = "button";
     wrap.appendChild(chk);
-    var box = el(doc, "div"); wrap.appendChild(box);
+    var box = DOM.el(doc, "div"); wrap.appendChild(box);
     chk.addEventListener("click", function () {
       if (myGen !== gen) return;
       settleCheck(doc, box, myGen, fAsset.input.value.trim());
@@ -794,7 +790,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * Params: input (symbol or 1.3.x). Fund raw stays a digit string until
    * Format renders it; precisions come from get_assets, never assumed. */
   function settleCheck(doc, box, myGen, input) {
-    clearBox(box);
+    DOM.clear(box);
     if (!input) { showError(doc, box, new Error("unknown-asset"), t("borrow.enter_a_bitasset_symbol_or_id_first", "Enter a bitasset symbol or id first.")); return; }
     showStatus(doc, box, t("borrow.resolving_asset_and_settlement_fund", "Resolving asset and settlement fund…"));
     Promise.resolve().then(async function () {
@@ -826,44 +822,44 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         backingPrec: backingPrec, debtPrec: debtPrec, bids: bids || [] };
     }).then(function (R) {
       if (myGen !== gen) return;
-      clearBox(box);
+      DOM.clear(box);
       if (R.fundRaw === null) {
-        box.appendChild(el(doc, "p", R.note, "muted"));
+        box.appendChild(DOM.el(doc, "p", R.note, "muted"));
         return;
       }
       var fundHuman = (typeof R.backingPrec === "number")
         ? Format.formatAmount(R.fundRaw, R.backingPrec) : R.fundRaw;
-      var fundLine = el(doc, "p", "Settlement fund for " + R.asset.symbol + ": " + fundHuman +
+      var fundLine = DOM.el(doc, "p", "Settlement fund for " + R.asset.symbol + ": " + fundHuman +
         ((typeof R.backingPrec === "number") ? " (backing " + R.backingId + ")" : " (raw " + R.fundRaw + ")"));
       fundLine.title = t("account.raw_prefix", "raw ") + R.fundRaw;
       box.appendChild(fundLine);
       box.appendChild(bidsTable(doc, R.bids, R));
       if (R.fundRaw === "0") {
-        box.appendChild(el(doc, "p", "No settlement fund for " + R.asset.symbol + " (not globally settled). The bid form stays disabled until a fund exists — no broadcast without a target.", "muted"));
+        box.appendChild(DOM.el(doc, "p", "No settlement fund for " + R.asset.symbol + " (not globally settled). The bid form stays disabled until a fund exists — no broadcast without a target.", "muted"));
         return;
       }
       var flags = Number(R.asset.options && R.asset.options.flags);
       if (Number.isFinite(flags) && (flags & 0x8000)) {
-        box.appendChild(el(doc, "p", R.asset.symbol + " has collateral bidding disabled by issuer flag (0x8000). Bids would be rejected — no form offered.", "muted"));
+        box.appendChild(DOM.el(doc, "p", R.asset.symbol + " has collateral bidding disabled by issuer flag (0x8000). Bids would be rejected — no form offered.", "muted"));
         return;
       }
       if (typeof R.backingPrec !== "number" || typeof R.debtPrec !== "number") {
-        box.appendChild(el(doc, "p", t("borrow.unexpected_asset_data_from_the_node_stopped_i", "Unexpected asset data from the node; stopped instead of guessing."), "muted"));
+        box.appendChild(DOM.el(doc, "p", t("borrow.unexpected_asset_data_from_the_node_stopped_i", "Unexpected asset data from the node; stopped instead of guessing."), "muted"));
         return;
       }
       bidBox(doc, box, myGen, R);
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearBox(box);
+      DOM.clear(box);
       showError(doc, box, e, t("borrow.could_not_load_the_settlement_fund", "Could not load the settlement fund."));
     });
   }
   /* Existing-bids table (desktop) + phone cards; legs human via the joined
    * precisions, raw integers in title (never shown bare). Empty -> honest note. */
   function bidsTable(doc, bids, R) {
-    var box = el(doc, "div");
+    var box = DOM.el(doc, "div");
     if (!bids || !bids.length) {
-      box.appendChild(el(doc, "p", "No collateral bids on " + R.asset.symbol + t("borrow.bids_suffix", " yet. Place one from the bid form below — bids list here."), "muted"));
+      box.appendChild(DOM.el(doc, "p", "No collateral bids on " + R.asset.symbol + t("borrow.bids_suffix", " yet. Place one from the bid form below — bids list here."), "muted"));
       return box;
     }
     var table = doc.createElement("table"); table.className = "node-table";
@@ -887,13 +883,13 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); box.appendChild(table);
-    var cards = el(doc, "div", null, "node-cards");
+    var cards = DOM.el(doc, "div", null, "node-cards");
     bids.forEach(function (b) {
-      var c = el(doc, "div", null, "node-card");
+      var c = DOM.el(doc, "div", null, "node-card");
       var inv = b.additional_collateral || {}, debt = b.debt_covered || {};
-      c.appendChild(el(doc, "div", "Bidder " + (b.bidder || "—")));
-      c.appendChild(el(doc, "div", "Collateral " + Format.formatAmount(String(inv.amount), R.backingPrec)));
-      c.appendChild(el(doc, "div", "Debt " + Format.formatAmount(String(debt.amount), R.debtPrec)));
+      c.appendChild(DOM.el(doc, "div", "Bidder " + (b.bidder || "—")));
+      c.appendChild(DOM.el(doc, "div", "Collateral " + Format.formatAmount(String(inv.amount), R.backingPrec)));
+      c.appendChild(DOM.el(doc, "div", "Debt " + Format.formatAmount(String(debt.amount), R.debtPrec)));
       cards.appendChild(c);
     });
     box.appendChild(cards);
@@ -904,7 +900,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * nonzero debt needs nonzero collateral). Live fee, named-row confirm,
    * re-read proof = the bid list observed again at a new head block. */
   function bidBox(doc, box, myGen, R) {
-    box.appendChild(el(doc, "h3", t("borrow.place_a_bid", "Place a bid")));
+    box.appendChild(DOM.el(doc, "h3", t("borrow.place_a_bid", "Place a bid")));
     var lockedBid = !isUnlockedNow();
     var fBidder = field(doc, t("borrow.bidder_blank_wallet_account", "Bidder (blank = wallet account)"), lockedBid
       ? { placeholder: t("borrow.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
@@ -912,15 +908,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var fColl = field(doc, t("borrow.coll_units_tpl", "Collateral (%(id)s units)", { id: R.backingId }), { placeholder: t("borrow.e_g_10_0", "e.g. 10.0"), inputmode: "decimal" });
     var fDebt = field(doc, t("borrow.debt_units_tpl", "Debt to cover (%(sym)s units)", { sym: R.asset.symbol }), { placeholder: t("borrow.e_g_5_0", "e.g. 5.0"), inputmode: "decimal" });
     [fBidder, fColl, fDebt].forEach(function (f) { box.appendChild(f.row); });
-    box.appendChild(el(doc, "p", t("borrow.a_bid_locks_your_collateral_against_the_settl", "A bid locks your collateral against the settlement fund; the chain matches it while reviving the asset. Both legs must be above zero."), "muted"));
-    var btn = touchable(el(doc, "button", t("borrow.review_bid", "Review bid"))); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    box.appendChild(DOM.el(doc, "p", t("borrow.a_bid_locks_your_collateral_against_the_settl", "A bid locks your collateral against the settlement fund; the chain matches it while reviving the asset. Both legs must be above zero."), "muted"));
+    var btn = touchable(DOM.el(doc, "button", t("borrow.review_bid", "Review bid"))); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     Account.myAccountId().then(function (id) {
       if (myGen === gen && !fBidder.input.value) fBidder.input.value = id;
     }).catch(function () { /* manual bidder entry remains */ });
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(out); btn.disabled = true;
+      DOM.clear(out); btn.disabled = true;
       showStatus(doc, out, t("borrow.resolving_and_estimating_fee", "Resolving and estimating fee…"));
       Promise.resolve().then(async function () {
         var bidderId = fBidder.input.value.trim() ? (await Account.resolve(fBidder.input.value.trim())).id
@@ -941,19 +937,19 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
         .then(function (fa) {
           if (myGen !== gen) return;
           var feeHuman = fa ? Format.formatAmount(String(S.fee.amount), fa.precision) + " " + fa.symbol : String(S.fee.amount);
-          clearBox(out);
-          out.appendChild(el(doc, "h3", t("borrow.confirm_settlement_bid", "Confirm settlement bid")));
+          DOM.clear(out);
+          out.appendChild(DOM.el(doc, "h3", t("borrow.confirm_settlement_bid", "Confirm settlement bid")));
           out.appendChild(confirmList(doc, [
             [t("borrow.bidder", "Bidder"), S.bidderId],
             [t("borrow.collateral", "Collateral"), Format.formatAmount(S.collRaw, R.backingPrec) + " (" + R.backingId + ")", "raw " + S.collRaw],
             [t("borrow.debt_covered", "Debt covered"), Format.formatAmount(S.debtRaw, R.debtPrec) + " " + R.asset.symbol, "raw " + S.debtRaw],
             [t("borrow.fund", "Fund"), Format.formatAmount(R.fundRaw, R.backingPrec), "raw " + R.fundRaw],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(S.fee.amount)], [t("borrow.network", "Network"), "testnet"]]));
-          out.appendChild(el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
+          out.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
+          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
+          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
           out.appendChild(back); out.appendChild(send);
-          back.addEventListener("click", function () { clearBox(out); btn.disabled = false; });
+          back.addEventListener("click", function () { DOM.clear(out); btn.disabled = false; });
           send.addEventListener("click", function () {
             if (myGen !== gen) return; send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("borrow.broadcasting", "Broadcasting…"));
@@ -967,9 +963,9 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
                 } catch (e) { return null; } return null;
               });
             }).then(async function (res) {
-              if (myGen !== gen) return; clearBox(out);
-              out.appendChild(el(doc, "p", t("borrow.bid_broadcast", "Bid broadcast."), "xfer-ok"));
-              out.appendChild(el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
+              if (myGen !== gen) return; DOM.clear(out);
+              out.appendChild(DOM.el(doc, "p", t("borrow.bid_broadcast", "Bid broadcast."), "xfer-ok"));
+              out.appendChild(DOM.el(doc, "p", t("borrow.observed_at_head_block", "Observed at head block #") + String(await headBlock()) + " (" + res.via + ").", "muted"));
               btn.disabled = false;
             }).catch(function (e) {
               if (myGen !== gen) return; out.removeChild(status);
@@ -980,7 +976,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           btn.disabled = false;
         });
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(out);
+        if (myGen !== gen) return; DOM.clear(out);
         showError(doc, out, e, t("borrow.could_not_prepare_the_bid", "Could not prepare the bid.")); btn.disabled = false;
       });
     });

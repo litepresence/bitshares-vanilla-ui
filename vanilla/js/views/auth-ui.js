@@ -83,31 +83,26 @@ var AuthUI = (function () {
   }
   var gen = 0;
   /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("auth.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) msg = t("auth.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg);
+    return err;
   }
   /* Labeled input row with its own inline error slot. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input"); input.type = opts.type || "text";
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
     if (opts.id) input.id = opts.id;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
     touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("auth.none", "none"); }
@@ -120,7 +115,7 @@ var AuthUI = (function () {
     return false; }
   /* Internal link paragraph (href + text pairs). */
   function linkPara(doc, pairs) {
-    var p = el(doc, "p", null, "muted");
+    var p = DOM.el(doc, "p", null, "muted");
     pairs.forEach(function (pr, i) {
       if (i > 0) p.appendChild(doc.createTextNode(" · "));
       var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; a.className = "subtle-btn"; touchable(a); p.appendChild(a);
@@ -133,17 +128,17 @@ var AuthUI = (function () {
    * Params: doc, wrap, title, body, opts. Returns the section. */
   function cardHead(doc, wrap, title, body, opts) {
     var s = doc.createElement("section");
-    s.appendChild(el(doc, "h2", title));
-    s.appendChild(el(doc, "p", body, "muted"));
+    DOM.append(s, DOM.el(doc, "h2", title));
+    DOM.append(s, DOM.el(doc, "p", body, "muted"));
     if (opts && opts.hint) {
       s.setAttribute("title", opts.hint);
-      s.appendChild(el(doc, "p", opts.hint, "muted"));
+      DOM.append(s, DOM.el(doc, "p", opts.hint, "muted"));
     }
-    wrap.appendChild(s);
+    DOM.append(wrap, s);
     return s; }
   /* Touch-sized navigation button (same floor as fieldRow inputs). */
   function goButton(doc, id, text, hash, variant) {
-    var b = touchable(el(doc, "button", text));
+    var b = touchable(DOM.el(doc, "button", text));
     b.id = id; b.type = "button";
     if (variant) b.className = variant;
     b.addEventListener("click", function () {
@@ -153,7 +148,7 @@ var AuthUI = (function () {
   /* Plain-literal muted note (new punchlist strings stay out of t() so the
    * i18n drift gate stays green until the batch-2 translation pass). */
   function notePara(doc, text) {
-    return el(doc, "p", text, "muted"); }
+    return DOM.el(doc, "p", text, "muted"); }
 
   /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
    * the local wallet (the only key path Wallet supports); card B looks an
@@ -165,16 +160,16 @@ var AuthUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("auth.login", "Login")));
+    DOM.append(wrap, DOM.el(doc, "h1", t("auth.login", "Login")));
     if (walletMissing(doc, wrap)) return;
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
     catch (e) { unlocked = false; }
     if (unlocked) {
-      wrap.appendChild(el(doc, "p", t("auth.your_wallet_is_already_unlocked_on_this_devic", "Your wallet is already unlocked on this device."), "muted"));
-      wrap.appendChild(linkPara(doc, [
+      DOM.append(wrap, DOM.el(doc, "p", t("auth.your_wallet_is_already_unlocked_on_this_devic", "Your wallet is already unlocked on this device."), "muted"));
+      DOM.append(wrap, linkPara(doc, [
         ["#/accounts", t("auth.open_accounts", "Open accounts")],
         ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
       ]));
@@ -186,9 +181,9 @@ var AuthUI = (function () {
       "Uses the password you set when this wallet was created. Keys never leave this device.",
       { hint: t("auth.best_security_stays_in_this_browser_move", "Best security — stays in this browser. Move it with the brainkey backup.") });
     var f = fieldRow(doc, t("auth.password", "Password "), { id: "login-password", type: "password" });
-    cardA.appendChild(f.row);
-    var btn = touchable(el(doc, "button", t("auth.unlock", "Unlock")));
-    btn.id = "login-do"; btn.type = "button"; cardA.appendChild(btn);
+    DOM.append(cardA, f.row);
+    var btn = touchable(DOM.el(doc, "button", t("auth.unlock", "Unlock")));
+    btn.id = "login-do"; btn.type = "button"; DOM.append(cardA, btn);
     btn.addEventListener("click", function () {
       setFieldError(f, ""); btn.disabled = true;
       if (!f.input.value) { setFieldError(f, t("auth.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); btn.disabled = false; return; }
@@ -199,11 +194,11 @@ var AuthUI = (function () {
           f.input.value = "";
           pw = null;
           if (myGen !== gen) return;
-          clearRoot(root);
+          DOM.clear(root);
           var done = makeWrap(doc, root);
-          done.appendChild(el(doc, "h1", t("auth.login", "Login")));
-          done.appendChild(el(doc, "p", t("auth.wallet_unlocked", "Wallet unlocked."), "muted"));
-          done.appendChild(linkPara(doc, [
+          DOM.append(done, DOM.el(doc, "h1", t("auth.login", "Login")));
+          DOM.append(done, DOM.el(doc, "p", t("auth.wallet_unlocked", "Wallet unlocked."), "muted"));
+          DOM.append(done, linkPara(doc, [
             ["#/accounts", t("auth.open_accounts", "Open accounts")],
             ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
           ]));
@@ -218,7 +213,7 @@ var AuthUI = (function () {
     });
     /* .bin honesty note: wallet.js has no backup-decrypt entry point, so no
      * file picker is offered — the supported import path is the brainkey. */
-    cardA.appendChild(notePara(doc, t("auth.have_a_bin_backup_file_instead_this_wallet_ke", "Have a .bin backup file instead? This wallet keeps one encrypted ") +
+    DOM.append(cardA, notePara(doc, t("auth.have_a_bin_backup_file_instead_this_wallet_ke", "Have a .bin backup file instead? This wallet keeps one encrypted ") +
       "brainkey and cannot decrypt .bin files. Import the brainkey itself under Import existing account — " +
       "nothing is uploaded anywhere."));
     /* Card B: cloud/account model — name lookup only. The old UI derived keys
@@ -229,13 +224,13 @@ var AuthUI = (function () {
       "(or import its brainkey). Account-password key derivation from the old UI is not supported here.",
       { hint: t("auth.no_login_from_anywhere_with_name_password", "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.") });
     var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
-    cardB.appendChild(g.row);
-    var lookBtn = touchable(el(doc, "button", t("auth.look_up_account", "Look up account")));
-    lookBtn.id = "login-lookup"; lookBtn.type = "button"; cardB.appendChild(lookBtn);
-    var out = el(doc, "div", "");
+    DOM.append(cardB, g.row);
+    var lookBtn = touchable(DOM.el(doc, "button", t("auth.look_up_account", "Look up account")));
+    lookBtn.id = "login-lookup"; lookBtn.type = "button"; DOM.append(cardB, lookBtn);
+    var out = DOM.el(doc, "div", "");
     out.id = "login-account-out";
     out.setAttribute("aria-live", "polite");
-    cardB.appendChild(out);
+    DOM.append(cardB, out);
     lookBtn.addEventListener("click", function () {
       setFieldError(g, ""); out.textContent = "";
       var name = String(g.input.value || "").trim().toLowerCase();
@@ -252,20 +247,20 @@ var AuthUI = (function () {
           if (myGen !== gen) return;
           lookBtn.disabled = false;
           out.textContent = "";
-          var line = el(doc, "p", t("auth.found", "Found ") + (acct.name || name) + " (" + (acct.id || "unknown id") + "). " +
+          var line = DOM.el(doc, "p", t("auth.found", "Found ") + (acct.name || name) + " (" + (acct.id || "unknown id") + "). " +
             "Unlock the local wallet above if it holds these keys, or import the brainkey.", "muted");
-          out.appendChild(line);
-          var p = el(doc, "p", null, "muted");
+          DOM.append(out, line);
+          var p = DOM.el(doc, "p", null, "muted");
           var a = doc.createElement("a");
           a.href = "#/account/" + encodeURIComponent(acct.name || name);
           a.textContent = t("auth.open", "Open ") + (acct.name || name);
-          p.appendChild(a);
+          DOM.append(p, a);
           p.appendChild(doc.createTextNode(" · "));
           var b = doc.createElement("a");
           b.href = "#/existing-account";
           b.textContent = t("auth.import_existing_account", "Import existing account");
-          p.appendChild(b);
-          out.appendChild(p);
+          DOM.append(p, b);
+          DOM.append(out, p);
         })
         .catch(function (e) {
           if (myGen !== gen) return;
@@ -279,7 +274,7 @@ var AuthUI = (function () {
           out.textContent = "";
         });
     });
-    wrap.appendChild(linkPara(doc, [
+    DOM.append(wrap, linkPara(doc, [
       ["#/create-wallet-brainkey", t("auth.no_wallet_yet_create_one", "No wallet yet? Create one")],
       ["#/existing-account", t("auth.import_existing_account", "Import existing account")]
     ]));
@@ -296,45 +291,45 @@ var AuthUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("auth.registration", "Registration")));
-    wrap.appendChild(el(doc, "p", t("auth.pick_how_to_get_started_registration_itself_h", "Pick how to get started. Registration itself happens on the linked screens — this page only points."), "muted"));
+    DOM.append(wrap, DOM.el(doc, "h1", t("auth.registration", "Registration")));
+    DOM.append(wrap, DOM.el(doc, "p", t("auth.pick_how_to_get_started_registration_itself_h", "Pick how to get started. Registration itself happens on the linked screens — this page only points."), "muted"));
     /* Local-wallet card: the recommended model (WalletHeaderSelection's
      * "recommended" badge concept). */
     var local = doc.createElement("section");
-    local.appendChild(el(doc, "h2", t("auth.local_wallet_keys_on_this_device", "Local wallet — keys on this device")));
+    DOM.append(local, DOM.el(doc, "h2", t("auth.local_wallet_keys_on_this_device", "Local wallet — keys on this device")));
     var badge = doc.createElement("p");
     var star = doc.createElement("strong");
     star.textContent = t("auth.recommended", "Recommended");
-    badge.appendChild(star);
-    local.appendChild(badge);
+    DOM.append(badge, star);
+    DOM.append(local, badge);
     [t("auth.security_high", "Security: High"),
      t("auth.login_by_password_on_this_device", "Login by: password on this device"),
      t("auth.back_up_yes_write_down_the_brainkey", "Back up: yes — write down the brainkey")].forEach(function (line) {
-      local.appendChild(el(doc, "p", line, "muted"));
+      DOM.append(local, DOM.el(doc, "p", line, "muted"));
     });
-    local.appendChild(goButton(doc, "reg-card-local", t("auth.continue", "Continue"), "#/registration/local", null));
-    wrap.appendChild(local);
+    DOM.append(local, goButton(doc, "reg-card-local", t("auth.continue", "Continue"), "#/registration/local", null));
+    DOM.append(wrap, local);
     /* Cloud-style card: faucet-sponsored names, weaker security
      * (AccountBlockSelection's Medium concept). */
     var cloud = doc.createElement("section");
-    cloud.appendChild(el(doc, "h2", t("auth.cloud_style_account_name_via_the_faucet", "Cloud-style account — name via the faucet")));
+    DOM.append(cloud, DOM.el(doc, "h2", t("auth.cloud_style_account_name_via_the_faucet", "Cloud-style account — name via the faucet")));
     [t("auth.security_medium", "Security: Medium"),
      t("auth.login_by_account_name_lookup_password_der", "Login by: account-name lookup (password-derived keys are not supported here)"),
      t("auth.back_up_no_file_the_new_account_s_brainke", "Back up: no file — the new account's brainkey is shown once at creation")].forEach(function (line) {
-      cloud.appendChild(el(doc, "p", line, "muted"));
+      DOM.append(cloud, DOM.el(doc, "p", line, "muted"));
     });
-    cloud.appendChild(goButton(doc, "reg-card-cloud", t("auth.continue", "Continue"), "#/registration/cloud", null));
-    wrap.appendChild(cloud);
+    DOM.append(cloud, goButton(doc, "reg-card-cloud", t("auth.continue", "Continue"), "#/registration/cloud", null));
+    DOM.append(wrap, cloud);
     /* Direct shortcuts: faucet register + brainkey import (both exist). */
     var list = doc.createElement("ul");
     [["#/create-account", t("auth.register_a_new_on_chain_account_testnet_fauce", "Register a new on-chain account (testnet faucet)")],
      ["#/existing-account", t("auth.import_an_existing_account_brainkey", "Import an existing account (brainkey)")]].forEach(function (pr) {
       var li = doc.createElement("li"), a = doc.createElement("a");
-      a.href = pr[0]; a.textContent = pr[1]; li.appendChild(a); list.appendChild(li);
+      a.href = pr[0]; a.textContent = pr[1]; DOM.append(li, a); DOM.append(list, li);
     });
-    wrap.appendChild(list);
+    DOM.append(wrap, list);
   }
 
   /* /registration/local — explainer + delegate to the slice-02 create screen.
@@ -346,23 +341,23 @@ var AuthUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("auth.local_registration", "Local registration")));
-    wrap.appendChild(el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
-    var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey", null));
+    DOM.append(wrap, DOM.el(doc, "h1", t("auth.local_registration", "Local registration")));
+    DOM.append(wrap, DOM.el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
+    var row = DOM.el(doc, "p", null, null);
+    DOM.append(row, goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account", null));
+    DOM.append(row, goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
-    wrap.appendChild(row);
-    var hp = el(doc, "p", null, "muted");
+    DOM.append(row, goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
+    DOM.append(wrap, row);
+    var hp = DOM.el(doc, "p", null, "muted");
     [["#/help/wallets", "How wallets work"], ["#/help/backups", "How backups work"]].forEach(function (pr, i) {
       if (i > 0) hp.appendChild(doc.createTextNode(" · "));
-      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; hp.appendChild(a);
+      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; DOM.append(hp, a);
     });
-    wrap.appendChild(hp);
+    DOM.append(wrap, hp);
   }
 
   /* /registration/cloud — inline name-availability pre-check (read-only,
@@ -374,20 +369,20 @@ var AuthUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("auth.cloud_registration", "Cloud registration")));
-    wrap.appendChild(el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
-    wrap.appendChild(notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
+    DOM.append(wrap, DOM.el(doc, "h1", t("auth.cloud_registration", "Cloud registration")));
+    DOM.append(wrap, DOM.el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
+    DOM.append(wrap, notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
       "Name checks work on either network."));
     var g = fieldRow(doc, t("auth.account_name", "Account name "), { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
-    wrap.appendChild(g.row);
-    var checkBtn = touchable(el(doc, "button", t("auth.check_availability", "Check availability")));
-    checkBtn.id = "reg-cloud-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
-    var out = el(doc, "p", t("auth.check_whether_the_name_is_free_before_registe", "Check whether the name is free before registering."), "muted");
+    DOM.append(wrap, g.row);
+    var checkBtn = touchable(DOM.el(doc, "button", t("auth.check_availability", "Check availability")));
+    checkBtn.id = "reg-cloud-check"; checkBtn.type = "button"; DOM.append(wrap, checkBtn);
+    var out = DOM.el(doc, "p", t("auth.check_whether_the_name_is_free_before_registe", "Check whether the name is free before registering."), "muted");
     out.id = "reg-cloud-out";
     out.setAttribute("aria-live", "polite");
-    wrap.appendChild(out);
+    DOM.append(wrap, out);
     checkBtn.addEventListener("click", function () {
       setFieldError(g, "");
       var name = String(g.input.value || "").trim().toLowerCase();
@@ -416,19 +411,19 @@ var AuthUI = (function () {
           }
         });
     });
-    var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-cloud-go", t("auth.register_via_the_faucet", "Register via the faucet"), "#/create-account", null));
+    var row = DOM.el(doc, "p", null, null);
+    DOM.append(row, goButton(doc, "reg-cloud-go", t("auth.register_via_the_faucet", "Register via the faucet"), "#/create-account", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-cloud-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
-    wrap.appendChild(row);
-    wrap.appendChild(linkPara(doc, [
+    DOM.append(row, goButton(doc, "reg-cloud-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
+    DOM.append(wrap, row);
+    DOM.append(wrap, linkPara(doc, [
       ["#/settings", "Settings — nodes"],
       ["#/create-account", t("auth.register_via_the_faucet", "Register via the faucet")]
     ]));
     /* MEDs (4): create-account-ui.js is forbidden, so the restore path lives
      * here — natural fit: a visitor who already has an account needs the
      * import page, not the faucet. Batch-3 i18n: keyed via t(). */
-    wrap.appendChild(linkPara(doc, [
+    DOM.append(wrap, linkPara(doc, [
       ["#/existing-account", t("auth.already_have_an_account_import_it_instead", "Already have an account? Import it instead of registering.")]
     ]));
   }

@@ -57,22 +57,14 @@ var ApiLabUI = (function () {
   };
   var GENERIC_HINT = "Raw node JSON above, untouched. Integer amounts divide by asset precision; percent fields are hundredths of a percent (2000 = 20%).";
 
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
-
   /* showError: inline error panel, never blank. Same contract as ops-ui. */
   function showError(doc, wrap, e) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || "Unexpected error");
     if (msg.indexOf("not connected") !== -1 || msg.indexOf("not-connected") !== -1) {
       msg = "Network unavailable. Check Settings → Nodes and retry.";
     }
-    var box = el(doc, "div", msg, "error");
-    box.setAttribute("aria-live", "polite"); wrap.appendChild(box); return box;
+    var box = DOM.error(wrap, msg);
+    return box;
   }
 
   /* waitForOpen: connect gate (ops-ui.js pattern) — cold socket paints a
@@ -80,16 +72,15 @@ var ApiLabUI = (function () {
   function waitForOpen(doc, wrap, root, myGen, rerun) {
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state === "open") return false;
-    var p = el(doc, "p", t("apilab.connecting", "Connecting to network…"), "muted");
-    p.setAttribute("aria-live", "polite"); wrap.appendChild(p);
-    var astat = el(doc, "p", "", "muted");
+    DOM.append(wrap, DOM.el(doc, "p", t("apilab.connecting", "Connecting to network…"), "muted"));
+    var astat = DOM.el(doc, "p", "", "muted");
     try { astat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
-    wrap.appendChild(astat);
-    var arow = el(doc, "div", null, "pools-offline-row");
-    wrap.appendChild(arow);
-    var retry = el(doc, "button", t("apilab.retry", "Retry"));
+    DOM.append(wrap, astat);
+    var arow = DOM.el(doc, "div", null, "pools-offline-row");
+    DOM.append(wrap, arow);
+    var retry = DOM.el(doc, "button", t("apilab.retry", "Retry"));
     retry.classList.add("touchable");
-    retry.type = "button"; arow.appendChild(retry);
+    retry.type = "button"; DOM.append(arow, retry);
     var aoff = null;
     try { aoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { aoff = null; }
     var arerun = function () {
@@ -106,11 +97,11 @@ var ApiLabUI = (function () {
       try { alink = aoff.settingsLink(doc, t); } catch (e) { alink = null; }
     }
     if (!alink) {
-      alink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      alink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { alink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       alink.classList.add("touchable");
     }
-    arow.appendChild(alink);
+    DOM.append(arow, alink);
     var settled = false, off = function () {};
     if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
       off = Store.subscribe("connection", function (st) {
@@ -162,22 +153,22 @@ var ApiLabUI = (function () {
   /* renderGate: the advanced-use modal. Params: doc, wrap, root, myGen,
    * onAck (continuation). Per-session only — never written to storage. */
   function renderGate(doc, wrap, root, myGen, onAck, tier) {
-    clearRoot(wrap);
-    var box = el(doc, "div", null, "card");
+    DOM.clear(wrap);
+    var box = DOM.el(doc, "div", null, "card");
     box.setAttribute("role", "alertdialog");
     box.setAttribute("aria-label", t("apilab.gate_title", "Advanced tool — confirm you understand"));
-    box.appendChild(el(doc, "h1", t("apilab.gate_title", "Advanced tool — confirm you understand")));
+    DOM.append(box, DOM.el(doc, "h1", t("apilab.gate_title", "Advanced tool — confirm you understand")));
     var body = tier === "broadcast"
       ? t("apilab.gate_broadcast", "Broadcasting sends a REAL signed transaction on the connected chain. Only proceed if you built and reviewed the transaction yourself and you know which chain (mainnet or testnet) you are on.")
       : tier === "debug"
       ? t("apilab.gate_debug", "Debug and node-maintenance calls are usually DISABLED on public API nodes. Expect rejections — the rejection is the honest result, not a bug in this page.")
       : t("apilab.gate_body", "This page sends hand-built API calls to a public node and shows raw chain JSON. Reads are safe; broadcasts move real funds. Only proceed if you know what you are doing.");
-    box.appendChild(el(doc, "p", body));
-    var row = el(doc, "p", null, null);
-    var ack = el(doc, "button", t("apilab.gate_ack", "I understand — open the API lab"));
+    DOM.append(box, DOM.el(doc, "p", body));
+    var row = DOM.el(doc, "p", null, null);
+    var ack = DOM.el(doc, "button", t("apilab.gate_ack", "I understand — open the API lab"));
     ack.type = "button";
     ack.classList.add("touchable");
-    var back = el(doc, "a", t("apilab.gate_back", "Back to Explorer"));
+    var back = DOM.el(doc, "a", t("apilab.gate_back", "Back to Explorer"));
     back.href = "#/explorer";
     back.classList.add("btn-ghost", "touchable");
     try { back.style.display = "inline-flex"; back.style.alignItems = "center"; back.style.marginLeft = "12px"; } catch (e) { /* stands */ }
@@ -186,8 +177,8 @@ var ApiLabUI = (function () {
       if (tier) escalated[tier] = true; else gateOk = true;
       onAck();
     });
-    row.appendChild(ack); row.appendChild(back); box.appendChild(row);
-    wrap.appendChild(box);
+    DOM.append(row, ack); DOM.append(row, back); DOM.append(box, row);
+    DOM.append(wrap, box);
   }
 
   /* renderDesk: full prober desk. Params: root. Entry from sticky selection
@@ -197,22 +188,22 @@ var ApiLabUI = (function () {
     var myGen = gen;
     var doc = (typeof document !== "undefined") ? document : null;
     if (!doc || !root) return;
-    clearRoot(root);
-    var wrap = el(doc, "div", null, "wrap wide"); root.appendChild(wrap);
+    DOM.clear(root);
+    var wrap = DOM.append(root, DOM.el(doc, "div", null, "wrap wide"));
 
     function proceed() { if (myGen === gen) renderDesk(root); }
     if (!gateOk) { renderGate(doc, wrap, root, myGen, proceed, null); return; }
     if (waitForOpen(doc, wrap, root, myGen, proceed)) return;
 
-    wrap.appendChild(el(doc, "h1", t("apilab.title", "API Lab")));
-    wrap.appendChild(el(doc, "p",
+    DOM.append(wrap, DOM.el(doc, "h1", t("apilab.title", "API Lab")));
+    DOM.append(wrap, DOM.el(doc, "p",
       t("apilab.subtitle", "Probe the connected node by hand: pick a method, fill the boxes, read raw JSON. Reads are safe; broadcast moves real funds."),
       "muted"));
     var st = { state: "unknown", node: null };
     try { st = Chain.status() || st; } catch (e) { /* strip stands */ }
-    var strip = el(doc, "p",
+    var strip = DOM.el(doc, "p",
       t("apilab.connected_to", "Connected node: ") + (st.node || "?"), "muted");
-    wrap.appendChild(strip);
+    DOM.append(wrap, strip);
 
     /* Deep link: ?by=login::method &params=<json array>. */
     var q = {};
@@ -235,17 +226,17 @@ var ApiLabUI = (function () {
     if (!startEntry) startEntry = ApiLab.byMethod("get_account_by_name", "database") || ApiLab.METHODS[0];
 
     /* Method pulldown with group optgroups + filter box. */
-    var pickRow = el(doc, "p", null, null);
-    var filter = el(doc, "input", null, null);
+    var pickRow = DOM.el(doc, "p", null, null);
+    var filter = DOM.el(doc, "input", null, null);
     filter.type = "search"; filter.placeholder = t("apilab.filter", "Filter methods…");
     filter.setAttribute("aria-label", t("apilab.filter", "Filter methods…"));
-    var sel = el(doc, "select", null, null);
+    var sel = DOM.el(doc, "select", null, null);
     sel.setAttribute("aria-label", t("apilab.method", "API method"));
     sel.classList.add("touchable");
-    pickRow.appendChild(filter); pickRow.appendChild(sel); wrap.appendChild(pickRow);
+    DOM.append(pickRow, filter); DOM.append(pickRow, sel); DOM.append(wrap, pickRow);
 
     function fillPick(ftext) {
-      while (sel.firstChild) sel.removeChild(sel.firstChild);
+      DOM.clear(sel);
       var ft = (ftext || "").toLowerCase();
       ApiLab.GROUPS.forEach(function (g) {
         var og = doc.createElement("optgroup"); og.label = g;
@@ -265,21 +256,21 @@ var ApiLabUI = (function () {
     fillPick("");
     filter.addEventListener("input", function () { fillPick(filter.value); });
 
-    var card = el(doc, "div", null, "card"); wrap.appendChild(card);
+    var card = DOM.el(doc, "div", null, "card"); DOM.append(wrap, card);
     var entry = startEntry;
     var inputEls = [];
     var rawBox = null, resultPre = null, hintP = null, histBox = null;
 
     /* renderForm: method card body for the current entry. */
     function renderForm(prefill) {
-      while (card.firstChild) card.removeChild(card.firstChild);
+      DOM.clear(card);
       inputEls = [];
-      card.appendChild(el(doc, "h3", entry.method, null));
-      card.appendChild(el(doc, "p", entry.desc || "", "muted"));
-      var meta = el(doc, "p", (entry.login || "") + "  ·  " + (entry.src || "") + "  ·  tier: " + entry.tier, "muted");
-      card.appendChild(meta);
+      DOM.append(card, DOM.el(doc, "h3", entry.method, null));
+      DOM.append(card, DOM.el(doc, "p", entry.desc || "", "muted"));
+      var meta = DOM.el(doc, "p", (entry.login || "") + "  ·  " + (entry.src || "") + "  ·  tier: " + entry.tier, "muted");
+      DOM.append(card, meta);
       (entry.params || []).forEach(function (p, i) {
-        var lab = el(doc, "label", p.name + (p.required ? " *" : "") + (p.hint ? " — " + p.hint : ""), null);
+        var lab = DOM.el(doc, "label", p.name + (p.required ? " *" : "") + (p.hint ? " — " + p.hint : ""), null);
         /* Stacked rows (Swagger feel): label text on its own line, box below.
          * Inline styles only — no new CSS file (doctrine). */
         try { lab.style.display = "block"; lab.style.margin = "10px 0 2px"; } catch (e) { /* stands */ }
@@ -309,16 +300,16 @@ var ApiLabUI = (function () {
         inp.classList.add("touchable");
         try { inp.style.display = "block"; inp.style.width = "100%"; inp.style.maxWidth = "560px"; inp.style.boxSizing = "border-box"; inp.style.marginTop = "4px"; } catch (e) { /* stands */ }
         lab.appendChild(inp);
-        card.appendChild(lab);
+        DOM.append(card, lab);
         inputEls.push(inp);
       });
-      var rawLab = el(doc, "label", t("apilab.raw_params", "Raw params JSON (mirrors the boxes)"), "subtle-btn");
+      var rawLab = DOM.el(doc, "label", t("apilab.raw_params", "Raw params JSON (mirrors the boxes)"), "subtle-btn");
       rawBox = doc.createElement("textarea"); rawBox.rows = 3;
       try { rawLab.style.display = "block"; rawLab.style.margin = "10px 0 2px";
         rawBox.style.display = "block"; rawBox.style.width = "100%"; rawBox.style.maxWidth = "560px";
         rawBox.style.boxSizing = "border-box"; rawBox.style.marginTop = "4px"; } catch (e) { /* stands */ }
       rawLab.classList.add("touchable");
-      rawLab.appendChild(rawBox); card.appendChild(rawLab);
+      rawLab.appendChild(rawBox); DOM.append(card, rawLab);
       syncRaw();
       inputEls.forEach(function (inp) {
         inp.addEventListener("input", syncRaw);
@@ -326,14 +317,14 @@ var ApiLabUI = (function () {
       });
       rawBox.addEventListener("input", syncCurated);
 
-      var btnRow = el(doc, "p", null, null);
-      var runB = el(doc, "button", t("apilab.run", "Run"));
+      var btnRow = DOM.el(doc, "p", null, null);
+      var runB = DOM.el(doc, "button", t("apilab.run", "Run"));
       runB.type = "button";
       runB.classList.add("touchable");
-      var resetB = el(doc, "button", t("apilab.reset", "Reset"));
+      var resetB = DOM.el(doc, "button", t("apilab.reset", "Reset"));
       resetB.type = "button";
       resetB.classList.add("btn-ghost", "touchable");
-      var copyB = el(doc, "button", t("apilab.copy_link", "Copy link"));
+      var copyB = DOM.el(doc, "button", t("apilab.copy_link", "Copy link"));
       copyB.type = "button";
       copyB.classList.add("btn-ghost", "touchable");
       try { resetB.style.marginLeft = "8px"; copyB.style.marginLeft = "8px"; } catch (e) { /* stands */ }
@@ -349,16 +340,16 @@ var ApiLabUI = (function () {
         try { window.location.hash; } catch (e2) { /* no-op */ }
         showResult({ ok: true, result: { note: "shareable link (also in the address bar after Run)", link: link } }, true);
       });
-      btnRow.appendChild(runB); btnRow.appendChild(resetB); btnRow.appendChild(copyB);
-      card.appendChild(btnRow);
+      DOM.append(btnRow, runB); DOM.append(btnRow, resetB); DOM.append(btnRow, copyB);
+      DOM.append(card, btnRow);
 
-      resultPre = el(doc, "pre", t("apilab.no_result", "No result yet — fill the boxes and press Run."), null);
+      resultPre = DOM.el(doc, "pre", t("apilab.no_result", "No result yet — fill the boxes and press Run."), null);
       try { resultPre.style.whiteSpace = "pre-wrap"; resultPre.style.wordBreak = "break-word"; } catch (e) { /* stands */ }
-      card.appendChild(resultPre);
-      hintP = el(doc, "p", "", "muted"); card.appendChild(hintP);
+      DOM.append(card, resultPre);
+      hintP = DOM.el(doc, "p", "", "muted"); DOM.append(card, hintP);
 
-      histBox = el(doc, "div", null, null);
-      card.appendChild(histBox);
+      histBox = DOM.el(doc, "div", null, null);
+      DOM.append(card, histBox);
       renderHistory();
     }
 
@@ -409,11 +400,11 @@ var ApiLabUI = (function () {
     /* renderHistory: in-session run buttons (re-load entry+params). */
     function renderHistory() {
       if (!histBox) return;
-      while (histBox.firstChild) histBox.removeChild(histBox.firstChild);
+      DOM.clear(histBox);
       if (!callLog.length) return;
-      histBox.appendChild(el(doc, "h4", t("apilab.history", "This session")));
+      DOM.append(histBox, DOM.el(doc, "h4", t("apilab.history", "This session")));
       callLog.forEach(function (h) {
-        var b = el(doc, "button", h.label, null);
+        var b = DOM.el(doc, "button", h.label, null);
         b.type = "button";
         b.addEventListener("click", function () {
           var e = findEntry(h.key);
@@ -422,7 +413,7 @@ var ApiLabUI = (function () {
           sel.value = h.key;
           renderForm(h.vals);
         });
-        histBox.appendChild(b);
+        DOM.append(histBox, b);
       });
     }
 
@@ -447,26 +438,26 @@ var ApiLabUI = (function () {
         catch (e) { unlocked = false; }
         if (!unlocked) {
           showError(doc, card, new Error(t("apilab.locked", "Wallet is locked — unlock first (top-bar lock), then confirm this broadcast.")));
-          var go = el(doc, "p", null, null);
+          var go = DOM.el(doc, "p", null, null);
           var a = doc.createElement("a"); a.href = "#/login";
           a.textContent = t("apilab.go_login", "Go to Login");
           try { a.style.display = "inline-flex"; a.style.alignItems = "center"; a.style.minHeight = "44px"; } catch (e2) { /* stands */ }
-          go.appendChild(a); card.appendChild(go);
+          DOM.append(go, a); DOM.append(card, go);
           return;
         }
-        var box = el(doc, "div", null, "card");
-        box.appendChild(el(doc, "h4", t("apilab.confirm_broadcast", "Confirm broadcast (real transaction)")));
-        var pre = el(doc, "pre", null, null);
+        var box = DOM.el(doc, "div", null, "card");
+        DOM.append(box, DOM.el(doc, "h4", t("apilab.confirm_broadcast", "Confirm broadcast (real transaction)")));
+        var pre = DOM.el(doc, "pre", null, null);
         try {
           pre.textContent = JSON.stringify(ApiLab.coerce(entry, vals), null, 2);
           pre.style.whiteSpace = "pre-wrap"; pre.style.wordBreak = "break-word";
         } catch (e) { pre.textContent = vals.join(", "); }
-        box.appendChild(pre);
-        var row = el(doc, "p", null, null);
-        var yes = el(doc, "button", t("apilab.confirm_yes", "Broadcast now"));
+        DOM.append(box, pre);
+        var row = DOM.el(doc, "p", null, null);
+        var yes = DOM.el(doc, "button", t("apilab.confirm_yes", "Broadcast now"));
         yes.type = "button";
         yes.classList.add("touchable");
-        var no = el(doc, "button", t("apilab.confirm_no", "Cancel"));
+        var no = DOM.el(doc, "button", t("apilab.confirm_no", "Cancel"));
         no.type = "button";
         no.classList.add("btn-ghost", "touchable");
         try { no.style.marginLeft = "8px"; } catch (e) { /* stands */ }
@@ -475,8 +466,8 @@ var ApiLabUI = (function () {
           try { box.remove(); } catch (e) { /* stands */ }
           doRun(vals);
         });
-        row.appendChild(yes); row.appendChild(no); box.appendChild(row);
-        card.appendChild(box);
+        DOM.append(row, yes); DOM.append(row, no); DOM.append(box, row);
+        DOM.append(card, box);
         return;
       }
       doRun(vals);
@@ -486,8 +477,8 @@ var ApiLabUI = (function () {
      * re-render) + history push. Broadcast deep links were prefilled+locked
      * by construction (we never auto-run on entry). */
     function doRun(vals) {
-      var running = el(doc, "p", t("apilab.running", "Running…"), "muted");
-      running.setAttribute("aria-live", "polite"); card.appendChild(running);
+      var running = DOM.el(doc, "p", t("apilab.running", "Running…"), "muted");
+      running.setAttribute("aria-live", "polite"); DOM.append(card, running);
       ApiLab.run(entry, vals).then(function (res) {
         if (myGen !== gen) return;
         try { running.remove(); } catch (e) { /* stands */ }

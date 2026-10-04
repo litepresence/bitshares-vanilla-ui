@@ -8,15 +8,15 @@
  *   sides' legs become enclosed transfer ops, fee-payer = Peer A, live op-22
  *   fee, standard confirm, prove by proposalsFor re-read. ZERO new serializers
  *   for barter — ever: #1 builds a transfer_list handed to op-22 create, and
-   *   this form calls Proposal.buildCreate with the same shape. Escrow stays
-   *   preview-only (verified: no escrow party in tx.js nor proposal.js
-   *   serializers — toggle + display upgrade only, gap noted in-preview). This form
-  *   broadcasts ONLY via the PROPOSE path after preview. Offline shows Retry
-  *   plus auto-resubscribe on reconnect (htlc-ui pattern).
-  * PUBLIC-FIRST (gate repair): no wallet gate — the two-sided form + atomic
-  *   preview render locked; peer inputs default to committee-account 1.2.0
-  *   while locked with a viewing notice. Password is asked only at Sign &
-  *   Send (confirmPropose sign-time gate + inline unlock).
+ *   this form calls Proposal.buildCreate with the same shape. Escrow stays
+ *   preview-only (verified: no escrow party in tx.js nor proposal.js
+ *   serializers — toggle + display upgrade only, gap noted in-preview). This form
+ *   broadcasts ONLY via the PROPOSE path after preview. Offline shows Retry
+ *   plus auto-resubscribe on reconnect (htlc-ui pattern).
+ * PUBLIC-FIRST (gate repair): no wallet gate — the two-sided form + atomic
+ *   preview render locked; peer inputs default to committee-account 1.2.0
+ *   while locked with a viewing notice. Password is asked only at Sign &
+ *   Send (confirmPropose sign-time gate + inline unlock).
  * Consumes: Format (parse/format, string math only), Account (resolve/balances),
  *   Asset.describe, Tx.fee (leg hints only — never broadcast), Chain/Store,
  *   Wallet (unlock gate only). Created by: building-vanilla-slices skill,
@@ -64,27 +64,23 @@ var BarterUI = (function () {
       openSubs.push(off);
     } catch (e) { /* subscribe unavailable: manual Retry remains */ }
   }
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-  function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("barter.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     else if (m.indexOf("wallet-locked") !== -1) m = t("barter.wallet_is_locked", "Wallet is locked.");
     else if (m.indexOf("unknown-account") !== -1) m = t("barter.unknown_account", "Unknown account.");
     else if (m.indexOf("unknown-asset") !== -1) m = t("barter.unknown_asset", "Unknown asset.");
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite");
-    wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m);
+    return err;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text);
+    return p;
   }
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -103,20 +99,20 @@ var BarterUI = (function () {
   }
   function viewingAsNotice(doc) {
     var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
+    return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("barter.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
     inp.setAttribute("placeholder", t("barter.password", "password")); inp.setAttribute("aria-label", t("barter.password", "password"));
-    touchable(inp); row.appendChild(inp);
-    var b = touchable(el(doc, "button", t("barter.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
-    parent.appendChild(row);
+    touchable(inp); DOM.append(row, inp);
+    var b = touchable(DOM.el(doc, "button", t("barter.unlock", "Unlock"))); b.type = "button"; DOM.append(row, b);
+    DOM.append(parent, row);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
       var pw = inp.value;
@@ -126,10 +122,10 @@ var BarterUI = (function () {
   }
   /* One barter leg row: asset + human amount (empty asset rows are skipped). */
   function legRow(doc, box) {
-    var r = el(doc, "div", null, "xfer-field");
+    var r = DOM.el(doc, "div", null, "xfer-field");
     var fa = doc.createElement("input"); fa.setAttribute("placeholder", t("barter.asset_symbol_or_1_3_x", "asset (symbol or 1.3.x)")); touchable(fa);
     var fq = doc.createElement("input"); fq.setAttribute("placeholder", t("barter.amount", "amount")); fq.setAttribute("inputmode", "decimal"); touchable(fq);
-    r.appendChild(fa); r.appendChild(fq); box.appendChild(r);
+    DOM.append(r, fa); DOM.append(r, fq); DOM.append(box, r);
     return { asset: fa, amount: fq };
   }
   /* Route entry: #/barter — two-sided form + escrow + preview; PROPOSE enabled
@@ -139,22 +135,22 @@ var BarterUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || document, myGen = ++gen;
     dropOpenSubs();
-    root.innerHTML = "";
+    DOM.clear(root);
     ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].forEach(function () { /* checked below */ });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", t("barter.barter", "Barter")));
+    var wrap = DOM.append(root, DOM.el(doc, "div", null, "wrap"));
+    DOM.append(wrap, DOM.el(doc, "h1", t("barter.barter", "Barter")));
     var miss = ["Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store", "Proposal"].filter(function (g) {
       return typeof globalThis[g] === "undefined"; });
     if (miss.length) { showError(doc, wrap, "Barter backend missing: " + miss.join(", ") + " failed to load."); return; }
     if (Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "p", t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-      var bastat = el(doc, "p", "", "muted");
+      DOM.append(wrap, DOM.el(doc, "p", t("barter.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
+      var bastat = DOM.el(doc, "p", "", "muted");
       try { bastat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
-      wrap.appendChild(bastat);
-      var barow = el(doc, "div", null, "pools-offline-row");
-      wrap.appendChild(barow);
-      var retry = touchable(el(doc, "button", t("barter.retry", "Retry"))); retry.type = "button"; retry.classList.add("btn-ghost");
-      barow.appendChild(retry);
+      DOM.append(wrap, bastat);
+      var barow = DOM.el(doc, "div", null, "pools-offline-row");
+      DOM.append(wrap, barow);
+      var retry = touchable(DOM.el(doc, "button", t("barter.retry", "Retry"))); retry.type = "button"; retry.classList.add("btn-ghost");
+      DOM.append(barow, retry);
       var baoff = null;
       try { baoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { baoff = null; }
       var barender = function () { if (myGen === gen) renderBarter(root); };
@@ -168,37 +164,37 @@ var BarterUI = (function () {
         try { balink = baoff.settingsLink(doc, t); } catch (e) { balink = null; }
       }
       if (!balink) {
-        balink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+        balink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { balink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(balink);
         balink.classList.add("subtle-btn");
       }
-      barow.appendChild(balink);
+      DOM.append(barow, balink);
       autoRetryOnOpen(myGen, barender, function () { return myGen === gen; });
       try { if (baoff && typeof baoff.ensure === "function") baoff.ensure(); } catch (e) { /* manual Retry remains */ }
       return;
     }
     /* PUBLIC-FIRST: no wallet gate — form + preview render locked. */
     var lockedBar = !isUnlockedNow();
-    if (lockedBar) wrap.appendChild(viewingAsNotice(doc));
-    wrap.appendChild(el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
+    if (lockedBar) DOM.append(wrap, viewingAsNotice(doc));
+    DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op 22, fee-payer = Peer A)."), "muted"));
     var fA = field(doc, t("barter.peer_a_account", "Peer A account"), lockedBar
       ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
-    wrap.appendChild(fA.row);
-    wrap.appendChild(el(doc, "h2", t("barter.a_gives", "A gives")));
-    var boxA = el(doc, "div"); wrap.appendChild(boxA);
+    DOM.append(wrap, fA.row);
+    DOM.append(wrap, DOM.el(doc, "h2", t("barter.a_gives", "A gives")));
+    var boxA = DOM.el(doc, "div"); DOM.append(wrap, boxA);
     var legsA = [legRow(doc, boxA)];
-    var addA = touchable(el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; addA.classList.add("subtle-btn"); wrap.appendChild(addA);
+    var addA = touchable(DOM.el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; addA.classList.add("subtle-btn"); DOM.append(wrap, addA);
     addA.addEventListener("click", function () { legsA.push(legRow(doc, boxA)); });
     var fB = field(doc, t("barter.peer_b_account", "Peer B account"), lockedBar
       ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N") });
-    wrap.appendChild(fB.row);
-    wrap.appendChild(el(doc, "h2", t("barter.b_gives", "B gives")));
-    var boxB = el(doc, "div"); wrap.appendChild(boxB);
+    DOM.append(wrap, fB.row);
+    DOM.append(wrap, DOM.el(doc, "h2", t("barter.b_gives", "B gives")));
+    var boxB = DOM.el(doc, "div"); DOM.append(wrap, boxB);
     var legsB = [legRow(doc, boxB)];
-    var addB = touchable(el(doc, "button", t("barter.add_asset_row_b", "Add asset row (B)"))); addB.type = "button"; addB.classList.add("subtle-btn"); wrap.appendChild(addB);
+    var addB = touchable(DOM.el(doc, "button", t("barter.add_asset_row_b", "Add asset row (B)"))); addB.type = "button"; addB.classList.add("subtle-btn"); DOM.append(wrap, addB);
     addB.addEventListener("click", function () { legsB.push(legRow(doc, boxB)); });
     /* MED escrow toggle (#1 Barter.jsx:75 showEscrow=false default,
      * :1159-1179 add/remove button): escrow hidden until added. WHY a toggle:
@@ -207,11 +203,11 @@ var BarterUI = (function () {
      * makes that explicit instead of an always-visible field implying
      * broadcast. Batch-3 i18n: literals below keyed via t(). */
     var escState = { on: false };
-    var escrowBtn = touchable(el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button"; escrowBtn.classList.add("btn-ghost");
-    wrap.appendChild(escrowBtn);
-    var escBox = el(doc, "div"); escBox.style.display = "none"; wrap.appendChild(escBox);
+    var escrowBtn = touchable(DOM.el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button"; escrowBtn.classList.add("btn-ghost");
+    DOM.append(wrap, escrowBtn);
+    var escBox = DOM.el(doc, "div"); escBox.style.display = "none"; DOM.append(wrap, escBox);
     var fEsc = field(doc, t("barter.escrow_account_optional", "Escrow account (optional)"), { placeholder: t("barter.blank_none", "blank = none") });
-    escBox.appendChild(fEsc.row);
+    DOM.append(escBox, fEsc.row);
     escrowBtn.addEventListener("click", function () {
       escState.on = !escState.on;
       escBox.style.display = escState.on ? "" : "none";
@@ -224,23 +220,23 @@ var BarterUI = (function () {
     var fFeeA = field(doc, t("barter.side_a_fee_asset_1_3_x", "Side A fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
     var fFeeB = field(doc, t("barter.side_b_fee_asset_1_3_x", "Side B fee asset (1.3.x)"), { placeholder: "1.3.0", value: "1.3.0" });
     var fPropFee = field(doc, t("barter.proposal_fee_asset_1_3_x_due_now", "Proposal fee asset (1.3.x, due now)"), { placeholder: "1.3.0", value: "1.3.0" });
-    wrap.appendChild(fFeeA.row); wrap.appendChild(fFeeB.row); wrap.appendChild(fPropFee.row);
-    var check = touchable(el(doc, "button", t("barter.preview_barter", "Preview barter"))); check.type = "button";
-    if (lockedBar) wrap.appendChild(signNotice(doc));
-    wrap.appendChild(check);
-    var out = el(doc, "div", null, "xfer-out"); wrap.appendChild(out);
+    DOM.append(wrap, fFeeA.row); DOM.append(wrap, fFeeB.row); DOM.append(wrap, fPropFee.row);
+    var check = touchable(DOM.el(doc, "button", t("barter.preview_barter", "Preview barter"))); check.type = "button";
+    if (lockedBar) DOM.append(wrap, signNotice(doc));
+    DOM.append(wrap, check);
+    var out = DOM.el(doc, "div", null, "xfer-out"); DOM.append(wrap, out);
     var fExp = field(doc, t("barter.proposal_expiration", "Proposal expiration"), { type: "datetime-local", value: defaultExpiration() });
     var fRev = field(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)"), { placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric" });
-    wrap.appendChild(fExp.row); wrap.appendChild(fRev.row);
-    var propose = touchable(el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op 22)")));
+    DOM.append(wrap, fExp.row); DOM.append(wrap, fRev.row);
+    var propose = touchable(DOM.el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op 22)")));
     propose.type = "button"; propose.disabled = true;
     propose.title = t("barter.preview_the_barter_first_proposing_needs_reso", "Preview the barter first — proposing needs resolved legs.");
-    wrap.appendChild(propose);
-    var proposeOut = el(doc, "div", null, "xfer-out"); wrap.appendChild(proposeOut);
+    DOM.append(wrap, propose);
+    var proposeOut = DOM.el(doc, "div", null, "xfer-out"); DOM.append(wrap, proposeOut);
     var lastPreview = null;
     check.addEventListener("click", function () {
       if (myGen !== gen) return;
-      clearBox(out); check.disabled = true; propose.disabled = true; lastPreview = null;
+      DOM.clear(out); check.disabled = true; propose.disabled = true; lastPreview = null;
       showStatus(doc, out, t("barter.resolving_and_checking_balances", "Resolving and checking balances…"));
       preview(doc, out, myGen, fA.input.value.trim(), legsA, fB.input.value.trim(), legsB,
         escState.on ? fEsc.input.value.trim() : "", fFeeA.input.value.trim() || "1.3.0",
@@ -253,7 +249,7 @@ var BarterUI = (function () {
           }
         })
         .catch(function (e) {
-          if (myGen !== gen) return; clearBox(out);
+          if (myGen !== gen) return; DOM.clear(out);
           showError(doc, out, e, t("barter.could_not_preview_the_barter", "Could not preview the barter.")); check.disabled = false;
         });
     });
@@ -272,7 +268,7 @@ var BarterUI = (function () {
    * Proposal.buildCreate (fee-payer = Peer A) -> live op-22 fee -> confirm ->
    * broadcast -> prove by proposalsFor re-read. Escrow stays preview-only. */
   function proposeBarter(doc, out, myGen, prev, expV, revV, btn) {
-    clearBox(out); btn.disabled = true;
+    DOM.clear(out); btn.disabled = true;
     showStatus(doc, out, t("barter.building_the_proposal", "Building the proposal…"));
     function done() { btn.disabled = false; }
     Promise.resolve().then(async function () {
@@ -303,10 +299,10 @@ var BarterUI = (function () {
         if (myGen !== gen) return done();
         confirmPropose(doc, out, myGen, prev, built, f, btn);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(out); showError(doc, out, e, t("barter.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, t("barter.could_not_build_the_proposal", "Could not build the proposal.")); done();
+      DOM.clear(out); showError(doc, out, e, t("barter.could_not_build_the_proposal", "Could not build the proposal.")); done();
     });
   }
   /* Fee object -> human + symbol (Asset.describe; raw + id fallback). Returns: Promise of string. */
@@ -318,39 +314,39 @@ var BarterUI = (function () {
   }
   /* Nested confirm rows for the barter legs (self-contained: no ProposalUI coupling). */
   function confirmPropose(doc, out, myGen, prev, built, feeHuman, btn) {
-    clearBox(out);
-    out.appendChild(el(doc, "h3", t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)")));
-    var list = el(doc, "dl", null, "confirm");
+    DOM.clear(out);
+    DOM.append(out, DOM.el(doc, "h3", t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)")));
+    var list = DOM.el(doc, "dl", null, "confirm");
     [[t("barter.fee_payer", "Fee payer"), prev.A.acct.name + " (" + prev.A.acct.id + ")"],
      [t("barter.expiration", "Expiration"), built.pair[1].expiration_time],
      [t("barter.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("barter.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
      [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)],
      [t("barter.fee_live", "Fee (live)"), feeHuman]].forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0])); list.appendChild(el(doc, "dd", r[1]));
+      DOM.append(list, DOM.el(doc, "dt", r[0])); DOM.append(list, DOM.el(doc, "dd", r[1]));
     });
-    out.appendChild(list);
+    DOM.append(out, list);
     /* MED fee recap (batch-3 keyed): timing + assets +
      * proposal estimate + BigInt total ride along from preview so the confirm
      * shows what signing pays. */
-    if (prev.timing) out.appendChild(el(doc, "p", prev.timing, "muted"));
-    out.appendChild(el(doc, "p", t("barter.side_a_fee_asset_prefix", "Side A fee asset: ") + (prev.feeAId || "1.3.0") +
+    if (prev.timing) DOM.append(out, DOM.el(doc, "p", prev.timing, "muted"));
+    DOM.append(out, DOM.el(doc, "p", t("barter.side_a_fee_asset_prefix", "Side A fee asset: ") + (prev.feeAId || "1.3.0") +
       t("barter.side_b_fee_asset_mid", "; Side B fee asset: ") + (prev.feeBId || "1.3.0") +
       t("barter.proposal_fee_asset_mid", "; proposal fee asset: ") + (prev.propFeeId || "1.3.0") + t("barter.due_now_suffix", " (due now)."), "muted"));
-    if (prev.propHuman) out.appendChild(el(doc, "p", t("barter.proposal_fee_estimate_prefix", "Proposal fee estimate: ") + prev.propHuman, "muted"));
-    if (prev.totalText) out.appendChild(el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + prev.totalText, "muted"));
+    if (prev.propHuman) DOM.append(out, DOM.el(doc, "p", t("barter.proposal_fee_estimate_prefix", "Proposal fee estimate: ") + prev.propHuman, "muted"));
+    if (prev.totalText) DOM.append(out, DOM.el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + prev.totalText, "muted"));
     prev.A.items.forEach(function (it) {
-      out.appendChild(el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+      DOM.append(out, DOM.el(doc, "p", prev.A.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
         " " + it.symbol + " → " + prev.B.acct.name, ""));
     });
     prev.B.items.forEach(function (it) {
-      out.appendChild(el(doc, "p", prev.B.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+      DOM.append(out, DOM.el(doc, "p", prev.B.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
         " " + it.symbol + " → " + prev.A.acct.name, ""));
     });
-    if (prev.esc) out.appendChild(el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
-    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.classList.add("btn-ghost");
-    var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
-    out.appendChild(back); out.appendChild(send);
-    back.addEventListener("click", function () { clearBox(out); });
+    if (prev.esc) DOM.append(out, DOM.el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
+    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.classList.add("btn-ghost");
+    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
+    DOM.append(out, back); DOM.append(out, send);
+    back.addEventListener("click", function () { DOM.clear(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, t("barter.signing", "Signing…"));
@@ -358,11 +354,11 @@ var BarterUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         out.removeChild(status);
         if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-          var note = el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-          note.className = "muted xfer-sign-note"; out.appendChild(note);
+          var note = DOM.el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          note.className = "muted xfer-sign-note"; DOM.append(out, note);
         }
         unlockInline(doc, out, function () {
-          out.appendChild(el(doc, "p", t("barter.unlocked_repreview_note", "Unlocked — preview again so the proposal uses your account, then propose."), "muted"));
+          DOM.append(out, DOM.el(doc, "p", t("barter.unlocked_repreview_note", "Unlocked — preview again so the proposal uses your account, then propose."), "muted"));
         });
         send.disabled = false; back.disabled = false; return; }
       Tx.buildTx([built.pair]).then(function (unsigned) {
@@ -372,10 +368,10 @@ var BarterUI = (function () {
           return now.length > built.before ? now[now.length - 1] : null;
         });
       }).then(async function (res) {
-        if (myGen !== gen) return; clearBox(out);
-        out.appendChild(el(doc, "p", t("barter.barter_proposed_and_re_read_on_chain", "Barter proposed and re-read on chain."), "xfer-ok"));
+        if (myGen !== gen) return; DOM.clear(out);
+        DOM.append(out, DOM.el(doc, "p", t("barter.barter_proposed_and_re_read_on_chain", "Barter proposed and re-read on chain."), "xfer-ok"));
         var head = (await Chain.call(await Chain.db(), "get_dynamic_global_properties", [])).head_block_number || 0;
-        out.appendChild(el(doc, "p", "Observed at head block #" + String(head) + " (" + res.via + ").", "muted"));
+        DOM.append(out, DOM.el(doc, "p", "Observed at head block #" + String(head) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
         showError(doc, out, e, t("barter.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
@@ -453,12 +449,12 @@ var BarterUI = (function () {
     if (myGen !== gen) return;
     var esc = null;
     if (escrowOn && escV) { esc = await Account.resolve(escV); if (myGen !== gen) return; }
-    clearBox(out);
-    out.appendChild(el(doc, "h3", t("barter.atomic_preview", "Atomic preview")));
+    DOM.clear(out);
+    DOM.append(out, DOM.el(doc, "h3", t("barter.atomic_preview", "Atomic preview")));
     /* Append "X gives N SYM → Y" preview lines for one side. Params: side (readSide shape), givesTo (name). */
     function sideLines(side, givesTo) {
       side.items.forEach(function (it) {
-        out.appendChild(el(doc, "p", side.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
+        DOM.append(out, DOM.el(doc, "p", side.acct.name + " gives " + Format.formatAmount(it.raw, it.prec) +
           " " + it.symbol + " → " + givesTo, ""));
       });
     }
@@ -466,18 +462,18 @@ var BarterUI = (function () {
     /* Escrow display upgrade (preview-only): no escrow party is serialized
      * by tx.js/proposal.js (grep "escrow" hits this file only), so the
      * proposal below encloses just the two sides' A↔B transfers. */
-    if (esc) out.appendChild(el(doc, "p", t("barter.escrow_prefix", "Escrow ") + esc.name + " (" + esc.id + t("barter.escrow_holds_off_proposal_suffix", ") holds off-proposal — preview-only: the proposal below encloses only A↔B transfers (no escrow party serialized)."), "muted"));
-    else if (escrowOn) out.appendChild(el(doc, "p", t("barter.escrow_enabled_but_no_account_set_legs_", "Escrow enabled but no account set — legs settle peer-to-peer."), "muted"));
+    if (esc) DOM.append(out, DOM.el(doc, "p", t("barter.escrow_prefix", "Escrow ") + esc.name + " (" + esc.id + t("barter.escrow_holds_off_proposal_suffix", ") holds off-proposal — preview-only: the proposal below encloses only A↔B transfers (no escrow party serialized)."), "muted"));
+    else if (escrowOn) DOM.append(out, DOM.el(doc, "p", t("barter.escrow_enabled_but_no_account_set_legs_", "Escrow enabled but no account set — legs settle peer-to-peer."), "muted"));
     var warns = A.warnings.concat(B.warnings);
-    if (warns.length) warns.forEach(function (w) { out.appendChild(el(doc, "p", "Warning: " + w, "error")); });
-    else out.appendChild(el(doc, "p", t("barter.both_sides_hold_every_leg_amount_integer_chec", "Both sides hold every leg amount (integer check)."), "muted"));
+    if (warns.length) warns.forEach(function (w) { DOM.append(out, DOM.el(doc, "p", "Warning: " + w, "error")); });
+    else DOM.append(out, DOM.el(doc, "p", t("barter.both_sides_hold_every_leg_amount_integer_chec", "Both sides hold every leg amount (integer check)."), "muted"));
     /* Fee-timing indicator (#1 Barter.jsx fee_due_now vs
      * fee_when_proposal_executes): escrow custodian path pays now, the plain
      * proposal path pays when the proposal executes. */
     var timing = (escrowOn && esc)
       ? t("barter.side_fees_due_now_escrow_custodian_path", "Side fees: due now (escrow custodian path — legs route via escrow).")
       : t("barter.side_fees_when_proposal_executes_no_escr", "Side fees: when proposal executes (no escrow — enclosed transfers pay on execution).");
-    out.appendChild(el(doc, "p", timing, "muted"));
+    DOM.append(out, DOM.el(doc, "p", timing, "muted"));
     var status = showStatus(doc, out, t("barter.estimating_leg_fees", "Estimating leg fees…"));
     var hintsA = [], hintsB = [], rawA = [], rawB = [];
     /* One leg's live op-0 fee hint in the side's fee asset (human display;
@@ -505,8 +501,8 @@ var BarterUI = (function () {
       return sideName + t("barter.fee_asset_mid", " fee asset: ") + sym + " — " + (hints.length ? hints.join("; ") : t("barter.no_legs", "no legs"));
     }
     out.removeChild(status);
-    out.appendChild(el(doc, "p", await feeAssetLine(t("barter.side_a", "Side A"), feeAId, hintsA), "muted"));
-    out.appendChild(el(doc, "p", await feeAssetLine(t("barter.side_b", "Side B"), feeBId, hintsB), "muted"));
+    DOM.append(out, DOM.el(doc, "p", await feeAssetLine(t("barter.side_a", "Side A"), feeAId, hintsA), "muted"));
+    DOM.append(out, DOM.el(doc, "p", await feeAssetLine(t("barter.side_b", "Side B"), feeBId, hintsB), "muted"));
     if (myGen !== gen) return;
     /* Proposal-fee estimate (due now, paid by Peer A at PROPOSE): draft the
      * same pairs proposeBarter builds and ask the chain once. Degrades
@@ -525,12 +521,12 @@ var BarterUI = (function () {
         propHuman = Format.formatAmount(propRaw, pa.precision) + " " + pa.symbol;
       } catch (e3) { propHuman = propRaw + " (" + propAsset + ")"; }
     } catch (e) { /* hint unavailable stands */ }
-    out.appendChild(el(doc, "p", t("barter.proposal_fee_due_now_paid_by_prefix", "Proposal fee (due now, paid by ") + A.acct.name + t("barter.paid_by_suffix", "): ") + propHuman, "muted"));
+    DOM.append(out, DOM.el(doc, "p", t("barter.proposal_fee_due_now_paid_by_prefix", "Proposal fee (due now, paid by ") + A.acct.name + t("barter.paid_by_suffix", "): ") + propHuman, "muted"));
     /* TOTAL FEES line (BigInt only): leg raws + proposal raw grouped by fee
      * asset, formatted human per asset. */
     var totalText = await totalFeesText(rawA.concat(rawB), propRaw, propAsset);
     if (myGen !== gen) return;
-    out.appendChild(el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + totalText, "muted"));
+    DOM.append(out, DOM.el(doc, "p", t("barter.total_fees_prefix", "Total fees: ") + totalText, "muted"));
     return { A: A, B: B, esc: esc, feeAId: feeAId, feeBId: feeBId, propFeeId: propFeeId,
       timing: timing, totalText: totalText, propHuman: propHuman };
   }

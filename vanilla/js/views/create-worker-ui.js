@@ -53,15 +53,10 @@ var CreateWorkerUI = (function () {
     for (var i = 0; i < KINDS.length; i++) if (KINDS[i][0] === kind) return KINDS[i][1];
     return String(kind);
   }
-  /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
   /* Touch floor (#7): interactive elements >= 44px one dimension. */
   // using global touchable from js/utils/touchable.js
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* clearRoot removed — use DOM.clear */
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to a sentence. */
@@ -69,24 +64,24 @@ var CreateWorkerUI = (function () {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("createworker.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) msg = t("createworker.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("createworker.unknown_owner_account", "Unknown owner account.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg);
+    return err;
   }
   /* Status line for multi-step flows (resolving -> preview). */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p); return p; }
+    var p = DOM.status(wrap, text);
+    return p; }
   /* Labeled input row with its own inline error slot. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input"); input.type = opts.type || "text";
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
     if (opts.id) input.id = opts.id;
     if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
     touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("createworker.none", "none"); }
@@ -112,7 +107,7 @@ var CreateWorkerUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Account === "undefined" || !Account ||
         typeof Format === "undefined" || !Format) {
@@ -120,8 +115,8 @@ var CreateWorkerUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", t("createworker.create_worker", "Create Worker")));
-      wrap.appendChild(el(doc, "p", t("createworker.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+      wrap.appendChild(DOM.el(doc, "p", t("createworker.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -134,16 +129,16 @@ var CreateWorkerUI = (function () {
         if (settled || myGen !== gen) return;
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+        failWrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
         showError(doc, failWrap, new Error("not connected"), t("createworker.network_unavailable", "Network unavailable."));
-        var cwstat = el(doc, "p", "", "muted");
+        var cwstat = DOM.el(doc, "p", "", "muted");
         try { cwstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(cwstat);
-        var cwrow = el(doc, "div", null, "pools-offline-row");
+        var cwrow = DOM.el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(cwrow);
-    var cwretry = touchable(el(doc, "button", t("fees.retry", "Retry"))); cwretry.type = "button"; cwretry.className = "btn-ghost";
+    var cwretry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry"))); cwretry.type = "button"; cwretry.className = "btn-ghost";
         cwretry.type = "button";
         cwrow.appendChild(cwretry);
         var cwoff = null;
@@ -158,7 +153,7 @@ var CreateWorkerUI = (function () {
           try { cwlink = cwoff.settingsLink(doc, t); } catch (e) { cwlink = null; }
         }
         if (!cwlink) {
-          cwlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          cwlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { cwlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           cwlink.className = "subtle-btn";
         }
@@ -175,32 +170,32 @@ var CreateWorkerUI = (function () {
    * State survives Back via P. */
   function paintForm(doc, root, myGen, P) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("createworker.create_worker", "Create Worker")));
-    wrap.appendChild(el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op 34). Preview is live; review quotes the live fee, then Sign & Send broadcasts op 34 directly — workers are created by direct op, not by proposal."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op 34). Preview is live; review quotes the live fee, then Sign & Send broadcasts op 34 directly — workers are created by direct op, not by proposal."), "muted"));
     /* LOW punchlist: lifetime-member requirement note + per-field helper
      * texts (CreateWorker concept). Batch-3 i18n: keyed, no new routes. */
-    wrap.appendChild(el(doc, "p", t("createworker.publishing_a_worker_requires_a_lifeti", "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.publishing_a_worker_requires_a_lifeti", "Publishing a worker requires a lifetime-member account — basic accounts cannot pay this fee. The owner below must already be upgraded."), "muted"));
     var ownerF = fieldRow(doc, t("createworker.owner_account", "Owner account "), { id: "cw-owner", value: P.owner, placeholder: "account-name", inputmode: "text" });
     wrap.appendChild(ownerF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.owner_pays_the_fee_and_receives_the_", "Owner pays the fee and receives the worker pay — use a lifetime-member account you control."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.owner_pays_the_fee_and_receives_the_", "Owner pays the fee and receives the worker pay — use a lifetime-member account you control."), "muted"));
     var beginF = fieldRow(doc, t("createworker.work_begins", "Work begins "), { id: "cw-begin", value: P.begin, type: "datetime-local" });
     wrap.appendChild(beginF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.start_date_must_be_before_the_end_da", "Start date must be before the end date (chain rule) — pick both in UTC."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.start_date_must_be_before_the_end_da", "Start date must be before the end date (chain rule) — pick both in UTC."), "muted"));
     var endF = fieldRow(doc, t("createworker.work_ends", "Work ends "), { id: "cw-end", value: P.end, type: "datetime-local" });
     wrap.appendChild(endF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.end_date_must_be_after_the_start_dat", "End date must be after the start date; pay accrues only inside this window."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.end_date_must_be_after_the_start_dat", "End date must be after the start date; pay accrues only inside this window."), "muted"));
     var payF = fieldRow(doc, t("createworker.daily_pay_tpl", "Daily pay (%(sym)s) ", { sym: CORE_SYMBOL }), { id: "cw-pay", value: P.pay, placeholder: "0.00", inputmode: "decimal" });
     wrap.appendChild(payF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.daily_pay_in_core_asset_bts_precision", "Daily pay in core asset (BTS, precision 5), greater than zero and below the chain maximum."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.daily_pay_in_core_asset_bts_precision", "Daily pay in core asset (BTS, precision 5), greater than zero and below the chain maximum."), "muted"));
     var nameF = fieldRow(doc, t("createworker.worker_name", "Worker name "), { id: "cw-name", value: P.name, placeholder: "2026-maintenance", inputmode: "text" });
     wrap.appendChild(nameF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.short_name_under_63_bytes_shown_on_th", "Short name under 63 bytes — shown on the voting page."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.short_name_under_63_bytes_shown_on_th", "Short name under 63 bytes — shown on the voting page."), "muted"));
     var urlF = fieldRow(doc, t("createworker.proposal_url", "Proposal URL "), { id: "cw-url", value: P.url, placeholder: "https://…", inputmode: "url" });
     wrap.appendChild(urlF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.link_to_the_full_proposal_text_under_1", "Link to the full proposal text, under 127 bytes."), "muted"));
-    var kindRow = el(doc, "div", null, "xfer-field"), kindLab = el(doc, "label", t("createworker.pay_destination", "Pay destination "));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.link_to_the_full_proposal_text_under_1", "Link to the full proposal text, under 127 bytes."), "muted"));
+    var kindRow = DOM.el(doc, "div", null, "xfer-field"), kindLab = DOM.el(doc, "label", t("createworker.pay_destination", "Pay destination "));
     var kindSel = doc.createElement("select");
     KINDS.forEach(function (o) {
       var opt = doc.createElement("option"); opt.value = o[0]; opt.textContent = t("createworker.kind_" + o[0], o[1]);
@@ -211,15 +206,15 @@ var CreateWorkerUI = (function () {
     wrap.appendChild(kindRow);
     var daysF = fieldRow(doc, "Vesting period (days) ", { id: "cw-days", value: P.days, placeholder: "30", inputmode: "numeric" });
     wrap.appendChild(daysF.row);
-    wrap.appendChild(el(doc, "p", t("createworker.vesting_choice_only_whole_days_0_6553", "Vesting choice only: whole days 0..65535 for the vesting pay destination; hidden otherwise."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.vesting_choice_only_whole_days_0_6553", "Vesting choice only: whole days 0..65535 for the vesting pay destination; hidden otherwise."), "muted"));
     function syncDays() { daysF.row.style.display = (kindSel.value === "vesting") ? "" : t("createworker.none", "none"); }
     kindSel.addEventListener("change", syncDays); syncDays();
-    var previewBtn = touchable(el(doc, "button", t("createworker.preview_worker", "Preview worker")));
+    var previewBtn = touchable(DOM.el(doc, "button", t("createworker.preview_worker", "Preview worker")));
     previewBtn.id = "cw-preview"; previewBtn.type = "button"; wrap.appendChild(previewBtn);
-    var out = el(doc, "div"); wrap.appendChild(out);
+    var out = DOM.el(doc, "div"); wrap.appendChild(out);
     previewBtn.addEventListener("click", function () {
       [ownerF, beginF, endF, payF, nameF, urlF, daysF].forEach(function (f) { setFieldError(f, ""); });
-      out.innerHTML = "";
+      DOM.clear(out);
       P.owner = ownerF.input.value.trim().toLowerCase();
       P.begin = beginF.input.value; P.end = endF.input.value; P.pay = payF.input.value.trim();
       P.name = nameF.input.value.trim(); P.url = urlF.input.value.trim(); P.kind = kindSel.value;
@@ -318,13 +313,13 @@ var CreateWorkerUI = (function () {
    * direct op, never enclosed in a proposal — see header). */
   function paintPreview(doc, root, myGen, P, R) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("createworker.worker_preview_op_34", "Worker preview (op 34)")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    wrap.appendChild(DOM.el(doc, "h1", t("createworker.worker_preview_op_34", "Worker preview (op 34)")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
     row(t("createworker.owner", "Owner"), R.ownerName + " (" + R.ownerId + ")");
     row(t("createworker.work_begins_2", "Work begins"), R.beginWire);
     row(t("createworker.work_ends_2", "Work ends"), R.endWire);
@@ -334,21 +329,21 @@ var CreateWorkerUI = (function () {
     row(t("createworker.pay_destination_2", "Pay destination"), t("createworker.kind_" + P.kind, R.kindWord));
     if (P.kind === "vesting") row("Vesting period", String(R.days) + " days", String(R.days));
     wrap.appendChild(list);
-    wrap.appendChild(el(doc, "p", t("createworker.pay_denom_note", "Daily pay is denominated in the core asset (%(sym)s, precision %(prec)s); the fee is quoted live at review time via get_required_fees.", { sym: CORE_SYMBOL, prec: CORE_PRECISION }), "muted"));
-    var backBtn = touchable(el(doc, "button", t("createworker.back", "Back"))); backBtn.id = "cw-back"; backBtn.type = "button"; backBtn.className = "btn-ghost";
+    wrap.appendChild(DOM.el(doc, "p", t("createworker.pay_denom_note", "Daily pay is denominated in the core asset (%(sym)s, precision %(prec)s); the fee is quoted live at review time via get_required_fees.", { sym: CORE_SYMBOL, prec: CORE_PRECISION }), "muted"));
+    var backBtn = touchable(DOM.el(doc, "button", t("createworker.back", "Back"))); backBtn.id = "cw-back"; backBtn.type = "button"; backBtn.className = "btn-ghost";
     backBtn.id = "cw-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintForm(doc, root, myGen, P); });
     if (!op34Ready()) {
-      wrap.appendChild(el(doc, "p", t("createworker.broadcast_unavailable_the_op_34_serializer_is", "Broadcast unavailable: the op-34 serializer is not loaded in this bundle (tx.js/tx-send.js). The preview above is exact — reload the app files and retry. Nothing was broadcast."), "error"));
+      wrap.appendChild(DOM.el(doc, "p", t("createworker.broadcast_unavailable_the_op_34_serializer_is", "Broadcast unavailable: the op-34 serializer is not loaded in this bundle (tx.js/tx-send.js). The preview above is exact — reload the app files and retry. Nothing was broadcast."), "error"));
       return;
     }
-    var reviewBtn = touchable(el(doc, "button", t("createworker.review_fee_sign", "Review fee & sign")));
+    var reviewBtn = touchable(DOM.el(doc, "button", t("createworker.review_fee_sign", "Review fee & sign")));
     reviewBtn.id = "cw-review"; reviewBtn.type = "button"; wrap.appendChild(reviewBtn);
-    var out = el(doc, "div"); wrap.appendChild(out);
+    var out = DOM.el(doc, "div"); wrap.appendChild(out);
     reviewBtn.addEventListener("click", function () {
       if (myGen !== gen) return;
       reviewBtn.disabled = true; backBtn.disabled = true;
-      out.innerHTML = "";
+      DOM.clear(out);
       var status = showStatus(doc, out, t("createworker.estimating_fee", "Estimating fee…"));
       var opData = buildOpData(P, R);
       Promise.resolve().then(function () {
@@ -358,7 +353,7 @@ var CreateWorkerUI = (function () {
         if (myGen !== gen) return;
         out.removeChild(status);
         paintConfirm(doc, out, myGen, P, R, opData, function () {
-          reviewBtn.disabled = false; backBtn.disabled = false; out.innerHTML = "";
+          reviewBtn.disabled = false; backBtn.disabled = false; DOM.clear(out);
         }, function () { reviewBtn.disabled = true; });
       }).catch(function (e) {
         if (myGen !== gen) return;
@@ -376,11 +371,11 @@ var CreateWorkerUI = (function () {
    * review button; onSent locks it so a created worker can never be
    * double-signed from a stale confirm. */
   function paintConfirm(doc, box, myGen, P, R, opData, onBack, onSent) {
-    box.appendChild(el(doc, "h3", t("createworker.confirm_worker_op_34", "Confirm worker (op 34)")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    box.appendChild(DOM.el(doc, "h3", t("createworker.confirm_worker_op_34", "Confirm worker (op 34)")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
     row(t("createworker.owner", "Owner"), R.ownerName + " (" + R.ownerId + ")");
     row(t("createworker.work_begins_2", "Work begins"), R.beginWire);
     row(t("createworker.work_ends_2", "Work ends"), R.endWire);
@@ -394,8 +389,8 @@ var CreateWorkerUI = (function () {
     catch (e) { feeHuman = String(opData.fee.amount) + " (" + opData.fee.asset_id + ")"; }
     row(t("createworker.fee_live", "Fee (live)"), feeHuman + " (core)", String(opData.fee.amount));
     box.appendChild(list);
-    var back = touchable(el(doc, "button", t("createworker.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
-    var send = touchable(el(doc, "button", t("createworker.sign_send", "Sign & Send"))); send.type = "button";
+    var back = touchable(DOM.el(doc, "button", t("createworker.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
+    var send = touchable(DOM.el(doc, "button", t("createworker.sign_send", "Sign & Send"))); send.type = "button";
     box.appendChild(back); box.appendChild(send);
     back.addEventListener("click", function () { if (myGen === gen) onBack(); });
     send.addEventListener("click", function () {
@@ -437,10 +432,10 @@ var CreateWorkerUI = (function () {
       }).then(function (done) {
         if (!done || myGen !== gen) return;
         onSent();
-        box.innerHTML = "";
-        var ok = el(doc, "p", "Worker " + done.res.proof.id + " created and re-read on chain.", "xfer-ok");
+        DOM.clear(box);
+        var ok = DOM.el(doc, "p", "Worker " + done.res.proof.id + " created and re-read on chain.", "xfer-ok");
         ok.setAttribute("aria-live", "polite"); box.appendChild(ok);
-        box.appendChild(el(doc, "p", "Observed at head block #" + String(done.head) +
+        box.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(done.head) +
           " (" + done.res.via + ").", "muted"));
         var a = doc.createElement("a");
         a.href = "#/account/" + encodeURIComponent(R.ownerName);

@@ -37,38 +37,32 @@ var CreateAccountUI = (function () {
   var gen = 0;
   var FAUCET_URL = "https://testnet-faucet.xbts.io/api/v1/accounts";
   var FETCH_TIMEOUT_MS = 20000;
-  /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n; }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
   /* Touch floor (#7): interactive elements >= 44px one dimension. */
-function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
   /* Inline error panel, never blank: any thrown value maps to text. */
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("createaccount.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) msg = t("createaccount.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, msg);
+    return err;
   }
   /* Status line for multi-step flows (checking → registering → verifying). */
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite");
-    wrap.appendChild(p); return p; }
+    var p = DOM.status(wrap, text);
+    return p; }
   /* Labeled input row with its own inline error slot. */
   function fieldRow(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input"); input.type = opts.type || "text";
     if (opts.inputmode) input.setAttribute("inputmode", opts.inputmode);
     if (opts.id) input.id = opts.id;
     if (opts.value !== undefined && opts.value !== null) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
     touchable(input); label.appendChild(input); row.appendChild(label);
-    var err = el(doc, "div", "", "error");
+    var err = DOM.el(doc, "div", "", "error");
     err.setAttribute("aria-live", "polite"); err.style.display = "none"; row.appendChild(err);
     return { row: row, input: input, err: err }; }
   function setFieldError(f, msg) { f.err.textContent = msg || ""; f.err.style.display = msg ? "" : t("createaccount.none", "none"); }
@@ -102,7 +96,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     if (typeof Crypto === "undefined" || !Crypto || typeof Account === "undefined" || !Account ||
         typeof Wallet === "undefined" || !Wallet) {
@@ -110,8 +104,8 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
-      wrap.appendChild(el(doc, "p", t("createaccount.connecting_to_network", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
+      wrap.appendChild(DOM.el(doc, "p", t("createaccount.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -124,16 +118,16 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
         if (settled || myGen !== gen) return;
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
+        failWrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
         showError(doc, failWrap, new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
-        var castat = el(doc, "p", "", "muted");
+        var castat = DOM.el(doc, "p", "", "muted");
         try { castat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(castat);
-        var carow = el(doc, "div", null, "pools-offline-row");
+        var carow = DOM.el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(carow);
-        var caretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        var caretry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
         caretry.type = "button";
         carow.appendChild(caretry);
         var caoff = null;
@@ -148,7 +142,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
           try { calink = caoff.settingsLink(doc, t); } catch (e) { calink = null; }
         }
         if (!calink) {
-          calink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          calink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { calink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           touchable(calink);
         }
@@ -169,18 +163,18 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
    * @param {any} P form state {name, brainkey, checked, takenId} */
   function paintForm(doc, root, myGen, P) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root), testnet = networkName() === "testnet";
-    wrap.appendChild(el(doc, "h1", t("createaccount.create_account", "Create Account")));
-    wrap.appendChild(el(doc, "p", testnet
+    wrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
+    wrap.appendChild(DOM.el(doc, "p", testnet
       ? "Register a new testnet account through the faucet (testnet network)."
       : "Registration uses the testnet faucet — switch to testnet in Settings to register. Name checks work on either network.", "muted"));
     /* Punchlist MED: CREATE ACCOUNT vs LOGIN selector card (original
      * create-account.png). This form below is the create path; #/login
      * unlocks an existing wallet. Plain literals only. */
     (function selectorCard() {
-      var card = el(doc, "div", null, "ca-selector");
-      card.appendChild(el(doc, "strong", t("createaccount.selector_this_form", "Create account (this form)")));
+      var card = DOM.el(doc, "div", null, "ca-selector");
+      card.appendChild(DOM.el(doc, "strong", t("createaccount.selector_this_form", "Create account (this form)")));
       card.appendChild(doc.createTextNode(" · "));
       var a = doc.createElement("a");
       a.href = "#/login";
@@ -191,29 +185,29 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
     })();
     var nameF = fieldRow(doc, t("createaccount.account_name", "Account name "), { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
     wrap.appendChild(nameF.row);
-    var checkBtn = touchable(el(doc, "button", t("createaccount.check_availability", "Check availability")));
+    var checkBtn = touchable(DOM.el(doc, "button", t("createaccount.check_availability", "Check availability")));
     checkBtn.id = "ca-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
-    var avail = el(doc, "p", availabilityText(P), "muted");
+    var avail = DOM.el(doc, "p", availabilityText(P), "muted");
     avail.id = "ca-avail"; avail.setAttribute("aria-live", "polite"); wrap.appendChild(avail);
-    wrap.appendChild(el(doc, "h3", t("createaccount.brainkey_back_it_up", "Brainkey (back it up)")));
-    wrap.appendChild(el(doc, "p", t("createaccount.a_fresh_brainkey_is_generated_for_the_new_acc", "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys."), "muted"));
+    wrap.appendChild(DOM.el(doc, "h3", t("createaccount.brainkey_back_it_up", "Brainkey (back it up)")));
+    wrap.appendChild(DOM.el(doc, "p", t("createaccount.a_fresh_brainkey_is_generated_for_the_new_acc", "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys."), "muted"));
     var bkArea = doc.createElement("textarea");
     bkArea.id = "ca-brainkey"; bkArea.rows = 3; bkArea.readOnly = true; bkArea.style.width = "100%";
     bkArea.setAttribute("spellcheck", "false"); bkArea.setAttribute("autocomplete", "off");
     bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…");
     if (P.brainkey) bkArea.value = P.brainkey;
     wrap.appendChild(bkArea);
-    var regenBtn = touchable(el(doc, "button", t("createaccount.generate_new_brainkey", "Generate new brainkey")));
+    var regenBtn = touchable(DOM.el(doc, "button", t("createaccount.generate_new_brainkey", "Generate new brainkey")));
     regenBtn.id = "ca-regen"; regenBtn.type = "button"; wrap.appendChild(regenBtn);
-    var regBtn = touchable(el(doc, "button", testnet ? t("createaccount.register_account", "Register account") : t("createaccount.register_account_testnet_only", "Register account (testnet only)")));
+    var regBtn = touchable(DOM.el(doc, "button", testnet ? t("createaccount.register_account", "Register account") : t("createaccount.register_account_testnet_only", "Register account (testnet only)")));
     regBtn.id = "ca-register"; regBtn.type = "button";
     if (!testnet) regBtn.disabled = true;
     wrap.appendChild(regBtn);
-    var out = el(doc, "div"); wrap.appendChild(out);
+    var out = DOM.el(doc, "div"); wrap.appendChild(out);
     /* LOW punchlist: restore-your-account / advanced-form links on this page
      * (original create-account.png). Batch-3 i18n: keyed, existing routes only. */
     (function restoreLinks() {
-      var p = el(doc, "p", null, "muted");
+      var p = DOM.el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/existing-account";
       a.textContent = t("createaccount.restore_your_account", "Restore your account");
@@ -234,11 +228,11 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       avail.textContent = availabilityText(P);
     });
     regenBtn.addEventListener("click", function () {
-      out.innerHTML = ""; bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…"); bkArea.value = ""; P.brainkey = "";
+      DOM.clear(out); bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…"); bkArea.value = ""; P.brainkey = "";
       genBrainkey(doc, myGen, P, out);
     });
     checkBtn.addEventListener("click", function () {
-      setFieldError(nameF, ""); out.innerHTML = "";
+      setFieldError(nameF, ""); DOM.clear(out);
       P.name = nameF.input.value.trim().toLowerCase(); nameF.input.value = P.name;
       var bad = nameFormatError(P.name);
       if (bad) { setFieldError(nameF, bad); return; }
@@ -256,7 +250,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
       });
     });
     regBtn.addEventListener("click", function () {
-      setFieldError(nameF, ""); out.innerHTML = "";
+      setFieldError(nameF, ""); DOM.clear(out);
       P.name = nameF.input.value.trim().toLowerCase(); nameF.input.value = P.name;
       var bad = nameFormatError(P.name);
       if (bad) { setFieldError(nameF, bad); return; }
@@ -367,35 +361,35 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
    * save-to-wallet (password -> Wallet.create), link to the account page. */
   function paintResult(doc, root, myGen, P, reg) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("createaccount.account_created", "Account created")));
-    var list = el(doc, "dl", null, "xfer-confirm");
+    wrap.appendChild(DOM.el(doc, "h1", t("createaccount.account_created", "Account created")));
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
-      list.appendChild(el(doc, "dt", term));
-      var dd = el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
+      list.appendChild(DOM.el(doc, "dt", term));
+      var dd = DOM.el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
     row(t("createaccount.account", "Account"), reg.name + " (" + reg.id + ")");
     row(t("createaccount.owner_key", "Owner key"), reg.pubs.owner);
     row(t("createaccount.active_key", "Active key"), reg.pubs.active);
     row(t("createaccount.memo_key", "Memo key"), reg.pubs.memo);
     row(t("createaccount.network", "Network"), networkName());
     wrap.appendChild(list);
-    wrap.appendChild(el(doc, "p", t("createaccount.back_up_this_brainkey_it_is_the_only_way_to_r", "Back up this brainkey — it is the only way to recover the account."), "muted"));
+    wrap.appendChild(DOM.el(doc, "p", t("createaccount.back_up_this_brainkey_it_is_the_only_way_to_r", "Back up this brainkey — it is the only way to recover the account."), "muted"));
     var saved = doc.createElement("textarea");
     saved.id = "ca-backup-text"; saved.rows = 3; saved.readOnly = true; saved.value = P.brainkey; saved.style.width = "100%";
     wrap.appendChild(saved);
-    wrap.appendChild(el(doc, "h3", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
+    wrap.appendChild(DOM.el(doc, "h3", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
     var pwF = fieldRow(doc, t("createaccount.password", "Password "), { id: "ca-password", type: "password" });
     wrap.appendChild(pwF.row);
-    var saveBtn = touchable(el(doc, "button", t("createaccount.save_wallet_with_this_brainkey", "Save wallet with this brainkey")));
+    var saveBtn = touchable(DOM.el(doc, "button", t("createaccount.save_wallet_with_this_brainkey", "Save wallet with this brainkey")));
     saveBtn.id = "ca-save"; saveBtn.type = "button"; wrap.appendChild(saveBtn);
-    var out = el(doc, "div"); wrap.appendChild(out);
-    var acctP = el(doc, "p", null, "muted"), acctA = doc.createElement("a");
+    var out = DOM.el(doc, "div"); wrap.appendChild(out);
+    var acctP = DOM.el(doc, "p", null, "muted"), acctA = doc.createElement("a");
     acctA.href = "#/account/" + encodeURIComponent(reg.name);
     acctA.textContent = t("account.open_prefix", "Open ") + reg.name;
     acctP.appendChild(acctA); wrap.appendChild(acctP);
     saveBtn.addEventListener("click", function () {
-      setFieldError(pwF, ""); out.innerHTML = "";
+      setFieldError(pwF, ""); DOM.clear(out);
       if (!pwF.input.value) { setFieldError(pwF, t("createaccount.password_required_enter_a_non_empty_password", "Password required: enter a non-empty password.")); return; }
       saveBtn.disabled = true;
       var status = showStatus(doc, out, t("createaccount.saving_wallet", "Saving wallet…"));
@@ -407,7 +401,7 @@ function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstCh
           pw = null;
           if (myGen !== gen) return;
           out.removeChild(status);
-          out.appendChild(el(doc, "p", t("createaccount.wallet_saved_the_account_keys_are_now_unlocke", "Wallet saved. The account keys are now unlocked on this device."), "muted"));
+          out.appendChild(DOM.el(doc, "p", t("createaccount.wallet_saved_the_account_keys_are_now_unlocke", "Wallet saved. The account keys are now unlocked on this device."), "muted"));
         })
         .catch(function (e) {
           pwF.input.value = "";

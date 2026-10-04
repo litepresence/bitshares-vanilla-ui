@@ -53,15 +53,7 @@ var DashboardUI = (function () {
     return dflt;
   }
 
-  /* textContent-only element (user/chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — use DOM.el, DOM.clear */
 
   /* Unlocked right now (read-only Wallet probe, never throws). */
   function isUnlockedNow() {
@@ -89,8 +81,7 @@ var DashboardUI = (function () {
     else if (msg.indexOf("history-unavailable") !== -1) msg = t("account.err_history", "History unavailable on this node.");
     else if (msg.indexOf("bad-asset-shape") !== -1) msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
     else if (msg.indexOf("unknown-account") !== -1) msg = t("transfer.unknown_account", "Unknown account.");
-    var err = el(doc, "div", msg, "error");
-    err.setAttribute("aria-live", "polite"); wrap.appendChild(err);
+    var err = DOM.error(wrap, msg);
     if (isHist) {
       try {
         if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
@@ -104,7 +95,7 @@ var DashboardUI = (function () {
 
   /* Internal link paragraph (href + text pairs, tap-sized links). */
   function linkPara(doc, pairs) {
-    var p = el(doc, "p", null, "muted");
+    var p = DOM.el(doc, "p", null, "muted");
     pairs.forEach(function (pr, i) {
       if (i > 0) p.appendChild(doc.createTextNode(" · "));
       var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; a.className = "subtle-btn"; touchable(a); p.appendChild(a);
@@ -252,7 +243,7 @@ var DashboardUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
-    clearRoot(root);
+    DOM.clear(root);
     /* Landing rule (Option B, 2026-10-01): locked visitors get the splash,
      * unlocked visitors get the watched-account dashboard unchanged. The
      * landing paints immediately (static hero/cards/steps + fail-open live
@@ -299,8 +290,8 @@ var DashboardUI = (function () {
     }
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(el(doc, "h1", t("shell.dashboard", "Dashboard")));
-      wrap.appendChild(el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
+      wrap.appendChild(DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled || myGen !== gen) return;
@@ -313,16 +304,16 @@ var DashboardUI = (function () {
         if (settled || myGen !== gen) return;
         settled = true; off();
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
-        clearRoot(root);
+        DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(el(doc, "h1", t("shell.dashboard", "Dashboard")));
+        failWrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
         showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
-        var dstat = el(doc, "p", "", "muted");
+        var dstat = DOM.el(doc, "p", "", "muted");
         try { dstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(dstat);
-        var drow = el(doc, "div", null, "pools-offline-row");
+        var drow = DOM.el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(drow);
-        var dtry = touchable(el(doc, "button", t("fees.retry", "Retry"))); dtry.className = "btn-ghost";
+        var dtry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry"))); dtry.className = "btn-ghost";
         dtry.type = "button";
         drow.appendChild(dtry);
         var doff = null;
@@ -337,7 +328,7 @@ var DashboardUI = (function () {
           try { dlink = doff.settingsLink(doc, t); } catch (e) { dlink = null; }
         }
         if (!dlink) {
-          dlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
+          dlink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { dlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           dlink.className = "subtle-btn";
         }
@@ -355,16 +346,16 @@ var DashboardUI = (function () {
    * line replaced by data, an empty state, or an error panel. */
   function paintDashboard(doc, root, myGen) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(el(doc, "h1", t("shell.dashboard", "Dashboard")));
+    wrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
 
     var unlocked = false;
     try { unlocked = typeof Wallet !== "undefined" && Wallet && typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked(); }
     catch (e) { unlocked = false; }
     if (!unlocked) {
       wrap.appendChild(gateCard(doc));
-      wrap.appendChild(el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
       wrap.appendChild(linkPara(doc, [
         ["#/login", t("auth.login", "Login")],
         ["#/accounts", t("account.manager_title", "Accounts")]
@@ -387,11 +378,11 @@ var DashboardUI = (function () {
     paintMarkets(doc, wrap);
     paintQuickLinks(doc, wrap);
 
-    acctSection.appendChild(el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
-    balSection.appendChild(el(doc, "h2", t("account.s7", "Balances")));
-    balSection.appendChild(el(doc, "p", t("account.loading_balances", "Loading balances…"), "muted"));
-    histSection.appendChild(el(doc, "h2", t("account.history_title", "History")));
-    histSection.appendChild(el(doc, "p", t("account.loading_history", "Loading history…"), "muted"));
+    acctSection.appendChild(DOM.el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
+    balSection.appendChild(DOM.el(doc, "h2", t("account.s7", "Balances")));
+    balSection.appendChild(DOM.el(doc, "p", t("account.loading_balances", "Loading balances…"), "muted"));
+    histSection.appendChild(DOM.el(doc, "h2", t("account.history_title", "History")));
+    histSection.appendChild(DOM.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"));
 
     resolveWatched(unlocked).then(function (found) {
       if (myGen !== gen) return;
@@ -400,7 +391,7 @@ var DashboardUI = (function () {
       fillHistory(doc, histSection, found, myGen);
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearRoot(acctSection);
+      DOM.clear(acctSection);
       showError(doc, acctSection, e, t("transfer.load_account_failed", "Could not load your account."));
     });
   }
@@ -423,8 +414,8 @@ var DashboardUI = (function () {
       logo.className = "dashboard-gate-logo";
       card.appendChild(logo);
     } catch (e) { /* gate works without the mark */ }
-    card.appendChild(el(doc, "h2", t("dashboard.welcome", "Welcome to BitShares")));
-    card.appendChild(el(doc, "p", t("dashboard.tagline", "Your Decentralized Platform"), "muted"));
+    card.appendChild(DOM.el(doc, "h2", t("dashboard.welcome", "Welcome to BitShares")));
+    card.appendChild(DOM.el(doc, "p", t("dashboard.tagline", "Your Decentralized Platform"), "muted"));
     var row = doc.createElement("p");
     row.className = "dashboard-gate-row";
     var create = doc.createElement("a");
@@ -509,7 +500,7 @@ var DashboardUI = (function () {
 
   /* Account heading: name linked to its page + watch-mode disclaimer. */
   function fillAccount(doc, section, found, unlocked) {
-    clearRoot(section);
+    DOM.clear(section);
     var h2 = doc.createElement("h2");
     var a = doc.createElement("a");
     a.href = "#/account/" + encodeURIComponent(found.name);
@@ -517,9 +508,9 @@ var DashboardUI = (function () {
     touchable(a);
     h2.appendChild(a);
     section.appendChild(h2);
-    section.appendChild(el(doc, "p", found.id, "muted"));
+    section.appendChild(DOM.el(doc, "p", found.id, "muted"));
     if (found.watched || !unlocked) {
-      section.appendChild(el(doc, "p",
+      section.appendChild(DOM.el(doc, "p",
         t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: found.name, id: found.id }), "muted"));
     }
     section.appendChild(linkPara(doc, [
@@ -536,11 +527,11 @@ var DashboardUI = (function () {
   function fillBalances(doc, section, found, myGen) {
     Account.balances(found.id).then(function (list) {
       if (myGen !== gen) return;
-      clearRoot(section);
-      section.appendChild(el(doc, "h2", t("account.s7", "Balances")));
-      section.appendChild(el(doc, "p", t("dashboard.top_holdings_for_the_watched_account_", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."), "muted"));
+      DOM.clear(section);
+      section.appendChild(DOM.el(doc, "h2", t("account.s7", "Balances")));
+      section.appendChild(DOM.el(doc, "p", t("dashboard.top_holdings_for_the_watched_account_", "Top holdings for the watched account — the reference dashboard shows market tabs instead; full balances live on the account page."), "muted"));
       if (!list || list.length === 0) {
-        section.appendChild(el(doc, "p", t("account.s1", "No balances.") + t("account.s1_hint", " Fund it with a transfer, or place a market order — holdings list here."), "muted"));
+        section.appendChild(DOM.el(doc, "p", t("account.s1", "No balances.") + t("account.s1_hint", " Fund it with a transfer, or place a market order — holdings list here."), "muted"));
         return;
       }
       var table = doc.createElement("table");
@@ -592,8 +583,8 @@ var DashboardUI = (function () {
       ]));
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearRoot(section);
-      section.appendChild(el(doc, "h2", t("account.s7", "Balances")));
+      DOM.clear(section);
+      section.appendChild(DOM.el(doc, "h2", t("account.s7", "Balances")));
       showError(doc, section, e, t("account.load_balances_failed", "Could not load balances."));
     });
   }
@@ -603,10 +594,10 @@ var DashboardUI = (function () {
   function fillHistory(doc, section, found, myGen) {
     Account.history(found.id, 10).then(function (rows) {
       if (myGen !== gen) return;
-      clearRoot(section);
-      section.appendChild(el(doc, "h2", t("account.history_title", "History")));
+      DOM.clear(section);
+      section.appendChild(DOM.el(doc, "h2", t("account.history_title", "History")));
       if (!rows || rows.length === 0) {
-        section.appendChild(el(doc, "p", t("account.s3", "No recent activity.") + t("account.activity_hint", " Transfers, orders, and fills list here once they happen."), "muted"));
+        section.appendChild(DOM.el(doc, "p", t("account.s3", "No recent activity.") + t("account.activity_hint", " Transfers, orders, and fills list here once they happen."), "muted"));
         return;
       }
       var ul = doc.createElement("ul");
@@ -621,8 +612,8 @@ var DashboardUI = (function () {
       ]));
     }).catch(function (e) {
       if (myGen !== gen) return;
-      clearRoot(section);
-      section.appendChild(el(doc, "h2", t("account.history_title", "History")));
+      DOM.clear(section);
+      section.appendChild(DOM.el(doc, "h2", t("account.history_title", "History")));
       showError(doc, section, e, t("account.err_history", "History unavailable on this node."));
     });
   }
@@ -641,7 +632,7 @@ var DashboardUI = (function () {
   function paintMarketStrip(doc, wrap, myGen) {
     var section = doc.createElement("section");
     section.className = "mkt-strip";
-    section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
+    section.appendChild(DOM.el(doc, "h2", t("market.picker_title", "Markets")));
     var tabs = doc.createElement("div");
     tabs.className = "mkt-tabs";
     tabs.setAttribute("role", "tablist");
@@ -675,11 +666,11 @@ var DashboardUI = (function () {
    * its market; price/change fill fail-open ("—" on miss). Never blank:
    * empty Starred shows the shared favourites empty state + links. */
   function paintStripPane(doc, pane, name, myGen) {
-    while (pane.firstChild) pane.removeChild(pane.firstChild);
+    DOM.clear(pane);
     var ids = name === "Starred" ? favMarkets() : (FEATURED[name] || []).slice();
     ids = ids.slice().sort().slice(0, STRIP_MAX);
     if (!ids.length) {
-      pane.appendChild(el(doc, "p",
+      pane.appendChild(DOM.el(doc, "p",
         name === "Starred"
           ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
           : (t("account.s3", "No recent activity.") + t("dashboard.strip_hint", " No markets are configured for this strip — open any market from the picker.")), "muted"));
@@ -696,9 +687,9 @@ var DashboardUI = (function () {
       a.className = "mkt-strip-chip subtle-btn";
       a.href = "#/market/" + encodeURIComponent(id);
       touchable(a);
-      var pair = el(doc, "span", id, "mkt-strip-pair");
-      var px = el(doc, "span", "…", "mkt-strip-px num");
-      var chg = el(doc, "span", "…", "mkt-strip-chg num");
+      var pair = DOM.el(doc, "span", id, "mkt-strip-pair");
+      var px = DOM.el(doc, "span", "…", "mkt-strip-px num");
+      var chg = DOM.el(doc, "span", "…", "mkt-strip-chg num");
       a.appendChild(pair);
       a.appendChild(px);
       a.appendChild(chg);
@@ -722,7 +713,7 @@ var DashboardUI = (function () {
    * Ticker stats load fail-open per row ("—" on miss); panes never blank. */
   function paintMarkets(doc, wrap) {
     var section = doc.createElement("section");
-    section.appendChild(el(doc, "h2", t("market.picker_title", "Markets")));
+    section.appendChild(DOM.el(doc, "h2", t("market.picker_title", "Markets")));
     var tabs = doc.createElement("div");
     tabs.className = "mkt-tabs";
     tabs.setAttribute("role", "tablist");
@@ -753,10 +744,10 @@ var DashboardUI = (function () {
   /* One markets pane: Starred reads the fav key; quote panes read FEATURED.
    * Rows: market link + latest + 24h change (fail-open "—"). */
   function paintMarketPane(doc, pane, name) {
-    while (pane.firstChild) pane.removeChild(pane.firstChild);
+    DOM.clear(pane);
     var ids = name === "Starred" ? favMarkets() : (FEATURED[name] || []).slice();
     if (!ids.length) {
-      pane.appendChild(el(doc, "p",
+      pane.appendChild(DOM.el(doc, "p",
         name === "Starred"
           ? t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below.")
           : (t("account.s3", "No recent activity.") + t("dashboard.strip_hint", " No markets are configured for this strip — open any market from the picker.")), "muted"));
@@ -788,8 +779,8 @@ var DashboardUI = (function () {
       touchable(a);
       tdM.appendChild(a);
       tr.appendChild(tdM);
-      var tdL = el(doc, "td", "…", "num");
-      var tdC = el(doc, "td", "…", "num");
+      var tdL = DOM.el(doc, "td", "…", "num");
+      var tdC = DOM.el(doc, "td", "…", "num");
       tr.appendChild(tdL);
       tr.appendChild(tdC);
       tbody.appendChild(tr);
@@ -811,7 +802,7 @@ var DashboardUI = (function () {
    * strings, byte-identical to en.json). */
   function paintQuickLinks(doc, wrap) {
     var section = doc.createElement("section");
-    section.appendChild(el(doc, "h2", t("news.start_here", "Start here")));
+    section.appendChild(DOM.el(doc, "h2", t("news.start_here", "Start here")));
     section.appendChild(linkPara(doc, [
       ["#/account/me", t("news.account_overview_balances_and_history", "Account overview — balances and history")],
       ["#/market/" + encodeURIComponent(defaultMarket()), t("news.exchange_trade_on_the_dex", "Exchange — trade on the DEX")],
@@ -833,7 +824,7 @@ var DashboardUI = (function () {
    * the hero <img> (owner art, empty alt — the h1 carries the meaning). */
   function paintLanding(doc, root, myGen) {
     if (myGen !== gen) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = makeWrap(doc, root);
     wrap.appendChild(landingHero(doc));
     paintMarketStrip(doc, wrap, myGen);
@@ -858,10 +849,10 @@ var DashboardUI = (function () {
       img.className = "splash-hero-img";
       s.appendChild(img);
     } catch (e) { /* hero works without art */ }
-    s.appendChild(el(doc, "h1", t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable.")));
-    s.appendChild(el(doc, "p",
+    s.appendChild(DOM.el(doc, "h1", t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable.")));
+    s.appendChild(DOM.el(doc, "p",
       t("splash.hero_sub", "Your keys. Your coins."), "muted"));
-    s.appendChild(el(doc, "p",
+    s.appendChild(DOM.el(doc, "p",
       t("splash.hero_sub2", "Nothing but fresh vanilla html/js/css in between."), "muted"));
     var row = doc.createElement("p");
     row.className = "splash-cta-row";
@@ -895,7 +886,7 @@ var DashboardUI = (function () {
   function paintPulse(doc, wrap, myGen) {
     var s = doc.createElement("section");
     s.className = "pulse-band";
-    s.appendChild(el(doc, "h2", t("splash.pulse_title", "Chain pulse")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.pulse_title", "Chain pulse")));
     var grid = doc.createElement("div");
     grid.className = "pulse-grid";
     s.appendChild(grid);
@@ -903,8 +894,8 @@ var DashboardUI = (function () {
     ["head", "time", "accounts", "assets", "witnesses", "committee"].forEach(function (k) {
       var cell = doc.createElement("div");
       cell.className = "pulse-cell";
-      cell.appendChild(el(doc, "div", t("splash.pulse_" + k, k), "muted"));
-      var v = el(doc, "div", "…", "num");
+      cell.appendChild(DOM.el(doc, "div", t("splash.pulse_" + k, k), "muted"));
+      var v = DOM.el(doc, "div", "…", "num");
       cell.appendChild(v);
       grid.appendChild(cell);
       cells[k] = v;
@@ -1011,7 +1002,7 @@ var DashboardUI = (function () {
   function landingCards(doc) {
     var s = doc.createElement("section");
     s.className = "prod-cards";
-    s.appendChild(el(doc, "h2", t("splash.cards_title", "What you can do here")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.cards_title", "What you can do here")));
     var grid = doc.createElement("div");
     grid.className = "prod-grid";
     [
@@ -1028,8 +1019,8 @@ var DashboardUI = (function () {
       a.href = c[0];
       a.className = "prod-card subtle-btn";
       touchable(a);
-      a.appendChild(el(doc, "h3", c[1]));
-      a.appendChild(el(doc, "p", c[2], "muted"));
+      a.appendChild(DOM.el(doc, "h3", c[1]));
+      a.appendChild(DOM.el(doc, "p", c[2], "muted"));
       grid.appendChild(a);
     });
     s.appendChild(grid);
@@ -1041,7 +1032,7 @@ var DashboardUI = (function () {
   function landingTrust(doc) {
     var s = doc.createElement("section");
     s.className = "trust-trio";
-    s.appendChild(el(doc, "h2", t("splash.trust_title", "Why it stays yours")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.trust_title", "Why it stays yours")));
     var grid = doc.createElement("div");
     grid.className = "trust-grid";
     [
@@ -1054,8 +1045,8 @@ var DashboardUI = (function () {
     ].forEach(function (c) {
       var d = doc.createElement("div");
       d.className = "trust-cell";
-      d.appendChild(el(doc, "h3", c[0]));
-      d.appendChild(el(doc, "p", c[1], "muted"));
+      d.appendChild(DOM.el(doc, "h3", c[0]));
+      d.appendChild(DOM.el(doc, "p", c[1], "muted"));
       grid.appendChild(d);
     });
     s.appendChild(grid);
@@ -1066,7 +1057,7 @@ var DashboardUI = (function () {
   function landingSteps(doc) {
     var s = doc.createElement("section");
     s.className = "splash-steps";
-    s.appendChild(el(doc, "h2", t("splash.steps_title", "Get started in three steps")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.steps_title", "Get started in three steps")));
     var grid = doc.createElement("div");
     grid.className = "steps-grid";
     [
@@ -1082,9 +1073,9 @@ var DashboardUI = (function () {
     ].forEach(function (c) {
       var d = doc.createElement("div");
       d.className = "step-cell";
-      d.appendChild(el(doc, "div", c[0], "step-num"));
-      d.appendChild(el(doc, "h3", c[1]));
-      d.appendChild(el(doc, "p", c[2], "muted"));
+      d.appendChild(DOM.el(doc, "div", c[0], "step-num"));
+      d.appendChild(DOM.el(doc, "h3", c[1]));
+      d.appendChild(DOM.el(doc, "p", c[2], "muted"));
       var a = doc.createElement("a");
       a.href = c[3];
       a.textContent = c[1];
@@ -1101,7 +1092,7 @@ var DashboardUI = (function () {
   function landingFinal(doc) {
     var s = doc.createElement("section");
     s.className = "cta-band";
-    s.appendChild(el(doc, "h2", t("splash.final_t", "Ready when you are.")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.final_t", "Ready when you are.")));
     var a = doc.createElement("a");
     a.href = "#/create-wallet-brainkey";
     a.className = "btn";

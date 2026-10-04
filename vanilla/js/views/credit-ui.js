@@ -43,12 +43,7 @@ var CreditUI = (function () {
     return dflt;
   }
   var gen = 0, subs = [];
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text; return n;
-  }
-function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
+  /* No local el/clearBox — use DOM.el, DOM.clear */
   /* Thrown values -> human sentences; unknown shapes fall back generic. */
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("credit.unexpected_error", "Unexpected error"));
@@ -59,11 +54,12 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     else if (m.indexOf("unknown-deal") !== -1) m = t("credit.unknown_credit_deal", "Unknown credit deal.");
     else if (m.indexOf("unknown-account") !== -1) m = t("credit.unknown_account", "Unknown account.");
     else if (m.indexOf("unknown-asset") !== -1) m = t("credit.unknown_asset", "Unknown asset.");
-    var err = el(doc, "div", m, "error"); err.setAttribute("aria-live", "polite");
-    wrap.appendChild(err); return err;
+    var err = DOM.error(wrap, m);
+    return err;
   }
   function showStatus(doc, wrap, text) {
-    var p = el(doc, "p", text, "muted"); p.setAttribute("aria-live", "polite"); wrap.appendChild(p); return p;
+    var p = DOM.status(wrap, text);
+    return p;
   }
   function offlineBox(doc, wrap, retryFn) { /* Offline panel: copy depends on
     * actual connection (unknown-id failures while connected must not claim
@@ -72,15 +68,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     * links to #/settings for node failover. Falls back to plain re-render
     * when the helper script failed to load. */
     var open = (typeof Chain !== "undefined" && Chain && Chain.status && Chain.status().state === "open");
-    wrap.appendChild(el(doc, "p", open
+    wrap.appendChild(DOM.el(doc, "p", open
       ? t("credit.retry_load", "Retry loading.")
       : t("credit.network_unavailable_check_settings_nodes_and", "Network unavailable. Check Settings → Nodes and retry."), "muted"));
-    var status = el(doc, "p", "", "muted");
+    var status = DOM.el(doc, "p", "", "muted");
     try { status.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     wrap.appendChild(status);
-    var row = el(doc, "div", null, "pools-offline-row");
+    var row = DOM.el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(row);
-    var b = touchable(el(doc, "button", t("credit.retry", "Retry"))); b.type = "button";
+    var b = touchable(DOM.el(doc, "button", t("credit.retry", "Retry"))); b.type = "button";
     row.appendChild(b);
     var off = null;
     try { off = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { off = null; }
@@ -94,7 +90,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       try { link = off.settingsLink(doc, t); } catch (e) { link = null; }
     }
     if (!link) {
-      link = el(doc, "a", t("notice.open_settings", "Open Settings"));
+      link = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { link.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
       touchable(link);
     }
@@ -113,19 +109,19 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   }
   function viewingAsNotice(doc) {
     var v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
-    return el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
+    return DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: v.name, id: v.id }), "muted");
   }
   function signNotice(doc) {
-    return el(doc, "p", t("credit.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
+    return DOM.el(doc, "p", t("credit.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
   function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
     if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = el(doc, "div", null, "xfer-field xfer-unlock-row");
+    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
     var inp = doc.createElement("input");
     inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
     inp.setAttribute("placeholder", t("credit.password", "password")); inp.setAttribute("aria-label", t("credit.password", "password"));
     touchable(inp); row.appendChild(inp);
-    var b = touchable(el(doc, "button", t("credit.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
+    var b = touchable(DOM.el(doc, "button", t("credit.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
     parent.appendChild(row);
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
@@ -139,11 +135,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * PUBLIC-FIRST: no wallet gate here — lists/details/previews render locked. */
   function routeReady(root, title, retry) {
     var doc = root.ownerDocument || document, myGen = ++gen, miss = null;
-    dropSubs(); root.innerHTML = "";
+    dropSubs(); DOM.clear(root);
     ["Credit", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
-    var wrap = el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", title));
+    var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
+    wrap.appendChild(DOM.el(doc, "h1", title));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       offlineBox(doc, wrap, retry);
@@ -162,16 +158,16 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     return { doc: doc, wrap: wrap, myGen: myGen };
   }
   function confirmList(doc, rows) {
-    var list = el(doc, "dl", null, "xfer-confirm");
+    var list = DOM.el(doc, "dl", null, "xfer-confirm");
     rows.forEach(function (r) {
-      list.appendChild(el(doc, "dt", r[0]));
-      var dd = el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
+      list.appendChild(DOM.el(doc, "dt", r[0]));
+      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
     });
     return list;
   }
   function field(doc, labelText, opts) {
     opts = opts || {};
-    var row = el(doc, "div", null, "xfer-field"), label = el(doc, "label", labelText + " ");
+    var row = DOM.el(doc, "div", null, "xfer-field"), label = DOM.el(doc, "label", labelText + " ");
     var input = doc.createElement("input");
     if (opts.type) input.type = opts.type; if (opts.value !== undefined) input.value = opts.value;
     if (opts.placeholder) input.setAttribute("placeholder", opts.placeholder);
@@ -180,30 +176,30 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   }
   function tableHead(doc, titles) {
     var hr = doc.createElement("tr");
-    titles.forEach(function (t) { hr.appendChild(el(doc, "th", t)); });
+    titles.forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); return thead;
   }
   /* Table (desktop, sticky first col via .node-table) + cards (phone <560px). */
   function deskTable(doc, headers, rows, cardLines) {
-    var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
+    var box = DOM.el(doc, "div");
+    if (!rows.length) { box.appendChild(DOM.el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table";
     table.appendChild(tableHead(doc, headers));
     var tbody = doc.createElement("tbody");
     rows.forEach(function (r) {
       var tr = doc.createElement("tr");
       r.cells.forEach(function (c) {
-        var td = el(doc, "td", c.text); if (c.raw) td.title = t("account.raw_prefix", "raw ") + c.raw; tr.appendChild(td); });
+        var td = DOM.el(doc, "td", c.text); if (c.raw) td.title = t("account.raw_prefix", "raw ") + c.raw; tr.appendChild(td); });
       if (r.href) { var td = doc.createElement("td");
-        var a = el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); td.appendChild(a); tr.appendChild(td); }
+        var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); td.appendChild(a); tr.appendChild(td); }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); box.appendChild(table);
-    var cards = el(doc, "div", null, "node-cards");
+    var cards = DOM.el(doc, "div", null, "node-cards");
     rows.forEach(function (r) {
-      var c = el(doc, "div", null, "node-card");
-      cardLines(r).forEach(function (ln) { c.appendChild(el(doc, "div", ln)); });
-      if (r.href) { var a = el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); c.appendChild(a); }
+      var c = DOM.el(doc, "div", null, "node-card");
+      cardLines(r).forEach(function (ln) { c.appendChild(DOM.el(doc, "div", ln)); });
+      if (r.href) { var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); c.appendChild(a); }
       cards.appendChild(c);
     });
     box.appendChild(cards); return box;
@@ -234,12 +230,12 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * @param {number} myGen route generation (liveness token)
    * @returns {void} */
   function sendConfirm(doc, out, cfg, myGen) {
-    clearBox(out);
-    out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(el(doc, "button", t("credit.back", "Back"))); back.type = "button";
-    var send = touchable(el(doc, "button", t("credit.sign_send", "Sign & Send"))); send.type = "button";
+    DOM.clear(out);
+    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
+    var back = touchable(DOM.el(doc, "button", t("credit.back", "Back"))); back.type = "button";
+    var send = touchable(DOM.el(doc, "button", t("credit.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
-    back.addEventListener("click", function () { clearBox(out); });
+    back.addEventListener("click", function () { DOM.clear(out); });
     send.addEventListener("click", function () {
       if (myGen !== gen) return; send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, t("credit.signing", "Signing…"));
@@ -247,20 +243,20 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         out.removeChild(status);
         if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-          var note = el(doc, "p", t("credit.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
+          var note = DOM.el(doc, "p", t("credit.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
           note.className = "muted xfer-sign-note"; out.appendChild(note);
         }
         unlockInline(doc, out, function () {
-          out.appendChild(el(doc, "p", t("credit.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          out.appendChild(DOM.el(doc, "p", t("credit.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
         });
         send.disabled = false; back.disabled = false; return; }
       Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
         status.textContent = t("credit.broadcasting", "Broadcasting…");
         return Credit.sendAndProve(unsigned, wif, cfg.prove);
       }).then(async function (res) {
-        if (myGen !== gen) return; clearBox(out);
-        out.appendChild(el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+        if (myGen !== gen) return; DOM.clear(out);
+        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
       }).catch(function (e) {
         if (myGen !== gen) return; out.removeChild(status);
         showError(doc, out, e, t("credit.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
@@ -275,7 +271,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * @param {any} cfg {build, rows, title, ok, fail, btn?}
    * @returns {void} */
   function reviewPaid(doc, out, myGen, cfg) {
-    clearBox(out); if (cfg.btn) cfg.btn.disabled = true;
+    DOM.clear(out); if (cfg.btn) cfg.btn.disabled = true;
     showStatus(doc, out, t("credit.resolving_and_estimating_fee", "Resolving and estimating fee…"));
     function done() { if (cfg.btn) cfg.btn.disabled = false; }
     Promise.resolve().then(cfg.build).then(function (built) {
@@ -286,15 +282,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
           prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();
-      }).catch(function (e) { if (myGen === gen) { clearBox(out); showError(doc, out, e, t("credit.fee_lookup_failed", "Fee lookup failed.")); } done(); });
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(out); showError(doc, out, e, t("credit.fee_lookup_failed", "Fee lookup failed.")); } done(); });
     }).catch(function (e) {
       if (myGen !== gen) return done();
-      clearBox(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
+      DOM.clear(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
   function reviewSection(doc, box, myGen, label, cfg) {
-    var btn = touchable(el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
-    var out = el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    var btn = touchable(DOM.el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
+    var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
     return btn;
@@ -339,8 +335,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
    * row too. hostBox owns the modal overlay so a list reload clears a stale
    * modal. Header words Available/Expiration/Loan are batch-3-keyed. */
   function openOffersTable(doc, hostBox, myGen, rows) {
-    var box = el(doc, "div");
-    if (!rows.length) { box.appendChild(el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
+    var box = DOM.el(doc, "div");
+    if (!rows.length) { box.appendChild(DOM.el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table offers-table";
     table.appendChild(tableHead(doc, [t("credit.offer", "Offer"), t("credit.asset", "Asset"), t("credit.owner", "Owner"),
       t("credit.total", "Total"), t("credit.available", "Available"), t("credit.min_deal_amount", "Min deal amount"),
@@ -354,22 +350,22 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       var exp = (o.auto_disable_time && String(o.auto_disable_time).trim()) ? String(o.auto_disable_time).trim() : "—";
       var min = amt(o.min_deal_raw, o.prec, o.sym, o.asset_id), rt = safeRate(o.rate_units);
       var tr = doc.createElement("tr"); tr.setAttribute("data-offer", o.id); tr.tabIndex = 0;
-      tr.appendChild(el(doc, "td", o.id));
-      tr.appendChild(el(doc, "td", o.sym || o.asset_id));
-      tr.appendChild(el(doc, "td", o.owner));
-      var c1 = el(doc, "td", tot.text); if (tot.raw) c1.title = t("account.raw_prefix", "raw ") + tot.raw; tr.appendChild(c1);
-      var c2 = el(doc, "td", avail.text); if (avail.raw) c2.title = t("account.raw_prefix", "raw ") + avail.raw; tr.appendChild(c2);
-      var c3 = el(doc, "td", min.text); if (min.raw) c3.title = t("account.raw_prefix", "raw ") + min.raw; tr.appendChild(c3);
-      var c4 = el(doc, "td", rt.text); if (rt.raw) c4.title = t("account.raw_prefix", "raw ") + rt.raw; tr.appendChild(c4);
-      tr.appendChild(el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
-      tr.appendChild(el(doc, "td", exp));
-      tr.appendChild(el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));
+      tr.appendChild(DOM.el(doc, "td", o.id));
+      tr.appendChild(DOM.el(doc, "td", o.sym || o.asset_id));
+      tr.appendChild(DOM.el(doc, "td", o.owner));
+      var c1 = DOM.el(doc, "td", tot.text); if (tot.raw) c1.title = t("account.raw_prefix", "raw ") + tot.raw; tr.appendChild(c1);
+      var c2 = DOM.el(doc, "td", avail.text); if (avail.raw) c2.title = t("account.raw_prefix", "raw ") + avail.raw; tr.appendChild(c2);
+      var c3 = DOM.el(doc, "td", min.text); if (min.raw) c3.title = t("account.raw_prefix", "raw ") + min.raw; tr.appendChild(c3);
+      var c4 = DOM.el(doc, "td", rt.text); if (rt.raw) c4.title = t("account.raw_prefix", "raw ") + rt.raw; tr.appendChild(c4);
+      tr.appendChild(DOM.el(doc, "td", Credit.durToHuman(o.max_dur_sec)));
+      tr.appendChild(DOM.el(doc, "td", exp));
+      tr.appendChild(DOM.el(doc, "td", o.collateral_raw.length ? o.collateral_raw.map(function (c) { return c[0]; }).join(", ") : "—"));
       var tdB = doc.createElement("td");
-      var bb = touchable(el(doc, "button", t("credit.borrow", "Borrow"))); bb.type = "button";
+      var bb = touchable(DOM.el(doc, "button", t("credit.borrow", "Borrow"))); bb.type = "button";
       bb.addEventListener("click", function (e) { e.stopPropagation(); openLoanModal(doc, hostBox, myGen, o); });
       tdB.appendChild(bb); tr.appendChild(tdB);
       var tdO = doc.createElement("td");
-      var a = el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", "#/credit-offer/" + o.id); tdO.appendChild(a); tr.appendChild(tdO);
+      var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", "#/credit-offer/" + o.id); tdO.appendChild(a); tr.appendChild(tdO);
       tr.addEventListener("click", function (e) {
         var n = e.target;
         while (n && n !== tr) { if (n.tagName === "A" || n.tagName === "BUTTON") return; n = n.parentElement; }
@@ -381,22 +377,22 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    var scroller = el(doc, "div", null, "offers-scroll");
+    var scroller = DOM.el(doc, "div", null, "offers-scroll");
     scroller.appendChild(table); box.appendChild(scroller);
-    var cards = el(doc, "div", null, "node-cards");
+    var cards = DOM.el(doc, "div", null, "node-cards");
     rows.forEach(function (o) {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
       var availC = (o.current_raw === null || o.current_raw === undefined || String(o.current_raw) === "") ? "—" : cur.text;
       var expC = (o.auto_disable_time && String(o.auto_disable_time).trim()) ? String(o.auto_disable_time).trim() : "—";
-      var c = el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
-      c.appendChild(el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
-      c.appendChild(el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
-      c.appendChild(el(doc, "div", t("credit.total_prefix", "Total ") + tot.text + t("credit.available_mid", " / Available ") + availC));
-      c.appendChild(el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + t("credit.expiration_mid", " · Expiration ") + expC));
-      var cb = touchable(el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
+      var c = DOM.el(doc, "div", null, "node-card"); c.setAttribute("data-offer", o.id);
+      c.appendChild(DOM.el(doc, "div", o.id + " · " + (o.sym || o.asset_id)));
+      c.appendChild(DOM.el(doc, "div", t("credit.owner", "Owner") + " " + o.owner));
+      c.appendChild(DOM.el(doc, "div", t("credit.total_prefix", "Total ") + tot.text + t("credit.available_mid", " / Available ") + availC));
+      c.appendChild(DOM.el(doc, "div", t("credit.fee_rate", "Fee rate") + " " + safeRate(o.rate_units).text + " · " + t("credit.max_duration", "Max duration") + " " + Credit.durToHuman(o.max_dur_sec) + t("credit.expiration_mid", " · Expiration ") + expC));
+      var cb = touchable(DOM.el(doc, "button", t("credit.borrow", "Borrow") + " " + o.id)); cb.type = "button";
       cb.addEventListener("click", function () { openLoanModal(doc, hostBox, myGen, o); });
       c.appendChild(cb);
-      var ca = el(doc, "a", t("credit.open", "Open")); ca.setAttribute("href", "#/credit-offer/" + o.id); c.appendChild(ca);
+      var ca = DOM.el(doc, "a", t("credit.open", "Open")); ca.setAttribute("href", "#/credit-offer/" + o.id); c.appendChild(ca);
       cards.appendChild(c);
     });
     box.appendChild(cards); return box;
@@ -407,8 +403,8 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function openLoanModal(doc, hostBox, myGen, o) {
     if (myGen !== gen) return;
     var locked = !isUnlockedNow();
-    var overlay = el(doc, "div", null, "credit-loan-overlay");
-    var panel = el(doc, "div", null, "credit-loan-panel");
+    var overlay = DOM.el(doc, "div", null, "credit-loan-overlay");
+    var panel = DOM.el(doc, "div", null, "credit-loan-panel");
     panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
     panel.setAttribute("aria-label", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id);
     overlay.appendChild(panel); hostBox.appendChild(overlay);
@@ -429,7 +425,10 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       try {
         var f = panel.querySelectorAll("button, input, select, textarea, a[href], [tabindex]");
         var vis = [];
-        for (var i = 0; i < f.length; i++) { if (!f[i].disabled && f[i].tabIndex >= 0) vis.push(f[i]); }
+        /* TYPE NOTE: querySelectorAll yields Element (no disabled/tabIndex/focus
+         * in the type); the selector only matches focusable controls, so the
+         * any-cast below is the honest seam (reviewPaid precedent). */
+        for (var i = 0; i < f.length; i++) { var cand = /** @type {any} */ (f[i]); if (!cand.disabled && cand.tabIndex >= 0) vis.push(cand); }
         if (!vis.length) return;
         var first = vis[0], last = vis[vis.length - 1];
         if (e.shiftKey && doc.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -437,7 +436,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       } catch (x) { /* tab order stands */ }
     }
     doc.addEventListener("keydown", onKey);
-    panel.appendChild(el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
+    panel.appendChild(DOM.el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
     var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
     var rt = safeRate(o.rate_units);
     panel.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
@@ -455,11 +454,11 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var fRate = field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: safeRateHuman(o.rate_units), inputmode: "decimal" });
     var fDur = field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });
     [fBor, fAmt, fCollA, fColl, fRate, fDur].forEach(function (f) { panel.appendChild(f.row); });
-    var arRow = el(doc, "div", null, "xfer-field");
-    arRow.appendChild(el(doc, "span", t("credit.auto_repay_2", "Auto-repay: ")));
+    var arRow = DOM.el(doc, "div", null, "xfer-field");
+    arRow.appendChild(DOM.el(doc, "span", t("credit.auto_repay_2", "Auto-repay: ")));
     var arNames = [["", t("credit.omit_chain_default", "omit (chain default)")], ["0", t("credit.0_none", "0 — none")], ["1", t("credit.1_full_only", "1 — full only")], ["2", t("credit.2_partial_ok", "2 — partial ok")]];
     var arInputs = arNames.map(function (n, i) {
-      var lab = el(doc, "label", " " + n[1] + " ");
+      var lab = DOM.el(doc, "label", " " + n[1] + " ");
       var r = doc.createElement("input"); r.type = "radio"; r.name = "ar-loan-" + o.id; r.value = n[0];
       if (i === 0) r.checked = true; touchable(r); lab.insertBefore(r, lab.firstChild);
       arRow.appendChild(lab); return r;
@@ -500,7 +499,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
           [t("credit.fee", "Fee"), fee.text, "raw " + fee.raw], [t("credit.network", "Network"), "testnet"]];
       },
       title: t("credit.confirm_accept", "Confirm accept"), ok: function () { return t("credit.deal_opened_accept_broadcast", "Deal opened (accept broadcast)."); }, fail: t("credit.could_not_prepare_the_accept", "Could not prepare the accept.") });
-    var closeBtn = touchable(el(doc, "button", t("trade.cancel_button", "Cancel"))); closeBtn.type = "button";
+    var closeBtn = touchable(DOM.el(doc, "button", t("trade.cancel_button", "Cancel"))); closeBtn.type = "button";
     closeBtn.addEventListener("click", close);
     panel.appendChild(closeBtn);
     try { fBor.input.focus(); } catch (e) { /* keyboard path stays via tab order */ }
@@ -514,17 +513,17 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var doc = ctx.doc, myGen = ctx.myGen;
     var locked0 = !isUnlockedNow();
     if (locked0) ctx.wrap.appendChild(viewingAsNotice(doc));
-    ctx.wrap.appendChild(el(doc, "p", t("credit.lend_assets_at_a_fee_rate_a_borrower_accepts", "Lend assets at a fee rate. A borrower accepts an offer and a credit deal appears. Rates are percent at denom 1,000,000 — 0.1% stores 1000 units."), "muted"));
+    ctx.wrap.appendChild(DOM.el(doc, "p", t("credit.lend_assets_at_a_fee_rate_a_borrower_accepts", "Lend assets at a fee rate. A borrower accepts an offer and a credit deal appears. Rates are percent at denom 1,000,000 — 0.1% stores 1000 units."), "muted"));
     var fO = field(doc, t("credit.owner", "Owner"), locked0
       ? { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.name_or_1_2_n", "name or 1.2.N") });
     var fA = field(doc, t("credit.asset", "Asset"), { placeholder: t("credit.symbol_or_1_3_x", "symbol or 1.3.x") });
     ctx.wrap.appendChild(fO.row); ctx.wrap.appendChild(fA.row);
-    var go = touchable(el(doc, "button", t("credit.list_offers", "List offers"))); go.type = "button"; ctx.wrap.appendChild(go);
-    var listBox = el(doc, "div"); ctx.wrap.appendChild(listBox);
-    ctx.wrap.appendChild(el(doc, "h2", t("credit.my_offers", "My offers")));
-    var mineBox = el(doc, "div"); ctx.wrap.appendChild(mineBox);
-    ctx.wrap.appendChild(el(doc, "h2", t("credit.create_offer", "Create offer")));
+    var go = touchable(DOM.el(doc, "button", t("credit.list_offers", "List offers"))); go.type = "button"; ctx.wrap.appendChild(go);
+    var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("credit.my_offers", "My offers")));
+    var mineBox = DOM.el(doc, "div"); ctx.wrap.appendChild(mineBox);
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("credit.create_offer", "Create offer")));
     if (locked0) ctx.wrap.appendChild(signNotice(doc));
     createBox(doc, ctx.wrap, myGen);
     /* Open-offers list: auto-loads ALL chain offers (list_credit_offers);
@@ -532,14 +531,14 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
      * (owner-first, then asset, else all). My-offers + create form below stay
      * as they were. Empty/error states never blank (note / retry sentence). */
     function showOpenOffers(rowsPromise) {
-      if (myGen !== gen) return; go.disabled = true; clearBox(listBox);
+      if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox);
       showStatus(doc, listBox, t("credit.loading_offers", "Loading offers…"));
       Promise.resolve(rowsPromise).then(function (rows) {
-        if (myGen !== gen) return; clearBox(listBox);
-        listBox.appendChild(el(doc, "h2", t("credit.all_offers", "← All offers")));
+        if (myGen !== gen) return; DOM.clear(listBox);
+        listBox.appendChild(DOM.el(doc, "h2", t("credit.all_offers", "← All offers")));
         listBox.appendChild(openOffersTable(doc, listBox, myGen, rows));
       }).catch(function (e) {
-        if (myGen !== gen) return; clearBox(listBox); showError(doc, listBox, e, t("credit.could_not_load_offers", "Could not load offers."));
+        if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("credit.could_not_load_offers", "Could not load offers."));
       }).then(function () { go.disabled = false; });
     }
     go.addEventListener("click", function () {
@@ -555,15 +554,15 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
       if (myGen !== gen) return;
       if (!isUnlockedNow()) mineBox.appendChild(viewingAsNotice(doc));
       Credit.offersByOwner(me.id, {}).then(function (rows) {
-        if (myGen !== gen) return; clearBox(mineBox);
+        if (myGen !== gen) return; DOM.clear(mineBox);
         mineBox.appendChild(deskTable(doc, [t("credit.offer", "Offer"), t("credit.owner", "Owner"), t("credit.asset", "Asset"), t("credit.current", "Current"), t("credit.total", "Total"), t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"), t("credit.enabled", "Enabled"), ""], offerRows(rows), offerCards));
-      }).catch(function () { if (myGen === gen) { clearBox(mineBox); mineBox.appendChild(el(doc, "p", t("credit.no_owned_offers", "No owned offers.") + t("credit.owned_hint", " Create one in the Create offer form below — owned offers list here."), "muted")); } });
+      }).catch(function () { if (myGen === gen) { DOM.clear(mineBox); mineBox.appendChild(DOM.el(doc, "p", t("credit.no_owned_offers", "No owned offers.") + t("credit.owned_hint", " Create one in the Create offer form below — owned offers list here."), "muted")); } });
       showOpenOffers(Credit.offers({}));
     }).catch(function () { if (myGen === gen) showOpenOffers(Credit.offers({})); });
   }
   /* Collateral price-leg inputs (asset + base amt/asset + quote amt/asset); empty rows skipped. */
   function collRow(doc, box) {
-    var r = el(doc, "div", null, "xfer-field");
+    var r = DOM.el(doc, "div", null, "xfer-field");
     [t("credit.ph_coll_asset", "coll asset"), t("credit.ph_base_amt", "base amt"), t("credit.ph_base_asset", "base asset"), t("credit.ph_quote_amt", "quote amt"), t("credit.ph_quote_asset", "quote asset")].forEach(function (ph, i) {
       var inp = doc.createElement("input");
       inp.setAttribute("placeholder", ph);
@@ -573,7 +572,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     box.appendChild(r); return r;
   }
   function borrowerRow(doc, box) {
-    var r = el(doc, "div", null, "xfer-field");
+    var r = DOM.el(doc, "div", null, "xfer-field");
     [t("credit.ph_borrower_account", "borrower account"), t("credit.ph_max_amount", "max amount")].forEach(function (ph, i) {
       var inp = doc.createElement("input"); inp.setAttribute("placeholder", ph);
       if (i === 1) inp.setAttribute("inputmode", "decimal");
@@ -610,20 +609,20 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
     var durSel = doc.createElement("select"); touchable(durSel);
     [["86400", t("credit.1_day", "1 day")], ["259200", t("credit.3_days", "3 days")], ["604800", t("credit.1_week", "1 week")], ["2592000", t("credit.30_days", "30 days")], ["", t("credit.custom", "custom…")]].forEach(function (o) {
       var op = doc.createElement("option"); op.value = o[0]; op.textContent = o[1]; durSel.appendChild(op); });
-    var durRow = el(doc, "div", null, "xfer-field"), durLab = el(doc, "label", t("credit.max_duration_2", "Max duration "));
+    var durRow = DOM.el(doc, "div", null, "xfer-field"), durLab = DOM.el(doc, "label", t("credit.max_duration_2", "Max duration "));
     var fDurCustom = doc.createElement("input"); fDurCustom.setAttribute("placeholder", t("credit.e_g_3_days", "e.g. 3 days"));
     touchable(fDurCustom); durLab.appendChild(durSel); durLab.appendChild(fDurCustom); durRow.appendChild(durLab);
     box.appendChild(durRow);
     var enLab = doc.createElement("input"); enLab.type = "checkbox"; enLab.checked = true; touchable(enLab);
-    var enRow = el(doc, "div", null, "xfer-field"), enL = el(doc, "label", t("credit.enabled_3", "Enabled "));
+    var enRow = DOM.el(doc, "div", null, "xfer-field"), enL = DOM.el(doc, "label", t("credit.enabled_3", "Enabled "));
     enL.appendChild(enLab); enRow.appendChild(enL); box.appendChild(enRow);
-    box.appendChild(el(doc, "h3", t("credit.acceptable_collateral_asset_price_legs", "Acceptable collateral (asset + price legs)")));
-    var collBox = el(doc, "div"); box.appendChild(collBox); collRow(doc, collBox);
-    var addC = touchable(el(doc, "button", t("credit.add_collateral_row", "Add collateral row"))); addC.type = "button"; box.appendChild(addC);
+    box.appendChild(DOM.el(doc, "h3", t("credit.acceptable_collateral_asset_price_legs", "Acceptable collateral (asset + price legs)")));
+    var collBox = DOM.el(doc, "div"); box.appendChild(collBox); collRow(doc, collBox);
+    var addC = touchable(DOM.el(doc, "button", t("credit.add_collateral_row", "Add collateral row"))); addC.type = "button"; box.appendChild(addC);
     addC.addEventListener("click", function () { collRow(doc, collBox); });
-    box.appendChild(el(doc, "h3", t("credit.acceptable_borrowers_account_max", "Acceptable borrowers (account + max)")));
-    var borBox = el(doc, "div"); box.appendChild(borBox); borrowerRow(doc, borBox);
-    var addB = touchable(el(doc, "button", t("credit.add_borrower_row", "Add borrower row"))); addB.type = "button"; box.appendChild(addB);
+    box.appendChild(DOM.el(doc, "h3", t("credit.acceptable_borrowers_account_max", "Acceptable borrowers (account + max)")));
+    var borBox = DOM.el(doc, "div"); box.appendChild(borBox); borrowerRow(doc, borBox);
+    var addB = touchable(DOM.el(doc, "button", t("credit.add_borrower_row", "Add borrower row"))); addB.type = "button"; box.appendChild(addB);
     addB.addEventListener("click", function () { borrowerRow(doc, borBox); });
     reviewSection(doc, box, myGen, t("credit.review_create", "Review create"), {
       build: async function () {
@@ -670,7 +669,7 @@ function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   }
 
   return { renderOffers: renderOffers,
-    _ui: { el: el, touchable: touchable, clearBox: clearBox, showError: showError, showStatus: showStatus,
+    _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       confirmList: confirmList, field: field, tableHead: tableHead, deskTable: deskTable,
       feeText: feeText, headBlock: headBlock, amt: amt, rateText: rateText, who: who,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,

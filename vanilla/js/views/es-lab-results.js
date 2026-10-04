@@ -22,12 +22,7 @@ var EsLabResults = (function () {
     } catch (e) { /* default below */ }
     return dflt;
   }
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
+  /* No local el — use DOM.el */
 
   /* HINTS: human-reading line per kind (principle #6 — raw stays raw, the
    * hint tells the reader how to read it). */
@@ -48,7 +43,7 @@ var EsLabResults = (function () {
       href = (kind === "account") ? ("#/account/" + id) : (kind === "block" ? ("#/block/" + id) : null);
     }
     if (!href) {
-      var s = el(doc, "span", (id === null || id === undefined) ? "?" : String(id), null);
+      var s = DOM.el(doc, "span", (id === null || id === undefined) ? "?" : String(id), null);
       return s;
     }
     var a = doc.createElement("a");
@@ -60,13 +55,13 @@ var EsLabResults = (function () {
   /* table: node-table shell with header row. Params: doc, heads array.
    * Returns {table, tbody}. Fails: never. */
   function table(doc, heads) {
-    var scroller = el(doc, "div", null, "xplore-scroll");
+    var scroller = DOM.el(doc, "div", null, "xplore-scroll");
     try { scroller.style.overflowX = "auto"; } catch (e) { /* stands */ }
     var tb = doc.createElement("table");
     tb.className = "node-table";
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    heads.forEach(function (h) { hr.appendChild(el(doc, "th", h, null)); });
+    heads.forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h, null)); });
     thead.appendChild(hr);
     tb.appendChild(thead);
     var body = doc.createElement("tbody");
@@ -105,10 +100,10 @@ var EsLabResults = (function () {
   /* panel: honest-failure box (notice + optional retry + settings link).
    * Params: doc, box, msgKey/dflt, onRetry (fn or null). */
   function panel(doc, box, key, dflt, onRetry) {
-    box.appendChild(el(doc, "p", t(key, dflt), "muted"));
-    var row = el(doc, "p", null, null);
+    box.appendChild(DOM.el(doc, "p", t(key, dflt), "muted"));
+    var row = DOM.el(doc, "p", null, null);
     if (typeof onRetry === "function") {
-      var rb = touchable(el(doc, "button", t("eslab.retry", "Retry")));
+      var rb = touchable(DOM.el(doc, "button", t("eslab.retry", "Retry")));
       rb.type = "button";
       rb.className = "btn-ghost";
       rb.addEventListener("click", onRetry);
@@ -137,10 +132,10 @@ var EsLabResults = (function () {
         if (msg === "es-unavailable" || msg === "es-timeout") { panel(doc, box, "eslab.unavailable_notice", "Index unreachable. Check your connection and retry, or review Settings.", retry); hint(GENERIC_HINT); return; }
         if (msg === "not-connected") { panel(doc, box, "eslab.no_socket", "Wallet is offline — connect a node in Settings to resolve account names (or type a 1.2.x id).", null); hint(GENERIC_HINT); return; }
         if (msg && msg.indexOf("es-shape") === 0) { panel(doc, box, "eslab.shape_notice", "Index returned an unexpected shape — raw JSON below, nothing parsed.", retry); hint(GENERIC_HINT); return; }
-        box.appendChild(el(doc, "p", msg || t("eslab.unavailable_notice", "Index unreachable. Check your connection and retry, or review Settings."), "error"));
+        box.appendChild(DOM.el(doc, "p", msg || t("eslab.unavailable_notice", "Index unreachable. Check your connection and retry, or review Settings."), "error"));
         if (retry) {
-          var row = el(doc, "p", null, null);
-          var rb = touchable(el(doc, "button", t("eslab.retry", "Retry")));
+          var row = DOM.el(doc, "p", null, null);
+          var rb = touchable(DOM.el(doc, "button", t("eslab.retry", "Retry")));
           rb.type = "button";
           rb.className = "btn-ghost";
           rb.addEventListener("click", retry);
@@ -154,7 +149,7 @@ var EsLabResults = (function () {
       var rows = Array.isArray(outcome.rows) ? outcome.rows : [];
       if (kind === "raw" || !rows) { hint(GENERIC_HINT); return; }
       if (!rows.length) {
-        box.appendChild(el(doc, "p", t("eslab.no_rows", "0 rows — the index returned nothing for this query."), "muted"));
+        box.appendChild(DOM.el(doc, "p", t("eslab.no_rows", "0 rows — the index returned nothing for this query."), "muted"));
         hint(HINTS[kind] || GENERIC_HINT);
         return;
       }
@@ -162,11 +157,11 @@ var EsLabResults = (function () {
         var ot = table(doc, ["Time (UTC)", "Block", "Op"]);
         rows.forEach(function (r) {
           var tr = doc.createElement("tr");
-          tr.appendChild(el(doc, "td", r.time || "?", null));
+          tr.appendChild(DOM.el(doc, "td", r.time || "?", null));
           var tdB = doc.createElement("td");
           tdB.appendChild(link(doc, "block", (r.block === null || r.block === undefined) ? null : String(r.block)));
           tr.appendChild(tdB);
-          tr.appendChild(el(doc, "td", (r.name || "?") + (r.type === null ? "" : " (" + r.type + ")"), null));
+          tr.appendChild(DOM.el(doc, "td", (r.name || "?") + (r.type === null ? "" : " (" + r.type + ")"), null));
           ot.tbody.appendChild(tr);
         });
         box.appendChild(ot.wrap);
@@ -195,9 +190,9 @@ var EsLabResults = (function () {
         var at = table(doc, heads);
         rows.forEach(function (r) {
           var tr = doc.createElement("tr");
-          tr.appendChild(el(doc, "td", (r.name || "?") + " (" + r.type + ")", null));
-          tr.appendChild(el(doc, "td", String(r.count), null));
-          tr.appendChild(el(doc, "td", r.share, null));
+          tr.appendChild(DOM.el(doc, "td", (r.name || "?") + " (" + r.type + ")", null));
+          tr.appendChild(DOM.el(doc, "td", String(r.count), null));
+          tr.appendChild(DOM.el(doc, "td", r.share, null));
           if (hasTotal) {
             var tdT = doc.createElement("td");
             tdT.textContent = (r.total === undefined ? "—" : String(r.total));
@@ -213,7 +208,7 @@ var EsLabResults = (function () {
       hint(GENERIC_HINT);
     } catch (e) {
       try {
-        while (box.firstChild) box.removeChild(box.firstChild);
+        DOM.clear(box);
         panel(doc, box, "eslab.shape_notice", "Index returned an unexpected shape — raw JSON below, nothing parsed.", null);
       } catch (e2) { /* box stands */ }
     }

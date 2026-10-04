@@ -121,7 +121,14 @@ declare var Wallet: any;
 declare var WalletUI: any;
 declare var touchable: <T extends HTMLElement>(el: T) => T;
 declare var DOM: {
-  el: (doc: Document, tag: string, text?: string | null, cls?: string | null) => HTMLElement;
+  el: {
+    (doc: Document, tag: "a", text?: string | null, cls?: string | null): HTMLAnchorElement;
+    (doc: Document, tag: "button", text?: string | null, cls?: string | null): HTMLButtonElement;
+    (doc: Document, tag: "input", text?: string | null, cls?: string | null): HTMLInputElement;
+    (doc: Document, tag: "select", text?: string | null, cls?: string | null): HTMLSelectElement;
+    (doc: Document, tag: "textarea", text?: string | null, cls?: string | null): HTMLTextAreaElement;
+    (doc: Document, tag: string, text?: string | null, cls?: string | null): HTMLElement;
+  };
   clear: (root: HTMLElement) => void;
   text: (el: HTMLElement, text: string | null | undefined) => HTMLElement;
   attrs: (el: HTMLElement, obj: Record<string, string | null | undefined>) => HTMLElement;
@@ -132,7 +139,14 @@ declare var DOM: {
 interface Window {
   touchable: <T extends HTMLElement>(el: T) => T;
   DOM: {
-    el: (doc: Document, tag: string, text?: string | null, cls?: string | null) => HTMLElement;
+    el: {
+    (doc: Document, tag: "a", text?: string | null, cls?: string | null): HTMLAnchorElement;
+    (doc: Document, tag: "button", text?: string | null, cls?: string | null): HTMLButtonElement;
+    (doc: Document, tag: "input", text?: string | null, cls?: string | null): HTMLInputElement;
+    (doc: Document, tag: "select", text?: string | null, cls?: string | null): HTMLSelectElement;
+    (doc: Document, tag: "textarea", text?: string | null, cls?: string | null): HTMLTextAreaElement;
+    (doc: Document, tag: string, text?: string | null, cls?: string | null): HTMLElement;
+  };
     clear: (root: HTMLElement) => void;
     text: (el: HTMLElement, text: string | null | undefined) => HTMLElement;
     attrs: (el: HTMLElement, obj: Record<string, string | null | undefined>) => HTMLElement;
