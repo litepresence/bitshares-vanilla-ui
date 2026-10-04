@@ -28,15 +28,6 @@ var AboutUI = (function () {
     return dflt;
   }
 
-  /* textContent-only element (about strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
-
   /* cta: one full-card link button. Params: doc, href, label. Returns the
    * anchor. Never throws. */
   function cta(doc, href, label) {
@@ -47,15 +38,6 @@ var AboutUI = (function () {
     b.textContent = label;
     a.appendChild(b);
     return a;
-  }
-
-  /* section: one h2 + paragraph block from already-resolved strings
-   * (call sites pass t() literals so the i18n drift gate sees every
-   * default verbatim). Params: doc, wrap, title, body (strings).
-   * Returns nothing. Never throws. */
-  function section(doc, wrap, title, body) {
-    wrap.appendChild(el(doc, "h2", title));
-    wrap.appendChild(el(doc, "p", body));
   }
 
   /* dialogNumber: parse Router.query() into a 1-based exchange number.
@@ -150,9 +132,9 @@ var AboutUI = (function () {
     var s = doc.createElement("summary");
     s.textContent = "#" + entry.n + " · " + entry.session + " · " + entry.time;
     d.appendChild(s);
-    d.appendChild(el(doc, "p", entry.user));
-    if (entry.reply) d.appendChild(el(doc, "p", entry.reply));
-    else d.appendChild(el(doc, "p",
+    d.appendChild(DOM.el(doc, "p", entry.user));
+    if (entry.reply) d.appendChild(DOM.el(doc, "p", entry.reply));
+    else d.appendChild(DOM.el(doc, "p",
       t("about.dlg_no_reply", "No reply recorded — the next prompt followed immediately."), "muted"));
     var pl = doc.createElement("a");
     try {
@@ -170,38 +152,47 @@ var AboutUI = (function () {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
-    clearRoot(root);
+    DOM.clear(root);
     var wrap = doc.createElement("div");
     wrap.className = "wrap";
     root.appendChild(wrap);
-    wrap.appendChild(el(doc, "h1", t("about.hero_title", "BitShares, in your browser. Nothing to install.")));
-    wrap.appendChild(el(doc, "p",
-      t("about.hero_lede", "A complete wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser."),
-      "muted"));
+    DOM.append(wrap,
+      DOM.el(doc, "h1", t("about.hero_title", "BitShares, in your browser. Nothing to install.")),
+      DOM.el(doc, "p",
+        t("about.hero_lede", "A complete wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser."),
+        "muted"));
     var grid = doc.createElement("div");
     grid.className = "menu-grid";
-    grid.appendChild(cta(doc, "#/market/BTS_USD", t("about.cta_trade", "Open the exchange")));
-    grid.appendChild(cta(doc, "#/help", t("about.cta_guides", "Read the guides")));
-    wrap.appendChild(grid);
-    section(doc, wrap,
-      t("about.s1_title", "Your keys never leave this browser"),
-      t("about.s1_body", "Accounts live in an encrypted vault on your device, and every transaction is signed locally before broadcast. The nodes you connect to never see your secrets — which is also why backups are yours alone: lose the brainkey and nobody can recover your funds."));
-    section(doc, wrap,
-      t("about.s2_title", "A real exchange, not a screenshot"),
-      t("about.s2_body", "Order books, liquidity pools, swaps, borrowing, credit, prediction markets, and voting all settle on-chain. What you see is the chain itself — books you can trade against, not pictures of books."));
-    section(doc, wrap,
-      t("about.s3_title", "Built to outlive its builders"),
-      t("about.s3_body", "The wallet it replaces died under a hundred stale packages and a toolchain nobody can reproduce. This one depends on nothing with a release cycle: no framework, no package manager, no build step. If everyone walks away for ten years, it still runs in a browser."));
-    section(doc, wrap,
-      t("about.s4_title", "Familiar, but alive"),
-      t("about.s4_body", "Returning users feel at home instantly — the same pages, panels, and words as the classic wallet — while balances, books, and connection status update live in place. Fast forgiving search everywhere, three themes, and layouts that work from a 360px phone to a 4K trading desk."));
-    section(doc, wrap,
-      t("about.s5_title", "Numbers you can trust"),
-      t("about.s5_body", "The chain speaks integers; you never see them. Every amount sits at its asset's decimals, every percent at its true value, and every fee is previewed from the live chain before you sign — never estimated, never guessed."));
-    section(doc, wrap,
-      t("about.s6_title", "Honest limits"),
-      t("about.s6_body", "Gateways are custodians holding your outside coins — read their terms as the custody deal it is. The history index is run by the community, not by this wallet. Some features have no testnet data by nature, and there is no in-app news feed by decision. Where this wallet cannot know, it says so instead of guessing."));
-    wrap.appendChild(el(doc, "h2", t("about.links_title", "Go further")));
+    DOM.append(grid,
+      cta(doc, "#/market/BTS_USD", t("about.cta_trade", "Open the exchange")),
+      cta(doc, "#/help", t("about.cta_guides", "Read the guides")));
+    DOM.append(wrap, grid);
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s1_title", "Your keys never leave this browser")),
+      DOM.el(doc, "p",
+        t("about.s1_body", "Accounts live in an encrypted vault on your device, and every transaction is signed locally before broadcast. The nodes you connect to never see your secrets — which is also why backups are yours alone: lose the brainkey and nobody can recover your funds.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s2_title", "A real exchange, not a screenshot")),
+      DOM.el(doc, "p",
+        t("about.s2_body", "Order books, liquidity pools, swaps, borrowing, credit, prediction markets, and voting all settle on-chain. What you see is the chain itself — books you can trade against, not pictures of books.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s3_title", "Built to outlive its builders")),
+      DOM.el(doc, "p",
+        t("about.s3_body", "The wallet it replaces died under a hundred stale packages and a toolchain nobody can reproduce. This one depends on nothing with a release cycle: no framework, no package manager, no build step. If everyone walks away for ten years, it still runs in a browser.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s4_title", "Familiar, but alive")),
+      DOM.el(doc, "p",
+        t("about.s4_body", "Returning users feel at home instantly — the same pages, panels, and words as the classic wallet — while balances, books, and connection status update live in place. Fast forgiving search everywhere, three themes, and layouts that work from a 360px phone to a 4K trading desk.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s5_title", "Numbers you can trust")),
+      DOM.el(doc, "p",
+        t("about.s5_body", "The chain speaks integers; you never see them. Every amount sits at its asset's decimals, every percent at its true value, and every fee is previewed from the live chain before you sign — never estimated, never guessed.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.s6_title", "Honest limits")),
+      DOM.el(doc, "p",
+        t("about.s6_body", "Gateways are custodians holding your outside coins — read their terms as the custody deal it is. The history index is run by the community, not by this wallet. Some features have no testnet data by nature, and there is no in-app news feed by decision. Where this wallet cannot know, it says so instead of guessing.")));
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.links_title", "Go further")));
     var ul = doc.createElement("ul");
     [["#/help", t("help.help", "Help")],
      ["#/community", t("help.community_title", "Community")],
@@ -214,10 +205,11 @@ var AboutUI = (function () {
       }
       li.appendChild(a); ul.appendChild(li);
     });
-    wrap.appendChild(ul);
-    section(doc, wrap,
-      t("about.making_title", "Making of this wallet"),
-      t("about.making_body", "What follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited. It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated. 413 exchanges across 14 sessions. Read it as history: this is how the wallet got built."));
+    DOM.append(wrap, ul);
+    DOM.append(wrap,
+      DOM.el(doc, "h2", t("about.making_title", "Making of this wallet")),
+      DOM.el(doc, "p",
+        t("about.making_body", "What follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited. It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated. 413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.")));
     /* Collapsed build-dialog archive. First expansion injects the asset
      * script once (data-bd flag on the box); load error writes the
      * unavailable line. Deep-link ?dialog=N expands + scrolls on render. */
@@ -235,17 +227,16 @@ var AboutUI = (function () {
       field.setAttribute("aria-label", ph);
     } catch (e) { /* unlabelled filter stands */ }
     try { field.placeholder = ph; } catch (e2) { /* placeholder stands */ }
-    var clearBtn = el(doc, "button", t("about.dlg_search_clear", "Clear"));
+    var clearBtn = DOM.el(doc, "button", t("about.dlg_search_clear", "Clear"));
     try { clearBtn.setAttribute("type", "button"); } catch (e3) { /* submit default stands */ }
-    var status = el(doc, "p", "", "muted");
-    searchRow.appendChild(field);
-    searchRow.appendChild(clearBtn);
-    searchRow.appendChild(status);
+    var status = DOM.el(doc, "p", "", "muted");
+    DOM.append(searchRow, field, clearBtn, status);
     bdBox.appendChild(searchRow);
     var bdList = doc.createElement("div");
     bdBox.appendChild(bdList);
-    wrap.appendChild(bdBox);
-    wrap.appendChild(el(doc, "p", t("about.dlg_noscript", "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo."), "muted"));
+    DOM.append(wrap, bdBox);
+    DOM.append(wrap,
+      DOM.el(doc, "p", t("about.dlg_noscript", "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo."), "muted"));
     /* Deep link: ?dialog=N read on render only (never navigated to here,
      * so no render loop). Guard mirrors the I18n guard in t(). */
     var query = {};
@@ -272,10 +263,10 @@ var AboutUI = (function () {
         } catch (e2) { /* collapsed box stands */ }
         return;
       }
-try {
-          bdBox.setAttribute("data-bd", "ready");
-          bdSum.textContent = t("about.dlg_heading_c", "Full build dialog (%(total)s)", { total: asset.length });
-        } catch (e3) { /* stale count stands */ }
+      try {
+        bdBox.setAttribute("data-bd", "ready");
+        bdSum.textContent = t("about.dlg_heading_c", "Full build dialog (%(total)s)", { total: asset.length });
+      } catch (e3) { /* stale count stands */ }
       var index = [], groups = [], lastDay = null, cur = null, i, entry, day, d;
       for (i = 0; i < asset.length; i++) {
         entry = asset[i];
@@ -284,10 +275,9 @@ try {
           lastDay = day;
           cur = { day: day, head: null, wrap: null };
           try {
-            cur.head = el(doc, "h3", day, "bd-day muted");
+            cur.head = DOM.el(doc, "h3", day, "bd-day muted");
             cur.wrap = doc.createElement("div");
-            bdList.appendChild(cur.head);
-            bdList.appendChild(cur.wrap);
+            DOM.append(bdList, cur.head, cur.wrap);
           } catch (e5) { cur = null; }
           if (cur) groups.push(cur);
         }
