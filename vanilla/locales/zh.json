@@ -7208,10 +7208,10 @@
     "dlg_unavailable": "Build-dialog archive unavailable.",
     "dlg_noscript": "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo.",
     "dlg_no_reply": "No reply recorded — the next prompt followed immediately.",
+    "dlg_no_match": "无匹配交易所。清空搜索以查看全部。",
+    "dlg_bad_link": "无效的交易所编号。有效范围：1–413。",
     "dlg_heading_c": "Full build dialog (%(total)s)",
-    "dlg_showing_c": "Showing %(shown)s / %(total)s",
-    "dlg_bad_link": "Invalid exchange number. Valid range: 1–413.",
-    "dlg_no_match": "No matching exchanges. Clear the search to see everything."
+    "dlg_showing_c": "Showing %(shown)s / %(total)s"
   },
   "approval": {
     "title": "Approve signature",

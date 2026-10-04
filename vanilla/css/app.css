@@ -741,6 +741,10 @@ img, canvas, pre { max-width: 100%; }
   .wrap.mkt-wrap { max-width: min(98vw, 3400px); }
 }
 
+/* About page build-dialog archive (R12): code-fence wrap + tap targets */
+.bd-details p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bd-details a[href*="dialog="] { display: inline-block; min-height: 44px; padding: 10px 4px; }
+
 /* Retro forgery pass (target: vanilla/notes/original-header-exchange-2026-09-28.png).
  * Token-driven throughout so all three themes keep working; the banner skin
  * below rides the per-theme --banner-* tokens (themes.css) — same as #1,
