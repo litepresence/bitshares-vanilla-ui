@@ -64,6 +64,7 @@ wallet, with the assistant's replies, ending after issue #1 was addressed
   docs numbering (exact fragment scheme at plan time — must survive the
   hash router without misrouting, e.g. must not parse as a new route);
   anchor visits auto-load data, expand the exchange, scroll to it.
+  Shipped as `?dialog=N` query deep-link (via `Router.query()`) to avoid hash-router collision; `#N` fragment scheme abandoned as unnecessary.
 - i18n: only search placeholder/clear get keys; dialog content stays
   verbatim English (see archival rule §1).
 - Verification: 360px phone (scroll, ≥44px targets, no hover-only UI),
