@@ -1,7 +1,8 @@
 /* SettingsPrefs: preference sections of the #/settings page.
-  * Owns: the theme selector
- *   (ref-ui-theme/vanilla-ui-theme/dex-ux-theme), and the locale switcher
- *   stub marking). Builds DOM only — the change-event wiring lives in
+ * Owns: the theme selector
+ *   (ref-ui-theme/vanilla-ui-theme/dex-ux-theme), the locale switcher
+ *   stub, buildHistory (community history index toggle), and buildSigning
+ *   (signing route section shell). Builds DOM only — the change-event wiring lives in
  *   settings.js (SettingsPage.render passes `t` in; I18n is read here for
  *   the locale names/current tag only, never written — I18n.setLocale owns
  *   the pref write). There is no reset section: the old UI's reset tab was

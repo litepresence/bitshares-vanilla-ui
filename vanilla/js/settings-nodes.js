@@ -20,7 +20,7 @@ var SettingsNodes = (function () {
   /* Both networks' defaults + customs joined, de-duplicated, order-stable
    * (mainnet defaults, testnet defaults, customs, minus hiddenNodes). The table owns network
    * switching, so every row is always listed. Params: settings
-   * (Store.loadSettings shape: {network, customNodes}). Returns: array of
+   * (Store.loadSettings shape: {network, customNodes, hiddenNodes}). Returns: array of
    * wss:// URL strings. Fails: never (garbage entries drop). */
   function allNodes(settings) {
     var mains = (Store.DEFAULT_NODES && Store.DEFAULT_NODES.mainnet) || [];
@@ -862,9 +862,11 @@ var SettingsNodes = (function () {
     } catch (e) { /* row paint stands */ }
   }
 
-  /* hideNode: append a URL to a hidden list (capped at 60 like probe
-   * history, deduped). Params: list (array|null), url string. Returns a
-   * NEW array. Never throws. */
+  /** hideNode: append a URL to a hidden list (capped at 60 like probe
+   * history, deduped).
+   * @param {Array|null} list hidden URL list (null reads as empty)
+   * @param {string} url node URL to hide
+   * @returns {Array} NEW array. Never throws. */
   function hideNode(list, url) {
     try {
       var out = Array.isArray(list) ? list.slice() : [];
@@ -874,8 +876,10 @@ var SettingsNodes = (function () {
     } catch (e) { return []; }
   }
 
-  /* unhideNode: drop a URL from a hidden list (the re-add path).
-   * Params/returns: same shape as hideNode. Never throws. */
+  /** unhideNode: drop a URL from a hidden list (the re-add path).
+   * @param {Array|null} list hidden URL list (null reads as empty)
+   * @param {string} url node URL to drop
+   * @returns {Array} NEW array, same shape as hideNode. Never throws. */
   function unhideNode(list, url) {
     try {
       var out = Array.isArray(list) ? list.slice() : [];
@@ -1048,7 +1052,7 @@ var SettingsNodes = (function () {
       return Promise.resolve((net === "mainnet" || net === "testnet") ? net !== prev : false);
     }
     try {
-      var known = netFromChain(seenChain[url] || "") || listNetwork(url);
+      var known = listNetwork(url) || netFromChain(seenChain[url] || "");
       if (known) return apply(known);
       if (typeof Chain !== "undefined" && Chain && typeof Chain.probe === "function") {
         return Chain.probe(url, 6000).then(function (r) {
