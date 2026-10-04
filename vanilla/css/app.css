@@ -601,6 +601,11 @@ table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
  * skips them). */
 .node-table tr.node-sep td { height: 8px; padding: 0; border: 0; border-top: 2px solid var(--border); background: var(--panel-deep); }
 .node-cards .node-sep { height: 8px; background: var(--panel-deep); border-top: 2px solid var(--border); border-radius: 4px; }
+/* Remove column: red × per row (defaults hide, customs unlist). Glyph
+ * buttons need an explicit 44px box (text buttons size themselves; a
+ * bare × would miss the touch floor). --danger follows the footer
+ * closed-host precedent for small red text. */
+.node-table .node-remove, .node-card .node-remove { min-width: 44px; color: var(--danger); font-weight: 700; font-size: 1.1rem; }
 .node-table tbody tr:nth-child(even) td:first-child { background: var(--panel-deep); }
 /* Clickable offer rows (row click opens the loan modal; the per-row Borrow
  * button is the touch/keyboard path — no hover-dependent UI). */

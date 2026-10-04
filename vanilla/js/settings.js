@@ -216,7 +216,7 @@ var SettingsPage = (function () {
         return;
       }
       customs.push(v);
-      Store.saveSettings({customNodes: customs});
+      Store.saveSettings({ customNodes: customs, hiddenNodes: SettingsNodes.unhideNode(cur.hiddenNodes, v) });
       render(rootEl);
     });
 
@@ -277,16 +277,22 @@ var SettingsPage = (function () {
       });
     })();
 
-    // Events: custom remove (table + cards)
+    // Events: node remove (table + cards) — defaults hide persistently,
+    // customs unlist; removing the active node falls back to first visible.
     Array.prototype.forEach.call(wrap.querySelectorAll(".node-remove"), function (b) {
       b.addEventListener("click", function () {
         var u = b.getAttribute("data-url");
         var cur = Store.loadSettings();
-        var customs = (Array.isArray(cur.customNodes) ? cur.customNodes : []).filter(function (x) { return x !== u; });
-        var patch = {customNodes: customs};
+        var customs = Array.isArray(cur.customNodes) ? cur.customNodes.slice() : [];
+        var hidden = Array.isArray(cur.hiddenNodes) ? cur.hiddenNodes.slice() : [];
+        var isC = customs.indexOf(u) !== -1;
+        var patch = {
+          customNodes: isC ? customs.filter(function (x) { return x !== u; }) : customs,
+          hiddenNodes: isC ? hidden : SettingsNodes.hideNode(hidden, u)
+        };
         if (cur.activeNode === u) {
-          var fb = (Store.DEFAULT_NODES && Store.DEFAULT_NODES[cur.network] && Store.DEFAULT_NODES[cur.network][0]) || "";
-          patch.activeNode = fb;
+          var rest = SettingsNodes.allNodes({ network: cur.network, customNodes: patch.customNodes, hiddenNodes: patch.hiddenNodes });
+          patch.activeNode = rest[0] || "";
         }
         Store.saveSettings(patch);
         render(rootEl);

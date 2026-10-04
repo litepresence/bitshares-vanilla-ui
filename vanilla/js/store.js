@@ -106,6 +106,7 @@ var Store = (function () {
       network: "mainnet",
       activeNode: DEFAULT_NODES.mainnet[0],
       customNodes: [],
+      hiddenNodes: [],
       theme: "ref-ui-theme",
       locale: "en",
       esEnabled: true,
@@ -148,8 +149,15 @@ var Store = (function () {
     var customNodes = Array.isArray(stored.customNodes)
       ? stored.customNodes.filter(function (u) { return typeof u === "string"; })
       : [];
+    var hiddenNodes = Array.isArray(stored.hiddenNodes)
+      ? stored.hiddenNodes.filter(function (u) { return typeof u === "string"; }).slice(-60)
+      : [];
     var fallbackNode = network === "testnet" ? DEFAULT_NODES.testnet[0] : DEFAULT_NODES.mainnet[0];
     var activeNode = (typeof stored.activeNode === "string" && stored.activeNode) ? stored.activeNode : fallbackNode;
+    if (hiddenNodes.indexOf(activeNode) !== -1) {
+      var visible = DEFAULT_NODES.mainnet.concat(DEFAULT_NODES.testnet).concat(customNodes).filter(function (u) { return hiddenNodes.indexOf(u) === -1; });
+      activeNode = visible[0] || fallbackNode;
+    }
     var locale = (typeof stored.locale === "string" && stored.locale) ? stored.locale : base.locale;
     /* esEnabled: pre-Phase-1 envelopes lack the key — default ON (owner ruling
      * 2026-10-02: community ES is a main feature). Only an explicit false
@@ -160,7 +168,7 @@ var Store = (function () {
      * auto (fail toward the default, never toward a forced route). */
     var signing = (stored.signing === "extension" || stored.signing === "browser" ||
       stored.signing === "auto") ? stored.signing : base.signing;
-    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale, esEnabled: esEnabled, signing: signing };
+    return { network: network, activeNode: activeNode, customNodes: customNodes, hiddenNodes: hiddenNodes, theme: theme, locale: locale, esEnabled: esEnabled, signing: signing };
   }
 
   /* saveSettings: merges a patch onto current settings, persists + emits.
@@ -174,6 +182,7 @@ var Store = (function () {
       network: current.network,
       activeNode: current.activeNode,
       customNodes: current.customNodes,
+      hiddenNodes: current.hiddenNodes,
       theme: current.theme,
       locale: current.locale,
       esEnabled: current.esEnabled,
@@ -183,6 +192,7 @@ var Store = (function () {
       if (typeof patch.network === "string") next.network = patch.network;
       if (typeof patch.activeNode === "string") next.activeNode = patch.activeNode;
       if (Array.isArray(patch.customNodes)) next.customNodes = patch.customNodes;
+      if (Array.isArray(patch.hiddenNodes)) next.hiddenNodes = patch.hiddenNodes.filter(function (u) { return typeof u === "string"; }).slice(-60);
       if (typeof patch.theme === "string") next.theme = patch.theme;
       if (typeof patch.locale === "string") next.locale = patch.locale;
       if (typeof patch.esEnabled === "boolean") next.esEnabled = patch.esEnabled;

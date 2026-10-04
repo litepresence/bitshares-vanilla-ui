@@ -15,7 +15,7 @@ global.Store = {
 };
 var SN = require("../vanilla/js/settings-nodes.js");
 var T = SN._test;
-["listNetwork", "netFromChain", "networkLabel", "networkHealth", "groupOf"].forEach(function (k) {
+["listNetwork", "netFromChain", "networkLabel", "networkHealth", "groupOf", "hideNode", "unhideNode"].forEach(function (k) {
   assert.ok(T && typeof T[k] === "function", "_test." + k + " exported");
 });
 function t(k, d) { return d; }
@@ -53,5 +53,13 @@ eq(T.networkHealth("", null), "", "unknown uncolored");
 eq(T.groupOf("wss://m1"), "mainnet", "group mainnet");
 eq(T.groupOf("wss://t1"), "testnet", "group testnet");
 eq(T.groupOf("wss://x"), "custom", "group custom");
+eq(T.hideNode([], "wss://a").join(","), "wss://a", "hide appends");
+eq(T.hideNode(["wss://a"], "wss://a").length, 1, "hide dedupes");
+eq(T.hideNode(null, "wss://a").join(","), "wss://a", "hide null list");
+eq(T.unhideNode(["wss://a", "wss://b"], "wss://a").join(","), "wss://b", "unhide drops");
+eq(T.unhideNode(null, "wss://a").length, 0, "unhide null list");
+eq(T.hideNode(["wss://a"], null).join(","), "wss://a", "hide null url no-op");
+var big = []; for (var i = 0; i < 65; i++) big.push("wss://n" + i);
+eq(T.hideNode(big, "wss://z").length, 60, "hide caps at 60");
 delete global.Store;
 console.log("node-network-test: " + passed + " passed, 0 failed");

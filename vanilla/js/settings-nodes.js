@@ -18,7 +18,7 @@ var SettingsNodes = (function () {
   "use strict";
 
   /* Both networks' defaults + customs joined, de-duplicated, order-stable
-   * (mainnet defaults, testnet defaults, customs). The table owns network
+   * (mainnet defaults, testnet defaults, customs, minus hiddenNodes). The table owns network
    * switching, so every row is always listed. Params: settings
    * (Store.loadSettings shape: {network, customNodes}). Returns: array of
    * wss:// URL strings. Fails: never (garbage entries drop). */
@@ -26,21 +26,16 @@ var SettingsNodes = (function () {
     var mains = (Store.DEFAULT_NODES && Store.DEFAULT_NODES.mainnet) || [];
     var tests = (Store.DEFAULT_NODES && Store.DEFAULT_NODES.testnet) || [];
     var customs = Array.isArray(settings.customNodes) ? settings.customNodes : [];
+    var hidden = Array.isArray(settings.hiddenNodes) ? settings.hiddenNodes : [];
     var seen = {};
     var out = [];
     mains.concat(tests).concat(customs).forEach(function (u) {
       if (typeof u !== "string" || !u) return;
-      if (seen[u]) return;
+      if (seen[u] || hidden.indexOf(u) !== -1) return;
       seen[u] = true;
       out.push(u);
     });
     return out;
-  }
-
-  /* True when the URL came from the user's custom list (gets a Remove button).
-   * Params: url string, settings (Store shape). Returns: boolean. */
-  function isCustom(url, settings) {
-    return Array.isArray(settings.customNodes) && settings.customNodes.indexOf(url) !== -1;
   }
 
   /* M2: row lookup by getAttribute compare — URLs are never interpolated
@@ -134,7 +129,7 @@ var SettingsNodes = (function () {
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var headRow = doc.createElement("tr");
-    ["", t("settings.th_node", "Node"), t("settings.th_network", "Network"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), ""].forEach(function (t) {
+    ["", t("settings.th_node", "Node"), t("settings.th_network", "Network"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), t("settings.remove", "Remove")].forEach(function (t) {
       var th = doc.createElement("th");
       th.textContent = t;
       headRow.appendChild(th);
@@ -231,14 +226,13 @@ var SettingsNodes = (function () {
       tr.appendChild(tdHist);
 
       var tdAct = doc.createElement("td");
-      if (isCustom(url, settings)) {
-        var rm = doc.createElement("button");
-        rm.type = "button";
-        rm.className = "node-remove";
-        rm.setAttribute("data-url", url);
-        rm.textContent = t("settings.remove", "Remove");
-        tdAct.appendChild(rm);
-      }
+      var rm = doc.createElement("button");
+      rm.type = "button";
+      rm.className = "node-remove";
+      rm.setAttribute("data-url", url);
+      rm.setAttribute("aria-label", t("settings.remove", "Remove"));
+      rm.textContent = "×";
+      tdAct.appendChild(rm);
       tr.appendChild(tdAct);
 
       tbody.appendChild(tr);
@@ -323,14 +317,13 @@ var SettingsNodes = (function () {
       selBtn.textContent = settings.activeNode === url ? t("settings.selected", "Selected") : t("settings.select", "Select");
       card.appendChild(selBtn);
 
-      if (isCustom(url, settings)) {
-        var rm2 = doc.createElement("button");
-        rm2.type = "button";
-        rm2.className = "node-remove";
-        rm2.setAttribute("data-url", url);
-        rm2.textContent = t("settings.remove", "Remove");
-        card.appendChild(rm2);
-      }
+      var rm2 = doc.createElement("button");
+      rm2.type = "button";
+      rm2.className = "node-remove";
+      rm2.setAttribute("data-url", url);
+      rm2.setAttribute("aria-label", t("settings.remove", "Remove"));
+      rm2.textContent = "×";
+      card.appendChild(rm2);
 
       cards.appendChild(card);
       paintHistory(card, url, t);
@@ -869,6 +862,27 @@ var SettingsNodes = (function () {
     } catch (e) { /* row paint stands */ }
   }
 
+  /* hideNode: append a URL to a hidden list (capped at 60 like probe
+   * history, deduped). Params: list (array|null), url string. Returns a
+   * NEW array. Never throws. */
+  function hideNode(list, url) {
+    try {
+      var out = Array.isArray(list) ? list.slice() : [];
+      if (typeof url === "string" && url && out.indexOf(url) === -1) out.push(url);
+      if (out.length > 60) out = out.slice(out.length - 60);
+      return out.filter(function (u) { return typeof u === "string"; });
+    } catch (e) { return []; }
+  }
+
+  /* unhideNode: drop a URL from a hidden list (the re-add path).
+   * Params/returns: same shape as hideNode. Never throws. */
+  function unhideNode(list, url) {
+    try {
+      var out = Array.isArray(list) ? list.slice() : [];
+      return out.filter(function (u) { return typeof u === "string" && u !== url; });
+    } catch (e) { return []; }
+  }
+
   /* Observed chain ids per URL, this page-load only (lets selectNode reuse
    * a probe this session ran instead of re-probing; no storage churn —
    * absence just means probe-first). Never read before write fails: a
@@ -1049,7 +1063,6 @@ var SettingsNodes = (function () {
 
   return {
     allNodes: allNodes,
-    isCustom: isCustom,
     findRow: findRow,
     setRow: setRow,
     buildNodeTable: buildNodeTable,
@@ -1062,7 +1075,9 @@ var SettingsNodes = (function () {
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth, groupOf: groupOf }
+    hideNode: hideNode,
+    unhideNode: unhideNode,
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth, groupOf: groupOf, hideNode: hideNode, unhideNode: unhideNode }
   };
 })();
 
