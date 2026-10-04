@@ -433,6 +433,9 @@ var MiscUI = (function () {
     ctx.wrap.appendChild(cT.row); ctx.wrap.appendChild(cA.row); ctx.wrap.appendChild(cN.row);
     area = doc.createElement("textarea");
     area.setAttribute("placeholder", t("misc.invoice_lines_placeholder", "coffee|1.5\ncake|2")); area.setAttribute("rows", "4");
+    /* A11y: placeholder is not a name — mirror it as the accessible name
+     * (same key, no new i18n; txbuilder-ui.js precedent). */
+    area.setAttribute("aria-label", t("misc.invoice_lines_placeholder", "coffee|1.5\ncake|2"));
     if (qAmount || qMemo) area.value = qAmount ? (qMemo ? qMemo + "|" + qAmount : qAmount) : "";
     ui.touchable(area); area.style.width = "100%"; ctx.wrap.appendChild(area);
     var mk = ui.touchable(ui.el(doc, "button", t("misc.make_invoice_link", "Make invoice link"))); mk.type = "button"; ctx.wrap.appendChild(mk);
@@ -454,6 +457,7 @@ var MiscUI = (function () {
         var url = "#/invoice/" + Proposal.packInvoice({ to: to, asset: asset, lines: out, note: cN.input.value.trim(), id: "inv-" + Date.now() });
         var link = ui.el(doc, "a", t("misc.open_invoice", "Open invoice")); link.setAttribute("href", url); o2.appendChild(link);
         var ta = doc.createElement("textarea"); ta.value = url; ta.setAttribute("rows", "3");
+        ta.setAttribute("aria-label", t("misc.open_invoice", "Open invoice"));
         ui.touchable(ta); ta.style.width = "100%"; o2.appendChild(ta);
       } catch (e) { ui.showError(doc, o2, e, t("misc.could_not_create_the_invoice", "Could not create the invoice.")); }
     });
@@ -529,6 +533,7 @@ var MiscUI = (function () {
       var shareTa = doc.createElement("textarea");
       shareTa.value = shareHash(qTo, qAsset || "BTS", qAmount, qMemo);
       shareTa.setAttribute("rows", "3"); shareTa.readOnly = true;
+      shareTa.setAttribute("aria-label", t("misc.shareable_link", "Shareable link"));
       ui.touchable(shareTa); shareTa.style.width = "100%"; ctx.wrap.appendChild(shareTa);
       var copyBtn = ui.touchable(ui.el(doc, "button", t("misc.copy_link", "Copy link"))); copyBtn.type = "button";
       var printBtn = ui.touchable(ui.el(doc, "button", t("misc.print", "Print"))); printBtn.type = "button";
