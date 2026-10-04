@@ -165,7 +165,7 @@ var ExplorerUI = (function () {
       DOM.clear(root);
       var failed = makeWrap(doc, root);
       failed.appendChild(shellTitle(doc));
-      showError(doc, failed, new Error("not-connected"), t("explorer.offline_short", "Network unavailable."));
+      showError(doc, failed, new Error("not-connected"), t("common.network_unavailable_short", "Network unavailable."));
       var xstat = DOM.el(doc, "p", "", "muted");
       try { xstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
       failed.appendChild(xstat);
@@ -428,7 +428,7 @@ var ExplorerUI = (function () {
           if (res && res.status === "offline") {
             clearHashBox();
             showError(doc, hashBox, new Error("not-connected"),
-              t("explorer.offline_short", "Network unavailable."));
+              t("common.network_unavailable_short", "Network unavailable."));
             return;
           }
           clearHashBox();

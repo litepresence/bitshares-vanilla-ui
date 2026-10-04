@@ -52,7 +52,7 @@ var CreditUI = (function () {
     else if (m.indexOf("unknown-offer") !== -1) m = t("credit.unknown_credit_offer", "Unknown credit offer.");
     else if (m.indexOf("unknown-fund") !== -1) m = t("credit.unknown_same_t_fund", "Unknown Same-T fund.");
     else if (m.indexOf("unknown-deal") !== -1) m = t("credit.unknown_credit_deal", "Unknown credit deal.");
-    else if (m.indexOf("unknown-account") !== -1) m = t("credit.unknown_account", "Unknown account.");
+    else if (m.indexOf("unknown-account") !== -1) m = t("common.unknown_account", "Unknown account.");
     else if (m.indexOf("unknown-asset") !== -1) m = t("credit.unknown_asset", "Unknown asset.");
     var err = DOM.error(wrap, m);
     return err;
@@ -238,7 +238,7 @@ var CreditUI = (function () {
   function sendConfirm(doc, out, cfg, myGen) {
     DOM.clear(out);
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
-      backLabel: t("credit.back", "Back"), sendLabel: t("credit.sign_send", "Sign & Send"),
+      backLabel: t("credit.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
       onSend: function () {
         if (myGen !== gen) return;

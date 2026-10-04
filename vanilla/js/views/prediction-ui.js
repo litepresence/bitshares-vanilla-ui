@@ -1041,7 +1041,7 @@ var PredictionUI = (function () {
             });
           }
           sDlg = ConfirmDialog.show({ title: t("prediction.confirm_settle", "Confirm settle"), rows: sRows,
-            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            backLabel: t("borrow.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: sBack, onSend: sSend });
           /* Principle #6 (raw in title): sRows carry native r[2] raw
            * titles (ConfirmDialog.show sets dd.title); no post-show

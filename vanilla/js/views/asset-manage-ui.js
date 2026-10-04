@@ -45,7 +45,7 @@ var AssetManageUI = (function () {
     var b = el(d, "div", null, "error"); b.setAttribute("aria-live", "polite");
     var m = (e && e.message) ? e.message : String(e || fb || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("unknown-asset") !== -1) m = fb || t("barter.unknown_asset", "Unknown asset.");
-    else if (m.indexOf("unknown-account") !== -1) m = fb || t("barter.unknown_account", "Unknown account.");
+    else if (m.indexOf("unknown-account") !== -1) m = fb || t("common.unknown_account", "Unknown account.");
     else if (m.indexOf("symbol-taken") !== -1) m = t("asset.symbol_taken", "Symbol is already taken.");
     else if (m.indexOf("not-issuer") !== -1) m = t("asset.only_issuer", "Only the issuer can change this.");
     else if (m.indexOf("not-market-issued") !== -1) m = t("asset.not_market_issued", "Not a market-issued asset.");
@@ -66,7 +66,7 @@ var AssetManageUI = (function () {
    * stale offline panel survives after connect). true = caller stops. */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(DOM.pageHead(d, t("assets.title", "Assets"), "assets")); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    w.appendChild(DOM.pageHead(d, t("assets.title", "Assets"), "assets")); err(d, w,new Error("not-connected"),t("common.network_unavailable_short", "Network unavailable."));
     var cstat = el(d, "p", "", "muted");
     try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     w.appendChild(cstat);
@@ -207,7 +207,7 @@ var AssetManageUI = (function () {
           catch (feeErr) { updFee = String(f.amount) + " (core)"; }
           var updDlg = ConfirmDialog.show({ title: t("asset.confirm_update", "Confirm asset update"),
             rows: rows, feeHuman: updFee, feeTerm: t("borrow.fee", "Fee"),
-            backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+            backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: function () { renderUpdate(root, info.symbol); },
             onSend: function () {
               var btns = updDlg.getElementsByTagName("button");
@@ -252,7 +252,7 @@ var AssetManageUI = (function () {
             catch (feeErr2) { bitFee = String(f.amount) + " (core)"; }
             var bitDlg = ConfirmDialog.show({ title: t("asset.confirm_bitasset", "Confirm bitasset update"),
               rows: bitRows, feeHuman: bitFee, feeTerm: t("borrow.fee", "Fee"),
-              backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+              backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
               onBack: function () { renderUpdate(root, info.symbol); },
               onSend: function () {
                 var btns = bitDlg.getElementsByTagName("button");
@@ -293,7 +293,7 @@ var AssetManageUI = (function () {
           catch (feeErr3) { prodFee = String(f.amount) + " (core)"; }
           var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
             rows: prodRows, feeHuman: prodFee, feeTerm: t("borrow.fee", "Fee"),
-            backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+            backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: function () { renderUpdate(root, info.symbol); },
             onSend: function () {
               var btns = prodDlg.getElementsByTagName("button");
@@ -352,7 +352,7 @@ var AssetManageUI = (function () {
         catch (feeErr4) { halfFee = String(f.amount) + " (core)"; }
         var halfDlg = ConfirmDialog.show({ title: isReserve ? "Confirm reserve" : "Confirm issue",
           rows: rows, feeHuman: halfFee, feeTerm: t("borrow.fee", "Fee"),
-          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
           onBack: function () { renderIssue(root); },
           onSend: function () {
             var btns = halfDlg.getElementsByTagName("button");

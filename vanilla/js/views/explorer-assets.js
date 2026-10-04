@@ -1042,7 +1042,7 @@ var ExplorerAssets = (function () {
             confRow(t("explorer.confirm_network", "Network"), netName);
             actBox.appendChild(dl);
             var back = touchable(DOM.el(doc, "button", t("explorer.fund_back", "Back"))); back.type = "button";
-            var send = touchable(DOM.el(doc, "button", t("explorer.fund_sign_send", "Sign & Send"))); send.type = "button";
+            var send = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send"))); send.type = "button";
             actBox.appendChild(back); actBox.appendChild(send);
             back.addEventListener("click", function () { renderAsset(root, symbol); });
             send.addEventListener("click", function () {

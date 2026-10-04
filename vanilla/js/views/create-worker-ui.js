@@ -121,7 +121,7 @@ var CreateWorkerUI = (function () {
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
         failWrap.appendChild(DOM.pageHead(doc, t("createworker.create_worker", "Create Worker"), null));
-        showError(doc, failWrap, new Error("not connected"), t("createworker.network_unavailable", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var cwstat = DOM.el(doc, "p", "", "muted");
         try { cwstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(cwstat);
@@ -385,10 +385,10 @@ var CreateWorkerUI = (function () {
     var feeHuman;
     try { feeHuman = Format.formatAmount(String(opData.fee.amount), CORE_PRECISION) + " " + CORE_SYMBOL; }
     catch (e) { feeHuman = String(opData.fee.amount) + " (" + opData.fee.asset_id + ")"; }
-    row(t("createworker.fee_live", "Fee (live)"), feeHuman + " (core)", String(opData.fee.amount));
+    row(t("common.fee_live", "Fee (live)"), feeHuman + " (core)", String(opData.fee.amount));
     box.appendChild(list);
     var back = touchable(DOM.el(doc, "button", t("createworker.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
-    var send = touchable(DOM.el(doc, "button", t("createworker.sign_send", "Sign & Send"))); send.type = "button";
+    var send = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send"))); send.type = "button";
     box.appendChild(back); box.appendChild(send);
     back.addEventListener("click", function () { if (myGen === gen) onBack(); });
     send.addEventListener("click", function () {

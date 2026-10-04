@@ -158,7 +158,7 @@ var TransferUI = (function () {
       ? e.message
       : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
-      msg = fallback || t("transfer.unknown_account", "Unknown account.");
+      msg = fallback || t("common.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
@@ -277,7 +277,7 @@ var TransferUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var tstat = DOM.el(doc, "p", "", "muted");
         try { tstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(tstat);
@@ -1019,7 +1019,7 @@ var TransferUI = (function () {
             msg = t("transfer.from_mismatch", "From must match the unlocked wallet account.") +
               " " + (e.fromName + " (" + e.fromId + ")") + " / wallet " + e.walletId + ".";
           } else if (msg.indexOf("unknown-account") !== -1) {
-            setFieldError(toF, t("transfer.unknown_account", "Unknown account."));
+            setFieldError(toF, t("common.unknown_account", "Unknown account."));
           } else if (msg.indexOf("Unknown asset") === 0 || msg.indexOf("bad-asset-shape") !== -1) {
             setFieldError(assetF, msg);
           } else if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 ||
@@ -1371,8 +1371,8 @@ var TransferUI = (function () {
       [t("confirm.memo", "Memo"), memoText],
       [t("confirm.network", "Network"), networkNameLocal()]];
     var dlg = ConfirmDialog.show({ title: t("transfer.confirm_proposal_title", "Confirm proposal (op 22)"),
-      rows: rows, feeHuman: fh.text, feeTerm: t("transfer.fee_live_label", "Fee (live)"),
-      backLabel: t("confirm.back", "Back"), sendLabel: t("confirm.sign_send", "Sign & Send"),
+      rows: rows, feeHuman: fh.text, feeTerm: t("common.fee_live", "Fee (live)"),
+      backLabel: t("confirm.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { if (typeof onBack === "function") onBack(); },
       onSend: function () { doPropSend(); } });
     /* Enclosed-op note + raw op JSON ride inside the dialog above its
@@ -1578,7 +1578,7 @@ var TransferUI = (function () {
         Format.formatAmount(P.leg.amountInt, P.leg.asset.precision) + " " + P.leg.asset.symbol, P.leg.amountInt);
       row(t("confirm.memo", "Memo"), P.leg.memoKind === "plain" ? t("transfer.memo_plain_prefix", "Plain: ") + P.leg.memoText :
         (P.leg.lockedEnc ? t("transfer.locked_encrypted_hint", "Encrypted memos need the wallet keys — unlock first, or switch the memo to plain.") : t("transfer.memo_none", "(none)")));
-      row(t("transfer.fee_live_label", "Fee (live)"), P.fh.text, String(P.pair[1].fee.amount));
+      row(t("common.fee_live", "Fee (live)"), P.fh.text, String(P.pair[1].fee.amount));
       row(t("confirm.network", "Network"), networkNameLocal());
       box.appendChild(list);
       box.appendChild(DOM.el(doc, "p",

@@ -78,7 +78,7 @@ var AccountsUI = (function () {
         DOM.clear(root);
         var failWrap = DOM.append(root, DOM.el(doc, "div", null, "wrap"));
         DOM.append(failWrap, DOM.pageHead(doc, t("account.manager_title", "Accounts"), "user"));
-        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var acstat = DOM.el(doc, "p", "", "muted");
         try { acstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         DOM.append(failWrap, acstat);
@@ -189,7 +189,7 @@ var AccountsUI = (function () {
     }
     DOM.append(wrap, DOM.el(doc, "h2", t("account.lookup_title", "Look up an account")));
     DOM.append(wrap, DOM.el(doc, "p", t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history)."), "muted"));
-    var nameF = Forms.labeledInput(doc, t("account.lookup_label", "Account name ") + " ", { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
+    var nameF = Forms.labeledInput(doc, t("common.account_name", "Account name ") + " ", { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
     nameF.err = DOM.el(doc, "div", "", "error");
     nameF.err.setAttribute("aria-live", "polite"); nameF.err.style.display = "none"; nameF.row.appendChild(nameF.err);
     DOM.append(wrap, nameF.row);

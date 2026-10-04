@@ -89,7 +89,7 @@ var ViewingAs = (function () {
     var entry = doc.createElement("div");
     entry.className = "viewing-input-row";
     var label = doc.createElement("label");
-    label.textContent = t("viewing.dialog_label", "Account name ");
+    label.textContent = t("common.account_name", "Account name ");
     var input = doc.createElement("input");
     input.type = "text";
     input.setAttribute("placeholder", t("viewing.dialog_placeholder", "account-name"));

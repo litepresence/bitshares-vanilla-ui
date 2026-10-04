@@ -279,7 +279,7 @@ var VestingUI = (function () {
       title: t("vesting.confirm_vesting_create_op_32", "Confirm vesting create (op 32)"),
       rows: function (built, f) {
         return [[t("vesting.creator", "Creator"), built.pair[1].creator], [t("vesting.owner", "Owner"), built.pair[1].owner],
-          [t("vesting.amount", "Amount"), built.human, built.pair[1].amount.amount], [t("vesting.policy", "Policy"), built.words], [t("vesting.fee_live", "Fee (live)"), f]];
+          [t("vesting.amount", "Amount"), built.human, built.pair[1].amount.amount], [t("vesting.policy", "Policy"), built.words], [t("common.fee_live", "Fee (live)"), f]];
       },
       ok: function () { return t("vesting.vesting_created_and_re_read_on_chain", "Vesting created and re-read on chain."); },
       fail: t("vesting.could_not_build_vesting_check_accounts_asset", "Could not build vesting (check accounts, asset, amount and dates).") });
@@ -331,7 +331,7 @@ var VestingUI = (function () {
           },
           title: t("vesting.confirm_vesting_withdraw_op_33", "Confirm vesting withdraw (op 33)"),
           rows: function (built, f) {
-            return [[t("vesting.vesting_balance", "Vesting balance"), vr.r.id], [t("vesting.owner", "Owner"), vr.r.owner], [t("vesting.amount", "Amount"), built.human], [t("vesting.fee_live", "Fee (live)"), f]];
+            return [[t("vesting.vesting_balance", "Vesting balance"), vr.r.id], [t("vesting.owner", "Owner"), vr.r.owner], [t("vesting.amount", "Amount"), built.human], [t("common.fee_live", "Fee (live)"), f]];
           },
           ok: function () { return t("vesting.vesting_withdrawn_and_re_read_on_chain", "Vesting withdrawn and re-read on chain."); } });
       });

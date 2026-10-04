@@ -110,7 +110,7 @@ var CreateAccountUI = (function () {
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
         failWrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
-        showError(doc, failWrap, new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var castat = DOM.el(doc, "p", "", "muted");
         try { castat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(castat);
@@ -172,7 +172,7 @@ var CreateAccountUI = (function () {
       card.appendChild(a);
       wrap.appendChild(card);
     })();
-    var nameF = Forms.labeledInput(doc, t("createaccount.account_name", "Account name ") + " ", { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
+    var nameF = Forms.labeledInput(doc, t("common.account_name", "Account name ") + " ", { id: "ca-name", value: P.name, placeholder: "your-name", inputmode: "text" });
     nameF.err = DOM.el(doc, "div", "", "error");
     nameF.err.setAttribute("aria-live", "polite"); nameF.err.style.display = "none"; nameF.row.appendChild(nameF.err);
     wrap.appendChild(nameF.row);

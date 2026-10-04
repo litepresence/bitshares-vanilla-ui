@@ -157,7 +157,7 @@ var MiscUI = (function () {
             if (vT.input.value.trim() !== "") r.push([t("misc.valid_to", "Valid-to"), dateHuman(a.valid_to) + " → " + dateHuman(iso16(vT.input.value))]);
             if (vTh.input.value.trim() !== "") r.push([t("misc.threshold", "Threshold"), "→ " + vTh.input.value.trim()]);
             if (r.length === 2) r.push([t("misc.changed_fields", "Changed fields"), t("misc.none_this_would_be_a_no_op", "none — this would be a no-op")]);
-            r.push([t("misc.fee_live", "Fee (live)"), f]);
+            r.push([t("common.fee_live", "Fee (live)"), f]);
             return r;
           },
           ok: function () { return t("misc.authority_updated_and_re_read_on_chain", "Authority updated and re-read on chain."); } });
@@ -176,7 +176,7 @@ var MiscUI = (function () {
               } };
           },
           title: t("misc.confirm_authority_delete_op_56", "Confirm authority delete (op 56)"),
-          rows: function (built, f) { return [[t("misc.authority", "Authority"), String(a.id)], [t("misc.account", "Account"), String(a.account)], [t("misc.fee_live", "Fee (live)"), f]]; },
+          rows: function (built, f) { return [[t("misc.authority", "Authority"), String(a.id)], [t("misc.account", "Account"), String(a.account)], [t("common.fee_live", "Fee (live)"), f]]; },
           ok: function () { return t("misc.authority_deleted_re_read_confirms_it_is_gone", "Authority deleted (re-read confirms it is gone)."); } });
       });
     }
@@ -240,7 +240,7 @@ var MiscUI = (function () {
         return [[t("misc.account", "Account"), built.pair[1].account], [t("misc.enabled", "Enabled"), built.pair[1].enabled ? t("misc.yes", "yes") : t("misc.no", "no")],
           [t("misc.valid", "Valid"), dateHuman(built.pair[1].valid_from) + " → " + dateHuman(built.pair[1].valid_to)],
           [t("misc.operation_type", "Operation type"), String(built.pair[1].operation_type) + typeName(built.pair[1].operation_type)], [t("misc.threshold", "Threshold"), String(built.pair[1].auth.weight_threshold)],
-          [t("misc.restrictions", "Restrictions"), t("misc.none_proven_path", "none (proven path)")], [t("misc.fee_live", "Fee (live)"), f]];
+          [t("misc.restrictions", "Restrictions"), t("misc.none_proven_path", "none (proven path)")], [t("common.fee_live", "Fee (live)"), f]];
       },
       ok: function () { return t("misc.authority_created", "Authority created."); },
       fail: t("misc.could_not_build_the_authority_check_account_d", "Could not build the authority (check account, dates, op type and key).") });
@@ -281,7 +281,7 @@ var MiscUI = (function () {
         rows: function (built, f) {
           return [[t("misc.authorizer", "Authorizer"), authId], [t("misc.account", "Account"), listeeId],
             [t("misc.listing", "Listing"), ProposalMisc.listingLabel(cur) + " → " + ProposalMisc.listingLabel(next), cur + "→" + next],
-            [t("misc.fee_live", "Fee (live)"), f]];
+            [t("common.fee_live", "Fee (live)"), f]];
         },
         ok: function () { return t("misc.listing_updated_re_check_the_counterparty_to", "Listing updated (re-check the counterparty to see the echoed state)."); } });
     }

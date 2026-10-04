@@ -80,7 +80,7 @@ var DashboardUI = (function () {
     if (msg.indexOf("not connected") !== -1) msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     else if (msg.indexOf("history-unavailable") !== -1) msg = t("account.err_history", "History unavailable on this node.");
     else if (msg.indexOf("bad-asset-shape") !== -1) msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
-    else if (msg.indexOf("unknown-account") !== -1) msg = t("transfer.unknown_account", "Unknown account.");
+    else if (msg.indexOf("unknown-account") !== -1) msg = t("common.unknown_account", "Unknown account.");
     var err = DOM.error(wrap, msg);
     if (isHist) {
       try {
@@ -307,7 +307,7 @@ var DashboardUI = (function () {
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
         failWrap.appendChild(DOM.pageHead(doc, t("shell.dashboard", "Dashboard"), "dashboard"));
-        showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var dstat = DOM.el(doc, "p", "", "muted");
         try { dstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(dstat);

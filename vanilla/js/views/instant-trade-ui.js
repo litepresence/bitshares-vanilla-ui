@@ -367,7 +367,7 @@ var InstantTradeUI = (function () {
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
         failWrap.appendChild(DOM.pageHead(doc, t("instant.instant_trade", "Instant Trade"), "instant-trade"));
-        showError(doc, failWrap, new Error("not connected"), t("instant.network_unavailable", "Network unavailable."));
+        showError(doc, failWrap, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var istat = DOM.el(doc, "p", "", "muted");
         try { istat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failWrap.appendChild(istat);
@@ -1003,7 +1003,7 @@ var InstantTradeUI = (function () {
     if (R.previewWarn) wrap.appendChild(DOM.el(doc, "p", R.previewWarn, "error"));
     if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
     var backBtn = touchable(DOM.el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
-    var sendBtn = touchable(DOM.el(doc, "button", t("instant.sign_send", "Sign & Send")));
+    var sendBtn = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
     sendBtn.addEventListener("click", function () {

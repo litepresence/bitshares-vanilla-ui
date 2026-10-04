@@ -62,7 +62,7 @@ var BorrowUI = (function () {
     var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
-    else if (m.indexOf("unknown-account") !== -1) m = t("borrow.unknown_account", "Unknown account.");
+    else if (m.indexOf("unknown-account") !== -1) m = t("common.unknown_account", "Unknown account.");
     var err = DOM.error(wrap, m);
     return err;
   }
@@ -391,7 +391,7 @@ var BorrowUI = (function () {
             [t("borrow.target_ratio", "Target ratio"), tcrRow], [t("borrow.network", "Network"), "testnet"]];
           var adjDlg = ConfirmDialog.show({ title: t("borrow.confirm_margin_adjust", "Confirm margin adjust"),
             rows: adjRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
-            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            backLabel: t("borrow.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doAdjSend(); } });
           try {
@@ -609,7 +609,7 @@ var BorrowUI = (function () {
             [t("borrow.network", "Network"), "testnet"]];
           var openDlg = ConfirmDialog.show({ title: t("borrow.confirm_new_borrow", "Confirm new borrow"),
             rows: openRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
-            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            backLabel: t("borrow.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doOpenSend(); } });
           try {
@@ -950,7 +950,7 @@ var BorrowUI = (function () {
             [t("borrow.network", "Network"), "testnet"]];
           var bidDlg = ConfirmDialog.show({ title: t("borrow.confirm_settlement_bid", "Confirm settlement bid"),
             rows: bidRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"),
-            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            backLabel: t("borrow.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
             onBack: function () { DOM.clear(out); btn.disabled = false; },
             onSend: function () { doBidSend(); } });
           try {

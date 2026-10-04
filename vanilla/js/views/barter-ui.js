@@ -69,7 +69,7 @@ var BarterUI = (function () {
     var m = (e && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("not-connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
-    else if (m.indexOf("unknown-account") !== -1) m = t("barter.unknown_account", "Unknown account.");
+    else if (m.indexOf("unknown-account") !== -1) m = t("common.unknown_account", "Unknown account.");
     else if (m.indexOf("unknown-asset") !== -1) m = t("barter.unknown_asset", "Unknown asset.");
     var err = DOM.error(wrap, m);
     return err;
@@ -314,8 +314,8 @@ var BarterUI = (function () {
      [t("barter.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("barter.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
      [t("barter.enclosed_transfers", "Enclosed transfers"), String(built.pair[1].proposed_ops.length)]];
     var dlg = ConfirmDialog.show({ title: t("barter.confirm_barter_proposal_op_22", "Confirm barter proposal (op 22)"),
-      rows: rows, feeHuman: feeHuman, feeTerm: t("barter.fee_live", "Fee (live)"),
-      backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+      rows: rows, feeHuman: feeHuman, feeTerm: t("common.fee_live", "Fee (live)"),
+      backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
       onSend: function () { doSend(); } });
     /* MED fee recap (batch-3 keyed): timing + assets +

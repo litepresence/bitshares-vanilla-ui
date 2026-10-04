@@ -215,7 +215,7 @@ var AuthUI = (function () {
       "Look an on-chain account up by name, then unlock the local wallet above " +
       "(or import its brainkey). Account-password key derivation from the old UI is not supported here.",
       { hint: t("auth.no_login_from_anywhere_with_name_password", "No login from anywhere with name + password here — find the name below, then unlock the local wallet above.") });
-    var g = Forms.labeledInput(doc, t("auth.account_name", "Account name ") + " ", { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
+    var g = Forms.labeledInput(doc, t("common.account_name", "Account name ") + " ", { id: "login-account", type: "text", placeholder: "account-name", inputmode: "text" });
     g.err = DOM.el(doc, "div", "", "error");
     g.err.setAttribute("aria-live", "polite"); g.err.style.display = "none"; g.row.appendChild(g.err);
     DOM.append(cardB, g.row);
@@ -369,7 +369,7 @@ var AuthUI = (function () {
     DOM.append(wrap, DOM.el(doc, "p", t("auth.cloud_style_registration_picks_an_account_nam", "Cloud-style registration picks an account name and registers it through the faucet, which pays the creation fee. On testnet this is free; on mainnet a faucet or registrar must sponsor the name."), "muted"));
     DOM.append(wrap, notePara(doc, t("auth.registration_uses_the_testnet_faucet_switch_t", "Registration uses the testnet faucet — switch to testnet in Settings to register. ") +
       "Name checks work on either network."));
-    var g = Forms.labeledInput(doc, t("auth.account_name", "Account name ") + " ", { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
+    var g = Forms.labeledInput(doc, t("common.account_name", "Account name ") + " ", { id: "reg-cloud-name", type: "text", placeholder: "your-name", inputmode: "text" });
     g.err = DOM.el(doc, "div", "", "error");
     g.err.setAttribute("aria-live", "polite"); g.err.style.display = "none"; g.row.appendChild(g.err);
     DOM.append(wrap, g.row);

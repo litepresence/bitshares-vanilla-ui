@@ -6,7 +6,7 @@
  *   inline), last-visited market persistence (saveLast under LAST_KEY),
  *   timer/listener cleanup.
  *   LAYOUT (retro equal 2x3 grid + right rail — reference
- *   docs/parity/original-buy-sell-2x3-2026-09-28.png): chart stack on top
+  *   docs/parity/original-buy-sell-2x3-2026-09-28.png): chart stack on top
  *   (mkt-charts: price pane + volume pane + depth slice + oscillator panes
  *   + timeframe), then row 1 Buy panel | Sell panel | trades toggle, then
  *   row 2 BUY ORDERS (bids) | SELL ORDERS (asks) | my open orders — six
@@ -247,7 +247,7 @@ var MarketDesk = (function () {
     var isHist = raw.indexOf("history-unavailable") !== -1;
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("bad-market") !== -1) {
       msg = "Unknown market. Check the QUOTE_BASE pair (e.g. " + defaultMarket() + ").";
     } else if (msg.indexOf("bad-asset-shape") !== -1) {
@@ -255,11 +255,11 @@ var MarketDesk = (function () {
     } else if (msg.indexOf("history-unavailable") !== -1) {
       msg = t("market.err_history", "History unavailable on this node (fills and charts need the history plugin).");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("market.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("not connected") !== -1) {
-      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     }
     var err = DOM.error(wrap, msg);
     if (isHist) {
@@ -338,7 +338,7 @@ var MarketDesk = (function () {
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("market.connecting", "Connecting to network…"), "muted"));
+      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var settled = false;
       var off = Store.subscribe("connection", function (st) {
         if (settled) return;
@@ -357,7 +357,7 @@ var MarketDesk = (function () {
         DOM.clear(root);
         var failed = makeWrap(doc, root);
         failed.appendChild(DOM.pageHead(doc, t("market.title", "Exchange"), "trade"));
-        showError(doc, failed, new Error("not connected"), t("market.err_offline_short", "Network unavailable."));
+        showError(doc, failed, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var mstat = DOM.el(doc, "p", "", "muted");
         try { mstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failed.appendChild(mstat);

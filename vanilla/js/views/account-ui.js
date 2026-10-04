@@ -134,7 +134,7 @@ var AccountUI = (function () {
       ? e.message
       : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
-      msg = fallback || t("transfer.unknown_account", "Unknown account.");
+      msg = fallback || t("common.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("history-unavailable") !== -1) {
@@ -1196,7 +1196,7 @@ var AccountUI = (function () {
     lookInput.type = "text";
     lookInput.setAttribute("autocomplete", "off");
     lookInput.style.minHeight = "44px";
-    var lookRow = Forms.fieldRow(doc, t("account.lookup_label", "Account name "), lookInput);
+    var lookRow = Forms.fieldRow(doc, t("common.account_name", "Account name "), lookInput);
     wrap.appendChild(lookRow);
     var lookErr = makeError(doc);
     wrap.appendChild(lookErr);
@@ -1380,7 +1380,7 @@ var AccountUI = (function () {
               var send = doc.createElement("button");
               send.type = "button";
               send.style.minHeight = "44px";
-              send.textContent = t("confirm.sign_send", "Sign & Send");
+              send.textContent = t("common.sign_send", "Sign & Send");
               out.appendChild(back);
               out.appendChild(send);
               back.addEventListener("click", function () {
@@ -1937,7 +1937,7 @@ var AccountUI = (function () {
       return;
     }
     if (typeof name !== "string" || !name) {
-      showError(doc, wrap, "unknown-account", t("transfer.unknown_account", "Unknown account."));
+      showError(doc, wrap, "unknown-account", t("common.unknown_account", "Unknown account."));
       return;
     }
 
@@ -1965,7 +1965,7 @@ var AccountUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         clearRoot(root);
         var failed = makeWrap(doc, root);
-        showError(doc, failed, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
+        showError(doc, failed, new Error("not connected"), t("common.network_unavailable_short", "Network unavailable."));
         var astat = doc.createElement("p");
         astat.className = "muted";
         try { astat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }

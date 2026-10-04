@@ -60,7 +60,7 @@ var ProposalUI = (function () {
   }
   var ERRMAP = [["not-connected", "Network unavailable. Check Settings → Nodes and retry.", "common.network_unavailable"], ["wallet-locked", "Wallet is locked.", "common.wallet_locked"],
     ["unknown-proposal", "Unknown proposal."], ["unknown-ticket", "Unknown ticket."], ["unknown-vesting", "Unknown vesting balance."],
-    ["unknown-authority", "Unknown custom authority."], ["unknown-account", "Unknown account."], ["unknown-asset", "Unknown asset."],
+    ["unknown-authority", "Unknown custom authority."], ["unknown-account", "Unknown account.", "common.unknown_account"], ["unknown-asset", "Unknown asset."],
     ["bad-lock-type", "Bad lock type — pick one of the five."], ["no-claimables", "Nothing claimable for this account."],
     ["invoice-unparseable", "This invoice link cannot be parsed."], ["downgrade-unproven", "Ticket downgrades are unproven — pick the current lock or a longer one."],
     ["restrictions-unproven", "Restrictions are unproven — create with zero restrictions until testnet proves them."],
@@ -253,7 +253,7 @@ var ProposalUI = (function () {
       } catch (e2) { try { dlg.appendChild(node); } catch (e3) { /* display-only */ } }
     }
     dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
-      backLabel: t("proposal.back", "Back"), sendLabel: t("proposal.sign_send", "Sign & Send"),
+      backLabel: t("proposal.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
       onSend: function () {
         if (myGen !== gen) return;
@@ -682,7 +682,7 @@ var ProposalUI = (function () {
       rows: function (built, f) {
         return [[t("proposal.fee_payer", "Fee payer"), built.pair[1].fee_paying_account], [t("proposal.expiration", "Expiration"), timeHuman(built.pair[1].expiration_time)],
           [t("proposal.review_period", "Review period"), (built.pair[1].review_period_seconds === null ? t("proposal.none", "none") : Proposal.durToHuman(built.pair[1].review_period_seconds))],
-          [t("proposal.enclosed_ops", "Enclosed ops"), String(built.pair[1].proposed_ops.length)], [t("proposal.fee_live", "Fee (live)"), f]];
+          [t("proposal.enclosed_ops", "Enclosed ops"), String(built.pair[1].proposed_ops.length)], [t("common.fee_live", "Fee (live)"), f]];
       },
       extra: function (doc, built) {
         var box = doc.createElement("div");
@@ -808,7 +808,7 @@ var ProposalUI = (function () {
           title: "Confirm " + ab[0].toLowerCase() + " (op 23)",
           rows: function (built, f) {
             return [[t("proposal.proposal", "Proposal"), String(p.id)], [(ab[1] ? t("proposal.removed", "Removed") : t("proposal.added", "Added")) + " approval", built.who + " (" + ow.value + ")"],
-              [t("proposal.fee_payer", "Fee payer"), built.pair[1].fee_paying_account], [t("proposal.fee_live", "Fee (live)"), f]];
+              [t("proposal.fee_payer", "Fee payer"), built.pair[1].fee_paying_account], [t("common.fee_live", "Fee (live)"), f]];
           },
           ok: function () { return "Approval " + (ab[1] ? "removed" : "recorded") + " and re-read on chain."; } });
       });
@@ -832,7 +832,7 @@ var ProposalUI = (function () {
         },
         title: t("proposal.confirm_proposal_delete_op_24", "Confirm proposal delete (op 24)"),
         rows: function (built, f) {
-          return [[t("proposal.proposal", "Proposal"), String(p.id)], [t("proposal.owner_authority", "Owner authority"), chk.checked ? t("proposal.yes_veto", "yes (veto)") : t("proposal.no", "no")], [t("proposal.fee_live", "Fee (live)"), f]];
+          return [[t("proposal.proposal", "Proposal"), String(p.id)], [t("proposal.owner_authority", "Owner authority"), chk.checked ? t("proposal.yes_veto", "yes (veto)") : t("proposal.no", "no")], [t("common.fee_live", "Fee (live)"), f]];
         },
         ok: function () { return t("proposal.proposal_deleted_re_read_confirms_it_is_gone", "Proposal deleted (re-read confirms it is gone)."); } });
     }).catch(function (e) {

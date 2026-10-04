@@ -102,11 +102,11 @@ var TradeForm = (function () {
     var err = null; /* created via DOM.error below */
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
-      : String(e || fallback || t("market.err_unexpected", "Unexpected error"));
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("not connected") !== -1) {
-      msg = t("market.err_offline", "Network unavailable. Check Settings → Nodes and retry.");
+      msg = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
-      msg = t("market.err_locked", "Wallet is locked.");
+      msg = t("common.wallet_locked", "Wallet is locked.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("market.err_no_account", "No on-chain account found for the wallet's active key.");
     }
@@ -1212,7 +1212,7 @@ var TradeForm = (function () {
     backBtn.id = sid("trade-back", side);
     backBtn.type = "button";
     mount.appendChild(backBtn);
-    var sendBtn = touchable(DOM.el(doc, "button", t("trade.sign_send", "Sign & Send")));
+    var sendBtn = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send")));
     sendBtn.id = sid("trade-send", side);
     sendBtn.type = "button";
     mount.appendChild(sendBtn);
@@ -1236,7 +1236,7 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = t("trade.s1", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return sendTx(signed, proveNewOrder(P.me.id, before, R.sellAssetId, R.sellRaw));
         })
         .then(function (res) {
@@ -1572,7 +1572,7 @@ var TradeForm = (function () {
           return Tx.sign(R.unsigned, wif);
         })
         .then(function (signed) {
-          status.textContent = t("trade.s1", "Broadcasting…");
+          status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return sendTx(signed, async function () {
             var dbId = await Chain.db();
             var rows = await Chain.call(dbId, "get_limit_orders_by_account", [P.me.id, 100]);

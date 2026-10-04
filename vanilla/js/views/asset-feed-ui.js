@@ -37,7 +37,7 @@ var AssetFeedUI = (function () {
     var b = el(d, "div", null, "error"); b.setAttribute("aria-live", "polite");
     var m = (e && e.message) ? e.message : String(e || fb || t("common.unexpected_error", "Unexpected error"));
     if (m.indexOf("unknown-asset") !== -1) m = fb || t("barter.unknown_asset", "Unknown asset.");
-    else if (m.indexOf("unknown-account") !== -1) m = fb || t("barter.unknown_account", "Unknown account.");
+    else if (m.indexOf("unknown-account") !== -1) m = fb || t("common.unknown_account", "Unknown account.");
     else if (m.indexOf("not-market-issued") !== -1) m = t("asset.not_mpa_feed", "Not a market-issued asset — feeds exist only on smartcoins.");
     else if (m.indexOf("wallet-locked") !== -1) m = t("common.wallet_locked", "Wallet is locked.");
     else if (m.indexOf("not-connected") !== -1 || m.indexOf("not connected") !== -1) m = t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.");
@@ -62,7 +62,7 @@ var AssetFeedUI = (function () {
    * stale offline panel survives after connect). */
   function cold(d, w, root, rerun) {
     if (Chain.status && Chain.status().state === "open") return false;
-    w.appendChild(DOM.pageHead(d, t("asset.feed_title", "Publish feed"), "assets")); err(d, w,new Error("not-connected"),t("createaccount.network_unavailable", "Network unavailable."));
+    w.appendChild(DOM.pageHead(d, t("asset.feed_title", "Publish feed"), "assets")); err(d, w,new Error("not-connected"),t("common.network_unavailable_short", "Network unavailable."));
     var cstat = el(d, "p", "", "muted");
     try { cstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     w.appendChild(cstat);
@@ -253,7 +253,7 @@ var AssetFeedUI = (function () {
         catch (feeErr) { feedFee = String(f.amount) + " (core)"; }
         var feedDlg = ConfirmDialog.show({ title: t("asset.confirm_feed", "Confirm feed"),
           rows: feedRows, feeHuman: feedFee, feeTerm: t("borrow.fee", "Fee"),
-          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
           onBack: function () { renderFeed(root); },
           onSend: function () {
             var btns = feedDlg.getElementsByTagName("button");
@@ -313,7 +313,7 @@ var AssetFeedUI = (function () {
         catch (feeErr2) { prodFee = String(f.amount) + " (core)"; }
         var prodDlg = ConfirmDialog.show({ title: t("asset.confirm_producers", "Confirm feed producers"),
           rows: prodRows, feeHuman: prodFee, feeTerm: t("borrow.fee", "Fee"),
-          backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+          backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
           onBack: function () { renderFeed(root); },
           onSend: function () {
             var btns = prodDlg.getElementsByTagName("button");

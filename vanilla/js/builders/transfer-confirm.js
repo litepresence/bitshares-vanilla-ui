@@ -95,7 +95,7 @@ var TransferConfirm = (function () {
       ? e.message
       : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
     if (msg.indexOf("unknown-account") !== -1) {
-      msg = fallback || t("transfer.unknown_account", "Unknown account.");
+      msg = fallback || t("common.unknown_account", "Unknown account.");
     } else if (msg.indexOf("no-account") !== -1) {
       msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
     } else if (msg.indexOf("wallet-locked") !== -1) {
@@ -360,7 +360,7 @@ var TransferConfirm = (function () {
     dlg = ConfirmDialog.show({ title: t("confirm.title", "Confirm transfer"),
       rows: rows, feeHuman: feeHuman, feeTerm: t("confirm.fee", "Fee"),
       feeRawTitle: String(ctx.fee.amount),
-      backLabel: t("confirm.back", "Back"), sendLabel: t("confirm.sign_send", "Sign & Send"),
+      backLabel: t("confirm.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       doc: doc, onBack: doBack, onSend: doSend });
     /* Stable hooks: the shared dialog owns the buttons — keep the old ids
      * so automation/tests keep finding Back + Send. The outlet appended

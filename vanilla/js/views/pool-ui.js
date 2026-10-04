@@ -229,7 +229,7 @@ var PoolUI = (function () {
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     DOM.clear(out);
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
-      backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+      backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
       onSend: function () {
         if (myGen !== gen) return;

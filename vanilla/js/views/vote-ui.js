@@ -148,7 +148,7 @@ var VoteUI = (function () {
     var msg = (e && typeof e.message === "string" && e.message)
       ? e.message
       : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
-    if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("vote.unknown_account", "Unknown account.");
+    if (msg.indexOf("unknown-account") !== -1) msg = fallback || t("common.unknown_account", "Unknown account.");
     else if (msg.indexOf("no-account") !== -1) msg = t("vote.no_account", "No on-chain account found for the wallet's active key. Enter an account name below.");
     else if (msg.indexOf("wallet-locked") !== -1) msg = t("common.wallet_locked", "Wallet is locked.");
     else if (msg.indexOf("not-connected") !== -1 || msg.indexOf("not connected") !== -1) {
@@ -206,7 +206,7 @@ var VoteUI = (function () {
         clearRoot(root);
         var failed = makeWrap(doc, root);
         failed.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
-        showError(doc, failed, new Error("not-connected"), t("vote.offline_short", "Network unavailable."));
+        showError(doc, failed, new Error("not-connected"), t("common.network_unavailable_short", "Network unavailable."));
         var vstat = el(doc, "p", "", "muted");
         try { vstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
         failed.appendChild(vstat);
@@ -279,7 +279,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
         if (myGen === gen) { clearRoot(root); loadAll(root, doc, acct, myGen); }
       }).catch(function (e) {
         btn.disabled = false;
-        errBox.textContent = (e && e.message) ? t("vote.unknown_account", "Unknown account.") : String(e || t("vote.unknown_account", "Unknown account."));
+        errBox.textContent = (e && e.message) ? t("common.unknown_account", "Unknown account.") : String(e || t("common.unknown_account", "Unknown account."));
       });
     });
   }
@@ -542,7 +542,7 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
         refresh();
       }).catch(function () {
         setBtn.disabled = false;
-        msg.textContent = t("vote.unknown_account", "Unknown account.");
+        msg.textContent = t("common.unknown_account", "Unknown account.");
       });
     });
 

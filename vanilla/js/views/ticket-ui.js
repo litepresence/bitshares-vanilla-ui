@@ -108,7 +108,7 @@ var TicketUI = (function () {
         rows: function (built, f) {
           return [[t("ticket.ticket", "Ticket"), tk.id], [t("ticket.account", "Account"), tk.owner],
             [t("ticket.lock", "Lock"), tk.lock_word + " → " + ProposalTicket.lockLabel(parseInt(sel.value, 10))],
-            [t("ticket.amount", "Amount"), (fM.input.value.trim() === "" ? t("ticket.unchanged", "unchanged") : fM.input.value.trim() + " " + tk.sym)], [t("ticket.fee_live", "Fee (live)"), f]];
+            [t("ticket.amount", "Amount"), (fM.input.value.trim() === "" ? t("ticket.unchanged", "unchanged") : fM.input.value.trim() + " " + tk.sym)], [t("common.fee_live", "Fee (live)"), f]];
         },
         ok: function () { return t("ticket.ticket_updated_and_re_read_on_chain", "Ticket updated and re-read on chain."); } });
     });
@@ -193,7 +193,7 @@ var TicketUI = (function () {
       rows: function (built, f) {
         return [["Account", built.pair[1].account],
           [t("ticket.lock", "Lock"), ProposalTicket.lockLabel(built.pair[1].target_type), String(built.pair[1].target_type)],
-          [t("ticket.amount", "Amount"), built.human, built.pair[1].amount.amount], [t("ticket.fee_live", "Fee (live)"), f]];
+          [t("ticket.amount", "Amount"), built.human, built.pair[1].amount.amount], [t("common.fee_live", "Fee (live)"), f]];
       },
       ok: function () { return t("ticket.ticket_created_and_re_read_on_chain", "Ticket created and re-read on chain."); },
       fail: t("ticket.could_not_build_the_ticket_check_account_asse", "Could not build the ticket (check account, asset and amount).") });
