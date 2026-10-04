@@ -591,6 +591,69 @@ var SettingsNodes = (function () {
     } catch (e) { /* "" below */ }
     return "";
   }
+  /* listNetwork: which default list owns a URL (customs return "").
+   * Params: url string. Returns "mainnet"|"testnet"|"". Never throws
+   * (Store missing -> ""). */
+  function listNetwork(url) {
+    try {
+      if (typeof url !== "string" || !url) return "";
+      if (typeof Store === "undefined" || !Store || !Store.DEFAULT_NODES) return "";
+      var mains = Store.DEFAULT_NODES.mainnet || [];
+      var tests = Store.DEFAULT_NODES.testnet || [];
+      for (var i = 0; i < mains.length; i++) if (mains[i] === url) return "mainnet";
+      for (var j = 0; j < tests.length; j++) if (tests[j] === url) return "testnet";
+    } catch (e) { /* "" below */ }
+    return "";
+  }
+
+  /* netFromChain: network for an observed chain id (customs after probe).
+   * Params: chainId string|null. Returns "mainnet"|"testnet"|"".
+   * Never throws (ids missing -> ""). */
+  function netFromChain(chainId) {
+    try {
+      if (typeof chainId !== "string" || !chainId) return "";
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
+      var low = chainId.toLowerCase();
+      if (Store.CHAIN_IDS.mainnet && low === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "mainnet";
+      if (Store.CHAIN_IDS.testnet && low === String(Store.CHAIN_IDS.testnet).toLowerCase()) return "testnet";
+    } catch (e) { /* "" below */ }
+    return "";
+  }
+
+  /* networkLabel: NETWORK cell text. Params: t (injected lookup), net
+   * ("mainnet"|"testnet"|""), chainId (observed or null). Returns the
+   * keyed network name, the 4-char chain prefix, or the keyed dash.
+   * Never throws. */
+  function networkLabel(t, net, chainId) {
+    var dash = "—";
+    try { dash = String(t("settings.dash", "—")); } catch (e) { /* dash stands */ }
+    try {
+      if (net === "mainnet") return String(t("settings.network_mainnet", "mainnet"));
+      if (net === "testnet") return String(t("settings.network_testnet", "testnet"));
+      if (typeof chainId === "string" && chainId) return chainId.slice(0, 4);
+    } catch (e) { /* dash below */ }
+    return dash;
+  }
+
+  /* networkHealth: NETWORK cell color. Params: net, chainId (observed or
+   * null). Returns "good" (mainnet chain) | "warn" (testnet or any other
+   * chain — owner rule: yellow unless 4018) | "bad" (listed default
+   * answering a foreign chain) | "" (unprobed: unknown never guesses).
+   * Never throws. */
+  function networkHealth(net, chainId) {
+    try {
+      if (typeof chainId !== "string" || !chainId) return "";
+      if (net === "mainnet" || net === "testnet") {
+        if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
+        var exp = Store.CHAIN_IDS[net];
+        var match = !!exp && chainId.toLowerCase() === String(exp).toLowerCase();
+        return healthFor("chain", null, { network: net, match: match });
+      }
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS || !Store.CHAIN_IDS.mainnet) return "";
+      if (chainId.toLowerCase() === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
+      return "warn";
+    } catch (e) { return ""; }
+  }
   /* geoText: pure location-cell content. Params: t (injected lookup, dash
    *   only), label (Geo.lookup "City, Region" string or null). Returns the
    *   label verbatim (user/chain string — textContent-only downstream) or
@@ -909,7 +972,7 @@ var SettingsNodes = (function () {
     paintOfflineIfAllDown: paintOfflineIfAllDown,
     probeAll: probeAll,
     selectNode: selectNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth }
   };
 })();
 
