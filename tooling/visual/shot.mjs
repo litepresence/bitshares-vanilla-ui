@@ -75,6 +75,15 @@ if (theme || network || noTour || locale) {
 }
 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 await page.waitForTimeout(waitMs);
+/* Optional scroll framing: --scrollY PX scrolls the page before capture
+ * (region shots like the order-book panel without changing the route).
+ * Never throws — unscrolled shot stands. */
+if (args.scrollY) {
+  try {
+    await page.evaluate((y) => { window.scrollTo(0, Number(y) || 0); }, args.scrollY);
+    await page.waitForTimeout(1200);
+  } catch (e) { /* unscrolled shot stands */ }
+}
 /* Optional tab-gated capture: --click TEXT clicks the first button whose
  * trimmed uppercase text matches, then waits again (AFK rounds need shots
  * of tab content like account HISTORY without a human hand). Never throws
