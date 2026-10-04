@@ -58,10 +58,7 @@ var MarketOrders = (function () {
   }
 
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
+  // using global touchable from js/utils/touchable.js
 
   /* Network from Store (sole settings owner); mainnet when unreadable. */
   function network() {
@@ -146,9 +143,11 @@ var MarketOrders = (function () {
     tabs.setAttribute("aria-label", t("market.trades_toggle_label", "Recent or my trades"));
     var tabOrders = touchable(el(doc, "button", t("market.tab_orders", "My orders")));
     tabOrders.type = "button";
+    tabOrders.className = "subtle-btn";
     tabOrders.setAttribute("role", "tab");
     var tabSettle = touchable(el(doc, "button", t("market.tab_settle", "Settlement orders")));
     tabSettle.type = "button";
+    tabSettle.className = "subtle-btn";
     tabSettle.setAttribute("role", "tab");
     tabs.appendChild(tabOrders);
     tabs.appendChild(tabSettle);
@@ -199,7 +198,7 @@ var MarketOrders = (function () {
       var hint = el(doc, "p", t("market.orders_locked", "Unlock your wallet to see your open orders on this market. "), "muted");
       var a = el(doc, "a", t("market.go_wallet", "Go to Wallet"));
       a.setAttribute("href", "#/wallet");
-      touchable(a);
+      a.className = "subtle-btn";
       hint.appendChild(a);
       body.appendChild(hint);
     }
@@ -265,6 +264,7 @@ var MarketOrders = (function () {
         det.className = "raw";
         var sum = doc.createElement("summary");
         sum.setAttribute("aria-label", t("market.raw_order", "Show raw order JSON"));
+        sum.className = "subtle-btn";
         touchable(sum);
         det.appendChild(sum);
         var pre = doc.createElement("pre");
@@ -476,6 +476,7 @@ var MarketOrders = (function () {
       detAll.className = "raw";
       var sumAll = doc.createElement("summary");
       sumAll.setAttribute("aria-label", t("market.raw_orders", "Show raw orders JSON"));
+      sumAll.className = "subtle-btn";
       touchable(sumAll);
       detAll.appendChild(sumAll);
       var preAll = doc.createElement("pre");
@@ -663,6 +664,7 @@ var MarketOrders = (function () {
   function cancelButton(doc, order, assets, cancelBox, rerender) {
     var b = touchable(el(doc, "button", t("trade.cancel_button", "Cancel")));
     b.type = "button";
+    b.className = "btn-ghost";
     b.setAttribute("aria-label", t("explorer.pill_cancel", "Cancel order") + " " + String(order.id));
     b.addEventListener("click", function () {
       TradeUI.orderCancelBox(doc, cancelBox, order, assets, rerender);

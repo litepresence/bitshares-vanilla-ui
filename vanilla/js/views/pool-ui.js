@@ -47,7 +47,6 @@ var PoolUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearBox(box) { while (box.firstChild) box.removeChild(box.firstChild); }
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("fees.unexpected_error", "Unexpected error"));
@@ -103,7 +102,7 @@ var PoolUI = (function () {
     wrap.appendChild(status);
     var row = el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(row);
-    var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button";
+    var b = touchable(el(doc, "button", t("fees.retry", "Retry"))); b.type = "button"; b.className = "btn-ghost";
     row.appendChild(b);
     var off = offlineBackend();
     if (off && typeof off.wire === "function") {
@@ -125,7 +124,7 @@ var PoolUI = (function () {
     if (!settingsLink) {
       settingsLink = el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { settingsLink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-      touchable(settingsLink);
+      settingsLink.className = "subtle-btn";
     }
     row.appendChild(settingsLink);
   }
@@ -246,7 +245,7 @@ var PoolUI = (function () {
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     clearBox(out);
     out.appendChild(el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button";
+    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
     var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
     /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
@@ -384,7 +383,7 @@ var PoolUI = (function () {
         b.textContent = c.label + (sortKey === c.key ? (sortDir === 1 ? " ▲" : " ▼") : "");
         b.setAttribute("aria-label", t("pool.sort_by", "Sort by ") + c.label);
         if (sortKey === c.key) th.setAttribute("aria-sort", sortDir === 1 ? "ascending" : "descending");
-        touchable(b);
+        touchable(b); b.className = "th-sort subtle-btn";
         b.addEventListener("click", function () {
           if (sortKey === c.key) sortDir = -1 * sortDir;
           else { sortKey = c.key; sortDir = 1; }
@@ -486,10 +485,10 @@ var PoolUI = (function () {
      * the following page's startId (list_* paging has no offsets). */
     function pagerBar(pageRows, hasNext) {
       var bar = el(doc, "div", null, "pools-pager");
-      var prev = touchable(el(doc, "button", t("pool.prev_btn", "‹ Prev"))); prev.type = "button";
+      var prev = touchable(el(doc, "button", t("pool.prev_btn", "‹ Prev"))); prev.type = "button"; prev.className = "subtle-btn";
       prev.disabled = pager.page === 0;
       var note = el(doc, "span", "Page " + (pager.page + 1), "pools-page");
-      var next = touchable(el(doc, "button", t("pool.next_btn", "Next ›"))); next.type = "button";
+      var next = touchable(el(doc, "button", t("pool.next_btn", "Next ›"))); next.type = "button"; next.className = "subtle-btn";
       next.disabled = !hasNext;
       prev.addEventListener("click", function () {
         if (myGen !== gen || pager.page === 0) return;
@@ -590,7 +589,7 @@ var PoolUI = (function () {
       title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
   return { renderPools: renderPools,
-    _ui: { el: el, touchable: touchable, clearBox: clearBox, showError: showError, showStatus: showStatus,
+    _ui: { el: el, clearBox: clearBox, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, unlockBox: unlockBox, confirmList: confirmList, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,

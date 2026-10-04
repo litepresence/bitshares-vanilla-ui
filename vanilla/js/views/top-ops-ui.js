@@ -176,7 +176,7 @@ var TopOpsUI = (function () {
     return n;
   }
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
+  // using global touchable from js/utils/touchable.js
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w;
@@ -206,7 +206,7 @@ var TopOpsUI = (function () {
     var tostat = showStatus(doc, wrap, "");
     var torow = el(doc, "div", null, "pools-offline-row");
     wrap.appendChild(torow);
-    var retry = touchable(el(doc, "button", t("topops.retry", "Retry")));
+    var retry = touchable(el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
     retry.type = "button"; torow.appendChild(retry);
     var tooff = null;
     try { tooff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { tooff = null; }
@@ -226,7 +226,7 @@ var TopOpsUI = (function () {
     if (!tolink) {
       tolink = el(doc, "a", t("notice.open_settings", "Open Settings"));
       try { tolink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-      touchable(tolink);
+      tolink.className = "subtle-btn";
     }
     torow.appendChild(tolink);
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
@@ -437,13 +437,13 @@ var TopOpsUI = (function () {
       var more = el(doc, "p", null, "muted");
       var a = doc.createElement("a");
       a.href = "#/explorer"; a.textContent = t("topops.back", "Back to Explorer");
-      touchable(a); a.style.display = "inline-block";
+      a.className = "subtle-btn"; touchable(a); a.style.display = "inline-block";
       more.appendChild(a); wrap.appendChild(more);
     }).catch(function (e) {
       if (myGen !== gen) return;
       status.textContent = "";
       showError(doc, wrap, e, "Could not sample recent blocks.");
-      var retry = touchable(el(doc, "button", t("topops.retry", "Retry")));
+      var retry = touchable(el(doc, "button", t("topops.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
       retry.type = "button";
       retry.addEventListener("click", function () { if (myGen === gen) renderTopOps(root); });
       wrap.appendChild(retry);

@@ -60,7 +60,7 @@ var CreateWorkerUI = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n; }
   /* Touch floor (#7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
+  // using global touchable from js/utils/touchable.js
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
@@ -143,7 +143,7 @@ var CreateWorkerUI = (function () {
         failWrap.appendChild(cwstat);
         var cwrow = el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(cwrow);
-        var cwretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+    var cwretry = touchable(el(doc, "button", t("fees.retry", "Retry"))); cwretry.type = "button"; cwretry.className = "btn-ghost";
         cwretry.type = "button";
         cwrow.appendChild(cwretry);
         var cwoff = null;
@@ -160,7 +160,7 @@ var CreateWorkerUI = (function () {
         if (!cwlink) {
           cwlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { cwlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-          touchable(cwlink);
+          cwlink.className = "subtle-btn";
         }
         cwrow.appendChild(cwlink);
       }, 15000);
@@ -335,7 +335,7 @@ var CreateWorkerUI = (function () {
     if (P.kind === "vesting") row("Vesting period", String(R.days) + " days", String(R.days));
     wrap.appendChild(list);
     wrap.appendChild(el(doc, "p", t("createworker.pay_denom_note", "Daily pay is denominated in the core asset (%(sym)s, precision %(prec)s); the fee is quoted live at review time via get_required_fees.", { sym: CORE_SYMBOL, prec: CORE_PRECISION }), "muted"));
-    var backBtn = touchable(el(doc, "button", t("createworker.back", "Back")));
+    var backBtn = touchable(el(doc, "button", t("createworker.back", "Back"))); backBtn.id = "cw-back"; backBtn.type = "button"; backBtn.className = "btn-ghost";
     backBtn.id = "cw-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintForm(doc, root, myGen, P); });
     if (!op34Ready()) {
@@ -394,7 +394,7 @@ var CreateWorkerUI = (function () {
     catch (e) { feeHuman = String(opData.fee.amount) + " (" + opData.fee.asset_id + ")"; }
     row(t("createworker.fee_live", "Fee (live)"), feeHuman + " (core)", String(opData.fee.amount));
     box.appendChild(list);
-    var back = touchable(el(doc, "button", t("createworker.back", "Back"))); back.type = "button";
+    var back = touchable(el(doc, "button", t("createworker.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
     var send = touchable(el(doc, "button", t("createworker.sign_send", "Sign & Send"))); send.type = "button";
     box.appendChild(back); box.appendChild(send);
     back.addEventListener("click", function () { if (myGen === gen) onBack(); });
@@ -444,7 +444,7 @@ var CreateWorkerUI = (function () {
           " (" + done.res.via + ").", "muted"));
         var a = doc.createElement("a");
         a.href = "#/account/" + encodeURIComponent(R.ownerName);
-        a.textContent = t("account.open_prefix", "Open ") + R.ownerName; touchable(a); box.appendChild(a);
+        a.textContent = t("account.open_prefix", "Open ") + R.ownerName; a.className = "subtle-btn"; touchable(a); box.appendChild(a);
       }).catch(function (e) {
         if (myGen !== gen) return;
         var msg = (e && e.message) ? e.message : String(e || t("createworker.send_failed", "Send failed."));

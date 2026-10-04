@@ -61,8 +61,6 @@ var DashboardUI = (function () {
     return n;
   }
 
-  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
 
   /* Unlocked right now (read-only Wallet probe, never throws). */
@@ -109,7 +107,7 @@ var DashboardUI = (function () {
     var p = el(doc, "p", null, "muted");
     pairs.forEach(function (pr, i) {
       if (i > 0) p.appendChild(doc.createTextNode(" · "));
-      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; touchable(a); p.appendChild(a);
+      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; a.className = "subtle-btn"; touchable(a); p.appendChild(a);
     });
     return p;
   }
@@ -324,7 +322,7 @@ var DashboardUI = (function () {
         failWrap.appendChild(dstat);
         var drow = el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(drow);
-        var dtry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        var dtry = touchable(el(doc, "button", t("fees.retry", "Retry"))); dtry.className = "btn-ghost";
         dtry.type = "button";
         drow.appendChild(dtry);
         var doff = null;
@@ -341,7 +339,7 @@ var DashboardUI = (function () {
         if (!dlink) {
           dlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { dlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-          touchable(dlink);
+          dlink.className = "subtle-btn";
         }
         drow.appendChild(dlink);
       }, CONNECT_TIMEOUT_MS);
@@ -483,8 +481,7 @@ var DashboardUI = (function () {
     var restore = doc.createElement("a");
     restore.href = "#/existing-account";
     restore.textContent = t("password.import_existing_account", "Import existing account");
-    touchable(restore);
-    sub.appendChild(restore);
+    restore.className = "subtle-btn";
     card.appendChild(sub);
     return card;
   }
@@ -657,6 +654,7 @@ var DashboardUI = (function () {
       b.textContent = name === "Starred" ? t("market.starred_tab", "Starred") : name;
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", name === STRIP_DEFAULT ? "true" : "false");
+      b.className = "subtle-btn";
       touchable(b);
       b.addEventListener("click", function () {
         Array.prototype.forEach.call(tabs.querySelectorAll("button"), function (x) {
@@ -695,7 +693,7 @@ var DashboardUI = (function () {
     list.className = "mkt-strip-list";
     ids.forEach(function (id) {
       var a = doc.createElement("a");
-      a.className = "mkt-strip-chip";
+      a.className = "mkt-strip-chip subtle-btn";
       a.href = "#/market/" + encodeURIComponent(id);
       touchable(a);
       var pair = el(doc, "span", id, "mkt-strip-pair");
@@ -736,6 +734,7 @@ var DashboardUI = (function () {
       b.textContent = name === "Starred" ? t("market.starred_tab", "Starred") : name;
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+      b.className = "subtle-btn";
       touchable(b);
       b.addEventListener("click", function () {
         Array.prototype.forEach.call(tabs.querySelectorAll("button"), function (x) {
@@ -785,6 +784,7 @@ var DashboardUI = (function () {
       var a = doc.createElement("a");
       a.href = "#/market/" + encodeURIComponent(id);
       a.textContent = id;
+      a.className = "subtle-btn";
       touchable(a);
       tdM.appendChild(a);
       tr.appendChild(tdM);
@@ -1026,7 +1026,7 @@ var DashboardUI = (function () {
     ].forEach(function (c) {
       var a = doc.createElement("a");
       a.href = c[0];
-      a.className = "prod-card";
+      a.className = "prod-card subtle-btn";
       touchable(a);
       a.appendChild(el(doc, "h3", c[1]));
       a.appendChild(el(doc, "p", c[2], "muted"));
@@ -1088,6 +1088,7 @@ var DashboardUI = (function () {
       var a = doc.createElement("a");
       a.href = c[3];
       a.textContent = c[1];
+      a.className = "subtle-btn";
       touchable(a);
       d.appendChild(a);
       grid.appendChild(d);
@@ -1105,7 +1106,6 @@ var DashboardUI = (function () {
     a.href = "#/create-wallet-brainkey";
     a.className = "btn";
     a.textContent = t("splash.final_cta", "Create a wallet");
-    touchable(a);
     s.appendChild(a);
     return s;
   }

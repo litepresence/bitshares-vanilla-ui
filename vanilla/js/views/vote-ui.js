@@ -123,13 +123,6 @@ var VoteUI = (function () {
     return n;
   }
 
-  /* Touch target floor (principle #7): interactive elements are >=44px in
-   * at least one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
   function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
@@ -219,9 +212,8 @@ var VoteUI = (function () {
         failed.appendChild(vstat);
         var vrow = el(doc, "div", null, "pools-offline-row");
         failed.appendChild(vrow);
-        var retry = touchable(el(doc, "button", t("vote.retry", "Retry")));
-        retry.type = "button";
-        vrow.appendChild(retry);
+var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
+      vrow.appendChild(retry);
         var voff = null;
         try { voff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { voff = null; }
         if (voff && typeof voff.wire === "function") {
@@ -236,7 +228,7 @@ var VoteUI = (function () {
         if (!vlink) {
           vlink = el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { vlink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-          touchable(vlink);
+          vlink.className = "subtle-btn";
         }
         vrow.appendChild(vlink);
       }, 15000);
@@ -320,9 +312,7 @@ var VoteUI = (function () {
       var failed = makeWrap(doc, root);
       failed.appendChild(el(doc, "h1", t("vote.title", "Voting")));
       showError(doc, failed, e, t("vote.load_failed", "Could not load governance data."));
-      var retry = touchable(el(doc, "button", t("vote.retry", "Retry")));
-      retry.type = "button";
-      retry.addEventListener("click", function () { renderVoting(root); });
+var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type = "button"; retry.className = "btn-ghost";
       failed.appendChild(retry);
     }
   }
@@ -374,7 +364,7 @@ var VoteUI = (function () {
     lockLink.setAttribute("href", "#/tickets");
     lockLink.style.display = "inline-block";
     lockLink.style.alignSelf = "center";
-    touchable(lockLink);
+    lockLink.className = "subtle-btn";
     govRow.appendChild(joinWBtn);
     govRow.appendChild(updWBtn);
     govRow.appendChild(joinCBtn);
@@ -473,7 +463,7 @@ var VoteUI = (function () {
       q.href = "#/help/voting";
       q.textContent = t("vote.what_is_a_proxy", "? What is a proxy?");
       q.title = t("vote.proxies_follow_another_account_s_slate_re", "Proxies follow another account's slate — read how voting works before setting one.");
-      touchable(q);
+      q.className = "subtle-btn";
       p.appendChild(q);
       box.appendChild(p);
     })();
@@ -500,6 +490,7 @@ var VoteUI = (function () {
     row.appendChild(setBtn);
     var rmBtn = touchable(el(doc, "button", t("vote.remove_proxy", "Remove proxy")));
     rmBtn.type = "button";
+    rmBtn.className = "btn-ghost";
     rmBtn.disabled = !hasProxy;
     row.appendChild(rmBtn);
     box.appendChild(row);
@@ -528,6 +519,7 @@ var VoteUI = (function () {
           while (hits.firstChild) hits.removeChild(hits.firstChild);
           var pick = touchable(el(doc, "button", acct.name + " (" + acct.id + ")"));
           pick.type = "button";
+          pick.className = "subtle-btn";
           pick.addEventListener("click", function () {
             input.value = acct.name;
             while (hits.firstChild) hits.removeChild(hits.firstChild);
@@ -581,6 +573,7 @@ var VoteUI = (function () {
     pub.disabled = !changed;
     var reset = touchable(el(doc, "button", t("vote.reset", "Reset")));
     reset.type = "button";
+    reset.className = "btn-ghost";
     reset.disabled = !changed;
     bar.appendChild(pub);
     bar.appendChild(reset);
@@ -711,6 +704,7 @@ var VoteUI = (function () {
 
     var backBtn = touchable(el(doc, "button", t("vote.back", "Back")));
     backBtn.type = "button";
+    backBtn.className = "btn-ghost";
     wrap.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", t("vote.sign_publish", "Sign & Publish")));
     sendBtn.type = "button";
@@ -893,6 +887,7 @@ var VoteUI = (function () {
     }
     var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
     back.setAttribute("href", "#/voting");
+    back.className = "subtle-btn";
     wrap.appendChild(back);
   }
 
@@ -1269,6 +1264,7 @@ var VoteUI = (function () {
 
     var backBtn = touchable(el(doc, "button", t("vote.back", "Back")));
     backBtn.type = "button";
+    backBtn.className = "btn-ghost";
     box.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", spec.isUpdate ? t("vote.sign_update", "Sign & Update") : t("vote.sign_join", "Sign & Join")));
     sendBtn.type = "button";
@@ -1371,6 +1367,7 @@ var VoteUI = (function () {
     }
     var back = touchable(el(doc, "a", t("vote.back_to_voting", "Back to voting")));
     back.setAttribute("href", "#/voting");
+    back.className = "subtle-btn";
     box.appendChild(back);
   }
 

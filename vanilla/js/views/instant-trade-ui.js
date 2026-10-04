@@ -76,8 +76,6 @@ var InstantTradeUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text;
     return n; }
-  /* Touch floor (#7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
@@ -384,7 +382,7 @@ var InstantTradeUI = (function () {
         failWrap.appendChild(istat);
         var irow = el(doc, "div", null, "pools-offline-row");
         failWrap.appendChild(irow);
-        var iretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
+        var iretry = touchable(el(doc, "button", t("fees.retry", "Retry"))); iretry.type = "button"; iretry.className = "btn-ghost";
         iretry.type = "button";
         irow.appendChild(iretry);
         var ioff = null;
@@ -401,7 +399,7 @@ var InstantTradeUI = (function () {
         if (!ilink) {
           ilink = el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { ilink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-          touchable(ilink);
+          ilink.className = "subtle-btn";
         }
         irow.appendChild(ilink);
       }, 15000);
@@ -478,7 +476,7 @@ var InstantTradeUI = (function () {
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
     var swapBtn = touchable(el(doc, "button", "⇄"));
     swapBtn.id = "it-swap"; swapBtn.type = "button";
-    swapBtn.setAttribute("aria-label", t("swap.title", "Swap") + t("instant.swap_suffix_sell_receive", " sell/receive"));
+    var swapBtn = touchable(el(doc, "button", "21c4")); swapBtn.id = "it-swap"; swapBtn.type = "button"; swapBtn.className = "subtle-btn";
     /* Bare-glyph swap (SellReceive.jsx concept: Icon name="swap" with no
      * button chrome): transparent, accent ⇄ at ~1.5em. touchable() keeps the
      * 44px target (min-height) plus min-width below. Same id/handler/
@@ -1014,7 +1012,7 @@ var InstantTradeUI = (function () {
     wrap.appendChild(list);
     if (R.previewWarn) wrap.appendChild(el(doc, "p", R.previewWarn, "error"));
     if (!isUnlockedNow()) wrap.appendChild(el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
-    var backBtn = touchable(el(doc, "button", t("instant.back", "Back")));
+    var backBtn = touchable(el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
     backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", t("instant.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);

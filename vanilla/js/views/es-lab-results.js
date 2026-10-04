@@ -28,7 +28,6 @@ var EsLabResults = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) { try { n.style.minHeight = "44px"; } catch (e) { /* stands */ } return n; }
 
   /* HINTS: human-reading line per kind (principle #6 — raw stays raw, the
    * hint tells the reader how to read it). */
@@ -111,6 +110,7 @@ var EsLabResults = (function () {
     if (typeof onRetry === "function") {
       var rb = touchable(el(doc, "button", t("eslab.retry", "Retry")));
       rb.type = "button";
+      rb.className = "btn-ghost";
       rb.addEventListener("click", onRetry);
       row.appendChild(rb);
       try { rb.style.marginRight = "8px"; } catch (e) { /* stands */ }
@@ -142,6 +142,7 @@ var EsLabResults = (function () {
           var row = el(doc, "p", null, null);
           var rb = touchable(el(doc, "button", t("eslab.retry", "Retry")));
           rb.type = "button";
+          rb.className = "btn-ghost";
           rb.addEventListener("click", retry);
           row.appendChild(rb);
           box.appendChild(row);

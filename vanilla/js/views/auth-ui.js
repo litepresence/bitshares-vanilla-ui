@@ -88,8 +88,6 @@ var AuthUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text;
     return n; }
-  /* Touch floor (#7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
@@ -125,7 +123,7 @@ var AuthUI = (function () {
     var p = el(doc, "p", null, "muted");
     pairs.forEach(function (pr, i) {
       if (i > 0) p.appendChild(doc.createTextNode(" · "));
-      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; p.appendChild(a);
+      var a = doc.createElement("a"); a.href = pr[0]; a.textContent = pr[1]; a.className = "subtle-btn"; touchable(a); p.appendChild(a);
     });
     return p; }
   /* Selector-card section: h2 title plus a muted explainer (Login.jsx:31-106
@@ -144,9 +142,10 @@ var AuthUI = (function () {
     wrap.appendChild(s);
     return s; }
   /* Touch-sized navigation button (same floor as fieldRow inputs). */
-  function goButton(doc, id, text, hash) {
+  function goButton(doc, id, text, hash, variant) {
     var b = touchable(el(doc, "button", text));
     b.id = id; b.type = "button";
+    if (variant) b.className = variant;
     b.addEventListener("click", function () {
       if (typeof location !== "undefined") location.hash = hash;
     });
@@ -315,7 +314,7 @@ var AuthUI = (function () {
      t("auth.back_up_yes_write_down_the_brainkey", "Back up: yes — write down the brainkey")].forEach(function (line) {
       local.appendChild(el(doc, "p", line, "muted"));
     });
-    local.appendChild(goButton(doc, "reg-card-local", t("auth.continue", "Continue"), "#/registration/local"));
+    local.appendChild(goButton(doc, "reg-card-local", t("auth.continue", "Continue"), "#/registration/local", null));
     wrap.appendChild(local);
     /* Cloud-style card: faucet-sponsored names, weaker security
      * (AccountBlockSelection's Medium concept). */
@@ -326,7 +325,7 @@ var AuthUI = (function () {
      t("auth.back_up_no_file_the_new_account_s_brainke", "Back up: no file — the new account's brainkey is shown once at creation")].forEach(function (line) {
       cloud.appendChild(el(doc, "p", line, "muted"));
     });
-    cloud.appendChild(goButton(doc, "reg-card-cloud", t("auth.continue", "Continue"), "#/registration/cloud"));
+    cloud.appendChild(goButton(doc, "reg-card-cloud", t("auth.continue", "Continue"), "#/registration/cloud", null));
     wrap.appendChild(cloud);
     /* Direct shortcuts: faucet register + brainkey import (both exist). */
     var list = doc.createElement("ul");
@@ -352,11 +351,11 @@ var AuthUI = (function () {
     wrap.appendChild(el(doc, "h1", t("auth.local_registration", "Local registration")));
     wrap.appendChild(el(doc, "p", t("auth.a_local_wallet_creates_a_brainkey_on_this_dev", "A local wallet creates a brainkey on this device and derives the owner, active and memo keys from it. Keys never leave the device; the wallet file is encrypted with your password."), "muted"));
     var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey"));
+    row.appendChild(goButton(doc, "reg-local-create", t("auth.create_a_local_wallet", "Create a local wallet"), "#/create-wallet-brainkey", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account"));
+    row.appendChild(goButton(doc, "reg-local-import", t("auth.import_existing_account", "Import existing account"), "#/existing-account", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration"));
+    row.appendChild(goButton(doc, "reg-local-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
     wrap.appendChild(row);
     var hp = el(doc, "p", null, "muted");
     [["#/help/wallets", "How wallets work"], ["#/help/backups", "How backups work"]].forEach(function (pr, i) {
@@ -418,9 +417,9 @@ var AuthUI = (function () {
         });
     });
     var row = el(doc, "p", null, null);
-    row.appendChild(goButton(doc, "reg-cloud-go", t("auth.register_via_the_faucet", "Register via the faucet"), "#/create-account"));
+    row.appendChild(goButton(doc, "reg-cloud-go", t("auth.register_via_the_faucet", "Register via the faucet"), "#/create-account", null));
     row.appendChild(doc.createTextNode(" "));
-    row.appendChild(goButton(doc, "reg-cloud-back", t("auth.back_to_registration", "Back to registration"), "#/registration"));
+    row.appendChild(goButton(doc, "reg-cloud-back", t("auth.back_to_registration", "Back to registration"), "#/registration", "btn-ghost"));
     wrap.appendChild(row);
     wrap.appendChild(linkPara(doc, [
       ["#/settings", "Settings — nodes"],

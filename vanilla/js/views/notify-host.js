@@ -46,8 +46,6 @@ var NotifyHost = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  /* Touch floor (#7): interactive elements >= 44px in one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   /* mark: open a new host generation (the view calls this per render).
    * live: true only for the current generation (stale async work dies). */
   function mark() { return ++gen; }
@@ -109,7 +107,7 @@ var NotifyHost = (function () {
        * !important; host positioning inline above stays as pre-CSS fallback. */
       var head = el(document, "div", null, "toast-head");
       if (item.title) head.appendChild(el(document, "strong", item.title));
-      var x = touchable(el(document, "button", "×", "toast-x"));
+      var x = touchable(el(document, "button", "×", "toast-x subtle-btn"));
       x.type = "button";
       x.setAttribute("aria-label", t("notify.dismiss", "Dismiss notification"));
       x.addEventListener("click", function () {
@@ -136,10 +134,10 @@ var NotifyHost = (function () {
     if (typeof document === "undefined") return null;
     var q = String(quote || "").trim().toUpperCase();
     var b = String(base || "").trim().toUpperCase();
-    var a = touchable(el(document, "a", "", "mkt-bell"));
-    a.setAttribute("href", "#/alerts");
-    a.setAttribute("aria-label", t("notify.bell", "Price Alert"));
-    a.setAttribute("title", t("notify.bell", "Price Alert"));
+var a = touchable(el(document, "a", "", "mkt-bell subtle-btn"));
+      a.setAttribute("href", "#/alerts");
+      a.setAttribute("aria-label", t("notify.bell", "Price Alert"));
+      a.setAttribute("title", t("notify.bell", "Price Alert"));
     var on = (q && b) ? _hasAny(q, b) : false;
     /* Icon wiring (alarm.svg = #1's bell affordance; ExchangeHeader.jsx:210-232
      * shape kept: link to #/alerts + has-alerts indicator class). Synchronous
@@ -163,7 +161,7 @@ var NotifyHost = (function () {
     return a;
   }
   return {
-    el: el, touchable: touchable, mark: mark, live: live,
+    el: el, mark: mark, live: live,
     mountToasts: mountToasts, paintToasts: paintToasts, bellFor: bellFor
   };
 })();
