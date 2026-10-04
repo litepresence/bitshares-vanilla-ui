@@ -28,6 +28,13 @@ that owns switching has nothing to keep in sync.
 - Order: mainnet defaults (existing order), then testnet defaults
   (existing order), then customs (existing order). No group headers, no
   re-sorting — `probeAll` order and latency-sort behavior untouched.
+- Group bands: a thin full-width background divider separates the
+  mainnet / testnet / custom blocks (empty groups produce no divider),
+  so each block reads as its own table. Single `<tbody>` and one
+  `name="node"` radio group throughout — selection stays mutually
+  exclusive by construction. Divider rows carry no `data-url`, so
+  probe/offline/selection logic skips them; the all-down check ignores
+  rows without `data-url`.
 - NETWORK cell content:
   - Defaults: MAINNET / TESTNET from list membership, shown immediately
     (no probe needed to know which list a default came from).

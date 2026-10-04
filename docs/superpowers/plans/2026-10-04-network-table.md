@@ -659,3 +659,151 @@ git commit -m "Network table: th_network header x12 locales (English stubs)"
 **2. Placeholder scan:** no TBD/TODO; every code block complete with exact old/new text and anchors; commands carry expected outputs; no "similar to" references.
 
 **3. Type consistency:** `_test` names (`listNetwork`, `netFromChain`, `networkLabel`, `networkHealth`) identical in test, implementation, and Task 2 consumers; `selectNode(url)` → `Promise<boolean>` at both call sites with `.then` + `render(rootEl)` in scope; `setRow` `cells.network`/`health.network` naming consistent across all three outcomes and the paint function; `t("settings.th_network", "Network")` default identical in table header step and one-shot value.
+
+---
+
+### Task 5: Group divider bands (follow-up 2026-10-04)
+
+**Rationale:** owner call — the three row blocks (mainnet/testnet/custom) read as separate tables via a thin background band, while radios stay one `name="node"` set by construction (single tbody, dividers carry no inputs).
+
+**Files:**
+- Modify: `vanilla/js/settings-nodes.js` (`groupOf` + `_test`, divider insertion in `buildNodeTable`/`buildNodeCards`, `paintOfflineIfAllDown` skips dataless rows)
+- Modify: `tooling/node-network-test.js` (3 vectors, 24 → 27)
+- Modify: `vanilla/css/app.css` (divider band rules after the stripe block)
+
+**Interfaces:**
+- Consumes: Task 1 `listNetwork` (module-local).
+- Produces: `groupOf(url)` → `"mainnet" | "testnet" | "custom"` via `_test`. No other consumers (dividers are presentational; probe/selection logic keys off `data-url`, which dividers lack).
+
+- [ ] **Step 1: groupOf + vectors** — in `vanilla/js/settings-nodes.js`, insert immediately before the line `  /* geoText: pure location-cell content.` (unique):
+
+```js
+  /**
+   * Visual group for divider bands (mainnet / testnet / custom blocks).
+   * @param {string} url node URL
+   * @returns {string} "mainnet", "testnet", or "custom" */
+  function groupOf(url) {
+    var net = "";
+    try { net = listNetwork(url); } catch (e) { net = ""; }
+    return (net === "mainnet" || net === "testnet") ? net : "custom";
+  }
+
+```
+
+Anchor `networkHealth: networkHealth }` (unique — definition sites read `function networkHealth`) → `networkHealth: networkHealth, groupOf: groupOf }`. In `tooling/node-network-test.js`: add `"groupOf"` to the exports `forEach` array; update the header helper list to `listNetwork/netFromChain/networkLabel/networkHealth/groupOf`; append before `console.log`:
+
+```js
+eq(T.groupOf("wss://m1"), "mainnet", "group mainnet");
+eq(T.groupOf("wss://t1"), "testnet", "group testnet");
+eq(T.groupOf("wss://x"), "custom", "group custom");
+```
+
+and change the log line to `console.log("node-network-test: " + passed + " passed, 0 failed");` (unchanged text — count becomes 27). Run: `node tooling/node-network-test.js` — expect `27 passed, 0 failed` (TDD: vectors fail first with `_test.groupOf exported`, then pass).
+
+- [ ] **Step 2: Divider rows + cards** — table, old (exact):
+
+```js
+    var tbody = doc.createElement("tbody");
+    tbody.id = "node-rows";
+    table.appendChild(tbody);
+
+    nodes.forEach(function (url) {
+      var tr = doc.createElement("tr");
+```
+
+New:
+
+```js
+    var tbody = doc.createElement("tbody");
+    tbody.id = "node-rows";
+    table.appendChild(tbody);
+
+    var lastGroup = "";
+    nodes.forEach(function (url) {
+      var grp = groupOf(url);
+      if (lastGroup && grp !== lastGroup) {
+        var sep = doc.createElement("tr");
+        sep.className = "node-sep";
+        sep.setAttribute("aria-hidden", "true");
+        var sepTd = doc.createElement("td");
+        sepTd.setAttribute("colspan", "12");
+        sep.appendChild(sepTd);
+        tbody.appendChild(sep);
+      }
+      lastGroup = grp;
+      var tr = doc.createElement("tr");
+```
+
+(`colspan 12` = sel+Node+Network+Location+Provider+Handshake+Ping+Participation+Head+Chain+History+action; bump if columns change.) Cards, old (exact):
+
+```js
+    var cards = doc.createElement("div");
+    cards.className = "node-cards";
+    nodes.forEach(function (url) {
+      var card = doc.createElement("div");
+```
+
+New:
+
+```js
+    var cards = doc.createElement("div");
+    cards.className = "node-cards";
+    var lastGroup = "";
+    nodes.forEach(function (url) {
+      var grp = groupOf(url);
+      if (lastGroup && grp !== lastGroup) {
+        var sep = doc.createElement("div");
+        sep.className = "node-sep";
+        sep.setAttribute("aria-hidden", "true");
+        cards.appendChild(sep);
+      }
+      lastGroup = grp;
+      var card = doc.createElement("div");
+```
+
+- [ ] **Step 3: Offline check skips dividers** — old (exact):
+
+```js
+    for (var k = 0; k < rows.length; k++) {
+      if (rows[k].getAttribute("data-status") !== "down") { allDown = false; break; }
+    }
+```
+
+New:
+
+```js
+    for (var k = 0; k < rows.length; k++) {
+      if (!rows[k].getAttribute("data-url")) continue;
+      if (rows[k].getAttribute("data-status") !== "down") { allDown = false; break; }
+    }
+```
+
+- [ ] **Step 4: Divider CSS** — old (exact):
+
+```css
+.node-table tbody tr:nth-child(even),
+table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
+```
+
+Append after it (later source order wins the equal-specificity tie with the stripe rule; tokens only):
+
+```css
+/* Network-group dividers (settings node table + cards): thin background
+ * band between the mainnet / testnet / custom row blocks — reads as
+ * separate tables while the radios stay one set (single tbody, one
+ * name="node" group; dividers carry no data-url so probe/offline logic
+ * skips them). */
+.node-table tr.node-sep td { height: 8px; padding: 0; border: 0; border-top: 2px solid var(--border); background: var(--panel-deep); }
+.node-cards .node-sep { height: 8px; background: var(--panel-deep); border-top: 2px solid var(--border); border-radius: 4px; }
+```
+
+- [ ] **Step 5: Gates + matrix + commit** — run `node tooling/node-network-test.js` (27/0), `node tooling/node-health-test.js` (exit 0), `node tooling/probe-geo-wiring-test.js` (exit 0 — stub has mainnet-only rows so zero dividers, row[0] unaffected), `bash tooling/check_types.sh` (zero lines on touched files), `python3 tooling/check_i18n.py` + `check_rot.py` (exit 0, no locale changes). Manual matrix via serve: dividers visible between groups; selecting across groups keeps single selection (native radio group + human pass); Probe All unaffected; 360px card dividers; three themes. Commit ONLY `vanilla/js/settings-nodes.js tooling/node-network-test.js vanilla/css/app.css`:
+
+```bash
+git add vanilla/js/settings-nodes.js tooling/node-network-test.js vanilla/css/app.css
+git commit -m "Network table: group divider bands (radios stay one set)"
+```
+
+## Task 5 Self-Review
+
+**Spec coverage:** group bands (§Rows — dividers, single tbody/group, dataless-skip). No gaps. **Placeholders:** none — all anchors/code exact. **Type consistency:** `groupOf` name/shape identical in helper, builders, test, export; `colspan` documented; divider class `node-sep` identical in JS + CSS.
