@@ -664,14 +664,9 @@ var PredictionUI = (function () {
         return !!(typeof Wallet !== "undefined" && Wallet.keys);
       } catch (e) { return false; }
     }
-    function confirmListP(rows) {
-      var list = DOM.el(doc, "dl", null, "xfer-confirm");
-      rows.forEach(function (r) {
-        list.appendChild(DOM.el(doc, "dt", r[0]));
-        var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
-      });
-      return list;
-    }
+  /* No local confirm builder — the settle confirm below uses
+   * ConfirmDialog.show (title/rows/Back/Sign&Send); unlock gates + status +
+   * sendAndProve stay in its onSend. */
     function unlockInlineP(parent, onUnlock) {
       if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
       var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
@@ -1000,24 +995,23 @@ var PredictionUI = (function () {
           if (myGen !== gen) return;
           var feeHuman = fa ? Format.formatAmount(String(S.fee.amount), fa.precision) + " " + fa.symbol : String(S.fee.amount);
           DOM.clear(pfConfirm);
-          pfConfirm.appendChild(DOM.el(doc, "h3", t("prediction.confirm_settle", "Confirm settle")));
-          pfConfirm.appendChild(confirmListP([
+          var sRows = [
             [t("borrow.account", "Account"), me.name + " (" + me.id + ")"],
             [t("prediction.asset", "Asset"), (h.balance.symbol || h.balance.asset_id) + " (" + h.balance.asset_id + ")"],
             [t("confirm.amount", "Amount"), S.amountHuman + " " + (h.balance.symbol || ""), "raw " + S.holdingRaw],
             [t("borrow.fee", "Fee"), feeHuman, "raw " + String(S.fee.amount)],
-            [t("borrow.network", "Network"), "testnet"]]));
-          pfConfirm.appendChild(DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted"));
-          var back = touchable(DOM.el(doc, "button", t("borrow.back", "Back"))); back.type = "button";
-          var send = touchable(DOM.el(doc, "button", t("borrow.sign_send", "Sign & Send"))); send.type = "button";
-          pfConfirm.appendChild(back); pfConfirm.appendChild(send);
-          back.addEventListener("click", function () { DOM.clear(pfConfirm); if (btn) btn.disabled = false; });
-          send.addEventListener("click", function () {
+            [t("borrow.network", "Network"), "testnet"]];
+          var sDlg = null;
+          /* Back clears the preview and re-arms the Settle button. */
+          function sBack() { DOM.clear(pfConfirm); if (btn) btn.disabled = false; }
+          function sSend() {
             if (myGen !== gen) return;
-            send.disabled = true; back.disabled = true;
+            var btns = sDlg.getElementsByTagName("button");
+            var backB = btns[0], sendB = btns[1];
+            sendB.disabled = true; backB.disabled = true;
             var st = showStatus(doc, pfConfirm, t("borrow.broadcasting", "Broadcasting…"));
             var wif = (typeof Wallet !== "undefined" && Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
-            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, send, back); return; }
+            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {
               return AssetOps.sendAndProve(unsigned, wif, async function () {
                 try {
@@ -1043,9 +1037,34 @@ var PredictionUI = (function () {
               if (myGen !== gen) return;
               try { pfConfirm.removeChild(st); } catch (ee) { /* status stands */ }
               showError(doc, pfConfirm, e, t("borrow.failed_check_state_before_retrying_do_not_bli", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
-              send.disabled = false; back.disabled = false;
+              sendB.disabled = false; backB.disabled = false;
             });
-          });
+          }
+          sDlg = ConfirmDialog.show({ title: t("prediction.confirm_settle", "Confirm settle"), rows: sRows,
+            backLabel: t("borrow.back", "Back"), sendLabel: t("borrow.sign_send", "Sign & Send"),
+            onBack: sBack, onSend: sSend });
+          /* Principle #6 (raw in title): ConfirmDialog's [term, text] row
+           * shape carries no raw-title slot (native r[2] support is owned
+           * by the sibling batch — see the Task 3.2 Batch B report).
+           * Restore r[2] titles post-show; mapping is 1:1 because no
+           * feeHuman is passed. Display-only. */
+          try {
+            var sDds = sDlg.querySelectorAll ? sDlg.querySelectorAll("dd") : [];
+            sRows.forEach(function (r, i) {
+              if (r && r[2] && sDds[i]) { try { sDds[i].title = r[2]; } catch (e0) {} }
+            });
+          } catch (e) { /* titles are display-only */ }
+          /* Fee-asset note rides between the rows and the actions (old position). */
+          (function () {
+            var note = DOM.el(doc, "p", t("borrow.fee_asset_note", "Fee asset 1.3.0 (switching deferred)."), "muted");
+            var acts = null;
+            try { acts = (sDlg.querySelector) ? sDlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+            try {
+              if (acts && sDlg.insertBefore) sDlg.insertBefore(note, acts);
+              else sDlg.appendChild(note);
+            } catch (e2) { try { sDlg.appendChild(note); } catch (e3) { /* note is display-only */ } }
+          })();
+          pfConfirm.appendChild(sDlg);
         });
       }).catch(function (e) {
         if (myGen !== gen) return;

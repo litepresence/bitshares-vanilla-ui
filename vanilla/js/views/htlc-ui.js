@@ -219,40 +219,60 @@ var HtlcUI = (function () {
     }
     return { text: String(raw) + " (" + assetId + ")", raw: String(raw) };
   }
+  /* Confirm + publish through the shared ConfirmDialog (ui/confirm.js):
+   * title + named rows render as div.confirm-dialog (h3 + dl.confirm with
+   * Back carrying btn-ghost + Sign & Send in div.confirm-actions).
+   * confirmList above stays for the read-only detail panel. The sign-time
+   * gate (password asked only here, preview stays visible), fresh-WIF
+   * sendAndProve, re-read proof, head-block result, and secret-field
+   * clearing (cfg.clear) below are unchanged. */
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     DOM.clear(out);
-    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button";
-    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
-    out.appendChild(back); out.appendChild(send);
-    back.addEventListener("click", function () { DOM.clear(out); });
-    send.addEventListener("click", function () {
-      if (myGen !== gen) return; send.disabled = true; back.disabled = true;
-      var status = showStatus(doc, out, "Signing…");
-      var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
-        out.removeChild(status);
-        if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
-          out.appendChild(DOM.el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
-        unlockInline(doc, out, function () {
-          out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+    var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
+      backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+      onBack: function () { DOM.clear(out); },
+      onSend: function () {
+        if (myGen !== gen) return;
+        var btns = dlg.getElementsByTagName("button");
+        var backB = btns[0], sendB = btns[1];
+        sendB.disabled = true; backB.disabled = true;
+        var status = showStatus(doc, out, "Signing…");
+        var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+        if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+          out.removeChild(status);
+          if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
+            out.appendChild(DOM.el(doc, "p", t("barter.locked_sign_note", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
+          unlockInline(doc, out, function () {
+            out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          });
+          sendB.disabled = false; backB.disabled = false; return; }
+        Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
+          status.textContent = t("htlc.s2", "Broadcasting…");
+          return Htlc.sendAndProve(unsigned, wif, cfg.prove);
+        }).then(async function (res) {
+          if (myGen !== gen) return;
+          DOM.clear(out);
+          out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+          out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+          (cfg.clear || []).forEach(function (inp) { inp.value = ""; }); /* secrecy: drop secret fields */
+        }).catch(function (e) {
+          if (myGen !== gen) return;
+          out.removeChild(status);
+          showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast).")); sendB.disabled = false; backB.disabled = false;
         });
-        send.disabled = false; back.disabled = false; return; }
-      Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-        status.textContent = t("htlc.s2", "Broadcasting…");
-        return Htlc.sendAndProve(unsigned, wif, cfg.prove);
-      }).then(async function (res) {
-        if (myGen !== gen) return;
-        DOM.clear(out);
-        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
-        (cfg.clear || []).forEach(function (inp) { inp.value = ""; }); /* secrecy: drop secret fields */
-      }).catch(function (e) {
-        if (myGen !== gen) return;
-        out.removeChild(status);
-        showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast).")); send.disabled = false; back.disabled = false;
+      } });
+    /* Principle #6 (raw in title): ConfirmDialog's [term, text] row shape
+     * carries no raw-title slot (native r[2] support is owned by the
+     * sibling batch — see the Task 3.2 Batch B report). Restore r[2]
+     * titles post-show so human terms keep their raw chain values;
+     * mapping is 1:1 because no feeHuman is passed. Display-only. */
+    try {
+      var dds = dlg.querySelectorAll ? dlg.querySelectorAll("dd") : [];
+      (cfg.rows || []).forEach(function (r, i) {
+        if (r && r[2] && dds[i]) { try { dds[i].title = r[2]; } catch (e0) {} }
       });
-    });
+    } catch (e) { /* titles are display-only */ }
+    out.appendChild(dlg);
   }
   /** review: build {pair,fee,prove} + live fee -> rows -> sendConfirm.
    * TYPE NOTE: the cfg.build promise resolves {pair, fee, prove} but tsc

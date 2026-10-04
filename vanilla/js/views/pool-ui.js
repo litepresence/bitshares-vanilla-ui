@@ -189,14 +189,9 @@ var PoolUI = (function () {
     root.appendChild(box); box.appendChild(DOM.el(doc, "h1", title));
     showError(doc, box,e,t("pool.load_failed", "Could not load pools.")); offlineBox(doc, box, retry);
   }
-  function confirmList(doc, rows) {
-    var list = DOM.el(doc, "dl", null, "xfer-confirm");
-    rows.forEach(function (r) {
-      list.appendChild(DOM.el(doc, "dt", r[0]));
-      var dd = DOM.el(doc, "dd", r[1]); if (r[2]) dd.title = r[2]; list.appendChild(dd);
-    });
-    return list;
-  }
+  /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
+   * Back/Sign&Send). Fee rows ride inside rows (embedded by rows-builder
+   * closures); unlock gates + status + sendAndProve stay in onSend below. */
   /* field: labeled touch-sized input row (Forms-delegating _ui export).
    * The row shell comes from Forms.labeledInput (no local DOM duplication);
    * retained under this name/signature because PoolUI._ui.field is consumed
@@ -233,10 +228,41 @@ var PoolUI = (function () {
   function whoText(me) { return me.name + " (" + me.id + ")"; }
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     DOM.clear(out);
-    out.appendChild(DOM.el(doc, "h3", cfg.title)); out.appendChild(confirmList(doc, cfg.rows));
-    var back = touchable(DOM.el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.className = "btn-ghost";
-    var send = touchable(DOM.el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
-    out.appendChild(back); out.appendChild(send);
+    var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
+      backLabel: t("barter.back", "Back"), sendLabel: t("barter.sign_send", "Sign & Send"),
+      onBack: function () { DOM.clear(out); },
+      onSend: function () {
+        if (myGen !== gen) return;
+        var btns = dlg.getElementsByTagName("button");
+        var backB = btns[0], sendB = btns[1];
+        sendB.disabled = true; backB.disabled = true;
+        var status = showStatus(doc, out, "Signing…");
+        var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
+        if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); sendB.disabled = false; backB.disabled = false; return; }
+        Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
+          status.textContent = t("htlc.s2", "Broadcasting…");
+          return Pool.sendAndProve(unsigned, wif, cfg.prove);
+        }).then(async function (res) {
+          if (myGen !== gen) return; DOM.clear(out);
+          out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
+          out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
+        }).catch(function (e) {
+          if (myGen !== gen) return; out.removeChild(status);
+          showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+          sendB.disabled = false; backB.disabled = false;
+        });
+      } });
+    /* Principle #6 (raw in title): ConfirmDialog's [term, text] row shape
+     * carries no raw-title slot (native r[2] support is owned by the
+     * sibling batch — see the Task 3.2 Batch B report). Restore r[2]
+     * titles post-show so human terms keep their raw chain values;
+     * mapping is 1:1 because no feeHuman is passed. Display-only. */
+    try {
+      var dds = dlg.querySelectorAll ? dlg.querySelectorAll("dd") : [];
+      (cfg.rows || []).forEach(function (r, i) {
+        if (r && r[2] && dds[i]) { try { dds[i].title = r[2]; } catch (e0) {} }
+      });
+    } catch (e) { /* titles are display-only */ }
     /* TxBuilder outlet (additive): stake only ([61, opData]) — queue the
      * deposit without broadcasting. Create/unstake/swap confirms render no
      * outlet. The pair passes as JS values only (never into the DOM); the
@@ -256,28 +282,10 @@ var PoolUI = (function () {
           } catch (e2) { /* toast optional; the desk badge is the record */ }
           location.hash = "#/txbuilder";
         });
-        out.appendChild(tbDep);
+        dlg.appendChild(tbDep);
       }
     } catch (e) { /* outlet never breaks the one-shot path */ }
-    back.addEventListener("click", function () { DOM.clear(out); });
-    send.addEventListener("click", function () {
-      if (myGen !== gen) return; send.disabled = true; back.disabled = true;
-      var status = showStatus(doc, out, "Signing…");
-      var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) { out.removeChild(status); showError(doc, out, new Error("wallet-locked")); send.disabled = false; back.disabled = false; return; }
-      Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
-        status.textContent = t("htlc.s2", "Broadcasting…");
-        return Pool.sendAndProve(unsigned, wif, cfg.prove);
-      }).then(async function (res) {
-        if (myGen !== gen) return; DOM.clear(out);
-        out.appendChild(DOM.el(doc, "p", cfg.okText, "xfer-ok"));
-        out.appendChild(DOM.el(doc, "p", "Observed at head block #" + String(await headBlock()) + " (" + res.via + ").", "muted"));
-      }).catch(function (e) {
-        if (myGen !== gen) return; out.removeChild(status);
-        showError(doc, out,e,t("account.upgrade_failed_hint", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
-        send.disabled = false; back.disabled = false;
-      });
-    });
+    out.appendChild(dlg);
   }
   /** build {pair,fee,prove} + live fee -> rows -> sendConfirm.
    * TYPE NOTE: the cfg.build promise resolves {pair, fee, prove} but tsc
@@ -579,7 +587,7 @@ var PoolUI = (function () {
   }
   return { renderPools: renderPools,
     _ui: { el: DOM.el, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
-      offlineBox: offlineBox, unlockBox: unlockBox, confirmList: confirmList, field: field, tableHead: tableHead,
+      offlineBox: offlineBox, unlockBox: unlockBox, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady, routeFail: routeFail, autoRetry: autoRetry, dropSubs: dropSubs,
