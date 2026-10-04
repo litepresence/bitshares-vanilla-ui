@@ -169,8 +169,10 @@ var WalletUI = (function () {
   }
 
   /* Lazily built dictionary set for the brainkey hint. Reads the global word
- *   list crypto.js consumes (js/sdk/data/brainkey-dict.js); null when absent
-   * (file:// with missing dict) so the hint degrades to length-only. */
+  *   list crypto.js lazy-loads (js/sdk/data/brainkey-dict.js, via
+  *   Crypto.ensureBrainkeyDict — no longer a boot script); null when absent
+  *   so the hint degrades to length-only. The once-cache (_dictTried) is
+  *   reset by the lazy-load kick below, so a pre-load hint never sticks. */
   var _dictSet = null;
   var _dictTried = false;
   function dictSet() {
@@ -445,6 +447,25 @@ var WalletUI = (function () {
     wrap.appendChild(bkHint);
     function refreshBkHint() { bkHint.textContent = brainkeyHintText(bkArea.value); }
     bkArea.addEventListener("input", refreshBkHint);
+    /* Lazy-dict kick: the form above already renders with the length-only
+     * hint; when the word list arrives, drop the once-cache and repaint.
+     * Offline failure keeps the length-only hint — never blank, never
+     * throws. The generate() path needs no kick: suggestBrainkey awaits the
+     * same loader internally and surfaces failure inline. */
+    try {
+      if (typeof Crypto !== "undefined" && Crypto &&
+          typeof (/** @type {any} */ (Crypto).ensureBrainkeyDict) === "function") {
+        (/** @type {any} */ (Crypto).ensureBrainkeyDict)(function (ok) {
+          if (!ok) return;
+          try {
+            if (root && root.isConnected === false) return;
+            _dictTried = false;
+            dictSet();
+            refreshBkHint();
+          } catch (e) { /* length-only hint stands */ }
+        });
+      }
+    } catch (e) { /* length-only hint stands */ }
 
     var regenRow = doc.createElement("p");
     var genBtn = actionButton(doc, "create-regen", t("wallet.generate_new_brainkey", "Generate new brainkey"));

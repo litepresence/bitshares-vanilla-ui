@@ -53,7 +53,10 @@
   <span class="appfoot-actions"><a id="foot-report" href="#/community">REPORT</a><a id="foot-about" href="#/about">About</a><a id="foot-help" href="#/help">Help</a></span>
 </footer>
 <script src="js/sdk/vendor/noble-classic.js"></script>
-<script src="js/sdk/data/brainkey-dict.js"></script>
+<!-- brainkey-dict.js NOT tagged here (340K saved on boot): Crypto.ensureBrainkeyDict
+  lazy-loads it behind first wallet-create/import use (same dynamic-script
+  precedent as about-ui.js ensureBuildDialog; URL resolved against
+  document.baseURI, file:// + http). -->
 <script src="js/sdk/crypto.js"></script>
 <script src="js/api/wallet.js"></script>
 <script src="js/views/wallet-ui.js"></script>

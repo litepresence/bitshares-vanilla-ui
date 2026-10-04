@@ -1,9 +1,10 @@
 /* crypto.js — async key derivation + key formats for the vanilla wallet.
  *
  * What it owns: all hashing, brainkey derivation, and WIF / prefixed-pubkey
- * formatting. Consumes: globals BRAINKEY_DICT (js/sdk/data/brainkey-dict.js)
+ * formatting. Consumes: global BRAINKEY_DICT (js/sdk/data/brainkey-dict.js,
+ * LAZY via ensureBrainkeyDict below — no longer a boot script in index.html)
  * and nobleGetPublicKey (js/sdk/vendor/noble-classic.js). Load order in
- * index.html: noble-classic.js, brainkey-dict.js, then this file. Side effects: none
+ * index.html: noble-classic.js, then this file. Side effects: none
  * beyond the `Crypto` global. Created by: building-vanilla-slices skill,
  * slice-02-wallet plan Task 3.
  *
@@ -155,9 +156,75 @@ var Crypto = (function () {
     return { wif: wif, pub: pub };
   }
 
+  /* Brainkey-dictionary lazy loader (ensureBuildDialog precedent in
+   * views/about-ui.js + ensureLightweight in api/charts-lwc.js: same-origin
+   * injected <script>, once-guard, onload/onerror, URL resolved against
+   * document.baseURI so it works on file:// AND http). The 340K dict is
+   * needed only for wallet-create/import suggestion + hint, never for first
+   * paint. Always returns a Promise<boolean> (so async suggestBrainkey can
+   * await it) and additionally fans out to an optional precedent-style
+   * callback (so the wallet-ui hint refresh keeps the precedent shape).
+   * Offline failure resolves false — callers keep their degraded path.
+   * Never throws.
+   * @param {((ok: boolean) => void)=} cb optional completion callback
+   * @returns {Promise<boolean>} true when the dict is usable */
+  var _dictLoading = false, _dictWaiters = [];
+  function _dictSrc() {
+    try {
+      if (typeof document !== "undefined" && document.baseURI) {
+        return new URL("js/sdk/data/brainkey-dict.js", document.baseURI).toString();
+      }
+    } catch (e) { /* relative fallback below */ }
+    return "js/sdk/data/brainkey-dict.js";
+  }
+  /* True when the global word list is present and non-empty. typeof-guard
+   * so an undeclared global reads back missing instead of throwing. */
+  function _dictPresent() {
+    try {
+      return typeof BRAINKEY_DICT === "string" && !!BRAINKEY_DICT;
+    } catch (e) { return false; }
+  }
+  function ensureBrainkeyDict(cb) {
+    function done(ok) {
+      if (typeof cb === "function") { try { cb(ok); } catch (e) {} }
+      return ok;
+    }
+    if (_dictPresent()) return Promise.resolve(done(true));
+    if (typeof document === "undefined") return Promise.resolve(done(false));
+    return new Promise(function (resolve) {
+      _dictWaiters.push(function (ok) { try { resolve(done(ok)); } catch (e) { resolve(false); } });
+      if (_dictLoading) return;
+      _dictLoading = true;
+      try {
+        var s = document.createElement("script");
+        s.src = _dictSrc();
+        s.async = true;
+        s.onload = function () {
+          _dictLoading = false;
+          var ok = _dictPresent();
+          var w = _dictWaiters; _dictWaiters = [];
+          w.forEach(function (f) { try { f(ok); } catch (e) {} });
+        };
+        s.onerror = function () {
+          _dictLoading = false;
+          var w = _dictWaiters; _dictWaiters = [];
+          w.forEach(function (f) { try { f(false); } catch (e) {} });
+        };
+        (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
+      } catch (e) {
+        _dictLoading = false;
+        var w = _dictWaiters; _dictWaiters = [];
+        w.forEach(function (f) { try { f(false); } catch (e2) {} });
+      }
+    });
+  }
+
   /* Random 16-word brainkey from 32 crypto-random bytes; two bytes per
-   * word, index uniform via floor (see header deviation note). */
+   * word, index uniform via floor (see header deviation note). Awaits the
+   * lazy dict first: offline failure keeps the existing "not loaded" throw,
+   * which both create screens already render inline (never blank). */
   async function suggestBrainkey() {
+    await ensureBrainkeyDict();
     if (typeof BRAINKEY_DICT !== "string" || !BRAINKEY_DICT) {
       throw new Error("BRAINKEY_DICT is not loaded");
     }
@@ -763,6 +830,7 @@ var Crypto = (function () {
   }
 
   return {
+    ensureBrainkeyDict: ensureBrainkeyDict,
     sha256hex: sha256hex,
     sha512hex: sha512hex,
     normalizeBrainkey: normalizeBrainkey,
