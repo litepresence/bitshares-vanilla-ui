@@ -1020,3 +1020,270 @@ git commit -m "Network table: persistent remove column (hide defaults, unlist cu
 ## Task 6 Self-Review
 
 **Spec coverage:** × column + header reuse (§Remove column — header key reuse, glyph, 44px); hiddenNodes persist/un-hide (§Remove column — Store shape, allNodes filter, custom-add return path); active fallback (§Remove column); zero new keys (§Remove column). No gaps. **Placeholders:** none — anchors/code exact, both isCustom branches spelled. **Type consistency:** `hiddenNodes` string-array in base/load/save/return; `hideNode`/`unhideNode` signatures identical in impl, export, handlers, tests; `allNodes({network, customNodes, hiddenNodes})` shape matches its reader.
+
+---
+
+### Task 7: Merge NETWORK into CHAIN, 3 finite states (follow-up 2026-10-04)
+
+**Rationale:** owner call — one column, three states for observed chains (green MAINNET 4018 / yellow TESTNET 39f5 / red DEVNET anything else, all caps via CSS); pending dash pre-probe; pill/mismatch text leaves the cell (tooltip keeps facts).
+
+**Files:**
+- Modify: `vanilla/js/settings-nodes.js` (chainLabel/chainHealth replace networkLabel/networkHealth, builders drop net spans + header entry, probeAll rewrites, setRow + JSDoc trim)
+- Modify: `tooling/node-network-test.js` (12 vectors rewritten to 8, 34 → 30)
+- Modify: `vanilla/css/app.css` (drop dead margin fragment, add caps rule)
+- Create: `tooling/merge_chain_column_i18n.py` (add network_devnet, drop th_network)
+- Modify: `vanilla/locales/*.json` (12 files, via one-shot)
+
+**Interfaces:**
+- Consumes: Task 1/2/5/6 code; `Store.CHAIN_IDS`; existing keys `network_mainnet/testnet/dash/pending/timeout/down`.
+- Produces: `chainLabel(t, chainId)` → `string`; `chainHealth(chainId)` → `"good"|"warn"|"bad"|""` via `_test`. `listNetwork/netFromChain/groupOf/hideNode` untouched (selection/probe/dividers still use them).
+
+- [ ] **Step 1: Helpers rename + reshape** — old (exact, lines 655-669):
+
+```js
+  /** networkLabel: NETWORK cell text.
+   * @param {Function} t - injected lookup.
+   * @param {string} net - "mainnet"|"testnet"|"".
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} the keyed network name, the 4-char chain prefix, or the keyed dash. Never throws. */
+  function networkLabel(t, net, chainId) {
+    var dash = "—";
+    try { dash = String(t("settings.dash", "—")); } catch (e) { /* dash stands */ }
+    try {
+      if (net === "mainnet") return String(t("settings.network_mainnet", "mainnet"));
+      if (net === "testnet") return String(t("settings.network_testnet", "testnet"));
+      if (typeof chainId === "string" && chainId) return chainId.slice(0, 4);
+    } catch (e) { /* dash below */ }
+    return dash;
+  }
+```
+
+New:
+
+```js
+  /** chainLabel: merged CHAIN cell text — three finite states for observed
+   * chains (rendered caps via CSS), dash pre-probe.
+   * @param {Function} t - injected lookup.
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} keyed mainnet/testnet/devnet word or dash. Never throws. */
+  function chainLabel(t, chainId) {
+    var dash = "—";
+    try { dash = String(t("settings.dash", "—")); } catch (e) { /* dash stands */ }
+    try {
+      if (typeof chainId !== "string" || !chainId) return dash;
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return dash;
+      var low = chainId.toLowerCase();
+      if (Store.CHAIN_IDS.mainnet && low === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return String(t("settings.network_mainnet", "mainnet"));
+      if (Store.CHAIN_IDS.testnet && low === String(Store.CHAIN_IDS.testnet).toLowerCase()) return String(t("settings.network_testnet", "testnet"));
+      return String(t("settings.network_devnet", "devnet"));
+    } catch (e) { return dash; }
+  }
+```
+
+Old (exact, lines 671-688):
+
+```js
+  /** networkHealth: NETWORK cell color.
+   * @param {string} net - "mainnet"|"testnet"|"".
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} "good" (mainnet chain) | "warn" (testnet or any other chain — owner rule: yellow unless 4018) | "bad" (listed default answering a foreign chain) | "" (unprobed: unknown never guesses). Never throws. */
+  function networkHealth(net, chainId) {
+    try {
+      if (typeof chainId !== "string" || !chainId) return "";
+      if (net === "mainnet" || net === "testnet") {
+        if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
+        var exp = Store.CHAIN_IDS[net];
+        var match = !!exp && chainId.toLowerCase() === String(exp).toLowerCase();
+        return healthFor("chain", null, { network: net, match: match });
+      }
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS || !Store.CHAIN_IDS.mainnet) return "";
+      if (chainId.toLowerCase() === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
+      return "warn";
+    } catch (e) { return ""; }
+  }
+```
+
+New:
+
+```js
+  /** chainHealth: merged CHAIN cell color.
+   * @param {string|null} chainId - observed chain id or null.
+   * @returns {string} "good" (4018) | "warn" (39f5) | "bad" (anything else) | "" (unprobed). Never throws. */
+  function chainHealth(chainId) {
+    try {
+      if (typeof chainId !== "string" || !chainId) return "";
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
+      var low = chainId.toLowerCase();
+      if (Store.CHAIN_IDS.mainnet && low === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
+      if (Store.CHAIN_IDS.testnet && low === String(Store.CHAIN_IDS.testnet).toLowerCase()) return "warn";
+      return "bad";
+    } catch (e) { return ""; }
+  }
+```
+
+Export line: anchor `networkLabel: networkLabel, networkHealth: networkHealth` (unique — definition sites read `function networkLabel`) → `chainLabel: chainLabel, chainHealth: chainHealth`. setRow JSDoc: old `    *   data-url), cells ({lat, ping, part, head, chain, network, geo, prov}` → drop `, network`; old `    *   health ({lat, ping, part, head, chain, network} "good"|"warn"|"bad" — painted` → drop `, network`.
+
+- [ ] **Step 2: Builders drop net spans + header entry** — table, old (exact):
+
+```js
+      var tdNet = doc.createElement("td");
+      var netSpan = doc.createElement("span");
+      netSpan.className = "node-network";
+      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
+      tdNet.appendChild(netSpan);
+      tr.appendChild(tdNet);
+```
+
+Delete the whole block. Cards, old (exact):
+
+```js
+      var netSpan = doc.createElement("span");
+      netSpan.className = "node-network";
+      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
+      card.appendChild(netSpan);
+```
+
+Delete the whole block. Header: old substring `t("settings.th_network", "Network"), ` (unique) → delete (empty string). chainSpan initial `…` pending text stays (already correct pre-probe).
+
+- [ ] **Step 3: setRow drops .node-network** — delete line `      var nnet = root.querySelector(".node-network");` (unique); delete line `      if (nnet && typeof c.network === "string") nnet.textContent = c.network;` (unique); old hue line (exact): `      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain"); hue(nnet, "network");` → new: `      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain");`.
+
+- [ ] **Step 4: probeAll rewrites** — delete line `        var dispNet = rowNet || netFromChain(cid);` (unique). Connecting, old (exact): `      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, network: networkLabel(t, listNetwork(url), seenChain[url] || null), geo: pend, prov: pend }, "connecting");` → new: `      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, geo: pend, prov: pend }, "connecting");`. Mismatch: delete block (exact):
+
+```js
+          var mChain4 = "";
+          try { mChain4 = String(prefix || "").slice(0, 4); } catch (sliceErr) { mChain4 = ""; }
+```
+
+old setRow (exact): `          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4, network: networkLabel(t, dispNet, cid) }, "down",` → new: `          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: chainLabel(t, cid) }, "down",`; old health tail (exact): `            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "bad", network: networkHealth(dispNet, cid) });` → new: `            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: chainHealth(cid) });` (tooltip `detailText(r, prefix, "wrong chain for this network")` stays untouched). Success: delete pill block (exact):
+
+```js
+          var pill = {
+            "GOOD": t("settings.node_good", "Good"),
+            "STALE": t("settings.node_stale", "Stale"),
+            "SUSPECT": t("settings.node_suspect", "Suspect"),
+            "FORKED": t("settings.node_forked", "Forked"),
+            "WRONG-CHAIN": "mismatch " + prefix
+          }[v.status] || t("settings.node_good", "Good");
+```
+
+old cells (exact): `            chain: (v.status === "GOOD") ? prefix.slice(0, 4) : (pill + " · " + prefix.slice(0, 4)), network: networkLabel(t, dispNet, cid) },` → new: `            chain: chainLabel(t, cid) },`; old health tail (exact): `              chain: networkHealth(dispNet, cid) });` → new: `              chain: chainHealth(cid) });` (`id` status mapping + tooltip + history lines stay). Catch, old (exact): `          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"), network: networkLabel(t, listNetwork(url), null) },` → new: `          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down") },` (Timeout/down behavior unchanged).
+
+- [ ] **Step 5: CSS caps + dead-margin cleanup** — delete substring ` .node-card .node-network,` (unique — joins neighbors back to valid CSS). Append after the divider rule line `.node-cards .node-sep { height: 8px; background: var(--panel-deep); border-top: 2px solid var(--border); border-radius: 4px; }` (unique):
+
+```css
+/* Merged CHAIN states render all-caps (MAINNET/TESTNET/DEVNET); locale
+ * values stay lowercase, translators never touch casing. */
+.node-table .node-chain, .node-card .node-chain { text-transform: uppercase; }
+```
+
+- [ ] **Step 6: Vectors 34 → 30 (TDD)** — test file: exports array substring `"networkLabel", "networkHealth"` → `"chainLabel", "chainHealth"`; header helper list `networkLabel/networkHealth` → `chainLabel/chainHealth`; delete the 12 old vectors (4 networkLabel + 8 networkHealth, exact text from Task 1 Step 5); append before `console.log`:
+
+```js
+eq(T.chainLabel(t, MID), "mainnet", "chain mainnet");
+eq(T.chainLabel(t, TID), "testnet", "chain testnet");
+eq(T.chainLabel(t, "ffff"), "devnet", "chain other devnet");
+eq(T.chainLabel(t, null), "—", "chain dash");
+eq(T.chainHealth(MID), "good", "chain health green");
+eq(T.chainHealth(TID), "warn", "chain health yellow");
+eq(T.chainHealth("ffff"), "bad", "chain health red");
+eq(T.chainHealth(null), "", "chain health unprobed");
+```
+
+Run: `node tooling/node-network-test.js` — expect `30 passed, 0 failed` (rewrite vectors first: RED `chainLabel exported`, then GREEN).
+
+- [ ] **Step 7: i18n one-shot** — create `tooling/merge_chain_column_i18n.py` with exactly:
+
+```python
+#!/usr/bin/env python3
+"""One-shot: merge NETWORK into CHAIN column i18n (2026-10-04).
+
+Adds settings.network_devnet ("devnet") and DROPS settings.th_network
+(header retired with the column) across all 12 vanilla/locales/*.json
+as honest English stubs (principle #10). MAINNET/TESTNET reuse
+settings.network_mainnet/testnet (rendered caps via CSS); chain states
+are verbatim values, never translated.
+
+Exact string surgery only (no JSON round-trip, diffs stay minimal).
+Safe to re-run: finished files match nothing and are left untouched.
+Aborts a file on an unexpected hit count. Verify with:
+  python3 tooling/check_i18n.py
+"""
+import glob
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+LOCALES = os.path.join(HERE, "..", "vanilla", "locales")
+
+ADDS = [
+    # (pattern, replacement, done_marker)
+    (re.compile(r'^    "network_mainnet": "mainnet",\n', re.MULTILINE),
+     '    "network_devnet": "devnet",\n    "network_mainnet": "mainnet",\n',
+     '"network_devnet"'),
+    (re.compile(r'^      "settings\.network_mainnet",\n', re.MULTILINE),
+     '      "settings.network_devnet",\n      "settings.network_mainnet",\n',
+     '"settings.network_devnet"'),
+]
+DROPS = [
+    # (pattern, replacement, absent_marker): skip when absent_marker gone.
+    (re.compile(r'^    "th_location": "Location \*",\n    "th_network": "Network",\n', re.MULTILINE),
+     '    "th_location": "Location *",\n',
+     '"th_network"'),
+    (re.compile(r'^      "settings\.th_network",\n', re.MULTILINE),
+     '',
+     '"settings.th_network"'),
+]
+
+
+def main():
+    paths = sorted(glob.glob(os.path.join(LOCALES, "*.json")))
+    if len(paths) != 12:
+        print("ABORT: expected 12 locale files, found %d" % len(paths))
+        return 1
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        changed = False
+        for pat, repl, marker in ADDS:
+            if marker in text:
+                continue
+            hits = len(pat.findall(text))
+            if hits != 1:
+                print("ABORT %s: add hits %d" % (path, hits))
+                return 1
+            text = pat.sub(repl, text, count=1)
+            changed = True
+        for pat, repl, gone in DROPS:
+            if gone not in text:
+                continue
+            hits = len(pat.findall(text))
+            if hits != 1:
+                print("ABORT %s: drop hits %d" % (path, hits))
+                return 1
+            text = pat.sub(repl, text, count=1)
+            changed = True
+        if changed:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            print("updated " + os.path.basename(path))
+    print("done")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+```
+
+Run: `python3 tooling/merge_chain_column_i18n.py` (expect 12 `updated` + `done`) then `python3 tooling/check_i18n.py` (exit 0).
+
+- [ ] **Step 8: Gates + matrix + commit** — run `node tooling/node-health-test.js` + `probe-geo-wiring-test.js` (exit 0 — neither asserts chain cells), `bash tooling/check_types.sh` (zero lines on touched files), `python3 tooling/check_rot.py` (exit 0). Manual matrix via serve: mainnet rows green MAINNET, testnet rows yellow TESTNET, pending `…` pre-probe, Timeout/down unchanged, tooltips keep full facts, DEVNET by code reasoning only (no odd chain available — human pass if a devnet URL exists), 360px + themes + single-set radios sanity. Commit ONLY `vanilla/js/settings-nodes.js tooling/node-network-test.js vanilla/css/app.css tooling/merge_chain_column_i18n.py vanilla/locales/`:
+
+```bash
+git add vanilla/js/settings-nodes.js tooling/node-network-test.js vanilla/css/app.css tooling/merge_chain_column_i18n.py vanilla/locales/
+git commit -m "Network table: merge NETWORK into CHAIN (MAINNET/TESTNET/DEVNET)"
+```
+
+## Task 7 Self-Review
+
+**Spec coverage:** 3 states + caps-via-CSS + devnet key (§Merged chain column → Steps 1/5/7); dash pre-probe (Steps 1-2); pill/mismatch text out, tooltips stay (Step 4); header reuse + th_network drop (Steps 2/7); data-status/offline/selection/probe-first/hidden untouched (no edits there). No gaps. **Placeholders:** none — all anchors/code exact. **Type consistency:** `chainLabel(t, chainId)`/`chainHealth(chainId)` identical in impl, all 6 call sites, tests, export; removed names (`networkLabel*`, `dispNet`, `pill`, `mChain4`, `nnet`) have zero remaining references (implementer verifies with grep before committing — any hit besides the deleted lines is NEEDS_CONTEXT).
