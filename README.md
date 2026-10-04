@@ -28,7 +28,7 @@ Chain explorer — live blocks, object search, per-tab deep links:
 
 ![explorer blockchain](docs/screenshots/explorer-blockchain.png)
 
-## The 9 guiding principles
+## The 10 guiding principles
 
 1. **Never re-create #3583.** Every dependency, abstraction, and build step
    is a future #3583 (upstream's thousand-hour React-uplift trap). Default
@@ -50,6 +50,10 @@ Chain explorer — live blocks, object search, per-tab deep links:
    comments — a stranger maintains it with no prior context.
 9. **Browse as anyone, sign as yourself.** Every page renders any account's
    data with no login; the password is asked ONLY at signing.
+10. **Every language, fully.** BitShares is global; the wallet speaks every
+    supported language completely — every display string keyed, every locale
+    fully translated and audited, never a half-translated screen. English is
+    the fallback, never the excuse.
 
 ## Features
 
@@ -80,7 +84,7 @@ Chain explorer — live blocks, object search, per-tab deep links:
   every object deep-linkable (`1.x.y` addressing).
 - **Gateways:** XBTSX + IOB live, GDEX manual-only (DNS-dead, honestly
   labeled), BIT20 disabled. Withdraw = transfer-prefill delegation.
-- **Plus:** price alerts + toasts, 10-language i18n, TxBuilder multi-op
+- **Plus:** price alerts + toasts, 12-language i18n, TxBuilder multi-op
   composer, first-run tour, dead-browser notice (feature-detected, never
   a gate), optional extension-wrapper repackaging.
 
@@ -110,9 +114,10 @@ status + retry instead.
 
 ## Status
 
-Slices 1–17 built + testnet-verified; see `SLICES.md` (binding build
-order) and `vanilla/notes/op-coverage-matrix.md` (zero unjustified gaps).
-`docs/tester-manual.md` is the human-gate checklist. Footer stamp `v1.0.0`.
+Slices 1–18 built + testnet-verified; 19 in progress; see `SLICES.md`
+(binding build order) and `vanilla/notes/op-coverage-matrix.md` (zero
+unjustified gaps). `docs/tester-manual.md` is the human-gate checklist.
+Footer stamp `v1.0.0`.
 
 ## For developers
 
