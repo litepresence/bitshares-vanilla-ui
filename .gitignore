@@ -31,3 +31,6 @@ tooling/typecheck/node_modules/
 
 # Python bytecode (regenerated, never committed).
 __pycache__/
+
+# Subagent scratch reports (task drafts/reviews). Never shipped, never committed.
+.superpowers/

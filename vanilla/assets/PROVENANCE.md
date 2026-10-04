@@ -9,7 +9,7 @@ token logos, flags, and app art must be pixel-identical to the original.
 |---|---|---|
 | `icons/` | 84 SVG | UI icon set (nav, buttons, status, actions) |
 | `asset-symbols/` | 105 PNG | Token/asset logos |
-| `language-dropdown/` | 243 mixed | Flag icons for the language picker |
+| `language-dropdown/` | 245 (243 PNG + 2 JS) | Flag icons for the language picker |
 | `bin-file/` | 5 SVG | Button-state graphics (default/hover/error/rounded-arrow/downloaded) |
 | `model-type-images/` | 6 | Model-type illustrations |
 | root (`favicon.ico`, `logo-*.png`, `qr.png`, `ul-arrow*.png`, `fresh-bolt2.png`) | 9 | Favicons, logos, misc art |
@@ -54,8 +54,10 @@ Hand-drawn addition (Tier 2):
   `--icon-filter` invert like the other PNG badges.
 
 Owner-supplied state icons (2026-10-04):
-- `icons/_source-lock-shield-4up.png` is the owner's 2×2 sheet (green-check
-  shield, red-X shield, red locked padlock, green open padlock on white).
+- `icons/_source-lock-shield-4up.png` was the owner's 2×2 sheet (green-check
+  shield, red-X shield, red locked padlock, green open padlock on white;
+  file deleted 2026-10-04 after the split — the four outputs below are the
+  wired artifacts, this paragraph is history).
   Split by `tooling/split_lock_shield_icons.py` (PIL edge flood-fill, white
   glyphs preserved) into `icons/shield-ok.png`, `icons/shield-bad.png`,
   `icons/lock-closed.png`, `icons/lock-open.png` (RGBA, transparent).

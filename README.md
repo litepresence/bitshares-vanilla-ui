@@ -90,7 +90,8 @@ Chain explorer — live blocks, object search, per-tab deep links:
 
 ## Hosting it
 
-Any static host works. No env vars, no `.env`, no build step:
+Any static host works. No env vars, no `.env`, no build step. The
+shipped `CNAME` serves `bitshares.litepresence.com`.
 
 ```bash
 python3 -m http.server 8080 --directory vanilla
@@ -115,7 +116,7 @@ status + retry instead.
 ## Status
 
 Slices 1–18 built + testnet-verified; 19 in progress; see `SLICES.md`
-(binding build order) and `vanilla/notes/op-coverage-matrix.md` (zero
+(binding build order) and `docs/parity/op-coverage-matrix.md` (zero
 unjustified gaps). `docs/tester-manual.md` is the human-gate checklist.
 Footer stamp `v1.0.0`.
 

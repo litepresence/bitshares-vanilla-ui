@@ -1057,8 +1057,7 @@ var AccountUI = (function () {
     }
   }
 
-  /* Equity sparkline section fill (dex-ux plot proposal 4 host — vanilla/
-   * notes/dexux-plots.md section 4). One <details open> with a small-multiples
+  /* Equity sparkline section fill (dex-ux plot proposal 4 host — docs/parity/dexux-plots.md section 4). One <details open> with a small-multiples
    * canvas per plotted asset (top 3 by |net|) + a net-change table for ALL
    * replayed assets + an honest counts line. Assets are never summed across
    * precisions (one series per asset, each scaled independently — the note

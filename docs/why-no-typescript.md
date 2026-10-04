@@ -1,7 +1,7 @@
 # Why No TypeScript — Decision Record
 
 Status: binding. Date: 2026-10-02. Scope: `vanilla/` (the shipped wallet).
-Companion: `vanilla/notes/type-safety-report.md` (the 2026-10-01 gate pass log).
+Companion: `docs/parity/type-safety-report.md` (the 2026-10-01 gate pass log).
 
 ## TL;DR
 
@@ -156,7 +156,7 @@ source is the debugged source.
 The wallet speaks WebSocket JSON to nodes whose responses are shaped by
 C++ (`reference/bitshares-core/.../database_api.hpp`, `api.hpp`) and by
 per-node configuration (bucket sets, history plugins, asset ids differ —
-see `vanilla/notes/phase-06-es-design.md`). No static type, however strict,
+see `docs/parity/phase-06-es-design.md`). No static type, however strict,
 can promise that `get_account_history` returns rows, that testnet BTS is
 `1.3.1420` rather than `1.3.0`, or that a fee field is present. Those facts
 are established by runtime guards, probe fixtures
@@ -172,10 +172,10 @@ skipping.
 | 2 | Shared interfaces / type aliases across modules | `api/types.js` typedefs (`ChainObjectId`, `RawInt`, `HumanAmount`, `FeeAssetId`, `ChainStatus`, `TxEnvelope`, `OpTuple`, `CountResult`, `PulseResult`, `TopMarketRow`, `TFunction`) consumed via `import('./types.js')` / `import('../api/types.js')` per file. tsc-only file: no `<script>` tag by documented rule (`types.js:1-16`), so it can never become load-bearing. | `vanilla/js/sdk/crypto.js:39-41`, `vanilla/js/api/wallet.js:17-22`, `vanilla/js/app.js:13-16` typedef headers |
 | 3 | Cross-file name resolution without imports (classic scripts share one scope) | `vanilla/js/globals.d.ts` ambient declares (116 lines, one `declare var X: any` per namespace global). Dev-only, never loaded — the rot gate fails any `.d.ts` referenced by markup or imports. Starts as `any`; seams refine per module. | `globals.d.ts:1-8` header states the contract and removal plan; `check_rot.py:86-108` enforces it |
 | 4 | Syntax safety | `node --check` on every touched file before every claim (slice plans since the founding commit; e.g. `docs/superpowers/plans/2026-09-28-slice-13-credit.md` acceptance: "`node --check` green"). | Slice plans + parity notes record exit 0 per round |
-| 5 | Logic correctness (types never prove behavior) | Stdlib-only `tooling/*-test.js` vectors (31 suites on 2026-10-02; 517 vectors + keepalive battery green at gate time), malformed-payload fuzz guards (commit `b21d83b`), byte-determinism fixtures for all 78 ops, and testnet connect → read → sign → broadcast proofs per slice. The type gate caught what tests missed and vice versa — see below. | `vanilla/notes/type-safety-report.md:13-16`; parity notes per slice |
+| 5 | Logic correctness (types never prove behavior) | Stdlib-only `tooling/*-test.js` vectors (31 suites on 2026-10-02; 517 vectors + keepalive battery green at gate time), malformed-payload fuzz guards (commit `b21d83b`), byte-determinism fixtures for all 78 ops, and testnet connect → read → sign → broadcast proofs per slice. The type gate caught what tests missed and vice versa — see below. | `docs/parity/type-safety-report.md:13-16`; parity notes per slice |
 | 6 | Null/undefined and shape drift at the WS boundary | Runtime guards at every seam: `typeof X === "undefined"` checks, named `throw` errors (`crypto backend missing`, `chain not ready`), `Object.prototype.hasOwnProperty` discrimination, `format.js` as the single money-math module (audit check 6 greps `Math.pow(10` outside it). Types describe; runtime asserts defend. | e.g. `vanilla/js/api/wallet.js` guards; `vanilla/js/api/history-notice.js:44-50` null/doc guards; `skills/auditing-vanilla-slices/SKILL.md` check 6 |
 | 7 | Documentation of intent | Module headers (owns/consumes/side effects/origin) and function descriptions (what/params/returns/failure-modes) required by principle #8 and audit check 8; JSDoc doubles as the type annotation so docs and checks cannot drift apart. | e.g. `vanilla/js/api/history-notice.js:1-16`, `vanilla/js/sdk/crypto.js:374-376` |
-| 8 | Exhibit: the gate paid for itself | `samet-ui.js openAction` used the route-liveness token `myGen` it never received (5-arg call, 6-arg body) — every Borrow/Repay/Update/Delete click threw `ReferenceError`. Dead feature, shipped. No test covered the click path; `tsc` flagged the arity mismatch. Fix threaded `myGen` through (2 lines + `BUGFIX NOTE` at site); regression covered by tester manual §11 step 3. | `vanilla/notes/type-safety-report.md:18-26`; commit `da344ae` |
+| 8 | Exhibit: the gate paid for itself | `samet-ui.js openAction` used the route-liveness token `myGen` it never received (5-arg call, 6-arg body) — every Borrow/Repay/Update/Delete click threw `ReferenceError`. Dead feature, shipped. No test covered the click path; `tsc` flagged the arity mismatch. Fix threaded `myGen` through (2 lines + `BUGFIX NOTE` at site); regression covered by tester manual §11 step 3. | `docs/parity/type-safety-report.md:18-26`; commit `da344ae` |
 
 ## 3. Git-history review: how the mitigation was built
 
@@ -188,7 +188,7 @@ two commits touch the type machinery, both on 2026-10-01:
    `tooling/typecheck/jsconfig.json` (13 lines),
    `tooling/typecheck/package.json` (`typescript: 7.0.2`),
    `vanilla/js/api/types.js` (73 lines), `vanilla/js/globals.d.ts` (112
-   declares), `vanilla/notes/type-safety-report.md` (46 lines); extended
+   declares), `docs/parity/type-safety-report.md` (46 lines); extended
    `.gitignore` (typecheck `node_modules/`), `AGENTS.md` (hard type gate),
    `skills/auditing-vanilla-slices/SKILL.md` (check 9), and `check_rot.py`
    (the `.d.ts` carve-out). Annotated the sdk seam (`chain.js`,
@@ -330,7 +330,7 @@ would leave untouched.
 - Type gate: `tooling/check_types.sh`, `tooling/typecheck/jsconfig.json`,
   `tooling/typecheck/package.json`, `tooling/typecheck/pnpm-lock.yaml`.
 - Seams: `vanilla/js/globals.d.ts`, `vanilla/js/api/types.js`.
-- Pass log: `vanilla/notes/type-safety-report.md`.
+- Pass log: `docs/parity/type-safety-report.md`.
 - Audit: `skills/auditing-vanilla-slices/SKILL.md` checks 1 (rot), 6
   (human terms), 8 (readability), 9 (type gate).
 - Commits: `da344ae` (gate + seams + samet fix), `c02f1a9` (pin),

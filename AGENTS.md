@@ -22,6 +22,8 @@
 > **Reference #4 (chain API contract, sparse):** `reference/bitshares-core` — `bitshares/bitshares-core`, branch `develop` (only `libraries/{app/include,protocol,chain/include,wallet/include}` checked out — no build, no submodules)
 > **Reference #5 (dashboard/style + indicator/plot math, behavior-only):** `reference/bitshares-dex-ux` — `squidKid-deluxe/bitshares-dex-ux` (Python/Falcon + JS, wrong runtime — NEVER a dependency; consult for market-picker logic and plot ideas, NOT for dark-theme CSS — the dark theme is Crypo-sourced, see §3.4)
 > **Reference #6 (machine spec oracle, sparse):** `reference/open-graphene` — `open-graphene/open-graphene`, branch `main` (ONLY `.../graphene-chain-bitshares-spec/dist/bitshares.open-graphene.json` checked out — 78 ops, tags 0–77, spec SHA `caa33ea9`, HEAD `eb78e28` as of 2026-10-01). Serializer cross-check oracle for `mapping-chain-calls` (rank below BJS; #4 wins conflicts; testnet decides). Reference-only, never a dependency.
+> **Reference (dark-theme HEX source, NOT a checkout):** `reference/crypo/crypo/Crypo/` — extracted Crypo designer template (no git history); HEX VALUES ONLY source of `dex-ux-theme`, see §3.4. Never a dependency.
+> **Reference (historical-chart behavior, sparse):** `reference/bitshares-historical-charts` — `squidKid-deluxe/BitShares-Historical-Charts`, branch `master` (static ES-backed chart app; consult for plot ideas, never a dependency).
 > **#1 vs #5 are UNIQUE projects — never confuse them.** #1 is the React-16
 > reference WALLET (wallet.bitshares.org) we behaviorally replace. #5 is a
 > Python dashboard/plot app whose only contributions are picker logic and
@@ -73,7 +75,7 @@
 > - **#9 — BROWSE AS ANYONE, SIGN AS YOURSELF.** It is a public blockchain:
 >   every page renders any account's data with NO login — reads never gate on
 >   unlock. The password is asked ONLY at signing. Acting-as defaults to
->   `committee-account` (`1.2.0`, verified on both chains — see parity note `vanilla/notes/committee-account.md`; `1.2.5` is
+>   `committee-account` (`1.2.0`, verified on both chains — see parity note `docs/parity/committee-account.md`; `1.2.5` is
 >   proxy-to-self, not the default) with an honest viewing-as notice.
 > - **#10 — EVERY LANGUAGE, FULLY.** BitShares is global; the wallet speaks
 >   every supported language completely — every display string keyed, every
@@ -799,7 +801,7 @@ Routes defined in `app/App.jsx` (~40 routes). Parity checklist v1:
    `/workspace/reference/astro-ui/*`, `/workspace/reference/wallet-extension/*`, or
    `/workspace/reference/bitshares-core/*`. Use
    `git -C <dir> log/fetch/status`. If you need to experiment, copy the file
-   to `/tmp` or `/workspace/vanilla/notes/`.
+   to `/tmp` or `/workspace/docs/parity/`.
 2. **New code lives in `/workspace/vanilla/`** (create on first implementation
    task). Static only: `index.html` must work via `python3 -m http.server` with
    zero `npm install`.
@@ -858,7 +860,7 @@ Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
 - [x] Sparse-clone `bitshares/bitshares-core` @ `develop` → `/workspace/reference/bitshares-core`
 - [x] Record HEAD (`fe7000c`, 2026-09-15) — API-contract 4th reference (headers only, ~2 MB)
 - [x] Clone `squidKid-deluxe/bitshares-dex-ux` @ `main` → `/workspace/reference/bitshares-dex-ux`
-- [x] Record HEAD (`bad2545`, committed 2023-02-21, cloned 2026-09-28) — dashboard/style 5th reference (Python/Falcon, behavior-only; live shots in `vanilla/notes/dexux-ref/`)
+- [x] Record HEAD (`bad2545`, committed 2023-02-21, cloned 2026-09-28) — dashboard/style 5th reference (Python/Falcon, behavior-only; live shots in `docs/parity/dexux-ref/`)
 
 ### Phase 1 — Inventory (folded into slices — no separate inventory docs)
 
