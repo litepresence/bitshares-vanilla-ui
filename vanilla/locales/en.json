@@ -6,12 +6,14 @@
       "about.cta_guides",
       "about.cta_trade",
       "about.dlg_heading",
+      "about.dlg_no_match",
       "about.dlg_no_reply",
       "about.dlg_search_clear",
       "about.dlg_search_ph",
       "about.dlg_showing",
       "about.dlg_unavailable",
       "about.dlg_noscript",
+      "about.dlg_bad_link",
       "about.hero_lede",
       "about.hero_title",
       "about.link",
@@ -3542,7 +3544,9 @@
       "wallet.wallet_name_required_use_letters_digits_dash",
       "wallet.ways_in",
       "wallet.write_down_brainkey_keep_safe",
-      "wallet.wrote_it_down"
+      "wallet.wrote_it_down",
+      "about.dlg_heading_c",
+      "about.dlg_showing_c"
     ]
   },
   "nav": {
@@ -7203,7 +7207,11 @@
     "dlg_showing": "Showing",
     "dlg_unavailable": "Build-dialog archive unavailable.",
     "dlg_noscript": "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo.",
-    "dlg_no_reply": "No reply recorded — the next prompt followed immediately."
+    "dlg_no_reply": "No reply recorded — the next prompt followed immediately.",
+    "dlg_no_match": "No matching exchanges. Clear the search to see everything.",
+    "dlg_bad_link": "Invalid exchange number. Valid range: 1–413.",
+    "dlg_heading_c": "Full build dialog (%(total)s)",
+    "dlg_showing_c": "Showing %(shown)s / %(total)s"
   },
   "approval": {
     "title": "Approve signature",

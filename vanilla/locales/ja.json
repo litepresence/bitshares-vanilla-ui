@@ -3542,7 +3542,11 @@
       "wallet.wallet_name_required_use_letters_digits_dash",
       "wallet.ways_in",
       "wallet.write_down_brainkey_keep_safe",
-      "wallet.wrote_it_down"
+      "wallet.wrote_it_down",
+      "about.dlg_heading_c",
+      "about.dlg_showing_c",
+      "about.dlg_bad_link",
+      "about.dlg_no_match"
     ]
   },
   "nav": {
@@ -7203,7 +7207,11 @@
     "dlg_showing": "Showing",
     "dlg_unavailable": "Build-dialog archive unavailable.",
     "dlg_noscript": "This archive needs JavaScript; the same text lives in docs/vanilla-ui-dialog.md in the source repo.",
-    "dlg_no_reply": "No reply recorded — the next prompt followed immediately."
+    "dlg_no_reply": "No reply recorded — the next prompt followed immediately.",
+    "dlg_no_match": "一致する取引所がありません。検索をクリアしてすべて表示。",
+    "dlg_bad_link": "無効な取引所番号です。有効範囲: 1–413。",
+    "dlg_heading_c": "Full build dialog (%(total)s)",
+    "dlg_showing_c": "Showing %(shown)s / %(total)s"
   },
   "approval": {
     "title": "Approve signature",

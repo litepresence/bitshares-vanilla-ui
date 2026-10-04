@@ -20,10 +20,10 @@ var AboutUI = (function () {
   /* Batch-pattern i18n (slice-17 precedent): display strings resolve via
    * I18n.t with the pre-conversion literal kept verbatim as enDefault.
    * Falls back to the default when i18n.js failed to load: never blank,
-   * never throws. */
-  function t(key, dflt) {
+   * never throws. Supports %(name)s interpolation via vars object. */
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
     return dflt;
   }
@@ -224,7 +224,7 @@ var AboutUI = (function () {
     var bdBox = doc.createElement("details");
     bdBox.className = "bd-archive";
     var bdSum = doc.createElement("summary");
-    bdSum.textContent = t("about.dlg_heading", "Full build dialog") + " (" + buildDialogTotal() + ")";
+    bdSum.textContent = t("about.dlg_heading_c", "Full build dialog (%(total)s)", { total: buildDialogTotal() });
     bdBox.appendChild(bdSum);
     var searchRow = doc.createElement("div");
     searchRow.className = "bd-search";
@@ -253,6 +253,10 @@ var AboutUI = (function () {
       if (typeof Router !== "undefined" && Router && typeof Router.query === "function") query = Router.query() || {};
     } catch (e4) { query = {}; }
     var target = dialogNumber(query);
+    /* R12: bad-link feedback — query.dialog present but out of range / non-numeric */
+    if (query && query.dialog && target === null) {
+      try { status.textContent = t("about.dlg_bad_link", "Invalid exchange number. Valid range: 1–413."); } catch (e) { /* status stands */ }
+    }
     /* fillArchive: build day groups + wire filter + honour deep link.
      * Params: ok (asset usable), deep (exchange number or null).
      * Returns nothing. Never throws (archive degrades to status line). */
@@ -268,10 +272,10 @@ var AboutUI = (function () {
         } catch (e2) { /* collapsed box stands */ }
         return;
       }
-      try {
-        bdBox.setAttribute("data-bd", "ready");
-        bdSum.textContent = t("about.dlg_heading", "Full build dialog") + " (" + asset.length + ")";
-      } catch (e3) { /* stale count stands */ }
+try {
+          bdBox.setAttribute("data-bd", "ready");
+          bdSum.textContent = t("about.dlg_heading_c", "Full build dialog (%(total)s)", { total: asset.length });
+        } catch (e3) { /* stale count stands */ }
       var index = [], groups = [], lastDay = null, cur = null, i, entry, day, d;
       for (i = 0; i < asset.length; i++) {
         entry = asset[i];
@@ -315,7 +319,11 @@ var AboutUI = (function () {
             if (n) groups[g].head.textContent = groups[g].day + " (" + n + ")";
           } catch (e4) { /* group stands */ }
         }
-        try { status.textContent = t("about.dlg_showing", "Showing") + " " + shown + "/" + index.length; } catch (e5) { /* count stands */ }
+        try {
+          var base = t("about.dlg_showing_c", "Showing %(shown)s / %(total)s", { shown: shown, total: index.length });
+          if (shown === 0 && needle) base += " — " + t("about.dlg_no_match", "No matching exchanges. Clear the search to see everything.");
+          status.textContent = base;
+        } catch (e5) { /* count stands */ }
       }
       try {
         field.addEventListener("input", applyFilter);
