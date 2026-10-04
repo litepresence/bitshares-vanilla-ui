@@ -67,10 +67,10 @@ var SettingsNodes = (function () {
    * The History cell is NOT painted here — paintHistory owns .node-history
    * from HistoryCap truth (snapshot at build, live after probe).
    * Params: row (tr, may be null — no-op except the card lookup needs its
-   *   data-url), cells ({lat, ping, part, head, chain, geo, prov} strings —
-   *   any missing key leaves that cell untouched), statusId (canonical, optional),
-   *   titleText (tooltip, optional — clears stale titles when omitted),
-   *   health ({lat, ping, part, head, chain} "good"|"warn"|"bad" — painted
+    *   data-url), cells ({lat, ping, part, head, chain, network, geo, prov}
+    *   strings — any missing key leaves that cell untouched), statusId (canonical, optional),
+    *   titleText (tooltip, optional — clears stale titles when omitted),
+    *   health ({lat, ping, part, head, chain, network} "good"|"warn"|"bad" — painted
    *   as data-h for the CSS signal colors; a missing key CLEARS that cell's
    *   color so re-probes never inherit stale signals).
    *   Fails: never (missing cells are skipped). */
@@ -165,7 +165,7 @@ var SettingsNodes = (function () {
       var tdNet = doc.createElement("td");
       var netSpan = doc.createElement("span");
       netSpan.className = "node-network";
-      netSpan.textContent = networkLabel(t, listNetwork(url), null);
+      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
       tdNet.appendChild(netSpan);
       tr.appendChild(tdNet);
 
@@ -253,7 +253,7 @@ var SettingsNodes = (function () {
 
       var netSpan = doc.createElement("span");
       netSpan.className = "node-network";
-      netSpan.textContent = networkLabel(t, listNetwork(url), null);
+      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
       card.appendChild(netSpan);
 
       var geoSpan = doc.createElement("span");
@@ -884,7 +884,7 @@ var SettingsNodes = (function () {
       try { pend = String(t("settings.pending", "…")); } catch (e) { pend = "…"; }
       var conn = "";
       try { conn = String(t("settings.connecting", "connecting")); } catch (e) { conn = "connecting"; }
-      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, geo: pend, prov: pend }, "connecting");
+      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, network: networkLabel(t, listNetwork(url), seenChain[url] || null), geo: pend, prov: pend }, "connecting");
       Chain.probe(url, 6000).then(function (r) {
         var cid = "";
         try { cid = (r && typeof r.chainId === "string") ? r.chainId : ""; } catch (cidErr) { cid = ""; }
@@ -908,8 +908,9 @@ var SettingsNodes = (function () {
           setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4, network: networkLabel(t, dispNet, cid) }, "down",
             detailText(r, prefix, "wrong chain for this network"),
             { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: "bad", network: networkHealth(dispNet, cid) });
-          /* History truth is recorded even for mismatches (the probe found
-           * it) — the row is unselectable anyway, the pill stays honest. */
+           /* History truth is recorded even for mismatches (the probe found
+            * it) — the row stays selectable and App.connect()'s chain-id
+            * pin is the guard; the pill stays honest. */
           try {
             if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
               HistoryCap.update(url, r.hasHistory === true);
@@ -1001,7 +1002,7 @@ var SettingsNodes = (function () {
       return Promise.resolve((net === "mainnet" || net === "testnet") ? net !== prev : false);
     }
     try {
-      var known = listNetwork(url) || netFromChain(seenChain[url] || "");
+      var known = netFromChain(seenChain[url] || "") || listNetwork(url);
       if (known) return apply(known);
       if (typeof Chain !== "undefined" && Chain && typeof Chain.probe === "function") {
         return Chain.probe(url, 6000).then(function (r) {

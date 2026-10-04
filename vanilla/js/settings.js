@@ -1,6 +1,6 @@
 /* SettingsPage: #/settings route orchestration (node list + preferences).
  * Owns: NOTHING built here — render() composes the SettingsNodes (node
- *   table/cards/probe/custom) and SettingsPrefs (network/theme/locale)
+ *   table/cards/probe/custom) and SettingsPrefs (theme/locale)
  *   sections, then wires every event handler. The wiring bodies are verbatim
  *   from the pre-split render; only the DOM construction moved out.
  * Consumes: Store.loadSettings/saveSettings (settings envelope), Chain

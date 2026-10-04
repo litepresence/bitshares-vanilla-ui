@@ -6,14 +6,13 @@
  *   the locale names/current tag only, never written — I18n.setLocale owns
  *   the pref write). There is no reset section: the old UI's reset tab was
  *   never ported, so nothing was moved for it and nothing is added here.
- * Consumes: Store.DEFAULT_NODES (first-node fallback is owned by the
- *   settings.js switch handler, not here), I18n.names/locale (display only),
+ * Consumes: I18n.names/locale (display only),
  *   document elements callers pass in.
  * Globals/side effects: DOM nodes it returns (appended by the caller under
  *   the router root); global SettingsPrefs only. No storage writes here.
  * Created by: building-vanilla-slices skill, slice-18 audit (settings split).
  *   Bodies moved verbatim from js/settings.js render; closure variables
- *   became params, the network/theme/locale change handlers stayed in
+ *   became params, the theme/locale change handlers stayed in
  *   settings.js (they rerender the page, which only the orchestrator owns).
  */
 var SettingsPrefs = (function () {

@@ -47,8 +47,10 @@ that owns switching has nothing to keep in sync.
 - Row tap sets BOTH `activeNode` and `network`: from the list for
   defaults, from the observed chain-id for probed customs.
 - Never-probed custom selected: probe it first (one `Chain.probe`, the tap
-  is user consent), apply node + network on success; on failure, honest
-  error, no switch, selection unchanged.
+  is user consent), apply node + network on success; on failure, apply
+  node-only (network unchanged) and let the existing `App.connect()`
+  chain-id pin verify — a wrong chain disconnects with the footer mismatch
+  message, a dead node surfaces via the footer/offline panel.
 - The existing chain-id pin in `App.connect()` stays as the backstop and
   should now almost never fire.
 - Footer (`MAINNET -`/`TESTNET -` prefix) and reconnect already follow
