@@ -69,7 +69,6 @@ var BarterUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text; return n;
   }
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearBox(b) { while (b.firstChild) b.removeChild(b.firstChild); }
   function showError(doc, wrap, e, fallback) {
     var m = (e && e.message) ? e.message : String(e || fallback || t("barter.unexpected_error", "Unexpected error"));
@@ -154,7 +153,7 @@ var BarterUI = (function () {
       wrap.appendChild(bastat);
       var barow = el(doc, "div", null, "pools-offline-row");
       wrap.appendChild(barow);
-      var retry = touchable(el(doc, "button", t("barter.retry", "Retry"))); retry.type = "button";
+      var retry = touchable(el(doc, "button", t("barter.retry", "Retry"))); retry.type = "button"; retry.classList.add("btn-ghost");
       barow.appendChild(retry);
       var baoff = null;
       try { baoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { baoff = null; }
@@ -172,6 +171,7 @@ var BarterUI = (function () {
         balink = el(doc, "a", t("notice.open_settings", "Open Settings"));
         try { balink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
         touchable(balink);
+        balink.classList.add("subtle-btn");
       }
       barow.appendChild(balink);
       autoRetryOnOpen(myGen, barender, function () { return myGen === gen; });
@@ -189,7 +189,7 @@ var BarterUI = (function () {
     wrap.appendChild(el(doc, "h2", t("barter.a_gives", "A gives")));
     var boxA = el(doc, "div"); wrap.appendChild(boxA);
     var legsA = [legRow(doc, boxA)];
-    var addA = touchable(el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; wrap.appendChild(addA);
+    var addA = touchable(el(doc, "button", t("barter.add_asset_row_a", "Add asset row (A)"))); addA.type = "button"; addA.classList.add("subtle-btn"); wrap.appendChild(addA);
     addA.addEventListener("click", function () { legsA.push(legRow(doc, boxA)); });
     var fB = field(doc, t("barter.peer_b_account", "Peer B account"), lockedBar
       ? { placeholder: t("barter.name_or_1_2_n", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
@@ -198,7 +198,7 @@ var BarterUI = (function () {
     wrap.appendChild(el(doc, "h2", t("barter.b_gives", "B gives")));
     var boxB = el(doc, "div"); wrap.appendChild(boxB);
     var legsB = [legRow(doc, boxB)];
-    var addB = touchable(el(doc, "button", t("barter.add_asset_row_b", "Add asset row (B)"))); addB.type = "button"; wrap.appendChild(addB);
+    var addB = touchable(el(doc, "button", t("barter.add_asset_row_b", "Add asset row (B)"))); addB.type = "button"; addB.classList.add("subtle-btn"); wrap.appendChild(addB);
     addB.addEventListener("click", function () { legsB.push(legRow(doc, boxB)); });
     /* MED escrow toggle (#1 Barter.jsx:75 showEscrow=false default,
      * :1159-1179 add/remove button): escrow hidden until added. WHY a toggle:
@@ -207,7 +207,7 @@ var BarterUI = (function () {
      * makes that explicit instead of an always-visible field implying
      * broadcast. Batch-3 i18n: literals below keyed via t(). */
     var escState = { on: false };
-    var escrowBtn = touchable(el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button";
+    var escrowBtn = touchable(el(doc, "button", t("barter.add_escrow", "Add escrow"))); escrowBtn.type = "button"; escrowBtn.classList.add("btn-ghost");
     wrap.appendChild(escrowBtn);
     var escBox = el(doc, "div"); escBox.style.display = "none"; wrap.appendChild(escBox);
     var fEsc = field(doc, t("barter.escrow_account_optional", "Escrow account (optional)"), { placeholder: t("barter.blank_none", "blank = none") });
@@ -347,7 +347,7 @@ var BarterUI = (function () {
         " " + it.symbol + " → " + prev.A.acct.name, ""));
     });
     if (prev.esc) out.appendChild(el(doc, "p", "Escrow " + prev.esc.name + " is preview-only — the proposed ops carry the two sides' transfers.", "muted"));
-    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button";
+    var back = touchable(el(doc, "button", t("barter.back", "Back"))); back.type = "button"; back.classList.add("btn-ghost");
     var send = touchable(el(doc, "button", t("barter.sign_send", "Sign & Send"))); send.type = "button";
     out.appendChild(back); out.appendChild(send);
     back.addEventListener("click", function () { clearBox(out); });

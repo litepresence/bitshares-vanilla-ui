@@ -11,7 +11,8 @@
  *   removed on end) plus one session-long body observer (+ a hashchange hook for
  *   dismissed profiles) that keeps the dashboard replay button injected
  *   across async fills and hash-only navigations — both idempotent and
- *   never removed, by design. Missing targets skip forward honestly, never throw.
+ *   never removed, by design. Missing targets render centered with their
+ *   CTA (issue #1: never skip — no single route holds every target), never throw.
  * Created by: marketing directive, first-run guided tour task. */
 var TourUI = (function () {
   "use strict";
@@ -94,22 +95,30 @@ var TourUI = (function () {
     return "BTS_CNY";
   }
 
-  /* Step table: target = dashboard/desk selectors (first live match wins);
-   * centerOk steps render a centered card when the target is absent (welcome
-   * + finale are route-agnostic); other steps skip forward honestly. */
+  /* Step table: target = dashboard/desk selectors (first live match wins).
+   * Every step is centerOk: a missing target renders a centered card with
+   * its CTA/links (issue #1 — the old skip-forward loop jumped Next/dots
+   * to the finale because no single route holds .mkt-strip + .mkt-charts +
+   * .mkt-buy together, and boot can fire before the strip paints). Dots
+   * and Next always land on the requested step; the hashchange + #view
+   * observers upgrade the centered card to a highlight once its target
+   * materializes or the user follows the CTA. */
   function steps() {
+    var deskHash = "#/market/" + defaultMarketId();
     return [
       { targets: [".dashboard-gate", "#view .wrap"], centerOk: true,
         title: ["tour.s1_title", "Welcome to BitShares Vanilla"],
         body: ["tour.s1_body", "A plain HTML, JavaScript, and CSS wallet for the BitShares chain. Look around and play: every page reads public chain data with no login. Your password is asked only when you sign."] },
-      { targets: [".mkt-strip"], centerOk: false,
-        cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: "#/market/" + defaultMarketId() },
+      { targets: [".mkt-strip"], centerOk: true,
+        cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
         title: ["tour.s2_title", "Pick a market"],
         body: ["tour.s2_body", "This strip lists starred and featured markets with live prices. Choose any chip to open that trading desk."] },
-      { targets: [".mkt-charts"], centerOk: false,
+      { targets: [".mkt-charts"], centerOk: true,
+        cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
         title: ["tour.s3_title", "Desk plots"],
         body: ["tour.s3_body", "Price candles, volume, and depth plus the indicators menu: overlays like SMA and EMA, oscillators like RSI, MACD, and Stochastic."] },
-      { targets: [".mkt-buy"], centerOk: false,
+      { targets: [".mkt-buy"], centerOk: true,
+        cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
         title: ["tour.s4_title", "Practice quoting"],
         body: ["tour.s4_body", "The Buy and Sell panels accept any numbers for practice. Nothing leaves your machine until you review and sign with an unlocked wallet."] },
       { targets: [], centerOk: true,
@@ -134,14 +143,28 @@ var TourUI = (function () {
    * the current step's target situation actually changed. Params: step
    * (current step def), found (live target or null), shown (highlighted
    * node or null), hasCard (a card is already showing). A newly
-   * materialized target re-renders (highlight upgrades); a target-required
-   * step whose target vanished re-resolves (skips forward honestly);
-   * everything else — including every routine async fill — skips, so no
-   * rebuild and no scroll hijack. Unit-tested with sentinel objects. */
+   * materialized target re-renders (highlight upgrades); a vanished target
+   * re-renders too (highlight drops to a centered card — issue #1: staying
+   * on the stale node strands the card after route changes); a centered
+   * card with no target change skips, so no rebuild and no scroll hijack.
+   * Unit-tested with sentinel objects. */
   function needsRerender(step, found, shown, hasCard) {
     if (found) return found !== shown;
+    if (shown) return true;
     if (step && step.centerOk) return !hasCard;
     return true;
+  }
+
+  /* Pure step-index resolver: every dot/Next/Back lands on exactly the
+   * requested step (issue #1 — no skip-forward). Params: i (requested),
+   * total (step count). Returns the clamped index, or total meaning
+   * past-the-end (caller finishes). Unit-tested. */
+  function resolveIndex(i, total) {
+    if (typeof total !== "number" || !(total > 0)) return 0;
+    if (typeof i !== "number" || isNaN(i)) return 0;
+    if (i < 0) return 0;
+    if (i >= total) return total;
+    return Math.floor(i);
   }
 
   /* First live target for a step, or null. Never throws. */
@@ -249,7 +272,7 @@ var TourUI = (function () {
     body.textContent = t(step.body[0], step.body[1]);
     box.appendChild(body);
     if (step.cta) {
-      var cta = doc.createElement("a");
+      var cta = touchable(doc.createElement("a"));
       cta.className = "tour-cta";
       cta.setAttribute("href", step.cta.hash);
       cta.textContent = t(step.cta.label[0], step.cta.label[1]);
@@ -259,10 +282,10 @@ var TourUI = (function () {
       var row0 = doc.createElement("div");
       row0.className = "tour-links";
       step.links.forEach(function (triple) {
-        var a = doc.createElement("a");
+        var a = touchable(doc.createElement("a"));
         a.setAttribute("href", triple[0]);
         a.textContent = t(triple[1], triple[2]);
-        try { a.style.minHeight = "44px"; a.style.lineHeight = "44px"; } catch (e) { /* native stands */ }
+        a.classList.add("subtle-btn");
         row0.appendChild(a);
       });
       box.appendChild(row0);
@@ -271,22 +294,25 @@ var TourUI = (function () {
     row.className = "tour-row";
     var last = (i === total - 1);
     if (i > 0) {
-      var back = doc.createElement("button");
+      var back = touchable(doc.createElement("button"));
       back.type = "button";
       back.textContent = t("tour.back", "Back");
+      back.classList.add("subtle-btn");
       back.addEventListener("click", function () { showStep(i - 1); });
       row.appendChild(back);
     }
-    var next = doc.createElement("button");
+    var next = touchable(doc.createElement("button"));
     next.type = "button";
     next.id = "tour-next";
     next.textContent = last ? t("tour.done", "Done") : t("tour.next", "Next");
+    next.classList.add("subtle-btn");
     next.addEventListener("click", function () { showStep(i + 1); });
     row.appendChild(next);
-    var skip = doc.createElement("button");
+    var skip = touchable(doc.createElement("button"));
     skip.type = "button";
     skip.id = "tour-skip";
     skip.textContent = t("tour.skip", "Skip");
+    skip.classList.add("subtle-btn");
     skip.addEventListener("click", function () { end(); });
     row.appendChild(skip);
     var dots = doc.createElement("div");
@@ -294,9 +320,9 @@ var TourUI = (function () {
     dots.setAttribute("role", "group");
     for (var d = 0; d < total; d++) {
       (function (n) {
-        var dot = doc.createElement("button");
+        var dot = touchable(doc.createElement("button"));
         dot.type = "button";
-        dot.className = "tour-dot";
+        dot.className = "tour-dot subtle-btn";
         dot.setAttribute("aria-label", t("tour.step_of", "Step %(current)s of %(total)s", { current: String(n + 1), total: String(total) }));
         if (n === i) dot.setAttribute("aria-current", "step");
         dot.addEventListener("click", function () { showStep(n); });
@@ -332,23 +358,17 @@ var TourUI = (function () {
     } catch (e) { /* focus stays */ }
   }
 
-  /* Shows step i, skipping route-specific steps whose target is absent.
+  /* Shows step i (dots/Next/Back land exactly — issue #1: never skips).
+   * A missing target renders centered with its CTA/links; the hashchange
+   * + #view observers upgrade it to a highlight once the target appears.
    * Past-the-end finishes (persisted). Never throws. */
   function showStep(i) {
     if (!active || typeof document === "undefined") return;
     var list = steps();
-    var n = i;
-    if (n < 0) n = 0;
-    while (n < list.length) {
-      var tgt = findTarget(list[n]);
-      if (tgt || list[n].centerOk) {
-        stepIdx = n;
-        renderCard(n, list, tgt);
-        return;
-      }
-      n++;
-    }
-    end();
+    var n = resolveIndex(i, list.length);
+    if (n >= list.length) { end(); return; }
+    stepIdx = n;
+    renderCard(n, list, findTarget(list[n]));
   }
 
   /* Removes overlay, highlight, and listeners; persists dismissal.
@@ -390,7 +410,8 @@ var TourUI = (function () {
   }
 
   /* Route change while touring: re-resolve the current step after the router
-   * repaints (missing targets skip forward honestly). Never throws. */
+   * repaints (centered card upgrades to a highlight when its target
+   * appears). Never throws. */
   function onHash() {
     if (!active) return;
     try {
@@ -454,12 +475,11 @@ var TourUI = (function () {
       if (hash && hash !== "#/" && hash !== "#") return;
       if (document.getElementById("tour-replay")) return;
       var host = document.querySelector(".dashboard-gate-row");
-      var btn = document.createElement("button");
+      var btn = touchable(document.createElement("button"));
       btn.type = "button";
       btn.id = "tour-replay";
       btn.className = "btn btn-ghost";
       btn.textContent = t("tour.take_tour", "Take tour");
-      try { btn.style.minHeight = "44px"; } catch (e) { /* native stands */ }
       btn.addEventListener("click", function () { start(true); });
       if (host) {
         host.appendChild(btn);
@@ -581,7 +601,7 @@ var TourUI = (function () {
 
   if (typeof document !== "undefined") boot();
 
-  return { start: start, dismissed: dismissed, _test: { scrollChanged: scrollChanged, needsRerender: needsRerender } };
+  return { start: start, dismissed: dismissed, _test: { scrollChanged: scrollChanged, needsRerender: needsRerender, resolveIndex: resolveIndex } };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.TourUI === "undefined") { globalThis.TourUI = TourUI; }

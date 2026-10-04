@@ -31,8 +31,6 @@ var AccountsUI = (function () {
     if (cls) n.className = cls;
     if (text !== undefined && text !== null) n.textContent = text;
     return n; }
-  /* Touch floor (#7): interactive elements >= 44px one dimension. */
-  function touchable(n) { n.style.minHeight = "44px"; return n; }
   function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   function makeWrap(doc, root) {
     var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
@@ -108,6 +106,7 @@ var AccountsUI = (function () {
         failWrap.appendChild(acrow);
         var acretry = touchable(el(doc, "button", t("fees.retry", "Retry")));
         acretry.type = "button";
+        acretry.classList.add("btn-ghost");
         acrow.appendChild(acretry);
         var acoff = null;
         try { acoff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { acoff = null; }
@@ -124,6 +123,7 @@ var AccountsUI = (function () {
           aclink = el(doc, "a", t("notice.open_settings", "Open Settings"));
           try { aclink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
           touchable(aclink);
+          aclink.classList.add("subtle-btn");
         }
         acrow.appendChild(aclink);
       }, 15000);
@@ -151,7 +151,7 @@ var AccountsUI = (function () {
        * otherwise a dead end for browsing). Button scrolls to + focuses the
        * lookup input — no hash change, so the router never fires. */
       var crossBtn = touchable(el(doc, "button", t("account.lookup_title", "Look up an account")));
-      crossBtn.type = "button"; wrap.appendChild(crossBtn);
+      crossBtn.type = "button"; crossBtn.classList.add("subtle-btn"); wrap.appendChild(crossBtn);
       crossBtn.addEventListener("click", function () {
         var box = doc.getElementById("accts-lookup");
         if (box) {
@@ -170,14 +170,14 @@ var AccountsUI = (function () {
        * Plain literals only, existing routes only. */
       (function gateRow() {
         var p = el(doc, "p", null, "muted");
-        var c = doc.createElement("a");
+        var c = touchable(el(doc, "a", t("account.gate_create_account", "Create account")));
         c.href = "#/create-account";
-        c.textContent = t("account.gate_create_account", "Create account");
+        c.classList.add("subtle-btn");
         p.appendChild(c);
         p.appendChild(doc.createTextNode(" · "));
-        var l = doc.createElement("a");
+        var l = touchable(el(doc, "a", t("account.gate_login", "Login")));
         l.href = "#/login";
-        l.textContent = t("account.gate_login", "Login");
+        l.classList.add("subtle-btn");
         p.appendChild(l);
         wrap.appendChild(p);
       })();
@@ -223,7 +223,7 @@ var AccountsUI = (function () {
      * via ViewingAs.clear. Same field error slot (no new strings, no new
      * route). ViewingAs missing -> network_error (feature unavailable). */
     var viewBtn = touchable(el(doc, "button", t("viewing.dialog_open", "View as this account")));
-    viewBtn.type = "button"; wrap.appendChild(viewBtn);
+    viewBtn.type = "button"; viewBtn.classList.add("btn-ghost"); wrap.appendChild(viewBtn);
     viewBtn.addEventListener("click", function () {
       var name = nameF.input.value.trim().toLowerCase();
       if (!name) { setFieldError(nameF, t("account.enter_name", "Enter an account name.")); return; }
@@ -243,7 +243,7 @@ var AccountsUI = (function () {
     });
     var resetLine = el(doc, "p", null, "muted");
     var resetBtn = touchable(el(doc, "button", t("viewing.dialog_reset", "Reset to committee-account")));
-    resetBtn.type = "button"; resetLine.appendChild(resetBtn);
+    resetBtn.type = "button"; resetBtn.classList.add("btn-ghost"); resetLine.appendChild(resetBtn);
     wrap.appendChild(resetLine);
     resetBtn.addEventListener("click", function () {
       setFieldError(nameF, "");
@@ -262,16 +262,14 @@ var AccountsUI = (function () {
      * Both targets exist — batch-3-keyed, no new routes. */
     (function restoreLinks() {
       var p = el(doc, "p", null, "muted");
-      var a = doc.createElement("a");
+      var a = touchable(el(doc, "a", t("account.restore_your_account", "Restore your account")));
       a.href = "#/existing-account";
-      a.textContent = t("account.restore_your_account", "Restore your account");
-      touchable(a);
+      a.classList.add("subtle-btn");
       p.appendChild(a);
       p.appendChild(doc.createTextNode(" · "));
-      var b = doc.createElement("a");
+      var b = touchable(el(doc, "a", t("account.advanced_form", "Advanced form")));
       b.href = "#/create-account";
-      b.textContent = t("account.advanced_form", "Advanced form");
-      touchable(b);
+      b.classList.add("subtle-btn");
       p.appendChild(b);
       wrap.appendChild(p);
     })();

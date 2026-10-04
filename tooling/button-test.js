@@ -49,3 +49,20 @@ has(".subtle-btn");
 has(".touchable { min-height: 44px; min-width: 44px; }");
 
 console.log("CSS variant shape: 7 passed, 0 failed");
+
+// ===== Migration smoke test (Task 3) =====
+var files = [
+  "vanilla/js/api/explorer-tabs.js",
+  "vanilla/js/api/market-book.js",
+  "vanilla/js/builders/trade-cancel.js",
+  "vanilla/js/builders/transfer-confirm.js",
+  "vanilla/js/views/accounts-ui.js",
+  "vanilla/js/views/barter-ui.js",
+  "vanilla/js/views/tour-ui.js"
+];
+files.forEach(function(f) {
+  var code = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
+  assert.ok(!code.includes("function touchable"), f + " still has local touchable");
+  assert.ok(code.includes("touchable("), f + " uses touchable but may not have migrated");
+});
+console.log("Migration smoke: " + files.length + " files clean");

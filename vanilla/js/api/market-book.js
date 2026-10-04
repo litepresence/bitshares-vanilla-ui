@@ -48,12 +48,6 @@ var MarketBook = (function () {
     return n;
   }
 
-  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
   /* Click-to-fill (desk parity with #1 order-book click): set the price
    * input of BOTH trade panels (per-side ids trade-price-buy /
    * trade-price-sell, legacy bare trade-price as fallback) and fire input
@@ -369,6 +363,7 @@ var MarketBook = (function () {
     var s = doc.createElement("summary");
     s.setAttribute("aria-label", label || t("market.raw_fallback", "Show raw JSON"));
     touchable(s);
+    s.classList.add("subtle-btn");
     d.appendChild(s);
     var pre = doc.createElement("pre");
     try {

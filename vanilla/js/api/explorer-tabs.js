@@ -44,10 +44,6 @@ var ExplorerTabs = (function () {
     if (text !== undefined && text !== null) n.textContent = text;
     return n;
   }
-  function touchable(n) {
-    try { n.style.minHeight = "44px"; } catch (e) { /* native stands */ }
-    return n;
-  }
   function link(doc, href, text) {
     var a = doc.createElement("a");
     a.setAttribute("href", href);
@@ -122,6 +118,7 @@ var ExplorerTabs = (function () {
     input.setAttribute("placeholder", t("explorer.accounts_prefix_ph", "Account name prefix…"));
     input.setAttribute("aria-label", t("explorer.accounts_search_aria", "Search accounts by name prefix"));
     touchable(input);
+    input.classList.add("subtle-btn");
     form.appendChild(input);
     var go = touchable(el(doc, "button", "Search"));
     go.type = "submit";
@@ -376,12 +373,14 @@ var ExplorerTabs = (function () {
         filter.setAttribute("placeholder", /** @type {any} */ (t)("explorer.markets_filter_ph", "Filter markets…"));
         filter.setAttribute("aria-label", /** @type {any} */ (t)("explorer.markets_filter_ph", "Filter markets…"));
         touchable(filter);
+        filter.classList.add("subtle-btn");
         ctl.appendChild(filter);
         var sortLab = el(doc, "span", /** @type {any} */ (t)("explorer.markets_sort_label", "Sort") + " ");
         ctl.appendChild(sortLab);
         var sortSel = doc.createElement("select");
         sortSel.setAttribute("aria-label", /** @type {any} */ (t)("explorer.markets_sort_label", "Sort"));
         touchable(sortSel);
+        sortSel.classList.add("subtle-btn");
         [["vol_desc", "explorer.markets_sort_vol_desc", "Volume ↓"],
          ["vol_asc", "explorer.markets_sort_vol_asc", "Volume ↑"],
          ["price_desc", "explorer.markets_sort_price_desc", "Price ↓"],

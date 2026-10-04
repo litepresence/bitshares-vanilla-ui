@@ -51,12 +51,6 @@ var TradeCancel = (function () {
     return n;
   }
 
-  /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
   function clearBox(box) {
     while (box.firstChild) box.removeChild(box.firstChild);
   }
@@ -192,6 +186,7 @@ var TradeCancel = (function () {
     });
     var back = touchable(el(doc, "button", spec.backLabel || t("trade.back", "Back")));
     back.type = "button";
+    back.classList.add("btn-ghost");
     back.addEventListener("click", spec.onBack);
     mount.appendChild(back);
   }
@@ -225,6 +220,7 @@ var TradeCancel = (function () {
       t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted"));
     var backBtn = touchable(el(doc, "button", t("trade.keep_order", "Keep order")));
     backBtn.type = "button";
+    backBtn.classList.add("btn-ghost");
     box.appendChild(backBtn);
     var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel", "Confirm cancel")));
     goBtn.type = "button";
@@ -284,6 +280,7 @@ var TradeCancel = (function () {
             "Cancel fee: " + humanFee(out.R.feeRaw, out.R.meta) + ".", "muted"));
           var done = touchable(el(doc, "button", t("trade.back_orders", "Back to orders")));
           done.type = "button";
+          done.classList.add("btn-ghost");
           done.addEventListener("click", function () { clearBox(box); onDone(); });
           box.appendChild(done);
         }).catch(function (e) {
@@ -341,6 +338,7 @@ var TradeCancel = (function () {
         ". Warning: canceling permanently removes these orders from the book.", "muted"));
       var backBtn = touchable(el(doc, "button", t("trade.keep_orders", "Keep orders")));
       backBtn.type = "button";
+      backBtn.classList.add("btn-ghost");
       box.appendChild(backBtn);
       var goBtn = touchable(el(doc, "button", t("trade.confirm_cancel_all", "Confirm cancel-all")));
       goBtn.type = "button";
@@ -399,6 +397,7 @@ var TradeCancel = (function () {
           box.appendChild(ok);
           var done = touchable(el(doc, "button", t("trade.back_orders", "Back to orders")));
           done.type = "button";
+          done.classList.add("btn-ghost");
           done.addEventListener("click", function () { clearBox(box); onDone(); });
           box.appendChild(done);
         }).catch(function (e) {

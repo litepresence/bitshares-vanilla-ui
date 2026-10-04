@@ -119,6 +119,10 @@ declare var VoteUI: any;
 declare var ViewingAs: any;
 declare var Wallet: any;
 declare var WalletUI: any;
+declare var touchable: <T extends HTMLElement>(el: T) => T;
+interface Window {
+  touchable: <T extends HTMLElement>(el: T) => T;
+}
 declare var BRAINKEY_DICT: any;
 declare var nobleGetPublicKey: any;
 declare var nobleSignAsync: any;

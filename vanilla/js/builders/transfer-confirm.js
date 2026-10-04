@@ -75,13 +75,6 @@ var TransferConfirm = (function () {
     return n;
   }
 
-  /* Touch target floor (principle #7): every interactive element is ≥44px
-   * in at least one dimension. Inline style keeps this view self-contained. */
-  function touchable(n) {
-    n.style.minHeight = "44px";
-    return n;
-  }
-
   function clearRoot(root) {
     while (root.firstChild) root.removeChild(root.firstChild);
   }
@@ -360,6 +353,7 @@ var TransferConfirm = (function () {
     var backBtn = touchable(el(doc, "button", t("confirm.back", "Back")));
     backBtn.id = "xfer-back";
     backBtn.type = "button";
+    backBtn.classList.add("btn-ghost");
     wrap.appendChild(backBtn);
     var sendBtn = touchable(el(doc, "button", t("confirm.sign_send", "Sign & Send")));
     sendBtn.id = "xfer-send";
@@ -504,6 +498,7 @@ var TransferConfirm = (function () {
     var link = el(doc, "a", t("confirm.view_account", "View account ") + from.name);
     link.setAttribute("href", "#/account/" + from.name);
     touchable(link);
+    link.classList.add("subtle-btn");
     wrap.appendChild(link);
   }
 
