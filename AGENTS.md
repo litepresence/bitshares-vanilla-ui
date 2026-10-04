@@ -832,6 +832,15 @@ Every "done" claim must ALSO pass the §4.5 anti-rot gate questions (a)–(c)
    (coordinating multi-task rounds), `batch-dispatch-parallelism`
    (saturating a dispatch round), `chain-doctor` (references disagree on
    chain behavior), `afk-keep-rolling` (user goes AFK mid-loop).
+9. **Shared utilities — DO NOT RECREATE.** The following utilities exist in `vanilla/js/` and MUST be used instead of writing local copies:
+   - `utils/dom.js` — `DOM.el(doc, tag, text, cls)`, `DOM.clear(root)`, `DOM.text(el, text)`, `DOM.attrs(el, obj)`, `DOM.status(wrap, text)`, `DOM.error(wrap, text)`, `DOM.append(wrap, ...nodes)`
+   - `forms/field.js` — `Forms.fieldRow(doc, labelText, inputEl, opts)`, `Forms.labeledInput(doc, labelText, inputAttrs)`, `Forms.labeledSelect(doc, labelText, options, value)`, `Forms.labeledTextarea(doc, labelText, attrs)`
+   - `ui/confirm.js` — `ConfirmDialog.show({ title, rows, feeHuman, onBack, onSend })`
+   - `ui/overlay.js` — `Overlay.open({ content, onClose, className })`
+   - `ui/table.js` — `TableRenderer.render({ columns, rows, keyExtractor, rowClass, onRowClick, stickyFirstCol })`
+   - `utils/dom.js` also provides `touchable(el)` — ensures 44×44px touch floor
+   - `utils/event.js` — `Event.delegate(parent, selector, eventType, handler)`
+   Any view or builder needing these patterns MUST import from the shared module (via global `DOM`, `Forms`, `ConfirmDialog`, `Overlay`, `TableRenderer`, `Event` — loaded via script tags in `index.html`). Writing local `function el()`, `clearRoot()`, `showStatus()`, `confirmList()`, `fieldRow()`, or `touchable()` is forbidden — it creates duplication and rot.
 
 ---
 
