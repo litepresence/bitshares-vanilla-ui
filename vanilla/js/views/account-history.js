@@ -369,7 +369,7 @@ AccountUI._history = AccountUI._history || {};
       var n = opTypeOf(row);
       var head = doc.createElement("div");
       head.textContent = timeText(row) + " — " +
-        (n === null ? t("account.unknown_operation", "Unknown operation") : opLabel(n));
+        (row._summary || (n === null ? t("account.unknown_operation", "Unknown operation") : opLabel(n)));
       li.appendChild(head);
       var details = doc.createElement("details");
       details.className = "raw";

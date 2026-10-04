@@ -1331,8 +1331,13 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       }
       Promise.resolve(p).then(function (rows) {
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
-        histRowsCache = Array.isArray(rows) ? rows : [];
-        AccountUI._history.renderHistory(doc, histBody, rows);
+        Promise.resolve(rows).then(function (r2) {
+          if (typeof HistorySummary !== "undefined" && HistorySummary && typeof HistorySummary.enrich === "function") return HistorySummary.enrich(r2, acct.id);
+          return r2;
+        }).then(function (r3) {
+          histRowsCache = Array.isArray(r3) ? r3 : [];
+          AccountUI._history.renderHistory(doc, histBody, r3);
+        });
         /* Slice-16 (F1b): pulled history watcher on the existing fetch.
          * First-entry diff per plan; a notify fault never breaks history. */
         if (mode === "all") {
