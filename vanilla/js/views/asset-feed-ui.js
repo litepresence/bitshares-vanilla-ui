@@ -124,7 +124,8 @@ var AssetFeedUI = (function () {
       if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned.") + t("asset.schedule_hint", " The node sent an empty schedule — retry or check Settings → Nodes."), "muted")); return; }
       var sc = el(d, "div", null, "xplore-scroll"); sc.style.overflowX = "auto";
       var tb = d.createElement("table"), th = d.createElement("thead"), hr = d.createElement("tr");
-      [t("asset.op_col", "Op"),  "Fee"].forEach(function (h) { hr.appendChild(el(d, "th", h)); });
+      tb.setAttribute("aria-label", t("fees.network_fees", "Network fees"));
+      [t("asset.op_col", "Op"),  "Fee"].forEach(function (h) { var thc = el(d, "th", h); thc.setAttribute("scope", "col"); hr.appendChild(thc); });
       th.appendChild(hr); tb.appendChild(th);
       var tb2 = d.createElement("tbody");
       s.fees.forEach(function (f) {

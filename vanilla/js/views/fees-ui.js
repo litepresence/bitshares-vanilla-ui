@@ -171,11 +171,14 @@ var FeesUI = (function () {
    * ltmReq (id->true set). Returns missing-op count. */
   function groupTable(doc, box, gname, ids, byId, s, ltmReq) {
     var prec = s.fee_asset_precision, scale = s.scale, netPct = s.network_percent_of_fee;
-    box.appendChild(DOM.el(doc, "h2", GROUP_NAMES[gname] || gname));
+    var gLabel = GROUP_NAMES[gname] || gname;
+    box.appendChild(DOM.el(doc, "h2", gLabel));
     var sc = DOM.el(doc, "div", null, null); sc.style.overflowX = "auto";
     var tb = doc.createElement("table"), thead = doc.createElement("thead"), hr = doc.createElement("tr");
+    tb.setAttribute("aria-label", gLabel);
     ["#", "Operation", "Type", "Standard fee", "LTM fee"].forEach(function (h, hi) {
       var th = DOM.el(doc, "th", h);
+      th.setAttribute("scope", "col");
       if (hi >= 3) th.style.textAlign = "right";
       hr.appendChild(th);
     });

@@ -317,9 +317,10 @@ var ExplorerAssets = (function () {
     scroller.style.overflowX = "auto";
     var table = doc.createElement("table");
     table.className = "node-table";
+    table.setAttribute("aria-label", headers.join(", "));
     var thead = doc.createElement("thead");
     var hr = doc.createElement("tr");
-    headers.forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
+    headers.forEach(function (h) { var th = DOM.el(doc, "th", h); th.setAttribute("scope", "col"); hr.appendChild(th); });
     thead.appendChild(hr);
     table.appendChild(thead);
     var tb = doc.createElement("tbody");
