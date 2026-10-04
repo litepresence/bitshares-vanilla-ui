@@ -711,3 +711,149 @@ git commit -m "Footer build-info + network prefix wiring (gates green, manual ma
 **2. Placeholder scan:** no TBD/TODO; all code blocks complete; exact commands with expected outputs; no "similar to" references (geo-script pattern is described but every line is spelled out).
 
 **3. Type consistency:** `parseBuildInfo`/`parseCompare` JSDoc shapes match test `deepStrictEqual` targets and wiring consumers (`buildInfo.repo/.branch/.commit/.short`, `buildCmp.ahead/.behind/.offbranch`); `relationText`/`netHostText`/`currentNetwork` signatures identical in test, implementation, and call sites; `paintVersion()` zero-param change is call-compatible with the existing `paintVersion(status)` call site.
+
+---
+
+### Task 5: Generation-time ahead count for 404 builds (amendment 2026-10-04)
+
+**Rationale:** compare 404s SHAs GitHub never saw (unpushed builds), so live N is uncomputable there — but the generator knows `origin/master..HEAD` exactly. Record it + reuse the build date, render only in the 404 branch, timestamped so it never poses as live.
+
+**Files:**
+- Modify: `tooling/generate_version.py` (ahead count + docstring)
+- Modify: `vanilla/js/app.js` (`parseBuildInfo` shape + `offbranchText` + `paintVersion` 404 branch + `_test` export)
+- Modify: `tooling/footer-build-test.js` (update 1 vector, add 9 vectors + export entry)
+- Modify: `tooling/add_footer_build_i18n.py` (docstring count + 2 new STEPS)
+- Modify: `vanilla/locales/*.json` (12 files, via re-run — existing STEPS skip cleanly on done-markers)
+- Generate (untracked, never committed): `vanilla/version.json`
+
+**Interfaces:**
+- Consumes: Tasks 1/3/4 code (exact anchors below verified 2026-10-04).
+- Produces: `parseBuildInfo` → `{repo, branch, commit, short, generated_at, ahead_of_master}` (`generated_at`: string or `""`; `ahead_of_master`: int ≥ 0 or `null` — field-level fail-open, never whole-record null); `offbranchText(info)` → `{rel, note}` exported via `_test`; new key `shell.footer_at_build` = `"at build %(date)s"` × 12.
+
+- [ ] **Step 1: Generator** — in `tooling/generate_version.py`, docstring line `Writes {repo, branch, commit, short, generated_at} for the footer-left` becomes `Writes {repo, branch, commit, short, ahead_of_master, generated_at} for the footer-left`, and after the `Branch is pinned` docstring lines insert `ahead_of_master counts HEAD vs origin/master at generation (null when origin is unknown); the footer shows it only for 404 builds, labeled with the build date.` Then old:
+
+```python
+    info = {"repo": repo, "branch": branch or "master", "commit": commit.lower(),
+            "short": commit.lower()[:7],
+            "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+```
+
+New:
+
+```python
+    try:
+        ahead = int(sh(["git", "rev-list", "--count", "origin/master..HEAD"], top))
+        if ahead < 0:
+            ahead = None
+    except (subprocess.CalledProcessError, OSError, ValueError):
+        ahead = None
+    info = {"repo": repo, "branch": branch or "master", "commit": commit.lower(),
+            "short": commit.lower()[:7], "ahead_of_master": ahead,
+            "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+```
+
+- [ ] **Step 2: parseBuildInfo shape** — old JSDoc line `   * @returns {{repo: string, branch: string, commit: string, short: string} | null} */` gains the two fields: `   * @returns {{repo: string, branch: string, commit: string, short: string, generated_at: string, ahead_of_master: number | null} | null} */`. Old return `      return { repo: repo, branch: branch, commit: low, short: low.slice(0, 7) };` becomes:
+
+```js
+      var low = commit.toLowerCase();
+      var gen = (typeof json.generated_at === "string") ? json.generated_at : "";
+      var ah = json.ahead_of_master;
+      if (typeof ah !== "number" || !isFinite(ah) || Math.floor(ah) !== ah || ah < 0) ah = null;
+      return { repo: repo, branch: branch, commit: low, short: low.slice(0, 7), generated_at: gen, ahead_of_master: ah };
+```
+
+- [ ] **Step 3: offbranchText** — insert after `    return t("shell.footer_sync", "in sync with");` + `  }` (end of `relationText`):
+
+```js
+
+  /**
+   * Offbranch relation for 404 builds (SHA unknown to GitHub): counted
+   * "N ahead of" from the generation-time git count when known, else the
+   * plain fallback. Caller appends the Master link, then .note in parens.
+   * @param {{ahead_of_master: number | null, generated_at: string}} info parsed build record
+   * @returns {{rel: string, note: string | null}} */
+  function offbranchText(info) {
+    try {
+      var a = info ? info.ahead_of_master : null;
+      if (typeof a === "number" && isFinite(a) && Math.floor(a) === a && a > 0) {
+        var rel = (a === 1) ? t("shell.footer_ahead_one", "1 commit ahead of") : t("shell.footer_ahead", "%(n)s commits ahead of", { n: String(a) });
+        var date = String((info && info.generated_at) || "").slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return { rel: rel, note: t("shell.footer_at_build", "at build %(date)s", { date: date }) };
+        }
+        return { rel: rel, note: null };
+      }
+    } catch (e) { /* fallback below */ }
+    return { rel: t("shell.footer_offbranch", "not on Master"), note: null };
+  }
+```
+
+`_test` export: old substring `currentNetwork: currentNetwork } };` becomes `currentNetwork: currentNetwork, offbranchText: offbranchText } };`.
+
+- [ ] **Step 4: paintVersion 404 branch** — old:
+
+```js
+      if (buildCmp && buildCmp.offbranch) {
+        left.appendChild(doc.createTextNode(t("shell.footer_offbranch", "not on Master") + " "));
+      } else if (buildCmp) {
+        left.appendChild(doc.createTextNode(relationText(buildCmp) + " "));
+      }
+```
+
+New:
+
+```js
+      var cmpRel = null, cmpNote = null;
+      if (buildCmp && buildCmp.offbranch) {
+        var ob = offbranchText(buildInfo);
+        cmpRel = ob.rel; cmpNote = ob.note;
+      } else if (buildCmp) {
+        cmpRel = relationText(buildCmp);
+      }
+      if (cmpRel) left.appendChild(doc.createTextNode(cmpRel + " "));
+```
+
+Old `      a.textContent = "Master";\n      left.appendChild(a);` becomes itself plus `      if (cmpNote) left.appendChild(doc.createTextNode(" (" + cmpNote + ")"));`. Also update the paintVersion comment ladder line `   * Ladder: full relation | offbranch "not on Master" | hash-only |` to `   * Ladder: full relation | offbranch counted/plain | hash-only |`.
+
+- [ ] **Step 5: Test vectors** — in `tooling/footer-build-test.js`: add `"offbranchText"` to the exports `forEach` array; update the valid-build-info `deq` expectation to include `generated_at: "2026-10-04T00:00:00Z", ahead_of_master: null`; append before `console.log`:
+
+```js
+deq(T.parseBuildInfo({ repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: 5 }),
+  { repo: "litepresence/bitshares-vanilla-ui", branch: "master", commit: SHA40, short: "0123456", generated_at: "2026-10-04T00:00:00Z", ahead_of_master: 5 }, "ahead count kept");
+deq(T.parseBuildInfo({ repo: "a/b", branch: "master", commit: SHA40 }),
+  { repo: "a/b", branch: "master", commit: SHA40, short: "0123456", generated_at: "", ahead_of_master: null }, "missing optionals default");
+deq(T.parseBuildInfo({ repo: "a/b", branch: "master", commit: SHA40, ahead_of_master: -2 }),
+  { repo: "a/b", branch: "master", commit: SHA40, short: "0123456", generated_at: "", ahead_of_master: null }, "negative ahead nulled");
+deq(T.offbranchText({ ahead_of_master: 3, generated_at: "2026-10-04T00:00:00Z" }), { rel: "3 commits ahead of", note: "at build 2026-10-04" }, "offbranch counted plural");
+deq(T.offbranchText({ ahead_of_master: 1, generated_at: "2026-10-04T00:00:00Z" }), { rel: "1 commit ahead of", note: "at build 2026-10-04" }, "offbranch counted singular");
+deq(T.offbranchText({ ahead_of_master: 0, generated_at: "2026-10-04T00:00:00Z" }), { rel: "not on Master", note: null }, "offbranch zero falls back");
+deq(T.offbranchText({ ahead_of_master: null, generated_at: "" }), { rel: "not on Master", note: null }, "offbranch null falls back");
+deq(T.offbranchText({ ahead_of_master: 2, generated_at: "garbage" }), { rel: "2 commits ahead of", note: null }, "offbranch bad date drops note");
+deq(T.offbranchText(null), { rel: "not on Master", note: null }, "offbranch null info");
+```
+
+Run: `node tooling/footer-build-test.js` — expect `33 passed, 0 failed` (24 existing with 1 updated + 9 new).
+
+- [ ] **Step 6: at_build locale key** — in `tooling/add_footer_build_i18n.py`: docstring `Adds 11 shell.* keys` → `Adds 12 shell.* keys`, key list gains `footer_at_build`; append two STEPS (existing done-markers make re-run safe):
+
+```python
+    (re.compile(r'^    "footer_ahead_one": "1 commit ahead of",\n', re.MULTILINE),
+     '    "footer_ahead_one": "1 commit ahead of",\n    "footer_at_build": "at build %(date)s",\n',
+     '"footer_at_build"'),
+    (re.compile(r'^      "shell\.footer_ahead_one",\n', re.MULTILINE),
+     '      "shell.footer_ahead_one",\n      "shell.footer_at_build",\n',
+     '"shell.footer_at_build"'),
+```
+
+Run: `python3 tooling/add_footer_build_i18n.py` (expect 12 `updated` + `done`, or `done` only where already applied) then `python3 tooling/check_i18n.py` (exit 0).
+
+- [ ] **Step 7: Regenerate + gates + commit** — run `python3 tooling/generate_version.py`, then `test "$(python3 -c "import json;print(json.load(open('vanilla/version.json'))['commit'])")" = "$(git rev-parse HEAD)" && echo COMMIT-MATCH`, then plausibility `test "$(python3 -c "import json;print(json.load(open('vanilla/version.json'))['ahead_of_master'])")" = "$(git rev-list --count origin/master..HEAD)" && echo AHEAD-MATCH` (if origin exists; if no origin, expect JSON null). Then `node -e "var T=require('./vanilla/js/app.js')._test;var fs=require('fs');var j=JSON.parse(fs.readFileSync('./vanilla/version.json'));console.log(JSON.stringify(T.offbranchText(T.parseBuildInfo(j))))"` — expect the counted relation for this checkout. Then `bash tooling/check_types.sh` (app.js must be clean; repo-wide red from parallel splits is out of scope), `python3 tooling/check_rot.py` (exit 0). Commit ONLY `tooling/generate_version.py vanilla/js/app.js tooling/footer-build-test.js tooling/add_footer_build_i18n.py vanilla/locales/` — NEVER `vanilla/version.json`:
+
+```bash
+git add tooling/generate_version.py vanilla/js/app.js tooling/footer-build-test.js tooling/add_footer_build_i18n.py vanilla/locales/
+git commit -m "Footer build-info Task 5: generation-time ahead count for 404 builds"
+```
+
+## Task 5 Self-Review
+
+**Spec coverage:** spec ladder-2 counted variant (generator count → offbranchText → paintVersion note) + at_build key (§3.9). No gaps. **Placeholders:** none — all code/commands exact. **Type consistency:** record gains `{generated_at: string, ahead_of_master: number | null}` in JSDoc, test deqs, and wiring consumers (`offbranchText` reads both; `writeCmpCache` untouched — offbranch cache needs no count since buildInfo carries it).

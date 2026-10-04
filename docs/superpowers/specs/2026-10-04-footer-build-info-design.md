@@ -34,9 +34,13 @@ only the word "Master" hyperlinked (repo root URL).
 - Degradation ladder (never blank, never false):
   1. version.json + compare 200 → full string
      (identical / ahead / behind / diverged via `ahead_by`/`behind_by`).
-  2. version.json + compare 404 → `{short} · not on Master` (the build's
-     SHA is unknown to GitHub — e.g. local unpushed work. Verified
-     2026-10-04: SHA-as-head works for pushed SHAs, 404s otherwise).
+  2. version.json + compare 404 (build SHA unknown to GitHub — e.g. local
+     unpushed work. Verified 2026-10-04: SHA-as-head works for pushed
+     SHAs, 404s otherwise):
+     - `ahead_of_master > 0` recorded → `{short} · {N ahead of} Master
+       (at build {YYYY-MM-DD})` — the count is generation-time truth,
+       labeled with its date so it can never pose as live.
+     - otherwise (0 / null / bad date) → `{short} · not on Master`.
   3. version.json + API unreachable / offline / rate-limited → hash only,
      no count, no link text change.
   4. No version.json (or `file://` fetch blocked) → leave the static
@@ -46,8 +50,13 @@ only the word "Master" hyperlinked (repo root URL).
 
 1. `tooling/generate_version.py` (new, optional dev tooling) runs
    `git rev-parse HEAD`, records `{repo, branch: "master", commit, short,
-   generated_at}`, writes `vanilla/version.json`. Gitignored. Never
-   required to serve, run, or deploy (doctrine rule 4).
+   ahead_of_master, generated_at}`, writes `vanilla/version.json`.
+   `ahead_of_master` is `git rev-list --count origin/master..HEAD` at
+   generation (int, or null when origin is unknown) — the only source for
+   the ahead count of unpushed builds, since GitHub 404s unknown SHAs.
+   `generated_at` doubles as the "at build" date (ISO, date part shown
+   verbatim). Gitignored. Never required to serve, run, or deploy
+   (doctrine rule 4).
 2. App boot fetches `version.json` same-origin (CSP `connect-src` already
    allows `https:` + `'self'`; `file://` failure falls to ladder step 3).
 3. Single live call `GET /repos/{repo}/compare/{branch}...{commit}` →
@@ -95,7 +104,10 @@ prefixed with the active network: `MAINNET - {host}` / `TESTNET - {host}`.
 ## i18n
 
 New `shell.footer_*` keys with `%(name)s`-style placeholders; repo URL,
-commit hash, and counts stay byte-verbatim in every language. English
+commit hash, counts, and the ISO build date stay byte-verbatim in every
+language (the date is locale-neutral by construction). The extra
+`shell.footer_at_build` key (`at build %(date)s`) exists only for the
+404-with-count display. English
 first, other locales carry honest English stubs until human-verified.
 `tooling/check_i18n.py` must pass.
 
