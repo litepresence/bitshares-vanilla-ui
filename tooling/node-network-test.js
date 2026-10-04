@@ -1,8 +1,9 @@
 /* node-network-test.js — unit vectors for merged-table network helpers
- * (settings-nodes.js listNetwork/netFromChain/networkLabel/networkHealth/groupOf).
+ * (settings-nodes.js listNetwork/netFromChain/chainLabel/chainHealth/groupOf).
  * Stdlib only: `node tooling/node-network-test.js` (exit 0 = green). Covers
- * list-vs-chain derivation, display labels, and the yellow-unless-4018
- * color rule. No DOM, no network, no deps (Store stubbed globally).
+ * list-vs-chain derivation, merged CHAIN cell text, and the
+ * green-MAINNET/yellow-TESTNET/red-DEVNET color rule. No DOM, no network,
+ * no deps (Store stubbed globally).
  */
 "use strict";
 var assert = require("assert");
@@ -15,7 +16,7 @@ global.Store = {
 };
 var SN = require("../vanilla/js/settings-nodes.js");
 var T = SN._test;
-["listNetwork", "netFromChain", "networkLabel", "networkHealth", "groupOf", "hideNode", "unhideNode"].forEach(function (k) {
+["listNetwork", "netFromChain", "chainLabel", "chainHealth", "groupOf", "hideNode", "unhideNode"].forEach(function (k) {
   assert.ok(T && typeof T[k] === "function", "_test." + k + " exported");
 });
 function t(k, d) { return d; }
@@ -38,18 +39,14 @@ eq(T.netFromChain(TID), "testnet", "testnet chain");
 eq(T.netFromChain("abcd"), "", "unknown chain");
 eq(T.netFromChain(null), "", "null chain");
 eq(T.netFromChain(""), "", "empty chain");
-eq(T.networkLabel(t, "mainnet", null), "mainnet", "label mainnet");
-eq(T.networkLabel(t, "testnet", null), "testnet", "label testnet");
-eq(T.networkLabel(t, "", "abcd1234"), "abcd", "label chain prefix");
-eq(T.networkLabel(t, "", null), "—", "label dash");
-eq(T.networkHealth("mainnet", MID), "good", "mainnet chain green");
-eq(T.networkHealth("testnet", TID), "warn", "testnet chain yellow");
-eq(T.networkHealth("mainnet", TID), "bad", "default answering foreign chain red");
-eq(T.networkHealth("", TID), "warn", "custom testnet yellow");
-eq(T.networkHealth("", "ffff"), "warn", "custom unknown chain yellow");
-eq(T.networkHealth("", MID), "good", "custom mainnet green");
-eq(T.networkHealth("mainnet", null), "", "unprobed uncolored");
-eq(T.networkHealth("", null), "", "unknown uncolored");
+eq(T.chainLabel(t, MID), "mainnet", "chain mainnet");
+eq(T.chainLabel(t, TID), "testnet", "chain testnet");
+eq(T.chainLabel(t, "ffff"), "devnet", "chain other devnet");
+eq(T.chainLabel(t, null), "—", "chain dash");
+eq(T.chainHealth(MID), "good", "chain health green");
+eq(T.chainHealth(TID), "warn", "chain health yellow");
+eq(T.chainHealth("ffff"), "bad", "chain health red");
+eq(T.chainHealth(null), "", "chain health unprobed");
 eq(T.groupOf("wss://m1"), "mainnet", "group mainnet");
 eq(T.groupOf("wss://t1"), "testnet", "group testnet");
 eq(T.groupOf("wss://x"), "custom", "group custom");

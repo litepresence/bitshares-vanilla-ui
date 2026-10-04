@@ -62,10 +62,10 @@ var SettingsNodes = (function () {
    * The History cell is NOT painted here — paintHistory owns .node-history
    * from HistoryCap truth (snapshot at build, live after probe).
    * Params: row (tr, may be null — no-op except the card lookup needs its
-    *   data-url), cells ({lat, ping, part, head, chain, network, geo, prov}
+    *   data-url), cells ({lat, ping, part, head, chain, geo, prov}
     *   strings — any missing key leaves that cell untouched), statusId (canonical, optional),
     *   titleText (tooltip, optional — clears stale titles when omitted),
-    *   health ({lat, ping, part, head, chain, network} "good"|"warn"|"bad" — painted
+    *   health ({lat, ping, part, head, chain} "good"|"warn"|"bad" — painted
    *   as data-h for the CSS signal colors; a missing key CLEARS that cell's
    *   color so re-probes never inherit stale signals).
    *   Fails: never (missing cells are skipped). */
@@ -86,7 +86,6 @@ var SettingsNodes = (function () {
       var prt = root.querySelector(".part");
       var hed = root.querySelector(".node-head");
       var chn = root.querySelector(".node-chain");
-      var nnet = root.querySelector(".node-network");
       var geo = root.querySelector(".node-geo");
       var prv = root.querySelector(".node-provider");
       if (lat && typeof c.lat === "string") lat.textContent = c.lat;
@@ -94,10 +93,9 @@ var SettingsNodes = (function () {
       if (prt && typeof c.part === "string") prt.textContent = c.part;
       if (hed && typeof c.head === "string") hed.textContent = c.head;
       if (chn && typeof c.chain === "string") chn.textContent = c.chain;
-      if (nnet && typeof c.network === "string") nnet.textContent = c.network;
       if (geo && typeof c.geo === "string") geo.textContent = c.geo;
       if (prv && typeof c.prov === "string") prv.textContent = c.prov;
-      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain"); hue(nnet, "network");
+      hue(lat, "lat"); hue(png, "ping"); hue(prt, "part"); hue(hed, "head"); hue(chn, "chain");
     }
     function tag(root) {
       if (!root || typeof root.setAttribute !== "function") return;
@@ -129,7 +127,7 @@ var SettingsNodes = (function () {
     table.className = "node-table";
     var thead = doc.createElement("thead");
     var headRow = doc.createElement("tr");
-    ["", t("settings.th_node", "Node"), t("settings.th_network", "Network"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), t("settings.remove", "Remove")].forEach(function (t) {
+    ["", t("settings.th_node", "Node"), t("settings.th_location", "Location *"), t("settings.th_provider", "Provider *"), t("settings.th_handshake", "Handshake"), t("settings.th_ping", "Ping"), t("settings.th_participation", "Participation"), t("settings.th_head", "Head"), t("settings.th_chain", "Chain"), t("settings.th_history", "History"), t("settings.remove", "Remove")].forEach(function (t) {
       var th = doc.createElement("th");
       th.textContent = t;
       headRow.appendChild(th);
@@ -168,13 +166,6 @@ var SettingsNodes = (function () {
       var tdUrl = doc.createElement("td");
       tdUrl.textContent = url;
       tr.appendChild(tdUrl);
-
-      var tdNet = doc.createElement("td");
-      var netSpan = doc.createElement("span");
-      netSpan.className = "node-network";
-      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
-      tdNet.appendChild(netSpan);
-      tr.appendChild(tdNet);
 
       var tdGeo = doc.createElement("td");
       var geoSpan = doc.createElement("span");
@@ -265,11 +256,6 @@ var SettingsNodes = (function () {
       urlDiv.className = "node-card-url";
       urlDiv.textContent = url;
       card.appendChild(urlDiv);
-
-      var netSpan = doc.createElement("span");
-      netSpan.className = "node-network";
-      netSpan.textContent = networkLabel(t, listNetwork(url) || netFromChain(seenChain[url] || ""), seenChain[url] || null);
-      card.appendChild(netSpan);
 
       var geoSpan = doc.createElement("span");
       geoSpan.className = "node-geo";
@@ -652,38 +638,35 @@ var SettingsNodes = (function () {
     return "";
   }
 
-  /** networkLabel: NETWORK cell text.
+  /** chainLabel: merged CHAIN cell text — three finite states for observed
+   * chains (rendered caps via CSS), dash pre-probe.
    * @param {Function} t - injected lookup.
-   * @param {string} net - "mainnet"|"testnet"|"".
    * @param {string|null} chainId - observed chain id or null.
-   * @returns {string} the keyed network name, the 4-char chain prefix, or the keyed dash. Never throws. */
-  function networkLabel(t, net, chainId) {
+   * @returns {string} keyed mainnet/testnet/devnet word or dash. Never throws. */
+  function chainLabel(t, chainId) {
     var dash = "—";
     try { dash = String(t("settings.dash", "—")); } catch (e) { /* dash stands */ }
     try {
-      if (net === "mainnet") return String(t("settings.network_mainnet", "mainnet"));
-      if (net === "testnet") return String(t("settings.network_testnet", "testnet"));
-      if (typeof chainId === "string" && chainId) return chainId.slice(0, 4);
-    } catch (e) { /* dash below */ }
-    return dash;
+      if (typeof chainId !== "string" || !chainId) return dash;
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return dash;
+      var low = chainId.toLowerCase();
+      if (Store.CHAIN_IDS.mainnet && low === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return String(t("settings.network_mainnet", "mainnet"));
+      if (Store.CHAIN_IDS.testnet && low === String(Store.CHAIN_IDS.testnet).toLowerCase()) return String(t("settings.network_testnet", "testnet"));
+      return String(t("settings.network_devnet", "devnet"));
+    } catch (e) { return dash; }
   }
 
-  /** networkHealth: NETWORK cell color.
-   * @param {string} net - "mainnet"|"testnet"|"".
+  /** chainHealth: merged CHAIN cell color.
    * @param {string|null} chainId - observed chain id or null.
-   * @returns {string} "good" (mainnet chain) | "warn" (testnet or any other chain — owner rule: yellow unless 4018) | "bad" (listed default answering a foreign chain) | "" (unprobed: unknown never guesses). Never throws. */
-  function networkHealth(net, chainId) {
+   * @returns {string} "good" (4018) | "warn" (39f5) | "bad" (anything else) | "" (unprobed). Never throws. */
+  function chainHealth(chainId) {
     try {
       if (typeof chainId !== "string" || !chainId) return "";
-      if (net === "mainnet" || net === "testnet") {
-        if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
-        var exp = Store.CHAIN_IDS[net];
-        var match = !!exp && chainId.toLowerCase() === String(exp).toLowerCase();
-        return healthFor("chain", null, { network: net, match: match });
-      }
-      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS || !Store.CHAIN_IDS.mainnet) return "";
-      if (chainId.toLowerCase() === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
-      return "warn";
+      if (typeof Store === "undefined" || !Store || !Store.CHAIN_IDS) return "";
+      var low = chainId.toLowerCase();
+      if (Store.CHAIN_IDS.mainnet && low === String(Store.CHAIN_IDS.mainnet).toLowerCase()) return "good";
+      if (Store.CHAIN_IDS.testnet && low === String(Store.CHAIN_IDS.testnet).toLowerCase()) return "warn";
+      return "bad";
     } catch (e) { return ""; }
   }
 
@@ -934,7 +917,7 @@ var SettingsNodes = (function () {
       try { pend = String(t("settings.pending", "…")); } catch (e) { pend = "…"; }
       var conn = "";
       try { conn = String(t("settings.connecting", "connecting")); } catch (e) { conn = "connecting"; }
-      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, network: networkLabel(t, listNetwork(url), seenChain[url] || null), geo: pend, prov: pend }, "connecting");
+      setRow(row, { lat: pend, ping: pend, part: pend, head: pend, chain: conn, geo: pend, prov: pend }, "connecting");
       Chain.probe(url, 6000).then(function (r) {
         var cid = "";
         try { cid = (r && typeof r.chainId === "string") ? r.chainId : ""; } catch (cidErr) { cid = ""; }
@@ -948,16 +931,13 @@ var SettingsNodes = (function () {
           var exp = (rowNet && Store.CHAIN_IDS) ? Store.CHAIN_IDS[rowNet] : null;
           if (exp && cid && cid.toLowerCase() !== String(exp).toLowerCase()) mismatch = true;
         } catch (pinErr) { mismatch = false; }
-        var dispNet = rowNet || netFromChain(cid);
         var prefix = "";
         try { prefix = String(r.chainId || "").slice(0, 8); } catch (sliceErr) { prefix = ""; }
         if (mismatch) {
           pushSample(url, { ms: r.latencyMs, status: "WRONG-CHAIN" });
-          var mChain4 = "";
-          try { mChain4 = String(prefix || "").slice(0, 4); } catch (sliceErr) { mChain4 = ""; }
-          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: "mismatch " + mChain4, network: networkLabel(t, dispNet, cid) }, "down",
+          setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS), chain: chainLabel(t, cid) }, "down",
             detailText(r, prefix, "wrong chain for this network"),
-            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: "bad", network: networkHealth(dispNet, cid) });
+            { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS), chain: chainHealth(cid) });
            /* History truth is recorded even for mismatches (the probe found
             * it) — the row stays selectable and App.connect()'s chain-id
             * pin is the guard; the pill stays honest. */
@@ -976,13 +956,6 @@ var SettingsNodes = (function () {
             }
           } catch (clErr) { v = { status: "GOOD", detail: "ok" }; }
           pushSample(url, { ms: r.latencyMs, age: r.headAgeS, part: r.participation, status: v.status });
-          var pill = {
-            "GOOD": t("settings.node_good", "Good"),
-            "STALE": t("settings.node_stale", "Stale"),
-            "SUSPECT": t("settings.node_suspect", "Suspect"),
-            "FORKED": t("settings.node_forked", "Forked"),
-            "WRONG-CHAIN": "mismatch " + prefix
-          }[v.status] || t("settings.node_good", "Good");
           var id = (v.status === "GOOD") ? "up"
             : (v.status === "STALE") ? "stale"
             : (v.status === "SUSPECT") ? "suspect"
@@ -994,10 +967,10 @@ var SettingsNodes = (function () {
             if (ago) extra = "last good " + ago;
           }
           setRow(row, { lat: latencyText(t, r.latencyMs), ping: pingText(t, r.pingMs), part: partText(t, r.participation), head: headText(t, r.headAgeS),
-            chain: (v.status === "GOOD") ? prefix.slice(0, 4) : (pill + " · " + prefix.slice(0, 4)), network: networkLabel(t, dispNet, cid) },
+            chain: chainLabel(t, cid) },
             id, detailText(r, prefix, extra),
             { lat: healthFor("hs", r.latencyMs), ping: healthFor("ping", r.pingMs), part: healthFor("part", r.participation), head: healthFor("head", r.headAgeS),
-              chain: networkHealth(dispNet, cid) });
+              chain: chainHealth(cid) });
           /* Live history truth overwrites the snapshot (Phase-1 matrix). */
           try {
             if (typeof HistoryCap !== "undefined" && HistoryCap && typeof HistoryCap.update === "function") {
@@ -1013,7 +986,7 @@ var SettingsNodes = (function () {
         var extra = "";
         if (lg) { var ago = agoMinutes(lg.t); if (ago) extra = "last good " + ago; }
         setRow(row, { lat: t("settings.dash", "—"), ping: t("settings.dash", "—"), part: t("settings.dash", "—"), head: t("settings.dash", "—"),
-          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down"), network: networkLabel(t, listNetwork(url), null) },
+          chain: timeout ? t("settings.node_timeout", "Timeout") : t("settings.down", "down") },
           "down", extra || undefined, { chain: "bad" });
         /* No probe data — snapshot (or unknown) stands, still repaint so a
          * retried-then-failed row never shows a stale live pill. */
@@ -1081,7 +1054,7 @@ var SettingsNodes = (function () {
     selectNode: selectNode,
     hideNode: hideNode,
     unhideNode: unhideNode,
-    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, networkLabel: networkLabel, networkHealth: networkHealth, groupOf: groupOf, hideNode: hideNode, unhideNode: unhideNode }
+    _test: { readHist: readHist, pushSample: pushSample, lastGood: lastGood, agoMinutes: agoMinutes, histInfo: histInfo, latencyText: latencyText, pingText: pingText, partText: partText, headText: headText, geoText: geoText, provText: provText, healthFor: healthFor, listNetwork: listNetwork, netFromChain: netFromChain, chainLabel: chainLabel, chainHealth: chainHealth, groupOf: groupOf, hideNode: hideNode, unhideNode: unhideNode }
   };
 })();
 

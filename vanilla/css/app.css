@@ -200,7 +200,7 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   .node-card { background: var(--panel); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px; }
   .node-card .latency, .node-card .ping, .node-card .part, .node-card .node-head,
-  .node-card .node-chain, .node-card .node-network, .node-card .node-history, .node-card .node-geo,
+  .node-card .node-chain, .node-card .node-history, .node-card .node-geo,
   .node-card .node-provider { margin-right: 8px; }
 }
 button, select, input { min-height: 44px; font-size: 1rem; }
@@ -601,6 +601,9 @@ table.pools-table tbody tr:nth-child(even) { background: var(--panel-deep); }
  * skips them). */
 .node-table tr.node-sep td { height: 8px; padding: 0; border: 0; border-top: 2px solid var(--border); background: var(--panel-deep); }
 .node-cards .node-sep { height: 8px; background: var(--panel-deep); border-top: 2px solid var(--border); border-radius: 4px; }
+/* Merged CHAIN states render all-caps (MAINNET/TESTNET/DEVNET); locale
+ * values stay lowercase, translators never touch casing. */
+.node-table .node-chain, .node-card .node-chain { text-transform: uppercase; }
 /* Remove column: red × per row (defaults hide, customs unlist). Glyph
  * buttons need an explicit 44px box (text buttons size themselves; a
  * bare × would miss the touch floor). --danger follows the footer
