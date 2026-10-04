@@ -109,7 +109,7 @@ var BarterUI = (function () {
       /* H2: wipe the password local + input on either outcome. */
       var pw = inp.value;
       Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("barter.unlock_failed", "Unlock failed.")); });
+        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
     });
   }
   /* One barter leg row: asset + human amount (empty asset rows are skipped). */

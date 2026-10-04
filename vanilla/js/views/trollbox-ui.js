@@ -355,7 +355,7 @@ var TrollboxUI = (function () {
         refreshGate(); scheduleFee();
       }).catch(function () {
         if (myGen !== gen) return;
-        note.textContent = t("trollbox.unlock_failed", "Unlock failed.");
+        note.textContent = t("common.unlock_failed", "Unlock failed.");
       });
     });
 

@@ -715,7 +715,7 @@ var TradeForm = (function () {
         try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
         pw = null;
         btn.disabled = false;
-        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
+        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed."));
       });
   }
 
@@ -749,7 +749,7 @@ var TradeForm = (function () {
         try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
         pw = null;
         btn.disabled = false;
-        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("trade.unlock_failed", "Unlock failed"));
+        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed."));
       });
   }
 

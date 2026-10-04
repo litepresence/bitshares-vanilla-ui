@@ -1009,7 +1009,7 @@ var AccountPortfolio = (function () {
   /* Unlock prompt for /account/me while locked: password + button; on
    * success re-renders #/account/me so the user lands back where asked. */
   function renderUnlockPrompt(doc, wrap, root) {
-    wrap.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
+    wrap.appendChild(DOM.pageHead(doc, t("account.s4", "My account"), "user"));
     var hint = doc.createElement("p");
     hint.textContent = t("account.s5", "Wallet is locked. Enter your password to view your account.");
     wrap.appendChild(hint);
@@ -1044,7 +1044,7 @@ var AccountPortfolio = (function () {
           input.value = "";
           pw = null;
           btn.disabled = false;
-          var msg = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");
+          var msg = (e && e.message) ? e.message : t("common.unlock_failed", "Unlock failed.");
           err.textContent = msg;
         });
     });
@@ -1623,14 +1623,14 @@ var AccountPortfolio = (function () {
 
     var marSection = doc.createElement("section");
     var marH = doc.createElement("h2");
-    marH.textContent = t("account.margin_positions", "Margin Positions");
+    marH.textContent = t("account.margin_positions", "Margin positions");
     marSection.appendChild(marH);
     wrap.appendChild(marSection);
     renderMargin(doc, marSection, acct, sharedPositions);
 
     var creSection = doc.createElement("section");
     var creH = doc.createElement("h2");
-    creH.textContent = t("account.credit_management", "Credit Management");
+    creH.textContent = t("account.credit_management", "Credit management");
     creSection.appendChild(creH);
     wrap.appendChild(creSection);
     renderCredit(doc, creSection, acct);
@@ -1647,8 +1647,8 @@ var AccountPortfolio = (function () {
       { key: "history", label: t("account.history_title", "History"), sec: histSection },
       { key: "membership", label: t("account.membership", "Membership"), sec: memSection },
       { key: "equity", label: t("account.equity_tab", "Equity"), sec: eqSection },
-      { key: "margin", label: "Margin Positions", sec: marSection },
-      { key: "credit", label: "Credit Management", sec: creSection }
+      { key: "margin", label: "Margin positions", sec: marSection },
+      { key: "credit", label: "Credit management", sec: creSection }
     ];
     /* Deep-link seed: ?tab= picks the initial tab (?hist= seeds the filter
      * below); unknown slugs stay on Balances. */
@@ -1887,7 +1887,7 @@ var AccountPortfolio = (function () {
       }).catch(function (e) {
         clearRoot(root);
         var retry = makeWrap(doc, root);
-        retry.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
+        retry.appendChild(DOM.pageHead(doc, t("account.s4", "My account"), "user"));
         showError(doc, retry, e, t("transfer.load_account_failed", "Could not load your account."));
       });
       return;

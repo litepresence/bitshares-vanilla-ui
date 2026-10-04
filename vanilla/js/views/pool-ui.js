@@ -131,7 +131,7 @@ var PoolUI = (function () {
     b.addEventListener("click", function () { b.disabled = true;
       /* H2: wipe the password local + input on either outcome. */
       var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; retry(); }).catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, wrap,e,t("barter.unlock_failed", "Unlock failed.")); });
+      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; retry(); }).catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, wrap,e,t("common.unlock_failed", "Unlock failed.")); });
     });
   }
   /* Default viewing account while locked: committee-account 1.2.0 (a public

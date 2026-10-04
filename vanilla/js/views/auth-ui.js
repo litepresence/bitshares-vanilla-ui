@@ -200,7 +200,7 @@ var AuthUI = (function () {
           pw = null;
           if (myGen !== gen) return;
           btn.disabled = false;
-          setFieldError(f, (e && e.message) ? e.message : String(e || t("auth.unlock_failed", "Unlock failed")));
+          setFieldError(f, (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed.")));
         });
     });
     /* .bin honesty note: wallet.js has no backup-decrypt entry point, so no

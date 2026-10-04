@@ -914,7 +914,7 @@ var HelpUI = (function () {
         ["https://btslens.pages.dev", "help.link_exp_lens", "BTS Lens explorer (btslens.pages.dev)"],
         ["https://bitshares.network", "help.link_exp_network", "BitShares.network explorer"],
         ["https://bitshares-explorer.lovable.app", "help.link_exp_lovable", "BitShares Explorer (lovable.app)"]]],
-      ["help.elastic", "Chain data (Elastic)", [
+      ["help.elastic", "Community index (third-party history)", [
         ["https://es.bitshares.dev", "help.link_es_api", "History API (es.bitshares.dev)"],
         ["https://kibana.bitshares.dev", "help.link_es_kibana", "History dashboards (kibana.bitshares.dev)"]]],
       ["help.forum", "Forum", [

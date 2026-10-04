@@ -214,7 +214,7 @@ var TransferPreview = (function () {
             try { pw.value = ""; } catch (wipeErr2) { /* input gone */ }
             pwStr = null;
             ub.disabled = false;
-            env.showError(doc, box, e2, t("transfer.unlock_failed", "Unlock failed"));
+            env.showError(doc, box, e2, t("common.unlock_failed", "Unlock failed."));
           });
       });
       done();

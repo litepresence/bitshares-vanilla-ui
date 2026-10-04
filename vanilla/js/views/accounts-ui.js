@@ -178,7 +178,7 @@ var AccountsUI = (function () {
             pw = null;
             if (myGen !== gen) return;
             btn.disabled = false;
-            errBox.textContent = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");
+            errBox.textContent = (e && e.message) ? e.message : t("common.unlock_failed", "Unlock failed.");
           });
       });
     } else {

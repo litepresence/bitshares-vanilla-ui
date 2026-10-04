@@ -56,7 +56,7 @@ var MenuUI = (function () {
       blurbKey: "menu.blurb_wallet", blurbDefault: "Money in and out, accounts, and your keys.",
       links: [
         { href: "#/", icon: "dashboard", titleKey: "menu.p_dashboard", titleDefault: "Dashboard", blurbKey: "menu.d_dashboard", blurbDefault: "Markets at a glance and your watched account." },
-        { href: "#/account/me", icon: "user", titleKey: "menu.p_my_account", titleDefault: "My Account", blurbKey: "menu.d_my_account", blurbDefault: "Your balances, open orders, and history." },
+        { href: "#/account/me", icon: "user", titleKey: "menu.p_my_account", titleDefault: "My account", blurbKey: "menu.d_my_account", blurbDefault: "Your balances, open orders, and history." },
         { href: "#/accounts", icon: "people", titleKey: "menu.p_accounts", titleDefault: "Accounts", blurbKey: "menu.d_accounts", blurbDefault: "Manage and follow accounts." },
         { href: "#/transfer", icon: "transfer", titleKey: "menu.p_transfer", titleDefault: "Transfer", blurbKey: "menu.d_transfer", blurbDefault: "Send any asset, with optional encrypted memo." },
         { href: "#/invoice", icon: "merchant", titleKey: "menu.p_invoice", titleDefault: "Invoice", blurbKey: "menu.d_invoice", blurbDefault: "Request a precise payment with a shareable link." },
@@ -111,9 +111,9 @@ var MenuUI = (function () {
       links: [
         { href: "#/explorer", icon: "server", titleKey: "menu.p_explorer", titleDefault: "Explore", blurbKey: "menu.d_explorer", blurbDefault: "Blocks, transactions, and objects." },
         { href: "#/assets", icon: "assets", titleKey: "menu.p_assets", titleDefault: "Assets", blurbKey: "menu.d_assets", blurbDefault: "Browse every listed asset." },
-        { href: "#/assets/create", icon: "plus-circle", titleKey: "menu.p_asset_create", titleDefault: "Create Asset", blurbKey: "menu.d_asset_create", blurbDefault: "Issue your own token." },
+        { href: "#/assets/create", icon: "plus-circle", titleKey: "menu.p_asset_create", titleDefault: "Create asset", blurbKey: "menu.d_asset_create", blurbDefault: "Issue your own token." },
         { href: "#/assets/issue", icon: "deposit", titleKey: "menu.p_asset_issue", titleDefault: "Issue Asset", blurbKey: "menu.d_asset_issue", blurbDefault: "Mint supply of an asset you control." },
-        { href: "#/assets/feed", icon: "connected", titleKey: "menu.p_asset_feed", titleDefault: "Publish Feed", blurbKey: "menu.d_asset_feed", blurbDefault: "Publish price feeds as issuer or witness." },
+        { href: "#/assets/feed", icon: "connected", titleKey: "menu.p_asset_feed", titleDefault: "Publish feed", blurbKey: "menu.d_asset_feed", blurbDefault: "Publish price feeds as issuer or witness." },
         { href: "#/fees", icon: "dollar-green", titleKey: "menu.p_fees", titleDefault: "Network fees", blurbKey: "menu.d_fees", blurbDefault: "What each operation costs." },
         { href: "#/ops", icon: "list", titleKey: "menu.p_ops", titleDefault: "Operations", blurbKey: "menu.d_ops", blurbDefault: "Ranked operation counts from recent blocks." },
         { href: "#/top-ops", icon: "fire", titleKey: "menu.p_topops", titleDefault: "Top Operations", blurbKey: "menu.d_topops", blurbDefault: "Rankings with the chain-activity donut." },
