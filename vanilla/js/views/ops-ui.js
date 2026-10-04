@@ -7,7 +7,8 @@
  * Consumes: Explorer.head/block (the ONLY chain readers — no new WS methods,
  *   no new read file; a cache helper is NOT justified: one-shot page, N<=200
  *   fresh reads per view, no shared state to keep), Chain.status (connect
- *   gate), Store (connection subscribe for auto-reconnect). No wallet, no
+ *   gate), Store (connection subscribe for auto-reconnect), TableRenderer
+ *   (table shell — script-tag global). No wallet, no
  *   signing, no broadcasts. All percentages are BigInt integer math — no
  *   float, no Number() on money-adjacent values (counts are plain ints).
  * Globals/side effects: DOM under root only; global OpsUI. Generation
@@ -210,7 +211,13 @@ var OpsUI = (function () {
   /* renderTable: sorted op-count table with integer percentages + bars.
    * Params: doc, wrap, counts (idx->count map), total (op count). Dense
    * .node-table (theme-aware) inside a horizontal scroll region on phones
-   * (principle #7); bars are inline divs on theme vars, no new CSS file. */
+   * (principle #7); bars are inline divs on theme vars, no new CSS file.
+   * TableRenderer pilot: the table shell comes from the shared renderer
+   * (same Type/Operation/Count/Share titles, order, and right alignment on
+   * Count/Share as the hand-built table it replaces — no keys, classes, or
+   * clicks before, none added). The bar column and nowrap restore in one
+   * post-pass from the row objects — moved, not dropped (textContent only).
+   * Header literals stay plain (as before — no i18n keys minted here). */
   function renderTable(doc, wrap, counts, total) {
     var keys = Object.keys(counts).map(function (k) { return parseInt(k, 10); });
     keys.sort(function (a, b) { return counts[b] - counts[a]; });
@@ -220,34 +227,51 @@ var OpsUI = (function () {
     }
     var scroller = DOM.el(doc, "div", null, "ops-scroll");
     scroller.style.overflowX = "auto";
-    var table = doc.createElement("table");
-    table.className = "node-table";
-    var thead = doc.createElement("thead"), hr = doc.createElement("tr");
-    ["Type", "Operation", "Count", "Share", ""].forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
-    thead.appendChild(hr); table.appendChild(thead);
-    var tb = doc.createElement("tbody");
-    keys.forEach(function (idx) {
+    var rows = keys.map(function (idx) {
       var lab = opLabel(idx), c = counts[idx];
-      var tr = doc.createElement("tr");
-      var tdT = DOM.el(doc, "td", String(idx));
-      tdT.style.whiteSpace = "nowrap"; tr.appendChild(tdT);
-      tr.appendChild(DOM.el(doc, "td", lab.name + (lab.virtual ? " (virtual)" : "")));
-      var tdC = DOM.el(doc, "td", String(c));
-      tdC.style.textAlign = "right"; tdC.style.whiteSpace = "nowrap"; tr.appendChild(tdC);
-      var tdP = DOM.el(doc, "td", fmtPct(pctTenths(c, total)));
-      tdP.style.textAlign = "right"; tdP.style.whiteSpace = "nowrap"; tr.appendChild(tdP);
-      var tdB = doc.createElement("td");
-      var track = doc.createElement("div");
-      track.style.minWidth = "80px"; track.style.background = "var(--bg)";
-      track.style.border = "1px solid var(--border)"; track.style.borderRadius = "4px";
-      var fill = doc.createElement("div");
-      fill.style.width = barPct(c, total) + "%"; fill.style.height = "12px";
-      fill.style.background = "var(--accent)"; fill.style.borderRadius = "3px";
-      fill.setAttribute("aria-hidden", "true");
-      track.appendChild(fill); tdB.appendChild(track); tr.appendChild(tdB);
-      tb.appendChild(tr);
+      return {
+        type: String(idx),
+        op: lab.name + (lab.virtual ? " (virtual)" : ""),
+        count: String(c),
+        share: fmtPct(pctTenths(c, total)),
+        bar: "",
+        width: barPct(c, total)
+      };
     });
-    table.appendChild(tb); scroller.appendChild(table); wrap.appendChild(scroller);
+    var table = TableRenderer.render({
+      columns: [
+        { key: "type", title: "Type" },
+        { key: "op", title: "Operation" },
+        { key: "count", title: "Count", align: "right" },
+        { key: "share", title: "Share", align: "right" },
+        { key: "bar", title: "" }
+      ],
+      rows: rows,
+      stickyFirstCol: true
+    });
+    try {
+      var tb = table.getElementsByTagName("tbody")[0];
+      var trs = tb ? tb.rows : [];
+      for (var i = 0; i < trs.length && i < rows.length; i++) {
+        (function (tr, r) {
+          var cells = tr.cells;
+          if (!cells || cells.length < 5) return;
+          cells[0].style.whiteSpace = "nowrap";
+          cells[2].style.whiteSpace = "nowrap";
+          cells[3].style.whiteSpace = "nowrap";
+          DOM.clear(cells[4]);
+          var track = doc.createElement("div");
+          track.style.minWidth = "80px"; track.style.background = "var(--bg)";
+          track.style.border = "1px solid var(--border)"; track.style.borderRadius = "4px";
+          var fill = doc.createElement("div");
+          fill.style.width = r.width + "%"; fill.style.height = "12px";
+          fill.style.background = "var(--accent)"; fill.style.borderRadius = "3px";
+          fill.setAttribute("aria-hidden", "true");
+          track.appendChild(fill); cells[4].appendChild(track);
+        })(trs[i], rows[i]);
+      }
+    } catch (e) { /* strings stand without bars */ }
+    scroller.appendChild(table); wrap.appendChild(scroller);
   }
 
   /* Route entry #/ops: honest scope note + sample-size form, then head read

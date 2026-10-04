@@ -15,7 +15,8 @@
  *   Wallet.isUnlocked/unlock/keys (js/wallet.js); Format via Account display
  *   strings (no money math here); the upgrade path additionally consumes
  *   Chain (get_accounts re-read), Tx.fee/buildTx/sign (via Credit.fee/
- *   Credit.sendAndProve + Tx.buildTx), Asset.describe (fee display) —
+ *   Credit.sendAndProve + Tx.buildTx), Asset.describe (fee display),
+ *   TableRenderer (open-orders table shell — script-tag global) —
  *   all guarded at call time, never at load.
  * Globals/side effects: document DOM under the router's root element,
  *   global AccountUI only. The upgrade flow signs + broadcasts one op-8
@@ -805,6 +806,24 @@ var AccountUI = (function () {
     });
   }
 
+  /* orderCells: one open order -> plain display-string row (TableRenderer
+   * pilot: the cell math moved verbatim from the renderOpenOrders row builder
+   * below — display + symbol + raw titles, never raw integers on screen. The
+   * raw titles ride the row object; TableRenderer has no title contract, so
+   * the render restores them in one post-pass — moved, not dropped).
+   * Params: o (Account.openOrders row). Returns {sell, sellTitle, buy,
+   * buyTitle, price, order} strings. Never throws. */
+  function orderCells(o) {
+    return {
+      sell: o.sell.display + " " + o.sell.symbol,
+      sellTitle: o.sell.raw,
+      buy: o.buy.display + " " + o.buy.symbol,
+      buyTitle: o.buy.raw,
+      price: o.priceDisplay,
+      order: o.id
+    };
+  }
+
   /* Open-orders section: table + phone cards, same patterns as balances.
    * Read-only by design (cancel lives on the market desk). Each row shows
    * what the order sells, what it asks at what price, plus id/expiration. */
@@ -816,37 +835,34 @@ var AccountUI = (function () {
       section.appendChild(empty);
       return;
     }
-    var table = doc.createElement("table");
-    table.className = "node-table";
-    var thead = doc.createElement("thead");
-    var headRow = doc.createElement("tr");
-    [t("account.sell_th", "Sell"), t("account.buy_th", "Buy"), t("account.price_th", "Price"), t("account.order_th", "Order")].forEach(function (label) {
-      var th = doc.createElement("th");
-      th.textContent = label;
-      headRow.appendChild(th);
+    /* TableRenderer pilot: the table shell comes from the shared renderer
+     * (same Sell/Buy/Price/Order titles, order, and left alignment as the
+     * hand-built table it replaces — no keys, classes, or clicks before,
+     * none added). Cards + raw details below are unchanged. */
+    var rows = orders.map(orderCells);
+    var table = TableRenderer.render({
+      columns: [
+        { key: "sell", title: t("account.sell_th", "Sell") },
+        { key: "buy", title: t("account.buy_th", "Buy") },
+        { key: "price", title: t("account.price_th", "Price") },
+        { key: "order", title: t("account.order_th", "Order") }
+      ],
+      rows: rows,
+      stickyFirstCol: true
     });
-    thead.appendChild(headRow);
-    table.appendChild(thead);
-    var tbody = doc.createElement("tbody");
-    orders.forEach(function (o) {
-      var tr = doc.createElement("tr");
-      var sellCell = doc.createElement("td");
-      sellCell.textContent = o.sell.display + " " + o.sell.symbol;
-      sellCell.title = o.sell.raw;
-      tr.appendChild(sellCell);
-      var buyCell = doc.createElement("td");
-      buyCell.textContent = o.buy.display + " " + o.buy.symbol;
-      buyCell.title = o.buy.raw;
-      tr.appendChild(buyCell);
-      var priceCell = doc.createElement("td");
-      priceCell.textContent = o.priceDisplay;
-      tr.appendChild(priceCell);
-      var idCell = doc.createElement("td");
-      idCell.textContent = o.id;
-      tr.appendChild(idCell);
-      tbody.appendChild(tr);
-    });
-    table.appendChild(tbody);
+    /* Title pass: raw amounts ride the row objects (see orderCells) and land
+     * back on the sell/buy cells here — same strings as before. */
+    try {
+      var bodies = table.getElementsByTagName("tbody");
+      var trs = bodies.length ? bodies[0].rows : [];
+      for (var ti = 0; ti < trs.length && ti < rows.length; ti++) {
+        var cells = trs[ti].cells;
+        if (cells && cells.length >= 2 && rows[ti]) {
+          cells[0].title = rows[ti].sellTitle;
+          cells[1].title = rows[ti].buyTitle;
+        }
+      }
+    } catch (e) { /* table stands without raw titles */ }
     section.appendChild(table);
 
     var cards = doc.createElement("div");

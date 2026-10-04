@@ -6,6 +6,8 @@
  *   (opSection/accountLink — generic value rendering lives in
  *   explorer-assets.js), ExplorerUI._bumpGen/_isCurrent/_waitForOpen (the
  *   single generation counter + connect gate live in explorer-ui.js).
+ *   TableRenderer owns the blocks-table shell (script-tag global,
+ *   index.html order); rowTr stays the live-prepend row builder.
  * Globals/side effects: DOM under the given parent/root only; global
  *   ExplorerBlocks only. Tiny DOM helpers (el/touchable/clearRoot/makeWrap/
  *   anchor/showError/showStatus/scrollTable) are private verbatim copies of
@@ -318,6 +320,59 @@ var ExplorerBlocks = (function () {
     });
     table.appendChild(tb);
     scroller.appendChild(table);
+    return scroller;
+  }
+
+  /* Blocks table via the shared TableRenderer (TableRenderer pilot): the
+   * table shell (thead/tbody, .node-table, scope cols, data-k cells) comes
+   * from TableRenderer — same titles, order, and left alignment as the
+   * scrollTable shape it replaces (no keys, classes, or clicks before, none
+   * added). View-specific cells (height anchor, async witness link) restore
+   * in one post-pass from the row objects — moved, not dropped (textContent
+   * only, never innerHTML). Returns the same .xplore-scroll scroller
+   * scrollTable returns, so the tip + Older-paging callers and the
+   * live-prepend tbody lookup are unchanged. rowTr stays the live-prepend
+   * row builder (same cells); scrollTable stays for the BiggestSample panel.
+   * Params: doc, headers ([4] title strings), myGen (gen guard for the
+   * witness links), rows ([{height, time, witness, txs}]). Never throws. */
+  function blocksTable(doc, headers, myGen, rows) {
+    var list = Array.isArray(rows) ? rows : [];
+    var scroller = DOM.el(doc, "div", null, "xplore-scroll");
+    scroller.style.overflowX = "auto";
+    var table = TableRenderer.render({
+      columns: [
+        { key: "height", title: headers[0] },
+        { key: "time", title: headers[1] },
+        { key: "witness", title: headers[2] },
+        { key: "txs", title: headers[3] }
+      ],
+      rows: list.map(function (r) {
+        return {
+          height: "#" + commas(r.height),
+          time: r.time,
+          witness: r.witness ? String(r.witness) : "—",
+          txs: (r.txs === null || r.txs === undefined) ? "—" : String(r.txs)
+        };
+      }),
+      stickyFirstCol: true
+    });
+    scroller.appendChild(table);
+    try {
+      var tb = table.getElementsByTagName("tbody")[0];
+      var trs = tb ? tb.rows : [];
+      for (var i = 0; i < trs.length && i < list.length; i++) {
+        (function (tr, r) {
+          var cells = tr.cells;
+          if (!cells || cells.length < 4) return;
+          DOM.clear(cells[0]);
+          cells[0].appendChild(anchor(doc, "#" + commas(r.height), "#/block/" + r.height));
+          var w = witnessCell(doc, r.witness, myGen);
+          DOM.clear(cells[2]);
+          if (typeof w === "string") cells[2].textContent = w;
+          else if (w) cells[2].appendChild(w);
+        })(trs[i], list[i]);
+      }
+    } catch (e) { /* string cells stand without links */ }
     return scroller;
   }
 
@@ -1286,13 +1341,10 @@ var ExplorerBlocks = (function () {
       var blkPanel = DOM.el(doc, "div", null, "xplore-panel");
       blkPanel.appendChild(DOM.el(doc, "div", t("explorer.recent_blocks", "Recent blocks"), "xplore-panel-h"));
       var shown = rows.slice(0, TABLE_ROWS);
-      var tableRows = shown.map(function (r) {
-        var n = r.tx_count;
-        return [anchor(doc, "#" + commas(r.height), "#/block/" + r.height),
-          fmtTime(r.timestamp || "—"), witnessCell(doc, r.witness, myGen),
-          (n === null || n === undefined) ? "—" : String(n)];
-      });
-      var scroller = scrollTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")], tableRows);
+      var scroller = blocksTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")],
+        myGen, shown.map(function (r) {
+          return { height: r.height, time: fmtTime(r.timestamp || "—"), witness: r.witness, txs: r.tx_count };
+        }));
       blkPanel.appendChild(scroller);
       split.appendChild(blkPanel);
       body.appendChild(split);
@@ -1354,13 +1406,11 @@ var ExplorerBlocks = (function () {
       }
       var isTip = (oldest === null || oldest === undefined);
       if (!isTip) {
-        var tableRows = rows.map(function (r) {
-          var n = (r.tx_count !== undefined) ? r.tx_count : r.txs;
-          return [anchor(doc, "#" + commas(r.height), "#/block/" + r.height),
-            fmtTime(r.timestamp || "—"), witnessCell(doc, r.witness, myGen),
-            (n === null || n === undefined) ? "—" : String(n)];
-        });
-        var scroller = scrollTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")], tableRows);
+        var scroller = blocksTable(doc, [t("explorer.th_height", "Block ID"), t("explorer.th_time", "Date"), t("explorer.th_witness", "Witness"), t("explorer.th_txs", "Transaction count")],
+          myGen, rows.map(function (r) {
+            return { height: r.height, time: fmtTime(r.timestamp || "—"), witness: r.witness,
+              txs: (r.tx_count !== undefined) ? r.tx_count : r.txs };
+          }));
         body.appendChild(scroller);
         var oldestRow = rows[rows.length - 1];
         if (oldestRow.height > 1) {

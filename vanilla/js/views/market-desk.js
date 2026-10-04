@@ -31,7 +31,8 @@
  *   panels to TradeUI (all via lazy globals — same convention as before).
  * Consumes: Market (book/stats/trades/timeframes/candles/assets/parseId),
  *   Format (via book/orders views, never directly), Store (network for
- *   defaults + connection wait), Chain.status. No signing, no cancel path.
+ *   defaults + connection wait), Chain.status, TableRenderer (my-fills table
+ *   shell — script-tag global, index.html order). No signing, no cancel path.
  * Globals/side effects: DOM under the router root, localStorage last-market
  *   key (read half lives in market-ui.js homeTarget — same key string, single
  *   reader + single writer), one refresh timer + resize/theme listeners (all
@@ -1150,6 +1151,30 @@ var MarketDesk = (function () {
       });
       return fills;
     }
+    /* fillCells: one pair-fill -> plain display-string row {block, price,
+     * amount} (TableRenderer pilot: the cell math moved verbatim from the
+     * paintFills row builder below — Format math untouched, honest dashes
+     * stand; the phone cards reuse the same triple). Params: f ({row, op}).
+     * Returns {block, price, amount} strings. Never throws. */
+    function fillCells(f) {
+      var blk = f.row.block_num !== undefined && f.row.block_num !== null ? String(f.row.block_num) : (f.row.block_time || f.row.time || "—");
+      var price = "—", amt = "—";
+      try {
+        var fp = f.op.fill_price || null;
+        if (fp && fp.base && fp.quote && /^-?\d+$/.test(String(fp.base.amount)) && /^-?\d+$/.test(String(fp.quote.amount))) {
+          var rawB = fp.base.asset_id === b.id ? String(fp.base.amount) : (fp.quote.asset_id === b.id ? String(fp.quote.amount) : null);
+          var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
+          if (rawB !== null && rawQ !== null) {
+            price = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
+          }
+        }
+        var qLeg = f.op.pays && f.op.pays.asset_id === q.id ? f.op.pays : (f.op.receives && f.op.receives.asset_id === q.id ? f.op.receives : null);
+        if (qLeg && /^-?\d+$/.test(String(qLeg.amount))) {
+          amt = Format.formatAmount(String(qLeg.amount), q.precision) + " " + q.symbol;
+        }
+      } catch (e) { /* honest dashes stand */ }
+      return { block: String(blk), price: String(price), amount: String(amt) };
+    }
     /* paintFills: op-4 pair fills for the typed/unlocked account as a
      * table (empty -> honest hint). No-ops when live() is false. */
     function paintFills(fills) {
@@ -1159,52 +1184,37 @@ var MarketDesk = (function () {
         myBody.appendChild(DOM.el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
         return;
       }
-      var table = doc.createElement("table");
-      table.className = "node-table";
-      var thead = doc.createElement("thead");
-      var hr = doc.createElement("tr");
-      [t("market.th_block", "Block"), t("market.th_price", "Price"), t("market.th_amount", "Amount")].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
-      thead.appendChild(hr);
-      table.appendChild(thead);
-      var tbody = doc.createElement("tbody");
+      var shown = fills.slice(0, 30);
+      var rows = shown.map(fillCells);
+      /* TableRenderer pilot: the table shell comes from the shared renderer
+       * (same Block/Price/Amount titles, order, and left alignment as the
+       * hand-built table it replaces — no keys, classes, or clicks before,
+       * none added). Cards + scroller + raw details below are unchanged. */
+      var table = TableRenderer.render({
+        columns: [
+          { key: "block", title: t("market.th_block", "Block") },
+          { key: "price", title: t("market.th_price", "Price") },
+          { key: "amount", title: t("market.th_amount", "Amount") }
+        ],
+        rows: rows,
+        stickyFirstCol: true
+      });
       var cards = doc.createElement("div");
       cards.className = "node-cards trades-cards";
-      fills.slice(0, 30).forEach(function (f) {
-        var blk = f.row.block_num !== undefined && f.row.block_num !== null ? String(f.row.block_num) : (f.row.block_time || f.row.time || "—");
-        var price = "—", amt = "—";
-        try {
-          var fp = f.op.fill_price || null;
-          if (fp && fp.base && fp.quote && /^-?\d+$/.test(String(fp.base.amount)) && /^-?\d+$/.test(String(fp.quote.amount))) {
-            var rawB = fp.base.asset_id === b.id ? String(fp.base.amount) : (fp.quote.asset_id === b.id ? String(fp.quote.amount) : null);
-            var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
-            if (rawB !== null && rawQ !== null) {
-              price = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
-            }
-          }
-          var qLeg = f.op.pays && f.op.pays.asset_id === q.id ? f.op.pays : (f.op.receives && f.op.receives.asset_id === q.id ? f.op.receives : null);
-          if (qLeg && /^-?\d+$/.test(String(qLeg.amount))) {
-            amt = Format.formatAmount(String(qLeg.amount), q.precision) + " " + q.symbol;
-          }
-        } catch (e) { /* honest dashes stand */ }
-        var tr = doc.createElement("tr");
-        tr.appendChild(DOM.el(doc, "td", String(blk)));
-        tr.appendChild(DOM.el(doc, "td", String(price)));
-        tr.appendChild(DOM.el(doc, "td", String(amt)));
-        tbody.appendChild(tr);
+      shown.forEach(function (f, i) {
         var card = doc.createElement("div");
         card.className = "node-card";
-        card.appendChild(DOM.el(doc, "div", "#" + String(blk)));
-        card.appendChild(DOM.el(doc, "div", String(price)));
-        card.appendChild(DOM.el(doc, "div", String(amt)));
+        card.appendChild(DOM.el(doc, "div", "#" + rows[i].block));
+        card.appendChild(DOM.el(doc, "div", rows[i].price));
+        card.appendChild(DOM.el(doc, "div", rows[i].amount));
         cards.appendChild(card);
       });
-      table.appendChild(tbody);
       var scroller = doc.createElement("div");
       scroller.className = "trades-scroll";
       scroller.appendChild(table);
       myBody.appendChild(scroller);
       myBody.appendChild(cards);
-      rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), fills.slice(0, 30).map(function (f) { return f.row; }));
+      rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), shown.map(function (f) { return f.row; }));
     }
     /* Typed-account lookup: resolve the input, then paint that account's
      * fills for this pair via public Account.history. Blank + locked keeps
