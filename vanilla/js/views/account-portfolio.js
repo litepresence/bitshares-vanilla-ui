@@ -1908,15 +1908,6 @@ var AccountPortfolio = (function () {
   }
 
   return {
-    renderAccount: renderAccount,
-    OP_LABELS: OP_LABELS,
-    _test: { parseAcctQuery: parseAcctQuery, buildAcctQuery: buildAcctQuery }
-  };
-})();
-
-if (typeof module !== "undefined") { module.exports = AccountUI; }
-
-  return {
     enrichPortfolio: enrichPortfolio,
     renderPortfolio: renderPortfolio,
     renderEquity: renderEquity,
