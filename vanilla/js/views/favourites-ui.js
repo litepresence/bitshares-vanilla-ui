@@ -162,7 +162,7 @@ var FavouritesUI = (function () {
   function marketSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadStrings(MARKETS_KEY);
-    section.appendChild(DOM.el(doc, "h3", "Markets" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h2", "Markets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_markets_yet_star_one_from_any_ma", "No favourite markets yet. Star one from any market page picker, or add a pair below."));
     } else {
@@ -218,7 +218,7 @@ var FavouritesUI = (function () {
   function assetSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadPairs(ASSETS_KEY, "symbol");
-    section.appendChild(DOM.el(doc, "h3", "Assets" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h2", "Assets" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_assets_yet_add_one_by_symbol_bel", "No favourite assets yet. Add one by symbol below."));
     } else {
@@ -263,7 +263,7 @@ var FavouritesUI = (function () {
   function accountSection(doc, wrap, myGen, root) {
     var section = doc.createElement("section");
     var list = loadPairs(ACCOUNTS_KEY, "name");
-    section.appendChild(DOM.el(doc, "h3", "Accounts" + (list.length ? " (" + list.length + ")" : "")));
+    section.appendChild(DOM.el(doc, "h2", "Accounts" + (list.length ? " (" + list.length + ")" : "")));
     if (!list.length) {
       empty(doc, section, t("favourites.no_favourite_accounts_yet_add_one_by_name_bel", "No favourite accounts yet. Add one by name below."));
     } else {

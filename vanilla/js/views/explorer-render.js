@@ -387,7 +387,7 @@ var ExplorerRender = (function () {
    *   div. Fails: never (missing fields render "No fields."). */
   function opSection(doc, op, ctx, label) {
     var box = DOM.el(doc, "div", null, "xplore-op");
-    var head = DOM.el(doc, "h3", (label || t("explorer.op_label", "Operation")) + ": " + op.type_name +
+    var head = DOM.el(doc, "h2", (label || t("explorer.op_label", "Operation")) + ": " + op.type_name +
       (op.virtual ? t("explorer.virtual_mark", " (virtual)") : "") + t("explorer.op_badge_prefix", " [op ") + op.type_idx + "]");
     box.appendChild(head);
     var dl = DOM.el(doc, "dl", null, "xplore-fields");
@@ -431,7 +431,7 @@ var ExplorerRender = (function () {
       try { title += " · " + Format.formatAmount(String(votes), CORE_PRECISION) + t("explorer.votes_unit", " votes"); }
       catch (e) { /* header stays id + type */ }
     }
-    box.appendChild(DOM.el(doc, "h3", title));
+    box.appendChild(DOM.el(doc, "h2", title));
     if (entry.op) box.appendChild(opSection(doc, entry.op, ctx, t("explorer.history_op", "History op")));
     var dl = DOM.el(doc, "dl", null, "xplore-fields");
     var obj = entry.object || {};

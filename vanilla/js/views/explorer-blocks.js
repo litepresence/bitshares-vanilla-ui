@@ -1684,7 +1684,7 @@ var ExplorerBlocks = (function () {
         wrap.appendChild(opSection(doc, op, ctx, t("explorer.op_prefix", "Op ") + k));
       });
       if (tx.signatures.length > 0) {
-        wrap.appendChild(DOM.el(doc, "h3", t("explorer.signatures_prefix", "Signatures (") + tx.signatures.length + ")"));
+        wrap.appendChild(DOM.el(doc, "h2", t("explorer.signatures_prefix", "Signatures (") + tx.signatures.length + ")"));
         var ul = doc.createElement("ul");
         tx.signatures.forEach(function (sig) {
           ul.appendChild(DOM.el(doc, "li", String(sig), "muted"));

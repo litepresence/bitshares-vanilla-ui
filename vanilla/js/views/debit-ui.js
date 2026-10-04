@@ -244,7 +244,7 @@ var DebitUI = (function () {
     var grid = u.el(doc, "div", null, "spot-grid");
     tiles.forEach(function (t) {
       var card = u.el(doc, "div", null, "spot-card");
-      card.appendChild(u.el(doc, "h3", t[0]));
+      card.appendChild(u.el(doc, "h2", t[0]));
       card.appendChild(u.el(doc, "p", t[1] + (t[3] ? " " + t[3] + "." : ""), "muted"));
       if (t[2]) { var a = u.el(doc, "a", "Open " + t[0]); a.setAttribute("href", t[2]); card.appendChild(a); }
       grid.appendChild(card);

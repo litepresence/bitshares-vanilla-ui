@@ -223,7 +223,7 @@ var EsLabUI = (function () {
       inputEls = [];
       rawOverride = false;
       lastGood = null;
-      card.appendChild(DOM.el(doc, "h3", entry.title || entry.key, null));
+      card.appendChild(DOM.el(doc, "h2", entry.title || entry.key, null));
       card.appendChild(DOM.el(doc, "p", entry.desc || "", "muted"));
       if (!isRaw(entry.key)) {
         card.appendChild(DOM.el(doc, "p", entry.index + "  ·  " + (entry.sourceRef || ""), "muted"));

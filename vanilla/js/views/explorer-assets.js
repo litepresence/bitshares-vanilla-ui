@@ -810,7 +810,7 @@ var ExplorerAssets = (function () {
       infoBox.appendChild(dl);
       /* Asset-type/flags section (chain truth: protocol/types.hpp permission
        * bits; raw ints in titles, human lists via flagBitNames). */
-      infoBox.appendChild(DOM.el(doc, "h3", t("explorer.asset_type_and_permissions", "Asset type and permissions")));
+      infoBox.appendChild(DOM.el(doc, "h2", t("explorer.asset_type_and_permissions", "Asset type and permissions")));
       var dlF = DOM.el(doc, "dl", null, "xplore-fields");
       function flagRow(term, raw) {
         dlF.appendChild(DOM.el(doc, "dt", term));
@@ -834,7 +834,7 @@ var ExplorerAssets = (function () {
       /* Description box with grouped amounts (main text + short_name +
        * max/current/fees/fee-pool human — #1 AboutBox + Summary grouped). */
       var descBox = DOM.el(doc, "div", null, "xplore-descbox");
-      descBox.appendChild(DOM.el(doc, "h3", t("explorer.description", "Description")));
+      descBox.appendChild(DOM.el(doc, "h2", t("explorer.description", "Description")));
       var mainText = (descParsed.main && descParsed.main.trim())
         ? descParsed.main : "(no description)";
       descBox.appendChild(DOM.el(doc, "p", mainText));
@@ -860,7 +860,7 @@ var ExplorerAssets = (function () {
       (function holdersSection() {
         var box = DOM.el(doc, "div", null, "xplore-holders");
         infoBox.appendChild(box);
-        box.appendChild(DOM.el(doc, "h3", t("asset.holders_title", "Top holders")));
+        box.appendChild(DOM.el(doc, "h2", t("asset.holders_title", "Top holders")));
         var listBox = DOM.el(doc, "div", null, "xplore-holders-list");
         box.appendChild(listBox);
         showStatus(doc, listBox, t("explorer.loading_prefix", "Loading ") + t("asset.holders_title", "Top holders") + "…");
@@ -944,7 +944,7 @@ var ExplorerAssets = (function () {
        * renderFeePoolFunding + FeePoolOperation fund path and #2
        * AssetIssuerActions fund-fee-pool dialog (current pool + amount +
        * confirm); vanilla uses named confirm rows, never raw JSON. */
-      actBox.appendChild(DOM.el(doc, "h3", t("explorer.asset_actions", "Asset actions")));
+      actBox.appendChild(DOM.el(doc, "h2", t("explorer.asset_actions", "Asset actions")));
       var mLink = anchor(doc, t("explorer.open_market", "Open market ") + marketID, "#/market/" + marketID);
       mLink.title = marketID;
       actBox.appendChild(mLink);
@@ -957,7 +957,7 @@ var ExplorerAssets = (function () {
        * (publish gates on the fresh WIF, same as asset-manage-ui). Batch-7
        * i18n: labels keyed via t() under explorer dot fund, confirm, plus suffixes. */
       (function fundSection() {
-        actBox.appendChild(DOM.el(doc, "h3", t("explorer.fund_fee_pool_h", "Fund fee pool (op 16)")));
+        actBox.appendChild(DOM.el(doc, "h2", t("explorer.fund_fee_pool_h", "Fund fee pool (op 16)")));
         var poolHuman = "—", poolRaw = (dyn && dyn.fee_pool !== undefined && dyn.fee_pool !== null)
           ? String(dyn.fee_pool) : null;
         try { poolHuman = poolRaw === null ? "—" : Format.formatAmount(poolRaw, CORE_PRECISION) + t("explorer.core_suffix", " (core)"); }
@@ -1016,7 +1016,7 @@ var ExplorerAssets = (function () {
             pair[1].fee = { amount: f.amount, asset_id: f.asset_id };
             if (!isCurrent(myGen)) return;
             DOM.clear(actBox);
-            actBox.appendChild(DOM.el(doc, "h3", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
+            actBox.appendChild(DOM.el(doc, "h2", t("explorer.confirm_fund_h", "Confirm fee-pool funding")));
             var dl = DOM.el(doc, "dl", null, "xfer-confirm");
             /* confRow: append a confirm dt/dd row (human visible, raw in title).
              * WHY helper: fee-pool confirm rows share the human+raw contract (#6).
@@ -1102,7 +1102,7 @@ var ExplorerAssets = (function () {
         infoBox.appendChild(DOM.el(doc, "p", t("explorer.not_smartcoin", "Not a smartcoin — no price feeds."), "muted"));
         return;
       }
-      infoBox.appendChild(DOM.el(doc, "h3", t("explorer.feeds_h", "Price feeds")));
+      infoBox.appendChild(DOM.el(doc, "h2", t("explorer.feeds_h", "Price feeds")));
       var feedBox = DOM.el(doc, "div", null, "xplore-feed");
       infoBox.appendChild(feedBox);
       showStatus(doc, feedBox, t("explorer.loading_feeds", "Loading feeds…"));

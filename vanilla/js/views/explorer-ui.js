@@ -593,7 +593,7 @@ var ExplorerUI = (function () {
       });
       var sigs = (tx && Array.isArray(tx.signatures)) ? tx.signatures : [];
       if (sigs.length > 0) {
-        host.appendChild(DOM.el(doc, "h3",
+        host.appendChild(DOM.el(doc, "h2",
           t("explorer.signatures_prefix", "Signatures (") + sigs.length + ")"));
         var ul = doc.createElement("ul");
         sigs.forEach(function (sig) {
