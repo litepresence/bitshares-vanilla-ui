@@ -2,7 +2,7 @@
 
 The vanilla-UI build as a user/assistant dialog: each verbatim user prompt followed by the assistant's reply text (the final visible response only -- no reasoning or tool-call internals). Numbering matches docs/vanilla-ui-prompts.md exactly. Times are UTC.
 
-Generated 2026-10-03 18:11 UTC from opencode.db: 413 exchanges across 14 sessions.
+Generated 2026-10-04 00:14 UTC from opencode.db: 413 prompts across 14 sessions (13 distinct titles — two sessions share one title). 1496 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
 
 ---
 

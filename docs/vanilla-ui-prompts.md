@@ -2,7 +2,7 @@
 
 Every verbatim user prompt that created the vanilla UI, collated chronologically across all opencode sessions. Times are UTC.
 
-Generated 2026-10-03 18:11 UTC from opencode.db: 413 prompts across 14 sessions. 1505 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
+Generated 2026-10-04 00:14 UTC from opencode.db: 413 prompts across 14 sessions (13 distinct titles — two sessions share one title). 1496 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
 
 ## Sessions included
 
