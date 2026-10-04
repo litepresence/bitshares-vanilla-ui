@@ -221,12 +221,15 @@ function stubChain(txOrThrow) {
   eq([t.block, t.index], [null, null], "recentTxById carries no coords (location-less)");
   eq(t.ops[0].fields.amount.amount, "100", "recentTxById keeps raw op fields");
   globalThis.Chain.call = function () { return Promise.resolve(null); };
+  let rejErr = null;
   try {
     await Explorer.recentTxById(H);
-    assert.fail("null WS tx must reject");
   } catch (e) {
-    eq(e.message, "tx-expired-or-unknown", "null WS tx maps to tx-expired-or-unknown");
+    rejErr = e;
   }
+  assert.ok(rejErr, "null WS tx must reject (actual=resolved expected=rejected)");
+  passed++;
+  eq(rejErr && rejErr.message, "tx-expired-or-unknown", "null WS tx maps to tx-expired-or-unknown");
   delete globalThis.Chain;
 
   console.log("tx-hash-test: " + passed + " passed, 0 failed");

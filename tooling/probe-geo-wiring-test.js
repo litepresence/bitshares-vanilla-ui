@@ -6,6 +6,7 @@
  * Stdlib only: `node tooling/probe-geo-wiring-test.js`.
  */
 "use strict";
+const assert = require("assert");
 const fs = require("fs");
 const vm = require("vm");
 
@@ -133,7 +134,12 @@ const t = (k, d) => d;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async function main() {
-  const fails = [];
+  let pass = 0;
+  function check(cond, failMsg, passMsg) {
+    assert.ok(cond, "FAIL " + failMsg);
+    pass++;
+    if (passMsg) console.log(passMsg);
+  }
   const settings = sandbox.Store.loadSettings();
   const nodes = SettingsNodes.allNodes(settings);
   const built = SettingsNodes.buildNodeTable(doc, settings, nodes, t);
@@ -160,12 +166,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const cardGeo = cellText(cards, ".node-geo");
   console.log("card geo    : " + JSON.stringify(cardGeo));
 
-  if (geo === "<MISSING>" || prov === "<MISSING>") fails.push("geo cells were never built");
-  else {
-    if (geo !== "Ashburn, Virginia") fails.push("geo cell wrong (got " + JSON.stringify(geo) + ")");
-    if (prov !== "Amazon") fails.push("provider cell wrong (got " + JSON.stringify(prov) + ")");
-    if (cardGeo !== "Ashburn, Virginia") fails.push("card geo wrong (got " + JSON.stringify(cardGeo) + ")");
-  }
+  check(!(geo === "<MISSING>" || prov === "<MISSING>"),
+    "geo cells were never built (geo=" + JSON.stringify(geo) + " prov=" + JSON.stringify(prov) + " want built cells)");
+  assert.strictEqual(geo, "Ashburn, Virginia", "geo cell wrong (actual=" + JSON.stringify(geo) + " expected=" + JSON.stringify("Ashburn, Virginia") + ")");
+  pass++; console.log("PASS geo cell painted");
+  assert.strictEqual(prov, "Amazon", "provider cell wrong (actual=" + JSON.stringify(prov) + " expected=" + JSON.stringify("Amazon") + ")");
+  pass++; console.log("PASS provider cell painted");
+  assert.strictEqual(cardGeo, "Ashburn, Virginia", "card geo wrong (actual=" + JSON.stringify(cardGeo) + " expected=" + JSON.stringify("Ashburn, Virginia") + ")");
+  pass++; console.log("PASS card geo painted");
 
   /* Health signals ride data-h (stub probe: hs 800 good, ping 100 warn,
    * part 99 good, age 1.2 good, mainnet match good, history null uncolored). */
@@ -181,13 +189,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ];
   hChecks.forEach(([cls, want]) => {
     const got = healthOf(row, cls);
-    if (got !== want) fails.push(cls + " data-h want " + want + " (got " + JSON.stringify(got) + ")");
-    else console.log("PASS " + cls + " -> " + got);
+    assert.strictEqual(got, want, cls + " data-h wrong (actual=" + JSON.stringify(got) + " expected=" + JSON.stringify(want) + ")");
+    pass++;
+    console.log("PASS " + cls + " -> " + got);
   });
 
-  if (fails.length) {
-    fails.forEach((f) => console.log("FAIL " + f));
-    process.exit(1);
-  }
-  console.log("PROBE-GEO-WIRING GREEN");
+  assert.ok(pass > 0, "FAIL expected non-empty pass count (actual=" + pass + " expected>0)");
+  console.log("PROBE-GEO-WIRING GREEN (" + pass + " checks)");
 })().catch((e) => { console.log("FAIL harness: " + (e && e.stack || e)); process.exit(1); });

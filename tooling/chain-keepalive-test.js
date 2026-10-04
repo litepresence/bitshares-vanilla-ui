@@ -11,6 +11,7 @@
  *  6. probe() resolves pingMs (single RTT) bounded by handshake latencyMs.
  * Exit 0 green, 1 red. */
 "use strict";
+const assert = require("assert");
 const fs = require("fs");
 const vm = require("vm");
 
@@ -85,7 +86,12 @@ const Chain = sandbox.Chain;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async function main() {
-  let fails = [];
+  let pass = 0;
+  function check(cond, failMsg, passMsg) {
+    assert.ok(cond, "FAIL " + failMsg + " (actual=" + JSON.stringify(!cond) + " expected=true)");
+    pass++;
+    if (passMsg) console.log(passMsg);
+  }
   // Handshake: open socket 0, let login/database/chain-id/props resolve.
   const p = Chain.connect("wss://fake/ws", { heartbeatMs: 60, reconnectDelays: [40, 40] }).catch(() => null);
   await sleep(10);
@@ -97,8 +103,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   blockNum = 101;
   await sleep(200);
   const st1 = Chain.status();
-  if (st1.headBlock !== 101) fails.push("heartbeat did not advance headBlock (got " + st1.headBlock + ")");
-  else console.log("PASS heartbeat advanced headBlock to 101");
+  check(st1.headBlock === 101, "heartbeat did not advance headBlock (got " + st1.headBlock + ", want 101)",
+    "PASS heartbeat advanced headBlock to 101");
 
   // TEST 2: unexpected close triggers reconnect (new socket).
   const nBefore = sockets.length;
@@ -106,9 +112,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const last = sockets[sockets.length - 1];
   if (last.onclose) last.onclose();
   await sleep(150);
-  if (sockets.length <= nBefore) fails.push("no reconnect socket after unexpected close");
-  else {
-    console.log("PASS reconnect attempted (sockets " + nBefore + " -> " + sockets.length + ")");
+  check(sockets.length > nBefore, "no reconnect socket after unexpected close (sockets=" + sockets.length + " want>" + nBefore + ")",
+    "PASS reconnect attempted (sockets " + nBefore + " -> " + sockets.length + ")");
+  {
     sockets[sockets.length - 1].open();
     await sleep(50);
   }
@@ -121,8 +127,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   lastSock.onmessage({ data: JSON.stringify({ method: "notice", params: [1, ["06d73c6c" + "00".repeat(16)]] }) });
   await sleep(20);
   const afterNotice = Chain.status().headBlock;
-  if (afterNotice !== 0x06d73c6c) fails.push("block notice did not advance tip (got " + afterNotice + " from " + beforeNotice + ")");
-  else console.log("PASS block notice advanced tip to " + afterNotice);
+  check(afterNotice === 0x06d73c6c, "block notice did not advance tip (got " + afterNotice + " from " + beforeNotice + ", want " + 0x06d73c6c + ")",
+    "PASS block notice advanced tip to " + afterNotice);
 
   // TEST 4+5 on a fresh quiet connection (60s heartbeat, no redial — the
   // piggyback is the only possible latency emitter; the 1.1s sleep clears
@@ -145,32 +151,38 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // TEST 4: a successful call emits footer latency with zero extra RPC.
   const latEmits = piggyEmits.filter((e) => typeof e.latencyMs === "number");
-  if (!latEmits.length) fails.push("successful call did not refresh footer latency");
-  else console.log("PASS per-call RTT refreshed footer latency (" + latEmits[latEmits.length - 1].latencyMs + "ms)");
-  if (sentLog.length - rpcMark !== 1) fails.push("piggyback emitted extra RPC (sent " + (sentLog.length - rpcMark) + ", want 1)");
-  else console.log("PASS piggyback rode the app call (zero extra RPC)");
+  check(latEmits.length > 0, "successful call did not refresh footer latency (latEmits=" + latEmits.length + " want>0)",
+    "PASS per-call RTT refreshed footer latency (" + (latEmits.length ? latEmits[latEmits.length - 1].latencyMs : "?") + "ms)");
+  check(sentLog.length - rpcMark === 1, "piggyback emitted extra RPC (sent " + (sentLog.length - rpcMark) + ", want 1)",
+    "PASS piggyback rode the app call (zero extra RPC)");
 
   // TEST 5: a failed call neither moves latencyMs nor emits.
   const latBefore = Chain.status().latencyMs;
   const emitMark = piggyEmits.length;
-  await Chain.call(dbId4, "boom", []).then(() => fails.push("boom call should reject"), () => {});
+  {
+    let boomRejected = false;
+    try { await Chain.call(dbId4, "boom", []); } catch (e) { boomRejected = true; }
+    assert.ok(boomRejected, "FAIL boom call should reject (actual=resolved expected=rejected)");
+    pass++;
+    console.log("PASS boom call rejected as expected");
+  }
   await sleep(30);
-  if (Chain.status().latencyMs !== latBefore) fails.push("failed call moved latencyMs");
-  else console.log("PASS failed call left latency untouched");
-  if (piggyEmits.length !== emitMark) fails.push("failed call emitted status");
-  else console.log("PASS failed call emitted nothing");
+  check(Chain.status().latencyMs === latBefore, "failed call moved latencyMs (got " + Chain.status().latencyMs + " want " + latBefore + ")",
+    "PASS failed call left latency untouched");
+  check(piggyEmits.length === emitMark, "failed call emitted status (emits=" + piggyEmits.length + " want " + emitMark + ")",
+    "PASS failed call emitted nothing");
 
   // TEST 6: probe measures a single-RTT ping inside the handshake window.
   const prP = Chain.probe("wss://fake/probe", 8000);
   await sleep(10);
   sockets[sockets.length - 1].open();
   const pr = await prP;
-  if (!(pr && typeof pr.pingMs === "number" && pr.pingMs >= 0)) fails.push("probe pingMs missing (got " + JSON.stringify(pr && pr.pingMs) + ")");
-  else console.log("PASS probe measured single-RTT ping (" + pr.pingMs + "ms)");
-  if (!(pr && typeof pr.latencyMs === "number" && pr.latencyMs >= pr.pingMs)) fails.push("handshake latency should bound the ping");
-  else console.log("PASS handshake latency bounds the ping");
-  if (!(pr && pr.hasHistory === true)) fails.push("stub history id should mark hasHistory");
-  else console.log("PASS probe history flag intact");
+  check(!!(pr && typeof pr.pingMs === "number" && pr.pingMs >= 0), "probe pingMs missing (got " + JSON.stringify(pr && pr.pingMs) + " want number>=0)",
+    "PASS probe measured single-RTT ping (" + pr.pingMs + "ms)");
+  check(!!(pr && typeof pr.latencyMs === "number" && pr.latencyMs >= pr.pingMs), "handshake latency should bound the ping (latencyMs=" + JSON.stringify(pr && pr.latencyMs) + " pingMs=" + JSON.stringify(pr && pr.pingMs) + ")",
+    "PASS handshake latency bounds the ping");
+  check(!!(pr && pr.hasHistory === true), "stub history id should mark hasHistory (got " + JSON.stringify(pr && pr.hasHistory) + " want true)",
+    "PASS probe history flag intact");
 
   // TEST 7: a FAILED redial must reschedule instead of going silent
   // (the stuck-DISCONNECTED bug: one failed redial parked the app forever).
@@ -185,12 +197,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   sockets[sockets.length - 1].readyState = 3;
   sockets[sockets.length - 1].onclose();
   await sleep(120);
-  if (sockets.length <= nFlaky) fails.push("no redial after drop");
-  else console.log("PASS redial attempted after drop");
+  check(sockets.length > nFlaky, "no redial after drop (sockets=" + sockets.length + " want>" + nFlaky + ")",
+    "PASS redial attempted after drop");
   sockets[sockets.length - 1].onclose();
   await sleep(150);
-  if (sockets.length <= nFlaky + 1) fails.push("failed redial went silent (no reschedule)");
-  else console.log("PASS failed redial rescheduled");
+  check(sockets.length > nFlaky + 1, "failed redial went silent, no reschedule (sockets=" + sockets.length + " want>" + (nFlaky + 1) + ")",
+    "PASS failed redial rescheduled");
   sockets[sockets.length - 1].open();
   await sleep(60);
 
@@ -200,8 +212,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const nDead = sockets.length;
   await Chain.connect("wss://fake/dead", { heartbeatMs: 60000, reconnectDelays: [40], timeoutMs: 60 }).catch(() => null);
   await sleep(250);
-  if (sockets.length <= nDead + 1) fails.push("dead node connect went silent (no reschedule)");
-  else console.log("PASS dead node connect rescheduled");
+  check(sockets.length > nDead + 1, "dead node connect went silent, no reschedule (sockets=" + sockets.length + " want>" + (nDead + 1) + ")",
+    "PASS dead node connect rescheduled");
   sockets[sockets.length - 1].open();
   await sleep(60);
 
@@ -209,12 +221,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const nCalm = sockets.length;
   Chain.disconnect();
   await sleep(150);
-  if (sockets.length !== nCalm) fails.push("manual disconnect triggered reconnect");
-  else console.log("PASS manual disconnect stays quiet");
+  check(sockets.length === nCalm, "manual disconnect triggered reconnect (sockets=" + sockets.length + " want " + nCalm + ")",
+    "PASS manual disconnect stays quiet");
 
-  if (fails.length) {
-    fails.forEach((f) => console.log("FAIL " + f));
-    process.exit(1);
-  }
-  console.log("KEEPALIVE GREEN");
-})().catch((e) => { console.log("FAIL harness: " + (e && e.message)); process.exit(1); });
+  assert.ok(pass > 0, "FAIL expected non-empty pass count (actual=" + pass + " expected>0)");
+  console.log("KEEPALIVE GREEN (" + pass + " checks)");
+})().catch((e) => { console.log("FAIL harness: " + (e && e.stack || e && e.message)); process.exit(1); });

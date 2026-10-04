@@ -68,25 +68,58 @@ function ok(cond, name, extra) {
   // 3. rate-limit: consecutive failures are delayed + stamped. (Clear the
   // persisted stamp first so this step measures the DELAY mechanism rather
   // than tripping the stamp short-circuit from the step above.)
+  // 3. rate-limit: consecutive failures persist count + stamp, and the
+  // second failure requests the backoff delay (call-count + stamp asserts —
+  // no wall-clock deltas; timing is flaky under load).
   box.delete("bts-vanilla-lockout-v1");
   await Wallet.unlock(PW);
   Wallet.lock();
   box.delete("bts-vanilla-lockout-v1");
-  const t0 = Date.now();
-  try { await Wallet.unlock("nope-1"); } catch (e) {}
+  let firstMsg = null;
+  try {
+    await Wallet.unlock("nope-1");
+    ok(false, "first wrong password must reject", "resolved instead of rejecting");
+  } catch (e) {
+    firstMsg = e && e.message;
+    ok(firstMsg && firstMsg.indexOf("wrong password") === 0, "first failure reports wrong password", firstMsg);
+  }
+  let stamp1 = null;
+  try {
+    stamp1 = JSON.parse(box.get("bts-vanilla-lockout-v1"));
+    ok(stamp1 && stamp1.failCount === 1, "first failure persists failCount 1", JSON.stringify(stamp1));
+    ok(stamp1 && typeof stamp1.until === "number" && stamp1.until > 0, "first failure stamps a future until", JSON.stringify(stamp1));
+  } catch (e) {
+    ok(false, "first lockout stamp parses as JSON", e && e.message);
+  }
   box.delete("bts-vanilla-lockout-v1"); // isolate the delay mechanism
-  const t1 = Date.now();
+  const realSetTimeout = globalThis.setTimeout;
+  let delayCalls = 0;
+  let delayMs = [];
+  globalThis.setTimeout = function (fn, ms) { delayCalls++; delayMs.push(ms); return realSetTimeout(fn, ms); };
   let lateMsg = null;
-  try { await Wallet.unlock("nope-2"); } catch (e) { lateMsg = e && e.message; }
-  const dt = Date.now() - t1;
-  ok(dt >= 900, "second consecutive failure delayed ~1s", dt + "ms");
-  ok(lateMsg && lateMsg.indexOf("wrong password") === 0, "delayed failure still reports wrong password", lateMsg);
+  try {
+    await Wallet.unlock("nope-2");
+    ok(false, "second wrong password must reject", "resolved instead of rejecting");
+  } catch (e) {
+    lateMsg = e && e.message;
+    ok(lateMsg && lateMsg.indexOf("wrong password") === 0, "delayed failure still reports wrong password", lateMsg);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
+  ok(delayCalls >= 1, "second consecutive failure requests a backoff delay", delayCalls + " delay calls");
+  ok(delayMs.some((m) => m >= 1000), "backoff delay requested >=1000ms", JSON.stringify(delayMs));
+  let stamp2 = null;
+  try {
+    stamp2 = JSON.parse(box.get("bts-vanilla-lockout-v1"));
+    ok(stamp2 && stamp2.failCount === 2, "second failure persists failCount 2", JSON.stringify(stamp2));
+  } catch (e) {
+    ok(false, "second lockout stamp parses as JSON", e && e.message);
+  }
   // And the stamp path short-circuits while a lockout is recorded.
   let stampMsg = null;
   try { await Wallet.unlock("nope-3"); } catch (e) { stampMsg = e && e.message; }
   ok(stampMsg && stampMsg.indexOf("locked out") === 0, "persisted stamp short-circuits", stampMsg);
-  ok(box.has("bts-vanilla-lockout-v1"), "lockout stamp persisted");
-  void t0;
+  ok(box.has("bts-vanilla-lockout-v1"), "lockout stamp persisted", "missing bts-vanilla-lockout-v1");
 
   console.log("Wallet seam vectors: " + pass + " pass, " + fail + " fail");
   process.exit(fail ? 1 : 0);

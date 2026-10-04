@@ -28,12 +28,12 @@ assert.strictEqual(wrap.children.length, 0);
 
 var p = DOM.status(wrap, "test");
 assert.strictEqual(p.textContent, "test");
-assert.ok(p.hasAttribute("aria-live"));
+assert.strictEqual(p.hasAttribute("aria-live"), true, "status sets aria-live (actual=" + p.hasAttribute("aria-live") + " expected=true)");
 assert.strictEqual(p.getAttribute("aria-live"), "polite");
 
 var err = DOM.error(wrap, "oops");
 assert.strictEqual(err.className, "error");
-assert.ok(err.hasAttribute("aria-live"));
+assert.strictEqual(err.hasAttribute("aria-live"), true, "error sets aria-live (actual=" + err.hasAttribute("aria-live") + " expected=true)");
 
 // pageHead vectors (uniform heading-icons plan, Phase 1)
 assert.strictEqual(typeof DOM.pageHead, "function", "DOM.pageHead exists");

@@ -134,19 +134,18 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     const bodies = [];
     globalThis.fetch = function (url, opts) {
       calls++;
-      try { bodies.push(opts && opts.body ? String(opts.body) : ""); } catch (x) { bodies.push(""); }
+      bodies.push(opts && opts.body ? String(opts.body) : "");
       const hits = pages[Math.min(calls - 1, pages.length - 1)] || [];
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits } }) });
     };
     const pres = await PH.esSwaps("1.19.133", 2000);
     eq(pres.swaps.length, 502, "es pagination 2-page merge");
     eq(calls, 2, "es pagination short-page stop (2nd <500)");
-    let b2 = {};
-    try { b2 = JSON.parse(bodies[1] || "{}"); } catch (x) { b2 = {}; }
+    const b2 = JSON.parse(bodies[1]);
     eq(!!b2.search_after, true, "es pagination uses search_after");
     eq(JSON.stringify(b2.search_after), JSON.stringify(["p1-499"]), "es pagination search_after = last sort");
     if (_f0 !== undefined) globalThis.fetch = _f0; else delete globalThis.fetch;
-  } catch (e) { fail++; console.log("FAIL es pagination 2-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es pagination 2-page\n " + (e && e.stack || e)); if (typeof _f0 !== "undefined" && _f0 !== undefined) { globalThis.fetch = _f0; } else { delete globalThis.fetch; } }
   try {
     const _f1 = globalThis.fetch;
     let c1 = 0;
@@ -158,7 +157,7 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     eq(r1.swaps.length, 2, "es short page returns 2");
     eq(c1, 1, "es short-page stops after 1 fetch");
     if (_f1 !== undefined) globalThis.fetch = _f1; else delete globalThis.fetch;
-  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); if (typeof _f1 !== "undefined" && _f1 !== undefined) { globalThis.fetch = _f1; } else { delete globalThis.fetch; } }
   try {
     const _f2 = globalThis.fetch;
     let c2 = 0;
@@ -170,7 +169,7 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     eq(c2, 2, "es cap respects max 2 pages");
     eq(r2.swaps.length <= 1000, true, "es cap respects 1000 events");
     if (_f2 !== undefined) globalThis.fetch = _f2; else delete globalThis.fetch;
-  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); if (typeof _f2 !== "undefined" && _f2 !== undefined) { globalThis.fetch = _f2; } else { delete globalThis.fetch; } }
   // 6. chainSwaps clamps to the history-api limit (chain asserts limit <= 101;
   // measured 2026-10-01: limit 200 rejects, 100 returns 100 rows in 55ms).
   // Without the clamp the pool desk's chain-first paint could never work.

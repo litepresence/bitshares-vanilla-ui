@@ -17,7 +17,7 @@ var Bridge = require("../extension-wrapper/adapter/bridge.js");
 
 var passed = 0;
 function ok(cond, name) {
-  assert(cond, "FAIL: " + name);
+  assert.ok(cond, "FAIL: " + name + " (actual=" + JSON.stringify(cond) + " expected=true)");
   passed++;
 }
 

@@ -90,19 +90,18 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     var calls = 0, bodies = [];
     globalThis.fetch = function (url, opts) {
       calls++;
-      try { bodies.push(opts && opts.body ? String(opts.body) : ""); } catch (x) { bodies.push(""); }
+      bodies.push(opts && opts.body ? String(opts.body) : "");
       var hits = pages[Math.min(calls - 1, pages.length - 1)] || [];
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits } }); } });
     };
     var pres = await MF.esFills("1.3.0", "1.3.113", 2000);
     eq(pres.fills.length, 502, "es pagination 2-page merge");
     eq(calls, 2, "es pagination short-page stop (2nd <500)");
-    var b2 = {};
-    try { b2 = JSON.parse(bodies[1] || "{}"); } catch (x) { b2 = {}; }
+    var b2 = JSON.parse(bodies[1]);
     eq(!!b2.search_after, true, "es pagination uses search_after");
     eq(JSON.stringify(b2.search_after), JSON.stringify(["p1-499"]), "es pagination search_after = last sort");
     if (_f0 !== undefined) { globalThis.fetch = _f0; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL es pagination 2-page\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es pagination 2-page\n " + (e && e.stack || e)); if (typeof _f0 !== "undefined" && _f0 !== undefined) { globalThis.fetch = _f0; } else { delete globalThis.fetch; } }
   try {
     var _f1 = globalThis.fetch;
     var c1 = 0;
@@ -114,7 +113,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     eq(r1.fills.length, 2, "es short page returns 2");
     eq(c1, 1, "es short-page stops after 1 fetch");
     if (_f1 !== undefined) { globalThis.fetch = _f1; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es short-page stop\n " + (e && e.stack || e)); if (typeof _f1 !== "undefined" && _f1 !== undefined) { globalThis.fetch = _f1; } else { delete globalThis.fetch; } }
   try {
     var _f2 = globalThis.fetch;
     var c2 = 0;
@@ -127,7 +126,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     eq(c2, 2, "es cap respects max 2 pages");
     eq(r2.fills.length <= 1000, true, "es cap respects 1000 events");
     if (_f2 !== undefined) { globalThis.fetch = _f2; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL es cap respect\n " + (e && e.stack || e)); if (typeof _f2 !== "undefined" && _f2 !== undefined) { globalThis.fetch = _f2; } else { delete globalThis.fetch; } }
   /* 19-21: lazy-deep — candles() resolves chain-first even when ES hangs
    * forever, and deepen() merges the backfill when ES lands (offline). */
   try {
@@ -164,7 +163,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     eq(rc.deep, false, "lazy candles chain-only while ES hangs");
     eq(rc.buckets.length, 1, "lazy candles paint the chain row (leading gaps dropped)");
     if (_f3 !== undefined) { globalThis.fetch = _f3; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL lazy candles hang\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL lazy candles hang\n " + (e && e.stack || e)); if (typeof _f3 !== "undefined" && _f3 !== undefined) { globalThis.fetch = _f3; } else { delete globalThis.fetch; } }
   try {
     var _f4 = globalThis.fetch;
     var hits2 = pageOf(2, "d1");
@@ -176,7 +175,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     var rd = await MC2.candles("1.3.0", "1.3.113", 3600, 5);
     eq(rd.deep, true, "candles merge the deep cache");
     if (_f4 !== undefined) { globalThis.fetch = _f4; } else { delete globalThis.fetch; }
-  } catch (e) { fail++; console.log("FAIL deepen merge\n " + (e && e.stack || e)); try { delete globalThis.fetch; } catch (x) {} }
+  } catch (e) { fail++; console.log("FAIL deepen merge\n " + (e && e.stack || e)); if (typeof _f4 !== "undefined" && _f4 !== undefined) { globalThis.fetch = _f4; } else { delete globalThis.fetch; } }
   try {
     var _fetch = globalThis.fetch;
     globalThis.fetch = function () { return Promise.reject(new Error("no net in test")); };

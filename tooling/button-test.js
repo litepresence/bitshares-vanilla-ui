@@ -62,7 +62,7 @@ var files = [
 ];
 files.forEach(function(f) {
   var code = fs.readFileSync(path.join(__dirname, "..", f), "utf8");
-  assert.ok(!code.includes("function touchable"), f + " still has local touchable");
-  assert.ok(code.includes("touchable("), f + " uses touchable but may not have migrated");
+  assert.strictEqual(code.includes("function touchable"), false, f + " still has local touchable (actual=has-local expected=migrated)");
+  assert.ok(code.includes("touchable("), f + " uses touchable but may not have migrated (actual=" + code.includes("touchable(") + " expected=true)");
 });
 console.log("Migration smoke: " + files.length + " files clean");
