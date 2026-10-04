@@ -15,19 +15,8 @@
  */
 var VoteUI = (typeof globalThis !== "undefined" && globalThis.VoteUI) ? globalThis.VoteUI : ((typeof VoteUI !== "undefined") ? VoteUI : {});
 /* Node suites require() the facade directly while the browser loads
- * the parts via <script> order. Pull the parts through the module loader
- * WITHOUT naming `require` (checkJs runs browser libs — a bare require()
- * call is TS2591 there; tx.js precedent). module.require resolves relative
- * to THIS file, like require(). */
-var __partRequire = null;
-try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __partRequire = module.require.bind(module);
-} catch (e) { __partRequire = null; }
-if (__partRequire && (!VoteUI._gov || !VoteUI._ballot)) {
-  try { __partRequire("./vote-gov.js"); } catch (e) {}
-  try { __partRequire("./vote-ballot.js"); } catch (e) {}
-  if (typeof globalThis !== "undefined" && globalThis.VoteUI) VoteUI = globalThis.VoteUI;
-}
+ * Script-tag order in index.html (vote-gov.js, vote-ballot.js, then this
+ * facade) already guarantees the parts — no loader needed. */
 (function () {
   "use strict";
 

@@ -161,6 +161,7 @@ interface Window {
 }
 declare var BRAINKEY_DICT: any;
 declare var ConfirmDialog: any;
+declare var Duration: any;
 declare var Overlay: any;
 declare var TableRenderer: any;
 declare var EventDelegate: any;
