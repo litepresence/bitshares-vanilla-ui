@@ -180,7 +180,7 @@ var CreateAccountUI = (function () {
     checkBtn.id = "ca-check"; checkBtn.type = "button"; wrap.appendChild(checkBtn);
     var avail = DOM.el(doc, "p", availabilityText(P), "muted");
     avail.id = "ca-avail"; avail.setAttribute("aria-live", "polite"); wrap.appendChild(avail);
-    wrap.appendChild(DOM.el(doc, "h3", t("createaccount.brainkey_back_it_up", "Brainkey (back it up)")));
+    wrap.appendChild(DOM.el(doc, "h2", t("createaccount.brainkey_back_it_up", "Brainkey (back it up)")));
     wrap.appendChild(DOM.el(doc, "p", t("createaccount.a_fresh_brainkey_is_generated_for_the_new_acc", "A fresh brainkey is generated for the new account. Write it down — it derives the owner, active and memo keys."), "muted"));
     var bkArea = doc.createElement("textarea");
     bkArea.id = "ca-brainkey"; bkArea.rows = 3; bkArea.readOnly = true; bkArea.style.width = "100%";
@@ -369,7 +369,7 @@ var CreateAccountUI = (function () {
     var saved = doc.createElement("textarea");
     saved.id = "ca-backup-text"; saved.rows = 3; saved.readOnly = true; saved.value = P.brainkey; saved.style.width = "100%";
     wrap.appendChild(saved);
-    wrap.appendChild(DOM.el(doc, "h3", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
+    wrap.appendChild(DOM.el(doc, "h2", t("createaccount.save_to_this_wallet_optional", "Save to this wallet (optional)")));
     var pwF = Forms.labeledInput(doc, t("createaccount.password", "Password ") + " ", { id: "ca-password", type: "password" });
     pwF.err = DOM.el(doc, "div", "", "error");
     pwF.err.setAttribute("aria-live", "polite"); pwF.err.style.display = "none"; pwF.row.appendChild(pwF.err);

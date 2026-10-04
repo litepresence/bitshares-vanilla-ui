@@ -377,13 +377,13 @@ var AssetUI = (function () {
        * the whole description object; main/title/short/market go inside as
        * JSON-ish text. Batch-3 i18n: keyed. */
       body.appendChild(el(d, "p", t("asset.description_is_one_text_box_write_the_fu", "Description is one text box: write the full description here (main, short name, market pair and details as plain text)."), "muted"));
-      body.appendChild(el(d, "h3", t("help.topic_accounts-permissions_title", "Permissions"))); var pg = bits(d, PERMS, 79); body.appendChild(pg.box);
-      body.appendChild(el(d, "h3", t("asset.flags_title", "Flags"))); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
+      body.appendChild(el(d, "h2", t("help.topic_accounts-permissions_title", "Permissions"))); var pg = bits(d, PERMS, 79); body.appendChild(pg.box);
+      body.appendChild(el(d, "h2", t("asset.flags_title", "Flags"))); var fg = bits(d, FLAGS, 0); body.appendChild(fg.box);
       var nt = null, nu = null, lh = null, mf = null, dl = null, op = null, mv = null, ba = null;
-      if (nft) { body.appendChild(el(d, "h3", t("asset.nft_meta_title", "NFT metadata (description nft_object)")));
+      if (nft) { body.appendChild(el(d, "h2", t("asset.nft_meta_title", "NFT metadata (description nft_object)")));
         nt = Forms.labeledInput(d, t("asset.nft_title_field", "NFT title") + " ", { value: "", autocomplete: "off" }); nu = Forms.labeledInput(d, t("asset.nft_uri_field", "NFT URI") + " ", { value: "", autocomplete: "off" });
         body.appendChild(nt.row); body.appendChild(nu.row); }
-      if (smart) { body.appendChild(el(d, "h3", t("asset.bitasset_title", "Bitasset options")));
+      if (smart) { body.appendChild(el(d, "h2", t("asset.bitasset_title", "Bitasset options")));
         lh = Forms.labeledInput(d, t("asset.feed_lifetime_field", "Feed lifetime (hours)") + " ", { value: "24", inputmode: "numeric", autocomplete: "off" }); mf = Forms.labeledInput(d, t("explorer.min_feeds", "Minimum feeds") + " ", { value: "1", inputmode: "numeric", autocomplete: "off" });
         dl = Forms.labeledInput(d, t("asset.settle_delay_field", "Settlement delay (sec)") + " ", { value: "86400", inputmode: "numeric", autocomplete: "off" }); op = Forms.labeledInput(d, t("asset.settle_offset_field", "Settlement offset %") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
         mv = Forms.labeledInput(d, t("asset.max_settle_vol_field", "Max settlement vol %") + " ", { value: "20", inputmode: "decimal", autocomplete: "off" }); ba = Forms.labeledInput(d, t("asset.backing_field", "Backing (1.3.N)") + " ", { value: "1.3.0", autocomplete: "off" });

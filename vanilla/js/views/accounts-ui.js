@@ -124,7 +124,7 @@ var AccountsUI = (function () {
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
     catch (e) { unlocked = false; }
-    DOM.append(wrap, DOM.el(doc, "h3", t("account.this_wallet", "This wallet")));
+    DOM.append(wrap, DOM.el(doc, "h2", t("account.this_wallet", "This wallet")));
     if (!unlocked) {
       DOM.append(wrap, DOM.el(doc, "p", t("account.unlock_to_see", "Unlock your wallet to see which on-chain account it controls."), "muted"));
       /* G8: one-line pointer to the public lookup below (the locked card is
@@ -187,7 +187,7 @@ var AccountsUI = (function () {
       DOM.append(wrap, card);
       resolveWalletAccount(doc, myGen, card);
     }
-    DOM.append(wrap, DOM.el(doc, "h3", t("account.lookup_title", "Look up an account")));
+    DOM.append(wrap, DOM.el(doc, "h2", t("account.lookup_title", "Look up an account")));
     DOM.append(wrap, DOM.el(doc, "p", t("account.lookup_hint", "Public data — no unlock needed. Opens the full account page (balances, orders, history)."), "muted"));
     var nameF = Forms.labeledInput(doc, t("account.lookup_label", "Account name ") + " ", { id: "accts-lookup", placeholder: t("account.lookup_placeholder", "account-name"), inputmode: "text" });
     nameF.err = DOM.el(doc, "div", "", "error");
@@ -235,7 +235,7 @@ var AccountsUI = (function () {
         if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.clear === "function") ViewingAs.clear();
       } catch (e) { /* default stands */ }
     });
-    DOM.append(wrap, DOM.el(doc, "h3", t("account.manage", "Manage")));
+    DOM.append(wrap, DOM.el(doc, "h2", t("account.manage", "Manage")));
     DOM.append(wrap, linkPara(doc, [
       ["#/create-wallet-brainkey", t("account.create_wallet", "Create new wallet")],
       ["#/existing-account", t("account.import_account", "Import existing account")],

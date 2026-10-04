@@ -183,7 +183,7 @@ var AssetManageUI = (function () {
         err(d, v,new Error("not-issuer"),t("asset.only_issuer_edit", "Only the issuer can edit this asset."));
         v.appendChild(el(d, "p", "Issuer: " + (info.issuer_name || info.issuer_id) + ". Read-only.", "muted")); return; }
       /* op-11 common */
-      v.appendChild(el(d, "h3", t("asset.common_title", "Common options (op 11)")));
+      v.appendChild(el(d, "h2", t("asset.common_title", "Common options (op 11)")));
       var fp = Forms.labeledInput(d, "Market fee % (now " + AssetOps.hundredthsToPct(info.market_fee_hundredths) + "%)" + " ", { value: AssetOps.hundredthsToPct(info.market_fee_hundredths), inputmode: "decimal", autocomplete: "off" });
       var ds = Forms.labeledTextarea(d, t("asset.description_row", "Description") + " ", { value: info.description || "" });
       ds.input.setAttribute("autocomplete", "off");
@@ -227,7 +227,7 @@ var AssetManageUI = (function () {
         })().catch(function (e) { r1.disabled = false; err(d, v,e,t("credit.could_not_prepare_the_update", "Could not prepare the update.")); }); });
       /* op-12 bitasset (MPA only) */
       if (info.is_smartcoin) {
-        v.appendChild(el(d, "h3", t("asset.bitasset_op12_title", "Bitasset options (op 12)")));
+        v.appendChild(el(d, "h2", t("asset.bitasset_op12_title", "Bitasset options (op 12)")));
         var of = Forms.labeledInput(d, t("asset.settle_offset_field", "Settlement offset %") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
         var vf = Forms.labeledInput(d, t("asset.max_settle_vol_field", "Max settlement vol %") + " ", { value: "20", inputmode: "decimal", autocomplete: "off" });
         v.appendChild(of.row); v.appendChild(vf.row);
@@ -273,7 +273,7 @@ var AssetManageUI = (function () {
           })().catch(function (e) { r2.disabled = false; err(d, v,e,t("asset.bitasset_prepare_failed", "Could not prepare the bitasset update.")); }); });
       }
       /* op-13 producers */
-      v.appendChild(el(d, "h3", t("asset.producers_title", "Feed producers (op 13)")));
+      v.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op 13)")));
       var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
       pa.input.setAttribute("autocomplete", "off");
       v.appendChild(pa.row);
@@ -317,7 +317,7 @@ var AssetManageUI = (function () {
    * defaulting to 1.2.0 (never Account.myAccountId at render); Sign & Send
    * still needs the unlocked WIF in publish(). */
   function half(d, v, root, g, title, btnLabel, isReserve) {
-    v.appendChild(el(d, "h3", title));
+    v.appendChild(el(d, "h2", title));
     if (isReserve) v.appendChild(el(d, "p", t("asset.no_reserve_mpa", "Market-issued assets cannot be reserved."), "muted"));
     var s = Forms.labeledInput(d, t("explorer.th_symbol", "Symbol") + " ", { value: "", placeholder: "AFKTEST01", autocomplete: "off" });
     var toF = isReserve ? null : Forms.labeledInput(d, t("asset.to_field", "To (name or 1.2.N)") + " ", { value: "", autocomplete: "off" });

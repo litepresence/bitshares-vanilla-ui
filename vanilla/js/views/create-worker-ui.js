@@ -369,7 +369,7 @@ var CreateWorkerUI = (function () {
    * review button; onSent locks it so a created worker can never be
    * double-signed from a stale confirm. */
   function paintConfirm(doc, box, myGen, P, R, opData, onBack, onSent) {
-    box.appendChild(DOM.el(doc, "h3", t("createworker.confirm_worker_op_34", "Confirm worker (op 34)")));
+    box.appendChild(DOM.el(doc, "h2", t("createworker.confirm_worker_op_34", "Confirm worker (op 34)")));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));

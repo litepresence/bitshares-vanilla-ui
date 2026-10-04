@@ -265,7 +265,7 @@ var ApiLabUI = (function () {
     function renderForm(prefill) {
       DOM.clear(card);
       inputEls = [];
-      DOM.append(card, DOM.el(doc, "h3", entry.method, null));
+      DOM.append(card, DOM.el(doc, "h2", entry.method, null));
       DOM.append(card, DOM.el(doc, "p", entry.desc || "", "muted"));
       var meta = DOM.el(doc, "p", (entry.login || "") + "  ·  " + (entry.src || "") + "  ·  tier: " + entry.tier, "muted");
       DOM.append(card, meta);

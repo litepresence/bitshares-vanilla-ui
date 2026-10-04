@@ -113,11 +113,11 @@ var AssetFeedUI = (function () {
    * separate counter so it never disturbs renderFeed's gen. */
   function feeSection(d, box) {
     var my = ++feeGen;
-    box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
+    box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees")));
     status(d, box, t("asset.loading_fees", "Loading fee schedule…"));
     Asset.feeSchedule().then(function (s) {
       if (my !== feeGen) return; wipe(box);
-      box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees")));
+      box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees")));
       if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned.") + t("asset.schedule_hint", " The node sent an empty schedule — retry or check Settings → Nodes."), "muted")); return; }
       var sc = el(d, "div", null, "xplore-scroll"); sc.style.overflowX = "auto";
       var tb = d.createElement("table"), th = d.createElement("thead"), hr = d.createElement("tr");
@@ -133,7 +133,7 @@ var AssetFeedUI = (function () {
         if (f.price_per_kbyte !== undefined) td1.title = (td1.title ? td1.title + " " : "") + "+/kB " + f.price_per_kbyte;
         tr.appendChild(td1); tb2.appendChild(tr); });
       tb.appendChild(tb2); sc.appendChild(tb); box.appendChild(sc);
-    }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h3", t("fees.network_fees", "Network fees"))); err(d, box,e,t("asset.fees_failed", "Could not load fees.")); } });
+    }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees"))); err(d, box,e,t("asset.fees_failed", "Could not load fees.")); } });
   }
   /* feedPrice: settlement/CER pair -> human string with BOTH precisions. */
   function feedPrice(pair, bp, qp) {
@@ -181,7 +181,7 @@ var AssetFeedUI = (function () {
     var backing = info.bitasset.short_backing_asset, db = await Chain.db();
     var bMeta = await Chain.call(db, "get_assets", [[backing]]);
     var backingPrec = (bMeta && bMeta[0]) ? bMeta[0].precision : 5;
-    body.appendChild(el(d, "h3", info.symbol + " · current feed"));
+    body.appendChild(el(d, "h2", info.symbol + " · current feed"));
     try {
       var raw = await Chain.call(db, "lookup_asset_symbols", [[info.symbol]]);
       var bId = raw && raw[0] && raw[0].bitasset_data_id;
@@ -205,7 +205,7 @@ var AssetFeedUI = (function () {
    * Publisher defaults to public 1.2.0 (gate-repair); blank also falls back
    * to 1.2.0 — never myAccountId at render; the WIF throw at send is the gate. */
   function publishForm(d, body, root, g, info, backing, backingPrec) {
-    body.appendChild(el(d, "h3", t("asset.publish_op19_title", "Publish feed (op 19)")));
+    body.appendChild(el(d, "h2", t("asset.publish_op19_title", "Publish feed (op 19)")));
     var pub = Forms.labeledInput(d, t("asset.publisher_field", "Publisher (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
     var sb = Forms.labeledInput(d, "Settlement base (human, " + info.symbol + ")" + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
     var sq = Forms.labeledInput(d, t("asset.settle_quote_field", "Settlement quote (human, backing)") + " ", { value: "1", inputmode: "decimal", autocomplete: "off" });
@@ -288,7 +288,7 @@ var AssetFeedUI = (function () {
    * Acting account is explicit (public 1.2.0 default, gate-repair) — never
    * myAccountId at render; issuer check + WIF throw gate the write path. */
   function producerForm(d, body, root, g, info) {
-    body.appendChild(el(d, "h3", t("asset.producers_title", "Feed producers (op 13)")));
+    body.appendChild(el(d, "h2", t("asset.producers_title", "Feed producers (op 13)")));
     var whoF = Forms.labeledInput(d, t("asset.acting_field", "Acting account (name or 1.2.N)") + " ", { value: "1.2.0", autocomplete: "off" });
     body.appendChild(whoF.row);
     var pa = Forms.labeledTextarea(d, t("asset.producers_field", "Producers (one name or 1.2.N per line)") + " ", { value: "" });
