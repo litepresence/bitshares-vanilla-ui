@@ -1140,6 +1140,7 @@ var MarketInd = (function () {
           num.min = String(spec.param.min);
           num.max = String(spec.param.max);
           num.step = String(step);
+          num.setAttribute("inputmode", "numeric");
           num.setAttribute("aria-label", label + " " + spec.param.name);
           num.style.minHeight = "44px";
           num.addEventListener("change", function () {

@@ -444,6 +444,11 @@ var CreditUI = (function () {
     }
     function onTab(e) {
       if (!e || e.key !== "Tab") return;
+      /* Leak guard: a list reload detaches hostBox (and the modal with it)
+       * without close(), so the doc-level handler would outlive the modal.
+       * No-op once the overlay leaves the document (isConnected may be
+       * absent on old DOMs — then the trap stands as before). */
+      try { if (overlay && overlay.isConnected === false) return; } catch (x) { /* tab order stands */ }
       try {
         var shell = openedPanel();
         if (!shell || !shell.querySelectorAll) return;
@@ -647,6 +652,7 @@ var CreditUI = (function () {
       var op = doc.createElement("option"); op.value = o[0]; op.textContent = o[1]; durSel.appendChild(op); });
     var durRow = DOM.el(doc, "div", null, "xfer-field"), durLab = DOM.el(doc, "label", t("credit.max_duration_2", "Max duration "));
     var fDurCustom = doc.createElement("input"); fDurCustom.setAttribute("placeholder", t("credit.e_g_3_days", "e.g. 3 days"));
+    fDurCustom.setAttribute("inputmode", "numeric");
     touchable(fDurCustom); durLab.appendChild(durSel); durLab.appendChild(fDurCustom); durRow.appendChild(durLab);
     box.appendChild(durRow);
     var enLab = doc.createElement("input"); enLab.type = "checkbox"; enLab.checked = true; touchable(enLab);

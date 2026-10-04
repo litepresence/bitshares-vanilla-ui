@@ -418,7 +418,7 @@ var InstantTradeUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("instant.instant_trade", "Instant Trade")));
+    wrap.appendChild(DOM.pageHead(doc, t("instant.instant_trade", "Instant Trade"), "instant-trade"));
     if (!isUnlockedNow()) {
       var _v = (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.get === "function") ? ViewingAs.get() : { id: "1.2.0", name: "committee-account" };
       wrap.appendChild(DOM.el(doc, "p", t("viewing.notice_locked", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
@@ -465,9 +465,8 @@ var InstantTradeUI = (function () {
     recvBox.appendChild(recvBal);
     var swapCell = DOM.el(doc, "div", null, "it-swap-cell");
     try { swapCell.style.display = "flex"; swapCell.style.alignItems = "center"; swapCell.style.justifyContent = "center"; } catch (e) { /* centered best-effort */ }
-    var swapBtn = touchable(DOM.el(doc, "button", "⇄"));
-    swapBtn.id = "it-swap"; swapBtn.type = "button";
-    var swapBtn = touchable(DOM.el(doc, "button", "21c4")); swapBtn.id = "it-swap"; swapBtn.type = "button"; swapBtn.className = "subtle-btn";
+    var swapBtn = touchable(DOM.el(doc, "button", "⇄")); swapBtn.id = "it-swap"; swapBtn.type = "button"; swapBtn.className = "subtle-btn";
+    swapBtn.setAttribute("aria-label", t("swap.title", "Swap"));
     /* Bare-glyph swap (SellReceive.jsx concept: Icon name="swap" with no
      * button chrome): transparent, accent ⇄ at ~1.5em. touchable() keeps the
      * 44px target (min-height) plus min-width below. Same id/handler/
@@ -667,9 +666,9 @@ var InstantTradeUI = (function () {
     DOM.clear(walkBox);
     walkBox.appendChild(DOM.el(doc, "p", t("instant.price", "Price") + t("instant.effective_suffix_dash", " (effective): —"), "muted"));
     var lastE = DOM.el(doc, "p", t("instant.latest", "Latest: ") + "—", "muted");
-    lastE.id = "it-last"; walkBox.appendChild(lastE);
+    lastE.id = "it-last-empty"; walkBox.appendChild(lastE);
     var liqE = DOM.el(doc, "p", t("market.order_book", "Order book") + ": —", "muted");
-    liqE.id = "it-liquidity"; walkBox.appendChild(liqE);
+    liqE.id = "it-liquidity-empty"; walkBox.appendChild(liqE);
     walkBox.appendChild(DOM.el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted"));
     walkBox.appendChild(DOM.el(doc, "p", t("trade.market_fee_preview_dash", "Market fee (preview): —"), "muted"));
     walkBox.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
@@ -1004,7 +1003,6 @@ var InstantTradeUI = (function () {
     if (R.previewWarn) wrap.appendChild(DOM.el(doc, "p", R.previewWarn, "error"));
     if (!isUnlockedNow()) wrap.appendChild(DOM.el(doc, "p", t("instant.locked_preview_note", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted"));
     var backBtn = touchable(DOM.el(doc, "button", t("instant.back", "Back"))); backBtn.id = "it-back"; backBtn.type = "button"; backBtn.className = "btn-ghost"; wrap.appendChild(backBtn);
-    backBtn.id = "it-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
     var sendBtn = touchable(DOM.el(doc, "button", t("instant.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });

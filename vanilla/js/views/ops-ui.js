@@ -300,6 +300,7 @@ var OpsUI = (function () {
     lab.textContent = t("ops.blocks_sampled_prefix", "Blocks sampled (1–") + MAX_N + "): ";
     var num = doc.createElement("input");
     num.type = "number"; num.min = "1"; num.max = String(MAX_N); num.value = String(lastN);
+    num.setAttribute("inputmode", "numeric");
     num.setAttribute("aria-label", t("ops.blocks_sampled_aria", "Blocks sampled"));
     touchable(num); num.style.maxWidth = "120px";
     lab.appendChild(num); form.appendChild(lab);

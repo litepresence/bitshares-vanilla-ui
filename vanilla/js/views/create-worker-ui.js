@@ -329,7 +329,7 @@ var CreateWorkerUI = (function () {
     wrap.appendChild(list);
     wrap.appendChild(DOM.el(doc, "p", t("createworker.pay_denom_note", "Daily pay is denominated in the core asset (%(sym)s, precision %(prec)s); the fee is quoted live at review time via get_required_fees.", { sym: CORE_SYMBOL, prec: CORE_PRECISION }), "muted"));
     var backBtn = touchable(DOM.el(doc, "button", t("createworker.back", "Back"))); backBtn.id = "cw-back"; backBtn.type = "button"; backBtn.className = "btn-ghost";
-    backBtn.id = "cw-back"; backBtn.type = "button"; wrap.appendChild(backBtn);
+    wrap.appendChild(backBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintForm(doc, root, myGen, P); });
     if (!op34Ready()) {
       wrap.appendChild(DOM.el(doc, "p", t("createworker.broadcast_unavailable_the_op_34_serializer_is", "Broadcast unavailable: the op-34 serializer is not loaded in this bundle (tx.js/tx-send.js). The preview above is exact — reload the app files and retry. Nothing was broadcast."), "error"));

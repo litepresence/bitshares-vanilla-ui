@@ -1071,7 +1071,7 @@ var ExplorerAssets = (function () {
                 } catch (e) { /* head is display-only */ }
                 if (!isCurrent(myGen)) return;
                 DOM.clear(actBox);
-                actBox.appendChild(DOM.el(doc, "h1", t("explorer.funded_h", "Fee pool funded")));
+                actBox.appendChild(DOM.el(doc, "h2", t("explorer.funded_h", "Fee pool funded")));
                 var okP = DOM.el(doc, "p",
                   t("explorer.observed_prefix", "Observed at head block #") + headN + " (" + r.via + ").", "xfer-ok");
                 okP.setAttribute("aria-live", "polite"); actBox.appendChild(okP);

@@ -292,7 +292,7 @@ var ApiLabUI = (function () {
         } else {
           inp = doc.createElement("input");
           inp.type = "text";
-          if (p.type === "uint" || p.type === "int") { try { inp.inputMode = "numeric"; } catch (e) { /* stands */ } }
+          if (p.type === "uint" || p.type === "int") { try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* stands */ } }
           inp.placeholder = p.example || "";
           inp.value = (prefill && prefill[i] !== undefined) ? prefill[i] : "";
           if (!inp.value && p.example && (entry.method === "get_account_by_name" || entry.method === "get_chain_id")) inp.value = p.example;

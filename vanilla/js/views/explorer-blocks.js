@@ -1540,6 +1540,7 @@ var ExplorerBlocks = (function () {
       jumpInput.type = "number";
       jumpInput.min = "1";
       jumpInput.step = "1";
+      jumpInput.setAttribute("inputmode", "numeric");
       jumpInput.setAttribute("placeholder", t("explorer.height_ph", "height"));
       jumpInput.setAttribute("aria-label", t("explorer.block_height_aria", "Block height"));
       touchable(jumpInput);
