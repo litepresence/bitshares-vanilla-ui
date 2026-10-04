@@ -906,7 +906,45 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
          * retry covers). Generation guard on state.tipSeq (shared with
          * full-fill and deepen paints below): overlapping poll/push/full
          * responses paint only when still latest — a slow older fetch must
-         * never overwrite a newer paint (the flaky-chart fix). */
+         * never overwrite a newer paint (the flaky-chart fix). Tip-bail:
+         * tipHash over the merged window (inputs proven at tipHash) skips
+         * the repaint when nothing moved — same pixels, no DOM churn. */
+        /* tipHash: FNV-1a (32-bit, Math.imul-exact) over the tip window.
+         * HASH INPUTS — everything refreshTip paints, nothing else:
+         *   (a) state.bucket (window width in seconds — a timeframe switch
+         *       re-keys the window even over identical slots);
+         *   (b) the merged bucket COUNT;
+         *   (c) per bucket the slot time (timeMs, else time) plus the RAW
+         *       close pair (closeBase/closeQuote, else human close) and RAW
+         *       volumes (volumeBaseRaw/volumeQuoteRaw, else volume) — human
+         *       strings derive from raws via Format, so raws capture every
+         *       visible change;
+         *   (d) the deep flag from this fetch (chain-only vs deep suffix);
+         *   (e) state.liveMode (off/poll/live suffix in the count note).
+         * The ticker branch hashes latest/highestBid/lowestAsk inline (the
+         * three chain-human strings renderStrip shows). Equal hash means
+         * identical pixels, so the repaint is skipped; the 15s full fill
+         * never consults the hash and stays the unconditional correctness
+         * floor. Params: (bucketSec, buckets). Returns 8-hex string, null
+         * on failure (null never bails — paint when in doubt). Never throws. */
+        function tipHash(bucketSec, buckets) {
+          try {
+            var s = String(bucketSec) + "|" + String((buckets && buckets.length) || 0) + "|";
+            (buckets || []).forEach(function (b) {
+              if (!b || typeof b !== "object") { s += "?;"; return; }
+              s += String((b.timeMs !== undefined && b.timeMs !== null) ? b.timeMs : b.time) + "," +
+                String((b.closeBase !== undefined && b.closeBase !== null) ? b.closeBase : b.close) + "," +
+                String((b.closeQuote !== undefined && b.closeQuote !== null) ? b.closeQuote : "") + "," +
+                String((b.volumeBaseRaw !== undefined && b.volumeBaseRaw !== null) ? b.volumeBaseRaw : b.volume) + "," +
+                String((b.volumeQuoteRaw !== undefined && b.volumeQuoteRaw !== null) ? b.volumeQuoteRaw : "") + ";";
+            });
+            var h = 0x811c9dc5;
+            for (var i = 0; i < s.length; i++) {
+              h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+            }
+            return ("0000000" + h.toString(16)).slice(-8);
+          } catch (e) { return null; }
+        }
         function refreshTip() {
           if (!deskAlive()) return;
           if (state.loading) return;
@@ -934,9 +972,18 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
                     state.candles && state.candles.buckets, c.buckets, count);
                 }
               } catch (e) { /* fresh tip stands alone */ }
+              var deepNow = false;
+              try { deepNow = !!(c && c.deep); } catch (e) { deepNow = false; }
+              /* Tip-bail (hash inputs proven at tipHash): unchanged window,
+               * deep flag, and live mode ⇒ the repaint would paint identical
+               * pixels. Null hash never bails (paint when in doubt). */
+              var h = tipHash(state.bucket, merged);
+              var key = String(h) + "|" + (deepNow ? "1" : "0") + "|" + String(state.liveMode || "off");
+              if (h !== null && state._tipHash === key) return;
+              state._tipHash = key;
               state.candles = { bucket: state.bucket, start: null, end: null,
                 buckets: merged, closes: [], deep: state.deep };
-              try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
+              try { state.deep = deepNow; } catch (e) { state.deep = false; }
               try {
                 if (typeof MarketInd !== "undefined" && MarketInd &&
                     typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
@@ -947,6 +994,15 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
           try {
             Market.stats(b.id, q.id).then(function (st) {
               if (!deskAlive()) return;
+              /* Ticker-bail: the strip shows latest/highestBid/lowestAsk;
+               * unchanged triple ⇒ the strip already shows it. */
+              var tk = null;
+              try {
+                tk = String(st ? st.latest : null) + "|" +
+                  String(st ? st.highestBid : null) + "|" + String(st ? st.lowestAsk : null);
+              } catch (e) { tk = null; }
+              if (tk !== null && state._tickHash === tk) return;
+              state._tickHash = tk;
               state.ticker = st;
               try {
                 if (typeof MarketInd !== "undefined" && MarketInd &&

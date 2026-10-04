@@ -5,8 +5,8 @@
  * (POOL_BUCKETS + chartPane through the shared MarketInd stack + deepenPool
  * ES merge), the x·y=k curve canvas + CPMM depth table (cssTok/fitPlot/
  * drawCurve/depthPane), the pool-history tabs (tapeTable/historyPane with
- * the late-tape hook) and the pool-map provenance slice (_pgSrc/
- * _ensurePoolGraph/fetchPoolMap/redrawPoolMap). Stake/swap/update/delete
+ * the late-tape hook) and the pool-map provenance slice (_ensurePoolGraph delegates to the canonical
+ * MarketDesk._fill.ensurePoolGraph + fetchPoolMap/redrawPoolMap). Stake/swap/update/delete
  * panels live in pool-detail-actions.js and are called via
  * PoolDetailUI._actions at call time. Unknown id -> empty state, never
  * blank. No ops-57/58 code (slice 14 owns them).
@@ -1135,36 +1135,24 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     }
   }
 
-  /* Pool-map lazy loader (index.html frozen — dynamic script like router.js
-   * dashboard precedent; relative URL only, never CDN). Never throws. */
-  var _pgLoading = false, _pgWaiters = [];
-
-  function _pgSrc() {
-    try {
-      if (typeof document !== "undefined" && document.baseURI) {
-        return new URL("js/api/pool-graph.js", document.baseURI).toString();
-      }
-    } catch (e) { /* relative fallback below */ }
-    return "js/api/pool-graph.js";
-  }
-
+  /* Pool-map lazy loader: the SINGLE canonical loader lives in
+   * market-desk-fill.js (MarketDesk._fill.ensurePoolGraph — once-guard,
+   * onload/onerror waiter drain, file:// + http via document.baseURI;
+   * index.html loads the fill before this file, so the global is present).
+   * This wrapper only delegates — no second queue, so both desks requesting
+   * together inject exactly one <script>. Never throws. */
   function _ensurePoolGraph(cb) {
-    try { if (typeof PoolGraph !== "undefined" && PoolGraph) { cb(true); return; } } catch (e) {}
-    if (typeof document === "undefined") { try { cb(false); } catch (e) {} return; }
-    _pgWaiters.push(cb);
-    if (_pgLoading) return;
-    _pgLoading = true;
     try {
-      var s = document.createElement("script");
-      s.src = _pgSrc(); s.async = true;
-      s.onload = function () { _pgLoading = false; var w = _pgWaiters; _pgWaiters = []; w.forEach(function (f) { try { f(true); } catch (e) {} }); };
-      s.onerror = function () { _pgLoading = false; var w = _pgWaiters; _pgWaiters = []; w.forEach(function (f) { try { f(false); } catch (e) {} }); };
-      (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(s);
-    } catch (e) {
-      _pgLoading = false;
-      var w = _pgWaiters; _pgWaiters = [];
-      w.forEach(function (f) { try { f(false); } catch (x) {} });
-    }
+      var f = null;
+      if (typeof MarketDesk !== "undefined" && MarketDesk && MarketDesk._fill &&
+          typeof MarketDesk._fill.ensurePoolGraph === "function") f = MarketDesk._fill.ensurePoolGraph;
+      else if (typeof globalThis !== "undefined" && globalThis.MarketDesk && globalThis.MarketDesk._fill &&
+          typeof globalThis.MarketDesk._fill.ensurePoolGraph === "function") f = globalThis.MarketDesk._fill.ensurePoolGraph;
+      if (f) { f(cb); return; }
+    } catch (e) { /* honest fail below */ }
+    /* Fill missing (node require of this file alone — no document either):
+     * match the canonical loader's headless contract (cb(false)). */
+    try { cb(false); } catch (e) {}
   }
 
   /* Fetch 2-layer pool graph for this pool's legs (lazy async, <=9 RPCs).

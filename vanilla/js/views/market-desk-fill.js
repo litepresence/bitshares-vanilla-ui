@@ -484,7 +484,9 @@ MarketDesk._fill = MarketDesk._fill || {};
   }
 
   /* Pool-map lazy loader (index.html frozen — dynamic script like router.js
-   * dashboard precedent; relative URL only, never CDN). Params: cb(bool).
+   * dashboard precedent; relative URL only, never CDN). CANONICAL for both
+   * desks: pool-detail-view.js _ensurePoolGraph delegates here, so one queue
+   * serves concurrent requests (exactly one <script> inject). Params: cb(bool).
    * Returns nothing. Never throws. */
   var _graphLoading = false, _graphWaiters = [];
   MarketDesk._fill.fill = fill;
