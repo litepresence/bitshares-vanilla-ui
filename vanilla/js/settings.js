@@ -137,6 +137,15 @@ var SettingsPage = (function () {
     wrap.appendChild(loc.error);
     var localeSelect = loc.select, localeError = loc.error, currentLocale = loc.currentLocale;
 
+    /* Locked view-as section (exactly one, always last): the settings route
+     * clears its root first, so re-renders replace, never accumulate. The
+     * header account button navigates here (app.js goToViewingAs). */
+    try {
+      if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
+        wrap.appendChild(ViewingAs.renderSection(doc));
+      }
+    } catch (e) { /* settings stand without viewing */ }
+
     // Events: node radios
     Array.prototype.forEach.call(tbody.querySelectorAll('input[name="node"]'), function (r) {
       r.addEventListener("change", function () {

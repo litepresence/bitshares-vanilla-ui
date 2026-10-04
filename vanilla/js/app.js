@@ -448,12 +448,16 @@ var App = (function () {
   }
 
   /* bindViewingAsOnce: header #acting-as click (locked only) + repaint
-   *   subscription. Locked click appends ViewingAs.openPicker(document) to
-   *   the body; unlocked clicks keep the wallet identity (no-op). Repaint
-   *   flows through the ViewingAs subscription (no manual DOM edit at dialog
-   *   close). Wired once in finishBoot next to bindLockOnce. Params: none.
-   *   Returns nothing. Fails: never throws — missing ViewingAs/DOM is a no-op
-   *   (safe direction: header keeps the 1.2.0 default via paintActingAs). */
+   *   subscription. Locked click navigates to #/settings and scrolls the
+   *   inline view-as section to the top of the viewport (goToViewingAs);
+   *   the picker itself lives exactly once at the bottom of settings
+   *   (settings.js appends ViewingAs.renderSection; the route clears its
+   *   root first, so copies cannot accumulate). Unlocked clicks keep the
+   *   wallet identity (no-op). Repaint flows through the ViewingAs
+   *   subscription. Wired once in finishBoot next to bindLockOnce.
+   *   Params: none. Returns nothing. Fails: never throws — missing
+   *   ViewingAs/DOM is a no-op (safe direction: header keeps the 1.2.0
+   *   default via paintActingAs). */
   function bindViewingAsOnce() {
     if (typeof document === "undefined") return;
     try {
@@ -467,10 +471,35 @@ var App = (function () {
     el.addEventListener("click", function () {
       try {
         if (walletUnlockedNow()) return; /* unlocked keeps wallet identity */
-        if (typeof ViewingAs === "undefined" || !ViewingAs || typeof ViewingAs.openPicker !== "function") return;
-        document.body.appendChild(ViewingAs.openPicker(document));
-      } catch (e) { /* dialog best-effort */ }
+        goToViewingAs();
+      } catch (e) { /* header stands */ }
     });
+  }
+
+  /* goToViewingAs: navigate to #/settings and bring #viewing-as to the top
+   * of the viewport. Params: none. Returns nothing. Already-on-settings
+   * scrolls immediately; otherwise the hash change re-renders first and a
+   * bounded poll (20 × 50ms) waits for the section. scrollIntoView() bare
+   * (instant top-align — no smooth motion, reduced-motion safe). Never
+   * throws — worst case the user lands on settings unscrolled. */
+  function goToViewingAs() {
+    if (typeof document === "undefined") return;
+    try {
+      if (typeof window !== "undefined" && window.location && window.location.hash !== "#/settings") {
+        window.location.hash = "#/settings";
+      }
+    } catch (e) { /* poll below still tries */ }
+    var tries = 0;
+    (function poll() {
+      var target = null;
+      try { target = document.getElementById("viewing-as"); } catch (e) { target = null; }
+      if (target && target.scrollIntoView) {
+        try { target.scrollIntoView(); } catch (e) { /* landed anyway */ }
+        return;
+      }
+      tries++;
+      if (tries < 20) setTimeout(poll, 50);
+    })();
   }
 
   /* paintFootActions: footer REPORT + ABOUT + HELP buttons

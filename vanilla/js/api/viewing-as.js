@@ -62,12 +62,11 @@ var ViewingAs = (function () {
     listeners.push(fn);
     return function () { var i = listeners.indexOf(fn); if (i !== -1) listeners.splice(i, 1); };
   }
-  /* openPicker: shared locked view-as dialog. Params: doc (document).
-   * Returns the dialog wrapper element. Validates via set(), shows
-   * viewing.unknown_account / viewing.network_error inline, never throws out. */
-  function openPicker(doc) {
-    var overlay = doc.createElement("div");
-    overlay.className = "viewing-picker-overlay";
+  /* buildBox: the picker controls (heading + hint + input + Go/Reset/[×]).
+   * Params: doc (document), closable (bool — × button only in modal use;
+   *   the inline settings section has no close). Returns the box element.
+   * Never throws out (callers are click/render paths). */
+  function buildBox(doc, closable) {
     var box = doc.createElement("div");
     box.className = "viewing-picker";
     box.setAttribute("role", "dialog");
@@ -103,22 +102,31 @@ var ViewingAs = (function () {
     reset.style.minHeight = "44px";
     reset.textContent = t("viewing.dialog_reset", "Reset to committee-account");
     row.appendChild(reset);
-    var close = doc.createElement("button");
-    close.type = "button";
-    close.style.minHeight = "44px";
-    close.textContent = "×";
-    close.setAttribute("aria-label", "Close");
-    row.appendChild(close);
+    if (closable) {
+      var close = doc.createElement("button");
+      close.type = "button";
+      close.style.minHeight = "44px";
+      close.textContent = "×";
+      close.setAttribute("aria-label", "Close");
+      row.appendChild(close);
+      close.addEventListener("click", function () {
+        try {
+          var ov = box.parentNode;
+          if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+        } catch (e) { /* gone */ }
+      });
+    }
     box.appendChild(row);
-    overlay.appendChild(box);
-    function done() { try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) { /* gone */ } }
-    close.addEventListener("click", done);
-    overlay.addEventListener("click", function (ev) { if (ev.target === overlay) done(); });
-    reset.addEventListener("click", function () { err.textContent = ""; try { ViewingAs.clear(); } catch (e) { /* default stands */ } done(); });
+    reset.addEventListener("click", function () { err.textContent = ""; try { ViewingAs.clear(); } catch (e) { /* default stands */ } });
     go.addEventListener("click", function () {
       err.textContent = "";
       go.disabled = true;
-      ViewingAs.set(input.value).then(function () { done(); }).catch(function (e) {
+      ViewingAs.set(input.value).then(function () {
+        try {
+          var ov = box.parentNode;
+          if (ov && ov.className === "viewing-picker-overlay" && ov.parentNode) ov.parentNode.removeChild(ov);
+        } catch (e) { /* inline section stands */ }
+      }).catch(function (e) {
         go.disabled = false;
         var m = (e && e.message) ? e.message : "";
         if (m.indexOf("unknown-account") !== -1) err.textContent = t("viewing.unknown_account", "Unknown account name.");
@@ -126,9 +134,46 @@ var ViewingAs = (function () {
       });
     });
     try { input.focus(); } catch (e) { /* display-only */ }
+    return box;
+  }
+  /* renderSection: inline locked view-as section for the bottom of #/settings.
+   * Params: doc (document). Returns <section id="viewing-as"> (exactly one per
+   * render — the settings route clears its root first, so re-renders replace,
+   * never accumulate). No close button (nothing to dismiss inline). */
+  function renderSection(doc) {
+    var sec = doc.createElement("section");
+    sec.setAttribute("id", "viewing-as");
+    sec.appendChild(buildBox(doc, false));
+    return sec;
+  }
+  /* openPicker: shared locked view-as dialog. Params: doc (document).
+   * Returns the dialog wrapper element. Guards: an already-open picker is
+   * returned as-is (second header click focuses it — never a duplicate).
+   * Validates via set(), shows viewing.unknown_account /
+   * viewing.network_error inline, never throws out. */
+  function openPicker(doc) {
+    var existing = null;
+    try { existing = doc.getElementById("viewing-as-open"); } catch (e) { existing = null; }
+    if (existing) {
+      try {
+        var inp = existing.querySelector ? existing.querySelector("input") : null;
+        if (inp && inp.focus) inp.focus();
+      } catch (e) { /* shown anyway */ }
+      return existing;
+    }
+    var overlay = doc.createElement("div");
+    overlay.className = "viewing-picker-overlay";
+    overlay.setAttribute("id", "viewing-as-open");
+    var box = buildBox(doc, true);
+    overlay.appendChild(box);
+    overlay.addEventListener("click", function (ev) {
+      if (ev.target === overlay) {
+        try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) { /* gone */ }
+      }
+    });
     return overlay;
   }
-  return { get: get, id: id, isDefault: isDefault, set: set, clear: clear, subscribe: subscribe, openPicker: openPicker, DEF_ID: DEF_ID, DEF_NAME: DEF_NAME };
+  return { get: get, id: id, isDefault: isDefault, set: set, clear: clear, subscribe: subscribe, openPicker: openPicker, renderSection: renderSection, DEF_ID: DEF_ID, DEF_NAME: DEF_NAME };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.ViewingAs === "undefined") { globalThis.ViewingAs = ViewingAs; }
 if (typeof module !== "undefined") { module.exports = ViewingAs; }
