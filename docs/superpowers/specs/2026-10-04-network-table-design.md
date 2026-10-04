@@ -34,11 +34,11 @@ that owns switching has nothing to keep in sync.
   - Customs: `—` (`settings.dash`) until probed, then MAINNET / TESTNET /
     short chain-hash (first 4 chars, the existing row convention
     `prefix.slice(0, 4)`) from the observed chain-id.
-- The old WRONG-CHAIN mismatch pill retires: there is no "wrong" chain in
-  a merged table, only labeled ones. `healthFor("chain", …)` keeps its
-  bands for the cell coloring (mainnet-match green, testnet-match yellow,
-  mismatch red) — mismatch red now only fires for a chain matching
-  neither known id inside a row whose network is still list-derived.
+- The old WRONG-CHAIN mismatch pill retires for customs (no "wrong" chain
+  there, only labeled ones) but STAYS for defaults answering a foreign
+  chain (stale DNS, repurposed node — still red, still unselectable-worthy).
+  `healthFor("chain", …)` keeps its bands for the cell coloring
+  (mainnet-match green, testnet-match yellow, mismatch red).
 - `.node-card` mirrors gain the network cell via the existing mirror
   pattern in the `setRow`/paint path. Mobile behavior otherwise untouched.
 
