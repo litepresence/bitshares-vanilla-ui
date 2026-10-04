@@ -290,7 +290,7 @@ var DashboardUI = (function () {
     }
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
+      wrap.appendChild(DOM.pageHead(doc, t("shell.dashboard", "Dashboard"), "dashboard"));
       wrap.appendChild(DOM.el(doc, "p", t("transfer.connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -306,7 +306,7 @@ var DashboardUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
+        failWrap.appendChild(DOM.pageHead(doc, t("shell.dashboard", "Dashboard"), "dashboard"));
         showError(doc, failWrap, new Error("not connected"), t("transfer.network_unavailable_short", "Network unavailable."));
         var dstat = DOM.el(doc, "p", "", "muted");
         try { dstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -348,7 +348,7 @@ var DashboardUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("shell.dashboard", "Dashboard")));
+    wrap.appendChild(DOM.pageHead(doc, t("shell.dashboard", "Dashboard"), "dashboard"));
 
     var unlocked = false;
     try { unlocked = typeof Wallet !== "undefined" && Wallet && typeof Wallet.isUnlocked === "function" && Wallet.isUnlocked(); }
@@ -849,7 +849,7 @@ var DashboardUI = (function () {
       img.className = "splash-hero-img";
       s.appendChild(img);
     } catch (e) { /* hero works without art */ }
-    s.appendChild(DOM.el(doc, "h1", t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable.")));
+    s.appendChild(DOM.pageHead(doc, t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable."), "dashboard"));
     s.appendChild(DOM.el(doc, "p",
       t("splash.hero_sub", "Your keys. Your coins."), "muted"));
     s.appendChild(DOM.el(doc, "p",

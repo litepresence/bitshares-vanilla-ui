@@ -75,7 +75,7 @@ var CreditDetailUI = (function () {
       if (!live(myGen, uiGen)) return;
       ui.clearBox(ctx.wrap);
       var o = R.o, a = R.a;
-      ctx.wrap.appendChild(ui.el(doc, "h1", "Offer " + o.id));
+      ctx.wrap.appendChild(DOM.pageHead(doc, "Offer " + o.id, "merchant"));
       if (lockedD) ctx.wrap.appendChild(ui.viewingAsNotice(doc));
       var back = ui.el(doc, "a", t("credit.all_offers", "← All offers")); back.setAttribute("href", "#/credit-offer");
       ctx.wrap.appendChild(back);
@@ -105,7 +105,7 @@ var CreditDetailUI = (function () {
       }
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return; ui.clearBox(ctx.wrap);
-      ctx.wrap.appendChild(ui.el(doc, "h1", "Offer " + String(id)));
+      ctx.wrap.appendChild(DOM.pageHead(doc, "Offer " + String(id), "merchant"));
       ui.showError(doc, ctx.wrap, e, t("credit.unknown_offer", "Unknown offer."));
       var back = ui.el(doc, "a", t("credit.all_offers", "← All offers")); back.setAttribute("href", "#/credit-offer");
       ctx.wrap.appendChild(back);

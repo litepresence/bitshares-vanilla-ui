@@ -93,7 +93,7 @@ var CreateAccountUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
+      wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
       wrap.appendChild(DOM.el(doc, "p", t("createaccount.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -109,7 +109,7 @@ var CreateAccountUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
+        failWrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
         showError(doc, failWrap, new Error("not connected"), t("createaccount.network_unavailable", "Network unavailable."));
         var castat = DOM.el(doc, "p", "", "muted");
         try { castat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -154,7 +154,7 @@ var CreateAccountUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root), testnet = networkName() === "testnet";
-    wrap.appendChild(DOM.el(doc, "h1", t("createaccount.create_account", "Create Account")));
+    wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
     wrap.appendChild(DOM.el(doc, "p", testnet
       ? "Register a new testnet account through the faucet (testnet network)."
       : "Registration uses the testnet faucet — switch to testnet in Settings to register. Name checks work on either network.", "muted"));
@@ -354,7 +354,7 @@ var CreateAccountUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("createaccount.account_created", "Account created")));
+    wrap.appendChild(DOM.pageHead(doc, t("createaccount.account_created", "Account created"), "create_account"));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));

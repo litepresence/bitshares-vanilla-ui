@@ -1523,11 +1523,11 @@ var ExplorerBlocks = (function () {
     if (waitForOpen(doc, wrap, root, myGen, function () { renderBlock(root, height); })) return;
     var h = parseInt(height, 10);
     if (!(h >= 1)) {
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_title", "Block")));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.block_title", "Block"), "insight"));
       showError(doc, wrap, new Error("unknown-block"), t("explorer.unknown_block", "Unknown block."));
       return;
     }
-    wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+    wrap.appendChild(DOM.pageHead(doc, t("explorer.block_prefix", "Block #") + h, "insight"));
     /* Block-jump input (original Block.jsx toggleInput/_onKeyDown concept):
      * height -> #/block/N. Plain literals only (no new i18n keys). Invalid
      * input flags aria-invalid instead of navigating anywhere. Built by a
@@ -1566,7 +1566,7 @@ var ExplorerBlocks = (function () {
         if (!isCurrent(myGen)) return;
         var b = pair[0], head = pair[1];
         DOM.clear(wrap);
-        wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + b.height));
+        wrap.appendChild(DOM.pageHead(doc, t("explorer.block_prefix", "Block #") + b.height, "insight"));
         wrap.appendChild(buildJump());
         /* Prev/next arrows (original Block.jsx _previousBlock/_nextBlock
          * concept: prev = height - 1, next = height + 1 clamped at head).
@@ -1646,7 +1646,7 @@ var ExplorerBlocks = (function () {
       }).catch(function (e) {
         if (!isCurrent(myGen)) return;
         DOM.clear(wrap);
-        wrap.appendChild(DOM.el(doc, "h1", t("explorer.block_prefix", "Block #") + h));
+        wrap.appendChild(DOM.pageHead(doc, t("explorer.block_prefix", "Block #") + h, "insight"));
         wrap.appendChild(buildJump());
         showError(doc, wrap, e, t("explorer.unknown_block", "Unknown block."));
       });
@@ -1666,7 +1666,7 @@ var ExplorerBlocks = (function () {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderTx(root, height, txIndex); })) return;
     var h = parseInt(height, 10), ix = parseInt(txIndex, 10);
-    wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
+    wrap.appendChild(DOM.pageHead(doc, t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex, "insight"));
     if (!(h >= 1) || !(ix >= 0)) {
       showError(doc, wrap, new Error("unknown-tx"), t("explorer.unknown_tx", "Unknown transaction."));
       return;
@@ -1675,7 +1675,7 @@ var ExplorerBlocks = (function () {
     Explorer.tx(h, ix).then(function (tx) {
       if (!isCurrent(myGen)) return;
       DOM.clear(wrap);
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.tx_title_prefix", "Transaction ") + tx.block + " / " + tx.index, "insight"));
       wrap.appendChild(anchor(doc, t("explorer.back_to_block_prefix", "← Block #") + tx.block, "#/block/" + tx.block));
       wrap.appendChild(shareRow(doc, "#/block/" + tx.block + "/" + tx.index));
       var ctx = { gen: myGen, root: root, tab: "blocks" };
@@ -1694,7 +1694,7 @@ var ExplorerBlocks = (function () {
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       DOM.clear(wrap);
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.tx_title_prefix", "Transaction ") + h + " / " + txIndex, "insight"));
       showError(doc, wrap, e, t("explorer.unknown_tx", "Unknown transaction."));
     });
   }

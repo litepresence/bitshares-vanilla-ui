@@ -104,7 +104,7 @@ var CreateWorkerUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+      wrap.appendChild(DOM.pageHead(doc, t("createworker.create_worker", "Create Worker"), null));
       wrap.appendChild(DOM.el(doc, "p", t("createworker.connecting_to_network", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -120,7 +120,7 @@ var CreateWorkerUI = (function () {
         if (typeof location !== "undefined" && location.hash !== hashAtEntry) return;
         DOM.clear(root);
         var failWrap = makeWrap(doc, root);
-        failWrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+        failWrap.appendChild(DOM.pageHead(doc, t("createworker.create_worker", "Create Worker"), null));
         showError(doc, failWrap, new Error("not connected"), t("createworker.network_unavailable", "Network unavailable."));
         var cwstat = DOM.el(doc, "p", "", "muted");
         try { cwstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -161,7 +161,7 @@ var CreateWorkerUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("createworker.create_worker", "Create Worker")));
+    wrap.appendChild(DOM.pageHead(doc, t("createworker.create_worker", "Create Worker"), null));
     wrap.appendChild(DOM.el(doc, "p", t("createworker.draft_a_worker_op_34_preview_is_live_review_q", "Draft a worker (op 34). Preview is live; review quotes the live fee, then Sign & Send broadcasts op 34 directly — workers are created by direct op, not by proposal."), "muted"));
     /* LOW punchlist: lifetime-member requirement note + per-field helper
      * texts (CreateWorker concept). Batch-3 i18n: keyed, no new routes. */
@@ -313,7 +313,7 @@ var CreateWorkerUI = (function () {
     if (myGen !== gen) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", t("createworker.worker_preview_op_34", "Worker preview (op 34)")));
+    wrap.appendChild(DOM.pageHead(doc, t("createworker.worker_preview_op_34", "Worker preview (op 34)"), null));
     var list = DOM.el(doc, "dl", null, "xfer-confirm");
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));

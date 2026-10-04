@@ -69,7 +69,7 @@ var DebitUI = (function () {
       if (!found || myGen !== gen) return;
       root.innerHTML = "";
       var box = u.el(doc, "div", null, "wrap"); root.appendChild(box);
-      box.appendChild(u.el(doc, "h1", t("debit.title", "Direct Debit")));
+      box.appendChild(DOM.pageHead(doc, t("debit.title", "Direct Debit"), "direct_debit"));
       if (!u.isUnlockedNow()) box.appendChild(u.viewingAsNotice(doc));
       box.appendChild(u.el(doc, "p", t("debit.list_sub", "Recurring withdrawal rights you granted or received."), "muted"));
       box.appendChild(u.el(doc, "h2", "Granted by you (" + found.data.asGiver.length + ")"));
@@ -234,7 +234,7 @@ var DebitUI = (function () {
     u.dropOpenSubs();
     root.innerHTML = "";
     var wrap = u.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(u.el(doc, "h1", t("debit.spotlight_title", "Spotlight")));
+    wrap.appendChild(DOM.pageHead(doc, t("debit.spotlight_title", "Spotlight"), "direct_debit"));
     var miss = u.missingBackends();
     if (miss) { u.showError(doc, wrap, "Spotlight backend missing: " + miss + " failed to load."); return; }
     if (Chain.status().state !== "open") { var sretry = function () { renderSpotlight(root); }; u.offlineBox(doc, wrap, sretry); u.autoRetryOnOpen(myGen, sretry, function () { return myGen === gen; }); return; }

@@ -139,7 +139,7 @@ var CreditUI = (function () {
     ["Credit", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"].forEach(function (g) {
       if (typeof globalThis[g] === "undefined") miss = g; });
     var wrap = DOM.el(doc, "div", null, "wrap"); root.appendChild(wrap);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "merchant"));
     if (miss) { showError(doc, wrap, title + " backend missing: " + miss + " failed to load."); return null; }
     if (Chain.status().state !== "open") {
       offlineBox(doc, wrap, retry);

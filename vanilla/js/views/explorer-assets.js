@@ -699,11 +699,11 @@ var ExplorerAssets = (function () {
     }
     if (waitForOpen(doc, wrap, root, myGen, function () { renderAsset(root, symbol); })) return;
     if (typeof symbol !== "string" || !symbol) {
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_title", "Asset")));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.asset_title", "Asset"), "insight"));
       showError(doc, wrap, new Error("unknown-asset"), t("explorer.unknown_asset", "Unknown asset."));
       return;
     }
-    wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+    wrap.appendChild(DOM.pageHead(doc, t("explorer.asset_prefix", "Asset ") + symbol, "insight"));
     showStatus(doc, wrap, t("explorer.loading_asset", "Loading asset…"));
     Explorer.asset(symbol).then(function (j) {
       if (!isCurrent(myGen)) return;
@@ -717,7 +717,7 @@ var ExplorerAssets = (function () {
       var descParsed = parseDesc(a.options && a.options.description);
       var marketID = marketIdFor(a.symbol, a.options && a.options.description);
       DOM.clear(wrap);
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + a.symbol));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.asset_prefix", "Asset ") + a.symbol, "insight"));
       var marketBtn = anchor(doc, t("explorer.market_2", "MARKET →"), "#/market/" + marketID);
       marketBtn.title = marketID;
       marketBtn.setAttribute("aria-label", t("explorer.open_preferred_market", "Open preferred market ") + marketID);
@@ -1323,7 +1323,7 @@ var ExplorerAssets = (function () {
     }).catch(function (e) {
       if (!isCurrent(myGen)) return;
       DOM.clear(wrap);
-      wrap.appendChild(DOM.el(doc, "h1", t("explorer.asset_prefix", "Asset ") + symbol));
+      wrap.appendChild(DOM.pageHead(doc, t("explorer.asset_prefix", "Asset ") + symbol, "insight"));
       showError(doc, wrap, e, t("explorer.unknown_asset", "Unknown asset."));
     });
   }

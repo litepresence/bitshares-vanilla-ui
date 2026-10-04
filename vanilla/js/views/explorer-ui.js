@@ -98,7 +98,9 @@ var ExplorerUI = (function () {
    * under the header; vanilla keeps exactly one h1 for a11y but folds it
    * visually away via .xplore-sr so spacing matches the original). */
   function shellTitle(doc) {
-    return DOM.el(doc, "h1", t("explorer.title", "Explore"), "xplore-sr");
+    var h = DOM.pageHead(doc, t("explorer.title", "Explore"), "insight");
+    h.className = "xplore-sr";
+    return h;
   }
 
   /* Wide (viewport-gaps fix 2026-09-28): full-bleed stacked grid
@@ -219,7 +221,7 @@ var ExplorerUI = (function () {
     if (!doc) return;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    wrap.appendChild(DOM.el(doc, "h1", title));
+    wrap.appendChild(DOM.pageHead(doc, title, "insight"));
     showError(doc, wrap, t("explorer.view_missing_prefix", "Explorer view missing: ") + file + t("explorer.view_missing_suffix", " failed to load."));
   }
 

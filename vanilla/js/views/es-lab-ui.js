@@ -126,7 +126,7 @@ var EsLabUI = (function () {
     DOM.clear(root);
     var wrap = DOM.el(doc, "div", null, "wrap wide"); root.appendChild(wrap);
 
-    wrap.appendChild(DOM.el(doc, "h1", t("eslab.title", "ES Lab")));
+    wrap.appendChild(DOM.pageHead(doc, t("eslab.title", "ES Lab"), "zoom"));
     wrap.appendChild(DOM.el(doc, "p",
       t("eslab.subtitle", "Search the community index by hand: pick a query, fill the boxes, read parsed rows + raw JSON. Reads only — nothing here can move funds."),
       "muted"));
