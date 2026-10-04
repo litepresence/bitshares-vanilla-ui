@@ -10,8 +10,8 @@
  *   keydown/resize/passive-scroll listeners + a #view MutationObserver (all
  *   removed on end) plus one session-long body observer (+ a hashchange hook for
  *   dismissed profiles) that keeps the dashboard replay button injected
- *   across async fills and hash-only navigations — both idempotent and
- *   never removed, by design. Missing targets render centered with their
+ *   across async fills and hash-only navigations — both idempotent and both
+ *   also removed on end (handles kept for teardown, by design). Missing targets render centered with their
  *   CTA (issue #1: never skip — no single route holds every target), never throw.
  * Created by: marketing directive, first-run guided tour task. */
 var TourUI = (function () {
@@ -31,6 +31,11 @@ var TourUI = (function () {
   var placeTimer = null;
   var bootTimer = null;
   var bootObs = null;
+  /* Session replay upkeep handles (dismissed-profile injector): the body
+   * observer + hashchange hook created in boot(). Stored (not anonymous)
+   * so end() can disconnect/remove them — start() listeners already clean. */
+  var upkeepObs = null;
+  var onReplayHash = null;
   /* Scroll-once tracker: smooth-scrollIntoView hijacks the user's own
    * scrolling when it re-fires, so it must run exactly once per real
    * step/target change — never on observer re-renders of the same card.
@@ -391,8 +396,15 @@ var TourUI = (function () {
         window.removeEventListener("hashchange", onHash);
         window.removeEventListener("resize", onMove);
         window.removeEventListener("scroll", onMove);
+        /* Session replay upkeep (boot): disconnect the body observer and
+         * drop the named hashchange hook so end() leaks nothing. */
+        if (onReplayHash) {
+          try { window.removeEventListener("hashchange", onReplayHash); } catch (e2) { /* hook best-effort */ }
+          onReplayHash = null;
+        }
       }
       if (viewObs) { viewObs.disconnect(); viewObs = null; }
+      if (upkeepObs) { try { upkeepObs.disconnect(); } catch (e3) { /* gone */ } upkeepObs = null; }
     } catch (e) { /* listeners best-effort */ }
     if (placeTimer) { try { clearTimeout(placeTimer); } catch (e) { /* done */ } placeTimer = null; }
     try { ensureReplay(); } catch (e) { /* retry below */ }
@@ -547,14 +559,16 @@ var TourUI = (function () {
         /* replayUpkeep: session-long dashboard replay injector (idempotent —
          * ensureReplay exits fast once the button exists). Watches body so
          * async fills and hash-only SPA navigations (which never re-boot)
-         * still get the button. Never throws, never disconnects. */
+         * still get the button. Never throws. The observer handle is kept
+         * in upkeepObs so end() can disconnect it (no longer fire-and-forget). */
         var replayUpkeep = function () {
           try {
             if (typeof MutationObserver === "undefined") return;
-            var upkeep = new MutationObserver(function () {
+            try { if (upkeepObs) upkeepObs.disconnect(); } catch (e0) { /* re-observe below */ }
+            upkeepObs = new MutationObserver(function () {
               try { ensureReplay(); } catch (e) { /* retry next mutation */ }
             });
-            upkeep.observe(document.body, { childList: true, subtree: true });
+            upkeepObs.observe(document.body, { childList: true, subtree: true });
           } catch (e) { /* immediate attempt below stands */ }
           try { ensureReplay(); } catch (e) { /* retry on mutation */ }
         };
@@ -562,9 +576,11 @@ var TourUI = (function () {
           replayUpkeep();
           try {
             if (typeof window !== "undefined") {
-              window.addEventListener("hashchange", function () {
+              /* Named (not anonymous) so end() can remove it. */
+              onReplayHash = function () {
                 try { setTimeout(ensureReplay, 600); } catch (e) { /* retry on mutation */ }
-              });
+              };
+              window.addEventListener("hashchange", onReplayHash);
             }
           } catch (e) { /* observer stands */ }
           return;

@@ -187,6 +187,9 @@ var App = (function () {
     var panel = document.createElement("div");
     panel.id = "nav-directory";
     panel.setAttribute("role", "navigation");
+    /* Drawer focus target (lifecycle): focusable container so opening the
+     * drawer can move focus inside it; harmless when never focused. */
+    try { panel.setAttribute("tabindex", "-1"); } catch (e) { /* links stay tabbable */ }
     function headingLink(href, icon, label) {
       var a = document.createElement("a");
       a.setAttribute("href", href);
@@ -929,8 +932,16 @@ var App = (function () {
         var open = nav.classList.toggle("open");
         toggle.setAttribute("aria-expanded", open ? "true" : "false");
         syncDirectory(nav);
-        /* Focus-return on close lives in closeDirectory; nothing to focus
-         * on open (headings need no filter). Never throws. */
+        /* Focus-return on close lives in closeDirectory. Never throws. */
+        if (open) {
+          /* Drawer focus (lifecycle): move focus into the opened drawer
+           * (the #nav-directory container, tabindex=-1 above) so keyboard
+           * users land inside it; close returns focus via closeDirectory. */
+          try {
+            var panel = document.getElementById("nav-directory");
+            if (panel && typeof panel.focus === "function") panel.focus();
+          } catch (e) { /* toggle keeps focus */ }
+        }
       });
       /* Esc closes + refocuses; route change closes without stealing focus. */
       try {

@@ -130,6 +130,15 @@ var ConfirmDialog = (function () {
     if (D) D.append(box, actions);
     else box.appendChild(actions);
 
+    /* Focus capture + return (listener/focus lifecycle): record the opener,
+     * focus the first (Back) button, restore the opener on every close path
+     * (Back/Send/Esc). All guarded — fake docs without activeElement/focus
+     * degrade to the prior tab order. */
+    var opener = null;
+    try { opener = (doc.activeElement && typeof doc.activeElement.focus === "function") ? doc.activeElement : null; } catch (e) { opener = null; }
+    function restoreFocus() {
+      try { if (opener && typeof opener.focus === "function") opener.focus(); } catch (e) { /* tab order stands */ }
+    }
     /* One-shot Esc: Back exactly once, then detach (repeat Esc presses
      * after resolve are no-ops — the listener is gone). */
     function cleanup() {
@@ -141,14 +150,16 @@ var ConfirmDialog = (function () {
       e = e || {};
       if (e.key === "Escape" || e.keyCode === 27) {
         cleanup();
+        restoreFocus();
         onBack();
       }
     }
     try {
       if (doc.addEventListener) doc.addEventListener("keydown", onKey);
     } catch (e) { /* confirm still works via the buttons */ }
-    back.addEventListener("click", function () { cleanup(); onBack(); });
-    send.addEventListener("click", function () { cleanup(); onSend(); });
+    back.addEventListener("click", function () { cleanup(); restoreFocus(); onBack(); });
+    send.addEventListener("click", function () { cleanup(); restoreFocus(); onSend(); });
+    try { if (typeof back.focus === "function") back.focus(); } catch (e) { /* tab order stands */ }
     return box;
   }
 

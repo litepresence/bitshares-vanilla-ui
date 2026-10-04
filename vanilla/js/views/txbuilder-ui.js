@@ -178,7 +178,9 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
    * Params: none (queries .topbar/header/body once, then subscribes).
    * Returns nothing. Fails: never throws — missing TxBuilder is a silent
    * no-op so routes render without the composer loaded. */
+  var badgeSubscribed = false;
   function mountBadge() {
+    if (badgeSubscribed) return;
     if (document.getElementById("tb-badge") || typeof TxBuilder === "undefined") return;
     var bar = document.querySelector(".topbar") || document.querySelector("header") || document.body;
     var a = document.createElement("a");
@@ -195,6 +197,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
       } catch (e) { /* badge keeps prior state */ }
     }
     TxBuilder.subscribe(paint);
+    badgeSubscribed = true;
     try { paint(TxBuilder.state()); } catch (e) { /* subscription paints next */ }
   }
 

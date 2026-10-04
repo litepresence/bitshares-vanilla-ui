@@ -35,6 +35,20 @@ var PoolDetailUI = (function () {
     return dflt;
   }
   var gen = 0;
+  /* Route-listener cleanups (market-desk.js _cleanups precedent): resize +
+   * theme subscriptions registered per render; drained on the next render
+   * entry so re-renders never stack listeners. Navigation-away is still
+   * covered by the live() self-remove backstop below. */
+  var _cleanups = [];
+  /* Drain pending listener cleanups. Params: none. Returns nothing.
+   * Fails: never throws — each cleanup is individually guarded. */
+  function cleanupDetail() {
+    var fns = _cleanups;
+    _cleanups = [];
+    for (var i = 0; i < fns.length; i++) {
+      try { fns[i](); } catch (e) { /* cleanup must not throw */ }
+    }
+  }
   /* Shared-_ui accessor: PoolUI._ui (pool-ui.js loads first); throws when the backend is missing. */
   function U() {
     if (typeof PoolUI === "undefined" || !PoolUI._ui) throw new Error(t("pool.backend_missing", "Pool backend missing: pool-ui.js failed to load."));
@@ -51,6 +65,7 @@ var PoolDetailUI = (function () {
    * @param {string} poolId pool object id (1.19.x) or symbol */
   function renderPoolDetail(root, poolId) {
     if (!root) return;
+    cleanupDetail();
     var u = U(), retry = function () { renderPoolDetail(root, poolId); };
     var ctx = u.routeReady(root, "Pool " + poolId, retry);
     if (!ctx) return;
@@ -329,11 +344,12 @@ var PoolDetailUI = (function () {
       if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
         var onRs = function () { if (live(myGen, uiGen)) P.redraw(); else { try { window.removeEventListener("resize", onRs); } catch (e) {} } };
         window.addEventListener("resize", onRs);
+        _cleanups.push(function () { try { window.removeEventListener("resize", onRs); } catch (e) { /* gone */ } });
       }
       try {
         if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
           var offTh = Store.subscribe("settings", function () { if (live(myGen, uiGen)) P.redraw(); });
-          void offTh;
+          if (typeof offTh === "function") _cleanups.push(offTh);
         }
       } catch (e) { /* theme redraw best-effort */ }
       fetchPoolMap(doc, P, r, myGen, uiGen);

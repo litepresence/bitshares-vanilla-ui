@@ -71,6 +71,14 @@ var ViewingAs = (function () {
     box.className = "viewing-picker";
     box.setAttribute("role", "dialog");
     box.setAttribute("aria-label", t("viewing.dialog_title", "View as account"));
+    /* Focus return (lifecycle): opener is the invoking element, falling back
+     * to #acting-as (the header affordance that opens the picker). Every
+     * dismiss path below refocuses it. Guarded — headless docs keep prior
+     * behavior. */
+    var opener = null;
+    try { opener = (doc.activeElement && typeof doc.activeElement.focus === "function") ? doc.activeElement : null; } catch (e) { opener = null; }
+    if (!opener) { try { opener = (typeof doc.getElementById === "function") ? doc.getElementById("acting-as") : null; } catch (e) { opener = null; } }
+    function refocus() { try { if (opener && typeof opener.focus === "function") opener.focus(); } catch (e) { /* display stands */ } }
     var h = doc.createElement("h2");
     h.textContent = t("viewing.dialog_title", "View as account");
     box.appendChild(h);
@@ -117,6 +125,7 @@ var ViewingAs = (function () {
           var ov = box.parentNode;
           if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
         } catch (e) { /* gone */ }
+        refocus();
       });
     }
     box.appendChild(row);
@@ -129,6 +138,7 @@ var ViewingAs = (function () {
           var ov = box.parentNode;
           if (ov && ov.className === "viewing-picker-overlay" && ov.parentNode) ov.parentNode.removeChild(ov);
         } catch (e) { /* inline section stands */ }
+        refocus();
       }).catch(function (e) {
         go.disabled = false;
         var m = (e && e.message) ? e.message : "";
@@ -167,11 +177,17 @@ var ViewingAs = (function () {
     var overlay = doc.createElement("div");
     overlay.className = "viewing-picker-overlay";
     overlay.setAttribute("id", "viewing-as-open");
+    /* Backdrop-path opener (same rule as buildBox: invoking element, else
+     * #acting-as) — buildBox owns the ×/Go paths; this covers backdrop. */
+    var opener = null;
+    try { opener = (doc.activeElement && typeof doc.activeElement.focus === "function") ? doc.activeElement : null; } catch (e) { opener = null; }
+    if (!opener) { try { opener = (typeof doc.getElementById === "function") ? doc.getElementById("acting-as") : null; } catch (e) { opener = null; } }
     var box = buildBox(doc, true);
     overlay.appendChild(box);
     overlay.addEventListener("click", function (ev) {
       if (ev.target === overlay) {
         try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch (e) { /* gone */ }
+        try { if (opener && typeof opener.focus === "function") opener.focus(); } catch (e) { /* picker stands dismissed */ }
       }
     });
     return overlay;

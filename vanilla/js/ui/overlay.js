@@ -8,8 +8,8 @@
  * Origin: Task 3.3 of docs/superpowers/plans/2026-10-04-shared-utilities-refactor.md;
  *   common subset of the credit-ui.js openLoanModal overlay (~line 406-438:
  *   backdrop click target===overlay, Escape key, role=dialog panel).
- *   Callers needing more (focus trap, return-focus) keep their own — this
- *   module ships the subset every modal needs, nothing else.
+ *   Callers needing more (focus trap) keep their own — return-focus ships
+ *   here (optional override via cfg.returnFocus).
  * CSS contract: positioning/skin comes from vanilla/css/app.css
  *   .credit-loan-overlay/.credit-loan-panel (verified present); this module
  *   sets no inline positioning so no new CSS is needed.
@@ -36,12 +36,16 @@ var Overlay = (function () {
 
   /* Open a modal overlay around caller-built content.
    * @param {object} cfg {content: HTMLElement, onClose: function?,
-   *   className: string?} — content is moved inside the panel (not cloned);
-   *   onClose fires at most once, on any close path; className is an extra
-   *   hook appended to the overlay (contract classes are always kept).
+   *   className: string?, returnFocus?: HTMLElement|null} — content is moved
+   *   inside the panel (not cloned); onClose fires at most once, on any
+   *   close path; className is an extra hook appended to the overlay
+   *   (contract classes are always kept); returnFocus is the element to
+   *   focus on close (defaults to the opener captured here; pass null to
+   *   leave focus alone).
    * @return {{overlay: HTMLElement, close: function}} overlay is the
    *   backdrop element (attached to doc.body); close() detaches, removes
-   *   listeners, fires onClose once — safe to call repeatedly.
+   *   listeners, fires onClose once, then returns focus — safe to call
+   *   repeatedly.
    * Failure: throws when no document can be resolved; onClose missing means
    *   close paths only detach (never throws). */
   function open(cfg) {
@@ -69,6 +73,14 @@ var Overlay = (function () {
     if (doc.body && typeof doc.body.appendChild === "function") doc.body.appendChild(overlay);
     var closed = false;
     var onClose = (typeof cfg.onClose === "function") ? cfg.onClose : null;
+    /* Focus return (lifecycle, not styling): default to the opener captured
+     * at open; an explicit returnFocus (even null) wins. Guarded — fake
+     * docs without activeElement/focus keep prior behavior. */
+    var returnFocus = null;
+    try {
+      if (cfg && Object.prototype.hasOwnProperty.call(cfg, "returnFocus")) returnFocus = cfg.returnFocus || null;
+      else returnFocus = (doc.activeElement && typeof doc.activeElement.focus === "function") ? doc.activeElement : null;
+    } catch (e) { returnFocus = null; }
     /* Backdrop path: only a click whose target IS the overlay closes —
      * clicks inside the panel (target = content) bubble up but are ignored. */
     function onBackdrop(e) {
@@ -86,6 +98,7 @@ var Overlay = (function () {
       var parent = overlay.parentElement || overlay.parentNode;
       if (parent && typeof parent.removeChild === "function") parent.removeChild(overlay);
       if (onClose) onClose();
+      try { if (returnFocus && typeof returnFocus.focus === "function") returnFocus.focus(); } catch (e) { /* tab order stands */ }
     }
     overlay.addEventListener("click", onBackdrop);
     if (typeof doc.addEventListener === "function") doc.addEventListener("keydown", onKey);
