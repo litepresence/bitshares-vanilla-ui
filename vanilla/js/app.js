@@ -477,13 +477,21 @@ var App = (function () {
   }
 
   /* goToViewingAs: navigate to #/settings and bring #viewing-as to the top
-   * of the viewport. Params: none. Returns nothing. Already-on-settings
-   * scrolls immediately; otherwise the hash change re-renders first and a
-   * bounded poll (20 × 50ms) waits for the section. scrollIntoView() bare
-   * (instant top-align — no smooth motion, reduced-motion safe). Never
-   * throws — worst case the user lands on settings unscrolled. */
+   * of the viewport. Thin wrapper over goToSettingsSection (the shield
+   * badge rides the same helper to #sign-block). */
   function goToViewingAs() {
-    if (typeof document === "undefined") return;
+    goToSettingsSection("viewing-as");
+  }
+
+  /* goToSettingsSection: navigate to #/settings and bring one section to
+   * the top of the viewport. Params: targetId (string, element id).
+   * Already-on-settings scrolls immediately; otherwise the hash change
+   * re-renders first and a bounded poll (20 × 50ms) waits for the section.
+   * scrollIntoView() bare (instant top-align — no smooth motion,
+   * reduced-motion safe). Never throws — worst case the user lands on
+   * settings unscrolled. */
+  function goToSettingsSection(targetId) {
+    if (typeof document === "undefined" || !targetId) return;
     try {
       if (typeof window !== "undefined" && window.location && window.location.hash !== "#/settings") {
         window.location.hash = "#/settings";
@@ -492,7 +500,7 @@ var App = (function () {
     var tries = 0;
     (function poll() {
       var target = null;
-      try { target = document.getElementById("viewing-as"); } catch (e) { target = null; }
+      try { target = document.getElementById(targetId); } catch (e) { target = null; }
       if (target && target.scrollIntoView) {
         try { target.scrollIntoView(); } catch (e) { /* landed anyway */ }
         return;
@@ -897,6 +905,23 @@ var App = (function () {
         old.setAttribute("aria-label", label);
         old.setAttribute("title", label);
       } catch (e) { /* badge stands unlabeled */ }
+      /* Click rides the shared settings-section helper (same as the
+       * #acting-as account button): navigate + scroll #sign-block to the
+       * top. preventDefault keeps it deterministic (no double handling
+       * with the href); the href stays as the no-JS fallback. Bound once
+       * — the badge element persists across repaints, only its children
+       * are rebuilt. */
+      try {
+        if (old.getAttribute("data-sign-bound") !== "true") {
+          old.setAttribute("data-sign-bound", "true");
+          old.addEventListener("click", function (ev) {
+            try {
+              if (ev && ev.preventDefault) ev.preventDefault();
+              goToSettingsSection("sign-block");
+            } catch (e) { /* href fallback stands */ }
+          });
+        }
+      } catch (e) { /* badge stands unbound */ }
     } catch (e) { /* header keeps prior paint */ }
   }
 
