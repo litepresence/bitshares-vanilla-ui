@@ -157,6 +157,10 @@ interface Window {
   };
 }
 declare var BRAINKEY_DICT: any;
+declare var ConfirmDialog: any;
+declare var Overlay: any;
+declare var TableRenderer: any;
+declare var EventDelegate: any;
 declare var nobleGetPublicKey: any;
 declare var nobleSignAsync: any;
 declare var nobleGetSharedSecret: any;
