@@ -23,11 +23,12 @@ Tx._ser = Tx._ser || {};
 /* Node suites require() this file directly (tooling/*-test.js) while the
  * browser loads tx-primitives/tx-ops-* via <script> order. Pull the
  * split modules through the module loader WITHOUT naming `require`
- * (checkJs runs browser libs — a bare require() call is TS2591 there).
- * module.require resolves relative to THIS file, like require(). */
+ * (checkJs runs browser libs — a bare require() call is TS2591 there;
+ * seam-cast keeps the node path working). module.require resolves
+ * relative to THIS file, like require(). */
 var __txRequire = null;
 try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __txRequire = module.require.bind(module);
+  if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) __txRequire = /** @type {any} */ (module).require.bind(module);
 } catch (e) { __txRequire = null; }
 if (__txRequire && (typeof globalThis === "undefined" || !globalThis.Tx || !globalThis.Tx._ser || !globalThis.Tx._ser.serializeTransferOp)) {
   __txRequire("./tx-primitives.js");

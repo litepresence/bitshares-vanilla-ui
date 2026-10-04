@@ -29,6 +29,18 @@ var Router = (function () {
     return dflt;
   }
 
+  /* escapeHtml: &-<>"' escaping for interpolated shell strings. Params: s
+   * (any, stringified). Returns the escaped string. Fails: never. */
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      if (c === "&") return "&amp;";
+      if (c === "<") return "&lt;";
+      if (c === ">") return "&gt;";
+      if (c === '"') return "&quot;";
+      return "&#39;";
+    });
+  }
+
   /* placeholder: INTENTIONAL fallback renderer for view-script load failure
    *   (not dead code — About/Menu/Settings/Exchange routes call it when their
    *   view global is absent). Params: title (string). Returns a render
