@@ -1358,6 +1358,14 @@ p.muted[aria-live="polite"],
   text-shadow: 0 0 8px var(--live);
   animation: candy-glow 3s ease-in-out infinite;
 }
+/* Testnet twin of the open glow: --warn-text text (small-text contrast
+ * contract, cf. node-table warn) + --warn halo, same candy-glow pulse. */
+.appfoot-host[data-state="open-testnet"] {
+  color: var(--warn-text);
+  font-weight: 700;
+  text-shadow: 0 0 8px var(--warn);
+  animation: candy-glow 3s ease-in-out infinite;
+}
 @keyframes candy-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.72; } }
 
 /* 3. Number-tick flourish (zero JS): market-ind renderStrip rebuilds every
@@ -1402,7 +1410,7 @@ p.muted[aria-live="polite"],
  * pill, glows stay as static halos, ticks/views paint instantly). */
 @media (prefers-reduced-motion: reduce) {
   p.muted[aria-live="polite"], .mkt-statstrip > span.muted:only-child,
-  .appfoot-host[data-state="open"], .mkt-stat, #view.view-enter {
+  .appfoot-host[data-state="open"], .appfoot-host[data-state="open-testnet"], .mkt-stat, #view.view-enter {
     animation: none;
   }
   button:active, a.btn:active, .appfoot-actions a:active { transform: none; }

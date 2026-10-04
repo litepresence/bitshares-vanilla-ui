@@ -578,7 +578,7 @@ var App = (function () {
     if (s.mismatch) {
       var mhost = shortHost(s.node);
       var ml1 = line("appfoot-line1");
-      if (mhost) ml1.appendChild(span(mhost, "appfoot-host", "closed"));
+      if (mhost) ml1.appendChild(span(netHostText(currentNetwork(), mhost), "appfoot-host", "closed"));
       else ml1.appendChild(span("error", "appfoot-host", "closed"));
       foot.appendChild(ml1);
       var ml2 = line("appfoot-line2");
@@ -593,8 +593,9 @@ var App = (function () {
       var lat = (s.latencyMs !== null && s.latencyMs !== undefined) ? s.latencyMs + "ms" : "—";
       var blk = s.headBlock ? " / BLOCK #" + String(s.headBlock) : "";
       var l1 = line("appfoot-line1");
-      if (host) l1.appendChild(span(host, "appfoot-host", "open"));
-      else l1.appendChild(span("—", "appfoot-host", "open"));
+      var net = currentNetwork();
+      if (host) l1.appendChild(span(netHostText(net, host), "appfoot-host", net === "testnet" ? "open-testnet" : "open"));
+      else l1.appendChild(span(netHostText(net, "—"), "appfoot-host", net === "testnet" ? "open-testnet" : "open"));
       foot.appendChild(l1);
       var l2 = line("appfoot-line2");
       l2.appendChild(span("LATENCY " + lat + blk, "appfoot-telemetry", null));
@@ -602,8 +603,9 @@ var App = (function () {
     } else {
       var host = shortHost(s.node);
       var l1 = line("appfoot-line1");
-      if (host) l1.appendChild(span(host, "appfoot-host", "closed"));
-      else if (state && state !== "unknown") l1.appendChild(span(state, "appfoot-host", "closed"));
+      var net2 = currentNetwork();
+      if (host) l1.appendChild(span(netHostText(net2, host), "appfoot-host", "closed"));
+      else if (state && state !== "unknown") l1.appendChild(span(netHostText(net2, state), "appfoot-host", "closed"));
       else l1.appendChild(doc.createTextNode(t("shell.badge_initial", "connecting…")));
       foot.appendChild(l1);
       var l2 = line("appfoot-line2");
@@ -613,13 +615,6 @@ var App = (function () {
     }
   }
 
-  /* paintVersion: bottom-LEFT version string "BITSHARES <chainid8> • v1.0.0 •
-   * Disclaimer" (original footer: chain prefix + disclaimer link; the app
-   * version stamp was ruled in ship-day R8). The 8
-   * chars come from Chain.status().chainId, uppercased; a missing chain id
-   * omits the hash silently (prefix + disclaimer still paint — never blank,
-   * never throws). Called from paintFooter so every connection event
-   * refreshes it, plus once at boot. */
   /* Footer build-info pure helpers (spec 2026-10-04-footer-build-info-design:
    * no DOM, no fetch — the impure wiring below consumes these. Unit-tested
    * via _test; under node I18n is absent so t() falls back to the English
@@ -718,31 +713,116 @@ var App = (function () {
     return t("shell.footer_net_host", "%(net)s - %(host)s", { net: label, host: String(host) });
   }
 
-  function paintVersion(status) {
+  /* Footer build-info wiring (impure: fetch + localStorage, all fail-open).
+   * State: buildInfo (parsed version.json), buildCmp (null unknown |
+   * {offbranch:true} | {ahead,behind,status}), buildCmpAt (ms stamp).
+   * paintVersion renders current truth every call and kicks maybeRefreshCmp,
+   * whose completion repaints — connection-event repaints never fetch
+   * directly (TTL + cache, 60/hr unauthenticated GitHub budget respected). */
+  var buildInfo = null, buildCmp = null, buildCmpAt = 0, buildFetching = false, buildBooted = false;
+
+  /**
+   * Fetch version.json once (same-origin; file:// failure falls to null).
+   * @returns {Promise} resolves parsed record or null, never rejects */
+  function loadBuildInfo() {
+    if (typeof fetch === "undefined") return Promise.resolve(null);
+    return fetch("version.json", { cache: "no-store" }).then(function (r) {
+      if (!r || !r.ok) return null;
+      return r.json().catch(function () { return null; });
+    }).then(function (j) {
+      return parseBuildInfo(j);
+    }).then(null, function () { return null; });
+  }
+
+  /**
+   * Cached compare for this commit or null (commit mismatch/TTL = null).
+   * @param {string} commit 40-hex SHA
+   * @returns {{ahead: number, behind: number, status: string} | {offbranch: boolean} | null} */
+  function readCmpCache(commit) {
+    try {
+      if (typeof localStorage === "undefined") return null;
+      var raw = localStorage.getItem(COMPARE_CACHE_KEY);
+      if (!raw) return null;
+      var c = JSON.parse(raw);
+      if (!c || c.commit !== commit) return null;
+      if (typeof c.at !== "number" || (Date.now() - c.at) > COMPARE_TTL_MS) return null;
+      if (c.offbranch) return { offbranch: true };
+      return parseCompare({ ahead_by: c.ahead, behind_by: c.behind, status: c.status });
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Persist one compare result (best-effort, never throws).
+   * @param {string} commit 40-hex SHA
+   * @param {*} cmp compare record or {offbranch:true}
+   * @returns {void} */
+  function writeCmpCache(commit, cmp) {
+    try {
+      if (typeof localStorage === "undefined") return;
+      localStorage.setItem(COMPARE_CACHE_KEY, JSON.stringify({ commit: commit, ahead: cmp.ahead, behind: cmp.behind, status: cmp.status, offbranch: !!cmp.offbranch, at: Date.now() }));
+    } catch (e) { /* cache optional */ }
+  }
+
+  /* Kick one guarded compare fetch; completion repaints. Never throws. */
+  function maybeRefreshCmp() {
+    if (!buildInfo || buildFetching) return;
+    if (typeof fetch === "undefined") return;
+    if (buildCmp && (Date.now() - buildCmpAt) <= COMPARE_TTL_MS) return;
+    var cached = readCmpCache(buildInfo.commit);
+    if (cached) { buildCmp = cached; buildCmpAt = Date.now(); return; }
+    buildFetching = true;
+    fetch(compareUrl(buildInfo.repo, buildInfo.branch, buildInfo.commit), { headers: { "Accept": "application/vnd.github+json" } }).then(function (r) {
+      if (!r) return null;
+      if (r.status === 404) return { offbranch: true };
+      if (!r.ok) return null;
+      return r.json().catch(function () { return null; });
+    }).then(function (j) {
+      if (!j) return;
+      var next = j.offbranch ? { offbranch: true } : parseCompare(j);
+      if (!next) return;
+      buildCmp = next; buildCmpAt = Date.now();
+      writeCmpCache(buildInfo.commit, next);
+      paintVersion();
+    }).then(null, function () { /* hash-only stands */ }).then(function () { buildFetching = false; });
+  }
+
+  /* One-shot boot for build info (skeleton stands until info lands). */
+  function bootBuildInfo() {
+    if (buildBooted) return;
+    buildBooted = true;
+    loadBuildInfo().then(function (info) {
+      if (!info) return;
+      buildInfo = info;
+      paintVersion();
+      maybeRefreshCmp();
+    });
+  }
+
+  /* paintVersion: bottom-LEFT build string "BITSHARES VANILLA UI <short7>
+   * · <relation> Master" (Master = branch-name identifier, hyperlinked to
+   * the repo root from version.json; chain prefix retired per spec).
+   * Ladder: full relation | offbranch "not on Master" | hash-only |
+   * skeleton (no version.json — bootBuildInfo fails open, skeleton stands).
+   * Called from paintFooter so every connection event refreshes it. */
+  function paintVersion() {
     if (typeof document === "undefined") return;
     var left = document.getElementById("appfoot-version");
     if (!left) return;
     try {
-      var s = status || {};
-      var hash = "";
-      if (s.chainId !== null && s.chainId !== undefined && String(s.chainId)) {
-        hash = " " + String(s.chainId).slice(0, 8).toUpperCase();
-      } else {
-        try {
-          if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
-            var cur = Chain.status() || {};
-            if (cur.chainId !== null && cur.chainId !== undefined && String(cur.chainId)) {
-              hash = " " + String(cur.chainId).slice(0, 8).toUpperCase();
-            }
-          }
-        } catch (e) { /* hash stays omitted */ }
-      }
+      if (!buildInfo) { bootBuildInfo(); return; }
+      maybeRefreshCmp();
       while (left.firstChild) left.removeChild(left.firstChild);
       var doc = left.ownerDocument || document;
-      left.appendChild(doc.createTextNode(t("shell.footer_brand", "BITSHARES") + hash + " • v1.0.0 • "));
+      left.appendChild(doc.createTextNode(t("shell.footer_brand_vanilla", "BITSHARES VANILLA UI") + " " + buildInfo.short + " · "));
+      if (buildCmp && buildCmp.offbranch) {
+        left.appendChild(doc.createTextNode(t("shell.footer_offbranch", "not on Master") + " "));
+      } else if (buildCmp) {
+        left.appendChild(doc.createTextNode(relationText(buildCmp) + " "));
+      }
       var a = doc.createElement("a");
-      a.setAttribute("href", "#/help");
-      a.textContent = t("help.topic_disclaimer_title", "Disclaimer");
+      a.setAttribute("href", "https://github.com/" + buildInfo.repo);
+      a.setAttribute("rel", "noopener");
+      a.textContent = "Master";
       left.appendChild(a);
     } catch (e) { /* static skeleton stands */ }
   }
