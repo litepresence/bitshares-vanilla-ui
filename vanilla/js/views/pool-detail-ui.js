@@ -900,20 +900,50 @@ var PoolDetailUI = (function () {
     hist.appendChild(tabs);
     var poolBody = u.el(doc, "div"); poolBody.id = "pool-hist-pool"; poolBody.setAttribute("role", "tabpanel");
     var myBody = u.el(doc, "div"); myBody.id = "pool-hist-my"; myBody.setAttribute("role", "tabpanel");
+    /* APG tab-panel association (both panels exist with stable ids). */
+    tabPool.setAttribute("aria-controls", "pool-hist-pool");
+    tabMy.setAttribute("aria-controls", "pool-hist-my");
+    poolBody.setAttribute("aria-labelledby", "pool-hist-tab-pool");
+    myBody.setAttribute("aria-labelledby", "pool-hist-tab-my");
     hist.appendChild(poolBody); hist.appendChild(myBody);
     var cur = "pool";
-    /* paint: Pool-history vs My-swaps tab visibility + ARIA. */
+    /* paint: Pool-history vs My-swaps tab visibility + ARIA (incl. roving
+     * tabindex: selected 0, rest -1). */
     function paint() {
       var isMy = cur === "my";
       tabPool.setAttribute("aria-selected", isMy ? "false" : "true");
       tabMy.setAttribute("aria-selected", isMy ? "true" : "false");
       tabPool.setAttribute("aria-pressed", isMy ? "false" : "true");
       tabMy.setAttribute("aria-pressed", isMy ? "true" : "false");
+      tabPool.tabIndex = isMy ? -1 : 0;
+      tabMy.tabIndex = isMy ? 0 : -1;
       poolBody.style.display = isMy ? "none" : "";
       myBody.style.display = isMy ? "" : "none";
     }
     tabPool.addEventListener("click", function () { cur = "pool"; paint(); });
     tabMy.addEventListener("click", function () { cur = "my"; paint(); loadMy(poolBody, myBody, r, myGen, uiGen); });
+    /* APG tabs keyboard: arrows/Home/End focus + click (activation stays
+     * the click path above, no separate route). */
+    tabs.addEventListener("keydown", function (ev) {
+      if (!ev) return;
+      var k = ev.key;
+      if (k !== "ArrowLeft" && k !== "ArrowRight" && k !== "ArrowUp" &&
+        k !== "ArrowDown" && k !== "Home" && k !== "End") return;
+      var pair = [tabPool, tabMy];
+      var curI = 0;
+      if (doc.activeElement === tabMy) curI = 1;
+      else if (doc.activeElement !== tabPool) {
+        curI = (cur === "my") ? 1 : 0;
+      }
+      var n = curI;
+      if (k === "ArrowLeft" || k === "ArrowUp") n = (curI + pair.length - 1) % pair.length;
+      else if (k === "ArrowRight" || k === "ArrowDown") n = (curI + 1) % pair.length;
+      else if (k === "Home") n = 0;
+      else if (k === "End") n = pair.length - 1;
+      if (ev.preventDefault) ev.preventDefault();
+      pair[n].focus();
+      pair[n].click();
+    });
     paint();
     var note = u.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"); poolBody.appendChild(note);
     poolBody.removeChild(note);

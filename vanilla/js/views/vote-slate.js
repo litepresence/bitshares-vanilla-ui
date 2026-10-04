@@ -190,7 +190,13 @@ var VoteSlate = (function () {
 
   /* Slate tab bar (Witnesses/Committee/Workers with draft counts).
    * Params: doc, bar (emptied first), st (tab + draft sets), refresh
-   *   (vote-ui.js re-render closure). Returns nothing. */
+   *   (vote-ui.js re-render closure). Returns nothing.
+   * APG tabs keyboard: roving tabindex (selected 0, rest -1) +
+   * ArrowLeft/Right/Up/Down + Home/End. Activation stays the click path
+   * (keys focus + click, no separate route). The list box is one shared
+   * panel with no per-tab stable ids, so no aria-controls association.
+   * The bar element survives refresh (caller empties children only), so the
+   * key handler attaches once (guarded) and reads live tabs each key. */
   function renderTabs(doc, bar, st, refresh) {
     while (bar.firstChild) bar.removeChild(bar.firstChild);
     var tabs = [
@@ -203,9 +209,41 @@ var VoteSlate = (function () {
       b.type = "button";
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", st.tab === t[0] ? "true" : "false");
+      b.tabIndex = st.tab === t[0] ? 0 : -1;
       b.addEventListener("click", function () { st.tab = t[0]; refresh(); });
       bar.appendChild(b);
     });
+    if (!bar.getAttribute("data-slate-keys")) {
+      bar.setAttribute("data-slate-keys", "1");
+      bar.addEventListener("keydown", function (ev) {
+        if (!ev) return;
+        var k = ev.key;
+        if (k !== "ArrowLeft" && k !== "ArrowRight" && k !== "ArrowUp" &&
+          k !== "ArrowDown" && k !== "Home" && k !== "End") return;
+        var live = bar.querySelectorAll('[role="tab"]');
+        if (!live || live.length < 2) return;
+        var cur = -1;
+        for (var i = 0; i < live.length; i++) {
+          if (live[i] === doc.activeElement) { cur = i; break; }
+        }
+        if (cur < 0) {
+          cur = 0;
+          for (var s = 0; s < live.length; s++) {
+            if (live[s].getAttribute("aria-selected") === "true") { cur = s; break; }
+          }
+        }
+        var n = cur;
+        if (k === "ArrowLeft" || k === "ArrowUp") n = (cur + live.length - 1) % live.length;
+        else if (k === "ArrowRight" || k === "ArrowDown") n = (cur + 1) % live.length;
+        else if (k === "Home") n = 0;
+        else if (k === "End") n = live.length - 1;
+        if (ev.preventDefault) ev.preventDefault();
+        live[n].focus();
+        live[n].click();
+        var sel = bar.querySelector('[aria-selected="true"]');
+        if (sel) sel.focus();
+      });
+    }
   }
 
   /* One tab's searchable list. Rows are wrapping flex cards (phone stacks,

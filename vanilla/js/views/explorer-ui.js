@@ -470,21 +470,50 @@ var ExplorerUI = (function () {
       });
     });
 
-    /* Tabs: real buttons (keyboard + touch, never hover-only). */
+    /* Tabs: real buttons (keyboard + touch, never hover-only).
+     * APG tabs keyboard: roving tabindex (selected 0, rest -1) +
+     * ArrowLeft/Right/Up/Down + Home/End. Activation stays the click→hash
+     * path below (keys focus + click, no separate route). No per-tab panels
+     * with stable ids here (one shared .xplore-body), so no aria-controls
+     * association. */
     var bar = DOM.el(doc, "div", null, "xplore-tabs");
     bar.setAttribute("role", "tablist");
+    var tabBtns = [];
     TABS.forEach(function (t) {
       var b = touchable(DOM.el(doc, "button", tabLabel(t),
         want === t ? "xplore-tab active" : "xplore-tab"));
       b.type = "button";
       b.setAttribute("role", "tab");
       b.setAttribute("aria-selected", want === t ? "true" : "false");
+      b.tabIndex = want === t ? 0 : -1;
       b.addEventListener("click", function () {
         pendingObject = null;
         if (typeof location !== "undefined") location.hash = "#/explorer/" + t;
         else renderExplorer(root, t);
       });
+      tabBtns.push(b);
       bar.appendChild(b);
+    });
+    bar.addEventListener("keydown", function (ev) {
+      if (!ev) return;
+      var k = ev.key;
+      if (k !== "ArrowLeft" && k !== "ArrowRight" && k !== "ArrowUp" &&
+        k !== "ArrowDown" && k !== "Home" && k !== "End") return;
+      var cur = tabBtns.indexOf(doc.activeElement);
+      if (cur < 0) {
+        cur = 0;
+        for (var s = 0; s < tabBtns.length; s++) {
+          if (tabBtns[s].getAttribute("aria-selected") === "true") { cur = s; break; }
+        }
+      }
+      var n = cur;
+      if (k === "ArrowLeft" || k === "ArrowUp") n = (cur + tabBtns.length - 1) % tabBtns.length;
+      else if (k === "ArrowRight" || k === "ArrowDown") n = (cur + 1) % tabBtns.length;
+      else if (k === "Home") n = 0;
+      else if (k === "End") n = tabBtns.length - 1;
+      if (ev.preventDefault) ev.preventDefault();
+      tabBtns[n].focus();
+      tabBtns[n].click();
     });
     wrap.appendChild(bar);
 
