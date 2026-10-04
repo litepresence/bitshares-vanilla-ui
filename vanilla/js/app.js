@@ -620,6 +620,104 @@ var App = (function () {
    * omits the hash silently (prefix + disclaimer still paint — never blank,
    * never throws). Called from paintFooter so every connection event
    * refreshes it, plus once at boot. */
+  /* Footer build-info pure helpers (spec 2026-10-04-footer-build-info-design:
+   * no DOM, no fetch — the impure wiring below consumes these. Unit-tested
+   * via _test; under node I18n is absent so t() falls back to the English
+   * defaults, which check_i18n.py pins byte-equal to en.json). */
+  var COMPARE_TTL_MS = 10 * 60 * 1000;
+  var COMPARE_CACHE_KEY = "footerBuildCompare.v1";
+
+  /**
+   * version.json -> strict record or null (never throws, never partial).
+   * @param {*} json parsed version.json
+   * @returns {{repo: string, branch: string, commit: string, short: string} | null} */
+  function parseBuildInfo(json) {
+    try {
+      if (!json || typeof json !== "object") return null;
+      var commit = String(json.commit || "");
+      if (!/^[0-9a-f]{40}$/i.test(commit)) return null;
+      var repo = String(json.repo || "");
+      if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repo)) return null;
+      var branch = String(json.branch || "");
+      if (!branch) return null;
+      var low = commit.toLowerCase();
+      return { repo: repo, branch: branch, commit: low, short: low.slice(0, 7) };
+    } catch (e) { return null; }
+  }
+
+  /**
+   * GitHub compare payload -> counts or null (never throws).
+   * @param {*} json parsed compare response
+   * @returns {{ahead: number, behind: number, status: string} | null} */
+  function parseCompare(json) {
+    try {
+      if (!json || typeof json !== "object") return null;
+      var a = json.ahead_by, b = json.behind_by;
+      if (typeof a !== "number" || typeof b !== "number" || !isFinite(a) || !isFinite(b)) return null;
+      if (Math.floor(a) !== a || Math.floor(b) !== b || a < 0 || b < 0) return null;
+      var st = String(json.status || "");
+      if (st !== "identical" && st !== "ahead" && st !== "behind" && st !== "diverged") st = "";
+      return { ahead: a, behind: b, status: st };
+    } catch (e) { return null; }
+  }
+
+  /**
+   * Compare endpoint for own commit vs branch tip (base...head with
+   * base=branch, head=own SHA — verified 2026-10-04 to accept pushed SHAs).
+   * @param {string} repo "owner/name"
+   * @param {string} branch branch name
+   * @param {string} commit 40-hex SHA
+   * @returns {string} */
+  function compareUrl(repo, branch, commit) {
+    return "https://api.github.com/repos/" + repo + "/compare/" + branch + "..." + commit;
+  }
+
+  /**
+   * Relation fragment for footer-left (Master link appended by caller).
+   * @param {{ahead: number, behind: number}} cmp counts
+   * @returns {string} */
+  function relationText(cmp) {
+    /** @type {{ahead?: number, behind?: number}} */
+    var c = cmp || {};
+    var a = (typeof c.ahead === "number" && c.ahead > 0) ? Math.floor(c.ahead) : 0;
+    var b = (typeof c.behind === "number" && c.behind > 0) ? Math.floor(c.behind) : 0;
+    if (a > 0 && b > 0) {
+      return t("shell.footer_diverged", "diverged from") + " (" + t("shell.footer_dahead", "%(n)s ahead", { n: String(a) }) + ", " + t("shell.footer_dbehind", "%(n)s behind", { n: String(b) }) + ")";
+    }
+    if (a > 0) {
+      if (a === 1) return t("shell.footer_ahead_one", "1 commit ahead of");
+      return t("shell.footer_ahead", "%(n)s commits ahead of", { n: String(a) });
+    }
+    if (b > 0) {
+      if (b === 1) return t("shell.footer_behind_one", "1 commit behind");
+      return t("shell.footer_behind", "%(n)s commits behind", { n: String(b) });
+    }
+    return t("shell.footer_sync", "in sync with");
+  }
+
+  /**
+   * Active network, sole source Store settings (guarded mainnet default).
+   * @returns {string} "mainnet" or "testnet" */
+  function currentNetwork() {
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+        var s = Store.loadSettings();
+        if (s && (s.network === "testnet" || s.network === "mainnet")) return s.network;
+      }
+    } catch (e) { /* mainnet below */ }
+    return "mainnet";
+  }
+
+  /**
+   * Footer-right line-1 text with network prefix (caps come from CSS).
+   * @param {string} network "mainnet"|"testnet"
+   * @param {string} host bare host or status word
+   * @returns {string} */
+  function netHostText(network, host) {
+    var label = (network === "testnet") ? t("settings.network_testnet", "testnet") : t("settings.network_mainnet", "mainnet");
+    return t("shell.footer_net_host", "%(net)s - %(host)s", { net: label, host: String(host) });
+  }
+
   function paintVersion(status) {
     if (typeof document === "undefined") return;
     var left = document.getElementById("appfoot-version");
@@ -970,7 +1068,7 @@ var App = (function () {
   if (typeof document !== "undefined") boot();
 
   return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
-    _test: { validPoolMarket: validPoolMarket } };
+    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }
