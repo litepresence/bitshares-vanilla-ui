@@ -223,7 +223,7 @@ New:
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `node tooling/footer-build-test.js`
-Expected: `footer-build-test: 33 passed, 0 failed` (exit 0).
+Expected: `footer-build-test: 24 passed, 0 failed` (exit 0).
 
 - [ ] **Step 5: Run type gate**
 
