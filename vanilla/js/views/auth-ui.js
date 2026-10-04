@@ -140,6 +140,19 @@ var AuthUI = (function () {
   function notePara(doc, text) {
     return DOM.el(doc, "p", text, "muted"); }
 
+  /* loginHead: page h1 + blue-lock icon (owner-supplied art, same family
+   * as the state padlocks). Icon guarded like settings-prefs buildSigning:
+   * heading stands without it. Params: doc. Returns the h1. */
+  function loginHead(doc) {
+    var h = DOM.el(doc, "h1", t("auth.login", "Login"));
+    try {
+      if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+        h.appendChild(doc.createTextNode(" "));
+        h.appendChild(Icon.img("lock-blue", "h-title-icon", ""));
+      }
+    } catch (e) { /* heading stands without the icon */ }
+    return h;
+  }
   /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
    * the local wallet (the only key path Wallet supports); card B looks an
    * account name up read-only and points back at card A. Neither the .bin
@@ -152,7 +165,7 @@ var AuthUI = (function () {
     var myGen = ++gen;
     DOM.clear(root);
     var wrap = makeWrap(doc, root);
-    DOM.append(wrap, DOM.el(doc, "h1", t("auth.login", "Login")));
+    DOM.append(wrap, loginHead(doc));
     if (walletMissing(doc, wrap)) return;
     var unlocked = false;
     try { unlocked = typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys; }
@@ -188,7 +201,7 @@ var AuthUI = (function () {
           if (myGen !== gen) return;
           DOM.clear(root);
           var done = makeWrap(doc, root);
-          DOM.append(done, DOM.el(doc, "h1", t("auth.login", "Login")));
+          DOM.append(done, loginHead(doc));
           DOM.append(done, DOM.el(doc, "p", t("auth.wallet_unlocked", "Wallet unlocked."), "muted"));
           DOM.append(done, linkPara(doc, [
             ["#/accounts", t("auth.open_accounts", "Open accounts")],

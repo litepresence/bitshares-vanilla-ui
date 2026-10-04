@@ -55,7 +55,7 @@ var Icon = (function () {
   /* PNGS: raster state badges (owner-supplied lock/shield art — full
    *   color, so they bypass the --icon-filter invert via img.icon-state
    *   in app.css; see assets/PROVENANCE.md). Same VALID guard as above. */
-  var PNGS = { "lock-closed": 1, "lock-open": 1, "shield-ok": 1, "shield-bad": 1, "shield-blue": 1 };
+  var PNGS = { "lock-closed": 1, "lock-open": 1, "lock-blue": 1, "shield-ok": 1, "shield-bad": 1, "shield-blue": 1 };
   /* warmed: fetch-once Map (name -> true). The <img> load itself is the real
    * fetch; this one-time fetch() only warms the HTTP cache ahead of first
    * paint. Best-effort: file:// and offline failures are swallowed — the

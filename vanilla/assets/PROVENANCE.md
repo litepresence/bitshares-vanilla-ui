@@ -48,6 +48,10 @@ Hand-drawn addition (Tier 2):
 - `icons/shield-blue.png` (owner-supplied 2026-10-04, blue shield + white
   check, transparent) beside the Signing section heading
   (`settings-prefs.js` buildSigning). Same family as the state shields.
+- `icons/lock-blue.png` (owner-supplied 2026-10-04, blue padlock, 70×96,
+  transparent) beside the Login page heading (`auth-ui.js` renderLogin).
+  Same blue-lock family as the state padlocks; full-color art bypasses the
+  `--icon-filter` invert like the other PNG badges.
 
 Owner-supplied state icons (2026-10-04):
 - `icons/_source-lock-shield-4up.png` is the owner's 2×2 sheet (green-check

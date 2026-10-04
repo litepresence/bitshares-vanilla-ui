@@ -922,6 +922,15 @@ img, canvas, pre { max-width: 100%; }
  * icon-state badges, full-color art must not take the .icon-img theme
  * invert (it turns blue shields red). */
 .sign-title-icon { width: 22px; height: 22px; vertical-align: -4px; filter: none; }
+/* Page-heading icon (login h1 blue lock): portrait art keeps aspect via
+ * height-only sizing; full-color bypasses the invert like the shields. */
+.h-title-icon { height: 24px; width: auto; vertical-align: -4px; filter: none; }
+/* Uniform heading ladder (page h1 1.35rem keeps its rule above): section h2
+ * and subsection h3 were browser-default (h2 LARGER than the page h1 —
+ * inverted hierarchy). Later-in-file wins the one tie
+ * (.credit-loan-panel h2 1.2rem -> 1.15rem, negligible, same direction). */
+.wrap h2 { font-size: 1.15rem; margin: 10px 0 6px; }
+.wrap h3 { font-size: 1rem; margin: 8px 0 4px; }
 /* Colored state art (owner lock/shield PNGs) must NOT take the monochrome
  * invert above — green/red carries the state. icon-state marks the
  * full-color imgs (Icon.img cls slot, app.js paintLock/paintShieldBadge). */
