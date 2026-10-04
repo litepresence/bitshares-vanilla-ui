@@ -122,6 +122,13 @@ globalThis.Chain = {
 };
 
 (async function () {
+  /* Deterministic epoch (R-B-H2): freeze Date.now to a fixed epoch so the
+   * candles() window and the freshness assertion share one clock — no
+   * wall-clock flake. Restored in finally. No sleeps: stub Chain drives. */
+  var FIXED_EPOCH_MS = Date.parse("2026-09-01T12:00:00Z");
+  var _realDateNow = Date.now;
+  Date.now = function () { return FIXED_EPOCH_MS; };
+  try {
   var r = await MC.candles("1.3.0", "1.3.113", 3600, 500);
   eq(r.buckets.length, 500, "500-slot window fully covered despite 200 cap");
   var t0 = r.buckets[0].timeMs, t1 = r.buckets[r.buckets.length - 1].timeMs;
@@ -130,6 +137,7 @@ globalThis.Chain = {
   eq(__calls <= 4, true, "bounded chunk fetches (got " + __calls + ")");
   eq(r.deep, false, "no ES in stub (chain-only flag honest)");
   console.log("chart-zoom-test: " + passed + " passed, 0 failed");
+  } finally { Date.now = _realDateNow; }
 })().catch(function (e) {
   console.error("chart-zoom-test FAILED: " + (e && e.message));
   process.exit(1);

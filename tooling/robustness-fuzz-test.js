@@ -19,6 +19,17 @@ const fs = require("fs");
 const vm = require("vm");
 
 let pass = 0, fail = 0;
+
+/* Deterministic time + stub progression (R-B-H2: no wall-clock flakes).
+ * FIXED_EPOCH_MS pins Date.now per test (saved/restored in finally);
+ * _ticks(n) flushes n event-loop turns via setImmediate instead of
+ * wall-clock setTimeout sleeps, so stub WS responses settle deterministically. */
+const FIXED_EPOCH_MS = Date.parse("2026-09-01T12:00:00Z");
+function _ticks(n) {
+  let p = Promise.resolve();
+  for (let i = 0; i < n; i++) p = p.then(() => new Promise((r) => setImmediate(r)));
+  return p;
+}
 function ok(cond, name, detail) {
   if (cond) { pass++; }
   else { fail++; console.log("FAIL " + name + (detail ? " — " + detail : "")); }
@@ -356,6 +367,10 @@ const MC = require("/workspace/vanilla/js/api/market-candles.js");
   } catch (e) { ok(false, "trades harness no raw", (e && e.stack || e)); }
 
   // MarketCandles interpolation: empty / single / out-of-order / future / bad timestamps
+  // MarketCandles interpolation: empty / single / out-of-order / future / bad timestamps
+  // Deterministic epoch: freeze Date.now to FIXED_EPOCH_MS (restore in finally).
+  const _savedNow = Date.now;
+  Date.now = () => FIXED_EPOCH_MS;
   try {
     delete require.cache[require.resolve("/workspace/vanilla/js/api/market-candles.js")];
     const MC2 = require("/workspace/vanilla/js/api/market-candles.js");
@@ -412,6 +427,7 @@ const MC = require("/workspace/vanilla/js/api/market-candles.js");
     let badCount = null; try { await MC2.candles("1.3.0", "1.3.113", 3600, 0); } catch (e) { badCount = e; }
     ok(badCount && isNamedError(badCount), "candles bad count named");
   } catch (e) { ok(false, "candles harness no raw", (e && e.stack || e)); }
+  finally { Date.now = _savedNow; }
 
   // Chain parsers: blockNumberFromId short/garbage via notice (tip never moves backwards, never throws)
   try {
@@ -443,17 +459,16 @@ const MC = require("/workspace/vanilla/js/api/market-candles.js");
         const p = Chain.connect("wss://fake/ws", { timeoutMs: 4000, heartbeatMs: 60000 }).catch(() => null);
         setImmediate(() => { try { sockets[0].open(); } catch (e) {} });
         p.then(async () => {
-          await new Promise((rr) => setTimeout(rr, 30));
+          await _ticks(20);
           const before = Chain.status().headBlock;
           blockIds.forEach((id) => {
             try { sockets[0].onmessage({ data: JSON.stringify({ method: "notice", params: [1, [id]] }) }); } catch (e) {}
           });
-          await new Promise((rr) => setTimeout(rr, 30));
+          await _ticks(20);
           const after = Chain.status().headBlock;
           try { Chain.disconnect(); } catch (e) {}
           resolve({ before, after });
         });
-        setTimeout(() => resolve({ before: null, after: null, timeout: true }), 6000);
       });
     }
     let rr = await noticeHeads(["short", "", null, undefined, 12345, "zzzzzzzz00000000000000000000000000000000", "0000000000000000000000000000000000000000"]);
@@ -489,7 +504,6 @@ const MC = require("/workspace/vanilla/js/api/market-candles.js");
         const pr = Chain.connect("wss://fake/ws", { timeoutMs: 4000, heartbeatMs: 60000 });
         setImmediate(() => { try { sockets[0].open(); } catch (e) {} });
         pr.then((okv) => { try { Chain.disconnect(); } catch (e) {} resolve({ ok: true }); }, (err) => { try { Chain.disconnect(); } catch (e) {} resolve({ ok: false, error: String((err && err.message) || err) }); });
-        setTimeout(() => resolve({ ok: false, error: "harness timeout" }), 6000);
       });
     }
     const GOOD40 = "060560c4c0d58ccb50f17443302bdc8096e7f34a";
