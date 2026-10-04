@@ -6,14 +6,15 @@
  *   watch-list, the _histFirst watcher seed. Section bodies live in
  *   account-history.js (AccountUI._history: orders + history) and
  *   account-membership.js (AccountUI._membership: membership + margin +
- *   credit), portfolio + equity bodies stay local (account-portfolio.js is
- *   a committed shadow copy — NOT wired, untouched by this split).
+ *   credit); portfolio + equity bodies stay local to this file. (The former
+ *   account-portfolio.js shadow copy was deleted unreferenced — never
+ *   wired, no callers; see commit history.)
  * Consumes: AccountUI._history/_membership (late-bound at call time),
  *   Account, Wallet, ViewingAs, NotifyHost, NotifyRules, Offline,
  *   HistoryNotice, Explorer, Store, DOM, Forms, Icon. Globals/side effects:
  *   publishes globalThis.AccountUI; module.exports for node suites
  *   (account-deeplink-test.js pins _test). Load order in index.html:
- *   account-portfolio.js, account-history.js, account-membership.js,
+ *   account-history.js, account-membership.js,
  *   account-ui.js (facade LAST).
  * Created by: split_responsibility.py account/market frontier (facade
  *   assembly — skeleton + entries kept, section bodies moved verbatim).

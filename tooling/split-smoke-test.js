@@ -173,7 +173,7 @@ async function accountSmoke() {
   // Real shared DOM/Forms utils (dependency-free, load clean in node).
   vm.runInContext(fs.readFileSync("/workspace/vanilla/js/utils/dom.js", "utf8"), sandbox);
   vm.runInContext(fs.readFileSync("/workspace/vanilla/js/forms/field.js", "utf8"), sandbox);
-  for (const f of ["account-portfolio.js", "account-history.js",
+  for (const f of ["account-history.js",
                    "account-membership.js", "account-ui.js"]) {
     vm.runInContext(fs.readFileSync("/workspace/vanilla/js/views/" + f, "utf8"),
       sandbox, { filename: f });
