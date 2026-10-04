@@ -227,6 +227,109 @@ button { background: var(--button-bg); color: var(--accent-text); border: 0; bor
   padding: 0 16px; font-family: "RobotoCondensed-Regular", "Roboto-Regular", "Roboto", Arial, sans-serif;
   font-size: 0.875rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.05em; }
+
+/* ===== Unified button variants (3) ===== */
+
+/* Touch floor class (fallback for non-JS or missed elements) */
+.touchable { min-height: 44px; min-width: 44px; }
+
+/* Ghost — secondary/destructive: transparent + accent border → solid accent on hover */
+.btn-ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+@media (hover:hover) {
+  .btn-ghost:hover {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+  }
+}
+
+/* Subtle — tabs/pagers/inline/icon-only: transparent text → accent color + underline */
+.subtle-btn {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+}
+
+/* Primary hover uses --button-bg-deep (darker, white text readable in all 3 themes) */
+@media (hover:hover) {
+  button:not([aria-pressed]):not(.btn-ghost):not(.subtle-btn):hover,
+  a.btn:hover,
+  .appfoot-actions a:hover,
+  .mkt-quotes button:hover,
+  .mkt-scalerow button:hover,
+  .mkt-indmenu-btn:hover,
+  .pools-pager button:hover,
+  .mkt-star:hover,
+  .mkt-bell:hover {
+    background: var(--button-bg-deep);
+  }
+}
+
+/* Existing candy block extends for ghost fill + subtle color shift (no new transforms). */
+@media (hover:hover) {
+  .btn-ghost:hover,
+  .subtle-btn:hover,
+  .trade-tabs button:hover,
+  .order-tabs a:hover,
+  .mkt-tabs button:hover,
+  .mkt-bell:hover,
+  .mkt-star:hover,
+  .toast-x:hover,
+  details.raw > summary:hover {
+    transition: background-color 120ms ease, color 120ms ease,
+      background-size 120ms ease, border-color 120ms ease;
+  }
+}
+
+/* Menu cards are CTAs → ghost variant semantics */
+.menu-card {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+@media (hover:hover) {
+  .menu-card:hover {
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px var(--toast-shadow);
+  }
+}
+
+/* Trade/order/mkt tabs → subtle variant (transparent, underline on hover via existing gradient) */
+.trade-tabs button,
+.order-tabs a,
+.mkt-tabs button {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+}
+
+/* Pools pager / mkt-quotes / scalerow / indmenu / star / bell / toast-x → subtle */
+.pools-pager button,
+.mkt-quotes button,
+.mkt-scalerow button,
+.mkt-indmenu-btn,
+.mkt-star,
+.mkt-bell,
+.toast-x {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+}
+
+/* Raw summary → subtle */
+details.raw > summary {
+  background: transparent;
+  color: var(--text);
+  border: 0;
+}
+
 /* Table headers match the original: uppercase, small, letterspaced
  * (account/pools captures: ASSET/QTY/IN ORDERS/… grey caps row). */
 .node-table th { text-transform: uppercase; font-size: 0.78rem;
