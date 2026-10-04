@@ -242,8 +242,7 @@ var TransferUI = (function () {
   /* shareHash: pre-filled transfer deep link (unit-tested). Params: to,
    * asset, amount, memo strings (any may be ""). Returns "#/transfer?..."
    * with only non-empty params, encodeURIComponent-encoded. Pure. */
-  function shareHash(to, asset, amount, memo) {
-    var parts = [];
+  function shareHash(to, asset, amount, memo) {    var parts = [];
     try {
       if (to) parts.push("to=" + encodeURIComponent(to));
       if (asset) parts.push("asset=" + encodeURIComponent(asset));
@@ -347,6 +346,34 @@ var TransferUI = (function () {
       failed.appendChild(DOM.pageHead(doc, t("transfer.title", "Transfer"), "transfer"));
       showError(doc, failed, e, t("transfer.load_account_failed", "Could not load your account."));
     });
+  }
+
+  /* Verbatim copies of transfer-propose.js locals (same per-file convention
+   * as the market-ui split): the facade's send path kept these call sites,
+   * so they live here too — doctrine prefers duplication over a shared
+   * chain-lookup abstraction. */
+  function utf8HexLocal(str) {
+    var bytes = new TextEncoder().encode(str);
+    var out = "";
+    for (var i = 0; i < bytes.length; i++) {
+      out += bytes[i].toString(16).padStart(2, "0");
+    }
+    return out;
+  }
+  async function lookupAssetLocal(symbol) {
+    var sym = String(symbol || "").trim().toUpperCase();
+    if (!sym) throw new Error(t("transfer.asset_required", "Asset symbol is required."));
+    var dbId = await Chain.db();
+    var rows = await Chain.call(dbId, "lookup_asset_symbols", [[sym]]);
+    if (!rows || !rows[0]) throw new Error(t("transfer.unknown_asset_prefix", "Unknown asset: ") + sym + ".");
+    if (typeof rows[0].precision !== "number") throw new Error("bad-asset-shape");
+    return { id: rows[0].id, symbol: rows[0].symbol, precision: rows[0].precision };
+  }
+  async function fullAccountLocal(id) {
+    var dbId = await Chain.db();
+    var rows = await Chain.call(dbId, "get_accounts", [[id]]);
+    if (!rows || !rows[0]) throw new Error("unknown-account");
+    return rows[0];
   }
 
   /* Transfer form. From is an EDITABLE account input (defaults to the wallet

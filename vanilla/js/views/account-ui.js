@@ -26,7 +26,7 @@ var AccountUI = (typeof globalThis !== "undefined" && globalThis.AccountUI) ? gl
  * to THIS file, like require(). */
 var __partRequire = null;
 try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __partRequire = module.require.bind(module);
+  if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) __partRequire = /** @type {any} */ (module).require.bind(module);
 } catch (e) { __partRequire = null; }
 if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
   try { __partRequire("./account-history.js"); } catch (e) {}
@@ -773,7 +773,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
   /* Unlock prompt for /account/me while locked: password + button; on
    * success re-renders #/account/me so the user lands back where asked. */
   function renderUnlockPrompt(doc, wrap, root) {
-    wrap.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
+    wrap.appendChild(DOM.pageHead(doc, t("account.s4", "My account"), "user"));
     var hint = doc.createElement("p");
     hint.textContent = t("account.s5", "Wallet is locked. Enter your password to view your account.");
     wrap.appendChild(hint);
@@ -808,7 +808,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
           input.value = "";
           pw = null;
           btn.disabled = false;
-          var msg = (e && e.message) ? e.message : t("transfer.unlock_failed", "Unlock failed");
+          var msg = (e && e.message) ? e.message : t("common.unlock_failed", "Unlock failed.");
           err.textContent = msg;
         });
     });
@@ -1213,14 +1213,14 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
 
     var marSection = doc.createElement("section");
     var marH = doc.createElement("h2");
-    marH.textContent = t("account.margin_positions", "Margin Positions");
+    marH.textContent = t("account.margin_positions", "Margin positions");
     marSection.appendChild(marH);
     wrap.appendChild(marSection);
     AccountUI._membership.renderMargin(doc, marSection, acct, sharedPositions);
 
     var creSection = doc.createElement("section");
     var creH = doc.createElement("h2");
-    creH.textContent = t("account.credit_management", "Credit Management");
+    creH.textContent = t("account.credit_management", "Credit management");
     creSection.appendChild(creH);
     wrap.appendChild(creSection);
     AccountUI._membership.renderCredit(doc, creSection, acct);
@@ -1477,7 +1477,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       }).catch(function (e) {
         clearRoot(root);
         var retry = makeWrap(doc, root);
-        retry.appendChild(DOM.pageHead(doc, t("account.s4", "My Account"), "user"));
+        retry.appendChild(DOM.pageHead(doc, t("account.s4", "My account"), "user"));
         showError(doc, retry, e, t("transfer.load_account_failed", "Could not load your account."));
       });
       return;

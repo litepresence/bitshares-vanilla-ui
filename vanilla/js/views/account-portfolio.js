@@ -33,6 +33,137 @@ var AccountPortfolio = (function () {
   }
 
 
+  /* Verbatim copies of account-ui.js loadContacts/saveContacts/_histFirst
+   * (same convention): the contacts watch-list + per-account history cache
+   * this module’s unlock + history paths read. */
+  var CONTACTS_KEY = "bts-vanilla-contacts-v1";
+  function loadContacts() {
+    try {
+      var raw = localStorage.getItem(CONTACTS_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter(function (x) { return typeof x === "string"; }) : [];
+    } catch (e) { return []; }
+  }
+  function saveContacts(arr) {
+    try { localStorage.setItem(CONTACTS_KEY, JSON.stringify(arr)); } catch (e) { /* follow skips */ }
+  }
+  var _histFirst = {};
+  /* Verbatim copies of account-ui.js clearRoot/makeWrap (same convention):
+   * duplicated so moved bodies stay byte-identical. */
+  /* Clear all children of the router root. */
+  function clearRoot(root) {
+    while (root.firstChild) root.removeChild(root.firstChild);
+  }
+
+  /* New .wrap container appended to root. Wide (viewport-gaps fix
+   * 2026-09-28): full-bleed stacked grid ≥1200px instead of the 720px
+   * stranded column; children span full width via app.css .wide contract. */
+  function makeWrap(doc, root) {
+    var wrap = doc.createElement("div");
+    wrap.className = "wrap wide";
+    root.appendChild(wrap);
+    return wrap;
+  }
+
+  /* Verbatim copies of account-history.js OP_KEYS/OP_LABELS/opTypeOf/opLabel/timeText and
+   * account-membership.js makeError/showError (same per-file convention as the explorer/vote-slate
+   * splits): duplicated so moved bodies stay byte-identical — doctrine prefers duplication over a
+   * shared chart/vote abstraction. These serve this module’s own renderHistory/unlock paths. */
+
+  var OP_KEYS = {
+    0: "transfer.title",
+    1: "account.op_limit_create",
+    2: "account.op_limit_cancel",
+    3: "account.op_call_update",
+    4: "account.op_fill",
+    5: "account.op_account_create",
+    6: "account.op_account_update",
+    7: "account.op_whitelist",
+    8: "account.op_upgrade",
+    9: "account.op_account_transfer",
+    10: "account.op_asset_create"
+  };
+
+  var OP_LABELS = {
+    0: "Transfer",
+    1: "Limit order create",
+    2: "Limit order cancel",
+    3: "Call order update",
+    4: "Fill order",
+    5: "Account create",
+    6: "Account update",
+    7: "Account whitelist",
+    8: "Account upgrade",
+    9: "Account transfer",
+    10: "Asset create"
+  };
+
+  function opTypeOf(row) {
+    if (!row || typeof row !== "object") return null;
+    if (Array.isArray(row.op) && typeof row.op[0] === "number") return row.op[0];
+    if (typeof row.op_type === "number") return row.op_type;
+    if (typeof row.type === "number") return row.type;
+    return null;
+  }
+
+  function opLabel(n) {
+    if (typeof n === "number" && Object.prototype.hasOwnProperty.call(OP_LABELS, n)) {
+      return t(OP_KEYS[n], OP_LABELS[n]);
+    }
+    return t("account.op_unknown", "Operation #%(n)s", {n: String(n)});
+  }
+
+  function timeText(row) {
+    if (row.timestamp) return String(row.timestamp);
+    if (row.time) return String(row.time);
+    if (row.block_time) return String(row.block_time);
+    if (row.block_num !== undefined && row.block_num !== null) {
+      return t("account.block_prefix", "block #") + String(row.block_num);
+    }
+    if (row.id) return String(row.id);
+    return t("settings.dash", "—");
+  }
+
+  function makeError(doc) {
+    var err = doc.createElement("div");
+    err.className = "error";
+    err.setAttribute("aria-live", "polite");
+    return err;
+  }
+
+  function showError(doc, wrap, e, fallback) {
+    var err = makeError(doc);
+    var raw = (e && typeof e.message === "string" && e.message)
+      ? e.message
+      : String(e || fallback || "");
+    var isHist = raw.indexOf("history-unavailable") !== -1;
+    var msg = (e && typeof e.message === "string" && e.message)
+      ? e.message
+      : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
+    if (msg.indexOf("unknown-account") !== -1) {
+      msg = fallback || t("common.unknown_account", "Unknown account.");
+    } else if (msg.indexOf("no-account") !== -1) {
+      msg = t("transfer.err_no_account", "No on-chain account found for the wallet's active key.");
+    } else if (msg.indexOf("history-unavailable") !== -1) {
+      msg = t("account.err_history", "History unavailable on this node.");
+    } else if (msg.indexOf("bad-asset-shape") !== -1) {
+      msg = t("account.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing.");
+    } else if (msg.indexOf("wallet-locked") !== -1) {
+      msg = t("common.wallet_locked", "Wallet is locked.");
+    }
+    err.textContent = msg;
+    wrap.appendChild(err);
+    if (isHist) {
+      try {
+        if (typeof HistoryNotice !== "undefined" && HistoryNotice && typeof HistoryNotice.actionLink === "function") {
+          var link = HistoryNotice.actionLink(doc, t, "settings");
+          if (link) wrap.appendChild(link);
+        }
+      } catch (e2) { /* error panel stands without the link */ }
+    }
+  }
+
+
   /* Punchlist i18n note: NEW display strings in this portfolio block are
    * plain literals on purpose — tooling/check_i18n.py requires every t()
    * key to exist in all 10 locale dicts, and this single-file punchlist

@@ -23,7 +23,7 @@ var PoolDetailUI = (typeof globalThis !== "undefined" && globalThis.PoolDetailUI
  * to THIS file, like require(). */
 var __partRequire = null;
 try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __partRequire = module.require.bind(module);
+  if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) __partRequire = /** @type {any} */ (module).require.bind(module);
 } catch (e) { __partRequire = null; }
 if (__partRequire && (!PoolDetailUI._view || !PoolDetailUI._actions)) {
   try { __partRequire("./pool-detail-actions.js"); } catch (e) {}

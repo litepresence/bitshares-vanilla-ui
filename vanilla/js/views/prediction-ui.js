@@ -15,7 +15,7 @@
  */
 var __splRequire = null;
 try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __splRequire = module.require.bind(module);
+  if (typeof module !== "undefined" && module && (/** @type {any} */ (module)).require && (/** @type {any} */ (module)).require.bind) __splRequire = (/** @type {any} */ (module)).require.bind(module);
 } catch (e) { __splRequire = null; }
 
 var __predHelpers = null;

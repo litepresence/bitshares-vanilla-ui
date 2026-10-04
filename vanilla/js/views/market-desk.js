@@ -25,7 +25,7 @@ var MarketDesk = (typeof globalThis !== "undefined" && globalThis.MarketDesk) ? 
  * to THIS file, like require(). */
 var __partRequire = null;
 try {
-  if (typeof module !== "undefined" && module && module.require && module.require.bind) __partRequire = module.require.bind(module);
+  if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) __partRequire = /** @type {any} */ (module).require.bind(module);
 } catch (e) { __partRequire = null; }
 if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._fill)) {
   try { __partRequire("./market-desk-query.js"); } catch (e) {}
