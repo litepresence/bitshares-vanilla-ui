@@ -49,6 +49,21 @@ that owns switching has nothing to keep in sync.
 - `.node-card` mirrors gain the network cell via the existing mirror
   pattern in the `setRow`/paint path. Mobile behavior otherwise untouched.
 
+## Remove column + hidden list
+
+- Last column (after History, header reuse `settings.remove`) carries a
+  red `×` per row — defaults included, not just customs.
+- Removing a default hides it via a persistent `hiddenNodes` string array
+  in Store settings (validated, capped at 60 like the probe-history
+  precedent): `allNodes` filters hidden; the choice survives reloads
+  indefinitely. Removing a custom unlists it (existing path).
+- Re-adding a hidden URL through custom-add (or discovery Add, same path)
+  un-hides it — that is the "added again" return path.
+- Removing the active node falls back to the first visible row (or `""`,
+  which `loadSettings` resolves to the network default and `connect`
+  safely skips). `×` uses the existing `settings.remove` key as header +
+  `aria-label` — zero new keys. Glyph sized to the 44px touch floor.
+
 ## Selection = switching
 
 - Row tap sets BOTH `activeNode` and `network`: from the list for

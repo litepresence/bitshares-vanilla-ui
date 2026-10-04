@@ -807,3 +807,216 @@ git commit -m "Network table: group divider bands (radios stay one set)"
 ## Task 5 Self-Review
 
 **Spec coverage:** group bands (§Rows — dividers, single tbody/group, dataless-skip). No gaps. **Placeholders:** none — all anchors/code exact. **Type consistency:** `groupOf` name/shape identical in helper, builders, test, export; `colspan` documented; divider class `node-sep` identical in JS + CSS.
+
+---
+
+### Task 6: Persistent remove column (follow-up 2026-10-04)
+
+**Rationale:** owner call — every row gets a red `×` (after History); defaults hide into a persistent `hiddenNodes` Store list, customs unlist, re-add un-hides. Runs AFTER Task 5 (same builders).
+
+**Files:**
+- Modify: `vanilla/js/store.js` (`hiddenNodes` in base/load/save)
+- Modify: `vanilla/js/settings-nodes.js` (`allNodes` filter, `hideNode`/`unhideNode` + export, `×` buttons table + cards)
+- Modify: `vanilla/js/settings.js` (remove handler hide/unlist + visible fallback, custom-add un-hide)
+- Modify: `tooling/node-network-test.js` (7 vectors, 27 → 34)
+- Modify: `vanilla/css/app.css` (red 44px `×` rule)
+- No locale changes (reuse `settings.remove`).
+
+**Interfaces:**
+- Consumes: Task 1/2/5 code; `Store.loadSettings/saveSettings`.
+- Produces: `settings.hiddenNodes` (string array); `hideNode`/`unhideNode` via `SettingsNodes` public export + `_test`.
+
+- [ ] **Step 1: Store hiddenNodes** — baseSettings, old (exact): `      customNodes: [],` (the `baseSettings` occurrence — unique: saveSettings' copy reads `customNodes: current.customNodes,`) → new `      customNodes: [],\n      hiddenNodes: [],`. loadSettings, old (exact):
+
+```js
+    var customNodes = Array.isArray(stored.customNodes)
+      ? stored.customNodes.filter(function (u) { return typeof u === "string"; })
+      : [];
+```
+
+append after it:
+
+```js
+    var hiddenNodes = Array.isArray(stored.hiddenNodes)
+      ? stored.hiddenNodes.filter(function (u) { return typeof u === "string"; }).slice(-60)
+      : [];
+```
+
+Return line, old (exact): `    return { network: network, activeNode: activeNode, customNodes: customNodes, theme: theme, locale: locale, esEnabled: esEnabled, signing: signing };` → insert `hiddenNodes: hiddenNodes, ` after `customNodes: customNodes, `. Active-fallback, old (exact): `    var activeNode = (typeof stored.activeNode === "string" && stored.activeNode) ? stored.activeNode : fallbackNode;` append after it:
+
+```js
+    if (hiddenNodes.indexOf(activeNode) !== -1) {
+      var visible = DEFAULT_NODES.mainnet.concat(DEFAULT_NODES.testnet).concat(customNodes).filter(function (u) { return hiddenNodes.indexOf(u) === -1; });
+      activeNode = visible[0] || fallbackNode;
+    }
+```
+
+saveSettings `next`, old (exact): `      customNodes: current.customNodes,` → append after it `      hiddenNodes: current.hiddenNodes,`. Patch, old (exact): `      if (Array.isArray(patch.customNodes)) next.customNodes = patch.customNodes;` append after it: `      if (Array.isArray(patch.hiddenNodes)) next.hiddenNodes = patch.hiddenNodes.filter(function (u) { return typeof u === "string"; }).slice(-60);`.
+
+- [ ] **Step 2: allNodes filter + hide helpers** — old (exact): `    var customs = Array.isArray(settings.customNodes) ? settings.customNodes : [];` (the `allNodes` occurrence — verify: settings.js:213 has `cur.customNodes` variant, distinct ✓) → append after it `    var hidden = Array.isArray(settings.hiddenNodes) ? settings.hiddenNodes : [];`. Old (exact): `      if (seen[u]) return;` → new `      if (seen[u] || hidden.indexOf(u) !== -1) return;`. Comment line `   * (mainnet defaults, testnet defaults, customs). The table owns network` → `   * (mainnet defaults, testnet defaults, customs, minus hiddenNodes). The table owns network`. Insert after `noteChain` (anchor: the `  /* Observed chain ids` block end — place new helpers right before it; anchor unique `  /* Observed chain ids per URL, this page-load only`):
+
+```js
+  /* hideNode: append a URL to a hidden list (capped at 60 like probe
+   * history, deduped). Params: list (array|null), url string. Returns a
+   * NEW array. Never throws. */
+  function hideNode(list, url) {
+    try {
+      var out = Array.isArray(list) ? list.slice() : [];
+      if (typeof url === "string" && url && out.indexOf(url) === -1) out.push(url);
+      if (out.length > 60) out = out.slice(out.length - 60);
+      return out.filter(function (u) { return typeof u === "string"; });
+    } catch (e) { return []; }
+  }
+
+  /* unhideNode: drop a URL from a hidden list (the re-add path).
+   * Params/returns: same shape as hideNode. Never throws. */
+  function unhideNode(list, url) {
+    try {
+      var out = Array.isArray(list) ? list.slice() : [];
+      return out.filter(function (u) { return typeof u === "string" && u !== url; });
+    } catch (e) { return []; }
+  }
+
+```
+
+Export: anchor `    selectNode: selectNode,` (unique) → `    selectNode: selectNode,\n    hideNode: hideNode,\n    unhideNode: unhideNode,`; `_test` line gains `hideNode: hideNode, unhideNode: unhideNode` (anchor `healthFor: healthFor }` → `healthFor: healthFor, hideNode: hideNode, unhideNode: unhideNode }`; if Task 5 already extended it with groupOf, append after groupOf instead — verify at execution: the line ends with ` }`; append inside the braces regardless).
+
+- [ ] **Step 3: × buttons + header** — table action cell, old (exact):
+
+```js
+      var tdAct = doc.createElement("td");
+      if (isCustom(url, settings)) {
+        var rm = doc.createElement("button");
+        rm.type = "button";
+        rm.className = "node-remove";
+        rm.setAttribute("data-url", url);
+        rm.textContent = t("settings.remove", "Remove");
+        tdAct.appendChild(rm);
+      }
+      tr.appendChild(tdAct);
+```
+
+New:
+
+```js
+      var tdAct = doc.createElement("td");
+      var rm = doc.createElement("button");
+      rm.type = "button";
+      rm.className = "node-remove";
+      rm.setAttribute("data-url", url);
+      rm.setAttribute("aria-label", t("settings.remove", "Remove"));
+      rm.textContent = "×";
+      tdAct.appendChild(rm);
+      tr.appendChild(tdAct);
+```
+
+Header, old (exact): `t("settings.th_history", "History"), ""].forEach(function (t) {` → new: `t("settings.th_history", "History"), t("settings.remove", "Remove")].forEach(function (t) {`. Cards rm2, old (exact):
+
+```js
+      if (isCustom(url, settings)) {
+        var rm2 = doc.createElement("button");
+        rm2.type = "button";
+        rm2.className = "node-remove";
+        rm2.setAttribute("data-url", url);
+        rm2.textContent = t("settings.remove", "Remove");
+        card.appendChild(rm2);
+      }
+```
+
+New:
+
+```js
+      var rm2 = doc.createElement("button");
+      rm2.type = "button";
+      rm2.className = "node-remove";
+      rm2.setAttribute("data-url", url);
+      rm2.setAttribute("aria-label", t("settings.remove", "Remove"));
+      rm2.textContent = "×";
+      card.appendChild(rm2);
+```
+
+Then grep `isCustom(` across `vanilla/js`: if zero remaining callers, delete `isCustom` + its export entry (exact block lines 37-41 as read 2026-10-04 — verify before deleting); else keep.
+
+- [ ] **Step 4: Handlers** — remove handler, old (exact, lines 280-294 as read 2026-10-04 — verify boundaries):
+
+```js
+    // Events: custom remove (table + cards)
+    Array.prototype.forEach.call(wrap.querySelectorAll(".node-remove"), function (b) {
+      b.addEventListener("click", function () {
+        var u = b.getAttribute("data-url");
+        var cur = Store.loadSettings();
+        var customs = (Array.isArray(cur.customNodes) ? cur.customNodes : []).filter(function (x) { return x !== u; });
+        var patch = {customNodes: customs};
+        if (cur.activeNode === u) {
+          var fb = (Store.DEFAULT_NODES && Store.DEFAULT_NODES[cur.network] && Store.DEFAULT_NODES[cur.network][0]) || "";
+          patch.activeNode = fb;
+        }
+        Store.saveSettings(patch);
+        render(rootEl);
+      });
+    });
+```
+
+New:
+
+```js
+    // Events: node remove (table + cards) — defaults hide persistently,
+    // customs unlist; removing the active node falls back to first visible.
+    Array.prototype.forEach.call(wrap.querySelectorAll(".node-remove"), function (b) {
+      b.addEventListener("click", function () {
+        var u = b.getAttribute("data-url");
+        var cur = Store.loadSettings();
+        var customs = Array.isArray(cur.customNodes) ? cur.customNodes.slice() : [];
+        var hidden = Array.isArray(cur.hiddenNodes) ? cur.hiddenNodes.slice() : [];
+        var isC = customs.indexOf(u) !== -1;
+        var patch = {
+          customNodes: isC ? customs.filter(function (x) { return x !== u; }) : customs,
+          hiddenNodes: isC ? hidden : SettingsNodes.hideNode(hidden, u)
+        };
+        if (cur.activeNode === u) {
+          var rest = SettingsNodes.allNodes({ network: cur.network, customNodes: patch.customNodes, hiddenNodes: patch.hiddenNodes });
+          patch.activeNode = rest[0] || "";
+        }
+        Store.saveSettings(patch);
+        render(rootEl);
+      });
+    });
+```
+
+Custom-add un-hide, old (exact): `      customs.push(v);\n      Store.saveSettings({customNodes: customs});` → new: `      customs.push(v);\n      Store.saveSettings({ customNodes: customs, hiddenNodes: SettingsNodes.unhideNode(cur.hiddenNodes, v) });`.
+
+- [ ] **Step 5: CSS + vectors** — append after the Task 5 divider rules (anchor: `.node-cards .node-sep {` line):
+
+```css
+/* Remove column: red × per row (defaults hide, customs unlist). Glyph
+ * buttons need an explicit 44px box (text buttons size themselves; a
+ * bare × would miss the touch floor). --danger follows the footer
+ * closed-host precedent for small red text. */
+.node-table .node-remove, .node-card .node-remove { min-width: 44px; color: var(--danger); font-weight: 700; font-size: 1.1rem; }
+```
+
+Vectors — append before `console.log` in `tooling/node-network-test.js` (also extend the exports array with `"hideNode", "unhideNode"`):
+
+```js
+eq(T.hideNode([], "wss://a").join(","), "wss://a", "hide appends");
+eq(T.hideNode(["wss://a"], "wss://a").length, 1, "hide dedupes");
+eq(T.hideNode(null, "wss://a").join(","), "wss://a", "hide null list");
+eq(T.unhideNode(["wss://a", "wss://b"], "wss://a").join(","), "wss://b", "unhide drops");
+eq(T.unhideNode(null, "wss://a").length, 0, "unhide null list");
+eq(T.hideNode(["wss://a"], null).join(","), "wss://a", "hide null url no-op");
+var big = []; for (var i = 0; i < 65; i++) big.push("wss://n" + i);
+eq(T.hideNode(big, "wss://z").length, 60, "hide caps at 60");
+```
+
+Run: `node tooling/node-network-test.js` — expect `34 passed, 0 failed` (27 + 7).
+
+- [ ] **Step 6: Gates + matrix + commit** — run `node tooling/node-health-test.js` + `probe-geo-wiring-test.js` (exit 0 — stub settings lack hiddenNodes → guarded `[]`, same rows), `bash tooling/check_types.sh` (zero lines on touched files), `python3 tooling/check_i18n.py` + `check_rot.py` (exit 0 — no locale changes; reused key drift-safe). Manual matrix via serve: × on every row; remove default → row gone + persists across reload; re-add via custom-add → returns; remove active → fallback connects (footer follows); remove custom → unlisted; 360px 44px targets; three themes red legible. Commit ONLY `vanilla/js/store.js vanilla/js/settings-nodes.js vanilla/js/settings.js tooling/node-network-test.js vanilla/css/app.css`:
+
+```bash
+git add vanilla/js/store.js vanilla/js/settings-nodes.js vanilla/js/settings.js tooling/node-network-test.js vanilla/css/app.css
+git commit -m "Network table: persistent remove column (hide defaults, unlist customs)"
+```
+
+## Task 6 Self-Review
+
+**Spec coverage:** × column + header reuse (§Remove column — header key reuse, glyph, 44px); hiddenNodes persist/un-hide (§Remove column — Store shape, allNodes filter, custom-add return path); active fallback (§Remove column); zero new keys (§Remove column). No gaps. **Placeholders:** none — anchors/code exact, both isCustom branches spelled. **Type consistency:** `hiddenNodes` string-array in base/load/save/return; `hideNode`/`unhideNode` signatures identical in impl, export, handlers, tests; `allNodes({network, customNodes, hiddenNodes})` shape matches its reader.
