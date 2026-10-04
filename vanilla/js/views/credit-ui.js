@@ -270,17 +270,12 @@ var CreditUI = (function () {
           sendB.disabled = false; backB.disabled = false;
         });
       } });
-    /* Principle #6 (raw in title): ConfirmDialog's [term, text] row shape
-     * carries no raw-title slot (native r[2] support is owned by the
-     * sibling batch — see the Task 3.2 Batch B report). Restore r[2]
-     * titles post-show so human terms keep their raw chain values;
-     * mapping is 1:1 because no feeHuman is passed. Display-only. */
-    try {
-      var dds = dlg.querySelectorAll ? dlg.querySelectorAll("dd") : [];
-      (cfg.rows || []).forEach(function (r, i) {
-        if (r && r[2] && dds[i]) { try { dds[i].title = r[2]; } catch (e0) {} }
-      });
-    } catch (e) { /* titles are display-only */ }
+    /* Principle #6 (raw in title): rows carry r[2] raw titles rendered
+     * natively by ConfirmDialog (ui/confirm.js + tooling/confirm-test.js
+     * §9 — the Batch B post-show restore loop deleted as redundant, same
+     * as the htlc/pool/proposal/prediction batch). No feeHuman is passed
+     * so the row→dd mapping stays 1:1; Fee rides as a named row with r[2]
+     * (not feeHuman/feeRawTitle) to keep the Fee-before-Network order. */
     out.appendChild(dlg);
   }
   /** build {pair,fee,prove,extra} + live fee -> named rows -> sendConfirm.
@@ -418,31 +413,41 @@ var CreditUI = (function () {
   }
   /* Loan modal: borrow against one offer (op-72 accept, detail acceptBox shape).
    * Borrow-leg asset ALWAYS comes from the offer (never typed). Password is
-   * asked only at Sign & Send (shared sendConfirm gate + inline unlock). */
+   * asked only at Sign & Send (shared sendConfirm gate + inline unlock).
+   * Shell is the shared Overlay (ui/overlay.js — backdrop-click + Esc close,
+   * panel focus, single-fire onClose, .credit-loan-overlay/.credit-loan-panel
+   * contract classes, no new CSS). This file keeps only what Overlay leaves
+   * to callers: the Tab trap + return-focus (overlay.js header), the
+   * aria-label, and the hostBox mount (a list reload clears a stale modal —
+   * the overlay is position:fixed so the mount point changes nothing visual).
+   * Form state (inputs, radios, review output) lives in the content div. */
   function openLoanModal(doc, hostBox, myGen, o) {
     if (myGen !== gen) return;
     var locked = !isUnlockedNow();
-    var overlay = DOM.el(doc, "div", null, "credit-loan-overlay");
-    var panel = DOM.el(doc, "div", null, "credit-loan-panel");
-    panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true");
-    panel.setAttribute("aria-label", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id);
-    overlay.appendChild(panel); hostBox.appendChild(overlay);
-    /* A11y 2026-09-30: focus return + trap + listener cleanup. Previously
-     * only the Escape path removed onKey (overlay-click/Cancel leaked it)
-     * and focus never returned to the invoking row. */
+    /* A11y 2026-09-30: focus return + Tab trap + listener cleanup. Backdrop
+     * click and Esc are owned by the shared Overlay (onClose below fires
+     * single-fire on every close path); this file keeps only the Tab trap
+     * and return-focus that Overlay leaves to callers. */
     var returnFocus = null;
     try { returnFocus = doc.activeElement || null; } catch (e) { returnFocus = null; }
-    function close() {
-      if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
-      try { doc.removeEventListener("keydown", onKey); } catch (e) { /* once */ }
+    function onClose() {
+      try { doc.removeEventListener("keydown", onTab); } catch (e) { /* once */ }
       try { if (returnFocus && typeof returnFocus.focus === "function") returnFocus.focus(); } catch (e) { /* tab order stands */ }
     }
-    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
-    function onKey(e) {
-      if (e.key === "Escape") { close(); return; }
-      if (e.key !== "Tab") return;
+    /* Content owns the form state; the shared Overlay owns the shell.
+     * className restates the existing overlay hook — no new CSS. */
+    var body = DOM.el(doc, "div");
+    var handle = null, overlay = null;
+    function openedPanel() {
+      try { if (overlay && overlay.children && overlay.children[0]) return overlay.children[0]; } catch (e) { /* shell stands */ }
+      return null;
+    }
+    function onTab(e) {
+      if (!e || e.key !== "Tab") return;
       try {
-        var f = panel.querySelectorAll("button, input, select, textarea, a[href], [tabindex]");
+        var shell = openedPanel();
+        if (!shell || !shell.querySelectorAll) return;
+        var f = shell.querySelectorAll("button, input, select, textarea, a[href], [tabindex]");
         var vis = [];
         /* TYPE NOTE: querySelectorAll yields Element (no disabled/tabIndex/focus
          * in the type); the selector only matches focusable controls, so the
@@ -454,16 +459,15 @@ var CreditUI = (function () {
         else if (!e.shiftKey && doc.activeElement === last) { e.preventDefault(); first.focus(); }
       } catch (x) { /* tab order stands */ }
     }
-    doc.addEventListener("keydown", onKey);
-    panel.appendChild(DOM.el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
+    body.appendChild(DOM.el(doc, "h2", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id));
     var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
     var rt = safeRate(o.rate_units);
-    panel.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
+    body.appendChild(confirmList(doc, [[t("credit.offer", "Offer"), o.id], [t("credit.owner", "Owner"), o.owner],
       [t("credit.asset", "Asset"), (o.sym || o.asset_id)],
       [t("credit.current", "Current"), cur.text, "raw " + cur.raw], [t("credit.total", "Total"), tot.text, "raw " + tot.raw],
       [t("credit.fee_rate", "Fee rate"), rt.text + " (denom 1,000,000)", "raw " + rt.raw],
       [t("credit.max_duration", "Max duration"), Credit.durToHuman(o.max_dur_sec)]]));
-    if (locked) panel.appendChild(signNotice(doc));
+    if (locked) body.appendChild(signNotice(doc));
     var fBor = field(doc, t("credit.borrower", "Borrower"), locked
       ? { placeholder: t("credit.blank_wallet_account", "blank = wallet account"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("credit.blank_wallet_account", "blank = wallet account") });
@@ -472,7 +476,7 @@ var CreditUI = (function () {
     var fColl = field(doc, t("credit.collateral_amount", "Collateral amount"), { placeholder: "0.0", inputmode: "decimal" });
     var fRate = field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: safeRateHuman(o.rate_units), inputmode: "decimal" });
     var fDur = field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });
-    [fBor, fAmt, fCollA, fColl, fRate, fDur].forEach(function (f) { panel.appendChild(f.row); });
+    [fBor, fAmt, fCollA, fColl, fRate, fDur].forEach(function (f) { body.appendChild(f.row); });
     var arRow = DOM.el(doc, "div", null, "xfer-field");
     arRow.appendChild(DOM.el(doc, "span", t("credit.auto_repay_2", "Auto-repay: ")));
     var arNames = [["", t("credit.omit_chain_default", "omit (chain default)")], ["0", t("credit.0_none", "0 — none")], ["1", t("credit.1_full_only", "1 — full only")], ["2", t("credit.2_partial_ok", "2 — partial ok")]];
@@ -482,8 +486,8 @@ var CreditUI = (function () {
       if (i === 0) r.checked = true; touchable(r); lab.insertBefore(r, lab.firstChild);
       arRow.appendChild(lab); return r;
     });
-    panel.appendChild(arRow);
-    reviewSection(doc, panel, myGen, t("credit.review_accept", "Review accept"), {
+    body.appendChild(arRow);
+    reviewSection(doc, body, myGen, t("credit.review_accept", "Review accept"), {
       build: async function () {
         var bor = fBor.input.value.trim() ? await Account.resolve(fBor.input.value.trim())
           : await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
@@ -519,8 +523,21 @@ var CreditUI = (function () {
       },
       title: t("credit.confirm_accept", "Confirm accept"), ok: function () { return t("credit.deal_opened_accept_broadcast", "Deal opened (accept broadcast)."); }, fail: t("credit.could_not_prepare_the_accept", "Could not prepare the accept.") });
     var closeBtn = touchable(DOM.el(doc, "button", t("trade.cancel_button", "Cancel"))); closeBtn.type = "button";
-    closeBtn.addEventListener("click", close);
-    panel.appendChild(closeBtn);
+    closeBtn.addEventListener("click", function () { if (handle) handle.close(); });
+    body.appendChild(closeBtn);
+    /* Mount through the shared Overlay (backdrop + Esc + panel focus owned
+     * there); the aria-label, hostBox mount, Tab trap, and initial focus
+     * stay here. */
+    handle = Overlay.open({ content: body, onClose: onClose, className: "credit-loan-overlay" });
+    overlay = handle.overlay;
+    try {
+      var pn = openedPanel();
+      if (pn) pn.setAttribute("aria-label", t("credit.accept_borrow", "Accept (borrow)") + " " + o.id);
+    } catch (e) { /* label stands */ }
+    /* hostBox owns the modal so a list reload clears a stale modal (the
+     * overlay is position:fixed — identical on screen wherever mounted). */
+    try { hostBox.appendChild(overlay); } catch (e) { /* body mount stands */ }
+    doc.addEventListener("keydown", onTab);
     try { fBor.input.focus(); } catch (e) { /* keyboard path stays via tab order */ }
   }
   /** Route entry: #/credit-offer — filters + offer table + my-offers + create.
