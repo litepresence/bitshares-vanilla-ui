@@ -29,7 +29,7 @@ var SettingsPage = (function () {
 
   /* Route entry: compose node + preference sections, wire events, probe.
    * Params: rootEl (router #view child, cleared first). Sections append in
-   *   old-UI order: title, network, node table + cards (with history pills),
+   *   old-UI order: title, node table + cards (with history pills),
    *   probe + offline, custom, testnet note (testnet only), community-history
    *   switch, theme, locale. Fails: never (probe errors paint per-row). */
   function render(rootEl) {
@@ -44,9 +44,6 @@ var SettingsPage = (function () {
     rootEl.appendChild(wrap);
 
     wrap.appendChild(DOM.pageHead(doc, t("settings.title", "Settings"), "cog"));
-
-    var netToggle = SettingsPrefs.buildNetwork(doc, settings, t);
-    wrap.appendChild(netToggle);
 
     var tbl = SettingsNodes.buildNodeTable(doc, settings, nodes, t);
     wrap.appendChild(tbl.table);
@@ -186,20 +183,6 @@ var SettingsPage = (function () {
             if (flipped) render(rootEl);
           });
         } catch (e) { /* selection stands */ }
-      });
-    });
-
-    // Events: network toggle
-    Array.prototype.forEach.call(netToggle.querySelectorAll('input[name="network"]'), function (r) {
-      r.addEventListener("change", function () {
-        if (!r.checked) return;
-        var net = r.value;
-        var first = (Store.DEFAULT_NODES && Store.DEFAULT_NODES[net] && Store.DEFAULT_NODES[net][0]) || nodes[0];
-        Store.saveSettings({network: net, activeNode: first});
-        if (typeof Chain !== "undefined" && Chain && Chain.connect) {
-          try { Chain.connect(first); } catch (e) { /* offline panel carries the error */ }
-        }
-        render(rootEl);
       });
     });
 

@@ -1,5 +1,5 @@
 /* SettingsPrefs: preference sections of the #/settings page.
- * Owns: the network toggle (mainnet/testnet radios), the theme selector
+  * Owns: the theme selector
  *   (ref-ui-theme/vanilla-ui-theme/dex-ux-theme), and the locale switcher
  *   stub marking). Builds DOM only — the change-event wiring lives in
  *   settings.js (SettingsPage.render passes `t` in; I18n is read here for
@@ -18,29 +18,6 @@
  */
 var SettingsPrefs = (function () {
   "use strict";
-
-  /* Network toggle (mainnet/testnet radios, current network checked).
-   * The change handler (settings.js) swaps activeNode to the new network's
-   * first default and rerenders. Params: doc, settings, t. Returns: the
-   * toggle div (id net-toggle). */
-  function buildNetwork(doc, settings, t) {
-    var netToggle = doc.createElement("div");
-    netToggle.id = "net-toggle";
-    var networks = ["mainnet", "testnet"];
-    networks.forEach(function (net) {
-      var label = doc.createElement("label");
-      var radio = doc.createElement("input");
-      radio.type = "radio";
-      radio.name = "network";
-      radio.value = net;
-      if (settings.network === net) radio.checked = true;
-      label.appendChild(radio);
-      var netLabel = (net === "testnet") ? t("settings.network_testnet", "testnet") : t("settings.network_mainnet", "mainnet");
-      label.appendChild(doc.createTextNode(" " + netLabel));
-      netToggle.appendChild(label);
-    });
-    return netToggle;
-  }
 
   /* Theme selector (ref-ui-theme/vanilla-ui-theme/dex-ux-theme, current
    * selected; option labels are the keyed human names below — values stay
@@ -276,7 +253,6 @@ var SettingsPrefs = (function () {
   }
 
   return {
-    buildNetwork: buildNetwork,
     buildTheme: buildTheme,
     buildLocale: buildLocale,
     buildHistory: buildHistory,
