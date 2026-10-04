@@ -43,10 +43,10 @@ var SettingsPrefs = (function () {
   }
 
   /* Theme selector (ref-ui-theme/vanilla-ui-theme/dex-ux-theme, current
-   * selected; option labels are the same human names the header switcher
-   * shows (app.js THEME_NAMES) so both copies agree — values stay the ids.
-   * Batch-8 i18n: labels keyed via t() under settings dot theme, header
-   * copy in app.js stays plain until its own batch owns it).
+   * selected; option labels are the keyed human names below — values stay
+   * the ids. The header copies are deleted (owner call): this settings
+   * select is the only switcher, so no cross-copy agreement to maintain.
+   * Batch-8 i18n: labels keyed via t() under settings dot theme.
    * The change handler (settings.js) persists + flips data-theme on <html>.
    * Params: doc, settings, t. Returns: {label, select}. */
   function buildTheme(doc, settings, t) {
@@ -248,7 +248,7 @@ var SettingsPrefs = (function () {
       try { guide.style.minHeight = "44px"; } catch (e) { /* native stands */ }
       wrap.appendChild(guide);
     }
-    var sitesTitle = doc.createElement("h3");
+    var sitesTitle = doc.createElement("h2");
     sitesTitle.textContent = t("settings.sign_sites", "Connected sites");
     wrap.appendChild(sitesTitle);
     /* Concrete example (owner request): a fictional dice game shows what a

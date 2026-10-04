@@ -930,15 +930,14 @@ img, canvas, pre { max-width: 100%; }
  * items wrap instead of overflowing (principle #7). */
 .topbar { flex-wrap: wrap; }
 #nav-toggle { margin-left: 0; }
-/* Header hover affordances (brand logo, burger, theme select): same subtle
+/* Header hover affordances (brand logo, burger): same subtle
  * wash as the header nav links above; keyboard users get the accent ring.
  * Touch devices ignore hover and tap straight through — no hover-dependent
- * UI (principle #7). Theme tokens only, all three themes keep working. */
+ * UI (principle #7). Theme tokens only, all three themes keep working.
+ * (Header theme select removed with its copies — rule deleted.) */
 .brand:hover, #nav-toggle:hover { background: rgba(255, 255, 255, 0.08); }
 .brand, #nav-toggle { border-radius: 6px; }
-.theme-switcher-select:hover { border-color: var(--accent); background: rgba(255, 255, 255, 0.08); }
-.brand:focus-visible, #nav-toggle:focus-visible,
-.theme-switcher-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.brand:focus-visible, #nav-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Black nav bar (target: single black strip, white icon+label items in
  * Exchange / Credit Offer / Liquidity Pools / Explore order): #nav reuses the

@@ -531,102 +531,15 @@ var App = (function () {
     if (theme) document.documentElement.setAttribute("data-theme", theme);
   }
 
-  /* THEME_SWITCHER (user complaint: the switcher lived only in #/settings).
-   *   #1 has NO header theme switch — the "themes" dropdown renders only on
-   *   the settings page (SettingsEntry.jsx:100-113 case "themes";
-   *   Settings.jsx:38 lists it among settings entries, :226-228 handle the
-   *   case). Vanilla keeps that settings-page select (#1 parity) AND adds a
-   *   compact header copy plus a burger-menu copy inside #nav, so the theme
-   *   is visible/switchable from anywhere. Option list is the same three ids
-   *   as settings-prefs.js buildTheme (settings-prefs.js:54) + Store THEMES
-   *   (store.js:23) — keep all three in sync by hand (plain array; no module
-   *   system here by design, and theme ids are identifiers, never localized).
-   *   Behavior: native <select> (keyboard accessible: tab + arrows),
-   *   min-height 44px touch target, change -> Store.saveSettings (the
-   *   existing Store path; the settings subscription in onSettings flips
-   *   data-theme instantly). Every copy re-syncs via syncThemeSwitchers on
-   *   each settings emit. */
-  var THEMES = ["ref-ui-theme", "vanilla-ui-theme", "dex-ux-theme"];
-  /* Human names for the header select (raw ids are identifiers, kept as
-   * option values + in settings; the header shows names a person picks). */
-  var THEME_NAMES = {
-    "ref-ui-theme": "Classic",
-    "vanilla-ui-theme": "Vanilla light",
-    "dex-ux-theme": "DEX dark"
-  };
+  /* Header theme switcher REMOVED (owner call): the switcher lives only on
+   * #/settings now (settings.js theme select — the #1-parity location), so
+   * the header copies (bar + #nav) are deleted: THEMES/THEME_NAMES/setTheme/
+   * currentTheme/buildThemeSwitcher/syncThemeSwitchers all removed as dead
+   * code with them. Settings-page changes still flip data-theme instantly
+   * via the existing settings subscription (onSettings->applyTheme). */
 
-  /* setTheme: persist via the sole settings owner. Params: id (theme id
-   *   string). Returns nothing. Fails: never throws — unknown ids are
-   *   ignored, Store failures keep the current theme. Instant-apply flows
-   *   through the existing settings subscription (onSettings->applyTheme). */
-  function setTheme(id) {
-    if (THEMES.indexOf(id) === -1) return;
-    try {
-      Store.saveSettings({ theme: id });
-    } catch (e) { /* current theme stands */ }
-  }
-
-  /* currentTheme: read-only peek at the persisted theme. Params: none.
-   *   Returns the theme id or "ref-ui-theme". Fails: never throws. */
-  function currentTheme() {
-    try {
-      var s = Store.loadSettings();
-      if (s && THEMES.indexOf(s.theme) !== -1) return s.theme;
-    } catch (e) { /* default below */ }
-    return "ref-ui-theme";
-  }
-
-  /* buildThemeSwitcher: one compact label+select pair. Params: doc, suffix
-   *   (id suffix keeping the header/nav copies unique), onBar (true: the
-   *   copy sits on the header bar -> header-token colors; false: the copy
-   *   sits in #nav -> panel-token colors, so it stays readable on the light
-   *   cream/white nav of vanilla-ui-theme). Returns the wrapper span.
-   *   Fails: never throws — without Store the default stays selected.
-   *   Layout styling is inline (themes.css owns color tokens only): 44px
-   *   min-height; options get a fixed dark-on-light pair so the native popup
-   *   stays readable even when the bar is dark. */
-  function buildThemeSwitcher(doc, suffix, onBar) {
-    var fg = onBar ? "var(--header-text)" : "var(--text)";
-    var edge = onBar ? "var(--header-text)" : "var(--border)";
-    var wrap = doc.createElement("span");
-    wrap.className = "theme-switcher";
-    try { wrap.style.display = "inline-flex"; wrap.style.alignItems = "center"; wrap.style.gap = "6px"; } catch (e) { /* unstyled stands */ }
-    var label = doc.createElement("label");
-    try { label.style.fontSize = "0.9rem"; } catch (e) { /* inherit stands */ }
-    var select = doc.createElement("select");
-    select.id = "theme-switch-" + suffix;
-    select.className = "theme-switcher-select";
-    select.setAttribute("aria-label", t("settings.theme_label", "Theme "));
-    try {
-      select.style.minHeight = "44px"; select.style.maxWidth = "150px";
-      select.style.background = "transparent"; select.style.color = fg;
-      select.style.border = "1px solid " + edge; select.style.borderRadius = "6px";
-    } catch (e) { /* native styling stands */ }
-    THEMES.forEach(function (id) {
-      var opt = doc.createElement("option");
-      opt.value = id;
-      opt.textContent = THEME_NAMES[id] || id;
-      try { opt.style.color = "#111111"; opt.style.background = "#ffffff"; } catch (e) { /* native popup stands */ }
-      select.appendChild(opt);
-    });
-    select.value = currentTheme();
-    select.addEventListener("change", function () { setTheme(select.value); });
-    label.appendChild(select);
-    wrap.appendChild(label);
-    return wrap;
-  }
-
-  /* syncThemeSwitchers: repaint every header/nav copy after a theme change
-   *   from anywhere (settings page, another copy). Params: id (theme id).
-   *   Returns nothing. Fails: never throws — missing DOM is a no-op. */
-  function syncThemeSwitchers(id) {
-    if (typeof document === "undefined" || THEMES.indexOf(id) === -1) return;
-    try {
-      Array.prototype.forEach.call(document.querySelectorAll("select.theme-switcher-select"), function (sel) {
-        sel.value = id;
-      });
-    } catch (e) { /* copies keep stale selection until next rebuild */ }
-  }
+  /* Header theme-switcher builder + sync removed with the copies (see note
+   * above) — the settings page owns the only selector now. */
 
   /* paintFooter: persistent status bar — the connectivity signal (#1
    *   parity: the node location name carries the state in COLOR, vivid
@@ -778,7 +691,7 @@ var App = (function () {
    * throws — connect failures surface via connection events. */
   function onSettings(next) {
     if (!next) return;
-    if (next.theme !== lastTheme) { lastTheme = next.theme; applyTheme(next.theme); syncThemeSwitchers(next.theme); }
+    if (next.theme !== lastTheme) { lastTheme = next.theme; applyTheme(next.theme); }
     paintShieldBadge();
     if (next.activeNode !== lastNode || next.network !== lastNetwork) {
       lastNetwork = next.network; lastNode = next.activeNode; connect(next.activeNode);
@@ -985,14 +898,8 @@ var App = (function () {
     } catch (e) { /* banner keeps static state */ }
     var toggle = document.getElementById("nav-toggle");
     var nav = document.getElementById("nav");
-  /* Header theme copy: sits on the bar before the hamburger toggle, so it
-   * is visible without opening any menu (guarded: exactly one copy). */
-    try {
-      var topbar = document.querySelector(".topbar");
-      if (topbar && toggle && !document.getElementById("theme-switch-header")) {
-        topbar.insertBefore(buildThemeSwitcher(document, "header", true), toggle);
-      }
-    } catch (e) { /* settings-page select remains the switcher */ }
+    /* Header theme copy removed (owner call — settings page owns the only
+     * selector now); the bar keeps lock + hamburger only. */
     if (nav) buildNav(nav);
     if (toggle) ensureToggleIcon(toggle);
     bindLockOnce();

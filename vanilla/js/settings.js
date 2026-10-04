@@ -124,6 +124,9 @@ var SettingsPage = (function () {
     wrap.appendChild(sign.wrap);
     var signRadios = sign.radios, signList = sign.listBox, signEmpty = sign.emptyNote;
 
+    var themeHead = doc.createElement("h2");
+    themeHead.textContent = t("settings.theme_title", "Theme");
+    wrap.appendChild(themeHead);
     var theme = SettingsPrefs.buildTheme(doc, settings, t);
     wrap.appendChild(theme.label);
     var themeSelect = theme.select;
@@ -132,6 +135,9 @@ var SettingsPage = (function () {
      * the change handler below owns the switch (ambiguity D: full router
      * re-render, cheap and subscription-free; ambiguity E: honest fallback
      * line + snap-back on fetch failure — never a spinner, never blank). */
+    var locHead = doc.createElement("h2");
+    locHead.textContent = t("settings.language_title", "Language");
+    wrap.appendChild(locHead);
     var loc = SettingsPrefs.buildLocale(doc, t);
     wrap.appendChild(loc.label);
     wrap.appendChild(loc.error);
