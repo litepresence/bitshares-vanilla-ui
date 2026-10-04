@@ -120,8 +120,26 @@ declare var ViewingAs: any;
 declare var Wallet: any;
 declare var WalletUI: any;
 declare var touchable: <T extends HTMLElement>(el: T) => T;
+declare var DOM: {
+  el: (doc: Document, tag: string, text?: string | null, cls?: string | null) => HTMLElement;
+  clear: (root: HTMLElement) => void;
+  text: (el: HTMLElement, text: string | null | undefined) => HTMLElement;
+  attrs: (el: HTMLElement, obj: Record<string, string | null | undefined>) => HTMLElement;
+  status: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
+  error: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
+  append: (wrap: HTMLElement, ...nodes: HTMLElement[]) => HTMLElement;
+};
 interface Window {
   touchable: <T extends HTMLElement>(el: T) => T;
+  DOM: {
+    el: (doc: Document, tag: string, text?: string | null, cls?: string | null) => HTMLElement;
+    clear: (root: HTMLElement) => void;
+    text: (el: HTMLElement, text: string | null | undefined) => HTMLElement;
+    attrs: (el: HTMLElement, obj: Record<string, string | null | undefined>) => HTMLElement;
+    status: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
+    error: (wrap: HTMLElement, text: string | null | undefined) => HTMLElement;
+    append: (wrap: HTMLElement, ...nodes: HTMLElement[]) => HTMLElement;
+  };
 }
 declare var BRAINKEY_DICT: any;
 declare var nobleGetPublicKey: any;
