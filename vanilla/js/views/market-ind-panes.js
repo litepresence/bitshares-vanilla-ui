@@ -585,12 +585,19 @@ MarketInd._panes = MarketInd._panes || {};
         closes.map(MarketInd._series.numOrNaN), highs.map(MarketInd._series.numOrNaN), lows.map(MarketInd._series.numOrNaN), vols, C);
     }
     var depth = state.bookDepth || { bids: [], asks: [] };
+    /* Candle places ride along for the LWC axis (candles() magnitude-aware
+     * precision — the price pane prints the same 4 sig figs; absent means
+     * the pane derives it from the bars, same rule). */
+    var places = null;
+    try {
+      if (state.candles && Number.isInteger(state.candles.places)) places = state.candles.places;
+    } catch (e) { places = null; }
     /* Per-pane osc series are computed live in drawCharts (checkbox toggles
      * never refetch); only the pixel-ready raw arrays are cached here. */
     state.chartData = {
       buckets: buckets, overlays: overlays,
       closes: closes, highs: highs, lows: lows, opens: opens, vols: vols, oscTimes: times,
-      depth: depth
+      depth: depth, places: places
     };
     drawCharts(state);
   }
@@ -615,6 +622,7 @@ MarketInd._panes = MarketInd._panes || {};
     try {
       state.panes.price = MarketCharts.drawPricePane(doc, state.priceHost, {
         candles: d.buckets, overlays: d.overlays, logScale: state.logScale,
+        precision: (typeof d.places === "number" ? d.places : undefined),
         colors: frame, emptyText: t("market.no_price_history", "No price history on this market."),
         previous: state.panes.price
       });

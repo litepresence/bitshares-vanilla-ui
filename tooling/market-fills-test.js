@@ -44,7 +44,7 @@ var buckets = MF.fillsToCandles(fills, 3600, "1.3.0", 5, 4, "1.3.113");
 var slot = Math.floor(Date.parse("2026-09-01T10:00:00Z") / 1000) * 1000;
 eq(buckets.length, 1, "orientation fills share one bucket");
 eq(buckets.length ? buckets[0].timeMs : null, slot, "bucket slotted by floor(unix/bucket)");
-eq(buckets.length ? buckets[0].close : null, globalThis.Format.formatPrice("100000", 5, "5000", 4, 8), "oriented price base-per-quote");
+eq(buckets.length ? buckets[0].close : null, "2.000", "oriented price base-per-quote (4 sig figs, was 2.00000000 at fixed 8)");
 eq(buckets.length ? buckets[0].baseVolume : null, globalThis.Format.formatAmount("300000", 5), "base-leg volume summed");
 
 /* 7-9: leg-guard vector — esFill accepts the pair, rejects strangers. */

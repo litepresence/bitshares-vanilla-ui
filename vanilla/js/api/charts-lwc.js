@@ -317,13 +317,83 @@ var ChartsLwc = (function () {
     } catch (e) { /* line keeps its prior paint */ }
   }
 
+  /* Price-pane precision (satoshi-scale, 4 sig figs): the axis must print
+   * the candle strings, not 0.0. Explicit opts.precision (the candles()
+   * places, threaded by the desk) wins when valid; otherwise the same
+   * Format.sigFigPlaces rule derives it from the bars. Returns the precision
+   * int or null when the bars carry no magnitude (empty/zero-only -> the
+   * library defaults stand, as today — no crash, no invented ticks).
+   * Number()/Math here configure chart pixels only, never money. */
+  function pricePrecision(bars, explicit) {
+    var hasMag = false;
+    try {
+      for (var i = 0; i < (bars || []).length; i++) {
+        var b = bars[i] || {};
+        var legs = [b.open, b.high, b.low, b.close];
+        for (var j = 0; j < legs.length; j++) {
+          if (typeof legs[j] === "number" && isFinite(legs[j]) && legs[j] !== 0) {
+            hasMag = true;
+            break;
+          }
+        }
+        if (hasMag) break;
+      }
+    } catch (e) { hasMag = false; }
+    if (!hasMag) return null;
+    if (Number.isInteger(explicit) && explicit >= 0 && explicit <= 18) {
+      return explicit > 12 ? 12 : explicit;
+    }
+    try {
+      if (typeof Format !== "undefined" && Format &&
+          typeof Format.sigFigPlaces === "function") {
+        var humans = [];
+        for (var k = 0; k < (bars || []).length; k++) {
+          var bb = bars[k] || {};
+          humans.push(String(bb.open), String(bb.high), String(bb.low), String(bb.close));
+        }
+        var p = Format.sigFigPlaces(humans);
+        if (Number.isInteger(p) && p >= 0 && p <= 18) return p > 12 ? 12 : p;
+      }
+    } catch (e) { /* pixel fallback below */ }
+    try {
+      var maxAbs = 0, m, n;
+      for (m = 0; m < (bars || []).length; m++) {
+        var c = bars[m] || {};
+        var ws = [c.open, c.high, c.low, c.close];
+        for (n = 0; n < ws.length; n++) {
+          if (typeof ws[n] === "number" && isFinite(ws[n])) {
+            var av = ws[n] < 0 ? -ws[n] : ws[n];
+            if (av > maxAbs) maxAbs = av;
+          }
+        }
+      }
+      if (!(maxAbs > 0)) return null;
+      var pl = 3 - Math.floor(Math.log10(maxAbs));
+      if (pl < 0) return 0;
+      if (pl > 12) return 12;
+      return pl;
+    } catch (e) { return null; }
+  }
+
+  /* LWC price-format for one precision (axis + last-value labels follow the
+   * series precision; minMove is the axis step — pixel config, not money). */
+  function priceFormatFor(precision) {
+    var minMove = 1;
+    try {
+      minMove = Math.pow(10, -precision);
+      if (!isFinite(minMove) || minMove <= 0) minMove = 1;
+    } catch (e) { minMove = 1; }
+    return { type: "price", precision: precision, minMove: minMove };
+  }
+
   /* In-place price update on the previous handle's LIVE chart (the tip
    * path): same window -> series.update(lastBar); one appended bar ->
    * update appends; shifted window/bucket/count -> full setData on the
    * existing series (chart object — and its zoom — survive; only data
    * swaps). Returns true when painted in place (caller returns prev),
    * false when the caller must rebuild (dead chart, other host, theme/
-   * logScale/overlay-shape change, overlay series mismatch). Never throws. */
+   * logScale/overlay-shape/precision change, overlay series mismatch).
+   * Never throws. */
   function tryPriceUpdate(hostEl, prev, bars, opts, colors, times) {
     try {
       if (!prev || prev.kind !== "lwc" || !prev.chart || prev.host !== hostEl) return false;
@@ -335,8 +405,10 @@ var ChartsLwc = (function () {
       var ck = prev.key;
       if (!ck) return false;
       var ovs = Array.isArray(opts.overlays) ? opts.overlays : [];
+      var prec = pricePrecision(bars, opts ? opts.precision : undefined);
       var frame = (colors.paneBg || "") + "|" + (colors.grid || "") + "|" +
-        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin");
+        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin") + "|" +
+        (prec === null ? "-" : String(prec));
       if (ck.frame !== frame || ck.ovShape !== ovShape(ovs)) return false;
       /* Overlay/series alignment: an overlay that gained (or lost) array
        * values needs a real rebuild (series set differs). */
@@ -475,7 +547,8 @@ var ChartsLwc = (function () {
    * Params: doc; hostEl (emptied first — pass the previous handle in
    *   opts.previous for LWC teardown); opts {candles: market.js buckets,
    *   overlays: [{name, color, values}] aligned to candles, logScale: bool,
-   *   colors: {paneBg, grid, text}, emptyText}.
+   *   precision: candles() places (optional — derived from the bars when
+   *   absent, same 4-sig-fig rule), colors: {paneBg, grid, text}, emptyText}.
    * Returns a pane handle ({kind: "lwc"|"canvas"|"none", chart?}) for
    * removePane. Without the vendored global, falls back to the legacy canvas
    * line renderer (MarketCharts.drawPrice: closes + first two overlays as
@@ -539,11 +612,22 @@ var ChartsLwc = (function () {
       timeScale: { timeVisible: true, secondsVisible: false, rightOffset: 2 },
       rightPriceScale: { mode: scaleMode(LW, !!opts.logScale) }
     });
-    var series = chart.addSeries(LW.CandlestickSeries, {
+    /* Axis precision: the same 4-sig-fig places as the candle strings
+     * (explicit opts.precision from candles() wins, else derived above).
+     * Null (empty/zero-only) leaves the library defaults — as today.
+     * Oscillator panes (drawOscPane below: RSI/MACD fixed scales) are
+     * untouched by design. */
+    var prec = pricePrecision(bars, opts ? opts.precision : undefined);
+    var candleOpts = {
       upColor: CANDLE_UP, downColor: CANDLE_DOWN,
       wickUpColor: CANDLE_UP, wickDownColor: CANDLE_DOWN,
       borderVisible: false
-    });
+    };
+    if (prec !== null) {
+      candleOpts.precision = prec;
+      candleOpts.priceFormat = priceFormatFor(prec);
+    }
+    var series = chart.addSeries(LW.CandlestickSeries, candleOpts);
     series.setData(bars.map(function (b) {
       return { time: b.time, open: b.open, high: b.high, low: b.low, close: b.close };
     }));
@@ -553,13 +637,18 @@ var ChartsLwc = (function () {
     for (i = 0; i < ovs2.length; i++) {
       var ov = ovs2[i] || {};
       if (!Array.isArray(ov.values)) { lines.push({ series: null, tail: null }); continue; }
-      var line = chart.addSeries(LW.LineSeries, {
+      var lineOpts = {
         color: (typeof ov.color === "string" && ov.color) ? ov.color : colors.text,
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false,
         crosshairMarkerVisible: false
-      });
+      };
+      if (prec !== null) {
+        lineOpts.precision = prec;
+        lineOpts.priceFormat = priceFormatFor(prec);
+      }
+      var line = chart.addSeries(LW.LineSeries, lineOpts);
       line.setData(lineData(times, ov.values));
       lines.push({ series: line,
         tail: { n: ov.values.length, lv: ov.values.length ? ov.values[ov.values.length - 1] : null } });
@@ -577,7 +666,8 @@ var ChartsLwc = (function () {
     handle.key = { n: bars.length, first: bars[0].time, last: times[times.length - 1],
       lastOhlc: ohlcKey(bars[bars.length - 1]),
       frame: (colors.paneBg || "") + "|" + (colors.grid || "") + "|" +
-        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin"),
+        (colors.text || "") + "|" + (!!opts.logScale ? "log" : "lin") + "|" +
+        (prec === null ? "-" : String(prec)),
       ovShape: ovShape(ovs2) };
     return handle;
   }
@@ -790,7 +880,7 @@ var ChartsLwc = (function () {
     removePane: removePane,
     linkTimeScales: linkTimeScales,
     hasLightweight: hasLightweight,
-    _test: { savedRange: savedRange, restoreRange: restoreRange }
+    _test: { savedRange: savedRange, restoreRange: restoreRange, pricePrecision: pricePrecision }
   };
 })();
 

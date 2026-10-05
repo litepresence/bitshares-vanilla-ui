@@ -51,8 +51,29 @@ var MarketFills = (function () {
   var ES_MAX_EVENTS = 1000;
 
   /* Fixed decimals for BigInt price strings (follows #1 Price.toReal
-   * reward `parseFloat(real.toFixed(8))`, MarketClasses.js:284). */
+   * reward `parseFloat(real.toFixed(8))`, MarketClasses.js:284). Kept as the
+   * empty/zero-only fallback — live ES candles use the magnitude-aware places
+   * below (4 sig figs, satoshi-scale fix, same rule as MarketCandles). */
   var PRICE_PLACES = 8;
+
+  /* Ceiling for magnitude-aware places (see MarketCandles.SIGFIG_MAX —
+   * duplicated plain code keeps this file self-contained, same convention
+   * as the precision-cache split). */
+  var SIGFIG_MAX = 12;
+
+  /* Magnitude-aware places for already-human price strings (Number for
+   * magnitude only, never money). Falls back to PRICE_PLACES when the
+   * formatter is absent or the set is empty/zero-only. Never throws. */
+  function _sigPlaces(humans) {
+    try {
+      if (typeof Format !== "undefined" && Format &&
+          typeof Format.sigFigPlaces === "function") {
+        var p = Format.sigFigPlaces(humans);
+        if (Number.isInteger(p) && p >= 0 && p <= 18) return p > SIGFIG_MAX ? SIGFIG_MAX : p;
+      }
+    } catch (e) { /* fallback stands */ }
+    return PRICE_PLACES;
+  }
 
   /* True for digit-only raw-int strings (unsigned; amounts are >= 0). */
   function _isIntStr(s) {
@@ -280,8 +301,11 @@ var MarketFills = (function () {
   /* Oriented base-per-quote human price for one fill (Market display rule:
    * base_human / quote_human via BigInt math). Base leg = whichever side
    * carries baseId; quote leg = the other side (strict pair when quoteId
-   * given, else single-leg guard). Null when unmappable — never guessed. */
-  function priceHuman(fill, baseId, precB, precQ, quoteId) {
+   * given, else single-leg guard). Null when unmappable — never guessed.
+   * Params: (fill, baseId, precB, precQ, quoteId, places?) — places defaults
+   * to PRICE_PLACES (backward compat); fillsToCandles passes the
+   * magnitude-aware value so ES buckets read like chain candles. */
+  function priceHuman(fill, baseId, precB, precQ, quoteId, places) {
     try {
       var paid = fill.paid, recv = fill.received;
       if (!paid || !recv) return null;
@@ -300,7 +324,8 @@ var MarketFills = (function () {
       }
       if (!_isIntStr(String(bRaw)) || !_isIntStr(String(qRaw))) return null;
       if (BigInt(String(qRaw)) <= 0n) return null;
-      return Format.formatPrice(String(bRaw), precB, String(qRaw), precQ, PRICE_PLACES);
+      var pl = (Number.isInteger(places) && places >= 0 && places <= 18) ? places : PRICE_PLACES;
+      return Format.formatPrice(String(bRaw), precB, String(qRaw), precQ, pl);
     } catch (e) { return null; }
   }
 
@@ -314,9 +339,22 @@ var MarketFills = (function () {
   function fillsToCandles(fills, bucketSec, baseId, precB, precQ, quoteId) {
     if (!bucketSec || Math.floor(bucketSec) <= 0) throw new Error("bad bucket");
     bucketSec = Math.floor(bucketSec);
+    /* Satoshi-scale (4 sig figs): probe all fill prices at SIGFIG_MAX
+     * (human strings via BigInt; Number measures magnitude only), choose
+     * places once, then bucket at that precision. Empty/zero-only falls
+     * back to PRICE_PLACES (renders as today). */
+    var places = PRICE_PLACES;
+    try {
+      var probe = [];
+      (fills || []).forEach(function (f) {
+        var p = priceHuman(f, baseId, precB, precQ, quoteId, SIGFIG_MAX);
+        if (p !== null && p !== undefined) probe.push(p);
+      });
+      places = _sigPlaces(probe);
+    } catch (e) { places = PRICE_PLACES; }
     var buckets = {};
     (fills || []).forEach(function (f) {
-      var price = priceHuman(f, baseId, precB, precQ, quoteId);
+      var price = priceHuman(f, baseId, precB, precQ, quoteId, places);
       if (price === null || price === undefined) return;
       var unix = Math.floor(Date.parse(f.time) / 1000);
       if (!(unix > 0)) return;

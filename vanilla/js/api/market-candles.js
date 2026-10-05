@@ -32,8 +32,30 @@ var MarketCandles = (function () {
 
   /* Fixed decimals for BigInt-computed price strings (follows #1's
    * Price.toReal reward — `parseFloat(real.toFixed(8))`,
-   * MarketClasses.js:284; Task-4 vectors pin it). */
+   * MarketClasses.js:284; Task-4 vectors pin it). Kept as the
+   * empty/zero-only fallback — live candles use the magnitude-aware places
+   * below (4 sig figs, satoshi-scale fix). */
   var PRICE_PLACES = 8;
+
+  /* Ceiling for magnitude-aware places (Format allows 0..18; 12 covers
+   * ~1e-9 at 4 sig figs — below that the 12-place string still stands,
+   * honest but capped, never a "0" invented; see Format.sigFigPlaces). */
+  var SIGFIG_MAX = 12;
+
+  /* Magnitude-aware places for already-human price strings (Number for
+   * magnitude only, never money). Falls back to PRICE_PLACES when the
+   * formatter is absent or the set is empty/zero-only (renders as today).
+   * Never throws. */
+  function _sigPlaces(humans) {
+    try {
+      if (typeof Format !== "undefined" && Format &&
+          typeof Format.sigFigPlaces === "function") {
+        var p = Format.sigFigPlaces(humans);
+        if (Number.isInteger(p) && p >= 0 && p <= 18) return p > SIGFIG_MAX ? SIGFIG_MAX : p;
+      }
+    } catch (e) { /* fallback stands */ }
+    return PRICE_PLACES;
+  }
 
   /* asset id -> numeric precision, filled on demand via get_assets. */
   var _precCache = {};
@@ -174,7 +196,7 @@ var MarketCandles = (function () {
     if (!(count >= 1)) throw new Error("bad-count");
     var nums = await timeframes(); // throws history-unavailable
     if (nums.length === 0) {
-      return { bucket: null, start: null, end: null, buckets: [], closes: [], deep: false };
+      return { bucket: null, start: null, end: null, buckets: [], closes: [], deep: false, places: PRICE_PLACES };
     }
     var bucket;
     if (bucketSec === undefined) {
@@ -231,10 +253,31 @@ var MarketCandles = (function () {
       }
     }
     if (Object.keys(bySlot).length === 0) {
-      return { bucket: bucket, start: startISO, end: endISO, buckets: [], closes: [], deep: false };
+      return { bucket: bucket, start: startISO, end: endISO, buckets: [], closes: [], deep: false, places: PRICE_PLACES };
     }
     _needPriceMath();
     var precs = await _precisions([baseId, quoteId]);
+    /* Satoshi-scale (4 sig figs): probe the fetched set at SIGFIG_MAX
+     * (human strings via BigInt; Number measures magnitude only), choose
+     * places once, then format every leg at that precision. Empty/zero-only
+     * falls back to PRICE_PLACES (renders as today). */
+    var places = PRICE_PLACES;
+    try {
+      var magProbe = [];
+      Object.keys(bySlot).forEach(function (k) {
+        var rr = bySlot[k] || {};
+        var legs = [[rr.open_base, rr.open_quote], [rr.high_base, rr.high_quote],
+          [rr.low_base, rr.low_quote], [rr.close_base, rr.close_quote]];
+        for (var li = 0; li < legs.length; li++) {
+          var bRaw = String(legs[li][0]), qRaw = String(legs[li][1]);
+          if (!_isIntStr(bRaw) || !_isIntStr(qRaw)) continue;
+          try {
+            magProbe.push(Format.formatPrice(bRaw, precs[baseId], qRaw, precs[quoteId], SIGFIG_MAX));
+          } catch (e) { /* malformed leg is a gap, never a reject */ }
+        }
+      });
+      places = _sigPlaces(magProbe);
+    } catch (e) { places = PRICE_PLACES; }
     var out = [], closes = [];
     var prevB = null, prevQ = null, prevHuman = null, prevNum = null;
     for (var s = startSlotSec; s <= endSlotSec; s += bucket) {
@@ -248,10 +291,10 @@ var MarketCandles = (function () {
         if (_isIntStr(oB) && _isIntStr(oQ) && _isIntStr(cB) && _isIntStr(cQ) &&
           _isIntStr(hB) && _isIntStr(hQ) && _isIntStr(lB) && _isIntStr(lQ)) {
           try {
-          var o = Format.formatPrice(oB, precs[baseId], oQ, precs[quoteId], PRICE_PLACES);
-          var h = Format.formatPrice(hB, precs[baseId], hQ, precs[quoteId], PRICE_PLACES);
-          var l = Format.formatPrice(lB, precs[baseId], lQ, precs[quoteId], PRICE_PLACES);
-          var c = Format.formatPrice(cB, precs[baseId], cQ, precs[quoteId], PRICE_PLACES);
+          var o = Format.formatPrice(oB, precs[baseId], oQ, precs[quoteId], places);
+          var h = Format.formatPrice(hB, precs[baseId], hQ, precs[quoteId], places);
+          var l = Format.formatPrice(lB, precs[baseId], lQ, precs[quoteId], places);
+          var c = Format.formatPrice(cB, precs[baseId], cQ, precs[quoteId], places);
           var bv = row.base_volume !== undefined && row.base_volume !== null ? String(row.base_volume) : null;
           var qv = row.quote_volume !== undefined && row.quote_volume !== null ? String(row.quote_volume) : null;
           var cn = Number(c);
@@ -342,7 +385,24 @@ var MarketCandles = (function () {
         deep = true;
       }
     } catch (e) { deep = false; /* cache merge never breaks chain paint */ }
-    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep };
+    /* Merged-window places: the ES backfill may widen the range, so the
+     * chart axis follows the FINAL set (same 4-sig-fig rule, Number for
+     * magnitude only). Chain-only keeps the probe value above. */
+    var finalPlaces = places;
+    try {
+      if (deep && out.length > 0) {
+        var mergedHumans = [];
+        for (var mi = 0; mi < out.length; mi++) {
+          var me = out[mi] || {};
+          if (me.open !== undefined) mergedHumans.push(me.open);
+          if (me.high !== undefined) mergedHumans.push(me.high);
+          if (me.low !== undefined) mergedHumans.push(me.low);
+          if (me.close !== undefined) mergedHumans.push(me.close);
+        }
+        finalPlaces = _sigPlaces(mergedHumans);
+      }
+    } catch (e) { finalPlaces = places; }
+    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep, places: finalPlaces };
   }
 
   /* deepen: background ES backfill for one pair+bucket (lazy-deep, Playwright
@@ -409,6 +469,21 @@ var MarketCandles = (function () {
     }
     _needPriceMath();
     var list = Array.isArray(buckets) ? buckets : [];
+    /* Same 4-sig-fig rule as candles(): follow the input window's own
+     * humans so the strip reads like the price pane (fallback 8 renders
+     * as today). */
+    var vplaces = PRICE_PLACES;
+    try {
+      var vmag = [];
+      for (var mi = 0; mi < list.length; mi++) {
+        var me = list[mi] || {};
+        if (me.close !== undefined) vmag.push(me.close);
+        if (me.high !== undefined) vmag.push(me.high);
+        if (me.low !== undefined) vmag.push(me.low);
+        if (me.open !== undefined) vmag.push(me.open);
+      }
+      vplaces = _sigPlaces(vmag);
+    } catch (e) { vplaces = PRICE_PLACES; }
     var num = 0n, den = 0n, per = [], skipped = 0, i;
     for (i = 0; i < list.length; i++) {
       var e = list[i] || {};
@@ -424,19 +499,19 @@ var MarketCandles = (function () {
       try {
         per.push({
           timeMs: e.timeMs || 0,
-          vwap: Format.formatPrice(bRaw, basePrec, qRaw, quotePrec, PRICE_PLACES),
-          high: Format.formatPrice(String(e.highBase), basePrec, String(e.highQuote), quotePrec, PRICE_PLACES),
-          low: Format.formatPrice(String(e.lowBase), basePrec, String(e.lowQuote), quotePrec, PRICE_PLACES)
+          vwap: Format.formatPrice(bRaw, basePrec, qRaw, quotePrec, vplaces),
+          high: Format.formatPrice(String(e.highBase), basePrec, String(e.highQuote), quotePrec, vplaces),
+          low: Format.formatPrice(String(e.lowBase), basePrec, String(e.lowQuote), quotePrec, vplaces)
         });
       } catch (err) { skipped++; continue; }
     }
     var human = null;
     if (den > 0n) {
       try {
-        human = Format.formatPrice(num.toString(), basePrec, den.toString(), quotePrec, PRICE_PLACES);
+        human = Format.formatPrice(num.toString(), basePrec, den.toString(), quotePrec, vplaces);
       } catch (err) { human = null; }
     }
-    return { num: num.toString(), den: den.toString(), human: human, per: per, skipped: skipped };
+    return { num: num.toString(), den: den.toString(), human: human, per: per, skipped: skipped, places: vplaces };
   }
 
   /* mergeWindows: tip-sized fresh fetch into the painted window (pure).

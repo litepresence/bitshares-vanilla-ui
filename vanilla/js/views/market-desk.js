@@ -982,7 +982,9 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
               if (h !== null && state._tipHash === key) return;
               state._tipHash = key;
               state.candles = { bucket: state.bucket, start: null, end: null,
-                buckets: merged, closes: [], deep: state.deep };
+                buckets: merged, closes: [], deep: state.deep,
+                places: (state.candles && Number.isInteger(state.candles.places)
+                  ? state.candles.places : undefined) };
               try { state.deep = deepNow; } catch (e) { state.deep = false; }
               try {
                 if (typeof MarketInd !== "undefined" && MarketInd &&

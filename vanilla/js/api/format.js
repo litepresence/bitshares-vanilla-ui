@@ -84,6 +84,36 @@ var Format = (function () {
     return places === 0 ? s : s.slice(0, -places) + "." + s.slice(-places);
   }
 
+  /* sigFigPlaces: decimal places for 4 significant figures on price charts.
+   * Params: humans array of already-human price strings (or numbers).
+   * Returns an integer 0..12 (places for formatPrice). Empty, zero-only,
+   * or non-finite input returns 8 (today's candle default — no crash, no
+   * invented ticks). Otherwise places = 3 - floor(log10(maxAbs)), clamped
+   * 0..12 (e.g. 1234.5 -> 0, 1.2345 -> 3, 1.234e-7 -> 10). Values needing
+   * more than 12 places (below ~1e-9) cap at 12 and still lose figs — the
+   * cap is honest, not silent: callers keep the 12-place string (never "0"
+   * invented, never raw integers). MAGNITUDE ONLY: Number()/Math.log10
+   * here measure display width, never money — all amount math stays BigInt
+   * in formatPrice/formatAmount above. Pure. */
+  function sigFigPlaces(humans) {
+    var list = Array.isArray(humans) ? humans : [];
+    var maxAbs = 0;
+    var i;
+    for (i = 0; i < list.length; i++) {
+      var v = Number(list[i]);
+      if (!isFinite(v)) continue;
+      v = v < 0 ? -v : v;
+      if (v > maxAbs) maxAbs = v;
+    }
+    if (!(maxAbs > 0)) return 8;
+    var order = Math.floor(Math.log10(maxAbs));
+    if (!isFinite(order)) return 8;
+    var places = 3 - order;
+    if (places < 0) return 0;
+    if (places > 12) return 12;
+    return places;
+  }
+
   /* parsePriceRatio: display decimal price string -> exact {num, den} BigInt
    * ratio. Params: str (string, e.g. "100.5"). Returns {num: BigInt,
    * den: BigInt} with den = 10^fracLen, UNREDUCED ("100.5" -> 1005n/10n).
@@ -321,6 +351,7 @@ var Format = (function () {
     formatAmount: formatAmount,
     parseAmount: parseAmount,
     formatPrice: formatPrice,
+    sigFigPlaces: sigFigPlaces,
     parsePriceRatio: parsePriceRatio,
     pct1: pct1,
     settleEstimate: settleEstimate,
