@@ -3621,7 +3621,8 @@
       "wallet.write_down_brainkey_keep_safe",
       "wallet.wrote_it_down",
       "nav.credit",
-      "nav.margin"
+      "nav.margin",
+      "trade.tab_single"
     ]
   },
   "nav": {
@@ -5383,6 +5384,7 @@
     "row_total": "总计",
     "scaled_title": "阶梯订单（一次交易）",
     "side_label": "方向 ",
+    "tab_single": "单笔",
     "tab_buy": "买入",
     "tab_scaled": "阶梯",
     "tab_sell": "卖出",

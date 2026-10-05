@@ -3621,7 +3621,8 @@
       "wallet.write_down_brainkey_keep_safe",
       "wallet.wrote_it_down",
       "nav.credit",
-      "nav.margin"
+      "nav.margin",
+      "trade.tab_single"
     ]
   },
   "nav": {
@@ -5383,6 +5384,7 @@
     "row_total": "कुल",
     "scaled_title": "स्केल्ड ऑर्डर (एक लेनदेन)",
     "side_label": "पक्ष ",
+    "tab_single": "एकल",
     "tab_buy": "खरीदें",
     "tab_scaled": "स्केल्ड",
     "tab_sell": "बेचें",

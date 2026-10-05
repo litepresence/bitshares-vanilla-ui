@@ -570,7 +570,8 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
      * Exchange.jsx:2089-2210 — two panels side by side, always visible).
      * TradeUI owns the panels; the desk only hosts the mounts. Headings
      * name the side + QUOTE symbol (reference 2x3 shot: BUY BTS/SELL BTS);
-     * the Scaled swap lives on the buy panel's own tab row.
+     * the shared SINGLE/SCALED toggle row lives above both panels
+     * (trade-panels.js #trade-mode-bar, grid-area mode).
      * GAP FIX (desk columns): the six desk cells live in three column
      * stacks (buy+bids | sell+asks | trades+orders) so a tall trades cell
      * can no longer stretch the buy/sell row and strand a void under the

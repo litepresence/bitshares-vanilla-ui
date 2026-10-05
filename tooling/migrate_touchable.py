@@ -86,7 +86,7 @@ GHOST_IDS = [
 ]
 
 SUBTLE_IDS = [
-    "trade-tab-buy", "trade-tab-scaled", "trade-tab-sell",
+    "trade-tab-single", "trade-tab-scaled",
     "mkt-trades-tab-recent", "mkt-trades-tab-my",
     "mkt-tabs", "trade-tabs", "order-tabs",
     "pools-pager", "mkt-quotes", "mkt-scalerow", "mkt-indmenu",

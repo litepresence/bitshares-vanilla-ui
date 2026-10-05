@@ -75,7 +75,7 @@
   grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "stats" "side";
 }
 .mkt-exchange {
-  grid-template-areas: "head" "charts" "buy" "sell" "trades" "bids" "asks" "orders" "side";
+  grid-template-areas: "head" "charts" "mode" "buy" "sell" "trades" "bids" "asks" "orders" "side";
 }
 .mkt-head { grid-area: head; min-width: 0; }
 .mkt-charts { grid-area: charts; min-width: 0; }
@@ -93,10 +93,12 @@
     grid-template-areas: "head head head side" "charts charts charts side" "book trades orders side" "trade stats stats side";
     align-items: start;
   }
-  /* Retro equal 2x3: six equal thirds + the 320px rail stays. */
+  /* Retro equal 2x3: six equal thirds + the 320px rail stays. The shared
+   * SINGLE/SCALED toggle (trade-panels.js #trade-mode-bar) takes its own
+   * full-width mode row above the buy/sell row. */
   .mkt-exchange {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
-    grid-template-areas: "head head head side" "charts charts charts side" "buy sell trades side" "bids asks orders side";
+    grid-template-areas: "head head head side" "charts charts charts side" "mode mode mode side" "buy sell trades side" "bids asks orders side";
     align-items: start;
   }
   .mkt-side {
@@ -121,7 +123,7 @@
 @media (min-width: 1200px) {
   .mkt-exchange {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
-    grid-template-areas: "head head head side" "charts charts charts side" "colbuy colsell coltrades side";
+    grid-template-areas: "head head head side" "charts charts charts side" "mode mode mode side" "colbuy colsell coltrades side";
   }
   .mkt-col-buy, .mkt-col-sell, .mkt-col-trades {
     display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px;
@@ -134,6 +136,12 @@
     grid-area: auto; min-width: 0;
   }
 }
+
+/* Shared SINGLE/SCALED mode toggle (trade-panels.js #trade-mode-bar, one
+ * row above both Buy and Sell columns). Placement only — the button skin
+ * is the shared .trade-tabs rule in app.css. Theme tokens only, no hex. */
+.mkt-mode { grid-area: mode; min-width: 0; }
+.mkt-mode .trade-tabs { margin: 6px 0 8px; }
 
 /* Buy/sell panel headers (polish Task 1 — level tops): ONE shared rule for
  * both h2s (same margin + line-height = same header box, so the two panels

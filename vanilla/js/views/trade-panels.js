@@ -1,7 +1,9 @@
 /* trade-panels.js — DEX buy/sell/scaled panels + review + send (DOM side).
  * Owns: the Buy + Sell side-by-side panels mounted into the market desk
  *   (retro 2x3 row 1, per-side id namespaces via sid, typed values scraped
- *   from the live DOM so they survive redraws), locked quote panels
+ *   from the live DOM so they survive redraws) under ONE shared
+ *   SINGLE/SCALED toggle (grid-area mode above both columns — shared
+ *   P.scaledOpen, never per-side), locked quote panels
  *   (try-before-you-buy: isLockedView / wireThreeWay three-way quotes /
  *   mountFeePreview + mountBalanceLine / lockedPasswordRow /
  *   unlockAndReviewSingle + unlockAndReviewScaled with the password asked
@@ -112,7 +114,7 @@ var TradePanels = (function () {
    * (`disabled = noBalance || invalidPrice || invalidAmount` — only SUBMIT
    * gates; inputs/fee/total always live) + Exchange.jsx:2089-2210 (forms
    * render unconditionally; balance reads 0 logged out).
-   * The helpers below let a LOCKED wallet see the same Buy/Sell/Scaled tabs
+   * The helpers below let a LOCKED wallet see the same Single/Scaled panels
    * with live quotes. The password is asked ONLY at the review button
    * ("Unlock & review"), never to view the panels.
    *
@@ -440,8 +442,9 @@ var TradePanels = (function () {
   }
 
   /* Locked scaled "Unlock & review": same gate as single orders — unlock,
-   * keep the scaled inputs on P.scaled, then run the existing reviewScaled
-   * -> paintConfirmScaled path. */
+   * keep the scaled inputs on the panel's per-side state, then run the
+   * existing reviewScaled -> paintConfirmScaled path (confirm side follows
+   * spec.side, so each column confirms its own side). */
   function unlockAndReviewScaled(doc, body, mount, P, spec, refs, btn) {
     refs.pwErr.textContent = "";
     btn.disabled = true;
@@ -458,7 +461,7 @@ var TradePanels = (function () {
         try { body.removeChild(status); } catch (e) { /* gone */ }
         var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
         return reviewScaled(P, spec).then(function (R) {
-          paintConfirmScaled(doc, mount, P, R);
+          paintConfirmScaled(doc, mount, P, R, spec.side === "sell" ? "sell" : "buy");
         }).catch(function (e) {
           try { body.removeChild(status2); } catch (x) { /* gone */ }
           throw e;
@@ -475,13 +478,16 @@ var TradePanels = (function () {
 
   /* Desk entry: renderDual(doc, buyMount, sellMount, ctx). Guards backends,
    * then paints TWO always-visible panels (retro 2x3 row 1: Buy QUOTE |
-   * Sell QUOTE — reference docs/parity/original-buy-sell-2x3 shot): the
-   * buy panel owns a Buy/Scaled tab row (existing .trade-tabs skin +
-   * trade.tab_buy/trade.tab_scaled keys — Scaled swaps the scaled form into
-   * the buy panel in place of the single form, Buy swaps back); the sell
-   * panel always shows its single form. Locked wallets get full quote
-   * panels in BOTH cells with live three-way quotes + fee previews + "0"
-   * balances (commit 47a30bb contract); the unlock gate lives on each
+   * Sell QUOTE — reference docs/parity/original-buy-sell-2x3 shot) under ONE
+   * shared SINGLE/SCALED toggle row (existing .trade-tabs skin +
+   * trade.tab_single/trade.tab_scaled keys, grid-area mode above both
+   * columns): SINGLE shows both single forms (as before); SCALED shows a
+   * scaled form in EACH column, side fixed per column (buy spends BASE,
+   * sell spends QUOTE — no side selector). The toggle is shared state
+   * (P.scaledOpen, never per-side): both columns switch together, inputs
+   * scraped from the live DOM before every swap. Locked wallets get full
+   * quote panels in BOTH cells with live three-way quotes + fee previews +
+   * "0" balances (commit 47a30bb contract); the unlock gate lives on each
    * panel's review button ("Unlock & review"), never on viewing. */
   function renderDual(doc, buyMount, sellMount, ctx) {
     if (!buyMount || !sellMount) return;
@@ -500,17 +506,92 @@ var TradePanels = (function () {
       showError(doc, buyMount, t("trade.need_assets", "Trade panels need the market assets; reload the market."));
       return;
     }
-    /* Fresh per-side input state (buy/sell/scaled + which buy-panel view).
-     * paintSide scrapes the live DOM before every swap, so typed values
-     * survive redraws; confirm Back paths repaint through paintSide too. */
+    /* Fresh shared input state (single per side + scaled per side + the
+     * shared SINGLE/SCALED view). paintSide/mode swaps scrape the live DOM
+     * before every swap, so typed values survive redraws; confirm Back
+     * paths repaint through paintSide too. */
     function freshP(me) {
       return {
         ctx: ctx, me: me, scaledOpen: false,
         buy: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
         sell: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
-        scaled: { n: "3", low: "", high: "", total: "", side: "sell", key: "YEAR", custom: "" },
-        mounts: { buy: buyMount, sell: sellMount }
+        scaledBuy: { n: "3", low: "", high: "", total: "", side: "buy", key: "YEAR", custom: "" },
+        scaledSell: { n: "3", low: "", high: "", total: "", side: "sell", key: "YEAR", custom: "" },
+        mounts: { buy: buyMount, sell: sellMount },
+        modeBar: null
       };
+    }
+    /* Shared SINGLE/SCALED toggle: ONE row above both columns (grid-area
+     * mode, owned here so both panels switch together). Paints the bar once
+     * per renderDual into the desk (direct child before the buy column);
+     * setMode scrapes BOTH live forms, flips the shared flag, repaints the
+     * mode state + both panels. Params: doc, P. Never throws (forms still
+     * render when the bar cannot mount). */
+    function mountModeBar(doc, P) {
+      try {
+        var buySec = buyMount.parentNode;
+        var colBuy = buySec ? buySec.parentNode : null;
+        var deskEl = colBuy ? colBuy.parentNode : null;
+        if (!deskEl || !colBuy) return;
+        var old = null;
+        try { old = deskEl.querySelector("#trade-mode-bar"); } catch (e) { old = null; }
+        if (old && old.parentNode === deskEl) {
+          try { deskEl.removeChild(old); } catch (e) { /* stale stands */ }
+        }
+        var wrap = doc.createElement("div");
+        wrap.className = "mkt-mode";
+        wrap.id = "trade-mode-bar";
+        var bar = DOM.el(doc, "div", null, "trade-tabs");
+        [["single", t("trade.tab_single", "Single"), false], ["scaled", t("trade.tab_scaled", "Scaled"), true]].forEach(function (d) {
+          var b = touchable(DOM.el(doc, "button", d[1]));
+          b.type = "button";
+          b.id = "trade-tab-" + d[0];
+          bar.appendChild(b);
+        });
+        wrap.appendChild(bar);
+        deskEl.insertBefore(wrap, colBuy);
+        P.modeBar = {
+          single: bar.querySelector("#trade-tab-single"),
+          scaled: bar.querySelector("#trade-tab-scaled")
+        };
+        paintModeState(P);
+        if (P.modeBar.single) {
+          P.modeBar.single.addEventListener("click", function () { setMode(doc, P, false); });
+        }
+        if (P.modeBar.scaled) {
+          P.modeBar.scaled.addEventListener("click", function () { setMode(doc, P, true); });
+        }
+      } catch (e) { /* bar best-effort: panels below still render */ }
+    }
+    /* Mode-button pressed/current paint for the shared toggle. */
+    function paintModeState(P) {
+      try {
+        var pairs = [[P.modeBar.single, !P.scaledOpen], [P.modeBar.scaled, !!P.scaledOpen]];
+        pairs.forEach(function (pr) {
+          if (!pr[0]) return;
+          pr[0].setAttribute("aria-pressed", pr[1] ? "true" : "false");
+          if (pr[1]) pr[0].setAttribute("aria-current", "true");
+          else pr[0].removeAttribute("aria-current");
+        });
+      } catch (e) { /* paint best-effort */ }
+    }
+    /* Shared mode flip: scrape BOTH live forms into state first (single
+     * pair when leaving SINGLE, scaled pair when leaving SCALED — confirm
+     * screens scrape to no-ops, leaving state intact), then repaint the
+     * toggle + both panels. No-op when already in the target mode. */
+    function setMode(doc, P, open) {
+      if (!P || P.scaledOpen === open) return;
+      if (P.scaledOpen) {
+        scrapeScaled(P.mounts.buy, P.scaledBuy, "buy");
+        scrapeScaled(P.mounts.sell, P.scaledSell, "sell");
+      } else {
+        scrapeSingle(P.mounts.buy, P.buy, "buy");
+        scrapeSingle(P.mounts.sell, P.sell, "sell");
+      }
+      P.scaledOpen = open;
+      paintModeState(P);
+      paintSide(doc, P.mounts.buy, P, "buy");
+      paintSide(doc, P.mounts.sell, P, "sell");
     }
     var unlocked = false;
     try {
@@ -520,6 +601,7 @@ var TradePanels = (function () {
       /* TRY-BEFORE-YOU-BUY: full quote panels while locked (same fields as
        * unlocked). The unlock gate lives on each review button. */
       var P0 = freshP(null);
+      mountModeBar(doc, P0);
       paintSide(doc, buyMount, P0, "buy");
       paintSide(doc, sellMount, P0, "sell");
       return;
@@ -532,6 +614,7 @@ var TradePanels = (function () {
       });
     }).then(function (me) {
       var P = freshP(me);
+      mountModeBar(doc, P);
       paintSide(doc, buyMount, P, "buy");
       paintSide(doc, sellMount, P, "sell");
     }).catch(function (e) {
@@ -571,13 +654,14 @@ var TradePanels = (function () {
     } catch (e) { /* checkbox stands */ }
   }
 
-  /* Scrape the live scaled-form inputs back into P.scaled before a repaint
-   * (side change, tab swap). The scaled form only ever renders in the buy
-   * panel, so its ids carry the buy side. */
-  function scrapeScaled(mountEl, st) {
+  /* Scrape one panel's live scaled-form inputs back into its per-side
+   * state before a repaint (mode swap). Ids carry the panel's side
+   * (trade-n-buy vs trade-n-sell); missing nodes leave state untouched.
+   * The side stays fixed per column (st.side = side). */
+  function scrapeScaled(mountEl, st, side) {
     function val(base) {
       try {
-        var n = mountEl.querySelector("#" + sid(base, "buy"));
+        var n = mountEl.querySelector("#" + sid(base, side));
         return n ? n.value : null;
       } catch (e) { return null; }
     }
@@ -588,46 +672,19 @@ var TradePanels = (function () {
     v = val("trade-total"); if (v !== null) st.total = v;
     v = val("trade-expiry"); if (v !== null) st.key = v;
     v = val("trade-expiry-custom"); if (v !== null) st.custom = v;
-    try {
-      var s = mountEl.querySelector("#trade-scaled-side-buy");
-      if (s) st.side = s.value;
-    } catch (e) { /* side stands */ }
+    st.side = side;
   }
 
-  /* One panel paint. Buy panels get a Buy/Scaled tab row (existing
-   * .trade-tabs skin); Scaled swaps the scaled form into the buy panel in
-   * place of the single form, Buy swaps back — each swap scrapes the live
-   * form first. Sell panels always show the single form. Confirm screens
-   * paint into the same mount; Back returns here with P (both sides'
-   * inputs) intact. */
+  /* One panel paint. The shared SINGLE/SCALED toggle (mountModeBar) owns
+   * the mode: SINGLE renders the single form in both panels, SCALED
+   * renders the scaled form in both (side fixed per column). Confirm
+   * screens paint into the same mount; Back returns here with P (both
+   * sides' inputs) intact. */
   function paintSide(doc, mountEl, P, side) {
     DOM.clear(mountEl);
-    if (side === "buy") {
-      var bar = DOM.el(doc, "div", null, "trade-tabs");
-      [["buy", t("trade.tab_buy", "Buy"), false], ["scaled", t("trade.tab_scaled", "Scaled"), true]].forEach(function (d) {
-        var b = touchable(DOM.el(doc, "button", d[1]));
-        b.type = "button";
-        b.id = "trade-tab-" + d[0];
-        var active = P.scaledOpen === d[2];
-        b.setAttribute("aria-pressed", active ? "true" : "false");
-        if (active) b.setAttribute("aria-current", "true");
-        b.addEventListener("click", function () {
-          if (P.scaledOpen === d[2]) return;
-          if (P.scaledOpen) scrapeScaled(mountEl, P.scaled);
-          else scrapeSingle(mountEl, P.buy, "buy");
-          P.scaledOpen = d[2];
-          paintSide(doc, mountEl, P, "buy");
-        });
-        bar.appendChild(b);
-      });
-      mountEl.appendChild(bar);
-      /* nav-six 2026-10-05: borrow entry removed — Margin lives in the
-       * header bar now, so the buy panel keeps tabs + form only
-       * (no second entry point). */
-      if (P.scaledOpen) {
-        scaledForm(doc, mountEl, mountEl, P);
-        return;
-      }
+    if (P.scaledOpen) {
+      scaledForm(doc, mountEl, mountEl, P, side);
+      return;
     }
     orderForm(doc, mountEl, mountEl, P, side);
   }
@@ -981,28 +1038,22 @@ var TradePanels = (function () {
   }
 
   /* Scaled form: N (2-20), priceLow, priceHigh, total in SELL-asset units,
-   * side, expiry. Renders ONLY in the buy panel (in place of the single
-   * form while P.scaledOpen); every id carries the buy side so the sibling
-   * sell panel never collides. Preview first (exact BigInt math), then ONE
-   * multi-op tx. Locked wallets see the SAME fields (try-before-you-buy);
-   * the preview button becomes "Unlock & review" (per-side id
-   * unlock-and-review-buy) and unlocks before running the existing
-   * reviewScaled path with inputs preserved. The side select scrapes the
-   * live inputs before repainting so typed values survive the unit flip. */
-  function scaledForm(doc, body, mount, P) {
+   * expiry. Renders in EACH panel while the shared SINGLE/SCALED toggle is
+   * on SCALED (side fixed per column: buy spends BASE, sell spends QUOTE —
+   * no side selector); every id carries the panel's side so the siblings
+   * never collide. Preview first (exact BigInt math), then ONE multi-op tx.
+   * Locked wallets see the SAME fields (try-before-you-buy); the preview
+   * button becomes "Unlock & review" (per-side unlock-and-review-buy/sell)
+   * and unlocks before running the existing reviewScaled path with inputs
+   * preserved. */
+  function scaledForm(doc, body, mount, P, side) {
     var ctx = P.ctx;
-    var st = P.scaled;
+    var st = side === "sell" ? P.scaledSell : P.scaledBuy;
+    st.side = side;
     var lockedScaled = isLockedView(P);
     body.appendChild(DOM.el(doc, "h3", t("trade.scaled_title", "Scaled orders (one transaction)")));
-    var sideF = Forms.labeledSelect(doc, t("trade.side_label", "Side "),
-      [["sell", "Sell " + ctx.quoteSym + " (spend " + ctx.quoteSym + ")"],
-       ["buy", "Buy " + ctx.quoteSym + " (spend " + ctx.baseSym + ")"]], st.side);
-    var sideRow = sideF.row;
-    var sideSel = sideF.select;
-    sideSel.id = "trade-scaled-side-buy";
-    body.appendChild(sideRow);
     var nF = Forms.labeledInput(doc, t("trade.count_label", "Order count (2-20) ") + " ", {
-      id: sid("trade-n", "buy"), value: st.n, placeholder: "3", inputmode: "numeric"
+      id: sid("trade-n", side), value: st.n, placeholder: "3", inputmode: "numeric"
     });
     nF.err = DOM.el(doc, "div", "", "error");
     nF.err.setAttribute("aria-live", "polite");
@@ -1011,7 +1062,7 @@ var TradePanels = (function () {
     body.appendChild(nF.row);
     var priceUnit = ctx.baseSym + " / " + ctx.quoteSym;
     var lowF = Forms.labeledInput(doc, "Price low (" + ctx.baseSym + " per " + ctx.quoteSym + ") " + " ", {
-      id: sid("trade-low", "buy"), value: st.low, placeholder: "0.00", inputmode: "decimal"
+      id: sid("trade-low", side), value: st.low, placeholder: "0.00", inputmode: "decimal"
     });
     lowF.wrap = doc.createElement("span"); lowF.wrap.className = "unit-wrap";
     lowF.input.parentNode.insertBefore(lowF.wrap, lowF.input);
@@ -1023,7 +1074,7 @@ var TradePanels = (function () {
     lowF.row.appendChild(lowF.err);
     body.appendChild(lowF.row);
     var highF = Forms.labeledInput(doc, "Price high (" + ctx.baseSym + " per " + ctx.quoteSym + ") " + " ", {
-      id: sid("trade-high", "buy"), value: st.high, placeholder: "0.00", inputmode: "decimal"
+      id: sid("trade-high", side), value: st.high, placeholder: "0.00", inputmode: "decimal"
     });
     highF.wrap = doc.createElement("span"); highF.wrap.className = "unit-wrap";
     highF.input.parentNode.insertBefore(highF.wrap, highF.input);
@@ -1034,9 +1085,9 @@ var TradePanels = (function () {
     highF.err.style.display = "none";
     highF.row.appendChild(highF.err);
     body.appendChild(highF.row);
-    var sellS = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
+    var sellS = side === "buy" ? ctx.baseSym : ctx.quoteSym;
     var totalF = Forms.labeledInput(doc, "Total to sell (" + sellS + ") " + " ", {
-      id: sid("trade-total", "buy"), value: st.total, placeholder: "0.00", inputmode: "decimal"
+      id: sid("trade-total", side), value: st.total, placeholder: "0.00", inputmode: "decimal"
     });
     totalF.wrap = doc.createElement("span"); totalF.wrap.className = "unit-wrap";
     totalF.input.parentNode.insertBefore(totalF.wrap, totalF.input);
@@ -1047,19 +1098,14 @@ var TradePanels = (function () {
     totalF.err.style.display = "none";
     totalF.row.appendChild(totalF.err);
     body.appendChild(totalF.row);
-    sideSel.addEventListener("change", function () {
-      scrapeScaled(mount, st);
-      st.side = sideSel.value;
-      paintSide(doc, mount, P, "buy");
-    });
-    var exp = TradeCore.renderExpiry(doc, body, st, "buy");
+    var exp = TradeCore.renderExpiry(doc, body, st, side);
     if (lockedScaled) {
-      var sellSym = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
+      var sellSym = side === "buy" ? ctx.baseSym : ctx.quoteSym;
       body.appendChild(DOM.el(doc, "p",
         t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + sellSym, "muted"));
-      var sRefs = lockedPasswordRow(doc, body, "buy");
+      var sRefs = lockedPasswordRow(doc, body, side);
       var sUnlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
-      sUnlockBtn.id = sid("unlock-and-review", "buy");
+      sUnlockBtn.id = sid("unlock-and-review", side);
       sUnlockBtn.type = "button";
       body.appendChild(sUnlockBtn);
       sUnlockBtn.addEventListener("click", function () {
@@ -1069,7 +1115,7 @@ var TradePanels = (function () {
         st.low = lowF.input.value;
         st.high = highF.input.value;
         st.total = totalF.input.value;
-        st.side = sideSel.value;
+        st.side = side;
         st.key = exp.select.value;
         st.custom = exp.custom.value;
         unlockAndReviewScaled(doc, body, mount, P, {
@@ -1080,7 +1126,7 @@ var TradePanels = (function () {
       return;
     }
     var prevBtn = touchable(DOM.el(doc, "button", t("trade.preview", "Preview scaled orders")));
-    prevBtn.id = sid("trade-preview", "buy");
+    prevBtn.id = sid("trade-preview", side);
     prevBtn.type = "button";
     body.appendChild(prevBtn);
     prevBtn.addEventListener("click", function () {
@@ -1098,7 +1144,7 @@ var TradePanels = (function () {
         n: st.n, low: st.low, high: st.high, total: st.total,
         side: st.side, key: st.key, custom: st.custom
       }).then(function (R) {
-        paintConfirmScaled(doc, mount, P, R);
+        paintConfirmScaled(doc, mount, P, R, side);
       }).catch(function (e) {
         var msg = (e && e.message) ? e.message : String(e || "Could not prepare scaled orders.");
         if (msg.indexOf("Order count") === 0) setFieldError(nF, msg);
@@ -1203,10 +1249,11 @@ var TradePanels = (function () {
 
   /* Scaled confirm: preview table (per-order price/amount, remainder note on
    * the last row) + summed fee; ONE multi-op tx on Sign & Send. mount is the
-   * buy panel's own mount; Back returns to the scaled form (P.scaledOpen
-   * still true) with inputs intact. */
-  function paintConfirmScaled(doc, mount, P, R) {
+   * panel's own mount (side tells which column); Back returns to that
+   * column's scaled form (P.scaledOpen still true) with inputs intact. */
+  function paintConfirmScaled(doc, mount, P, R, side) {
     var ctx = P.ctx;
+    if (side !== "sell") side = "buy";
     DOM.clear(mount);
     mount.appendChild(DOM.el(doc, "h3", "Confirm " + R.calc.orders.length + " scaled orders"));
     var table = doc.createElement("table");
@@ -1269,14 +1316,14 @@ var TradePanels = (function () {
     detOps.appendChild(preOps);
     mount.appendChild(detOps);
     var backBtn = touchable(DOM.el(doc, "button", t("trade.back", "Back")));
-    backBtn.id = sid("trade-back", "buy");
+    backBtn.id = sid("trade-back", side);
     backBtn.type = "button";
     mount.appendChild(backBtn);
     var sendBtn = touchable(DOM.el(doc, "button", "Sign & Send (" + R.calc.orders.length + " orders)"));
-    sendBtn.id = sid("trade-send", "buy");
+    sendBtn.id = sid("trade-send", side);
     sendBtn.type = "button";
     mount.appendChild(sendBtn);
-    backBtn.addEventListener("click", function () { paintSide(doc, mount, P, "buy"); });
+    backBtn.addEventListener("click", function () { paintSide(doc, mount, P, side); });
     sendBtn.addEventListener("click", function () {
       backBtn.disabled = true;
       sendBtn.disabled = true;
@@ -1315,7 +1362,7 @@ var TradePanels = (function () {
               "Observed at head block #" + String(res.head) + " via " + res.via + "."
             ],
             backLabel: t("trade.place_more", "Place more orders"),
-            onBack: function () { paintSide(doc, mount, P, "buy"); }
+            onBack: function () { paintSide(doc, mount, P, side); }
           });
           if (typeof P.ctx.refresh === "function") {
             try { P.ctx.refresh(); } catch (e) { /* best-effort */ }

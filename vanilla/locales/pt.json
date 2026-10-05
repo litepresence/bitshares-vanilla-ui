@@ -3621,7 +3621,8 @@
       "wallet.write_down_brainkey_keep_safe",
       "wallet.wrote_it_down",
       "nav.credit",
-      "nav.margin"
+      "nav.margin",
+      "trade.tab_single"
     ]
   },
   "nav": {
@@ -5383,6 +5384,7 @@
     "row_total": "Total",
     "scaled_title": "Ordens escalonadas (uma transação)",
     "side_label": "Lado ",
+    "tab_single": "Simples",
     "tab_buy": "Comprar",
     "tab_scaled": "Escalonadas",
     "tab_sell": "Vender",
