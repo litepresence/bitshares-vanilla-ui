@@ -3619,7 +3619,9 @@
       "wallet.wallet_name_required_use_letters_digits_dash",
       "wallet.ways_in",
       "wallet.write_down_brainkey_keep_safe",
-      "wallet.wrote_it_down"
+      "wallet.wrote_it_down",
+      "nav.credit",
+      "nav.margin"
     ]
   },
   "nav": {
@@ -3629,7 +3631,9 @@
     "transfer": "이체",
     "explorer": "탐색",
     "voting": "투표",
-    "settings": "설정"
+    "settings": "설정",
+    "credit": "Credit",
+    "margin": "Margin"
   },
   "settings": {
     "title": "설정",

@@ -621,19 +621,9 @@ var TradePanels = (function () {
         bar.appendChild(b);
       });
       mountEl.appendChild(bar);
-      /* Punchlist HIGH: BORROW entry on the buy form (BuySell.jsx:1476-1489
-       * margin-short concept). The #/borrow desk owns the open-new-position
-       * form — this link is the entry point, not a second form (same
-       * single-home rationale as the faucet). Plain literals only. */
-      (function borrowEntry() {
-        var brow = DOM.el(doc, "p", null, "muted");
-        var blink = doc.createElement("a");
-        blink.href = "#/borrow";
-        blink.textContent = t("trade.borrow_margin_link", "Borrow (margin)");
-        blink.title = t("trade.borrow_margin_title", "Open a margin position on the borrow desk");
-        brow.appendChild(blink);
-        mountEl.appendChild(brow);
-      })();
+      /* nav-six 2026-10-05: borrow entry removed — Margin lives in the
+       * header bar now, so the buy panel keeps tabs + form only
+       * (no second entry point). */
       if (P.scaledOpen) {
         scaledForm(doc, mountEl, mountEl, P);
         return;

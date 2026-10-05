@@ -39,10 +39,10 @@ var App = (function () {
   }
 
   /* Headings burger + sitemap pages (menu-sitemap slice, nav-pulldown
-   *   Task 3 owner rework): #nav holds the 5-link bar (ORIGINAL_NAV below),
-   *   and the burger pulldown panel holds section links ONLY — the 7 sitemap
-   *   headings + one "All pages" overview link, stacked vertically (one per
-   *   row) — never the bar links (no duplication). API Lab + ES Lab are in
+   *   Task 3 owner rework, nav-six 2026-10-05): #nav holds the 6-link bar
+   *   (ORIGINAL_NAV below), and the burger pulldown panel holds section
+   *   links ONLY — the 7 sitemap headings + one "All pages" overview link,
+   *   stacked vertically (one per row) — never the bar links (no duplication). API Lab + ES Lab are in
    *   neither menu: they live on the Labs TOC page (#/menu/labs) alongside
    *   the Transaction Builder. Each heading navigates to its #/menu/<slug>
    *   table-of-contents page, which lists that section's pages as styled
@@ -64,14 +64,16 @@ var App = (function () {
     { slug: "personal", title: "Personal" }
   ];
 
-  /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
-   *   (MenuDataStructure.js:66-75: dashboard/market/lending/explorer +
-   *   poolmart inHeader Always) — Dashboard, Exchange, Credit Offer,
-   *   Liquidity Pools, Explore. The two vanilla-original labs (API Lab,
-   *   ES Lab) are reachable from the Labs sitemap section only, never the
-   *   bar (nav-pulldown Task 3 owner ruling), so boot rebuilds keep 5 links. */
-  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/credit-offer", "#/pools",
-    "#/explorer"];
+  /* ORIGINAL_NAV: the header bar (nav-six 2026-10-05 owner ruling:
+   *   Dashboard, Exchange, Swap, Credit, Margin, Explore). Exchange keeps
+   *   the pool-context swap (setPoolMarket); Liquidity Pools drops off the
+   *   bar (still at #/pools via Trade sitemap); Credit Offer shortens to
+   *   Credit; Swap (#/swap) + Margin (#/borrow) join. The two
+   *   vanilla-original labs (API Lab, ES Lab) are reachable from the Labs
+   *   sitemap section only, never the bar (nav-pulldown Task 3 owner
+   *   ruling), so boot rebuilds keep 6 links. */
+  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/swap", "#/credit-offer",
+    "#/borrow", "#/explorer"];
 
   /* Pool-market context (owner: Exchange tab follows the pool you're
    * visiting). Pool views publish their pair's QUOTE_BASE market id here;
@@ -111,21 +113,27 @@ var App = (function () {
     } catch (e) { /* link stands */ }
   }
 
-  /* Nav icons (icon-wiring pass): href -> vendored icon name. Mapping cites
-   *   #1 MenuDataStructure.js:182-299 (dashboard:194, trade:214, server:242;
-   *   credit uses borrow: #1's deployment-unit asset renders as a blob at
-   *   18px while the IcoMoon borrow glyph stays crisp — documented deviation,
-   *   same link/target/label). "user"/"voting" are the same icons-loader.js
-   *   names #1 uses for account/voting affordances. Icons are decorative
-   *   (aria-hidden <img>); the label span keeps the accessible name, so
-   *   routing, order, and i18n strings are untouched — skin only. Only the
-   *   five original links are iconified; grouped links stay text until an
-   *   icon pass maps them (plain text never breaks). */
+  /* Nav icons (icon-wiring pass, nav-six 2026-10-05): href -> vendored
+   *   icon name. Mapping cites #1 MenuDataStructure.js:182-299
+   *   (dashboard:194, trade:214, server:242; credit uses borrow: #1's
+   *   deployment-unit asset renders as a blob at 18px while the IcoMoon
+   *   borrow glyph stays crisp — documented deviation, same link/target).
+   *   Swap uses "swap" and Margin (#/borrow) uses "borrow" (both names exist
+   *   in icon.js KNOWN + menu-ui.js SECTIONS, so bar and sitemap agree).
+   *   Credit keeps "borrow" (label-only rename Credit Offer -> Credit);
+   *   Margin sharing the glyph is intentional (both are borrow-concept
+   *   affordances, labels disambiguate). "user"/"voting" are the same
+   *   icons-loader.js names #1 uses for account/voting affordances. Icons
+   *   are decorative (aria-hidden <img>); the label span keeps the
+   *   accessible name, so routing, order, and i18n strings are untouched —
+   *   skin only. Only the six bar links are iconified; grouped links stay
+   *   text until an icon pass maps them (plain text never breaks). */
   var NAV_ICONS = {
     "#/": "dashboard",
     "#/market/BTS_USD": "trade",
+    "#/swap": "swap",
     "#/credit-offer": "borrow",
-    "#/pools": "poolmart",
+    "#/borrow": "borrow",
     "#/explorer": "server"
   };
 
@@ -139,8 +147,9 @@ var App = (function () {
     switch (href) {
       case "#/": return t("nav.dashboard", "Dashboard");
       case "#/market/BTS_USD": return t("nav.exchange", "Exchange");
-      case "#/credit-offer": return t("credit.title", "Credit Offer");
-      case "#/pools": return t("pools.title", "Liquidity Pools");
+      case "#/swap": return t("swap.title", "Swap");
+      case "#/credit-offer": return t("nav.credit", "Credit");
+      case "#/borrow": return t("nav.margin", "Margin");
       case "#/explorer": return t("nav.explorer", "Explore");
       default: return href;
     }
@@ -313,7 +322,7 @@ var App = (function () {
     } catch (e) { /* CSS position stands */ }
   }
 
-  /* buildNav: 5-link bar + pulldown panel (idempotent; preserves
+  /* buildNav: 6-link bar + pulldown panel (idempotent; preserves
    *   the .open state so a locale switch never collapses the menu). Theme
    *   switching lives in settings + the header-bar copy (finishBoot). */
   function buildNav(nav) {
@@ -1298,7 +1307,7 @@ var App = (function () {
   if (typeof document !== "undefined") boot();
 
   return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
-    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText, buildDirectory: buildDirectory, closeDirectory: closeDirectory } };
+    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText, buildDirectory: buildDirectory, closeDirectory: closeDirectory, ORIGINAL_NAV: ORIGINAL_NAV, NAV_ICONS: NAV_ICONS, navText: navText, buildNav: buildNav, buildNavLink: buildNavLink } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }

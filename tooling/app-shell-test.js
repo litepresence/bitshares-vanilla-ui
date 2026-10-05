@@ -1,7 +1,9 @@
 /* app-shell-test.js — unit vectors for header shell purity (app.js).
  * Stdlib only: `node tooling/app-shell-test.js` (exit 0 = green). Covers
- * App._test.validPoolMarket (pool->Exchange context validation). No DOM,
- * no network, no deps.
+ * App._test.validPoolMarket (pool->Exchange context validation) + nav-six
+ * 6-link bar shape (ORIGINAL_NAV order, NAV_ICONS, navText labels, static
+ * fallback anchors, pool-context Exchange tab, buy-panel borrow-link gone).
+ * No DOM, no network, no deps.
  */
 "use strict";
 var assert = require("assert");
@@ -29,11 +31,12 @@ eq(T.validPoolMarket("TOOLONGTOKENNAME_X"), false, "overlong leg rejected");
 
 console.log("app-shell-test: " + passed + " passed, 0 failed");
 
-/* Pulldown panel shape (nav-pulldown Task 3 owner rework): buildDirectory
- * renders section links ONLY — the 7 sitemap headings + All pages, stacked
- * vertically (flex column) — never the bar links (no duplication), with no
- * separator. API Lab + ES Lab are in neither menu (they live on the Labs
- * TOC page). Fake-DOM, no browser, stdlib only. */
+/* Pulldown panel shape (nav-pulldown Task 3 owner rework, nav-six 2026-10-05):
+ * buildDirectory renders section links ONLY — the 7 sitemap headings + All
+ * pages, stacked vertically (flex column) — never the bar links (no
+ * duplication), with no separator. API Lab + ES Lab are in neither menu
+ * (they live on the Labs TOC page). Liquidity Pools is in neither menu
+ * either (Trade sitemap page only). Fake-DOM, no browser, stdlib only. */
 (function pulldownShape() {
   var fs = require("fs");
   var path = require("path");
@@ -129,8 +132,13 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
     var href = a.attributes.href || "";
     assert.ok(href.indexOf("#/menu") === 0, "sections-only: " + href + " lives under #/menu");
   });
-  assert.ok(!panel.querySelector("a[href='#/pools']"), "no bar duplication (pools lives on the bar only)");
   assert.ok(!panel.querySelector("a[href='#/']"), "no dashboard duplication");
+  assert.ok(!panel.querySelector("a[href='#/market/BTS_USD']"), "no Exchange duplication");
+  assert.ok(!panel.querySelector("a[href='#/swap']"), "no Swap duplication");
+  assert.ok(!panel.querySelector("a[href='#/credit-offer']"), "no Credit duplication");
+  assert.ok(!panel.querySelector("a[href='#/borrow']"), "no Margin duplication");
+  assert.ok(!panel.querySelector("a[href='#/explorer']"), "no Explore duplication");
+  assert.ok(!panel.querySelector("a[href='#/pools']"), "pools in neither menu (Trade sitemap only)");
   assert.ok(panel.querySelector("a[href='#/menu/wallet'] img.nav-icon"), "section link keeps its icon");
   assert.ok(panel.querySelector("a[href='#/menu']"), "All pages overview link present");
   assert.ok(!panel.querySelector("div[role='separator']"), "separator gone with the bar links");
@@ -138,7 +146,70 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   assert.ok(/#nav-directory\s*\{[^}]*position:\s*fixed/.test(css), "directory is a fixed overlay, not in-flow");
   assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*display:\s*flex/.test(css), "pulldown lays out as flex");
   assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*flex-direction:\s*column/.test(css), "pulldown stacks vertically (one per row)");
-  console.log("pulldown-shape: 8 passed, 0 failed");
+  console.log("pulldown-shape: 22 passed, 0 failed");
+})();
+
+/* Six-link bar (nav-six 2026-10-05 owner ruling): Dashboard, Exchange
+ * (pool-context-aware), Swap, Credit, Margin, Explore. Liquidity Pools drops
+ * off the bar; Credit Offer shortens to Credit. Fake-DOM globals come from
+ * the pulldown block above (document/Icon/I18n already stubbed); file-text
+ * covers the static fallback + buy-panel removal. Runs after pulldownShape
+ * so buildNavLink has a document. */
+(function barSix() {
+  var fs = require("fs");
+  var path = require("path");
+  var wantNav = ["#/", "#/market/BTS_USD", "#/swap", "#/credit-offer",
+    "#/borrow", "#/explorer"];
+  assert.deepStrictEqual(App._test.ORIGINAL_NAV, wantNav, "bar holds 6 links in owner order");
+  assert.deepStrictEqual(App._test.NAV_ICONS, {
+    "#/": "dashboard",
+    "#/market/BTS_USD": "trade",
+    "#/swap": "swap",
+    "#/credit-offer": "borrow",
+    "#/borrow": "borrow",
+    "#/explorer": "server"
+  }, "bar icons wired (swap=swap, margin=borrow)");
+  assert.strictEqual(App._test.navText("#/"), "Dashboard", "Dashboard label");
+  assert.strictEqual(App._test.navText("#/market/BTS_USD"), "Exchange", "Exchange label");
+  assert.strictEqual(App._test.navText("#/swap"), "Swap", "Swap label reuses swap.title");
+  assert.strictEqual(App._test.navText("#/credit-offer"), "Credit", "Credit label (nav.credit)");
+  assert.strictEqual(App._test.navText("#/borrow"), "Margin", "Margin label (nav.margin)");
+  assert.strictEqual(App._test.navText("#/explorer"), "Explore", "Explore label");
+  // Static fallback anchors in index.html mirror the bar (no-JS first paint).
+  var html = fs.readFileSync(path.join(__dirname, "..", "vanilla", "index.html"), "utf8");
+  var navBlock = /<nav id="nav"[^>]*>([\s\S]*?)<\/nav>/.exec(html);
+  assert.ok(navBlock, "index.html holds #nav");
+  var anchors = [];
+  var re = /<a\s+href="([^"]+)">([^<]+)<\/a>/g, m;
+  while ((m = re.exec(navBlock[1]))) anchors.push([m[1], m[2]]);
+  assert.deepStrictEqual(anchors, [
+    ["#/", "Dashboard"], ["#/market/BTS_USD", "Exchange"], ["#/swap", "Swap"],
+    ["#/credit-offer", "Credit"], ["#/borrow", "Margin"], ["#/explorer", "Explore"]
+  ], "static fallback anchors match the 6-link bar");
+  // buildNavLink: every bar href renders an icon + labeled span.
+  wantNav.forEach(function (href) {
+    var a = App._test.buildNavLink(href, true);
+    assert.strictEqual(a.attributes.href, href, href + " keeps its href");
+    var img = (a.children || []).filter(function (c) { return c.tag === "img"; })[0];
+    var span = (a.children || []).filter(function (c) { return c.tag === "span"; })[0];
+    assert.ok(img, href + " renders its icon");
+    assert.ok(span && span.textContent, href + " renders its label span");
+  });
+  // Pool-context Exchange tab stays: setPoolMarket swaps the desk href/label.
+  App.setPoolMarket("BTS_CNY");
+  var poolA = App._test.buildNavLink("#/market/BTS_USD", true);
+  assert.strictEqual(poolA.attributes.href, "#/market/BTS_CNY", "Exchange tab follows the pool market");
+  assert.ok((poolA.children || []).some(function (c) { return c.tag === "span" && c.textContent === "Exchange"; }),
+    "pool-context tab keeps the Exchange label");
+  App.setPoolMarket(null);
+  var backA = App._test.buildNavLink("#/market/BTS_USD", true);
+  assert.strictEqual(backA.attributes.href, "#/market/BTS_USD", "Exchange tab falls back to the default pair");
+  // Buy panel: borrow (margin) entry is gone; Margin lives in the bar now.
+  var panels = fs.readFileSync(path.join(__dirname, "..", "vanilla", "js", "views", "trade-panels.js"), "utf8");
+  assert.ok(panels.indexOf("trade.borrow_margin_link") === -1, "buy panel drops trade.borrow_margin_link");
+  assert.ok(panels.indexOf("trade.borrow_margin_title") === -1, "buy panel drops trade.borrow_margin_title");
+  assert.ok(panels.indexOf("#/borrow") === -1, "buy panel holds no #/borrow link");
+  console.log("bar-six: 34 passed, 0 failed");
 })();
 
 /* Phone scroll-row bar + sheet pulldown (nav-pulldown Task 2): under 719px

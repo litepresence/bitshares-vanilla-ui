@@ -3619,7 +3619,9 @@
       "wallet.wallet_name_required_use_letters_digits_dash",
       "wallet.ways_in",
       "wallet.write_down_brainkey_keep_safe",
-      "wallet.wrote_it_down"
+      "wallet.wrote_it_down",
+      "nav.credit",
+      "nav.margin"
     ]
   },
   "nav": {
@@ -3629,7 +3631,9 @@
     "transfer": "ट्रांसफर",
     "explorer": "एक्सप्लोर करें",
     "voting": "वोटिंग",
-    "settings": "सेटिंग्स"
+    "settings": "सेटिंग्स",
+    "credit": "Credit",
+    "margin": "Margin"
   },
   "settings": {
     "title": "सेटिंग्स",
