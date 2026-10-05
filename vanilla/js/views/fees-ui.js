@@ -93,8 +93,11 @@ var FeesUI = (function () {
   /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
 /* clearRoot removed — use DOM.clear */
+  /* makeWrap: plain .wrap plus the fees-view scoping hook (polish Task 2:
+   * the wide-screen width cap in app.css targets .wrap.fees-view so the
+   * global .wrap both dense and narrow pages share stays untouched). */
   function makeWrap(doc, root) {
-    var w = doc.createElement("div"); w.className = "wrap"; root.appendChild(w); return w; }
+    var w = doc.createElement("div"); w.className = "wrap fees-view"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));

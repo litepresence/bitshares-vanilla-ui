@@ -176,6 +176,15 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
   .wrap { max-width: min(94vw, 1080px); }
   .wrap.mkt-wrap { max-width: min(96vw, 2200px); }
 }
+/* Fees schedule only (polish Task 2): cap the five fee-group tables below
+ * desk width on wide screens — min(70vw, 1080px) never exceeds the global
+ * cap above, it just narrows earlier. Scoped to .wrap.fees-view (fees-ui.js
+ * makeWrap owns the hook) so the global .wrap dense and narrow pages share
+ * stays byte-identical. Media-gated like the caps above: phones/tablets
+ * keep the base 720px wrap instead of a stranded 70vw column. */
+@media (min-width: 1440px) {
+  .wrap.fees-view { max-width: min(70vw, 1080px); margin-inline: auto; }
+}
 @media (min-width: 1200px) { .wrap.wide { max-width: none; display: grid;
   grid-template-columns: repeat(12, 1fr); gap: 16px; } }
 @media (max-width: 719px) {
