@@ -884,7 +884,7 @@ img, canvas, pre { max-width: 100%; }
 /* (g) Desk side-panel bare controls (viewport sweep 2026-09-29, principle #7):
  * .xfer-field inputs/selects already carry width/max-width guards (section a
  * above), but pool-desk side controls sit BARE as direct .mkt-side children
- * (pool-swap-ui.js #pool-swap-dir direction select, pool-detail-ui.js
+ * (pool-detail-actions.js direction select, pool-detail-ui.js
  * withdrawal-fee keep/set select). A long option string
  * ("Withdrawal fee: set 0 (only allowed change)") sized one select to 392px
  * inside a 343px column at 375px (measured: .mkt-side scrollW=392 >
@@ -1044,7 +1044,7 @@ img.icon-state { filter: none; }
   border-radius: 0; font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.05em; white-space: nowrap; }
 
-/* Pools swap + detail tabs (.mkt-tabs hosts in pool-swap-ui.js:80,
+/* Pools detail tabs (.mkt-tabs hosts in pool-detail-view.js:1110,
  * pool-detail-ui.js:606, market-desk.js:422, dashboard-ui.js:461,
  * market-picker.js (All/Starred), account-ui.js (acct-tabs) — previously
  * unstyled): same uppercase accent-underline treatment as .trade-tabs, so the
@@ -1090,7 +1090,7 @@ img.icon-state { filter: none; }
  * the star is aria-hidden decoration, the sentence carries the meaning. */
 .ltm-star { color: var(--warn); }
 /* Swap quote + history surfaces sit on --plot-bg like the desk chart panes
- * (visual only — pool-swap-ui.js / pool-detail-ui.js untouched). */
+ * (visual only — pool detail swap/history untouched). */
 .swap-hist table td { font-size: 0.9rem; }
 .swap-hist table td:first-child { color: var(--muted); }
 /* Phone footer (360px): host + latency + REPORT/HELP cannot fit one 360px row,
