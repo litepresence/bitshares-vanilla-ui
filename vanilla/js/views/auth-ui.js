@@ -140,6 +140,120 @@ var AuthUI = (function () {
   function notePara(doc, text) {
     return DOM.el(doc, "p", text, "muted"); }
 
+  /* Signing + Connected-sites section (relocated from Settings — owner
+   *   directive: Login owns the route display + pin + warning + sites;
+   *   SettingsPrefs.buildSigning stays the shared builder, DOM only).
+   *   Radio changes persist + re-mount the login signing block (mode line,
+   *   warning, and effective route follow the envelope); the allowlist fills
+   *   async below (empty note stands when the extension store is absent).
+   *   No new strings — reuses settings.sign_* keys only. Params: doc, wrap,
+   *   root (router #view child, re-rendered on pin/revoke). Returns the
+   *   sign-block element or null. Never throws. */
+  function mountSigning(doc, wrap, root) {
+    try {
+      if (typeof SettingsPrefs === "undefined" || !SettingsPrefs ||
+          typeof SettingsPrefs.buildSigning !== "function") return null;
+      var settings = {};
+      try {
+        if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+          settings = Store.loadSettings() || {};
+        }
+      } catch (e) { settings = {}; }
+      var sign = SettingsPrefs.buildSigning(doc, settings, t);
+      wrap.appendChild(sign.wrap);
+      var signRadios = sign.radios, signList = sign.listBox, signEmpty = sign.emptyNote;
+      /* Events: signing pin (persist + re-mount login — the mode line,
+       * warning, and effective route all follow the envelope). */
+      ["auto", "extension", "browser"].forEach(function (v) {
+        try {
+          if (signRadios && signRadios[v]) {
+            signRadios[v].addEventListener("change", function () {
+              if (!signRadios[v].checked) return;
+              try {
+                if (typeof Store !== "undefined" && Store && typeof Store.saveSettings === "function") {
+                  Store.saveSettings({ signing: v });
+                }
+              } catch (e) { /* select keeps pick */ }
+              renderLogin(root);
+            });
+          }
+        } catch (e) { /* radio stands unpinned */ }
+      });
+      /* Connected sites (Tier 2 allowlist): read from the persistent
+       * extension store; each row names the origin + bound account ids with a
+       * per-origin Revoke (removes the binding — next request prompts again).
+       * Absent store (plain web) keeps the empty note: no sites, honestly. */
+      (function fillSites() {
+        var store = null;
+        try {
+          if (typeof chrome !== "undefined" && chrome && chrome.storage && chrome.storage.local) {
+            store = chrome.storage.local;
+          } else if (typeof browser !== "undefined" && browser && browser.storage && browser.storage.local) {
+            store = browser.storage.local;
+          }
+        } catch (e) { store = null; }
+        if (!store) return;
+        try {
+          store.get(["vb-allowlist-v1"], function (items) {
+            try {
+              var denied = false;
+              try {
+                var ns = (typeof chrome !== "undefined" && chrome) ||
+                  (typeof browser !== "undefined" && browser);
+                if (ns && ns.runtime && ns.runtime.lastError) denied = true;
+              } catch (e) { denied = true; }
+              if (denied) return;
+              var a = items ? items["vb-allowlist-v1"] : null;
+              if (!a || typeof a !== "object") return;
+              var origins = Object.keys(a);
+              if (!origins.length) return;
+              while (signEmpty.firstChild) signEmpty.removeChild(signEmpty.firstChild);
+              try { signEmpty.parentNode.removeChild(signEmpty); } catch (e) { /* note stands empty */ }
+              origins.forEach(function (origin) {
+                var entry = a[origin] || {};
+                var ids = Array.isArray(entry.allowedAccountIds) ? entry.allowedAccountIds : [];
+                var row = doc.createElement("div");
+                row.className = "sign-site-row";
+                var name = doc.createElement("div");
+                name.textContent = origin;
+                row.appendChild(name);
+                var sub = doc.createElement("div");
+                sub.className = "muted";
+                sub.textContent = ids.join(", ") || t("settings.sign_sites_empty", "No sites approved yet — approvals appear here with per-site revoke.");
+                row.appendChild(sub);
+                var revoke = doc.createElement("button");
+                revoke.type = "button";
+                revoke.textContent = t("settings.sign_revoke", "Revoke");
+                try { revoke.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+                revoke.addEventListener("click", function () {
+                  revoke.disabled = true;
+                  try {
+                    store.get(["vb-allowlist-v1"], function (items2) {
+                      try {
+                        var a2 = items2 ? items2["vb-allowlist-v1"] : null;
+                        if (a2 && typeof a2 === "object" && a2[origin]) {
+                          delete a2[origin];
+                          var o = {};
+                          o["vb-allowlist-v1"] = a2;
+                          store.set(o, function () { renderLogin(root); });
+                          return;
+                        }
+                      } catch (e) { /* fall through to rerender */ }
+                      renderLogin(root);
+                    });
+                  } catch (e) { renderLogin(root); }
+                });
+                row.appendChild(revoke);
+                signList.appendChild(row);
+              });
+            } catch (e) { /* empty note stands */ }
+          });
+        } catch (e) { /* empty note stands */ }
+      })();
+      return sign.wrap;
+    } catch (e) { return null; }
+  }
+
   /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
    * the local wallet (the only key path Wallet supports); card B looks an
    * account name up read-only and points back at card A. Neither the .bin
@@ -163,6 +277,7 @@ var AuthUI = (function () {
         ["#/accounts", t("auth.open_accounts", "Open accounts")],
         ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
       ]));
+      mountSigning(doc, wrap, root);
       return;
     }
     /* Card A: local model — password straight into Wallet.unlock (wallet-ui.js
@@ -272,6 +387,7 @@ var AuthUI = (function () {
       ["#/create-wallet-brainkey", t("auth.no_wallet_yet_create_one", "No wallet yet? Create one")],
       ["#/existing-account", t("common.import_existing", "Import existing account")]
     ]));
+    mountSigning(doc, wrap, root);
   }
 
   /* /registration — dual-card choice hub (RegistrationSelector.jsx:60-108 +

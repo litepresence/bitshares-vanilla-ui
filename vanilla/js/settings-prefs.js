@@ -121,11 +121,12 @@ var SettingsPrefs = (function () {
   }
 
   /* Signing section (Tier 2): route display + override + warning + sites.
-   * Builds DOM only — radio/revoke wiring lives in settings.js (it owns
-   * rerender). Effective mode resolves via SignMode (guarded: missing
+   * Builds DOM only — radio/revoke wiring lives in auth-ui.js login view
+   * (it owns the login re-mount; Settings no longer mounts this section).
+   * Effective mode resolves via SignMode (guarded: missing
    * module reads as in-browser, the safe display direction — never claim
    * protection that isn't there). The allowlist listBox is filled async by
-   * settings.js (chrome.storage read); prefs only owns the empty shell +
+   * auth-ui.js login view (chrome.storage read); prefs only owns the empty shell +
    * empty note so this builder stays sync like the rest.
    * Params: doc, settings (Store envelope with .signing), t. Returns
    * {wrap, radios, listBox, emptyNote}. */

@@ -555,24 +555,25 @@ var App = (function () {
   }
 
   /* goToViewingAs: navigate to #/settings and bring #viewing-as to the top
-   * of the viewport. Thin wrapper over goToSettingsSection (the shield
-   * badge rides the same helper to #sign-block). */
+   * of the viewport. Thin wrapper over goToSection (the shield badge rides
+   * the same helper to the #/login #sign-block). */
   function goToViewingAs() {
-    goToSettingsSection("viewing-as");
+    goToSection("viewing-as", "#/settings");
   }
 
-  /* goToSettingsSection: navigate to #/settings and bring one section to
-   * the top of the viewport. Params: targetId (string, element id).
-   * Already-on-settings scrolls immediately; otherwise the hash change
-   * re-renders first and a bounded poll (20 × 50ms) waits for the section.
-   * scrollIntoView() bare (instant top-align — no smooth motion,
-   * reduced-motion safe). Never throws — worst case the user lands on
-   * settings unscrolled. */
-  function goToSettingsSection(targetId) {
+  /* goToSection: navigate to a route and bring one section to the top of
+   * the viewport. Params: targetId (string, element id), route (string hash,
+   * defaults to "#/settings" for legacy callers). Already-on-route scrolls
+   * immediately; otherwise the hash change re-renders first and a bounded
+   * poll (20 × 50ms) waits for the section. scrollIntoView() bare (instant
+   * top-align — no smooth motion, reduced-motion safe). Never throws —
+   * worst case the user lands on the route unscrolled. */
+  function goToSection(targetId, route) {
     if (typeof document === "undefined" || !targetId) return;
+    var hash = route || "#/settings";
     try {
-      if (typeof window !== "undefined" && window.location && window.location.hash !== "#/settings") {
-        window.location.hash = "#/settings";
+      if (typeof window !== "undefined" && window.location && window.location.hash !== hash) {
+        window.location.hash = hash;
       }
     } catch (e) { /* poll below still tries */ }
     var tries = 0;
@@ -586,6 +587,14 @@ var App = (function () {
       tries++;
       if (tries < 20) setTimeout(poll, 50);
     })();
+  }
+
+  /* goToSettingsSection: legacy wrapper (settings callers) over goToSection.
+   * Params: targetId, route (optional, defaults to "#/settings" — the shield
+   * badge passes "#/login" for #sign-block). Kept so existing callers keep
+   * working. */
+  function goToSettingsSection(targetId, route) {
+    goToSection(targetId, route || "#/settings");
   }
 
   /* paintFootActions: footer REPORT + ABOUT + HELP buttons
@@ -1099,7 +1108,7 @@ var App = (function () {
    * the lock — lock answers "locked?" (red locked / green open PNG),
    * shield answers "extension-routed?" (green check / red X PNG). BOTH
    * badges always present (owner call — no zero-pixel mode); color carries
-   * the state. Taps to the settings signing section (indicators navigate,
+   * the state. Taps to the login signing section (indicators navigate,
    * never mutate). Labels via settings.sign_badge (routed) /
    * settings.sign_badge_local (in-page); Icon.img carries its own text
    * fallback so a missing file degrades to text, never a broken image.
@@ -1126,7 +1135,7 @@ var App = (function () {
       if (!old) {
         var a = document.createElement("a");
         a.id = "ext-sign-badge";
-        try { a.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
+        try { a.setAttribute("href", "#/login"); } catch (e) { /* label stands */ }
         try { a.style.minHeight = "44px"; } catch (e) { /* native stands */ }
         lock.parentNode.insertBefore(a, lock);
         old = a;
@@ -1141,13 +1150,14 @@ var App = (function () {
       } catch (e) {
         try { old.textContent = routed ? "EXT" : "SIG"; } catch (e2) { /* badge stands */ }
       }
+      try { old.setAttribute("href", "#/login"); } catch (e) { /* click handler carries it */ }
       try {
         old.setAttribute("aria-label", label);
         old.setAttribute("title", label);
       } catch (e) { /* badge stands unlabeled */ }
-      /* Click rides the shared settings-section helper (same as the
-       * #acting-as account button): navigate + scroll #sign-block to the
-       * top. preventDefault keeps it deterministic (no double handling
+      /* Click rides the shared section helper (same as the
+       * #acting-as account button): navigate to #/login + scroll #sign-block
+       * to the top. preventDefault keeps it deterministic (no double handling
        * with the href); the href stays as the no-JS fallback. Bound once
        * — the badge element persists across repaints, only its children
        * are rebuilt. */
@@ -1157,7 +1167,7 @@ var App = (function () {
           old.addEventListener("click", function (ev) {
             try {
               if (ev && ev.preventDefault) ev.preventDefault();
-              goToSettingsSection("sign-block");
+              goToSettingsSection("sign-block", "#/login");
             } catch (e) { /* href fallback stands */ }
           });
         }
