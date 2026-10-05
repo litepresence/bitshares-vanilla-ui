@@ -390,15 +390,14 @@ details.raw > summary {
 .mkt-picker-list .mkt-pk-chg-pos { color: var(--buy); }
 .mkt-picker-list .mkt-pk-chg-neg { color: var(--sell); }
 .mkt-picker-list .mkt-pk-chg-zero { color: var(--muted); }
-/* Market desk (slice-05): single column stacked chart/book/trades/side on
- * phones; three-column book|charts+trades|side desk at >=1200px. Tables and
- * cards reuse .node-table/.node-cards above; canvases size via CSS (JS only
- * reads layout width for devicePixelRatio scaling). */
-.mkt { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "head" "charts" "book" "trades" "side" "orders"; }
-.mkt-head { grid-area: head; } .mkt-charts { grid-area: charts; }
-.mkt-book { grid-area: book; } .mkt-trades { grid-area: trades; }
-.mkt-side { grid-area: side; } .mkt-orders { grid-area: orders; }
+/* Market desk (slice-05): single-column stack on phones. The desk GRID
+ * (areas, columns, breakpoints) lives in desk-grid.css — sole source
+ * (polish Task 1: the area maps duplicated here always lost to the later
+ * file by source order, never by design). This rule keeps only the
+ * structural display/gap/single-column track. Tables and cards reuse
+ * .node-table/.node-cards above; canvases size via CSS (JS only reads
+ * layout width for devicePixelRatio scaling). */
+.mkt { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
 .mkt section h2 { margin: 6px 0; font-size: 1rem; }
 .mkt-canvas { width: 100%; display: block; background: var(--plot-bg, var(--panel));
   border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
@@ -502,10 +501,9 @@ details.raw > summary {
 .mkt-direct input { flex: 1 1 180px; min-width: 0; }
 .mkt-foot { display: flex; align-items: center; gap: 12px; }
 .mkt table { margin-bottom: 12px; }
-@media (min-width: 1200px) {
-  .mkt { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr) minmax(0, 4fr);
-    grid-template-areas: "head head head" "book charts side" "book trades side" "orders orders orders"; }
-}
+/* (Desk grid at >=1200px lives in desk-grid.css — sole source. The old
+ * 5fr/7fr/4fr columns + area map here never won (later file wins ties),
+ * so it was deleted, not moved.) */
 
 /* Raw-chain-data disclosures (proof, not decoration): triangle-only summary,
  * copyable pre. Usage: <details class="raw"><summary aria-label="...">
@@ -762,12 +760,10 @@ dl.xfer-confirm dd { margin: 0; overflow-wrap: break-word; word-break: break-wor
   .wrap.wide { max-width: none; }
 }
 
-/* (c) Market desk ≥1600px: the 5fr/7fr/4fr split squeezes book and stats;
- * fixed 320px rails let the chart column take the remaining width. Grid
- * areas are unchanged (same names as the ≥1200px rule above). */
-@media (min-width: 1600px) {
-  .mkt { grid-template-columns: 320px minmax(0, 1fr) 320px; }
-}
+/* (c) Market desk >=1600px: REMOVED (polish Task 1) — the 320px/1fr/320px
+ * three-track rule never won (desk-grid.css >=1200px four-track columns are
+ * later in source order at equal specificity), so deleting it changes no
+ * pixels; wide-desk columns are owned by desk-grid.css alone. */
 
 /* (d) Page-level overflow safety: a future wide table can only ever clip
  * inside its own scroll region, never push the page sideways. clip (not

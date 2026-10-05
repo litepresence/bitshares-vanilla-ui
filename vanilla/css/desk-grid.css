@@ -42,6 +42,16 @@
   --desk-trades-row-h: 34px; /* trades row: 0.9rem type + 6px/8px pad + border */
   --desk-orders-row-h: 48px; /* orders row: base 12px pad + border */
   --desk-picker-row-h: 48px; /* picker row: 44px touch target + 4px gap */
+  /* Depth-slice canvas height, single source for BOTH osc-stack canvases
+   * (exchange #mkt-depth-canvas via MarketCharts DEPTH_H=180 in
+   * js/api/market-charts.js:32 + pool depth/graph canvases via fitPlot 180
+   * in js/views/pool-detail-view.js:682): the JS fit() writes an inline
+   * height at draw time (inline wins), so this token governs the pre-draw
+   * placeholder box — the desk never jumps while depth loads — and pins the
+   * two canvases to one value instead of two matching estimates. Deliberately
+   * a plain px token, NOT derived from --desk-row-h: no whole multiple of
+   * 29px equals the 180px the painters use, and a near-miss calc would lie. */
+  --desk-depth-h: 180px;
   /* Full-row wash alpha (pool-book retro batch 2026-09-29): raised 0.15 -> 0.35
    * for wash legibility. 0.15 matched OrderBook.jsx:177-183 literally but read
    * as thin grey bars in vanilla/notes/pool-book-compare shots; the original
@@ -123,6 +133,26 @@
   .mkt-col-buy > section, .mkt-col-sell > section, .mkt-col-trades > section {
     grid-area: auto; min-width: 0;
   }
+}
+
+/* Buy/sell panel headers (polish Task 1 — level tops): ONE shared rule for
+ * both h2s (same margin + line-height = same header box, so the two panels
+ * start level at every width). Values equal the standing `.mkt section h2`
+ * computed style (margin 6px 0, body line-height 1.45) — zero visual change,
+ * drift-proof: the extra .mkt scope beats app.css (0,2,1 > 0,1,2). */
+.mkt .mkt-buy > h2,
+.mkt .mkt-sell > h2 {
+  margin: 6px 0;
+  line-height: 1.45;
+}
+
+/* Depth-slice canvases (polish Task 1 — aligned charts): every
+ * .mkt-canvas inside an osc-stack pane (depth + pool-map on both desks)
+ * takes the single --desk-depth-h token, so the slices agree with each
+ * other instead of carrying two matching estimates. Pre-draw only — the
+ * JS fit() inline height governs once painted (same 180px). */
+.mkt-osc-pane canvas.mkt-canvas {
+  height: var(--desk-depth-h);
 }
 
 /* Trades/exchanges toggle tabs (Recent/My, Pool/My): tablist row above the
