@@ -161,6 +161,21 @@ var MarketBook = (function () {
     return s;
   }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): every
+   * DISPLAYED price routes through ps(); the full chain string stays on the
+   * cell/line title. Falls back to trim6 when format.js is absent (renders
+   * as today, never blank). Display/input split: book-row clicks fill the
+   * trade price INPUT with the FULL plain-decimal chain string (parseAmount
+   * cannot read sci notation, and trim6 truncation would destroy dust
+   * prices) — only the visible text is 4-sf. Amounts, depth sums, grouping
+   * keys, and spread/mid MATH stay untouched (ps wraps their display only). */
+  function ps(s) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") return Format.priceSig(s);
+    } catch (e) { /* fallback below */ }
+    return trim6(s);
+  }
+
   /* Spread + midpoint header from best bid/ask strings via exact string math
    * (unit: base-symbol per quote-symbol). Null when either side is empty. */
   function spreadMid(bestBid, bestAsk) {
@@ -457,7 +472,7 @@ var MarketBook = (function () {
   function buildLevelRec(doc, isAsk, lv, frac) {
     var fullPx = (lv.displayPrice !== undefined && lv.displayPrice !== null) ? String(lv.displayPrice) : "";
     var texts = [
-      fullPx === "" ? "" : trim6(fullPx),
+      fullPx === "" ? "" : ps(fullPx),
       lv.quote !== undefined ? String(lv.quote) : "",
       lv.base !== undefined ? String(lv.base) : ""
     ];
@@ -494,7 +509,9 @@ var MarketBook = (function () {
       key: fullPx, tr: tr, amtTx: spans[1], totTx: spans[2],
       priceTd: priceTd, fullPx: fullPx, card: null, cardAmt: null, cardTot: null
     };
-    /* Click-to-fill wiring (price text is texts[0]); row + card mirror.
+    /* Click-to-fill wiring (the INPUT gets the FULL plain-decimal chain
+     * price — never the 4-sf display text, which sci notation would make
+     * unparsable and trim6 would truncate); row + card mirror.
      * Ask rows take into the buy panel, bid rows into the sell panel. */
     (function (row, priceText) {
       function go() { fillTradePrice(doc, priceText, isAsk ? "buy" : "sell"); }
@@ -504,7 +521,7 @@ var MarketBook = (function () {
           if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
         });
       } catch (e) { /* rows render unclickable */ }
-    })(tr, texts[0]);
+    })(tr, fullPx === "" ? texts[0] : fullPx);
     return rec;
   }
 
@@ -525,7 +542,7 @@ var MarketBook = (function () {
     cbar.setAttribute("aria-hidden", "true");
     card.appendChild(cbar);
     var divs = [];
-    [(fullPx === "" ? "" : trim6(fullPx)), "Amount " + String((lv && lv.quote) || ""), "Total " + String((lv && lv.base) || "")].forEach(function (text, ci) {
+    [(fullPx === "" ? "" : ps(fullPx)), "Amount " + String((lv && lv.quote) || ""), "Total " + String((lv && lv.base) || "")].forEach(function (text, ci) {
       /* Phone-card price (first div) mirrors the table price color hook. */
       var cd = el(doc, "div", text, "cell-text" + (ci === 0 ? (isAsk ? " book-price-ask" : " book-price-bid") : ""));
       if (ci === 0 && fullPx) cd.title = fullPx;
@@ -547,7 +564,7 @@ var MarketBook = (function () {
           if (ev && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); go(); }
         });
       } catch (e) { /* cards render unclickable */ }
-    })(card, (rec.fullPx === "" ? "" : trim6(rec.fullPx)));
+    })(card, (rec.fullPx === "" ? "" : rec.fullPx));
     return card;
   }
   /* Book side table + phone cards (same .node-table/.node-cards pattern as
@@ -701,7 +718,7 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
+      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + ps(sm.spread) + " · Midpoint " + ps(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       try {
         ctx.spreadLine.title = t("market_book.spread_prefix", "Spread ") + sm.spread + " · Midpoint " + sm.mid +
@@ -743,7 +760,7 @@ var MarketBook = (function () {
     var bestAsk = ctx.book.asks.length > 0 ? ctx.book.asks[0].displayPrice : null;
     var sm = spreadMid(bestBid ? String(bestBid) : null, bestAsk ? String(bestAsk) : null);
     if (sm) {
-      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + trim6(sm.spread) + " · Midpoint " + trim6(sm.mid) +
+      ctx.spreadLine.textContent = t("market_book.spread_prefix", "Spread ") + ps(sm.spread) + " · Midpoint " + ps(sm.mid) +
         " (" + ctx.baseSymbol + " per " + ctx.quoteSymbol + ")";
       try {
         ctx.spreadLine.title = t("market_book.spread_prefix", "Spread ") + sm.spread + " · Midpoint " + sm.mid +
@@ -798,9 +815,9 @@ var MarketBook = (function () {
     var cards = wantCards ? doc.createElement("div") : null;
     if (wantCards) cards.className = "node-cards trades-cards";
     rows.forEach(function (r) {
-      /* Punchlist MED: fill prices trimmed like book rows (trim6); the full
+      /* Punchlist MED: fill prices read 4-sf (global price rule); the full
        * chain string stays in the cell title. */
-      var priceShown = (r.displayPrice === null || r.displayPrice === undefined) ? "—" : trim6(String(r.displayPrice));
+      var priceShown = (r.displayPrice === null || r.displayPrice === undefined) ? "—" : ps(String(r.displayPrice));
       var priceFull = (r.displayPrice === null || r.displayPrice === undefined) ? null : String(r.displayPrice);
       var amtShown = (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol);
       var tKey = timeText(r.time) + " " + String(priceFull === null ? "—" : priceFull) + " " + amtShown;

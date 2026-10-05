@@ -161,7 +161,7 @@ function collectInputs(root) {
   ok(!!ratioLine, "stake preview ratio line mounted (pool-stake-ratio)");
   ok(!!shareLine, "stake preview share line mounted (pool-stake-shares)");
   eq(ratioLine && ratioLine.textContent,
-    "Ratio (spot): 1 BTS ≈ 2.00000000 CNY", "stake ratio line spot text");
+    "Ratio (spot): 1 BTS ≈ 2.000 CNY", "stake ratio line spot text (4-sf global price rule)");
   ok(shareLine && /Enter both amounts/.test(shareLine.textContent),
     "stake share line starts at need-both hint");
 

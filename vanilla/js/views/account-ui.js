@@ -391,6 +391,18 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     return s;
   }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): the PRICE
+   * column only (ticker latest per holding, "1" for BTS). The raw `price`
+   * string keeps feeding valueRawOf math + priceFull titles/sort keys —
+   * only the displayed priceH text is 4-sf. Guarded: absent Format renders
+   * trim6 as today. */
+  function ps(s) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") return Format.priceSig(s);
+    } catch (e) { /* fallback below */ }
+    return trim6(s);
+  }
+
   /* Dash text for honestly-missing cells (reuses the shared dash key). */
   function dashText() { return t("settings.dash", "—"); }
 
@@ -628,7 +640,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
           : (vMap[b.asset_id] !== undefined ? fmtRaw(vMap[b.asset_id], b.precision) : dashText())),
         collH: (!cMap ? dashText()
           : (cMap[b.asset_id] !== undefined ? fmtRaw(cMap[b.asset_id], b.precision) : dashText())),
-        priceH: (price !== null && price !== undefined && price !== "" ? trim6(price) : dashText()),
+        priceH: (price !== null && price !== undefined && price !== "" ? ps(price) : dashText()),
         priceFull: (price !== null && price !== undefined && price !== "" ? String(price) : ""),
         changeH: (change !== null && change !== undefined && change !== "" ? change : dashText()),
         valueH: (valueH !== null ? valueH : dashText()),

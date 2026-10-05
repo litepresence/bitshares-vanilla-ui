@@ -139,9 +139,20 @@ var AssetFeedUI = (function () {
       tb.appendChild(tb2); sc.appendChild(tb); box.appendChild(sc);
     }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees"))); err(d, box,e,t("asset.fees_failed", "Could not load fees.")); } });
   }
-  /* feedPrice: settlement/CER pair -> human string with BOTH precisions. */
+  /* feedPrice: settlement/CER pair -> 4-sf human string with BOTH
+   * precisions (global price rule). Display-only; raw legs stay on the
+   * callers' dd titles. */
   function feedPrice(pair, bp, qp) {
-    try { return Format.formatPrice(String(pair.base.amount), bp, String(pair.quote.amount), qp, PLACES); }
+    try {
+      var human = Format.formatPrice(String(pair.base.amount), bp, String(pair.quote.amount), qp, PLACES);
+      try {
+        if (typeof Format.priceSig === "function") {
+          var sig = Format.priceSig(human);
+          if (typeof sig === "string" && sig) human = sig;
+        }
+      } catch (e) { /* 8-place stands */ }
+      return human;
+    }
     catch (e) { return "unavailable"; }
   }
   /* renderFeed: symbol loader + live read-back + publish + producer forms.

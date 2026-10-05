@@ -50,6 +50,17 @@ var MarketPicker = (function () {
     return s;
   }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): the PRICE
+   * column only. VOL is an amount and CHANGE a percent — both stay on the
+   * trim6/paintChg path, never ps. Guarded: absent Format renders trim6 as
+   * today. Full strings stay on titles (paint below). */
+  function ps(s) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") return Format.priceSig(s);
+    } catch (e) { /* fallback below */ }
+    return trim6(s);
+  }
+
   /* Session ticker cache (id -> {latest, chg, vol} or null-miss). Fail-open:
    * misses render "—", never an error. Vol is the SAME already-fetched
    * get_ticker row (raw.base_volume) — no added batch, no invented data
@@ -286,7 +297,8 @@ var MarketPicker = (function () {
    * star first-column, MARKET/VOL/PRICE/CHANGE header, one row per pair.
    * All/Starred tabs mirror MY vs FIND (favs-first sort kept on All);
    * VOL/PRICE/CHANGE come from the same per-row ticker row (no new calls).
-   * Prices render trim6 with full precision on title (D1 rule). */
+   * PRICE renders 4-sf with full precision on title (global price rule);
+   * VOL (amount) and CHANGE (percent) are not prices and stay untouched. */
   function renderPicker(doc, section, currentID, root) {
     section.appendChild(DOM.el(doc, "h2", t("market.picker_title", "Markets")));
     var list = (CURATED[network()] || CURATED.mainnet).slice();
@@ -507,7 +519,7 @@ var MarketPicker = (function () {
             try { volCell.title = r.vol; } catch (e) { /* text stands */ }
           }
           if (r.latest !== null) {
-            priceCell.textContent = trim6(r.latest);
+            priceCell.textContent = ps(r.latest);
             try { priceCell.title = r.latest; } catch (e) { /* text stands */ }
           }
           if (r.chg !== null) paintChg(chgCell, r.chg);

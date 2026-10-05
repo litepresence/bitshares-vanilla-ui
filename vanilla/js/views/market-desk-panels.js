@@ -254,8 +254,9 @@ MarketDesk._panels = MarketDesk._panels || {};
     /* fillCells: one pair-fill -> plain display-string row {block, price,
      * amount} (TableRenderer pilot: the cell math moved verbatim from the
      * paintFills row builder below — Format math untouched, honest dashes
-     * stand; the phone cards reuse the same triple). Params: f ({row, op}).
-     * Returns {block, price, amount} strings. Never throws. */
+     * stand; the phone cards reuse the same triple). Price reads 4-sf
+     * (global price rule); amount is NOT a price and stays full-precision.
+     * Params: f ({row, op}). Returns {block, price, amount} strings. Never throws. */
     function fillCells(f) {
       var blk = f.row.block_num !== undefined && f.row.block_num !== null ? String(f.row.block_num) : (f.row.block_time || f.row.time || "—");
       var price = "—", amt = "—";
@@ -266,6 +267,12 @@ MarketDesk._panels = MarketDesk._panels || {};
           var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
           if (rawB !== null && rawQ !== null) {
             price = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
+            try {
+              if (typeof Format.priceSig === "function") {
+                var sig = Format.priceSig(price);
+                if (typeof sig === "string" && sig) price = sig;
+              }
+            } catch (e) { /* 8-place stands */ }
           }
         }
         var qLeg = f.op.pays && f.op.pays.asset_id === q.id ? f.op.pays : (f.op.receives && f.op.receives.asset_id === q.id ? f.op.receives : null);

@@ -1341,8 +1341,15 @@ var ExplorerAssets = (function () {
             dd.textContent = t("explorer.unavailable_quote", "unavailable (quote precision unknown)");
           } else {
             try {
-              dd.textContent = Format.formatPrice(String(pair.base.amount), f.base_precision,
+              var prow = Format.formatPrice(String(pair.base.amount), f.base_precision,
                 String(pair.quote.amount), f.quote_precision, PRICE_PLACES);
+              try {
+                if (typeof Format.priceSig === "function") {
+                  var rsig = Format.priceSig(prow);
+                  if (typeof rsig === "string" && rsig) prow = rsig;
+                }
+              } catch (e) { /* 8-place stands */ }
+              dd.textContent = prow;
               dd.title = t("explorer.price_base", "base ") + pair.base.amount + " / quote " + pair.quote.amount;
             } catch (e) { dd.textContent = t("explorer.unavailable", "unavailable"); }
           }
@@ -1443,8 +1450,15 @@ var ExplorerAssets = (function () {
           function priceCell(pair) {
             if (!pair || f.quote_precision === null || f.quote_precision === undefined) return "—";
             try {
-              return Format.formatPrice(String(pair.base.amount), f.base_precision,
+              var cell = Format.formatPrice(String(pair.base.amount), f.base_precision,
                 String(pair.quote.amount), f.quote_precision, PRICE_PLACES);
+              try {
+                if (typeof Format.priceSig === "function") {
+                  var csig = Format.priceSig(cell);
+                  if (typeof csig === "string" && csig) cell = csig;
+                }
+              } catch (e) { /* 8-place stands */ }
+              return cell;
             } catch (e) { return "—"; }
           }
           var mssr = (f.mssr_hundredths !== null && f.mssr_hundredths !== undefined &&

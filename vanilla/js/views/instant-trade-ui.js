@@ -140,16 +140,23 @@ var InstantTradeUI = (function () {
     while (v.length <= places) v = "0" + v;
     return places === 0 ? v : v.slice(0, -places) + "." + v.slice(-places); }
   /* Chain price string (human base-per-quote, any precision) -> normalized
-   * PRICE_PLACES human decimals via Format.parsePriceRatio + ratioToDec
-   * (BigInt only, never float). Returns {human, raw}: human for display,
-   * raw (verbatim chain string) for the title attribute (principle #6).
-   * WHY: get_ticker/get_order_book price strings arrive full-precision
-   * (audit saw 18-decimal raws on screen); inputs + stats must show the
-   * trimmed human, never the verbatim long string. Never throws. */
+   * 4-sf display via Format.priceSig (global price rule) — BigInt-free
+   * display path, never float money math. Returns {human, raw}: human for
+   * display, raw (verbatim chain string) for the title attribute
+   * (principle #6). WHY: get_ticker/get_order_book price strings arrive
+   * full-precision (audit saw 18-decimal raws on screen); stats must show
+   * the 4-sf human, never the verbatim long string. priceSig also fixes
+   * the old 6-place floor which rendered dust as "0.000000". Inputs never
+   * read .human (amount inputs use Format.formatAmount; price math uses
+   * parsePriceRatio on user input) — display only. Never throws. */
   function humanPrice(str) {
     var raw = (str === undefined || str === null) ? "" : String(str);
     if (!raw) return { human: "", raw: raw };
     try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+        var sig = Format.priceSig(raw);
+        if (typeof sig === "string" && sig) return { human: sig, raw: raw };
+      }
       var r = Format.parsePriceRatio(raw);
       if (!r || r.den <= 0n || r.num <= 0n) return { human: raw, raw: raw };
       return { human: ratioToDec(r.num, r.den, PRICE_PLACES), raw: raw };
@@ -271,11 +278,20 @@ var InstantTradeUI = (function () {
   }
 
   /* Effective price human (RECEIVE per 1 SELL) from walked raw totals:
-   * (receiveRaw/10^rp)/(sellRaw/10^sp), floored to PRICE_PLACES. BigInt only. */
+   * (receiveRaw/10^rp)/(sellRaw/10^sp), floored to PRICE_PLACES then 4-sf
+   * for display (global price rule). BigInt only. Display-only: callers
+   * paint effP/confirm text with this and keep the raw pair in the title. */
   function effectiveHuman(sellRaw, receiveRaw, sellPrec, receivePrec) {
     var s = BigInt(sellRaw), r = BigInt(receiveRaw);
     if (s <= 0n || r <= 0n) throw new Error("bad walk totals");
-    return ratioToDec(r * pow10(sellPrec), s * pow10(receivePrec), PRICE_PLACES);
+    var floored = ratioToDec(r * pow10(sellPrec), s * pow10(receivePrec), PRICE_PLACES);
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+        var sig = Format.priceSig(floored);
+        if (typeof sig === "string" && sig) return sig;
+      }
+    } catch (e) { /* floored stands */ }
+    return floored;
   }
 
   /* Market-fee trio (trade-core.js, duplicated — TradeForm exports

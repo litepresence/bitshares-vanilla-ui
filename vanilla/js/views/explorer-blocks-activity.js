@@ -191,7 +191,15 @@ var ExplorerBlocksActivity = (function () {
         var px = isBuy
           ? Format.formatPrice(String(sell.amount), sP, String(buy.amount), bP, 8)
           : Format.formatPrice(String(buy.amount), bP, String(sell.amount), sP, 8);
-        px = px.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+        /* 4-sf display (global price rule — replaces the old trailing-zero
+         * trim, which dropped significant figs: "1.230" read "1.23". The
+         * raw leg pair stays on the title below). */
+        try {
+          if (typeof Format.priceSig === "function") {
+            var pxsig = Format.priceSig(px);
+            if (typeof pxsig === "string" && pxsig) px = pxsig;
+          }
+        } catch (e) { /* 8-place stands */ }
         pricePh.textContent = px;
         pricePh.title = isBuy
           ? (String(sell.amount) + " " + sellId + " / " + String(buy.amount) + " " + buyId)

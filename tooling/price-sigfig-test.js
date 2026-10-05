@@ -42,4 +42,22 @@ eq(Format.priceSig("0.000012345"), Format.priceSig("0.000012345"), "small plain 
 assert.ok(typeof Format.priceSig("1.00") === "string", "string out");
 passed++;
 
+/* Sigfig sweep (2026-10-05): per-area before/after for normal + dust
+ * magnitudes. "Before" = the string the view painted prior to the sweep
+ * (8-place formatPrice, trim6, or verbatim chain string); "after" = what
+ * the sweep paints via priceSig. Documents the intended 4sf normalization
+ * (trailing zeros significant: "1.230" stays "1.230") and the dust fix
+ * (trim6 rendered dust as "0.000000"; priceSig renders sci). */
+eq(Format.priceSig("1.23456789"), "1.235", "sweep/book: chain 8-dec latest -> 4sf (was trim6 1.234567)");
+eq(Format.priceSig("1.23000000"), "1.230", "sweep/feed: 8-place 1.23 -> 1.230 (zeros significant, was trim 1.23)");
+eq(Format.priceSig("0.0000001235"), "1.235e-7", "sweep/dust: trim6 showed 0.000000, now sci");
+eq(Format.priceSig("0.000000123456789012"), "1.235e-7", "sweep/dust: 18-dec chain latest -> sci");
+eq(Format.priceSig("1547.987600"), "1548", "sweep/portfolio: 8-place silver -> 1548");
+eq(Format.priceSig("1"), "1.000", "sweep/portfolio: BTS unit price 1 -> 1.000 (4sf)");
+eq(Format.priceSig("1.235"), "1.235", "sweep/chart: 4sf-places candle string is identity");
+eq(Format.priceSig("1235"), "1235", "sweep/chart: 0-place 4sf string is identity");
+eq(Format.priceSig("2.50000000"), "2.500", "sweep/spot: pool spot 2.5 -> 2.500");
+eq(Format.priceSig("100.00000000"), "100.0", "sweep/settle: estimate 100 -> 100.0");
+eq(Format.priceSig("0.000012345"), "0.00001234", "sweep/small: 9-digit plain stays plain, 4sf");
+
 console.log("price-sigfig-test: " + passed + " passed, 0 failed");

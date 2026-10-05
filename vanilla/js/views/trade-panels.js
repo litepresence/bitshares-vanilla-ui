@@ -897,7 +897,14 @@ var TradePanels = (function () {
       R.recvAssetId === ctx.base ? ctx.basePrec : ctx.quotePrec);
     var sellS = R.sellAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
     var recvS = R.recvAssetId === ctx.base ? ctx.baseSym : ctx.quoteSym;
-    var priceHuman = TradeCore.ratioToDec(R.ratio.num, R.ratio.den, TradeCore.PRICE_PLACES) +
+    var priceShown = TradeCore.ratioToDec(R.ratio.num, R.ratio.den, TradeCore.PRICE_PLACES);
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+        var sig = Format.priceSig(priceShown);
+        if (typeof sig === "string" && sig) priceShown = sig;
+      }
+    } catch (e) { /* 8-place stands */ }
+    var priceHuman = priceShown +
       " " + ctx.baseSym + " per " + ctx.quoteSym;
     row(t("trade.row_side", "Side"), (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym);
     row(t("trade.row_seller", "Seller"), P.me.name + " (" + P.me.id + ")");
@@ -1229,7 +1236,14 @@ var TradePanels = (function () {
     R.calc.orders.forEach(function (o, i) {
       var tr = doc.createElement("tr");
       tr.appendChild(DOM.el(doc, "td", String(i + 1)));
-      tr.appendChild(DOM.el(doc, "td", TradeCore.ratioToDec(o.priceNum, o.priceDen, TradeCore.PRICE_PLACES)));
+      var pxShown = TradeCore.ratioToDec(o.priceNum, o.priceDen, TradeCore.PRICE_PLACES);
+      try {
+        if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+          var sig = Format.priceSig(pxShown);
+          if (typeof sig === "string" && sig) pxShown = sig;
+        }
+      } catch (e) { /* 8-place stands */ }
+      tr.appendChild(DOM.el(doc, "td", pxShown));
       tr.appendChild(DOM.el(doc, "td",
         Format.formatAmount(o.sellRaw, sellP) + " " + sellS,
         "raw " + o.sellRaw));

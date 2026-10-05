@@ -388,6 +388,14 @@ var MarketOrders = (function () {
             price = Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, PRICE_PLACES);
             priceTitle = "offset " + String(off) + "/10000";
           }
+          /* 4-sf display (global price rule); the "—" fallback and the
+           * offset title above stand untouched. */
+          if (price !== "—" && typeof Format.priceSig === "function") {
+            try {
+              var ssig = Format.priceSig(price);
+              if (typeof ssig === "string" && ssig) price = ssig;
+            } catch (e) { /* 8-place stands */ }
+          }
         } catch (e) { price = "—"; }
         return { rows: sorted, price: price, priceTitle: priceTitle, assetId: marketAssetId, prec: settledPrec, sym: settledSym };
       }).then(function (R) {
@@ -672,7 +680,9 @@ var MarketOrders = (function () {
 
   /* Human row for a raw limit order: side from the sell leg (Exchange.jsx
    * bid/ask convention), for_sale in the sell asset, price in market terms
-   * (tail-per-head, PRICE_PLACES, BigInt). Unknown shapes stay honest. */
+   * (tail-per-head, 4-sf display via Format.priceSig, BigInt math beneath).
+   * Unknown shapes stay honest. Display-only strings (paintOrders renders
+   * text + raw-details proof); never inputs, never math. */
   function orderView(o, assets) {
     var q = assets.quote, b = assets.base;
     var id = (o && o.id) ? String(o.id) : "—";
@@ -701,6 +711,11 @@ var MarketOrders = (function () {
           price = Format.formatPrice(bb, b.precision, qq, q.precision, PRICE_PLACES);
         } else if (sp.base.asset_id === q.id && sp.quote.asset_id === b.id) {
           price = Format.formatPrice(qq, b.precision, bb, q.precision, PRICE_PLACES);
+        }
+        /* 4-sf display (global price rule); "—" shapes skip it. */
+        if (price !== "—" && typeof Format.priceSig === "function") {
+          var osig = Format.priceSig(price);
+          if (typeof osig === "string" && osig) price = osig;
         }
       }
     } catch (e) { price = "—"; }

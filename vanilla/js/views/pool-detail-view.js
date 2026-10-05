@@ -190,19 +190,30 @@ PoolDetailUI._view = PoolDetailUI._view || {};
      * formatPrice path — never 1/x float math). */
     var orient = { inverted: false, spotRepaint: null, bookRepaint: null };
     var spotEl = null;
+    /* 4-sf helper (global price rule, guarded — the strip stands unpriced
+     * when format.js is absent rather than blanking). */
+    function spotSig(human) {
+      try {
+        if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+          var sig = Format.priceSig(human);
+          if (typeof sig === "string" && sig) return sig;
+        }
+      } catch (e) { /* 8-place stands */ }
+      return human;
+    }
     orient.spotRepaint = function () {
       if (!spotEl) return;
       try {
         var s = orient.inverted
-          ? Format.formatPrice(String(r.balance_a_raw), precOr5(r.prec_a), String(r.balance_b_raw), precOr5(r.prec_b), 8)
-          : Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+          ? spotSig(Format.formatPrice(String(r.balance_a_raw), precOr5(r.prec_a), String(r.balance_b_raw), precOr5(r.prec_b), 8))
+          : spotSig(Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8));
         var q = orient.inverted ? (r.sym_a || r.asset_a_id) : (r.sym_b || r.asset_b_id);
         var b = orient.inverted ? (r.sym_b || r.asset_b_id) : (r.sym_a || r.asset_a_id);
         spotEl.textContent = t("pool.spot_row", "Spot") + ": " + s + " " + q + "/" + b;
       } catch (e) { /* last spot stands */ }
     };
     try {
-      var spot0 = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      var spot0 = spotSig(Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8));
       spotEl = u.el(doc, "span", t("pool.spot_row", "Spot") + ": " + spot0 + " " + (r.sym_b || r.asset_b_id) + "/" + (r.sym_a || r.asset_a_id));
       strip.appendChild(spotEl);
     } catch (e) { /* strip stands without spot */ }
@@ -1052,7 +1063,19 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     swaps.forEach(function (sw) {
       var tr = doc.createElement("tr");
       tr.appendChild(u.el(doc, "td", sw.time || "unknown"));
-      tr.appendChild(u.el(doc, "td", (sw.price === null || sw.price === undefined) ? "—" : String(sw.price)));
+      /* Executed-swap price reads 4-sf (global price rule); paid/received
+       * amounts are NOT prices and stay full-precision. */
+      var tapePx = "—";
+      if (sw.price !== null && sw.price !== undefined) {
+        tapePx = String(sw.price);
+        try {
+          if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+            var tsig = Format.priceSig(tapePx);
+            if (typeof tsig === "string" && tsig) tapePx = tsig;
+          }
+        } catch (e) { /* 8-place stands */ }
+      }
+      tr.appendChild(u.el(doc, "td", tapePx));
       [sw.paid, sw.received].forEach(function (legAmt) {
         var L = leg(legAmt.asset);
         tr.appendChild(u.el(doc, "td", u.amtText(legAmt.amount, legAmt.asset, L.prec, L.sym).text));

@@ -70,10 +70,18 @@ PoolDetailUI._actions = PoolDetailUI._actions || {};
     var shareLine = u.el(doc, "p", "", "muted"); shareLine.id = "pool-stake-shares";
     try { shareLine.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
     box.appendChild(shareLine);
-    /* Spot ratio line (B-per-A via the BigInt formatPrice path; empty pool ->
-     * honest enter-by-hand note, never a crash). */
+    /* Spot ratio line (B-per-A via the BigInt formatPrice path, 4-sf display
+     * per the global price rule; empty pool -> honest enter-by-hand note,
+     * never a crash). */
     try {
-      var spot = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      var spotRaw = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      var spot = spotRaw;
+      try {
+        if (typeof Format.priceSig === "function") {
+          var spsig = Format.priceSig(spotRaw);
+          if (typeof spsig === "string" && spsig) spot = spsig;
+        }
+      } catch (e) { /* 8-place stands */ }
       ratioLine.textContent = t("pool.stake_ratio_row", "Ratio (spot)") + ": 1 " + (r.sym_a || r.asset_a_id) +
         " ≈ " + spot + " " + (r.sym_b || r.asset_b_id);
     } catch (e) {

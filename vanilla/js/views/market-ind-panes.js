@@ -373,11 +373,25 @@ MarketInd._panes = MarketInd._panes || {};
     return s;
   }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): PRICE
+   * cells (Latest, Bid-Ask, Feed, Settlement) render ps(); change/volume
+   * cells are NOT prices (percent_change, base_volume amounts) and stay on
+   * the trim6/verbatim path. cell() still applies trim6 after ps — safe:
+   * 4-sf outputs carry <= 4 decimals (trim6 no-op) and sci notation has no
+   * plain-decimal shape (trim6 pass-through). Falls back to trim6 when
+   * format.js is absent. Full chain strings stay on titles (cell() below). */
+  function ps(s) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") return Format.priceSig(s);
+    } catch (e) { /* fallback below */ }
+    return trim6(s);
+  }
+
   /* Compact header stats strip: Latest / 24h change / 24h volume / Best
    * bid-ask, plus Feed Price + Settlement for bitasset markets (state.feed,
    * filled once per desk by market-desk.js fetchFeed — absent on non-MPA
    * pairs, exactly like #1 which hides both columns there). Price-like
-   * values render trim6 with the full chain string on title; ticker/volume
+   * values render ps (4-sf) with the full chain string on title; ticker/volume
    * fields pass through verbatim (same fields as the side panel, no money
    * math). Moved verbatim out of fill; state carries {ticker, strip, assets,
    * feed} exactly as before. */
@@ -403,7 +417,7 @@ MarketInd._panes = MarketInd._panes || {};
       s.appendChild(v);
       state.strip.appendChild(s);
     }
-    cell(t("market.stat_latest", "Latest"), st.latest);
+    cell(t("market.stat_latest", "Latest"), st.latest !== null && st.latest !== undefined ? ps(String(st.latest)) : null, st.latest);
     var chg = (st.raw && st.raw.percent_change !== undefined && st.raw.percent_change !== null)
       ? String(st.raw.percent_change) : null;
     cell(t("market.stat_chg", "24h Δ"), chg);
@@ -411,8 +425,8 @@ MarketInd._panes = MarketInd._panes || {};
       ? String(st.raw.base_volume) + " " + state.assets.base.symbol : null;
     cell(t("market.stat_vol", "24h Vol"), bv);
     var bidFull = [st.highestBid, st.lowestAsk].filter(function (x) { return x !== null; });
-    var bidTrim = bidFull.map(function (x) { return trim6(String(x)); });
-    cell(t("market.stat_bidask", "Bid–Ask"), bidTrim.length ? bidTrim.join(" / ") : null,
+    var bidShown = bidFull.map(function (x) { return ps(String(x)); });
+    cell(t("market.stat_bidask", "Bid–Ask"), bidShown.length ? bidShown.join(" / ") : null,
       bidFull.length ? bidFull.join(" / ") : null);
     /* Feed + settlement (D1): state.feed is filled once per desk by
      * market-desk.js fetchFeed ({feed, settle} human base-per-quote strings
@@ -420,7 +434,7 @@ MarketInd._panes = MarketInd._panes || {};
      * (non-MPA pairs, pending/failed fetch) — the strip stands on ticker. */
     var feed = state.feed || null;
     if (feed && feed.feed !== null && feed.feed !== undefined) {
-      cell(t("market.stat_feed", "Feed Price"), feed.feed);
+      cell(t("market.stat_feed", "Feed Price"), ps(String(feed.feed)), feed.feed);
     }
     if (feed && feed.settle && feed.settle.value !== null && feed.settle.value !== undefined) {
       var isGlobal = !!feed.settle.global;
@@ -430,7 +444,7 @@ MarketInd._panes = MarketInd._panes || {};
       }
       cell(isGlobal
         ? t("market.stat_global_settle", "Global Settlement")
-        : t("market.stat_settle", "Settlement Price"), feed.settle.value, settleFull);
+        : t("market.stat_settle", "Settlement Price"), ps(String(feed.settle.value)), settleFull);
     }
   }
 

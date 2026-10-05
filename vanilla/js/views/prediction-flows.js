@@ -55,6 +55,21 @@ var PredictionFlows = (function () {
   var openSubs = [];
   function dropOpenSubs() { openSubs.forEach(function (off) { try { off(); } catch (e) {} }); openSubs = []; }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): avg-cost
+   * and current-price humans route through sig4(); cost/value/PnL RAWS and
+   * the mid string feeding valueFromMidHuman math stay untouched (sci
+   * notation is unparsable there — display only, never math). Guarded:
+   * absent Format renders the 8-place string as today. Never throws. */
+  function sig4(human) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+        var sig = Format.priceSig(human);
+        if (typeof sig === "string" && sig) return sig;
+      }
+    } catch (e) { /* today's string stands */ }
+    return human;
+  }
+
   /* No local el — use DOM.el */
 /* clearBox removed — use DOM.clear */
 
@@ -541,7 +556,7 @@ var PredictionFlows = (function () {
               else if (cb.receivedRaw === "0") { zeroCost = true; costRaw = "0"; avgPerHuman = "0"; avgTitle = t("prediction.zero_cost", "zero-cost (no fills)"); }
               else if (pmaPrec !== null && backPrec !== null) {
                 costRaw = Format.costForHolding(holdingRaw, cb.receivedRaw, cb.paidRaw);
-                try { avgPerHuman = Format.formatPrice(cb.paidRaw, backPrec, cb.receivedRaw, pmaPrec, 8); }
+                try { avgPerHuman = sig4(Format.formatPrice(cb.paidRaw, backPrec, cb.receivedRaw, pmaPrec, 8)); }
                 catch (e) { avgPerHuman = null; }
                 avgTitle = "raw cost " + costRaw + " / received " + cb.receivedRaw;
               }
@@ -564,7 +579,7 @@ var PredictionFlows = (function () {
               if (legs && /^\d+$/.test(legs.pmaRaw) && /^\d+$/.test(legs.backRaw) && legs.pmaRaw !== "0") {
                 curRaw = Format.valueFromFeedRaw(holdingRaw, legs.pmaRaw, legs.backRaw);
                 if (pmaPrec !== null && backPrec !== null) {
-                  try { curPerHuman = Format.formatPrice(legs.backRaw, backPrec, legs.pmaRaw, pmaPrec, 8); }
+                  try { curPerHuman = sig4(Format.formatPrice(legs.backRaw, backPrec, legs.pmaRaw, pmaPrec, 8)); }
                   catch (e) { curPerHuman = null; }
                 }
                 curSrc = "settlement";
@@ -574,7 +589,7 @@ var PredictionFlows = (function () {
               var midH = R.mids[bal.asset_id];
               if (/^\d+(\.\d+)?$/.test(midH)) {
                 curRaw = Format.valueFromMidHuman(holdingRaw, pmaPrec, backPrec, midH);
-                curPerHuman = midH; curSrc = "mid";
+                curPerHuman = sig4(midH); curSrc = "mid";
               }
             }
             if (curRaw === null && b.current_feed && b.current_feed.settlement_price) {
@@ -588,7 +603,7 @@ var PredictionFlows = (function () {
               if (fl && /^\d+$/.test(fl.pmaRaw) && /^\d+$/.test(fl.backRaw) && fl.pmaRaw !== "0") {
                 curRaw = Format.valueFromFeedRaw(holdingRaw, fl.pmaRaw, fl.backRaw);
                 if (pmaPrec !== null && backPrec !== null) {
-                  try { curPerHuman = Format.formatPrice(fl.backRaw, backPrec, fl.pmaRaw, pmaPrec, 8); }
+                  try { curPerHuman = sig4(Format.formatPrice(fl.backRaw, backPrec, fl.pmaRaw, pmaPrec, 8)); }
                   catch (e) { curPerHuman = null; }
                 }
                 curSrc = "feed";
@@ -1186,8 +1201,8 @@ var PredictionFlows = (function () {
             var human = null;
             if (usable) {
               try {
-                human = Format.formatPrice(String(base.amount), feed.base_precision,
-                  String(quote.amount), qp, 6);
+                human = sig4(Format.formatPrice(String(base.amount), feed.base_precision,
+                  String(quote.amount), qp, 6));
               } catch (e) { human = null; }
             }
             row(t("prediction.settlement_price", "Settlement price"), human !== null ? (human + " " + backSym + " per " + info.symbol) : "No usable feed published");

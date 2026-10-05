@@ -56,6 +56,22 @@ AccountUI._history = AccountUI._history || {};
     return { num: num, den: den };
   }
 
+  /* 4-sig-fig price display (global price rule, Format.priceSig): open-order
+   * prices read ps(); sell/buy amounts are NOT prices and stay untouched.
+   * Guarded (format.js loads before views, but the table must never blank):
+   * absent Format renders the 8-place string as today. No title exists on
+   * the price cell today and none is added — raw legs ride the sell/buy
+   * titles and the raw-orders JSON details block below. */
+  function ps(s) {
+    try {
+      if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
+        var sig = Format.priceSig(s);
+        if (typeof sig === "string" && sig) return sig;
+      }
+    } catch (e) { /* today's string stands */ }
+    return s;
+  }
+
   /* Operation type -> i18n key (batch-2a; op 0 reuses transfer.title,
    * byte-identical "Transfer"). Tags 11..77 per the open-graphene spec
    * oracle (78 ops, tags 0-77); virtual-only tags (51/53 htlc-redeemed/
@@ -279,7 +295,7 @@ AccountUI._history = AccountUI._history || {};
       sellTitle: o.sell.raw,
       buy: o.buy.display + " " + o.buy.symbol,
       buyTitle: o.buy.raw,
-      price: o.priceDisplay,
+      price: ps(o.priceDisplay),
       order: o.id
     };
   }
@@ -336,7 +352,7 @@ AccountUI._history = AccountUI._history || {};
       card.appendChild(line);
       var meta = doc.createElement("div");
       meta.className = "muted";
-      meta.textContent = o.id + " @ " + o.priceDisplay;
+      meta.textContent = o.id + " @ " + ps(o.priceDisplay);
       card.appendChild(meta);
       cards.appendChild(card);
     });

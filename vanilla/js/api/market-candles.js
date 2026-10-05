@@ -509,6 +509,16 @@ var MarketCandles = (function () {
     if (den > 0n) {
       try {
         human = Format.formatPrice(num.toString(), basePrec, den.toString(), quotePrec, vplaces);
+        /* 4-sf display (global price rule): the session string is painted
+         * as text ("Session VWAP: …" + canvas label); per-bucket vwap/high/
+         * low stay as computed (plotted via Number, never text). Sci
+         * notation still Number-parses for the plot position below. */
+        try {
+          if (typeof Format.priceSig === "function") {
+            var hsig = Format.priceSig(human);
+            if (typeof hsig === "string" && hsig) human = hsig;
+          }
+        } catch (e) { /* places string stands */ }
       } catch (err) { human = null; }
     }
     return { num: num.toString(), den: den.toString(), human: human, per: per, skipped: skipped, places: vplaces };

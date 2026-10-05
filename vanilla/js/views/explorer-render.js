@@ -147,7 +147,9 @@ var ExplorerRender = (function () {
     return s;
   }
 
-  /* Price-pair leaf -> span filled in once both precisions resolve. */
+  /* Price-pair leaf -> span filled in once both precisions resolve.
+   * Display reads 4-sf (global price rule); the raw base/quote pair stays
+   * on the title (provenance, as before). */
   function priceSpan(doc, base, quote, myGen) {
     var s = DOM.el(doc, "span", "…");
     s.title = t("explorer.price_base", "base ") + base.amount + " " + base.asset_id + t("explorer.price_quote", " / quote ") + quote.amount + " " + quote.asset_id;
@@ -156,7 +158,14 @@ var ExplorerRender = (function () {
     Promise.all([pb, pq]).then(function (precs) {
       if (!isCurrent(myGen)) return;
       try {
-        s.textContent = Format.formatPrice(String(base.amount), precs[0], String(quote.amount), precs[1], PRICE_PLACES);
+        var human = Format.formatPrice(String(base.amount), precs[0], String(quote.amount), precs[1], PRICE_PLACES);
+        try {
+          if (typeof Format.priceSig === "function") {
+            var sig = Format.priceSig(human);
+            if (typeof sig === "string" && sig) human = sig;
+          }
+        } catch (e) { /* 8-place stands */ }
+        s.textContent = human;
       } catch (e) { s.textContent = s.title; }
     }).catch(function () {
       if (!isCurrent(myGen)) return;

@@ -366,6 +366,14 @@ MarketDesk._fill = MarketDesk._fill || {};
         var feed;
         try {
           feed = Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8);
+          /* 4-sf display (global price rule); raw legs stay in state for
+           * the strip title path below. Never throws outward. */
+          try {
+            if (typeof Format.priceSig === "function") {
+              var fsig = Format.priceSig(feed);
+              if (typeof fsig === "string" && fsig) feed = fsig;
+            }
+          } catch (e) { /* 8-place stands */ }
         } catch (e) { novalue(); return; }
         var out = { feed: feed, settle: null };
         try {
@@ -387,10 +395,14 @@ MarketDesk._fill = MarketDesk._fill || {};
               else if (leg.asset_id === q.id) sQ = String(leg.amount);
             });
             if (sB !== null && sQ !== null) {
-              out.settle = {
-                global: true,
-                value: Format.formatPrice(sB, b.precision, sQ, q.precision, 8)
-              };
+              var settleVal = Format.formatPrice(sB, b.precision, sQ, q.precision, 8);
+              try {
+                if (typeof Format.priceSig === "function") {
+                  var ssig = Format.priceSig(settleVal);
+                  if (typeof ssig === "string" && ssig) settleVal = ssig;
+                }
+              } catch (e) { /* 8-place stands */ }
+              out.settle = { global: true, value: settleVal };
             }
           } else {
             /* Live asset: offset-adjusted estimate (R1d). Offset lives on the
@@ -406,10 +418,17 @@ MarketDesk._fill = MarketDesk._fill || {};
             if (off === null && (offRaw === undefined || offRaw === null)) off = 0;
             if (off !== null && typeof Format.settleEstimate === "function") {
               var baseIsCore = String(b.id) === "1.3.0";
+              var estVal = Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, 8);
+              try {
+                if (typeof Format.priceSig === "function") {
+                  var esig = Format.priceSig(estVal);
+                  if (typeof esig === "string" && esig) estVal = esig;
+                }
+              } catch (e) { /* 8-place stands */ }
               out.settle = {
                 global: false,
                 offset: off,
-                value: Format.settleEstimate(rawB, b.precision, rawQ, q.precision, off, baseIsCore, 8)
+                value: estVal
               };
             }
           }
