@@ -13,7 +13,8 @@
  *   Account, Wallet, ViewingAs, NotifyHost, NotifyRules, Offline,
  *   HistoryNotice, Explorer, Store, DOM, Forms, Icon. Globals/side effects:
  *   publishes globalThis.AccountUI; module.exports for node suites
- *   (account-deeplink-test.js pins _test). Load order in index.html:
+ *   (account-deeplink-test.js pins _test parse/build; account-sort-test.js
+ *   pins _test sort/render). Load order in index.html:
  *   account-history.js, account-membership.js,
  *   account-ui.js (facade LAST).
  * Created by: split_responsibility.py account/market frontier (facade
@@ -173,6 +174,93 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     } catch (e) { return null; }
   }
 
+  /* Portfolio sort keys (Polish Task 5): raw digit string -> itself, or
+   * null when not all digits (malformed raws sort with the dashed bucket,
+   * never throw, never blank the column).
+   * @param {any} s candidate raw integer
+   * @returns {string | null} digit string, or null when not a raw integer */
+  function rawKey(s) {
+    var d = String(s === null || s === undefined ? "" : s);
+    return /^\d+$/.test(d) ? d : null;
+  }
+
+  /* Digit strings, smallest first (BigInt exact — never float for money;
+   * callers pin nulls, so a throw here falls back to string order, never
+   * propagates).
+   * @param {string} a digit string
+   * @param {string} b digit string
+   * @returns {number} -1|0|1 */
+  function cmpBigStr(a, b) {
+    try {
+      var x = BigInt(String(a)), y = BigInt(String(b));
+      return x < y ? -1 : x > y ? 1 : 0;
+    } catch (e) {
+      var xs = String(a), ys = String(b);
+      return xs < ys ? -1 : xs > ys ? 1 : 0;
+    }
+  }
+
+  /* Human decimal strings, smallest first, via exact decFrac cross
+   * multiplication (trim6 display strings stay exact — no parseFloat).
+   * Both sides must parse; the caller pins unparseable legs last and only
+   * calls this when both parsed.
+   * @param {string} a display decimal
+   * @param {string} b display decimal
+   * @returns {number} -1|0|1 (0 when either side is not a plain decimal) */
+  function cmpPriceStr(a, b) {
+    var fa = decFrac(a), fb = decFrac(b);
+    if (!fa || !fb) return 0;
+    try {
+      var l = fa.num * fb.den, r = fb.num * fa.den;
+      return l < r ? -1 : l > r ? 1 : 0;
+    } catch (e) { return 0; }
+  }
+
+  /** Sort enriched portfolio rows (rowFor shape: {b:{symbol, raw},
+   * priceFull, valueRaw}) without mutating the input. sortKey null (or
+   * unknown) = chain order (today's default paint). asset = symbol alpha;
+   * qty = numeric on b.raw; price = numeric on priceFull; value = numeric
+   * on valueRaw. Missing/dashed legs pin LAST in both directions (unlike
+   * explorer-assets supply, whose nulls flip with sortDir — the brief
+   * mandates dashed-last here). Ties keep chain order (stable sort).
+   * @param {Array} rows enriched rows
+   * @param {string | null} sortKey asset|qty|price|value (else chain order)
+   * @param {number} sortDir >=0 ascending, <0 descending
+   * @returns {Array} new array, sorted (or chain-ordered) */
+  function sortPortfolioRows(rows, sortKey, sortDir) {
+    var out = Array.isArray(rows) ? rows.slice() : [];
+    if (sortKey !== "asset" && sortKey !== "qty" &&
+        sortKey !== "price" && sortKey !== "value") return out;
+    var d = (sortDir < 0) ? -1 : 1;
+    out.sort(function (x, y) {
+      var c = 0;
+      if (sortKey === "asset") {
+        var xa = String((x.b && x.b.symbol) || ""), ya = String((y.b && y.b.symbol) || "");
+        c = xa < ya ? -1 : xa > ya ? 1 : 0;
+        return c * d;
+      }
+      var xn = null, yn = null;
+      if (sortKey === "qty") {
+        xn = rawKey(x.b && x.b.raw);
+        yn = rawKey(y.b && y.b.raw);
+        c = (xn === null || yn === null) ? 0 : cmpBigStr(xn, yn);
+      } else if (sortKey === "price") {
+        xn = (x.priceFull ? String(x.priceFull) : null);
+        yn = (y.priceFull ? String(y.priceFull) : null);
+        c = (xn === null || yn === null) ? 0 : cmpPriceStr(xn, yn);
+      } else {
+        xn = rawKey(x.valueRaw);
+        yn = rawKey(y.valueRaw);
+        c = (xn === null || yn === null) ? 0 : cmpBigStr(xn, yn);
+      }
+      if (xn === null && yn === null) return 0;
+      if (xn === null) return 1;
+      if (yn === null) return -1;
+      return c * d;
+    });
+    return out;
+  }
+
   /* Add a raw integer string into map[assetId] (BigInt sum; malformed legs
    * are ignored so one bad row never blanks the column). */
   function sumRawInto(map, assetId, raw) {
@@ -227,7 +315,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     /* Polish Task 4: monochrome glyph alongside each action label (icon+text
      * always, never icon-only — the text carries meaning when the glyph is
      * unknown or fails to load). Names mirror the nav semantics (transfer /
-     * deposit-withdraw / market / borrow); SETTLE shares the borrow glyph
+     * deposit-withdraw / market / borrow); SETTLE uses its own settle glyph
      * (the margin/settle family page hosts both flows). Guarded by
      * Icon.known: unknown names skip the network and render text-only, never
      * blank. Themed by the existing .icon-img filter (themes.css
@@ -387,9 +475,11 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
 
   /** Portfolio table + phone cards (punchlist 1-5): Asset (linked to
    * #/asset/:symbol) | QTY | IN ORDERS | IN VESTING | IN COLLATERAL |
-   * PRICE(BTS) | 24HR | VALUE(BTS) | actions. A search input filters rows
-   * client-side (no refetch); a muted subtext line carries the summed BTS
-   * total (floor of qty*price per asset, BTS row at face value, visible
+   * PRICE(BTS) | 24HR | VALUE(BTS) | actions. Asset/Qty/Price/Value headers
+   * sort (Polish Task 5, explorer-assets.js sortTh contract: click toggles,
+   * aria-sort, sortDir; default null = chain order). A search input filters
+   * rows client-side (no refetch); a muted subtext line carries the summed
+   * BTS total (floor of qty*price per asset, BTS row at face value, visible
    * rows only). Missing legs render as dashes (see enrichPortfolio notes).
    * Params: doc, section, acct ({id, name}), balances, enrich.
    * @param {Document} doc owner document
@@ -484,12 +574,47 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       a.textContent = sym;
       return a;
     }
+    /* Portfolio sort state (Polish Task 5): sortKey null = chain order
+     * (today's default paint); asset|qty|price|value after a header click.
+     * sortDir 1 ascending, -1 descending. Per-render closure (never shared
+     * across renders, never persisted). */
+    var sortKey = null, sortDir = 1;
+    /* Sort marker for the active header (explorer-assets.js sortMark twin). */
+    function sortMark(key) {
+      if (sortKey !== key) return "";
+      return sortDir >= 0 ? " ▲" : " ▼";
+    }
+    /* Sortable header cell (explorer-assets.js:582-600 sortTh contract:
+     * scope=col, aria-sort ascending/descending/none, button click toggles
+     * dir on re-click else selects the key ascending, then re-draws).
+     * touchable is call-time-guarded (browser script order supplies the
+     * global; node suites render text buttons without it). */
+    function sortTh(key, label) {
+      var th = doc.createElement("th");
+      th.setAttribute("scope", "col");
+      th.setAttribute("aria-sort",
+        sortKey === key ? (sortDir >= 0 ? "ascending" : "descending") : "none");
+      var b = doc.createElement("button");
+      b.type = "button";
+      b.textContent = label + sortMark(key);
+      try {
+        if (typeof touchable === "function") touchable(b);
+      } catch (e) { /* button stands without the touch floor */ }
+      b.addEventListener("click", function () {
+        if (sortKey === key) sortDir = -sortDir;
+        else { sortKey = key; sortDir = 1; }
+        draw();
+      });
+      th.appendChild(b);
+      return th;
+    }
     function draw() {
       var q = search.value.trim().toLowerCase();
       while (box.firstChild) box.removeChild(box.firstChild);
       var rows = list.map(rowFor).filter(function (r) {
         return !q || String(r.b.symbol).toLowerCase().indexOf(q) !== -1;
       });
+      rows = sortPortfolioRows(rows, sortKey, sortDir);
       if (!rows.length) {
         var none = doc.createElement("p");
         none.className = "muted";
@@ -500,13 +625,23 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
         table.className = "node-table";
         var thead = doc.createElement("thead");
         var headRow = doc.createElement("tr");
-        [t("account.asset_th", "Asset"), "QTY", "IN ORDERS", "IN VESTING",
-          "IN COLLATERAL", "PRICE(BTS)", "24HR", "VALUE(BTS)",
-          t("account.manage", "Manage")].forEach(function (label) {
+        /* Sortable four reuse their existing header labels (no new i18n
+         * strings); the rest stay plain text cells as before. */
+        headRow.appendChild(sortTh("asset", t("account.asset_th", "Asset")));
+        headRow.appendChild(sortTh("qty", "QTY"));
+        ["IN ORDERS", "IN VESTING", "IN COLLATERAL"].forEach(function (label) {
           var th = doc.createElement("th");
           th.textContent = label;
           headRow.appendChild(th);
         });
+        headRow.appendChild(sortTh("price", "PRICE(BTS)"));
+        var chg = doc.createElement("th");
+        chg.textContent = "24HR";
+        headRow.appendChild(chg);
+        headRow.appendChild(sortTh("value", "VALUE(BTS)"));
+        var mng = doc.createElement("th");
+        mng.textContent = t("account.manage", "Manage");
+        headRow.appendChild(mng);
         thead.appendChild(headRow);
         table.appendChild(thead);
         var tbody = doc.createElement("tbody");
@@ -1530,7 +1665,8 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
   }
   AccountUI.renderAccount = renderAccount;
   AccountUI.OP_LABELS = AccountUI._history.OP_LABELS;
-  AccountUI._test = { parseAcctQuery: parseAcctQuery, buildAcctQuery: buildAcctQuery };
+  AccountUI._test = { parseAcctQuery: parseAcctQuery, buildAcctQuery: buildAcctQuery,
+    sortPortfolioRows: sortPortfolioRows, renderPortfolio: renderPortfolio };
   if (typeof globalThis !== "undefined") { globalThis.AccountUI = AccountUI; }
 })();
 
