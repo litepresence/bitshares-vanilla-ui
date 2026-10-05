@@ -495,13 +495,10 @@ details.raw > summary {
 .mkt-book .node-table th:first-child, .mkt-bids .node-table th:first-child, .mkt-asks .node-table th:first-child { text-align: left; }
 .mkt-book .node-table td, .mkt-bids .node-table td, .mkt-asks .node-table td { font-size: 12px; padding: 5px 5px; text-align: right; }
 .mkt-book .node-table td:first-child, .mkt-bids .node-table td:first-child, .mkt-asks .node-table td:first-child { text-align: left; }
-/* Book scroll regions: capped height + sticky header (original behavior,
- * native overflow). Phone cards (<560px) keep natural flow — tables hidden. */
 .mkt h1 { font-size: 1.4rem; margin: 8px 0 4px; }
-@media (min-width: 560px) {
-  .book-scroll { max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
-  .book-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
-}
+/* (Book scroll regions live in desk-grid.css — sole source. The old 420px
+ * estimate + sticky header here never won (later file wins ties),
+ * so they were deleted, not moved.) */
 .mkt-trades .node-table th, .mkt-trades .node-table td { padding: 6px 8px;
   font-size: 0.9rem; }
 .mkt-stats { display: flex; flex-wrap: wrap; gap: 4px 24px; }
@@ -1088,6 +1085,10 @@ img.icon-state { filter: none; }
 .wrap.acct .node-table th, .wrap.acct .node-table td { padding: 6px 8px;
   font-variant-numeric: tabular-nums; }
 .wrap.acct .node-table td { font-size: 0.9rem; }
+/* Lifetime badge (account membership tab): a gold ★ + the existing
+ * account.lifetime text. Color via --warn token only (no literal palette);
+ * the star is aria-hidden decoration, the sentence carries the meaning. */
+.ltm-star { color: var(--warn); }
 /* Swap quote + history surfaces sit on --plot-bg like the desk chart panes
  * (visual only — pool-swap-ui.js / pool-detail-ui.js untouched). */
 .swap-hist table td { font-size: 0.9rem; }

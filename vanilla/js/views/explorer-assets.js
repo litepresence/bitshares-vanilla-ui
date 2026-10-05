@@ -1389,11 +1389,26 @@ var ExplorerAssets = (function () {
    * chain has none (ambiguity C) — never faked, never blank. */
   function feedsTab(doc, body, root, myGen) {
     showStatus(doc, body, t("explorer.scanning", "Scanning for smartcoins…"));
-    var lower = "", pages = 0, found = [];
+    var lower = "", pages = 0, found = [], scanned = 0;
+    /* paintCount: honest scan disclosure (assetsTab paintCount precedent):
+     * actual scanned rows vs shown smartcoins — "Showing X of Y scanned
+     * (first 100 assets)". Keyed explorer.feeds_* (12 locales), muted +
+     * aria-live, theme tokens only (no new CSS). WHY helper: both paints
+     * (empty + table) share one sentence so the counts can never drift
+     * from the scan. No params, no return; display-only, never throws. */
+    function paintCount() {
+      var note = DOM.el(doc, "p", "", "muted");
+      note.setAttribute("aria-live", "polite");
+      note.textContent = t("explorer.feeds_showing", "Showing") + ": " + found.length + " " +
+        t("explorer.feeds_of", "of") + " " + scanned + " " +
+        t("explorer.feeds_scanned_suffix", "scanned (first 100 assets)");
+      body.appendChild(note);
+    }
     function scan() {
       Explorer.assetsPage(lower, ASSETS_PAGE).then(function (rows) {
         if (!isCurrent(myGen)) return;
         rows = rows || [];
+        scanned += rows.length;
         rows.forEach(function (a) {
           if (a && a.bitasset_data_id && found.length < FEED_MAX) found.push(a.symbol);
         });
@@ -1412,6 +1427,7 @@ var ExplorerAssets = (function () {
     }
     function paint() {
       DOM.clear(body);
+      paintCount();
       if (found.length === 0) {
         body.appendChild(DOM.el(doc, "p",
           t("explorer.no_smartcoins", "No smartcoins with feeds found on this node. User-issued assets show here once they publish feeds."), "muted"));
@@ -1421,6 +1437,7 @@ var ExplorerAssets = (function () {
       Explorer.feeds(found).then(function (rows) {
         if (!isCurrent(myGen)) return;
         DOM.clear(body);
+        paintCount();
         var tableRows = (rows || []).map(function (f) {
           var sym = anchor(doc, f.symbol, "#/asset/" + f.symbol);
           function priceCell(pair) {

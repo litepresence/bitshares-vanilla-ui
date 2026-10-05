@@ -207,6 +207,73 @@ async function accountSmoke() {
   }
 }
 
+/* Lifetime gold-star badge (backlog-A): the Lifetime branch of
+ * renderMembership paints a ★ badge span (theme token color) + the existing
+ * account.lifetime text with an early return; the non-LTM path is untouched
+ * (status text + upgrade button, no star). Loads the real module in a fresh
+ * sandbox with a stub Chain serving lifetime/basic fixtures. */
+async function lifetimeBadge() {
+  const doc = makeDoc();
+  const LTM = { id: "1.2.7", lifetime_referrer: "1.2.7", membership_expiration_date: "2019-01-01T00:00:00" };
+  const BASIC = { id: "1.2.8", lifetime_referrer: "1.2.1", membership_expiration_date: "2000-01-01T00:00:00" };
+  let fixture = LTM;
+  const sandbox = {
+    console: console,
+    setTimeout: setTimeout,
+    clearTimeout: clearTimeout,
+    setInterval: () => 0,
+    clearInterval: () => {},
+    document: doc,
+    location: { href: "http://localhost/#/account/n1", hash: "#/account/n1" },
+    navigator: {},
+    fetch: () => Promise.reject(new Error("no net")),
+    Chain: { db: async () => 1, call: async () => [fixture] },
+    Tx: {},
+    Credit: {},
+    Format: { formatAmount: (s) => String(s) },
+    Asset: { describe: async () => null },
+    Wallet: { isUnlocked: () => false },
+    Account: { myAccountId: async () => "1.2.7" },
+    HistoryNotice: { actionLink: () => null },
+  };
+  sandbox.globalThis = sandbox;
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync("/workspace/vanilla/js/utils/dom.js", "utf8"), sandbox);
+  vm.runInContext(fs.readFileSync("/workspace/vanilla/js/views/account-membership.js", "utf8"),
+    sandbox, { filename: "account-membership.js" });
+  const M = sandbox.AccountUI && sandbox.AccountUI._membership;
+  check(M && typeof M.renderMembership === "function", "membership module loads standalone");
+
+  // Lifetime fixture: star badge span + lifetime text, early return (no button).
+  const boxL = doc.createElement("div");
+  doc.body.appendChild(boxL);
+  M.renderMembership(doc, boxL, { id: "1.2.7", name: "n1" });
+  await sleep(300);
+  const star = boxL.querySelector(".ltm-star");
+  check(!!star, "lifetime renders a star badge span");
+  check(!!star && /★/.test(star.textContent || ""), "star badge carries a ★ text node");
+  const pL = boxL.querySelector("p");
+  check(!!pL && (pL.children || []).some((c) => c.tagName === "#TEXT" && /Lifetime member/.test(c.textContent || "")),
+    "star badge reuses the account.lifetime text (separate text node)");
+  check(!boxL.querySelector("button"), "lifetime early-returns (no upgrade button)");
+
+  // Basic fixture: untouched path — status text + upgrade button, no star.
+  fixture = BASIC;
+  const boxB = doc.createElement("div");
+  doc.body.appendChild(boxB);
+  M.renderMembership(doc, boxB, { id: "1.2.8", name: "n2" });
+  await sleep(300);
+  check(!boxB.querySelector(".ltm-star"), "non-LTM renders no star");
+  const pB = boxB.querySelector("p");
+  check(!!pB && /Basic account/.test(pB.textContent || ""), "non-LTM status text intact");
+  check(!!boxB.querySelector("button"), "non-LTM keeps the upgrade button");
+
+  // CSS: badge color comes from a theme token only (no literal palette).
+  const css = fs.readFileSync("/workspace/vanilla/css/app.css", "utf8");
+  check(/\.ltm-star\s*\{[^}]*color:\s*var\(--warn\)/.test(css), "ltm-star colors via var(--warn) token");
+}
+
 async function marketSmoke() {
   const doc = makeDoc();
   const store = {};
@@ -314,6 +381,9 @@ async function marketSmoke() {
 (async function main() {
   try { await accountSmoke(); } catch (e) {
     fails.push("account smoke threw: " + (e && e.stack || e));
+  }
+  try { await lifetimeBadge(); } catch (e) {
+    fails.push("lifetime badge threw: " + (e && e.stack || e));
   }
   try { await marketSmoke(); } catch (e) {
     fails.push("market smoke threw: " + (e && e.stack || e));

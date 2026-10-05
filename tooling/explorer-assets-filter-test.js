@@ -94,7 +94,10 @@ var NEW_KEYS = {
   assets_of: "of",
   assets_mode_market: "SmartCoins",
   assets_mode_user: "User-Issued",
-  assets_mode_prediction: "Prediction"
+  assets_mode_prediction: "Prediction",
+  feeds_showing: "Showing",
+  feeds_of: "of",
+  feeds_scanned_suffix: "scanned (first 100 assets)"
 };
 ["en", "es", "de", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt"].forEach(function (code) {
   var d = JSON.parse(fs.readFileSync(
@@ -109,5 +112,24 @@ var en = JSON.parse(fs.readFileSync(
 Object.keys(NEW_KEYS).forEach(function (k) {
   ok(en._meta.translated.indexOf("explorer." + k) !== -1, "en _meta.translated lists explorer." + k);
 });
+
+/* 7. Feeds-tab honest count line (backlog-A): "Showing X of Y scanned
+ * (first 100 assets)" above the feeds table — actual scanned rows vs shown
+ * smartcoins (FEED_SCAN_PAGES=4 x 25 = first 100 list_assets), keyed
+ * explorer.feeds_* in source + all 12 locale dicts, aria-live. */
+var feedsAt = SRC.indexOf("function feedsTab(");
+ok(feedsAt !== -1, "source contains feedsTab");
+ok(SRC.indexOf('t("explorer.feeds_showing", "Showing")') > feedsAt,
+  "feeds count line uses explorer.feeds_showing");
+ok(SRC.indexOf('t("explorer.feeds_of", "of")') > feedsAt,
+  "feeds count line uses explorer.feeds_of");
+ok(SRC.indexOf('t("explorer.feeds_scanned_suffix", "scanned (first 100 assets)")') > feedsAt,
+  "feeds count line uses explorer.feeds_scanned_suffix");
+ok(/scanned\s*\+=/.test(SRC.slice(feedsAt)),
+  "feeds scan accumulates the actual scanned row count");
+ok(SRC.slice(feedsAt).indexOf("found.length") !== -1,
+  "feeds count line uses the actual shown count");
+ok(SRC.slice(feedsAt).indexOf("aria-live") !== -1,
+  "feeds count line is aria-live");
 
 console.log("explorer-assets-filter-test: PASS (" + passed + " checks)");

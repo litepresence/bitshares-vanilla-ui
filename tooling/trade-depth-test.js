@@ -157,6 +157,21 @@ function freshMarket() {
   catch (e) { ok(/bad limit/.test(String(e && e.message)), "limit:0 rejected"); }
   eq(tradeCalls(rec).length, 0, "invalid opts send no WS calls");
 
+  /* Book-scroll height contract (backlog-A dead-rule removal): the app.css
+   * 420px estimate never won (desk-grid.css loads later in index.html with
+   * equal specificity, so the token calc there governs at every width) — it
+   * was deleted, not migrated. Nearest suite: the book region this data
+   * feeds renders into .book-scroll (market-book.js). CSS-shape asserts
+   * follow the button-test.js precedent (read CSS text). */
+  (function bookScrollContract() {
+    var fs2 = require("fs"), path2 = require("path");
+    var app = fs2.readFileSync(path2.join(__dirname, "..", "vanilla", "css", "app.css"), "utf8");
+    var desk = fs2.readFileSync(path2.join(__dirname, "..", "vanilla", "css", "desk-grid.css"), "utf8");
+    ok(!/\.book-scroll\s*\{[^}]*420px/.test(app), "dead 420px book estimate gone from app.css");
+    ok(/\.book-scroll\s*\{[^}]*max-height:\s*calc\(var\(--desk-head-h\)/.test(desk),
+      "desk-grid token calc governs book scroll height");
+  })();
+
   console.log("trade-depth-test: " + pass + " passed, " + fail + " failed");
   process.exit(fail ? 1 : 0);
 })().catch(function (e) { console.log("FATAL " + (e && e.stack || e)); process.exit(1); });

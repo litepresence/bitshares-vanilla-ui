@@ -159,7 +159,12 @@ AccountUI._membership = AccountUI._membership || {};
       var status = memberStatus(full);
       var p = doc.createElement("p");
       if (status === "lifetime") {
-        p.textContent = t("account.lifetime", "Lifetime member.");
+        var star = doc.createElement("span");
+        star.className = "ltm-star";
+        star.setAttribute("aria-hidden", "true");
+        star.textContent = "★ ";
+        p.appendChild(star);
+        p.appendChild(doc.createTextNode(t("account.lifetime", "Lifetime member.")));
         box.appendChild(p);
         return;
       }
