@@ -149,29 +149,30 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   console.log("pulldown-shape: 22 passed, 0 failed");
 })();
 
-/* Six-link bar (nav-six 2026-10-05 owner ruling): Dashboard, Exchange
- * (pool-context-aware), Swap, Credit, Margin, Explore. Liquidity Pools drops
- * off the bar; Credit Offer shortens to Credit. Fake-DOM globals come from
- * the pulldown block above (document/Icon/I18n already stubbed); file-text
- * covers the static fallback + buy-panel removal. Runs after pulldownShape
- * so buildNavLink has a document. */
+/* Six-link bar (nav-six 2026-10-05 owner ruling, pools restore): Dashboard,
+ * Exchange (pool-context-aware), Pools, Credit, Margin, Explore. Swap drops
+ * off the bar (Trade sitemap + direct URL only); Credit Offer shortens to
+ * Credit. Fake-DOM globals come from the pulldown block above
+ * (document/Icon/I18n already stubbed); file-text covers the static
+ * fallback + buy-panel removal. Runs after pulldownShape so buildNavLink
+ * has a document. */
 (function barSix() {
   var fs = require("fs");
   var path = require("path");
-  var wantNav = ["#/", "#/market/BTS_USD", "#/swap", "#/credit-offer",
+  var wantNav = ["#/", "#/market/BTS_USD", "#/pools", "#/credit-offer",
     "#/borrow", "#/explorer"];
   assert.deepStrictEqual(App._test.ORIGINAL_NAV, wantNav, "bar holds 6 links in owner order");
   assert.deepStrictEqual(App._test.NAV_ICONS, {
     "#/": "dashboard",
     "#/market/BTS_USD": "trade",
-    "#/swap": "swap",
+    "#/pools": "poolmart",
     "#/credit-offer": "borrow",
     "#/borrow": "borrow",
     "#/explorer": "server"
-  }, "bar icons wired (swap=swap, margin=borrow)");
+  }, "bar icons wired (pools=poolmart, margin=borrow)");
   assert.strictEqual(App._test.navText("#/"), "Dashboard", "Dashboard label");
   assert.strictEqual(App._test.navText("#/market/BTS_USD"), "Exchange", "Exchange label");
-  assert.strictEqual(App._test.navText("#/swap"), "Swap", "Swap label reuses swap.title");
+  assert.strictEqual(App._test.navText("#/pools"), "Liquidity Pools", "Pools label reuses pools.title");
   assert.strictEqual(App._test.navText("#/credit-offer"), "Credit", "Credit label (nav.credit)");
   assert.strictEqual(App._test.navText("#/borrow"), "Margin", "Margin label (nav.margin)");
   assert.strictEqual(App._test.navText("#/explorer"), "Explore", "Explore label");
@@ -183,7 +184,7 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   var re = /<a\s+href="([^"]+)">([^<]+)<\/a>/g, m;
   while ((m = re.exec(navBlock[1]))) anchors.push([m[1], m[2]]);
   assert.deepStrictEqual(anchors, [
-    ["#/", "Dashboard"], ["#/market/BTS_USD", "Exchange"], ["#/swap", "Swap"],
+    ["#/", "Dashboard"], ["#/market/BTS_USD", "Exchange"], ["#/pools", "Liquidity Pools"],
     ["#/credit-offer", "Credit"], ["#/borrow", "Margin"], ["#/explorer", "Explore"]
   ], "static fallback anchors match the 6-link bar");
   // buildNavLink: every bar href renders an icon + labeled span.

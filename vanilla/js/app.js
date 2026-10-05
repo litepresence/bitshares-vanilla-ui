@@ -64,15 +64,15 @@ var App = (function () {
     { slug: "personal", title: "Personal" }
   ];
 
-  /* ORIGINAL_NAV: the header bar (nav-six 2026-10-05 owner ruling:
-   *   Dashboard, Exchange, Swap, Credit, Margin, Explore). Exchange keeps
-   *   the pool-context swap (setPoolMarket); Liquidity Pools drops off the
-   *   bar (still at #/pools via Trade sitemap); Credit Offer shortens to
-   *   Credit; Swap (#/swap) + Margin (#/borrow) join. The two
+  /* ORIGINAL_NAV: the header bar (nav-six 2026-10-05 owner ruling, pools
+   *   restore: Dashboard, Exchange, Pools, Credit, Margin, Explore).
+   *   Exchange keeps the pool-context swap (setPoolMarket); Swap (#/swap)
+   *   drops off the bar (still reachable via Trade sitemap + direct URL);
+   *   Credit Offer shortens to Credit; Margin (#/borrow) joins. The two
    *   vanilla-original labs (API Lab, ES Lab) are reachable from the Labs
    *   sitemap section only, never the bar (nav-pulldown Task 3 owner
    *   ruling), so boot rebuilds keep 6 links. */
-  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/swap", "#/credit-offer",
+  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/pools", "#/credit-offer",
     "#/borrow", "#/explorer"];
 
   /* Pool-market context (owner: Exchange tab follows the pool you're
@@ -113,13 +113,15 @@ var App = (function () {
     } catch (e) { /* link stands */ }
   }
 
-  /* Nav icons (icon-wiring pass, nav-six 2026-10-05): href -> vendored
-   *   icon name. Mapping cites #1 MenuDataStructure.js:182-299
+  /* Nav icons (icon-wiring pass, nav-six 2026-10-05, pools restore): href
+   *   -> vendored icon name. Mapping cites #1 MenuDataStructure.js:182-299
    *   (dashboard:194, trade:214, server:242; credit uses borrow: #1's
    *   deployment-unit asset renders as a blob at 18px while the IcoMoon
    *   borrow glyph stays crisp — documented deviation, same link/target).
-   *   Swap uses "swap" and Margin (#/borrow) uses "borrow" (both names exist
-   *   in icon.js KNOWN + menu-ui.js SECTIONS, so bar and sitemap agree).
+   *   Pools uses "poolmart" (the icon.js KNOWN name #1's poolmart affordance
+   *   maps to) and Margin (#/borrow) uses "borrow" (menu-ui.js SECTIONS
+   *   Trade cards use their own icon names — "swap" there is untouched by
+   *   this bar mapping, so bar and sitemap agree).
    *   Credit keeps "borrow" (label-only rename Credit Offer -> Credit);
    *   Margin sharing the glyph is intentional (both are borrow-concept
    *   affordances, labels disambiguate). "user"/"voting" are the same
@@ -131,7 +133,7 @@ var App = (function () {
   var NAV_ICONS = {
     "#/": "dashboard",
     "#/market/BTS_USD": "trade",
-    "#/swap": "swap",
+    "#/pools": "poolmart",
     "#/credit-offer": "borrow",
     "#/borrow": "borrow",
     "#/explorer": "server"
@@ -147,7 +149,7 @@ var App = (function () {
     switch (href) {
       case "#/": return t("nav.dashboard", "Dashboard");
       case "#/market/BTS_USD": return t("nav.exchange", "Exchange");
-      case "#/swap": return t("swap.title", "Swap");
+      case "#/pools": return t("pools.title", "Liquidity Pools");
       case "#/credit-offer": return t("nav.credit", "Credit");
       case "#/borrow": return t("nav.margin", "Margin");
       case "#/explorer": return t("nav.explorer", "Explore");
