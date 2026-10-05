@@ -1,8 +1,9 @@
 /* Pool: liquidity-pool (1.19.x) reads + op-data builders + CPMM math.
  * Owns: get/list/mine + history (honest degrade), six builders for ops
  *   59/60/61/62/63/75 ([opId, opData], zero-placeholder fee for live
- *   fee-fill), CPMM quote/slippage, share-mint estimates (shareOut; the
-  *   withdraw leg proves via Pool.get re-read, so shareBack was deleted in
+  *   fee-fill), CPMM quote/slippage, share-mint estimates (shareOut +
+  *   stakeCounterpart auto-fill ratio; the withdraw leg proves via Pool.get
+  *   re-read, so shareBack was deleted in
   *   the slice-18 audit — zero callers), depth points, x·y=k curve points
   *   (dex-ux plot proposal 5 — BigInt port of falcon_app.py:167-202),
  *   the ONLY percent converters (u16 <-> human), fee via Tx.fee (filled IN
@@ -228,6 +229,28 @@ var Pool = (function () {
     if (s <= 0n) throw new Error("deposit-too-small (rounds to zero shares)");
     return { share_raw: s.toString() };
   }
+  /* Proportional stake counterpart (stake auto-fill preview): the other leg's
+   * human amount at exact pool ratio. Params: srcHuman (display string),
+   * srcPrec/dstPrec (0-12), srcBalRaw/dstBalRaw (raw digit strings).
+   * Math: parse srcHuman to raw via Format, then
+   * dstRaw = floor(srcRaw * dstBal / srcBal) in BigInt, formatted with dstPrec.
+   * FLOOR is deliberate (not round-half-up): auto-fill must never over-ask the
+   * other leg past the ratio — the chain mints on the min leg, so a floored leg
+   * simply binds. Dust can floor to zero raw ("0.00000"-style honest zero —
+   * shareOut then reports deposit-too-small, never a silent substitution).
+   * Throws "empty-pool" on zero balances (virgin pools need both legs by hand),
+   * passthrough parse errors otherwise. Pure BigInt; Format only. */
+  function stakeCounterpart(args) {
+    args = args || {};
+    _assertPrecision(args.srcPrec, "srcPrec"); _assertPrecision(args.dstPrec, "dstPrec");
+    _assertDigits(args.srcBalRaw, "srcBalRaw"); _assertDigits(args.dstBalRaw, "dstBalRaw");
+    _needFormat();
+    var srcBal = BigInt(args.srcBalRaw), dstBal = BigInt(args.dstBalRaw);
+    if (srcBal <= 0n || dstBal <= 0n) throw new Error("empty-pool");
+    var srcRaw = Format.parseAmount(String(args.srcHuman), args.srcPrec);
+    var dstRaw = (BigInt(srcRaw) * dstBal) / srcBal;
+    return Format.formatAmount(dstRaw.toString(), args.dstPrec);
+  }
   /* CPMM depth points 0->99% both sides (#2 SimpleSwap depth SHAPE, integer-first; pct is a display pixel). */
   function depthPoints(args, n) {
     args = args || {};
@@ -399,7 +422,7 @@ var Pool = (function () {
   }
 
   return { get: get, list: list, mine: mine, history: history, listForm: listForm,
-    quote: quote, minReceive: minReceive, shareOut: shareOut, depthPoints: depthPoints, curvePoints: curvePoints,
+    quote: quote, minReceive: minReceive, shareOut: shareOut, stakeCounterpart: stakeCounterpart, depthPoints: depthPoints, curvePoints: curvePoints,
     buildCreate: buildCreate, buildDeposit: buildDeposit, buildWithdraw: buildWithdraw,
     buildExchange: buildExchange, buildUpdate: buildUpdate, buildDelete: buildDelete, fee: fee, sendAndProve: sendAndProve,
     pctUnitsToHuman: pctUnitsToHuman, pctHumanToUnits: pctHumanToUnits, DEFAULT_SLIPPAGE_PCT: DEFAULT_SLIPPAGE_PCT };

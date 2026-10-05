@@ -655,7 +655,7 @@ var PoolUI = (function () {
       title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
   return { renderPools: renderPools,
-    _ui: { el: DOM.el, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
+    _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, unlockBox: unlockBox, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,

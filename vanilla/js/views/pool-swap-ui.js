@@ -64,10 +64,18 @@ var PoolSwapUI = (function () {
     wrap.appendChild(u.el(doc, "p", t("pool.swap_sub", "Single-pool swap (one op-63). No multi-hop routing."), "muted"));
     var fSell = u.field(doc, t("pool.sell_asset_field", "Sell asset"), { value: "BTS" });
     var fBuy = u.field(doc, t("pool.buy_asset_field", "Buy asset"), { placeholder: "CNY" });
+    /* Swap-direction button (pool-desk FIX 1): sits between the two asset
+     * inputs; swaps their values and re-runs the Find-pools lookup below
+     * (same handler, no flow fork). Labeled for AT + touch-sized. */
+    var flipBtn = u.touchable(u.el(doc, "button", "⇄"));
+    flipBtn.type = "button"; flipBtn.id = "swap-flip";
+    flipBtn.setAttribute("aria-label", t("pool.swap_direction_label", "Swap sell and buy assets"));
+    flipBtn.title = t("pool.swap_direction_label", "Swap sell and buy assets");
     var fAmt = u.field(doc, t("pool.sell_amount_field", "Sell amount"), { inputmode: "decimal", placeholder: "1.0",
       unit: String(fSell.input.value || "").trim() || "BTS" });
     var fSlip = u.field(doc, t("pool.slippage_field", "Slippage %"), { value: Pool.DEFAULT_SLIPPAGE_PCT, inputmode: "decimal", unit: "%" });
-    [fSell, fBuy, fAmt, fSlip].forEach(function (f) { wrap.appendChild(f.row); });
+    wrap.appendChild(fSell.row); wrap.appendChild(flipBtn); wrap.appendChild(fBuy.row);
+    wrap.appendChild(fAmt.row); wrap.appendChild(fSlip.row);
     /* LOW punchlist: sell/buy balance display. Balances are account-scoped
      * (no new chain read here) — the honest pointer is the account page. */
     (function balanceHint() {
@@ -81,6 +89,16 @@ var PoolSwapUI = (function () {
       wrap.appendChild(p);
     })();
     var find = u.touchable(u.el(doc, "button", t("pool.find_pools", "Find pools"))); find.type = "button"; wrap.appendChild(find);
+    /* Flip wiring (declared after Find exists): swap the asset values, then
+     * re-run the lookup through the same button (disabled mid-flight, so a
+     * flip during a lookup is a safe no-op). */
+    flipBtn.addEventListener("click", function () {
+      if (!live(myGen, uiGen)) return;
+      var s = fSell.input.value;
+      fSell.input.value = fBuy.input.value;
+      fBuy.input.value = s;
+      try { find.click(); } catch (e) { /* values stand without a lookup */ }
+    });
     var pickBox = u.el(doc, "div"); wrap.appendChild(pickBox);
     var quoteBox = u.el(doc, "div"); wrap.appendChild(quoteBox);
     var actionBox = u.el(doc, "div"); wrap.appendChild(actionBox);

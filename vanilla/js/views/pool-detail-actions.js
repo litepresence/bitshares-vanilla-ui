@@ -56,6 +56,91 @@ PoolDetailUI._actions = PoolDetailUI._actions || {};
     var fA = u.field(doc, t("pool.amount_a_field", "Amount A"), { inputmode: "decimal", placeholder: "1.0" });
     var fB = u.field(doc, t("pool.amount_b_field", "Amount B"), { inputmode: "decimal", placeholder: "1.0" });
     box.appendChild(fA.row); box.appendChild(fB.row);
+    /* Proportional auto-fill preview (pool-desk FIX 3): typing in one leg
+     * auto-fills the other at pool ratio via Pool.stakeCounterpart (exact
+     * BigInt FLOOR math — floor never over-asks the other leg past the ratio;
+     * dust can floor to an honest zero and the share line below says so).
+     * Last-edited-wins (the filling guard stops echo loops; a cleared field
+     * mirror-clears its counterpart). Auto-fill is a PREVIEW only — the
+     * Review-stake confirm below still shows the exact integers to sign,
+     * never a silent substitution. Unstake (shares-only) is untouched. */
+    box.appendChild(u.el(doc, "p", t("pool.stake_autofill_hint", "Type one amount — the other auto-fills at pool ratio."), "muted"));
+    var ratioLine = u.el(doc, "p", "", "muted"); ratioLine.id = "pool-stake-ratio";
+    box.appendChild(ratioLine);
+    var shareLine = u.el(doc, "p", "", "muted"); shareLine.id = "pool-stake-shares";
+    try { shareLine.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+    box.appendChild(shareLine);
+    /* Spot ratio line (B-per-A via the BigInt formatPrice path; empty pool ->
+     * honest enter-by-hand note, never a crash). */
+    try {
+      var spot = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      ratioLine.textContent = t("pool.stake_ratio_row", "Ratio (spot)") + ": 1 " + (r.sym_a || r.asset_a_id) +
+        " ≈ " + spot + " " + (r.sym_b || r.asset_b_id);
+    } catch (e) {
+      ratioLine.textContent = t("pool.stake_ratio_empty", "Pool is empty — enter both amounts by hand.");
+    }
+    /* LP share supply for the estimate below (Asset.describe join; null until
+     * resolved or when offline — the share line says so honestly). */
+    var shareSupply = null;
+    shareLine.textContent = t("pool.stake_preview_need_both", "Enter both amounts for a share estimate.");
+    try {
+      if (typeof Asset !== "undefined" && Asset && typeof Asset.describe === "function") {
+        Asset.describe(r.share_id).then(function (a) {
+          if (a && a.supply_raw !== null && a.supply_raw !== undefined) shareSupply = String(a.supply_raw);
+          refreshShare();
+        }).catch(function () { /* need-both/unavailable note stands */ });
+      }
+    } catch (e) { /* note stands */ }
+    /* refreshShare: share-out preview via Pool.shareOut (pool.js BigInt mint
+     * math — min-of-ratios funded, max-raw virgin). Empty fields -> need-both
+     * hint; offline supply -> unavailable note; unparsable/too-small amounts
+     * -> check-amounts note. Never throws outward. */
+    function refreshShare() {
+      var aH = String(fA.input.value || "").trim(), bH = String(fB.input.value || "").trim();
+      if (!aH || !bH) { shareLine.textContent = t("pool.stake_preview_need_both", "Enter both amounts for a share estimate."); return; }
+      if (shareSupply === null) { shareLine.textContent = t("pool.stake_preview_unavailable", "Share estimate unavailable (offline)."); return; }
+      try {
+        var s = Pool.shareOut({ balanceA_raw: String(r.balance_a_raw), balanceB_raw: String(r.balance_b_raw),
+          supply_raw: shareSupply,
+          inA_raw: Format.parseAmount(aH, precOr5(r.prec_a)), inB_raw: Format.parseAmount(bH, precOr5(r.prec_b)) });
+        var sh = u.amtText(s.share_raw, r.share_id, precOr5(r.prec_share), r.sym_share);
+        shareLine.textContent = t("pool.stake_shares_row", "Est. LP shares") + ": " + sh.text;
+        try { shareLine.title = t("account.raw_prefix", "raw ") + sh.raw; } catch (e2) { /* text stands */ }
+      } catch (e) {
+        shareLine.textContent = t("pool.stake_preview_bad", "Check the amounts — no share estimate.");
+      }
+    }
+    var filling = false;
+    /* fillFromA/fillFromB: one leg typed -> counterpart fills the other at
+     * pool ratio (Pool.stakeCounterpart). Empty-pool (virgin) legs throw
+     * "empty-pool" here — the typed value stands and both legs stay hand-set.
+     * Params: none (reads its own input). Returns nothing. */
+    function fillFromA() {
+      if (filling) return;
+      var aH = String(fA.input.value || "").trim();
+      if (!aH) { fB.input.value = ""; refreshShare(); return; }
+      try {
+        var bH = Pool.stakeCounterpart({ srcHuman: aH, srcPrec: precOr5(r.prec_a), dstPrec: precOr5(r.prec_b),
+          srcBalRaw: String(r.balance_a_raw), dstBalRaw: String(r.balance_b_raw) });
+        filling = true; fB.input.value = bH; filling = false;
+      } catch (e) { /* counterpart stands (virgin pool or bad input) */ }
+      refreshShare();
+    }
+    function fillFromB() {
+      if (filling) return;
+      var bH2 = String(fB.input.value || "").trim();
+      if (!bH2) { fA.input.value = ""; refreshShare(); return; }
+      try {
+        var aH2 = Pool.stakeCounterpart({ srcHuman: bH2, srcPrec: precOr5(r.prec_b), dstPrec: precOr5(r.prec_a),
+          srcBalRaw: String(r.balance_b_raw), dstBalRaw: String(r.balance_a_raw) });
+        filling = true; fA.input.value = aH2; filling = false;
+      } catch (e) { /* counterpart stands (virgin pool or bad input) */ }
+      refreshShare();
+    }
+    try {
+      fA.input.addEventListener("input", fillFromA);
+      fB.input.addEventListener("input", fillFromB);
+    } catch (e) { /* fields stand without auto-fill */ }
     u.reviewSection(doc, box, uiGen, t("pool.review_stake", "Review stake"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId());

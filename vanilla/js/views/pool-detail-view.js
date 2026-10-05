@@ -78,6 +78,23 @@ PoolDetailUI._view = PoolDetailUI._view || {};
 
   function precOr5(p) { return (p === null || p === undefined) ? 5 : p; }
 
+  /* orientedRow: pool row with legs swapped for the inverted (A-per-B) desk
+   * (chart-invert wiring). Returns r unchanged when normal; otherwise a
+   * shallow copy with every a/b leg field mirrored (ids, raw balances,
+   * precisions, symbols). Trade forms keep the canonical r — only the
+   * chart/spot/book/tape surfaces consume the oriented copy.
+   * Params: r (pool row), inverted (boolean). Returns a row object. */
+  function orientedRow(r, inverted) {
+    if (!inverted) return r;
+    var o = {}, k;
+    for (k in r) { if (Object.prototype.hasOwnProperty.call(r, k)) o[k] = r[k]; }
+    o.asset_a_id = r.asset_b_id; o.asset_b_id = r.asset_a_id;
+    o.balance_a_raw = String(r.balance_b_raw); o.balance_b_raw = String(r.balance_a_raw);
+    o.prec_a = r.prec_b; o.prec_b = r.prec_a;
+    o.sym_a = r.sym_b; o.sym_b = r.sym_a;
+    return o;
+  }
+
   /** Route entry: #/pools/:id — detail desk mirroring the orderbook desk grid.
    * @param {HTMLElement} root router mount element
    * @param {string} poolId pool object id (1.19.x) or symbol */
@@ -167,11 +184,26 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     strip.appendChild(u.el(doc, "span", "Taker: " + u.pctText(r.taker_units)));
     strip.appendChild(u.el(doc, "span", "Withdrawal: " + u.pctText(r.withdrawal_units)));
     strip.appendChild(u.el(doc, "span", "Share: " + (r.sym_share || r.share_id)));
-    /* Spot price B-per-A (exact BigInt ratio, precOr5 fallbacks — same
-     * orientation as the book and candles below). */
+    /* Spot price (exact BigInt ratio, precOr5 fallbacks — same orientation as
+     * the book and candles below; the chart Invert toggle repaints it via
+     * orient.spotRepaint, swapping B-per-A to A-per-B through the same
+     * formatPrice path — never 1/x float math). */
+    var orient = { inverted: false, spotRepaint: null, bookRepaint: null };
+    var spotEl = null;
+    orient.spotRepaint = function () {
+      if (!spotEl) return;
+      try {
+        var s = orient.inverted
+          ? Format.formatPrice(String(r.balance_a_raw), precOr5(r.prec_a), String(r.balance_b_raw), precOr5(r.prec_b), 8)
+          : Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+        var q = orient.inverted ? (r.sym_a || r.asset_a_id) : (r.sym_b || r.asset_b_id);
+        var b = orient.inverted ? (r.sym_b || r.asset_b_id) : (r.sym_a || r.asset_a_id);
+        spotEl.textContent = t("pool.spot_row", "Spot") + ": " + s + " " + q + "/" + b;
+      } catch (e) { /* last spot stands */ }
+    };
     try {
-      var spot = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
-      var spotEl = u.el(doc, "span", t("pool.spot_row", "Spot") + ": " + spot + " " + (r.sym_b || r.asset_b_id) + "/" + (r.sym_a || r.asset_a_id));
+      var spot0 = Format.formatPrice(String(r.balance_b_raw), precOr5(r.prec_b), String(r.balance_a_raw), precOr5(r.prec_a), 8);
+      spotEl = u.el(doc, "span", t("pool.spot_row", "Spot") + ": " + spot0 + " " + (r.sym_b || r.asset_b_id) + "/" + (r.sym_a || r.asset_a_id));
       strip.appendChild(spotEl);
     } catch (e) { /* strip stands without spot */ }
     /* One tape fetch shared by chart + history (lazy-deep 2026-10-01 audit:
@@ -215,7 +247,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
      * background deepenPool can fill the list when chain-first came up empty.
      * Declared before chartPane — the background resolves after both ran. */
     var histHook = {};
-    chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook);
+    chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook, orient);
     var acts = doc.createElement("section"); acts.className = "mkt-side"; desk.appendChild(acts);
     acts.appendChild(u.el(doc, "h2", t("pool.stake_title", "Stake / unstake")));
     PoolDetailUI._actions.stakeBoxes(doc, acts, r, uiGen);
@@ -226,6 +258,24 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     var book = doc.createElement("section"); book.className = "mkt-book"; desk.appendChild(book);
     book.appendChild(u.el(doc, "h2", t("pool.book_title", "Order book")));
     depthPane(doc, book, r, synthLevels);
+    /* Invert repaint for the book (chart-invert wiring): keep the h2,
+     * re-render the curve + split book through depthPane with the legs
+     * swapped (same BigInt synthBook path, mirrored via orientedRow above).
+     * Params: none (reads orient). Returns nothing; route-gen guarded. */
+    orient.bookRepaint = function () {
+      if (!live(myGen, uiGen)) return;
+      while (book.children.length > 1) book.removeChild(book.lastChild);
+      var rO = orientedRow(r, orient.inverted);
+      var lvO = synthLevels;
+      if (orient.inverted && typeof PoolHistory !== "undefined" && PoolHistory &&
+          typeof PoolHistory.synthBook === "function") {
+        try {
+          lvO = PoolHistory.synthBook({ balanceA_raw: String(r.balance_b_raw), balanceB_raw: String(r.balance_a_raw),
+            precA: precOr5(r.prec_b), precB: precOr5(r.prec_a), taker_units: r.taker_units });
+        } catch (e) { lvO = { bids: [], asks: [] }; }
+      }
+      depthPane(doc, book, rO, lvO);
+    };
     var hist = doc.createElement("section"); hist.className = "mkt-trades"; desk.appendChild(hist);
     hist.appendChild(u.el(doc, "h2", t("pool.pool_history_title", "Pool history")));
     historyPane(doc, hist, r, tape, myGen, uiGen, histHook);
@@ -235,7 +285,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
    * leg, so bucketing happens here over enriched swaps). */
   var POOL_BUCKETS = [60, 300, 900, 1800, 3600, 14400, 86400, 604800];
 
-  function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook) {
+  function chartPane(doc, charts, r, tape, myGen, uiGen, synthLevels, histHook, orient) {
     /* Swap-price candles (ES adapter -> chain fallback) drawn through the
      * SHARED MarketInd stack (timeframes + dropdown menu + LWC price pane +
      * oscillator sub-panes) — the pool desk reads exactly like the exchange
@@ -273,6 +323,48 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     var menuHost = doc.createElement("div");
     menuHost.className = "mkt-indrow";
     controls.appendChild(menuHost);
+    /* Invert toggle (FIX 2, market-desk.js:535-549 semantics): the exchange
+     * desk re-renders the swapped QUOTE_BASE pair via the hash router; a pool
+     * has no pair URL, so this re-renders in place with legs swapped (A-per-B):
+     * candles re-enriched + rebucketed on the swapped legs, the depth slice
+     * recomputed from the mirrored synthBook, and the spot line + book + tape
+     * repainted via the orient hooks. Every number re-derives through the
+     * existing BigInt formatPrice path — no 1/x float math anywhere. The pool
+     * map carries no price orientation (symmetric pair graph), so it only
+     * repaints (theme/resize parity). */
+    var invBtn = u.touchable(u.el(doc, "button", t("pool_detail.invert", "Invert")));
+    invBtn.type = "button"; invBtn.id = "pool-chart-invert";
+    invBtn.setAttribute("aria-label", t("pool_detail.invert_label", "Invert chart orientation (A-per-B / B-per-A)"));
+    invBtn.setAttribute("aria-pressed", "false");
+    controls.appendChild(invBtn);
+    invBtn.addEventListener("click", function () {
+      if (!live(myGen, uiGen)) return;
+      P.inverted = !P.inverted;
+      if (orient) orient.inverted = P.inverted;
+      invBtn.setAttribute("aria-pressed", P.inverted ? "true" : "false");
+      try { orientEnrich(P.swaps); } catch (e) { /* tape renders unpriced */ }
+      paintAssets();
+      try {
+        var lv = orientLevels();
+        if (lv && (lv.asks.length || lv.bids.length) &&
+            typeof Market !== "undefined" && Market && typeof Market.depth === "function") {
+          P.bookDepth = Market.depth({ bids: lv.bids, asks: lv.asks });
+        }
+      } catch (e) { /* depth slice stands */ }
+      /* ES-bucket cache is orientation-bound (timeframe-switch precedent):
+       * drop it so deepenPool re-merges under the new legs. */
+      P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+      rebucket();
+      deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+      try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* map best-effort */ }
+      try { if (orient && typeof orient.spotRepaint === "function") orient.spotRepaint(); } catch (e) { /* spot stands */ }
+      try { if (orient && typeof orient.bookRepaint === "function") orient.bookRepaint(); } catch (e) { /* book stands */ }
+      try {
+        if (histHook && typeof histHook.setTape === "function") {
+          histHook.setTape(P.swaps, P._tapeSource || (tape && tape.source) || null);
+        }
+      } catch (e) { /* tape stands */ }
+    });
     var priceHost = doc.createElement("div");
     priceHost.className = "mkt-price-host";
     plots.appendChild(priceHost);
@@ -298,7 +390,12 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         base: { precision: precOr5(r.prec_b), symbol: r.sym_b || r.asset_b_id },
         quote: { precision: precOr5(r.prec_a), symbol: r.sym_a || r.asset_a_id }
       },
-      swaps: [], precA: precOr5(r.prec_a), precB: precOr5(r.prec_b)
+      swaps: [], precA: precOr5(r.prec_a), precB: precOr5(r.prec_b),
+      /* Invert state (FIX 2): false = B-per-A desk orientation, true =
+       * A-per-B. _tapeSource tracks which tape the history list shows so the
+       * toggle repaints it under the new legs. */
+      inverted: !!(orient && orient.inverted),
+      _tapeSource: (tape && tape.source) || null
     };
     /* Pool->Exchange context (owner): the header Exchange tab follows this
      * pool's pair (QUOTE_BASE orientation like the desk). Guarded: symbol
@@ -309,6 +406,40 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       }
     } catch (e) { /* default market stands */ }
     try { MarketInd.renderIndMenu(doc, menuHost, P); } catch (e) { /* chart works without the menu */ }
+    /* Orientation helpers (invert wiring): normal legs quote B-per-A (desk
+     * header SYMA/SYMB orientation); inverted legs quote A-per-B. Enriching
+     * with swapped (asset, prec) args re-derives prices through the same
+     * BigInt formatPrice path (pool-history.js priceHuman) — never floats. */
+    function orientEnrich(swaps) {
+      if (P.inverted) PoolHistory.enrich(swaps, r.asset_b_id, precOr5(r.prec_b), r.asset_a_id, precOr5(r.prec_a));
+      else PoolHistory.enrich(swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b));
+    }
+    function orientVol() {
+      return P.inverted ? { asset: r.asset_a_id, prec: precOr5(r.prec_a) } : { asset: r.asset_b_id, prec: precOr5(r.prec_b) };
+    }
+    function paintAssets() {
+      if (P.inverted) {
+        P.basePrec = precOr5(r.prec_a); P.quotePrec = precOr5(r.prec_b);
+        P.assets = {
+          base: { precision: precOr5(r.prec_a), symbol: r.sym_a || r.asset_a_id },
+          quote: { precision: precOr5(r.prec_b), symbol: r.sym_b || r.asset_b_id }
+        };
+      } else {
+        P.basePrec = precOr5(r.prec_b); P.quotePrec = precOr5(r.prec_a);
+        P.assets = {
+          base: { precision: precOr5(r.prec_b), symbol: r.sym_b || r.asset_b_id },
+          quote: { precision: precOr5(r.prec_a), symbol: r.sym_a || r.asset_a_id }
+        };
+      }
+    }
+    /* Mirrored depth levels (invert wiring): swapping the synthBook inputs
+     * walks the same CPMM BigInt path (Pool.quote floors + taker haircut)
+     * and yields A-per-B levels for the charts-stack depth slice. */
+    function orientLevels() {
+      if (!P.inverted) return synthLevels;
+      return PoolHistory.synthBook({ balanceA_raw: String(r.balance_b_raw), balanceB_raw: String(r.balance_a_raw),
+        precA: precOr5(r.prec_b), precB: precOr5(r.prec_a), taker_units: r.taker_units });
+    }
     /* Synthetic depth slice (CPMM levels as a cumulative staircase, same
      * visual language as the exchange depth slice): canvas in an osc-sized
      * wrap pinned at stack index 1 by drawCharts via P.depthWrap. Levels
@@ -380,7 +511,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
        * overlap — same chain-wins rule as the market desk). Bucket-keyed:
        * a timeframe switch resets the cache, so stale-bucket merges are
        * impossible. MarketFills missing -> chain buckets stand. */
-      var chainBuckets = PoolHistory.swapsToCandles(P.swaps, P.bucket, r.asset_b_id, P.precB);
+      var vv = orientVol();
+      var chainBuckets = PoolHistory.swapsToCandles(P.swaps, P.bucket, vv.asset, vv.prec);
       var buckets = chainBuckets;
       try {
         if (P.esBuckets && P.esBuckets.length && P._deepBucket === P.bucket &&
@@ -482,7 +614,11 @@ PoolDetailUI._view = PoolDetailUI._view || {};
               });
             });
             if (!out.length) return;
-            try { PoolHistory.enrich(out, poolLive.legA, P.precA, poolLive.legB, P.precB); } catch (e) { /* tape renders unpriced */ }
+            /* Live-tip enrich follows the current orientation (invert wiring). */
+            try {
+              if (P.inverted) PoolHistory.enrich(out, poolLive.legB, P.precB, poolLive.legA, P.precA);
+              else PoolHistory.enrich(out, poolLive.legA, P.precA, poolLive.legB, P.precB);
+            } catch (e) { /* tape renders unpriced */ }
             P.swaps = out.concat(P.swaps).slice(0, 500);
             rebucket();
           } catch (e) { /* scan skips */ }
@@ -557,9 +693,17 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         if (!live(myGen, uiGen)) return;
         var swaps = (res && res.swaps) || [];
         if (!swaps.length) return;
-        try { PoolHistory.enrich(swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b)); } catch (e) { /* tape renders unpriced */ }
+        /* Orientation-bound (invert wiring): the ES tape enriches + buckets
+         * on the current legs, never a cached orientation. */
+        try {
+          if (P.inverted) PoolHistory.enrich(swaps, r.asset_b_id, precOr5(r.prec_b), r.asset_a_id, precOr5(r.prec_a));
+          else PoolHistory.enrich(swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b));
+        } catch (e) { /* tape renders unpriced */ }
         var esBuckets = [];
-        try { esBuckets = PoolHistory.swapsToCandles(swaps, P.bucket, r.asset_b_id, P.precB); } catch (e) { esBuckets = []; }
+        try {
+          var ev = P.inverted ? { asset: r.asset_a_id, prec: precOr5(r.prec_a) } : { asset: r.asset_b_id, prec: precOr5(r.prec_b) };
+          esBuckets = PoolHistory.swapsToCandles(swaps, P.bucket, ev.asset, ev.prec);
+        } catch (e) { esBuckets = []; }
         if (!esBuckets.length) return;
         if (!P.swaps.length) {
           /* Chain was empty (lagging history api): adopt the ES tape for the
@@ -586,6 +730,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           try {
             if (histHook && typeof histHook.setTape === "function") histHook.setTape(P.swaps, "es");
           } catch (e) { /* chart below still paints */ }
+          P._tapeSource = "es";
         }
         P.esBuckets = esBuckets;
         P._deepBucket = P.bucket;
