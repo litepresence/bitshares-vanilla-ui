@@ -1,7 +1,11 @@
-// tooling/history-summary-test.js — vectors for HistorySummary.enrich Task 3.
-// Daily-eight families (tags 0,1,2,77,3,4,19,6): transfer direction trio +
-// name-form viewer + precision-miss dash; label-only fallback + never-rejects
-// from the Task 2 skeleton stay covered. Created by: history one-liners Task 3.
+// tooling/history-summary-test.js — vectors for HistorySummary.enrich Tasks 3+4.
+// Task 3 daily-eight families (tags 0,1,2,77,3,4,19,6): transfer direction
+// trio + name-form viewer + precision-miss dash; label-only fallback +
+// never-rejects from the Task 2 skeleton stay covered. Created by: history
+// one-liners Task 3.
+// Task 4 pool/asset/credit/samet/debit families (tags 59-63,75,10-18,42,43,
+// 47,48,64-68,69-76,25-28): one vector per tag (43+47 share the claim
+// template) + fee-pool unknown-asset fallback. Appended by: history Task 4.
 "use strict";
 var assert = require("assert");
 
@@ -18,11 +22,13 @@ global.I18n = {
 };
 var ASSETS = {
   "1.3.0": { id: "1.3.0", symbol: "BTS", precision: 5 },
-  "1.3.1": { id: "1.3.1", symbol: "USD", precision: 4 }
+  "1.3.1": { id: "1.3.1", symbol: "USD", precision: 4 },
+  "1.3.2": { id: "1.3.2", symbol: "SHARE", precision: 5 }
 };
 var ACCOUNTS = {
   "1.2.1": { id: "1.2.1", name: "alice" },
-  "1.2.2": { id: "1.2.2", name: "bob" }
+  "1.2.2": { id: "1.2.2", name: "bob" },
+  "1.2.3": { id: "1.2.3", name: "carol" }
 };
 global.Chain = {
   db: function () { return Promise.resolve(1); },
@@ -72,6 +78,62 @@ function eq(actual, expected, msg) {
   passed++;
 }
 
+var t4 = [
+  row("1.11.20", 59, { account: "1.2.1", asset_a: "1.3.0", asset_b: "1.3.1" }),
+  row("1.11.21", 60, { account: "1.2.1", pool: "1.19.1" }),
+  row("1.11.22", 61, { account: "1.2.1", pool: "1.19.1",
+    amount_a: { amount: "100000", asset_id: "1.3.0" },
+    amount_b: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.23", 62, { account: "1.2.1", pool: "1.19.1",
+    share_amount: { amount: "50000", asset_id: "1.3.2" } }),
+  row("1.11.24", 63, { account: "1.2.1", pool: "1.19.1",
+    amount_to_sell: { amount: "100000", asset_id: "1.3.0" },
+    min_to_receive: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.25", 75, { account: "1.2.1", pool: "1.19.2" }),
+  row("1.11.26", 10, { issuer: "1.2.1", symbol: "MINE", precision: 5 }),
+  row("1.11.27", 11, { issuer: "1.2.1", asset_to_update: "1.3.1" }),
+  row("1.11.28", 48, { issuer: "1.2.1", asset_to_update: "1.3.1", new_issuer: "1.2.2" }),
+  row("1.11.29", 12, { issuer: "1.2.1", asset_to_update: "1.3.1" }),
+  row("1.11.30", 13, { issuer: "1.2.1", asset_to_update: "1.3.1",
+    new_feed_producers: ["1.2.1", "1.2.2"] }),
+  row("1.11.31", 14, { issuer: "1.2.1",
+    asset_to_issue: { amount: "50000", asset_id: "1.3.1" }, issue_to_account: "1.2.2" }),
+  row("1.11.32", 15, { payer: "1.2.1", amount_to_reserve: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.33", 16, { from_account: "1.2.1", asset_id: "1.3.1", amount: "300000" }),
+  row("1.11.34", 16, { from_account: "1.2.1", asset_id: "1.3.999", amount: "300000" }),
+  row("1.11.35", 17, { account: "1.2.1", amount: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.36", 18, { issuer: "1.2.1", asset_to_settle: "1.3.1" }),
+  row("1.11.37", 42, { account: "1.2.1", amount: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.38", 43, { issuer: "1.2.1", amount_to_claim: { amount: "10000", asset_id: "1.3.1" } }),
+  row("1.11.39", 47, { issuer: "1.2.1", asset_id: "1.3.1",
+    amount_to_claim: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.40", 64, { owner_account: "1.2.1", asset_type: "1.3.0", balance: "200000" }),
+  row("1.11.41", 65, { owner_account: "1.2.1", fund_id: "1.20.1" }),
+  row("1.11.42", 66, { owner_account: "1.2.1", fund_id: "1.20.1" }),
+  row("1.11.43", 67, { borrower: "1.2.2", fund_id: "1.20.1",
+    borrow_amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.44", 68, { account: "1.2.2", fund_id: "1.20.1",
+    repay_amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.45", 69, { owner_account: "1.2.1", asset_type: "1.3.0", balance: "500000" }),
+  row("1.11.46", 70, { owner_account: "1.2.1", offer_id: "1.21.1" }),
+  row("1.11.47", 71, { owner_account: "1.2.1", offer_id: "1.21.1" }),
+  row("1.11.48", 72, { borrower: "1.2.2", offer_id: "1.21.1",
+    borrow_amount: { amount: "100000", asset_id: "1.3.0" },
+    collateral: { amount: "200000", asset_id: "1.3.1" } }),
+  row("1.11.49", 73, { account: "1.2.2", deal_id: "1.22.1",
+    repay_amount: { amount: "50000", asset_id: "1.3.0" } }),
+  row("1.11.50", 76, { account: "1.2.1", deal_id: "1.22.1" }),
+  row("1.11.51", 74, { deal_id: "1.22.1" }),
+  row("1.11.52", 25, { withdraw_from_account: "1.2.1", authorized_account: "1.2.2",
+    withdrawal_limit: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.53", 26, { withdraw_from_account: "1.2.1", authorized_account: "1.2.2",
+    withdrawal_limit: { amount: "200000", asset_id: "1.3.0" } }),
+  row("1.11.54", 27, { withdraw_from_account: "1.2.1", withdraw_to_account: "1.2.2",
+    amount_to_withdraw: { amount: "50000", asset_id: "1.3.0" } }),
+  row("1.11.55", 28, { withdraw_from_account: "1.2.1", authorized_account: "1.2.2",
+    withdrawal_permission: "1.12.1" })
+];
+
 HS.enrich(asAlice, "1.2.1").then(function (out) {
   eq(out, asAlice, "same array");
   eq(out[0]._summary, undefined, "unknown tag stays label-only");
@@ -93,5 +155,43 @@ HS.enrich(asAlice, "1.2.1").then(function (out) {
   return HS.enrich(asStranger, "1.2.9");
 }).then(function (out) {
   eq(out[0]._summary, "Transfer 1.00000 BTS from alice to bob", "tag 0 neither side");
-  console.log("history-summary Task 3: " + passed + " passed");
+  return HS.enrich(t4, "1.2.1");
+}).then(function (out) {
+  eq(out[0]._summary, "Created pool BTS / USD", "tag 59 pool create");
+  eq(out[1]._summary, "Deleted pool 1.19.1", "tag 60 pool delete");
+  eq(out[2]._summary, "Staked 1.00000 BTS + 5.0000 USD in pool 1.19.1", "tag 61 pool deposit");
+  eq(out[3]._summary, "Unstaked 0.50000 SHARE from pool 1.19.1", "tag 62 pool withdraw");
+  eq(out[4]._summary, "Swapped 1.00000 BTS \u2192 at least 5.0000 USD in pool 1.19.1", "tag 63 pool swap");
+  eq(out[5]._summary, "Updated pool 1.19.2", "tag 75 pool update");
+  eq(out[6]._summary, "Created asset MINE", "tag 10 asset create");
+  eq(out[7]._summary, "Updated asset USD", "tag 11 asset update");
+  eq(out[8]._summary, "New issuer for USD: bob", "tag 48 issuer update");
+  eq(out[9]._summary, "Updated smartcoin USD", "tag 12 smartcoin update");
+  eq(out[10]._summary, "Set 2 feed producers for USD", "tag 13 feed producers");
+  eq(out[11]._summary, "Issued 5.0000 USD to bob", "tag 14 asset issue");
+  eq(out[12]._summary, "Burned 1.00000 BTS", "tag 15 asset burn");
+  eq(out[13]._summary, "Funded fee pool of USD with 3.00000 BTS", "tag 16 fee pool fund");
+  eq(out[14]._summary, "Funded fee pool of 1.3.999 with 3.00000 BTS", "tag 16 unknown asset fallback");
+  eq(out[15]._summary, "Requested settlement of 5.0000 USD", "tag 17 settle");
+  eq(out[16]._summary, "Globally settled USD", "tag 18 global settle");
+  eq(out[17]._summary, "Cancelled settlement of 5.0000 USD", "tag 42 settle cancel");
+  eq(out[18]._summary, "Claimed 1.0000 USD in fees", "tag 43 claim fees");
+  eq(out[19]._summary, "Claimed 1.00000 BTS in fees", "tag 47 claim pool");
+  eq(out[20]._summary, "Created SameT fund with 2.00000 BTS", "tag 64 samet create");
+  eq(out[21]._summary, "Deleted SameT fund 1.20.1", "tag 65 samet delete");
+  eq(out[22]._summary, "Updated SameT fund 1.20.1", "tag 66 samet update");
+  eq(out[23]._summary, "Borrowed 1.00000 BTS from fund 1.20.1", "tag 67 samet borrow");
+  eq(out[24]._summary, "Repaid 1.00000 BTS to fund 1.20.1", "tag 68 samet repay");
+  eq(out[25]._summary, "Created credit offer in BTS", "tag 69 offer create");
+  eq(out[26]._summary, "Deleted offer 1.21.1", "tag 70 offer delete");
+  eq(out[27]._summary, "Updated offer 1.21.1", "tag 71 offer update");
+  eq(out[28]._summary, "Borrowed 1.00000 BTS against 20.0000 USD (offer 1.21.1)", "tag 72 offer accept");
+  eq(out[29]._summary, "Repaid 0.50000 BTS on deal 1.22.1", "tag 73 deal repay");
+  eq(out[30]._summary, "Updated deal 1.22.1", "tag 76 deal update");
+  eq(out[31]._summary, "Deal 1.22.1 expired", "tag 74 deal expired");
+  eq(out[32]._summary, "Authorized 1.00000 BTS debit for bob", "tag 25 debit create");
+  eq(out[33]._summary, "Updated 2.00000 BTS debit for bob", "tag 26 debit update");
+  eq(out[34]._summary, "Claimed 0.50000 BTS debit", "tag 27 debit claim");
+  eq(out[35]._summary, "Deleted debit permission 1.12.1", "tag 28 debit delete");
+  console.log("history-summary Tasks 3+4: " + passed + " passed");
 }).catch(function (e) { console.error("FAIL", e); process.exit(1); });
