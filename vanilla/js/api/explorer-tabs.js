@@ -177,16 +177,29 @@ var ExplorerTabs = (function () {
         return;
       }
       var tbl = table(doc, ["Name", "Account", "Active"]);
+      var cards = doc.createElement("div");
+      cards.className = "node-cards";
       rows.slice(0, 50).forEach(function (m) {
+        var label = m.name || m.account_id;
+        var href = "#/account/" + encodeURIComponent(m.name || m.account_id);
         var tr = doc.createElement("tr");
         var td = doc.createElement("td");
-        td.appendChild(link(doc, "#/account/" + encodeURIComponent(m.name || m.account_id), m.name || m.account_id));
+        td.appendChild(link(doc, href, label));
         tr.appendChild(td);
         tr.appendChild(el(doc, "td", m.account_id || "—"));
         tr.appendChild(el(doc, "td", m.active ? "yes" : "—"));
         tbl.tbody.appendChild(tr);
+        var card = doc.createElement("div");
+        card.className = "node-card";
+        var headline = doc.createElement("div");
+        headline.appendChild(link(doc, href, label));
+        card.appendChild(headline);
+        card.appendChild(el(doc, "div", m.account_id || "—", "muted"));
+        card.appendChild(el(doc, "div", m.active ? "yes" : "—"));
+        cards.appendChild(card);
       });
       body.appendChild(tbl.table);
+      body.appendChild(cards);
       var p = el(doc, "p", null, "muted");
       p.appendChild(link(doc, "#/voting", "Open voting for weights and slates →"));
       body.appendChild(p);
