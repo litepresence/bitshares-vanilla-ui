@@ -77,11 +77,34 @@ var ExplorerAssets = (function () {
    * mode market|user|prediction (default market = SmartCoins), q text filter,
    * perPage 10/25/50/100, sortKey symbol|issuer|supply + dir 1|-1. Module-level
    * so Next/Prev page turns keep the user's filter/sort (shell re-invokes
-   * assetsTab with new lower/stack but same state). Plain literals for new
-   * labels (no new t() keys) so check_i18n stays green without touching
-   * vanilla/locales/* — file-scope punchlist constraint. */
+   * assetsTab with new lower/stack but same state) — session memory, never
+   * localStorage (view state, not settings; polish Task 7). Mode labels +
+   * the Showing line are keyed explorer.assets_* (12 locales). */
   var assetState = { mode: "market", q: "", perPage: 25, sortKey: "symbol", sortDir: 1 };
   var ROW_OPTIONS = [10, 25, 50, 100];
+
+  /* normalizeAssetMode: clamp any stored mode to the three known filters.
+   * WHY: session memory persists the last mode; unknown values (future
+   *   modes, corrupt state) fall back to market — today's first-paint
+   *   default — instead of matching everything (the old unclamped path).
+   * @param {any} m candidate mode
+   * @returns {string} "market"|"user"|"prediction" */
+  function normalizeAssetMode(m) {
+    if (m === "market" || m === "user" || m === "prediction") return m;
+    return "market";
+  }
+
+  /* assetModeLabel: keyed display name for a (possibly unclamped) mode.
+   * WHY helper: the radios + the honest Showing line share one source so
+   *   they can never drift apart; display-only, never throws.
+   * @param {any} mode candidate mode (clamped inside)
+   * @returns {string} keyed SmartCoins/User-Issued/Prediction label */
+  function assetModeLabel(mode) {
+    var m = normalizeAssetMode(mode);
+    if (m === "user") return t("explorer.assets_mode_user", "User-Issued");
+    if (m === "prediction") return t("explorer.assets_mode_prediction", "Prediction");
+    return t("explorer.assets_mode_market", "SmartCoins");
+  }
 
   /* Permission/flag bit labels (chain truth: protocol/types.hpp
    * asset_issuer_permission_flags). Duplicated plain list per doctrine rule 5
@@ -385,9 +408,14 @@ var ExplorerAssets = (function () {
    *   Bitasset 2.4.x joins ride the same flow for the prediction filter. */
   function assetsTab(doc, body, root, myGen, lower, stack) {
     DOM.clear(body);
+    /* Session memory (polish Task 7): the module-level assetState already
+     * survives re-renders within the session — clamp (never reset) so an
+     * unknown stored value falls back to market, today's first-paint
+     * default. Never localStorage: filter state is view state, not settings. */
+    assetState.mode = normalizeAssetMode(assetState.mode);
     /* Filter bar (rebuilt per page turn with state values preserved; table
-     * repaints below it so typing never loses focus). New labels are plain
-     * literals (no new t() keys) per the file-scope i18n note above. */
+     * repaints below it so typing never loses focus). Mode labels + the
+     * Showing line below are keyed explorer.assets_* (12 locales). */
     var bar = DOM.el(doc, "div", null, "xplore-filters");
     /* Inline flex (no new CSS): wraps on 360px phones, one row on desktop.
      * Principle #7 — no hover-dependent UI, everything tap-sized. */
@@ -404,7 +432,7 @@ var ExplorerAssets = (function () {
     touchable(search);
     search.style.minWidth = "180px";
     bar.appendChild(search);
-    var modes = [["market", "SmartCoins"], ["user", "User-Issued"], ["prediction", "Prediction"]];
+    var modes = [["market", assetModeLabel("market")], ["user", assetModeLabel("user")], ["prediction", assetModeLabel("prediction")]];
     var radioWrap = DOM.el(doc, "span", null, "xplore-radios");
     radioWrap.setAttribute("role", "radiogroup");
     radioWrap.setAttribute("aria-label", t("explorer.asset_type_filter", "Asset type filter"));
@@ -415,9 +443,9 @@ var ExplorerAssets = (function () {
       inp.type = "radio";
       inp.name = "xplore-asset-filter";
       inp.value = m[0];
-      if (assetState.mode === m[0]) inp.checked = true;
+      if (normalizeAssetMode(assetState.mode) === m[0]) inp.checked = true;
       inp.addEventListener("change", function () {
-        assetState.mode = m[0];
+        assetState.mode = normalizeAssetMode(m[0]);
         paintCached();
       });
       lab.appendChild(inp);
@@ -446,6 +474,13 @@ var ExplorerAssets = (function () {
     perLab.appendChild(perSel);
     bar.appendChild(perLab);
     body.appendChild(bar);
+    /* Honest Showing line (polish Task 7, markets-tab precedent): names the
+     * active filter + filtered/total counts above the table ("Showing:
+     * SmartCoins — 5 of 25"). Muted text, aria-live, theme tokens only
+     * (no new CSS). Updated by paintCount on every repaint. */
+    var countLine = DOM.el(doc, "p", "", "muted");
+    countLine.setAttribute("aria-live", "polite");
+    body.appendChild(countLine);
     var tableWrap = DOM.el(doc, "div", null, "xplore-tablewrap");
     body.appendChild(tableWrap);
     var navWrap = DOM.el(doc, "div", null, "xplore-nav");
@@ -515,14 +550,17 @@ var ExplorerAssets = (function () {
     }
     /* filteredSorted: apply mode/search filter + sortKey sort over allRows.
      * WHY separate: paintCached reuses it on every keystroke/sort without re-fetch.
+     * Mode reads through normalizeAssetMode so an unknown stored value
+     * behaves as market (first-paint default), never match-everything.
      * No params; returns a new array (BigInt supply compare, nulls last). */
     function filteredSorted() {
       var q = (assetState.q || "").toUpperCase();
+      var mode = normalizeAssetMode(assetState.mode);
       var out = (allRows || []).filter(function (r) {
         if (!r || !r.a) return false;
-        if (assetState.mode === "market" && !(r.isSmart && !r.isPrediction)) return false;
-        if (assetState.mode === "user" && r.isSmart) return false;
-        if (assetState.mode === "prediction" && !(r.isSmart && r.isPrediction)) return false;
+        if (mode === "market" && !(r.isSmart && !r.isPrediction)) return false;
+        if (mode === "user" && r.isSmart) return false;
+        if (mode === "prediction" && !(r.isSmart && r.isPrediction)) return false;
         if (q && String(r.a.symbol || "").toUpperCase().indexOf(q) === -1) return false;
         return true;
       });
@@ -555,6 +593,20 @@ var ExplorerAssets = (function () {
       if (assetState.sortKey !== key) return "";
       return assetState.sortDir >= 0 ? " ▲" : " ▼";
     }
+    /* paintCount: refresh the honest Showing line (markets-tab precedent).
+     * WHY helper: empty + non-empty paints share one sentence so the count
+     *   can never drift from the filtered view; display-only, never throws.
+     * @param {Array} view filtered rows just painted
+     * @returns {void} */
+    function paintCount(view) {
+      try {
+        var total = (allRows || []).length;
+        var shown = (view || []).length;
+        countLine.textContent = t("explorer.assets_showing", "Showing") + ": " +
+          assetModeLabel(assetState.mode) + " — " + shown + " " +
+          t("explorer.assets_of", "of") + " " + total;
+      } catch (e) { /* display-only */ }
+    }
     /* paintCached: repaint the cached allRows via filteredSorted (gen-guarded).
      * WHY cached: search/sort/paging repaint locally; chain reads happen once.
      * No params, no return; empty view shows an honest muted line. */
@@ -564,6 +616,7 @@ var ExplorerAssets = (function () {
       DOM.clear(tableWrap);
       DOM.clear(navWrap);
       var view = filteredSorted();
+      paintCount(view);
       if (view.length === 0) {
         tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
       } else {
@@ -658,6 +711,8 @@ var ExplorerAssets = (function () {
       rows = rows || [];
       if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
         DOM.clear(tableWrap);
+        allRows = [];
+        paintCount([]);
         tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
         return;
       }
@@ -1400,7 +1455,8 @@ var ExplorerAssets = (function () {
     assetsTab: assetsTab,
     renderAsset: renderAsset,
     feedsTab: feedsTab,
-    _test: { pctHundredths: pctHundredths, ratio1000: ratio1000, lifetimeText: lifetimeText, parseHolders: _parseHolders }
+    _test: { pctHundredths: pctHundredths, ratio1000: ratio1000, lifetimeText: lifetimeText, parseHolders: _parseHolders,
+      normalizeAssetMode: normalizeAssetMode, assetModeLabel: assetModeLabel }
   };
 })();
 
