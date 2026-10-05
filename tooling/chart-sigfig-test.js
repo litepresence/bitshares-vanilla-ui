@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* chart-sigfig-test.js — offline vectors for satoshi-scale chart readability.
  * 4 significant figures on price charts: magnitude-aware decimal places for
- * candle human strings + lightweight-charts axis precision.
+ * candle human strings + lightweight-charts custom axis formatter (per-tick
+ * Format.priceSig: plain <= 9 digits, else sci).
  * Stdlib only: `node tooling/chart-sigfig-test.js` (exit 0 = green).
  * Covers pure helpers with no DOM, no network, no LWC build, no deps.
  */
@@ -49,21 +50,37 @@ passed++;
 var big = globalThis.Format.formatPrice("123450000", 5, "100000", 5, Format.sigFigPlaces(["1234.5"]));
 eq(big, "1235", "1234.5 rounds to 4 sig figs at 0 places");
 
-/* LWC axis precision (charts-lwc.js pricePrecision): same 4-sig-fig rule on
- * pixel bars; null leaves the library defaults (empty/zero-only as today).
- * Oscillator panes never take precision (untouched by design). */
+/* LWC axis tick formatter (charts-lwc.js priceTick): per-tick global 4-sf
+ * rule via Format.priceSig — plain fixed-point when <= 9 digits, else sci.
+ * The vendored build supports type:"custom" (verified: the standalone
+ * production bundle's series-formatter switch has a `case"custom"` branch
+ * reading priceFormat.formatter, with a tickmarksFormatter ?? map fallback).
+ * Oscillator panes never take a priceFormat (untouched by design). */
 var ChartsLwc = require("../vanilla/js/api/charts-lwc.js");
-var PP = ChartsLwc._test.pricePrecision;
-assert.ok(typeof PP === "function", "pricePrecision exported for vectors");
+assert.ok(typeof ChartsLwc._test.priceTick === "function", "priceTick exported for vectors");
 passed++;
-function bar(o, h, l, c) { return { time: 1, open: o, high: h, low: l, close: c }; }
-eq(PP([bar(0.0000001234, 0.00000013, 0.00000012, 0.0000001234)], undefined), 10, "tiny bars -> 10");
-eq(PP([bar(1234.5, 1235, 1234, 1234.5)], undefined), 0, "large bars -> 0");
-eq(PP([bar(1.2345, 1.24, 1.23, 1.2345)], undefined), 3, "unit bars -> 3");
-eq(PP([], undefined), null, "empty bars -> null (defaults stand)");
-eq(PP([bar(0, 0, 0, 0)], undefined), null, "zero-only bars -> null (as today)");
-eq(PP([bar(1.2345, 1.24, 1.23, 1.2345)], 10), 10, "explicit precision wins");
-eq(PP([bar(1.2345, 1.24, 1.23, 1.2345)], 99), 3, "invalid explicit falls back to derived");
+assert.ok(typeof ChartsLwc._test.priceFormatCustom === "function", "priceFormatCustom exported");
+passed++;
+var PT = ChartsLwc._test.priceTick;
+eq(PT(1.2345), "1.234", "unit tick -> plain 4sf (toPrecision display rounding)");
+eq(PT(1234.5), "1235", "large tick -> plain 4sf, no decimals");
+eq(PT(0.0000001234), "1.234e-7", "dust tick -> sci (sub-1e-9 cap retired for the axis)");
+eq(PT("0.0000001234"), "1.234e-7", "dust string tick -> sci");
+eq(PT(0), "0", "zero tick -> 0 (safe)");
+eq(PT(null), "", "null tick -> empty (safe)");
+eq(PT(undefined), "", "undefined tick -> empty (safe)");
+eq(PT(""), "", "empty string tick -> empty (safe)");
+var PF = ChartsLwc._test.priceFormatCustom();
+eq(PF.type, "custom", "price pane format type custom");
+assert.ok(typeof PF.formatter === "function", "custom formatter is a function");
+passed++;
+assert.ok(typeof PF.tickmarksFormatter === "function", "tickmarks formatter is a function");
+passed++;
+var mapped = PF.tickmarksFormatter([1.2345, 0.0000001234]);
+assert.deepStrictEqual(mapped, ["1.234", "1.234e-7"], "axis array maps exactly like crosshair labels");
+passed++;
+assert.deepStrictEqual(PF.tickmarksFormatter("not-an-array"), [], "non-array tickmarks -> [] (never throws)");
+passed++;
 
 /* Headless LWC wiring (DOM-shape asserts — no LWC build, no canvas): stub the
  * vendored global, capture the series options the price pane passes. */
@@ -90,12 +107,18 @@ eq(PP([bar(1.2345, 1.24, 1.23, 1.2345)], 99), 3, "invalid explicit falls back to
   eq(h.kind, "lwc", "tiny price pane builds an LWC chart headless");
   assert.ok(seen.length >= 1, "candle series created");
   passed++;
-  eq(seen[0].opts.precision, 10, "candle series carries precision 10");
-  eq(seen[0].opts.priceFormat.type, "price", "candle series priceFormat type price");
-  eq(seen[0].opts.priceFormat.precision, 10, "candle priceFormat precision 10");
-  assert.ok(Math.abs(seen[0].opts.priceFormat.minMove - 1e-10) < 1e-20, "candle minMove 1e-10 (got " + seen[0].opts.priceFormat.minMove + ")");
+  assert.ok(!("precision" in seen[0].opts), "candle series carries no fixed precision (custom per-tick)");
   passed++;
-  /* Overlay lines on the price scale share the precision ... */
+  eq(seen[0].opts.priceFormat.type, "custom", "candle series priceFormat type custom");
+  assert.ok(typeof seen[0].opts.priceFormat.formatter === "function", "candle formatter is a function");
+  passed++;
+  eq(seen[0].opts.priceFormat.formatter(0.0000001234), "1.234e-7", "candle formatter dust -> sci");
+  eq(seen[0].opts.priceFormat.formatter(1.2345), "1.234", "candle formatter unit -> plain 4sf");
+  assert.deepStrictEqual(
+    seen[0].opts.priceFormat.tickmarksFormatter([1.2345, 0.0000001234]),
+    ["1.234", "1.234e-7"], "axis tickmarks map exactly like crosshair labels");
+  passed++;
+  /* Overlay lines on the price scale share the custom format ... */
   seen = [];
   var host2 = {};
   ChartsLwc.drawPricePane(null, host2, {
@@ -104,7 +127,8 @@ eq(PP([bar(1.2345, 1.24, 1.23, 1.2345)], 99), 3, "invalid explicit falls back to
   });
   assert.ok(seen.length === 2, "candle + one overlay series (got " + seen.length + ")");
   passed++;
-  eq(seen[1].opts.precision, 10, "overlay line shares precision 10");
+  eq(seen[1].opts.priceFormat.type, "custom", "overlay line shares custom format");
+  eq(seen[1].opts.priceFormat.formatter(0.0000001267), "1.267e-7", "overlay formatter dust -> sci");
   /* ... but oscillator panes stay untouched (no precision key, fixed scales). */
   seen = [];
   var host3 = { _lwcToken: 0 };
