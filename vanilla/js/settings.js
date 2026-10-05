@@ -135,14 +135,8 @@ var SettingsPage = (function () {
     wrap.appendChild(loc.error);
     var localeSelect = loc.select, localeError = loc.error, currentLocale = loc.currentLocale;
 
-    /* Locked view-as section (exactly one, always last): the settings route
-     * clears its root first, so re-renders replace, never accumulate. The
-     * header account button navigates here (app.js goToViewingAs). */
-    try {
-      if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
-        wrap.appendChild(ViewingAs.renderSection(doc));
-      }
-    } catch (e) { /* settings stand without viewing */ }
+    /* View-as lives on #/login now (owner relocation): ViewingAs stays
+     * the shared builder, AuthUI owns the mount (both lock branches). */
 
     /* Card Select/Selected labels go stale without a rerender (radios flip
      * natively). Refresh after every selection; full render only when the

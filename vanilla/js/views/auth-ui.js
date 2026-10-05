@@ -278,6 +278,14 @@ var AuthUI = (function () {
         ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
       ]));
       mountSigning(doc, wrap, root);
+      /* View-as lives here now (owner relocation from Settings): inline
+       * section, self-wiring (Go/Reset owned by the builder, no login
+       * wiring needed). Visible regardless of lock state, always last. */
+      try {
+        if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
+          wrap.appendChild(ViewingAs.renderSection(doc));
+        }
+      } catch (e) { /* login stands without viewing */ }
       return;
     }
     /* Card A: local model — password straight into Wallet.unlock (wallet-ui.js
@@ -388,6 +396,13 @@ var AuthUI = (function () {
       ["#/existing-account", t("common.import_existing", "Import existing account")]
     ]));
     mountSigning(doc, wrap, root);
+    /* View-as (locked branch): same mount as the unlocked branch above —
+     * visible regardless of lock state, always last. */
+    try {
+      if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
+        wrap.appendChild(ViewingAs.renderSection(doc));
+      }
+    } catch (e) { /* login stands without viewing */ }
   }
 
   /* /registration — dual-card choice hub (RegistrationSelector.jsx:60-108 +

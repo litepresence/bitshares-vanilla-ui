@@ -64,7 +64,7 @@ var ViewingAs = (function () {
   }
   /* buildBox: the picker controls (heading + hint + input + Go/Reset/[×]).
    * Params: doc (document), closable (bool — × button only in modal use;
-   *   the inline settings section has no close). Returns the box element.
+   *   the inline login section has no close). Returns the box element.
    * Never throws out (callers are click/render paths). */
   function buildBox(doc, closable) {
     var box = doc.createElement("div");
@@ -149,9 +149,9 @@ var ViewingAs = (function () {
     try { input.focus(); } catch (e) { /* display-only */ }
     return box;
   }
-  /* renderSection: inline locked view-as section for the bottom of #/settings.
+  /* renderSection: inline locked view-as section for the bottom of #/login.
    * Params: doc (document). Returns <section id="viewing-as"> (exactly one per
-   * render — the settings route clears its root first, so re-renders replace,
+   * render — the login route clears its root first, so re-renders replace,
    * never accumulate). No close button (nothing to dismiss inline). */
   function renderSection(doc) {
     var sec = doc.createElement("section");

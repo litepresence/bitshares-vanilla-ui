@@ -526,16 +526,16 @@ var App = (function () {
   }
 
   /* bindViewingAsOnce: header #acting-as click (locked only) + repaint
-   *   subscription. Locked click navigates to #/settings and scrolls the
+   *   subscription. Locked click navigates to #/login and scrolls the
    *   inline view-as section to the top of the viewport (goToViewingAs);
-   *   the picker itself lives exactly once at the bottom of settings
-   *   (settings.js appends ViewingAs.renderSection; the route clears its
-   *   root first, so copies cannot accumulate). Unlocked clicks keep the
-   *   wallet identity (no-op). Repaint flows through the ViewingAs
-   *   subscription. Wired once in finishBoot next to bindLockOnce.
-   *   Params: none. Returns nothing. Fails: never throws — missing
-   *   ViewingAs/DOM is a no-op (safe direction: header keeps the 1.2.0
-   *   default via paintActingAs). */
+   *   the picker itself lives exactly once at the bottom of login
+   *   (auth-ui.js renderLogin appends ViewingAs.renderSection in both lock
+   *   branches; the route clears its root first, so copies cannot
+   *   accumulate). Unlocked clicks keep the wallet identity (no-op).
+   *   Repaint flows through the ViewingAs subscription. Wired once in
+   *   finishBoot next to bindLockOnce. Params: none. Returns nothing.
+   *   Fails: never throws — missing ViewingAs/DOM is a no-op (safe
+   *   direction: header keeps the 1.2.0 default via paintActingAs). */
   function bindViewingAsOnce() {
     if (typeof document === "undefined") return;
     try {
@@ -554,11 +554,11 @@ var App = (function () {
     });
   }
 
-  /* goToViewingAs: navigate to #/settings and bring #viewing-as to the top
-   * of the viewport. Thin wrapper over goToSection (the shield badge rides
-   * the same helper to the #/login #sign-block). */
+  /* goToViewingAs: navigate to #/login and bring #viewing-as to the top
+   * of the viewport. Thin wrapper over goToSection (same helper the shield
+   * badge rides to the #/login #sign-block). */
   function goToViewingAs() {
-    goToSection("viewing-as", "#/settings");
+    goToSection("viewing-as", "#/login");
   }
 
   /* goToSection: navigate to a route and bring one section to the top of
