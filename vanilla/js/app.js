@@ -66,9 +66,8 @@ var App = (function () {
 
   /* ORIGINAL_NAV: the header bar (nav-six 2026-10-05 owner ruling, pools
    *   restore: Dashboard, Exchange, Pools, Credit, Margin, Explore).
-   *   Exchange keeps the pool-context swap (setPoolMarket); Swap (#/swap)
-   *   drops off the bar (still reachable via Trade sitemap + direct URL);
-   *   Credit Offer shortens to Credit; Margin (#/borrow) joins. The two
+   *   Exchange keeps the pool-context swap (setPoolMarket); Credit Offer
+   *   shortens to Credit; Margin (#/borrow) joins. The two
    *   vanilla-original labs (API Lab, ES Lab) are reachable from the Labs
    *   sitemap section only, never the bar (nav-pulldown Task 3 owner
    *   ruling), so boot rebuilds keep 6 links. */
@@ -120,7 +119,7 @@ var App = (function () {
    *   borrow glyph stays crisp — documented deviation, same link/target).
    *   Pools uses "poolmart" (the icon.js KNOWN name #1's poolmart affordance
    *   maps to) and Margin (#/borrow) uses "borrow" (menu-ui.js SECTIONS
-   *   Trade cards use their own icon names — "swap" there is untouched by
+   *   Trade cards use their own icon names, untouched by
    *   this bar mapping, so bar and sitemap agree).
    *   Credit keeps "borrow" (label-only rename Credit Offer -> Credit);
    *   Margin sharing the glyph is intentional (both are borrow-concept

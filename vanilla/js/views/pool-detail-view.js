@@ -552,7 +552,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       return;
     }
     if (!swaps.length) {
-      note.textContent = t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap.");
+      note.textContent = t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from the Swap panel above.");
       deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
       return;
     }
@@ -1173,7 +1173,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       if (!source) {
         poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
       } else if (!swaps.length) {
-        poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from #/swap."), "muted"));
+        poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from the Swap panel above."), "muted"));
       } else {
         var scroller = doc.createElement("div");
         scroller.className = "pool-hist-scroll";
@@ -1219,7 +1219,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       function drawMine(mine) {
         if (!live(g1, g2)) return;
         u.clearBox(listBox);
-        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + t("pool.my_swaps_hint", " Run one from #/swap — your swaps in this pool list here."), "muted")); return; }
+        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + t("pool.my_swaps_hint", " Run one from the Swap panel above — your swaps in this pool list here."), "muted")); return; }
         var scroller = doc.createElement("div");
         scroller.className = "pool-hist-scroll";
         scroller.appendChild(tapeTable(doc, mine.slice(0, 20), row));

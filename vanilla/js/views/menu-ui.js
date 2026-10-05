@@ -48,7 +48,7 @@ var MenuUI = (function () {
    *   About card (about spec 2026-10-04), and the Labs/Personal split
    *   (nav-pulldown Task 3, owner ruling 2026-10-04: API Lab + ES Lab in
    *   NEITHER menu, reached via the Labs TOC page):
-   *   wallet 14, trade 9, earn 7, govern 4, explore 9, labs 3, personal 7 = 53.
+   *   wallet 14, trade 8, earn 7, govern 4, explore 9, labs 3, personal 7 = 52.
    * Icons are icon.js KNOWN names (decorative <img>, never load-bearing).
    * Detail routes (/pools/:id, /asset/:symbol, …) are never listed — their
    * list parents link onward, as in #1. */
@@ -79,7 +79,6 @@ var MenuUI = (function () {
         { href: "#/market/BTS_USD", icon: "trade", titleKey: "menu.p_exchange", titleDefault: "Exchange", blurbKey: "menu.d_exchange", blurbDefault: "Order book, charts, and buy/sell desk." },
         { href: "#/instant-trade", icon: "instant-trade", titleKey: "menu.p_instant", titleDefault: "Instant Trade", blurbKey: "menu.d_instant", blurbDefault: "One-screen buy and sell at market price." },
         { href: "#/pools", icon: "pools", titleKey: "menu.p_pools", titleDefault: "Liquidity Pools", blurbKey: "menu.d_pools", blurbDefault: "Supply pairs and earn swap fees." },
-        { href: "#/swap", icon: "swap", titleKey: "menu.p_swap", titleDefault: "Swap", blurbKey: "menu.d_swap", blurbDefault: "Instant pool trade with a slippage guard." },
         { href: "#/borrow", icon: "borrow", titleKey: "menu.p_borrow", titleDefault: "Borrow", blurbKey: "menu.d_borrow", blurbDefault: "Borrow smartcoins against BTS collateral." },
         { href: "#/barter", icon: "barter", titleKey: "menu.p_barter", titleDefault: "Barter", blurbKey: "menu.d_barter", blurbDefault: "Propose direct asset-for-asset trades." },
         { href: "#/deposit-withdraw", icon: "deposit", titleKey: "menu.p_gateway", titleDefault: "Deposit / Withdraw", blurbKey: "menu.d_gateway", blurbDefault: "Gateway bridges to outside chains." },

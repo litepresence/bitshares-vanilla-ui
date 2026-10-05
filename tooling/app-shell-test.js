@@ -134,7 +134,6 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   });
   assert.ok(!panel.querySelector("a[href='#/']"), "no dashboard duplication");
   assert.ok(!panel.querySelector("a[href='#/market/BTS_USD']"), "no Exchange duplication");
-  assert.ok(!panel.querySelector("a[href='#/swap']"), "no Swap duplication");
   assert.ok(!panel.querySelector("a[href='#/credit-offer']"), "no Credit duplication");
   assert.ok(!panel.querySelector("a[href='#/borrow']"), "no Margin duplication");
   assert.ok(!panel.querySelector("a[href='#/explorer']"), "no Explore duplication");
@@ -146,12 +145,12 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   assert.ok(/#nav-directory\s*\{[^}]*position:\s*fixed/.test(css), "directory is a fixed overlay, not in-flow");
   assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*display:\s*flex/.test(css), "pulldown lays out as flex");
   assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*flex-direction:\s*column/.test(css), "pulldown stacks vertically (one per row)");
-  console.log("pulldown-shape: 22 passed, 0 failed");
+  console.log("pulldown-shape: 21 passed, 0 failed");
 })();
 
 /* Six-link bar (nav-six 2026-10-05 owner ruling, pools restore): Dashboard,
- * Exchange (pool-context-aware), Pools, Credit, Margin, Explore. Swap drops
- * off the bar (Trade sitemap + direct URL only); Credit Offer shortens to
+ * Exchange (pool-context-aware), Pools, Credit, Margin, Explore. Standalone
+ * Swap is deleted (pools desk owns swapping now); Credit Offer shortens to
  * Credit. Fake-DOM globals come from the pulldown block above
  * (document/Icon/I18n already stubbed); file-text covers the static
  * fallback + buy-panel removal. Runs after pulldownShape so buildNavLink

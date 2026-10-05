@@ -13,7 +13,7 @@ eq(MenuUI.SECTIONS.length, 7, "seven sections");
 eq(MenuUI._test.sectionSlugs().join(","), "wallet,trade,earn,govern,explore,labs,personal", "slug order");
 var all = [];
 MenuUI.SECTIONS.forEach(function (s) { s.links.forEach(function (l) { all.push(l.href); }); });
-eq(all.length, 53, "53 listed pages");
+eq(all.length, 52, "52 listed pages");
 eq(new Set(all).size, all.length, "no href listed twice (single-home)");
 ["#/", "#/transfer", "#/market/BTS_USD", "#/samet", "#/barter", "#/spotlight",
  "#/direct-debit", "#/api-lab", "#/es-lab", "#/txbuilder", "#/ops", "#/top-ops",
@@ -21,6 +21,7 @@ eq(new Set(all).size, all.length, "no href listed twice (single-home)");
   ok(all.indexOf(h) !== -1, h + " listed");
 });
 eq(MenuUI._test.findSection("earn").links.length, 7, "earn has 7 links");
+eq(MenuUI._test.findSection("trade").links.length, 8, "trade has 8 links (standalone Swap deleted)");
 eq(MenuUI._test.findSection("labs").links.length, 3, "labs holds api-lab, es-lab, txbuilder only");
 eq(MenuUI._test.findSection("personal").links.length, 7, "personal holds the 7 chat/setup pages");
 eq(MenuUI._test.findSection("nope"), null, "unknown slug is null");

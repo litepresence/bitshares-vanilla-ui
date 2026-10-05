@@ -4,7 +4,9 @@
  * precisions, zero-balance guard, dust flooring) + shareOut wiring, a
  * fake-DOM stakeBoxes behavior test (auto-fill both directions,
  * mirror-clear, share preview line via the REAL view + _ui code), and
- * source-shape asserts for the FIX 1 swap-flip button + FIX 2 chart-invert
+ * source-shape asserts for the desk inline-swap direction select (FIX 1
+ *   affordance, surviving in pool-detail-actions.js after the standalone
+ *   #/swap page was deleted) + FIX 2 chart-invert
  * toggle (ids, keyed aria-labels, BigInt-path orientation).
  * Fake DOM, no chain, no browser. Exit 0 green, 1 red. ES5-free zone:
  * tooling may use modern Node (pool-history-test.js precedent). */
@@ -186,12 +188,13 @@ function collectInputs(root) {
   ok(/Est\. LP shares: 1\.00000 POOL/.test(shareLine.textContent),
     "stake share preview estimates via Pool.shareOut (got " + JSON.stringify(shareLine.textContent) + ")");
 
-  /* ---- 4. Source-shape asserts (FIX 1 flip + FIX 2 invert wiring) ---- */
-  const swapSrc = fs.readFileSync(JS("views", "pool-swap-ui.js"), "utf8");
-  ok(/id = "swap-flip"/.test(swapSrc), "swap flip button id shape");
-  ok(/> "⇄" /.test(swapSrc) || /"⇄"/.test(swapSrc), "swap flip button glyph shape");
-  ok(/pool\.swap_direction_label/.test(swapSrc), "swap flip aria-label keyed");
-  ok(/find\.click\(\)/.test(swapSrc), "swap flip re-runs the Find-pools lookup");
+  /* ---- 4. Source-shape asserts (desk direction select + FIX 2 invert wiring) ----
+   * The standalone #/swap page (pool-swap-ui.js) is deleted; its flip
+   * affordance survives as the inline-swap direction select on the pools
+   * desk (pool-detail-actions.js swapInlineBox). Assert that shape here. */
+  const actSrc = fs.readFileSync(JS("views", "pool-detail-actions.js"), "utf8");
+  ok(/id = "pool-swap-dir"/.test(actSrc), "desk swap direction select id shape");
+  ok(/account\.sell_prefix/.test(actSrc), "desk swap direction options keyed");
   const viewSrc = fs.readFileSync(JS("views", "pool-detail-view.js"), "utf8");
   ok(/id = "pool-chart-invert"/.test(viewSrc), "chart invert toggle id shape");
   ok(/pool_detail\.invert/.test(viewSrc), "chart invert label keyed");
@@ -212,7 +215,6 @@ function collectInputs(root) {
   const reciprocals = codeOnly.split("\n").filter((ln) =>
     /1\s*\/\s*[a-zA-Z(]/.test(ln) && ln.indexOf("1000000") === -1);
   eq(reciprocals, [], "chart invert carries no reciprocal float math");
-  const actSrc = fs.readFileSync(JS("views", "pool-detail-actions.js"), "utf8");
   ok(/stakeCounterpart/.test(actSrc), "stake auto-fill routes through Pool.stakeCounterpart");
   ok(/pool\.stake_autofill_hint/.test(actSrc), "stake auto-fill hint keyed");
   ok(/pool\.stake_shares_row/.test(actSrc), "stake share preview row keyed");
@@ -226,7 +228,7 @@ function collectInputs(root) {
       else flat[p + k] = d[k];
     });
   })(en, "");
-  ["pool.swap_direction_label", "pool_detail.invert", "pool_detail.invert_label",
+  ["account.sell_prefix", "pool_detail.invert", "pool_detail.invert_label",
    "pool.stake_autofill_hint", "pool.stake_ratio_row", "pool.stake_ratio_empty",
    "pool.stake_shares_row", "pool.stake_preview_need_both",
    "pool.stake_preview_unavailable", "pool.stake_preview_bad",

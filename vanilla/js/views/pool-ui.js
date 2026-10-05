@@ -1,7 +1,7 @@
 /* pool-ui.js — #/pools pools list + create form + shared _ui helpers.
  * Owns: pool table + filters + my-pools, op-59 create form with orientation
  *   preview, and the shared DOM/confirm helpers (PoolUI._ui) reused by
- *   pool-detail-ui.js (#/pools/:id desk) and pool-swap-ui.js (#/swap). No money
+ *   pool-detail-ui.js (#/pools/:id desk). No money
  *   math here (Pool builders do it); no serializers (tx.js owns bytes). WIFs
  *   are JS values, never DOM. Unknown ids -> empty state, never blank.
  *   PUBLIC-FIRST: routeReady never gates on unlock (list/detail/quote render
@@ -195,7 +195,7 @@ var PoolUI = (function () {
   /* field: labeled touch-sized input row (Forms-delegating _ui export).
    * The row shell comes from Forms.labeledInput (no local DOM duplication);
    * retained under this name/signature because PoolUI._ui.field is consumed
-   * by pool-detail-ui.js + pool-swap-ui.js (sibling-batch files). Returns
+   * by pool-detail-ui.js (sibling-batch file). Returns
    * {row, input, suffix} — suffix stays null (no unit-wrap site remains). */
   function field(doc, labelText, opts) {
     opts = opts || {};

@@ -68,7 +68,6 @@ var HelpUI = (function () {
     ["transfer", "Sending assets", "Send any asset to any account, with optional encrypted memos.", "#/transfer"],
     ["instant", "Instant trade", "One-screen simple buy and sell without building orders by hand.", "#/instant-trade"],
     ["pools", "Liquidity pools", "Supply two assets, earn a cut of every swap; stake pool shares.", "#/pools"],
-    ["swap", "Swapping in pools", "Trade instantly at the pool's price with a slippage guard.", "#/swap"],
     ["htlc", "Hash time-locked contracts", "Trustless atomic swaps with hash-lock plus timelock refund.", "#/htlc"],
     ["credit", "Credit offers", "Lend assets on your terms; borrowers draw against the offer.", "#/credit-offer"],
     ["borrow-extra", "Settling and collateral", "Force-settle smartcoins and watch collateral ratios and bids.", "#/borrow"],
@@ -424,15 +423,6 @@ var HelpUI = (function () {
       "Depositing mints share tokens tracking your slice. Stake them to earn, unstake to leave; updating fees or deleting an empty pool are owner actions with confirms.",
       "# Impermanent reality",
       "If prices drift apart after you deposit, withdrawing buys back less value than holding both assets would have. Fees must outrun that drift — check the pool's volume before committing size."
-    ],
-    "swap": [
-      "# Trade at the pool's price",
-      "Swaps execute immediately against pooled liquidity — no counterparty, no waiting for a fill.",
-      "Enter the sell amount: the preview shows the minimum you receive after the slippage guard before anything signs.",
-      "# Slippage guard",
-      "Big swaps move the pool price against you. The slippage percentage caps how bad the fill may get; past it, the transaction refuses rather than filling badly.",
-      "# One operation, one pool",
-      "Each swap is a single pool exchange — no multi-hop routing. Crossing two pools means two swaps, each with its own guard."
     ],
     "htlc": [
       "# Trustless swaps across time",
@@ -955,7 +945,7 @@ var HelpUI = (function () {
    * @type {Array.<[string, string, string[]]>} */
   var GROUPS = [
     ["menu.section_wallet", "Wallet", ["disclaimer", "wallets", "backups", "accounts-general", "accounts-proposed", "accounts-permissions", "accounts-membership", "transfer", "invoice", "vesting", "authorities", "lists", "register", "password", "referrals", "dashboard"]],
-    ["menu.section_trade", "Trade", ["bitshares", "blockchain", "dex-intro", "dex-trading", "dex-shorting", "instant", "pools", "swap", "gateways", "gateways-xbts", "gateways-ioxbank", "borrow-extra", "samet", "barter", "spotlight"]],
+    ["menu.section_trade", "Trade", ["bitshares", "blockchain", "dex-intro", "dex-trading", "dex-shorting", "instant", "pools", "gateways", "gateways-xbts", "gateways-ioxbank", "borrow-extra", "samet", "barter", "spotlight"]],
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
     ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "assets-issue", "assets-feed", "topops", "fees", "charts", "history-index", "community"]],

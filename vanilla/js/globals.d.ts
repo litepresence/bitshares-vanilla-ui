@@ -87,7 +87,6 @@ declare var PoolAssets: any;
 declare var PoolDetailUI: any;
 declare var PoolGraph: any;
 declare var PoolHistory: any;
-declare var PoolSwapUI: any;
 declare var PoolUI: any;
 declare var Prediction: any;
 declare var PredictionUI: any;

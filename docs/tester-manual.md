@@ -246,7 +246,7 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    Review-then-cancel discipline.
 3. Spotlight: featured view renders with no console errors.
 
-## 10. Pools (`#/pools`, `#/pools/<id>`, `#/swap`)
+## 10. Pools (`#/pools`, `#/pools/<id>`)
 
 1. Pools list renders with volumes. Open a pool detail: deposit/withdraw
    forms + history render.
@@ -254,9 +254,9 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
    SIDE BY SIDE (not stacked), best bid and best ask on the same top line
    near the center. At phone width they stack — that is correct, record
    desktop 1440px+ for this check.
-3. Swap page: pick two assets, enter amount. Expected: live preview quote
-   + fee line; Review → sign only on dev order.
-3. Pool connection map (if shown): nodes/links render, no console errors.
+3. Pool swap panel: on a pool detail, pick the swap direction, enter amount.
+   Expected: live preview quote + fee line; Review → sign only on dev order.
+4. Pool connection map (if shown): nodes/links render, no console errors.
 
 ## 11. Credit (`#/credit-offer`), Same-T (`#/samet`), borrow (`#/borrow`)
 

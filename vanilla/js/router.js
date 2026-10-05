@@ -260,7 +260,6 @@ var Router = (function () {
     { path: "/instant-trade/:marketID", title: "Instant Trade", render: function (root, params) { InstantTradeUI.renderInstant(root, params && params.marketID); } },
     { path: "/pools/:id", title: "Liquidity Pool", render: function (root, params) { PoolDetailUI.renderPoolDetail(root, params && params.id); } },
     { path: "/pools", title: "Liquidity Pools", render: function (root) { PoolUI.renderPools(root); } },
-    { path: "/swap", title: "Swap", render: function (root) { PoolSwapUI.renderSwap(root); } },
     { path: "/alerts", title: "Price Alerts", render: function (root) { NotifyUI.render(root); } },
     { path: "/trollbox", title: "Trollbox", render: function (root) { TrollboxUI.renderTrollbox(root); } },
     { path: "/assets", title: "Assets", render: function (root) { AssetUI.renderAssets(root); } },
@@ -438,12 +437,12 @@ var Router = (function () {
     }
     if (typeof document !== "undefined") document.title = title;
     /* Pool-market context hygiene: the header Exchange tab follows pool
-     * pages only. Leaving pools/swap/market clears it (market routes set
+     * pages only. Leaving pools/market clears it (market routes set
      * their own context implicitly by being the desk). currentPath() yields
      * "#"-less paths ("/pools/…"). Never throws. */
     try {
       if (typeof App !== "undefined" && App && typeof App.setPoolMarket === "function") {
-        if (path !== "/swap" && path.indexOf("/pools") !== 0 && path.indexOf("/market/") !== 0) {
+        if (path.indexOf("/pools") !== 0 && path.indexOf("/market/") !== 0) {
           App.setPoolMarket(null);
         }
       }
