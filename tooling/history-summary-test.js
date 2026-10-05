@@ -6,6 +6,11 @@
 // Task 4 pool/asset/credit/samet/debit families (tags 59-63,75,10-18,42,43,
 // 47,48,64-68,69-76,25-28): one vector per tag (43+47 share the claim
 // template) + fee-pool unknown-asset fallback. Appended by: history Task 4.
+// Task 5 governance/HTLC/tickets/vesting/proposals/misc/blind families
+// (tags 20,21,29,30,34,22,23,24,32,33,49-53,57,58,54-56,5,7,8,9,35,37,45,
+// 39-41): one vector per tag (54-56 share sum_authorities, 39-41 share
+// sum_blind counts-only) + label-only rows for 31/36/44/46 + a null-payload
+// fallback row. Appended by: history Task 5.
 "use strict";
 var assert = require("assert");
 
@@ -134,6 +139,57 @@ var t4 = [
     withdrawal_permission: "1.12.1" })
 ];
 
+var t5 = [
+  row("1.11.60", 20, { witness_account: "1.2.2" }),
+  row("1.11.61", 21, { witness: "1.6.1", witness_account: "1.2.2" }),
+  row("1.11.62", 29, { committee_member_account: "1.2.3" }),
+  row("1.11.63", 30, { committee_member: "1.5.1", committee_member_account: "1.2.3" }),
+  row("1.11.64", 34, { owner: "1.2.1", name: "my-worker" }),
+  row("1.11.65", 22, { fee_paying_account: "1.2.1",
+    proposed_ops: [{ op: [0, {}] }, { op: [1, {}] }] }),
+  row("1.11.66", 23, { fee_paying_account: "1.2.1", proposal: "1.10.5" }),
+  row("1.11.67", 24, { fee_paying_account: "1.2.1", proposal: "1.10.5" }),
+  row("1.11.68", 32, { creator: "1.2.1", owner: "1.2.2",
+    amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.69", 33, { vesting_balance: "1.13.1", owner: "1.2.2",
+    amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.70", 49, { from: "1.2.1", to: "1.2.2",
+    amount: { amount: "100000", asset_id: "1.3.0" }, htlc_id: "1.16.1" }),
+  row("1.11.71", 50, { htlc_id: "1.16.1", redeemer: "1.2.2" }),
+  row("1.11.72", 51, { htlc_id: "1.16.1", from: "1.2.1", to: "1.2.2",
+    redeemer: "1.2.2", amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.73", 52, { htlc_id: "1.16.1", update_issuer: "1.2.1", seconds_to_add: 3600 }),
+  row("1.11.74", 53, { htlc_id: "1.16.1", to: "1.2.1",
+    original_htlc_recipient: "1.2.2",
+    htlc_amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.75", 57, { account: "1.2.1",
+    amount: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.76", 58, { account: "1.2.1", ticket: "1.18.1" }),
+  row("1.11.77", 54, { account: "1.2.1" }),
+  row("1.11.78", 55, { account: "1.2.1", authority_to_update: "1.17.1" }),
+  row("1.11.79", 56, { account: "1.2.1", authority_to_delete: "1.17.1" }),
+  row("1.11.80", 5, { registrar: "1.2.1", name: "dave" }),
+  row("1.11.81", 7, { authorizing_account: "1.2.1", account_to_list: "1.2.3" }),
+  row("1.11.82", 8, { account_to_upgrade: "1.2.3" }),
+  row("1.11.83", 9, { account_id: "1.2.3", new_owner: "1.2.2" }),
+  row("1.11.84", 35, { payer: "1.2.1", required_auths: ["1.2.2"] }),
+  row("1.11.85", 37, { deposit_to_account: "1.2.2",
+    total_claimed: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.86", 45, { bidder: "1.2.1",
+    additional_collateral: { amount: "200000", asset_id: "1.3.0" },
+    debt_covered: { amount: "50000", asset_id: "1.3.1" } }),
+  row("1.11.87", 39, { from: "1.2.1",
+    amount: { amount: "100000", asset_id: "1.3.0" }, outputs: [{}, {}] }),
+  row("1.11.88", 40, { inputs: [{}], outputs: [{}, {}] }),
+  row("1.11.89", 41, { to: "1.2.2",
+    amount: { amount: "100000", asset_id: "1.3.0" }, inputs: [{}] }),
+  row("1.11.90", 31, { new_parameters: {} }),
+  row("1.11.91", 36, { fee_paying_account: "1.2.1", predicates: [] }),
+  row("1.11.92", 44, { account_id: "1.2.1", amount: "500000" }),
+  row("1.11.93", 46, { bidder: "1.2.1" }),
+  row("1.11.94", 20, {})
+];
+
 HS.enrich(asAlice, "1.2.1").then(function (out) {
   eq(out, asAlice, "same array");
   eq(out[0]._summary, undefined, "unknown tag stays label-only");
@@ -193,5 +249,42 @@ HS.enrich(asAlice, "1.2.1").then(function (out) {
   eq(out[33]._summary, "Updated 2.00000 BTS debit for bob", "tag 26 debit update");
   eq(out[34]._summary, "Claimed 0.50000 BTS debit", "tag 27 debit claim");
   eq(out[35]._summary, "Deleted debit permission 1.12.1", "tag 28 debit delete");
-  console.log("history-summary Tasks 3+4: " + passed + " passed");
+  return HS.enrich(t5, "1.2.1");
+}).then(function (out) {
+  eq(out[0]._summary, "Became witness: bob", "tag 20 witness create");
+  eq(out[1]._summary, "Updated witness bob", "tag 21 witness update");
+  eq(out[2]._summary, "Became committee member: carol", "tag 29 committee create");
+  eq(out[3]._summary, "Updated committee member carol", "tag 30 committee update");
+  eq(out[4]._summary, 'Created worker "my-worker"', "tag 34 worker create");
+  eq(out[5]._summary, "Proposed 2 operations", "tag 22 proposal create");
+  eq(out[6]._summary, "Approved proposal 1.10.5", "tag 23 proposal update");
+  eq(out[7]._summary, "Deleted proposal 1.10.5", "tag 24 proposal delete");
+  eq(out[8]._summary, "Vested 1.00000 BTS for bob", "tag 32 vesting create");
+  eq(out[9]._summary, "Withdrew 1.00000 BTS vested", "tag 33 vesting withdraw");
+  eq(out[10]._summary, "HTLC 1.16.1: 1.00000 BTS from alice to bob", "tag 49 htlc create");
+  eq(out[11]._summary, "Redeemed HTLC 1.16.1", "tag 50 htlc redeem");
+  eq(out[12]._summary, "HTLC 1.16.1 claimed", "tag 51 htlc redeemed");
+  eq(out[13]._summary, "Extended HTLC 1.16.1", "tag 52 htlc extend");
+  eq(out[14]._summary, "HTLC 1.16.1 refunded", "tag 53 htlc refund");
+  eq(out[15]._summary, "Created ticket 5.0000 USD", "tag 57 ticket create");
+  eq(out[16]._summary, "Updated ticket 1.18.1", "tag 58 ticket update");
+  eq(out[17]._summary, "Updated authorities for alice", "tag 54 authority create");
+  eq(out[18]._summary, "Updated authorities for alice", "tag 55 authority update");
+  eq(out[19]._summary, "Updated authorities for alice", "tag 56 authority delete");
+  eq(out[20]._summary, "Registered dave", "tag 5 account create");
+  eq(out[21]._summary, "Listed carol", "tag 7 whitelist");
+  eq(out[22]._summary, "Upgraded carol", "tag 8 upgrade");
+  eq(out[23]._summary, "Transferred account to bob", "tag 9 account transfer");
+  eq(out[24]._summary, "Custom operation by alice", "tag 35 custom");
+  eq(out[25]._summary, "Claimed 1.00000 BTS", "tag 37 balance claim");
+  eq(out[26]._summary, "Bid 2.00000 BTS for 5.0000 USD", "tag 45 bid");
+  eq(out[27]._summary, "Blind transfer (0 in, 2 out)", "tag 39 to-blind");
+  eq(out[28]._summary, "Blind transfer (1 in, 2 out)", "tag 40 blind");
+  eq(out[29]._summary, "Blind transfer (1 in, 0 out)", "tag 41 from-blind");
+  eq(out[30]._summary, undefined, "tag 31 params label-only");
+  eq(out[31]._summary, undefined, "tag 36 assert label-only");
+  eq(out[32]._summary, undefined, "tag 44 fba label-only");
+  eq(out[33]._summary, undefined, "tag 46 execute-bid label-only");
+  eq(out[34]._summary, undefined, "tag 20 empty payload fallback");
+  console.log("history-summary Tasks 3+4+5: " + passed + " passed");
 }).catch(function (e) { console.error("FAIL", e); process.exit(1); });
