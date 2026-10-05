@@ -20,8 +20,8 @@ When NOT to use: user is present and responsive (normal todo discipline applies)
 
 1. **Tail invariant.** The last todo item is always the keep-rolling item (e.g. "Keep rolling until user returns — next slice batch, no idle stop"). It stays `pending` until the user sends a new message. Never mark it complete while the user is away. All new round items insert ABOVE it.
 2. **No idle stop.** After every batch commit, immediately begin the next logical batch (next slice tasks per the plan, open audit findings, next parity note). A turn never ends with a clean tree and no next batch started.
-3. **No questions while AFK.** The question tool would block forever — decide per the skills and AGENTS.md (seven-check audit, core-wins-tiebreak, on-disk truth) and log assumptions in the commit message instead.
-4. **Keep the established pattern.** Batch discipline is unchanged: director rounds, verify on disk (never trust self-reports), small focused commits, findings folded into parity notes. This skill only governs CONTINUATION, not quality — see `auditing-vanilla-slices` for the audit contract.
+3. **No questions while AFK.** The question tool would block forever — decide per the skills and AGENTS.md (full audit, core-wins-tiebreak, on-disk truth) and log assumptions in the commit message instead.
+4. **Keep the established pattern.** Batch discipline is unchanged: director rounds, verify on disk (never trust self-reports — `node --check` + rot/types/i18n gates), small focused commits, findings folded into parity notes under `docs/parity/`. This skill only governs CONTINUATION, not quality — see `auditing-vanilla-slices` for the audit contract.
 5. **Stop only when:** the user sends any new message (stop, report position), or zero open slices/findings remain anywhere (finish the final audit round too, then stop and report shippable).
 
 ## Red Flags — STOP and re-read this skill

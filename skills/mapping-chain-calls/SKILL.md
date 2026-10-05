@@ -32,12 +32,20 @@ Online mirrors: `docs.bitshares.dev` (Database/History/Broadcast API) and `bitsh
 
 ## Procedure
 
-1. Start at #4: confirm the method exists and copy exact params (`database_api.hpp` for reads, `api.hpp` for broadcast, `protocol/<op>.hpp` for op fields).
-2. Check BJS current for the official JS serialization of the op (fetch the single file raw from GitHub on demand — no checkout, no install).
-2. Check #1 for how the old UI calls it (action→store→chain-call matrix, AGENTS.md §8 Phase 1).
-3. Cross-check #2 and #3 for newer usage. If they disagree with #4, #4 wins — note the conflict.
-4. Record the result in `chain-calls.md` format: method, params, one file:line per reference consulted, testnet observation.
-5. Fees always come from `get_required_fees` at runtime. Never copy #1's static fee tables into vanilla.
+1. Start at #4: confirm the method exists and copy exact params (`database_api.hpp` for reads, `api.hpp` for broadcast, `protocol/<op>.hpp` for op fields — struct field order comes from the `FC_REFLECT` line, which is serializer ground truth).
+2. Check BJS current for the official JS serialization of the op (fetch the single file raw from GitHub on demand — no checkout, no install, never cloned per AGENTS.md §8 Phase 2).
+3. Check #1 for how the old UI calls it (action→store→chain-call matrix, AGENTS.md §8 Phase 1).
+4. Cross-check #2 and #3 for newer usage. If they disagree with #4, #4 wins — note the conflict.
+5. Record the result in the slice's parity note under `docs/parity/` (NOT a central `chain-calls.md` matrix — Phase 1 inventory was folded into slices): method, params, one file:line per reference consulted, testnet observation.
+6. Fees always come from `get_required_fees` at runtime. Never copy #1's static fee tables into vanilla.
+
+## Serializer Rules (repeated testnet-proof failures — non-negotiable)
+
+- **Provenance comment per function:** every `serializeXxxOp` records all three sources (#4 struct + `FC_REFLECT` line, BJS raw file, #3 `bitshares-api.js` line ref). If sources disagree, #4 wins; note the conflict in the comment.
+- **No `|| default` on money/ids:** missing amounts or object IDs throw loudly — `|| 0` / `|| ''` silently builds a valid-looking wrong transaction.
+- **No extensions field unless the struct has one.**
+- **Fee rail:** builders carry a zero-placeholder fee filled via `get_required_fees` through the existing `AssetOps.fee`-style helper; suspicious fees throw — never auto-proceed.
+- **Testnet proof discipline:** testnet ONLY, fixture `tooling/testnet-lite-test-1.json`, never mainnet, never commit secrets. Evaluator/validate-stage rejection counts as byte-proof ONLY with the exact node error recorded (file:line of the evaluator). Shape errors (e.g. self-transfer) are test bugs, not proofs. No artifact = unproven (the 1.10.1492 rule).
 
 ## Common Mistakes
 

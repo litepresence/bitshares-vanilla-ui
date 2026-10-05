@@ -54,8 +54,14 @@ Subagents sometimes return EMPTY tool results and never wrote their file. Never 
 
 1. Target files exist with real content (no placeholder markers, no TODO stubs).
 2. `node --check` passes on every new/modified JS file.
-3. `python3 tooling/check_rot.py` passes.
-4. Line-count and interface sanity: the produced globals match the plan's interface blocks.
+3. `python3 tooling/check_rot.py` passes; `bash tooling/check_types.sh` and `python3 tooling/check_i18n.py` pass when the round touches JS seams or display strings.
+4. Line-count and interface sanity: the produced globals match the plan's interface blocks; no file past ~400 lines without its planned split; no local copies of shared utilities (`DOM`/`Forms`/`ConfirmDialog`/`Overlay`/`TableRenderer`/`Event`).
+5. Locale discipline: at most one worker per round touched `vanilla/locales/*.json`; `en.json` inventory updated; no orphaned keys added.
+
+## File-Disjoint Rules (learned from merge pain)
+
+- One file, one worker per round — always. This includes `vanilla/locales/*.json` as ONE shared file-set: locale edits go to a single worker, never parallel.
+- Commit after every dispatch round — the next dispatch reads committed baselines. Never commit generated artifacts (`dist/`, `__pycache__/`, backups) or to `reference/` dirs.
 
 ## Red Flags
 

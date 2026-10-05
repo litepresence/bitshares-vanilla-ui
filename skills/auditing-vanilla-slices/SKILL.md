@@ -7,7 +7,7 @@ description: Use when reviewing vanilla UI code for principle compliance, when c
 
 ## Overview
 
-Eight checks, one per guiding principle. Run all eight, in order. The slice passes only if all eight pass.
+Nine checks, one per guiding principle plus the hard type gate. Run all nine, in order. The slice passes only if all nine pass.
 
 ## When to Use
 
@@ -17,7 +17,7 @@ Eight checks, one per guiding principle. Run all eight, in order. The slice pass
 
 When NOT to use: during initial implementation (that is `building-vanilla-slices`).
 
-## The Six Checks
+## The Nine Checks
 
 ### 1. Rot gate (principle #1, AGENTS.md §4.5)
 
@@ -40,7 +40,7 @@ Every op in the slice exists in the op-coverage matrix (`#1 route/modal` × `#2 
 
 ### 4. Modern glow (principle #4, §3.3)
 
-No full-page reloads on chain updates; empty states and inline validation present; market/account/asset search is fast, typo-tolerant, keyboard-friendly. Search quality is a release blocker.
+No full-page reloads on chain updates; empty states and inline validation present; market/account/asset search is fast, typo-tolerant, keyboard-friendly. Search quality is a release blocker. Overlays clean up listeners and return focus on close (R1-LISTEN); route changes scroll to top; tab lists have APG keyboard support; headings form an honest `h1`→`h2` order with no orphan `h3`.
 
 ### 5. Themes (principle #5, §3.4)
 
@@ -80,6 +80,49 @@ for it; the rot gate fails a loaded `.d.ts`). Only parenthesized
 `/** @type {X} */ (expr)` casts as code-shape change — any behavior delta
 fails the audit. A red gate fails the slice, no exceptions.
 
+### 10. No recreated utilities — DRY (AGENTS.md §7 rule 9; the repo's most expensive retrofit)
+
+```bash
+grep -rn "function el(\|function clearRoot\|function showStatus\|function confirmList\|function fieldRow\|function touchable" vanilla/js/views/ ; echo "local-helper hits above (want none)"
+grep -rn "post-show restore\|querySelectorAll(.*\.confirm" vanilla/js/views/ ; echo "confirm-hack hits above (want none)"
+```
+
+Slice code MUST use the shared globals (`DOM`, `Forms`, `ConfirmDialog.show`,
+`Overlay.open`, `TableRenderer.render`, `Event.delegate`, shared `touchable` +
+variant classes, `DOM.pageHead`). A local copy of any of these fails the
+audit — the migration batches (DOM A–D, Forms, Confirm A–C, touchable ×3)
+exist precisely because per-file copies rot. Confirm flows additionally need
+the keyed fee term + raw `dd` titles (never post-show DOM restore loops).
+
+### 11. i18n completeness (principle #10, §3.9)
+
+```bash
+python3 tooling/check_i18n.py  # from /workspace (key-complete + drift-free, exit 0 = clean)
+```
+
+Every new user-visible string is `t(key, enDefault)` with entries + English
+values in ALL 12 `vanilla/locales/*.json` + `en.json` inventory; placeholders
+byte-verbatim; non-en dicts honest English stubs outside allowlists. Spot
+checks: no hardcoded display text in `el()`/`textContent`/`placeholder`/
+`title`/`aria-label` (help bodies English-first by design are exempt);
+orphaned keys removed (`tooling/collect_i18n_orphans.py`); sentence-case +
+shared-glossary copy-voice (see `i18n-batch`). A red gate fails the slice.
+
+### 12. Workspace hygiene + test discipline (the silent-rot pair)
+
+```bash
+git status --short  # no shadow copies, no strays, no generated artifacts (dist/, __pycache__/, backups)
+node --check <every new/modified JS file>
+```
+
+Hygiene: no unwired/dead files (the 1919-line shadow-copy lesson — verify
+every new file is referenced), no stray duplicated tails, no dead CSS
+selectors (`tooling/scan_dead_css.py`), no orphaned locale keys, parity-note
+paths point at `docs/parity/` (never `vanilla/notes/`). Tests that assert must
+actually assert (no swallowed failures); time-dependent tests freeze
+`Date.now` to a fixed epoch with stub-driven ticks (R-B-H1/H2 precedent);
+unit vectors precede implementation for money/serializer code.
+
 ## Red Flags — Stop and Fix
 
 - "It's just a demo/prototype, we'll harden later"
@@ -87,6 +130,8 @@ fails the audit. A red gate fails the slice, no exceptions.
 - "Precision handling is fine, it looked right for BTS"
 - "Themes work, I checked one of them"
 - "Mobile looks fine, I resized the window a bit"
+- "It's just a small local helper, shared utils are overkill"
+- "I'll key the strings later"
 - "The gate tool doesn't exist yet, so I'll skip that check"
 
-All of these mean: stop, fix, re-run all eight checks.
+All of these mean: stop, fix, re-run all nine checks plus 10–12.

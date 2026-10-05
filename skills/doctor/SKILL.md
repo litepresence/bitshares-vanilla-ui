@@ -17,8 +17,11 @@ workers apply and the director records in parity notes.
 1. **Read wide before deciding**: the method/op in `bitshares-core` headers
    (`database_api.hpp`, `api.hpp`, `protocol/<op>.hpp`) PLUS how each of the
    other references uses it (`bitshares-ui` action/store, `astro-ui`
-   component + `src/bts/`, `wallet-extension` `bitshares-api.js`). Parallel
-   usage beats single-source instinct.
+   component + `src/bts/`, `wallet-extension` `bitshares-api.js`), plus the
+   machine oracles where serializers are at stake (upstream `bitsharesjs`
+   raw files on demand per `mapping-chain-calls`, and the open-graphene spec
+   `reference/open-graphene/.../bitshares.open-graphene.json` as cross-check —
+   below BJS, #4 wins conflicts). Parallel usage beats single-source instinct.
 2. **Apply the tiebreakers in order**: `bitshares-core` wins reference
    conflicts (AGENTS.md §5.6); live testnet observation wins over ALL
    references — record the divergence; never trust #1's static fee tables
@@ -36,7 +39,8 @@ workers apply and the director records in parity notes.
 
 ## Ruling Log
 
-Every ruling is recorded by the director in the slice's parity note:
+Every ruling is recorded by the director in the slice's parity note under
+`docs/parity/`:
 
 | Field | Content |
 |---|---|

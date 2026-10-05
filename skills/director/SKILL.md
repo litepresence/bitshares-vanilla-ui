@@ -22,8 +22,8 @@ contract). You read it yourself too.
 | Path | Role |
 |---|---|
 | `vanilla/` | The app under construction (the only writable code) |
-| `vanilla/notes/` | Parity notes, one per slice (completion tracking) |
-| `tooling/` | Audit/probe scripts (`check_rot.py`, `ws-probe.mjs`) |
+| `docs/parity/` | Parity notes, one per slice (completion tracking — moved from `vanilla/notes/` 2026-10-01) |
+| `tooling/` | Audit/probe scripts (`check_rot.py`, `check_i18n.py`, `check_types.sh`, `ws-probe.mjs`) — stdlib only, saved files never inline |
 | `docs/superpowers/plans/` | Implementation plans (dispatch source of truth) |
 | `reference/bitshares-ui/`, `reference/astro-ui/`, … | References (immutable — workers never write here) |
 
@@ -34,7 +34,7 @@ Reference files are never modified by anyone, including you.
 | Skill | Role |
 |---|---|
 | `building-vanilla-slices` | Slice workflow + parity-note contract (every worker loads this) |
-| `auditing-vanilla-slices` | Seven-check audit before any done-claim |
+| `auditing-vanilla-slices` | Nine-plus checks (rot → look → features → glow → themes → numbers → viewports → readability → types → DRY → i18n → hygiene) before any done-claim |
 | `mapping-chain-calls` | WS methods, op fields, fees, endpoints |
 | `batch-dispatch-parallelism` | How to saturate dispatch rounds |
 | `chain-doctor` | Authority when references disagree on chain behavior |
@@ -61,7 +61,12 @@ tooling/* (parallel anytime — disjoint files, stdlib only)
 
 Interfaces specified in the plan (exact globals, signatures, element IDs)?
 Output file path disjoint from every other task in the round? Required skill
-named in the prompt? Skip or fix before dispatch.
+named in the prompt? Skip or fix before dispatch. Pre-flight additionally:
+shared-utility usage named (which global — never a local copy); JSDoc +
+`globals.d.ts` impact stated for cross-file seams; locale-dict edits assigned
+to exactly ONE worker per round (dicts merge-conflict — never two workers on
+`vanilla/locales/*.json` in one round); new files over ~400 lines split in
+the plan, not after.
 
 ### 3. Dispatch workers
 
@@ -82,10 +87,11 @@ todo list, note open questions. The parity note is the slice's completion record
 
 ### 5. Audit cycle (per finished slice, in order)
 
-Run the eight checks in `auditing-vanilla-slices`: rot → look → features →
-glow → themes → numbers → viewports → readability. Only slices that pass all eight move to
-done. Failed slices return to in_progress with findings attached, bundled with
-forward work per the pipeline-full principle.
+Run the full audit in `auditing-vanilla-slices` (checks 1–9 plus DRY/i18n/hygiene):
+rot → look → features → glow → themes → numbers → viewports → readability →
+types → shared-utils → i18n → hygiene. Only slices that pass everything move
+to done. Failed slices return to in_progress with findings attached, bundled
+with forward work per the pipeline-full principle.
 
 ### 6. Commit per round
 
@@ -108,7 +114,7 @@ corpus-wide only via a repair task, not ad hoc.
 
 | Mistake | Fix |
 |---|---|
-| Marking a slice done without the audit cycle | done = parity note + all eight checks green |
+| Marking a slice done without the audit cycle | done = parity note + all checks green (rot, types, i18n gates included) |
 | Letting an auditor edit files | Auditors report; workers repair next round |
 | Two workers on one file in a round | Disjoint file sets, always |
 | Modifying reference checkouts | Never |
