@@ -43,12 +43,20 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
    * on any transport, incl. file:// where dict fetch fails). Falls back
    * to the default when i18n.js failed to load: never blank, never throws.
    * vars fills %(name)s placeholders (Reference #6 shape); without I18n
-   * the raw default returns unfilled — i18n.js is a local script tag,
+   * the filled default returns (same substitution I18n.t performs — a raw
+   * "%(page)s" must never reach the screen) — i18n.js is a local script tag,
    * absent only when the file itself is missing. */
   function t(key, dflt, vars) {
     try {
       if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof vars === "object") {
+      try {
+        return String(dflt).replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : m;
+        });
+      } catch (e2) { /* default below */ }
+    }
     return dflt;
   }
 
@@ -261,6 +269,90 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     return out;
   }
 
+  /* Portfolio price page size (Polish Task 6): the old first-20 ticker cap
+   * becomes per-page pricing — 25 balances per page, one bounded ticker
+   * batch per page turn (never N+1, never per-row refetch). */
+  var PORTFOLIO_PAGE_SIZE = 25;
+
+  /** Balance-list length -> page count (ceil(n/25); anything that is not a
+   * positive count is 0 pages). Pure (no Chain) — pinned by
+   * account-sort-test.js vectors.
+   * @param {any} n candidate count
+   * @returns {number} page count (>= 0) */
+  function portfolioPageCount(n) {
+    if (typeof n !== "number" || !(n > 0)) return 0;
+    return Math.ceil(n / PORTFOLIO_PAGE_SIZE);
+  }
+
+  /** Clamp a 0-based page into [0, pageCount-1] (0 when there are no pages
+   * or the request is not finite; fractions floor). Pure (no Chain).
+   * @param {any} page requested page
+   * @param {any} pageCount total pages
+   * @returns {number} clamped page */
+  function clampPortfolioPage(page, pageCount) {
+    if (typeof pageCount !== "number" || !(pageCount > 0)) return 0;
+    if (typeof page !== "number" || !isFinite(page)) return 0;
+    var p = Math.floor(page);
+    if (p < 0) return 0;
+    if (p > pageCount - 1) return pageCount - 1;
+    return p;
+  }
+
+  /** Current page's priced asset ids (balance-list order, BTS excluded — it
+   * prices at 1 with no call). Pure (no Chain) — the "priced set = current
+   * page's ids only" contract.
+   * @param {any} balances balance rows ({asset_id})
+   * @param {any} btsId BTS asset id to exclude
+   * @param {any} page 0-based page (clamped against the list)
+   * @returns {Array<string>} non-BTS asset ids on that page */
+  function portfolioPageIds(balances, btsId, page) {
+    var list = Array.isArray(balances) ? balances : [];
+    var p = clampPortfolioPage(page, portfolioPageCount(list.length));
+    var slice = list.slice(p * PORTFOLIO_PAGE_SIZE, p * PORTFOLIO_PAGE_SIZE + PORTFOLIO_PAGE_SIZE);
+    var out = [];
+    slice.forEach(function (b) {
+      var aid = b && b.asset_id;
+      if (typeof aid === "string" && aid && aid !== btsId) out.push(aid);
+    });
+    return out;
+  }
+
+  /* Bounded ticker burst (shared by enrichPortfolio's initial page and the
+   * renderPortfolio pager): one get_ticker per asset id, Promise.all in
+   * chunks of 5 (never the whole batch at once). Results keyed by asset id;
+   * one asset failing dashes that row only (per-asset catch — the batch
+   * never rejects). Resolves {} when the backend is missing or the input is
+   * empty. Callers pass one page per turn, never rows: no N+1.
+   * @param {string} btsId BTS asset id (ticker base)
+   * @param {Array<string>} ids non-BTS asset ids to price
+   * @returns {Promise<Object>} id -> {latest, change} (null legs on miss) */
+  function fetchTickerBatch(btsId, ids) {
+    var need = Array.isArray(ids) ? ids.slice() : [];
+    var prices = {};
+    if (!btsId || !need.length) return Promise.resolve(prices);
+    if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
+      return Promise.resolve(prices);
+    }
+    function dbCall(method, params) {
+      return Chain.db().then(function (dbId) { return Chain.call(dbId, method, params); });
+    }
+    function fetchChunk(idx) {
+      if (idx >= need.length) return Promise.resolve();
+      var slice = need.slice(idx, idx + 5);
+      var burst = slice.map(function (aid) {
+        return dbCall("get_ticker", [btsId, aid]).then(function (tk) {
+          prices[aid] = {
+            latest: (tk && tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null,
+            change: (tk && tk.percent_change !== undefined && tk.percent_change !== null)
+              ? String(tk.percent_change) : null
+          };
+        }).catch(function () { prices[aid] = { latest: null, change: null }; });
+      });
+      return Promise.all(burst).then(function () { return fetchChunk(idx + 5); });
+    }
+    return fetchChunk(0).then(function () { return prices; });
+  }
+
   /* Add a raw integer string into map[assetId] (BigInt sum; malformed legs
    * are ignored so one bad row never blanks the column). */
   function sumRawInto(map, assetId, raw) {
@@ -366,8 +458,9 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
    * Credit.positions (proven margin-first / by-account-fallback read —
    * collateral summed per asset), and one get_ticker batch quoted in BTS
    * (latest = BTS-per-asset human, percent_change shown verbatim).
-   * Ticker batch is capped at 20 assets (N+1 ban holds: one bounded batch,
-   * never per-row refetch on filter). Every leg is best-effort: failures
+   * Ticker batch prices ONE 25-row page only (Polish Task 6: the old
+   * first-20 cap is gone — the pager prices further pages one bounded batch
+   * per turn, never per-row refetch). Every leg is best-effort: failures
    * resolve to null and render as dashes with a muted note — a missing
    * read never blanks the tab.
    * Params: acctId "1.2.N", balances (Account.balances rows), shared
@@ -375,13 +468,25 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
    * open-orders/margin promises — perf: the Orders/Margin tabs read the same
    * rows in the same render, so one fetch serves both; absent means fetch
    * here as before).
+   * Opts (optional 4th arg {page}): 0-based price page to price (default 0;
+   * out-of-range clamps). Only that page's asset ids price — the pager in
+   * renderPortfolio fetches further pages one bounded batch per turn.
    * Returns a Promise of {inOrders, vesting, collateral (assetId->raw, or
-   * null when that read failed), prices (assetId->{latest, change}), bts
-   * ({id, prec, symbol} or null), capped, notes}. Never rejects. */
-  function enrichPortfolio(acctId, balances, shared) {
+   * null when that read failed), prices (assetId->{latest, change} for the
+   * requested page), bts
+   * ({id, prec, symbol} or null), capped (true when more price pages exist
+   * beyond this batch), paging ({page, pageSize, pageCount, total} or null
+   * when BTS lookup failed), notes}. Never rejects. */
+  function enrichPortfolio(acctId, balances, shared, opts) {
     var useShared = (shared && typeof shared === "object") ? shared : null;
+    var reqPage = 0;
+    try {
+      if (opts && typeof opts === "object" && opts.page !== undefined && opts.page !== null) {
+        reqPage = opts.page;
+      }
+    } catch (e) { reqPage = 0; }
     var out = { inOrders: {}, vesting: null, collateral: null, prices: {},
-      bts: null, capped: false, notes: [] };
+      bts: null, capped: false, paging: null, notes: [] };
     if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") {
       out.notes.push("Chain backend missing — portfolio extras dashed.");
       return Promise.resolve(out);
@@ -437,50 +542,41 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       out.notes.push("Credit backend not loaded — collateral column dashed.");
     }
     /* PRICE(BTS) + 24HR: BTS id first, then ONE bounded ticker batch (base
-     * BTS, quote asset). BTS itself prices at 1 with no call. */
+     * BTS, quote asset) for the requested price page only (Polish Task 6 —
+     * the old slice-at-20 is gone; further pages arrive one batch per pager
+     * turn). BTS itself prices at 1 with no call. */
     jobs.push(dbCall("lookup_asset_symbols", [["BTS"]]).then(function (rows) {
       var bts = rows && rows[0];
       if (!bts || typeof bts.precision !== "number") throw new Error("no-bts");
       out.bts = { id: bts.id, prec: bts.precision, symbol: bts.symbol || "BTS" };
-      var need = [];
-      list.forEach(function (b) {
-        if (b && b.asset_id !== bts.id) need.push(b.asset_id);
+      var pageCount = portfolioPageCount(list.length);
+      var page = clampPortfolioPage(reqPage, pageCount);
+      out.paging = { page: page, pageSize: PORTFOLIO_PAGE_SIZE, pageCount: pageCount, total: list.length };
+      out.capped = pageCount > 1;
+      return fetchTickerBatch(bts.id, portfolioPageIds(list, bts.id, page)).then(function (got) {
+        out.prices = got;
       });
-      if (need.length > 20) { out.capped = true; need = need.slice(0, 20); }
-      /* Bounded burst: Promise.all in chunks of 5 (never 20-at-once).
-       * Results merge back keyed by asset id (deterministic rows, same
-       * shape as before); one asset failing dashes that row only — a
-       * per-asset catch means the chunk (and batch) never rejects. */
-      function fetchChunk(idx) {
-        if (idx >= need.length) return Promise.resolve();
-        var slice = need.slice(idx, idx + 5);
-        var burst = slice.map(function (aid) {
-          return dbCall("get_ticker", [bts.id, aid]).then(function (tk) {
-            out.prices[aid] = {
-              latest: (tk && tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null,
-              change: (tk && tk.percent_change !== undefined && tk.percent_change !== null)
-                ? String(tk.percent_change) : null
-            };
-          }).catch(function () { out.prices[aid] = { latest: null, change: null }; });
-        });
-        return Promise.all(burst).then(function () { return fetchChunk(idx + 5); });
-      }
-      return fetchChunk(0).then(function () { /* batch settled */ });
     }).catch(function () {
       out.bts = null;
+      out.paging = null;
       out.notes.push("BTS price batch unavailable — price/value columns dashed.");
     }));
     return Promise.all(jobs).then(function () { return out; });
   }
 
-  /** Portfolio table + phone cards (punchlist 1-5): Asset (linked to
+  /** Portfolio table + phone cards (punchlist 1-5, paging Polish Task 6):
+   * Asset (linked to
    * #/asset/:symbol) | QTY | IN ORDERS | IN VESTING | IN COLLATERAL |
    * PRICE(BTS) | 24HR | VALUE(BTS) | actions. Asset/Qty/Price/Value headers
    * sort (Polish Task 5, explorer-assets.js sortTh contract: click toggles,
    * aria-sort, sortDir; default null = chain order). A search input filters
-   * rows client-side (no refetch); a muted subtext line carries the summed
-   * BTS total (floor of qty*price per asset, BTS row at face value, visible
-   * rows only). Missing legs render as dashes (see enrichPortfolio notes).
+   * rows client-side (no refetch); the sorted/filtered rows page at 25 per
+   * page with a Prev/Next pager (pool-ui.js .pools-pager/.subtle-btn pattern,
+   * no new CSS) — prices arrive per page, one bounded batch per turn, and a
+   * muted notice says so. A muted subtext line carries the summed BTS total
+   * (floor of qty*price per asset, BTS row at face value) over the visible
+   * page only — labeled a page total while paging, the full total on one
+   * page. Missing legs render as dashes (see enrichPortfolio notes).
    * Params: doc, section, acct ({id, name}), balances, enrich.
    * @param {Document} doc owner document
    * @param {HTMLElement} section mount element for the portfolio panel
@@ -562,12 +658,14 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       nn.textContent = n;
       section.appendChild(nn);
     });
-    if (enrich.capped) {
-      var cap = doc.createElement("p");
-      cap.className = "muted";
-      cap.textContent = t("account.prices_cover_the_first_20_assets_the_rest_are", "Prices cover the first 20 assets — the rest are dashed.");
-      section.appendChild(cap);
-    }
+    /* Honest price notice (Polish Task 6): shown while more than one price
+     * page exists — text refreshed per draw (filtering can collapse paging
+     * away). The old first-20 key stays in the dicts for history; this page
+     * no longer reads it. */
+    var cap = doc.createElement("p");
+    cap.className = "muted";
+    cap.style.display = "none";
+    section.appendChild(cap);
     function symbolLink(sym) {
       var a = doc.createElement("a");
       a.setAttribute("href", "#/asset/" + encodeURIComponent(sym));
@@ -608,6 +706,90 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       th.appendChild(b);
       return th;
     }
+    /* Price-page state (Polish Task 6): 0-based page over the
+     * sorted/filtered rows, seeded from the enrichment's page (balance-list
+     * page 0 on first paint — identical to visible order until sort/filter).
+     * Per-render closure like sortKey/sortDir (never shared, never
+     * persisted). */
+    var curPage = 0;
+    try {
+      if (enrich && enrich.paging && typeof enrich.paging.page === "number" && enrich.paging.page > 0) {
+        curPage = Math.floor(enrich.paging.page);
+      }
+    } catch (e) { curPage = 0; }
+    /* Prev/Next pager bar (pool-ui.js pagerBar pattern: .pools-pager +
+     * .subtle-btn + .pools-page — theme tokens only, no new CSS; labels
+     * reuse the pool pager keys so both pagers read identically).
+     * touchable is call-time-guarded exactly like sortTh above.
+     * @param {number} pageCount total pages (>= 2 at every call site)
+     * @returns {HTMLElement} the pager bar */
+    function pagerBar(pageCount) {
+      var bar = doc.createElement("div");
+      bar.className = "pools-pager";
+      var prev = doc.createElement("button");
+      prev.type = "button";
+      prev.className = "subtle-btn";
+      prev.textContent = t("pool.prev_btn", "‹ Prev");
+      prev.disabled = curPage === 0;
+      try {
+        if (typeof touchable === "function") touchable(prev);
+      } catch (e) { /* button stands without the touch floor */ }
+      prev.addEventListener("click", function () {
+        if (curPage === 0) return;
+        curPage -= 1;
+        draw();
+      });
+      var note = doc.createElement("span");
+      note.className = "pools-page";
+      note.textContent = t("account.portfolio_page", "Page %(page)s of %(pages)s",
+        { page: String(curPage + 1), pages: String(pageCount) });
+      var next = doc.createElement("button");
+      next.type = "button";
+      next.className = "subtle-btn";
+      next.textContent = t("pool.next_btn", "Next ›");
+      next.disabled = curPage >= pageCount - 1;
+      try {
+        if (typeof touchable === "function") touchable(next);
+      } catch (e) { /* button stands without the touch floor */ }
+      next.addEventListener("click", function () {
+        if (curPage >= pageCount - 1) return;
+        curPage += 1;
+        draw();
+      });
+      bar.appendChild(prev);
+      bar.appendChild(note);
+      bar.appendChild(next);
+      return bar;
+    }
+    /* Price the visible page (one bounded batch per turn, never N+1):
+     * visible non-BTS ids missing from enrich.prices fetch through the
+     * shared burst and merge by id (revisits cost nothing). Redraws only
+     * when this page is still showing AND at least one new price landed —
+     * a miss adds nothing, so a failed batch settles without a redraw loop.
+     * BTS prices at 1 with no call.
+     * @param {Array} visible enriched rows on the current page
+     * @returns {void} Async fill; never throws (misses stay dashed) */
+    function ensurePrices(visible) {
+      if (!bts || !enrich || !enrich.prices) return;
+      var missing = [];
+      (visible || []).forEach(function (r) {
+        var aid = r && r.b && r.b.asset_id;
+        if (!aid || aid === bts.id) return;
+        if (!enrich.prices[aid]) missing.push(aid);
+      });
+      if (!missing.length) return;
+      var wantPage = curPage;
+      fetchTickerBatch(bts.id, missing).then(function (got) {
+        var added = 0, k;
+        for (k in got) {
+          if (Object.prototype.hasOwnProperty.call(got, k) && !enrich.prices[k]) {
+            enrich.prices[k] = got[k];
+            added += 1;
+          }
+        }
+        if (added > 0 && wantPage === curPage) draw();
+      });
+    }
     function draw() {
       var q = search.value.trim().toLowerCase();
       while (box.firstChild) box.removeChild(box.firstChild);
@@ -615,6 +797,19 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
         return !q || String(r.b.symbol).toLowerCase().indexOf(q) !== -1;
       });
       rows = sortPortfolioRows(rows, sortKey, sortDir);
+      /* One 25-row page of the sorted/filtered rows (single page renders
+       * exactly as before — no pager, no notice, full total). */
+      var pageCount = Math.max(1, Math.ceil(rows.length / PORTFOLIO_PAGE_SIZE));
+      if (curPage > pageCount - 1) curPage = pageCount - 1;
+      if (curPage < 0) curPage = 0;
+      if (pageCount > 1) {
+        cap.style.display = "";
+        cap.textContent = t("account.prices_cover_this_page", "Prices cover this page — turn the page to price more assets.");
+      } else {
+        cap.style.display = "none";
+        cap.textContent = "";
+      }
+      var visible = rows.slice(curPage * PORTFOLIO_PAGE_SIZE, curPage * PORTFOLIO_PAGE_SIZE + PORTFOLIO_PAGE_SIZE);
       if (!rows.length) {
         var none = doc.createElement("p");
         none.className = "muted";
@@ -645,7 +840,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
         thead.appendChild(headRow);
         table.appendChild(thead);
         var tbody = doc.createElement("tbody");
-        rows.forEach(function (r) {
+        visible.forEach(function (r) {
           var tr = doc.createElement("tr");
           var symCell = doc.createElement("td");
           symCell.appendChild(symbolLink(r.b.symbol));
@@ -671,7 +866,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
 
         var cards = doc.createElement("div");
         cards.className = "node-cards";
-        rows.forEach(function (r) {
+        visible.forEach(function (r) {
           var card = doc.createElement("div");
           card.className = "node-card";
           var top = doc.createElement("div");
@@ -690,22 +885,32 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
           cards.appendChild(card);
         });
         box.appendChild(cards);
+        if (pageCount > 1) box.appendChild(pagerBar(pageCount));
       }
+      /* Page-scoped total (floor of qty*price per asset, BTS row at face
+       * value): labeled a page total while paging so it never reads as the
+       * whole portfolio. Honest when no price leg exists. */
       var sum = 0n, any = false;
-      rows.forEach(function (r) {
+      visible.forEach(function (r) {
         if (r.valueRaw !== null) {
           try { sum += BigInt(r.valueRaw); any = true; } catch (e) { /* leg ignored */ }
         }
       });
       if (bts && any) {
-        total.textContent = t("account.total", "Total ≈ ") + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
+        var prefix = (pageCount > 1)
+          ? t("account.page_total", "Page total ≈ ")
+          : t("account.total", "Total ≈ ");
+        total.textContent = prefix + fmtRaw(sum.toString(), bts.prec) + " " + btsSym;
         total.title = t("account.raw_prefix", "raw ") + sum.toString();
       } else {
         total.textContent = t("account.total_value_unavailable_no_bts_prices_yet", "Total value unavailable (no BTS prices yet).");
         total.title = "";
       }
+      ensurePrices(visible);
     }
-    search.addEventListener("input", draw);
+    /* A new filter restarts paging at the first page (the result set
+     * shrank); sort clicks keep the page (clamped inside draw). */
+    search.addEventListener("input", function () { curPage = 0; draw(); });
     draw();
     var detBal = doc.createElement("details");
     detBal.className = "raw";
@@ -1666,7 +1871,9 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
   AccountUI.renderAccount = renderAccount;
   AccountUI.OP_LABELS = AccountUI._history.OP_LABELS;
   AccountUI._test = { parseAcctQuery: parseAcctQuery, buildAcctQuery: buildAcctQuery,
-    sortPortfolioRows: sortPortfolioRows, renderPortfolio: renderPortfolio };
+    sortPortfolioRows: sortPortfolioRows, renderPortfolio: renderPortfolio,
+    PORTFOLIO_PAGE_SIZE: PORTFOLIO_PAGE_SIZE, portfolioPageCount: portfolioPageCount,
+    clampPortfolioPage: clampPortfolioPage, portfolioPageIds: portfolioPageIds };
   if (typeof globalThis !== "undefined") { globalThis.AccountUI = AccountUI; }
 })();
 

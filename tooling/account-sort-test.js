@@ -192,4 +192,98 @@ eq(bodySyms(section), ["BTS", "ZEBRA", "AAA", "NODATA"], "value click sorts nume
 headerButtonFor(section, "VALUE(BTS)").btn.fire("click");
 eq(bodySyms(section), ["AAA", "ZEBRA", "BTS", "NODATA"], "value click again reverses, missing stays last");
 
+/* ---- Polish Task 6: portfolio price paging (25/page replaces first-20 cap).
+ * Pure-function vectors (no Chain needed): page size 25,
+ * pageCount = ceil(n/25), out-of-range page clamps, priced set = current
+ * page's ids only (BTS excluded — it prices at 1 with no call). ---- */
+var PAGE = AccountUI._test || {};
+assert.ok(typeof PAGE.portfolioPageCount === "function", "portfolioPageCount exported (pager math is pure)");
+assert.ok(typeof PAGE.clampPortfolioPage === "function", "clampPortfolioPage exported (out-of-range clamps)");
+assert.ok(typeof PAGE.portfolioPageIds === "function", "portfolioPageIds exported (priced set is the page slice)");
+assert.ok(PAGE.PORTFOLIO_PAGE_SIZE === 25, "portfolio page size is 25");
+var pageCount = PAGE.portfolioPageCount;
+var clampPage = PAGE.clampPortfolioPage;
+var pageIds = PAGE.portfolioPageIds;
+
+/* 9: pageCount = ceil(n/25). */
+eq(pageCount(0), 0, "pageCount empty is 0");
+eq(pageCount(1), 1, "pageCount single row is 1");
+eq(pageCount(25), 1, "pageCount full page is 1");
+eq(pageCount(26), 2, "pageCount 26 spills to 2");
+eq(pageCount(50), 2, "pageCount two full pages is 2");
+eq(pageCount(51), 3, "pageCount partial last page rounds up");
+
+/* 10: out-of-range page clamps. */
+eq(clampPage(0, 0), 0, "clamp with no pages is 0");
+eq(clampPage(1, 3), 1, "clamp in-range page stands");
+eq(clampPage(5, 3), 2, "clamp high page pins to last");
+eq(clampPage(-1, 3), 0, "clamp negative page pins to first");
+
+/* 11: priced set = current page's ids only (BTS excluded). 30 balances with
+ * BTS at index 10: page 0 prices indices 0..24 minus BTS (24 ids), page 1
+ * prices the partial tail (5 ids), page 7 clamps to the tail. */
+function bal30() {
+  var out = [], i;
+  for (i = 0; i < 30; i++) {
+    if (i === 10) out.push({ asset_id: "1.3.0", symbol: "BTS" });
+    else out.push({ asset_id: "1.3." + (100 + i), symbol: "SYM" + i });
+  }
+  return out;
+}
+var ids0 = pageIds(bal30(), "1.3.0", 0);
+eq(ids0.length, 24, "page 0 prices 24 non-BTS ids");
+ok(ids0.indexOf("1.3.0") === -1, "page 0 priced set excludes BTS");
+eq(ids0[0], "1.3.100", "page 0 priced set starts at the first balance");
+var ids1 = pageIds(bal30(), "1.3.0", 1);
+eq(ids1.length, 5, "page 1 prices the partial tail (5 ids)");
+eq(ids1[ids1.length - 1], "1.3.129", "page 1 priced set ends at the last balance");
+eq(pageIds(bal30(), "1.3.0", 7), ids1, "out-of-range page clamps to the tail set");
+
+/* 12: fake-doc pager — 30 balances render 25 rows + Prev/Next pager; page
+ * turn shows the tail. Chain is absent in node so the tail prices stay
+ * dashed, but the rows still render (missing legs dash, never blank). */
+function pagerBar(sec) {
+  var bars = walk(sec, function (n) { return n.className === "pools-pager"; });
+  assert.ok(bars.length === 1, "one pager bar rendered");
+  return bars[0];
+}
+function pageLabelText(sec) {
+  var spans = walk(sec, function (n) { return n.className === "pools-page"; });
+  assert.ok(spans.length === 1, "one page label rendered");
+  return spans[0].textContent;
+}
+function pagerButtons(sec) {
+  return pagerBar(sec).children.filter(function (c) { return c.tag === "button"; });
+}
+var doc2 = fakeDoc();
+var section2 = fakeEl("section");
+var balances30 = bal30().map(function (b, i) {
+  return { asset_id: b.asset_id, symbol: b.symbol, raw: String(1000 + i), display: "1.000", precision: 5 };
+});
+var prices0 = {};
+ids0.forEach(function (aid) { prices0[aid] = { latest: "2.0", change: "0.5" }; });
+var enrich30 = {
+  inOrders: {}, vesting: {}, collateral: {},
+  prices: prices0,
+  bts: { id: "1.3.0", prec: 5, symbol: "BTS" },
+  capped: true, notes: [],
+  paging: { page: 0, pageSize: 25, pageCount: 2, total: 30 }
+};
+T.renderPortfolio(doc2, section2, { id: "1.2.5", name: "tester" }, balances30, enrich30);
+eq(bodySyms(section2).length, 25, "page 0 shows 25 rows");
+eq(pageLabelText(section2), "Page 1 of 2", "pager label starts at page 1 of 2");
+var btns0 = pagerButtons(section2);
+eq(btns0.length, 2, "pager has Prev + Next");
+ok(btns0[0].disabled === true, "Prev disabled on the first page");
+ok(btns0[1].disabled !== true, "Next enabled with more pages");
+btns0[1].fire("click");
+eq(bodySyms(section2).length, 5, "Next shows the partial tail page");
+eq(pageLabelText(section2), "Page 2 of 2", "pager label tracks the page turn");
+var btns1 = pagerButtons(section2);
+ok(btns1[0].disabled !== true, "Prev enabled past the first page");
+ok(btns1[1].disabled === true, "Next disabled on the last page");
+btns1[0].fire("click");
+eq(bodySyms(section2).length, 25, "Prev returns to the first page");
+eq(pageLabelText(section2), "Page 1 of 2", "pager label tracks the way back");
+
 console.log("account-sort-test: " + passed + " passed, 0 failed");
