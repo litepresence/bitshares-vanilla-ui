@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 """Add trade.tab_single (SINGLE/SCALED shared toggle) to all 12 locale dicts.
 
+SPENT one-shot (2026-10-05, principle #10 fix): the original run wrote
+one-shot MACHINE translations for the 11 non-en locales, which violates
+the honest-English rule (unverified strings must stay English until a
+human verifies them). All non-en trade.tab_single values were reverted
+to honest English "Single". This script is now IDEMPOTENT-HONEST: a
+re-run sets every locale to "Single" and never reintroduces translations.
+
 One-shot for the scaled-toggle task: the buy-panel Buy/Scaled tabs become one
 shared SINGLE/SCALED row above both columns, so trade.tab_buy's "Buy" label is
 replaced by trade.tab_single "Single" (trade.tab_scaled "Scaled" reused as-is;
 trade.tab_buy/tab_sell stay in the dicts untouched — no call-site churn).
 
-Non-en values are ONE-SHOT machine translations (unverified — flagged for the
-human audit wave, principle #10). Gate stays green: key sets stay identical
-across dicts and every _meta.translated allowlist covers the new key.
+Non-en values stay HONEST ENGLISH "Single" until the audit wave verifies a
+real translation per principle #10 (never write machine translations into
+locale dicts). Gate stays green: key sets stay identical across dicts and
+every _meta.translated allowlist covers the new key (fully-translated gate
+branch performs no value checks, so allowlists are left untouched).
 
 Usage: python3 tooling/add_trade_tab_single_i18n.py
 """
@@ -18,20 +27,22 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOCALES = os.path.join(HERE, "..", "vanilla", "locales")
 
-# One-shot translations of "Single" (tab label next to "Scaled").
+# Honest-English only (SPENT): every locale gets en "Single" until a human
+# translator verifies a real translation (principle #10). A re-run MUST NOT
+# reintroduce machine translations — this table is intentionally en-identical.
 VALUES = {
     "en": "Single",
-    "de": "Einzel",
-    "es": "Simple",
-    "fr": "Simple",
-    "hi": "एकल",
-    "it": "Singolo",
-    "ja": "単一",
-    "ko": "단일",
-    "pt": "Simples",
-    "ru": "Одиночный",
-    "tr": "Tekli",
-    "zh": "单笔",
+    "de": "Single",
+    "es": "Single",
+    "fr": "Single",
+    "hi": "Single",
+    "it": "Single",
+    "ja": "Single",
+    "ko": "Single",
+    "pt": "Single",
+    "ru": "Single",
+    "tr": "Single",
+    "zh": "Single",
 }
 
 CODES = ["en", "de", "es", "fr", "hi", "it", "ja", "ko", "pt", "ru", "tr", "zh"]
