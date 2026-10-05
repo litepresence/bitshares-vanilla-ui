@@ -88,6 +88,23 @@ var ChartsLwc = (function () {
     return { ctx: ctx, w: w, h: cssH };
   }
 
+  /* Number coercion for chart-pixel inputs (LWC points, canvas strokes):
+   * plain numbers pass through; numeric STRINGS (VWAP/indicator human
+   * strings, headless string bars) coerce via Number() — the String()/
+   * sigFigPlaces paths upstream already traffic in strings, so refusing
+   * them here would blank an all-string series even though every value is
+   * plottable. Anything else (null, booleans, blank/ junk strings) is NaN:
+   * a gap, never a zero — a plotted zero would invent a price. Callers
+   * still gate on isFinite. Pixel coordinates only, never money. Pure. */
+  function _num(v) {
+    if (typeof v === "number") return v;
+    if (typeof v === "string") {
+      if (v.trim() === "") return NaN;
+      return Number(v);
+    }
+    return NaN;
+  }
+
   /* Stroke one series, breaking the path across null/NaN gaps (warmup bars).
    * Params: g fit object, arr number[]|nulls, n total x-count, x/y mappers.
    * Private copy of the market-charts.js helper (canvas fallback only). */
@@ -100,16 +117,16 @@ var ChartsLwc = (function () {
     g.ctx.beginPath();
     var i;
     for (i = 0; i < n; i++) {
-      var v = arr[i];
-      if (typeof v !== "number" || !isFinite(v)) {
+      var nv = _num(arr[i]);
+      if (!isFinite(nv)) {
         started = false;
         continue;
       }
       if (!started) {
-        g.ctx.moveTo(x(i), y(v));
+        g.ctx.moveTo(x(i), y(nv));
         started = true;
       } else {
-        g.ctx.lineTo(x(i), y(v));
+        g.ctx.lineTo(x(i), y(nv));
       }
       drew = true;
     }
@@ -509,14 +526,16 @@ var ChartsLwc = (function () {
   }
 
   /* Aligned values[] -> LWC line points, skipping warmup nulls/NaNs so the
-   * overlay breaks across gaps instead of diving to zero. Pixel math only. */
+   * overlay breaks across gaps instead of diving to zero. Numeric strings
+   * coerce via _num above (all-string overlay bars plot, they never blank
+   * the pane). Pixel math only. */
   function lineData(times, values) {
     var out = [];
     var i;
     for (i = 0; i < times.length && i < values.length; i++) {
-      var v = values[i];
-      if (typeof v !== "number" || !isFinite(v)) continue;
-      out.push({ time: times[i], value: v });
+      var nv = _num(values[i]);
+      if (!isFinite(nv)) continue;
+      out.push({ time: times[i], value: nv });
     }
     return out;
   }
@@ -671,7 +690,7 @@ var ChartsLwc = (function () {
       var vals = entries[i] ? entries[i].values : null;
       if (!Array.isArray(vals)) continue;
       for (k = 0; k < vals.length && k < times.length; k++) {
-        if (typeof vals[k] === "number" && isFinite(vals[k])) { anyPts = true; break; }
+        if (isFinite(_num(vals[k]))) { anyPts = true; break; }
       }
       if (anyPts) break;
     }
@@ -694,9 +713,10 @@ var ChartsLwc = (function () {
         if (!Array.isArray(arr)) continue;
         if (arr.length > n) n = arr.length;
         for (k = 0; k < arr.length; k++) {
-          if (typeof arr[k] === "number" && isFinite(arr[k])) {
-            if (arr[k] < min) min = arr[k];
-            if (arr[k] > max) max = arr[k];
+          var av = _num(arr[k]);
+          if (isFinite(av)) {
+            if (av < min) min = av;
+            if (av > max) max = av;
           }
         }
       }
@@ -855,7 +875,7 @@ var ChartsLwc = (function () {
     removePane: removePane,
     linkTimeScales: linkTimeScales,
     hasLightweight: hasLightweight,
-    _test: { savedRange: savedRange, restoreRange: restoreRange, priceTick: priceTick, priceFormatCustom: priceFormatCustom }
+    _test: { savedRange: savedRange, restoreRange: restoreRange, priceTick: priceTick, priceFormatCustom: priceFormatCustom, lineData: lineData }
   };
 })();
 

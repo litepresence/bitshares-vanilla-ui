@@ -371,6 +371,21 @@ AccountUI._history = AccountUI._history || {};
 
   /* History section: one row per op (time + label + raw JSON details).
    * Plain list (no table) so it is readable from 360px to 4K as-is. */
+
+  /* Shallow copy of a history row without the derived _summary label.
+   * HistorySummary enriches rows in place (adds _summary for the head line
+   * above); the raw-JSON fold must show chain truth only, never our
+   * annotation. Non-objects pass through untouched; arrays stay arrays.
+   * Pure. ES5. */
+  function _chainRow(row) {
+    if (!row || typeof row !== "object") return row;
+    var copy = Array.isArray(row) ? [] : {};
+    for (var k in row) {
+      if (Object.prototype.hasOwnProperty.call(row, k) && k !== "_summary") copy[k] = row[k];
+    }
+    return copy;
+  }
+
   function renderHistory(doc, section, rows) {
     if (!rows || rows.length === 0) {
       var empty = doc.createElement("p");
@@ -394,7 +409,9 @@ AccountUI._history = AccountUI._history || {};
       details.appendChild(summary);
       var pre = doc.createElement("pre");
       try {
-        pre.textContent = JSON.stringify(row);
+        /* Chain truth only: the head line above already shows _summary —
+         * the fold stringifies the row with our annotation stripped. */
+        pre.textContent = JSON.stringify(_chainRow(row));
       } catch (e) {
         pre.textContent = String(row);
       }
@@ -407,6 +424,7 @@ AccountUI._history = AccountUI._history || {};
   AccountUI._history.OP_LABELS = OP_LABELS;
   AccountUI._history.renderOpenOrders = renderOpenOrders;
   AccountUI._history.renderHistory = renderHistory;
+  AccountUI._history._test = { chainRow: _chainRow };
   if (typeof globalThis !== "undefined") { globalThis.AccountUI = AccountUI; }
 })();
 

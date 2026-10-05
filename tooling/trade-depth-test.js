@@ -127,7 +127,7 @@ function freshMarket() {
   var deep = await M.tradesDeep(BASE, QUOTE, { days: 1, limit: 10 });
   var shallow = await M.trades(BASE, QUOTE, 10);
   eq(deep, shallow, "tradesDeep envelope deep-equals trades() envelope");
-  eq(Object.keys(deep[0]).sort(), ["baseAmount", "displayPrice", "quoteAmount", "raw", "time"], "envelope keys match trades()");
+  eq(Object.keys(deep[0]).sort(), ["baseAmount", "displayPrice", "priceExact", "quoteAmount", "raw", "time"], "envelope keys match trades() (priceExact: exact 8-place string for titles/keys)");
   eq([deep[1].displayPrice, deep[1].baseAmount, deep[1].quoteAmount], [null, null, null], "unmappable row is nulls, not a reject");
 
   /* 17: market_trade chain shape — human strings + date, time falls back to date. */

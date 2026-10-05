@@ -282,27 +282,44 @@ var Market = (function () {
 
   /* Normalize one raw fill row to the trades() envelope (factored so
    * trades() and tradesDeep() share ONE normalizer — never two).
-   * Returns {raw, time, displayPrice, baseAmount, quoteAmount}; price/amounts
-   * are base-per-quote human strings via BigInt math, null when the row shape
-   * is unmappable (see header ambiguity (a)). time prefers row.time /
+   * Returns {raw, time, displayPrice, priceExact, baseAmount, quoteAmount};
+   * price/amounts are base-per-quote human strings via BigInt math, null
+   * when the row shape is unmappable (see header ambiguity (a)).
+   * displayPrice is the 4-sig-fig DISPLAY string (global price rule:
+   * Format.priceSig over the exact 8-place value — dust reads sci, never
+   * "0.00000000"); priceExact keeps the exact 8-place string for titles
+   * and dedupe keys. Math/sort keys (time, raw, baseAmount, quoteAmount)
+   * stay exact — priceSig touches the display string only, and no input
+   * path consumes fill-row displayPrice (trades rows have no click-to-fill;
+   * book click-to-fill reads LEVEL rows, untouched). time prefers row.time /
    * row.block_time (fill_history shape) with row.date as the last fallback
    * (market_trade shape, api_objects.hpp:149-159) — fill rows carry
    * block_time so trades() vectors are unchanged by the fallback. */
   function _fillRow(row, baseId, quoteId, precs) {
     row = row || {};
     var pair = _fillPair(row, baseId, quoteId);
-    var dp = null, ba = null, qa = null;
+    var dp = null, exact = null, ba = null, qa = null;
     if (pair) {
       try {
-        dp = Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES);
+        exact = Format.formatPrice(pair.rawB, precs[baseId], pair.rawQ, precs[quoteId], PRICE_PLACES);
+        dp = exact;
+        /* 4-sf display (global price rule); the exact string stays on
+         * priceExact below. priceSig absent -> 8-place string stands. */
+        try {
+          if (typeof Format.priceSig === "function") {
+            var sig = Format.priceSig(exact);
+            if (typeof sig === "string" && sig) dp = sig;
+          }
+        } catch (e) { /* exact stands */ }
         ba = Format.formatAmount(pair.rawB, precs[baseId]);
         qa = Format.formatAmount(pair.rawQ, precs[quoteId]);
-      } catch (e) { dp = null; ba = null; qa = null; /* zero-quote etc. is a dash, never a whole-history reject */ }
+      } catch (e) { dp = null; exact = null; ba = null; qa = null; /* zero-quote etc. is a dash, never a whole-history reject */ }
     }
     return {
       raw: row,
       time: row.time || row.block_time || row.date || null,
       displayPrice: dp,
+      priceExact: exact,
       baseAmount: ba,
       quoteAmount: qa
     };
@@ -642,7 +659,8 @@ var Market = (function () {
     settleOrders: settleOrders,
     sortSettles: sortSettles,
     mySettlements: mySettlements,
-    myLimitOrders: myLimitOrders
+    myLimitOrders: myLimitOrders,
+    _test: { fillRow: _fillRow }
   };
 })();
 

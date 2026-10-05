@@ -35,8 +35,7 @@ eq(Format.sigFigPlaces(["0.0000000000001234"]), 12, "1.234e-15 capped at 12");
 var tiny = globalThis.Format.formatPrice("1234", 5, "10000000000", 5, 10);
 eq(tiny, "0.0000001234", "tiny price formats to 4 sig figs at 10 places");
 var tiny8 = globalThis.Format.formatPrice("1234", 5, "10000000000", 5, 8);
-assert.ok(tiny8 !== "0.00000000" || true, "placeholder");
-passed++;
+eq(tiny8, "0.00000012", "tiny price survives at 8 places (dust-zero only below 5e-9)");
 /* Below 5e-9 quantizes to zero at 8 places (the reported bug) ... */
 var dust8 = globalThis.Format.formatPrice("1234", 5, "1000000000000", 5, 8);
 eq(dust8, "0.00000000", "dust quantizes to zero at 8 places (bug pinned)");

@@ -816,9 +816,13 @@ var MarketBook = (function () {
     if (wantCards) cards.className = "node-cards trades-cards";
     rows.forEach(function (r) {
       /* Punchlist MED: fill prices read 4-sf (global price rule); the full
-       * chain string stays in the cell title. */
+       * chain string stays in the cell title. displayPrice arrives 4-sf
+       * from Market._fillRow; priceExact (when present) is the exact
+       * 8-place string for the title + dedupe key — ps() below is then
+       * identity, math/sort keys stay exact. */
       var priceShown = (r.displayPrice === null || r.displayPrice === undefined) ? "—" : ps(String(r.displayPrice));
-      var priceFull = (r.displayPrice === null || r.displayPrice === undefined) ? null : String(r.displayPrice);
+      var priceFull = (r.priceExact !== null && r.priceExact !== undefined) ? String(r.priceExact) :
+        ((r.displayPrice === null || r.displayPrice === undefined) ? null : String(r.displayPrice));
       var amtShown = (r.quoteAmount === null ? "" : String(r.quoteAmount) + " " + ctx.quoteSymbol);
       var tKey = timeText(r.time) + " " + String(priceFull === null ? "—" : priceFull) + " " + amtShown;
       var dup = 1, k = tKey;
