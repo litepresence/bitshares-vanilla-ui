@@ -280,18 +280,34 @@ var InstantTradeUI = (function () {
   /* Effective price human (RECEIVE per 1 SELL) from walked raw totals:
    * (receiveRaw/10^rp)/(sellRaw/10^sp), floored to PRICE_PLACES then 4-sf
    * for display (global price rule). BigInt only. Display-only: callers
-   * paint effP/confirm text with this and keep the raw pair in the title. */
+   * paint effP/confirm text with this and keep the raw pair in the title.
+   * Dust guard: when the 6-place floor is exactly zero but the true ratio is
+   * nonzero, recompute the SAME ratio at adaptive higher intermediate
+   * precision (leading-zero count + 8 guard digits, exact BigInt) and route
+   * THAT through priceSig, so dust renders 4-sf/sci instead of "0". Normal
+   * magnitudes take the 6-place path byte-identically (outputs unchanged).
+   * Tx/math inputs always use the exact raw legs, never this string. */
   function effectiveHuman(sellRaw, receiveRaw, sellPrec, receivePrec) {
     var s = BigInt(sellRaw), r = BigInt(receiveRaw);
     if (s <= 0n || r <= 0n) throw new Error("bad walk totals");
-    var floored = ratioToDec(r * pow10(sellPrec), s * pow10(receivePrec), PRICE_PLACES);
+    var num = r * pow10(sellPrec), den = s * pow10(receivePrec);
+    var floored = ratioToDec(num, den, PRICE_PLACES);
+    var hi = floored;
+    try {
+      if (Number(floored) === 0) {
+        var need = den.toString().length - num.toString().length + 8;
+        if (need < PRICE_PLACES) need = PRICE_PLACES;
+        if (need > 60) need = 60;
+        hi = ratioToDec(num, den, need);
+      }
+    } catch (e) { hi = floored; }
     try {
       if (typeof Format !== "undefined" && Format && typeof Format.priceSig === "function") {
-        var sig = Format.priceSig(floored);
+        var sig = Format.priceSig(hi);
         if (typeof sig === "string" && sig) return sig;
       }
     } catch (e) { /* floored stands */ }
-    return floored;
+    return hi;
   }
 
   /* Market-fee trio (trade-core.js, duplicated — TradeForm exports
