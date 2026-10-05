@@ -129,3 +129,21 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   assert.ok(/#nav-directory\s*\{[^}]*position:\s*fixed/.test(css), "directory is a fixed overlay, not in-flow");
   console.log("pulldown-shape: 4 passed, 0 failed");
 })();
+
+/* Phone scroll-row bar + sheet pulldown (nav-pulldown Task 2): under 719px
+ * the bar stays visible as a horizontal scroll-row (flex-wrap nowrap +
+ * overflow-x auto) instead of the old display:none collapse; the open panel
+ * becomes a sheet with 8px gutters (left/right 8px, min-width 0). CSS-shape
+ * asserts following the button-test.js precedent (read app.css text). */
+(function phoneScrollRow() {
+  var fs = require("fs");
+  var path = require("path");
+  var css = fs.readFileSync(path.join(__dirname, "..", "vanilla", "css", "app.css"), "utf8");
+  assert.ok(/#nav\s*\{[^}]*flex-wrap:\s*nowrap/.test(css), "bar keeps one row instead of wrapping");
+  assert.ok(/#nav\s*\{[^}]*overflow-x:\s*auto/.test(css), "bar scrolls instead of wrapping");
+  assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*left:\s*8px/.test(css), "sheet keeps a left gutter");
+  assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*right:\s*8px/.test(css), "sheet keeps a right gutter");
+  assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*min-width:\s*0/.test(css), "sheet can shrink to phone width");
+  assert.ok(!/#nav\s*\{\s*display:\s*none/.test(css), "phone hide reconciled (scroll-row replaces display:none)");
+  console.log("phone-scroll-row: 6 passed, 0 failed");
+})();

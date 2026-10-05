@@ -179,9 +179,14 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
 @media (min-width: 1200px) { .wrap.wide { max-width: none; display: grid;
   grid-template-columns: repeat(12, 1fr); gap: 16px; } }
 @media (max-width: 719px) {
-  #nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
-  #nav { display: none; flex-direction: column; }
-  #nav.open { display: flex; }
+  /* Phone scroll-row (nav-pulldown Task 2): the bar stays visible as one
+   * horizontal scroll-row instead of the old display:none collapse (the
+   * hide conflicted with the Task 1 overlay pulldown — the bar links must
+   * stay tappable while #nav.open shows the directory sheet). No layout
+   * beyond the scroll row; keyboard/focus behavior lives in app.js
+   * (Esc/outside-tap/hashchange close, focus-return) and is untouched. */
+  #nav { flex-wrap: nowrap; overflow-x: auto; }
+  #nav.open #nav-directory { left: 8px; right: 8px; min-width: 0; }
 }
 .node-table, .xplore-scroll table { width: 100%; border-collapse: collapse; background: var(--panel); }
 .node-table th, .node-table td { padding: 12px; border-bottom: 1px solid var(--border);
