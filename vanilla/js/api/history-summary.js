@@ -74,7 +74,11 @@ if (__partRequire && (!HistorySummary.SUMMARIZERS || !HistorySummary.SUMMARIZERS
     } catch (e) { /* live joins cover */ }
   }
 
-  /* Collect every 1.2.x/1.3.x/1.19.x id in the page payloads (generic pass). */
+  /* Collect every 1.2.x/1.3.x/1.19.x id in the page payloads (generic pass).
+   * Tag 16 fee-pool funding stores its CORE leg as a bare integer (no
+   * "1.3.0" in the payload), so force 1.3.0 into the join when any tag-16
+   * row is present — otherwise a fee-pool-only page with an empty cache
+   * renders the BTS leg as "—". */
   function collect(rows) {
     var out = { acc: [], asset: [], pool: [] }, seen = {};
     (rows || []).forEach(function (r) {
@@ -87,6 +91,7 @@ if (__partRequire && (!HistorySummary.SUMMARIZERS || !HistorySummary.SUMMARIZERS
         else if (id.indexOf("1.3.") === 0) out.asset.push(id);
         else out.pool.push(id);
       });
+      if (tagOf(r) === 16 && !seen["1.3.0"]) { seen["1.3.0"] = 1; out.asset.push("1.3.0"); }
     });
     return out;
   }

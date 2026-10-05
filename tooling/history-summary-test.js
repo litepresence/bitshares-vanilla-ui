@@ -339,7 +339,22 @@ HS.enrich(asAlice, "1.2.1").then(function (out) {
     eq(out2, advThrow, "throwing join keeps the same array");
     eq(out2[0]._summary, undefined, "throwing join adds no summary (999)");
     eq(out2[1]._summary, undefined, "throwing join adds no summary (31)");
-    console.log("history-summary Tasks 3+4+5+6: " + passed + " passed");
+    // Isolated fee-pool vector (finding: 1.3.0 never collected): fresh
+    // module state with no prior 1.3.0 in cache, single tag-16 row whose
+    // payload carries no "1.3.0" (bare CORE leg). Asserts human BTS amount.
+    var isoRow = [row("1.11.200", 16, { from_account: "1.2.1", asset_id: "1.3.1", amount: "300000" })];
+    try {
+      delete require.cache[require.resolve("../vanilla/js/api/history-summary.js")];
+      delete require.cache[require.resolve("../vanilla/js/api/history-families-trade.js")];
+      delete require.cache[require.resolve("../vanilla/js/api/history-families-pools.js")];
+      delete require.cache[require.resolve("../vanilla/js/api/history-families-gov.js")];
+    } catch (e) { /* first load only */ }
+    if (typeof globalThis !== "undefined") { delete globalThis.HistorySummary; }
+    var freshHS = require("../vanilla/js/api/history-summary.js");
+    return freshHS.enrich(isoRow, "1.2.1").then(function (out3) {
+      eq(out3[0]._summary, "Funded fee pool of USD with 3.00000 BTS", "tag 16 isolated fresh-cache BTS leg");
+      console.log("history-summary Tasks 3+4+5+6: " + passed + " passed");
+    });
   }, function (e) {
     global.Chain = savedChain;
     throw e;
