@@ -122,3 +122,33 @@ Expected: all green. Human browser pass (390px + 1440px × 3 themes, Esc/outside
 git add vanilla/css/app.css tooling/app-shell-test.js
 git commit -m "feat(nav): phone scroll-row bar + sheet pulldown"
 ```
+
+---
+
+### Task 3: Owner rework (no duplication, vertical stack, labs out, split Labs/Personal)
+
+**Files:**
+- Modify: `vanilla/js/app.js` (`ORIGINAL_NAV` → 5 hrefs, `NAV_ICONS` drop labs entries, `buildDirectory` remove 7 primaries + separator), `vanilla/index.html` (static bar 7→5 links), `vanilla/css/app.css` (pulldown links vertical: column layout on `#nav-directory`), `vanilla/js/views/menu-ui.js` (split labs→labs+personal), `vanilla/js/views/help-ui.js` (mirror split in GROUPS), `vanilla/locales/*.json` (keys below), `tooling/menu-test.js` (6→7), `tooling/app-shell-test.js` (pulldown asserts: sections-only, vertical)
+- Test: `node tooling/menu-test.js`, `node tooling/app-shell-test.js`, `node tooling/help-test.js`
+
+**Interfaces:**
+- Consumes: existing `headingLink`, `MenuUI.SECTIONS`, existing keys.
+- Produces: pulldown = 7 section links + All pages, stacked vertically; bar = 5 links; `#/menu/labs` (api-lab, es-lab, txbuilder) + `#/menu/personal` (trollbox, favourites, alerts, help, about, community, settings).
+
+- [ ] **Step 1: Update SECTIONS + groups + keys**
+
+Split the labs entry: `{ slug: "labs", icon: "cogs", titleKey: "menu.section_labs" ("Labs"), blurbKey: "menu.blurb_labs" ("Power tools for chain and node work."), links: [api-lab, es-lab, txbuilder] }` + `{ slug: "personal", icon: "user", titleKey: "menu.section_personal" ("Personal"), blurbKey: "menu.blurb_personal" ("Chat, alerts, and your setup."), links: [trollbox, favourites, alerts, help, about, community, settings] }` (move link objects byte-identically). Update the counts comment (14+9+7+4+9+3+7=53). Mirror in help-ui GROUPS: split the labs group into Labs (`txbuilder, api-lab, es-lab, browser`) + Personal (rest). Keys (`menu.section_labs` default→"Labs", `menu.blurb_labs` new default, new `menu.section_personal`/`menu.blurb_personal`) via one-shot script + `check_i18n.py`.
+
+- [ ] **Step 2: Strip duplication + vertical stack**
+
+`ORIGINAL_NAV` → 5 hrefs; drop the 2 labs `NAV_ICONS` entries; `buildDirectory` emits section links + All only; `index.html` bar drops the 2 lab anchors; pulldown CSS stacks items vertically (single column — verify `#nav-directory a` computes to one-per-row at 390px and 1440px).
+
+- [ ] **Step 3: Verify + commit**
+
+Run: `node tooling/menu-test.js && node tooling/app-shell-test.js && node tooling/help-test.js && python3 tooling/check_i18n.py && bash tooling/check_types.sh && python3 tooling/check_rot.py`
+Expected: all green (menu-test updated 6→7 sections).
+
+```bash
+git add vanilla/js/app.js vanilla/index.html vanilla/css/app.css vanilla/js/views/menu-ui.js vanilla/js/views/help-ui.js vanilla/locales/*.json tooling/menu-test.js tooling/app-shell-test.js tooling/add_menu_split_i18n.py
+git commit -m "feat(nav): sections-only vertical pulldown, labs out of menus, split Labs/Personal"
+```

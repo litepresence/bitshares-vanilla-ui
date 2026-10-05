@@ -22,12 +22,26 @@ icons. Two presentations of navigation stacked on each other.
 - Instant show/hide, no slide/fade (reduced-motion safe, zero jank).
 - `max-height: 70vh` with internal scroll (keeps the current directory cap).
 
-## 3. Contents
+## 3. Contents (revised 2026-10-04: no bar duplication, vertical stack)
 
-Same data as today, one presentation: the 7 primary links with icons
-(same `buildNavLink` source, existing `--header-icon-filter` theming),
-a divider, the 6 section entries with icons → `#/menu/:slug`, and
-"All pages" → `#/menu`. Nothing reachable today becomes unreachable.
+The pulldown holds section links ONLY — never the primary bar links
+(owner ruling: no duplication). The 7 section entries (Wallet, Trade,
+Earn & Protect, Govern, Explore, Labs, Personal — §3b) with icons link
+to their TOC pages (`#/menu/:slug`), plus "All pages" → `#/menu`.
+Items stack vertically (one per row — the whole notion of a burger
+menu); the panel is a single column.
+
+API Lab and ES Lab appear in NEITHER menu (owner ruling): not in the
+bar, not in the pulldown. They live on the Labs TOC page (`#/menu/labs`)
+alongside the Transaction Builder.
+
+### 3b. Labs/Personal split (revised 2026-10-04)
+
+The old "Labs & Personal" section splits in two (53 pages total,
+unchanged): **Labs** (`#/menu/labs`: API Lab, ES Lab, Transaction
+Builder — power tools) and **Personal** (`#/menu/personal`: Trollbox,
+Favourites, Price Alerts, Help, About, Community, Settings — chat and
+setup). Old `#/menu/labs` keeps resolving (now Labs-only content).
 
 ## 4. Small screens (owner-delegated, principle #7)
 
