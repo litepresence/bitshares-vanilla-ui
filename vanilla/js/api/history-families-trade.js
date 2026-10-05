@@ -146,6 +146,11 @@ HistorySummary.SUMMARIZERS = HistorySummary.SUMMARIZERS || {};
   }
 
   HistorySummary.SUMMARIZERS[0] = sumTransfer;
+  /* Tag 38 override_transfer (transfer.hpp:77-100, reflected
+   * transfer.hpp:107 with (fee)(issuer)(from)(to)(amount)(memo)(extensions)):
+   * same from/to/amount shape as tag 0 plus the issuer leg, so the transfer
+   * summarizer applies verbatim — zero new keys. Task 6 leftover. */
+  HistorySummary.SUMMARIZERS[38] = sumTransfer;
   HistorySummary.SUMMARIZERS[1] = sumOrderCreate;
   HistorySummary.SUMMARIZERS[2] = sumOrderCancel;
   HistorySummary.SUMMARIZERS[77] = sumOrderUpdate;

@@ -11,6 +11,10 @@
 // 39-41): one vector per tag (54-56 share sum_authorities, 39-41 share
 // sum_blind counts-only) + label-only rows for 31/36/44/46 + a null-payload
 // fallback row. Appended by: history Task 5.
+// Task 6 leftovers (38 override_transfer aliased to the tag-0 transfer
+// summarizer, zero new keys; 46 execute_bid with its own template) +
+// adversarial vectors (precision-miss 6-digit guard, unknown-shape 77,
+// null/empty enrich, throwing Chain join). Appended by: history Task 6.
 "use strict";
 var assert = require("assert");
 
@@ -190,6 +194,23 @@ var t5 = [
   row("1.11.94", 20, {})
 ];
 
+var t6 = [
+  row("1.11.95", 38, { issuer: "1.2.1", from: "1.2.1", to: "1.2.2",
+    amount: { amount: "100000", asset_id: "1.3.0" } }),
+  row("1.11.96", 46, { bidder: "1.2.1",
+    debt: { amount: "50000", asset_id: "1.3.1" },
+    collateral: { amount: "200000", asset_id: "1.3.0" } })
+];
+
+/* Task 6 adversarial rows: unknown 6-digit asset (never raw), unknown-shape
+ * 77 (no summary), unknown tag under a throwing join (rows unchanged). */
+var advMiss = [
+  row("1.11.100", 0, { from: "1.2.1", to: "1.2.2",
+    amount: { amount: "123456", asset_id: "1.3.999999" } })
+];
+var advShape = [row("1.11.101", 77, {}), row("1.11.102", 77, { seller: "1.2.1" })];
+var advThrow = [row("1.11.103", 999, {}), row("1.11.104", 31, { new_parameters: {} })];
+
 HS.enrich(asAlice, "1.2.1").then(function (out) {
   eq(out, asAlice, "same array");
   eq(out[0]._summary, undefined, "unknown tag stays label-only");
@@ -284,7 +305,43 @@ HS.enrich(asAlice, "1.2.1").then(function (out) {
   eq(out[30]._summary, undefined, "tag 31 params label-only");
   eq(out[31]._summary, undefined, "tag 36 assert label-only");
   eq(out[32]._summary, undefined, "tag 44 fba label-only");
-  eq(out[33]._summary, undefined, "tag 46 execute-bid label-only");
+  eq(out[33]._summary, undefined, "tag 46 bare-bidder payload stays label-only");
   eq(out[34]._summary, undefined, "tag 20 empty payload fallback");
-  console.log("history-summary Tasks 3+4+5: " + passed + " passed");
+  return HS.enrich(t6, "1.2.1");
+}).then(function (out) {
+  eq(out[0]._summary, "Sent 1.00000 BTS to bob", "tag 38 override transfer reuses send");
+  eq(out[1]._summary, "Executed bid 2.00000 BTS for 5.0000 USD", "tag 46 execute bid");
+  eq(typeof HS._test.amount, "function", "_test exposes amount");
+  eq(typeof HS._test.name, "function", "_test exposes name");
+  return HS.enrich(advMiss, "1.2.1");
+}).then(function (out) {
+  assert.ok(out[0]._summary.indexOf("—") !== -1, "precision-miss renders dash");
+  assert.ok(out[0]._summary.indexOf("123456") === -1, "precision-miss never raw");
+  passed += 2;
+  return HS.enrich(advShape, "1.2.1");
+}).then(function (out) {
+  eq(out[0]._summary, undefined, "tag 77 empty payload stays label-only");
+  eq(out[1]._summary, undefined, "tag 77 orderless payload stays label-only");
+  return HS.enrich(null, "1.2.1");
+}).then(function (out) {
+  eq(out, null, "enrich(null) resolves null");
+  return HS.enrich([], "1.2.1");
+}).then(function (out) {
+  assert.ok(Array.isArray(out) && out.length === 0, "enrich([]) resolves []");
+  passed++;
+  var savedChain = global.Chain;
+  global.Chain = {
+    db: function () { return Promise.resolve(1); },
+    call: function () { return Promise.reject(new Error("boom")); }
+  };
+  return HS.enrich(advThrow, "1.2.1").then(function (out2) {
+    global.Chain = savedChain;
+    eq(out2, advThrow, "throwing join keeps the same array");
+    eq(out2[0]._summary, undefined, "throwing join adds no summary (999)");
+    eq(out2[1]._summary, undefined, "throwing join adds no summary (31)");
+    console.log("history-summary Tasks 3+4+5+6: " + passed + " passed");
+  }, function (e) {
+    global.Chain = savedChain;
+    throw e;
+  });
 }).catch(function (e) { console.error("FAIL", e); process.exit(1); });

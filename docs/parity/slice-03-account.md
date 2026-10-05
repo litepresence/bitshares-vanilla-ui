@@ -199,3 +199,19 @@ had balances + history but no orders section — fixed to match the model:
   + orders + history with zero console errors → canceled → `openOrders` = 0
   (BOOK-CLEAN). Orientation cross-check: live price `0.00000010` = 1/10000000
   base-per-quote ✓.
+
+## History one-liners Task 6 (live re-read probe 2026-10-05)
+
+`node tooling/history-summary-probe.mjs` (reads only — `get_chain_id`,
+`get_dynamic_global_properties`, `get_account_by_name`, `get_account_history`,
+`lookup_asset_symbols`, `get_accounts`; no keys, no signing, no broadcast)
+drives the exact view path `Account.history(id, 20)` →
+`HistorySummary.enrich(rows, id)` with the real `I18n` + shipped `en.json`
+seeded in, then fails on any `\d{5,}` run left after stripping dotted
+object ids (identifiers may show raw — spec §3) and decimal amounts.
+- `wss://testnet.xbts.io/ws` @ head `#101131485` (`2026-10-05T00:26:00`),
+  fixture `lite-test-1` → `1.2.26833`: 20/20 rows object-shaped, 20/20
+  summarized (e.g. `Sent 0.10000 TEST to committee-account`), 20 scanned,
+  zero raw runs. PASS.
+- `wss://testnet.dex.trading/` @ head `#101131487`: same 20/20, zero raw
+  runs. PASS.

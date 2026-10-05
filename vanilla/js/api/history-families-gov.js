@@ -1,11 +1,12 @@
 /* history-families-gov.js — Task 5 governance/HTLC/tickets/vesting/proposals/
  * misc/blind summarizers (witness 20-21, committee 29-30, worker 34, proposals
  * 22-24, vesting 32-33, HTLC 49-53, tickets 57-58, authorities 54-56, account
- * admin 5/7/8/9, custom 35, balance claim 37, bid 45, blind 39-41).
- * Owns: the 24 per-tag summarizers + verbatim copies of the t/amount/name
+ * admin 5/7/8/9, custom 35, balance claim 37, bid 45, execute-bid 46, blind
+ * 39-41).
+ * Owns: the 25 per-tag summarizers + verbatim copies of the t/amount/name
  *   helpers they call (same per-file convention as the market-desk splits:
  *   duplicated so bodies stay plain — doctrine prefers duplication over a
- *   shared helper abstraction). Tags 31/36/44/46 stay label-only (see below),
+ *   shared helper abstraction). Tags 31/36/44 stay label-only (see below),
  *   so they attach nothing. Blind transfers render input/output COUNTS only,
  *   never amounts.
  *   Attaches its entries to HistorySummary.SUMMARIZERS (created here if
@@ -14,7 +15,8 @@
  * Consumes: Format.formatAmount, I18n.t (both via the local verbatim copies).
  *   Globals/side effects: attaches HistorySummary.SUMMARIZERS[*] and
  *   republishes globalThis.HistorySummary.
- * Created by: history one-liners Task 5 (spec docs/superpowers/specs/2026-10-04-history-one-liners-design.md). */
+ * Created by: history one-liners Task 5 (spec docs/superpowers/specs/2026-10-04-history-one-liners-design.md).
+ * Extended by: history Task 6 (tag 46 execute_bid summarizer). */
 var HistorySummary = (typeof globalThis !== "undefined" && globalThis.HistorySummary) ? globalThis.HistorySummary : ((typeof HistorySummary !== "undefined") ? HistorySummary : {});
 HistorySummary.SUMMARIZERS = HistorySummary.SUMMARIZERS || {};
 (function () {
@@ -52,9 +54,11 @@ HistorySummary.SUMMARIZERS = HistorySummary.SUMMARIZERS || {};
    *   (fba.hpp:34-38), NOT an asset object — no asset leg exists in the
    *   payload, so no honest money string is buildable within the 2-join
    *   design; label-only, no key (#3's popup.js likewise shows "-" there).
-   * - execute_bid 46 fields verify cleanly (bidder/debt/collateral,
-   *   market.hpp:262-276) but the brief ships no template for it — label-only,
-   *   no invented wording.
+   * - execute_bid 46 is a VIRTUAL revival op (market.hpp:262-280,
+   *   reflected market.hpp:309-310 with (fee)(bidder)(debt)(collateral)):
+   *   bidder plus two asset legs, all verified present, so it summarizes
+   *   like tag 45's bid with an "Executed" verb (Task 6 leftover; #3's
+   *   popup.js likewise reads opData.debt there).
    * - assert 36 is label-only per the brief (predicates are chain logic).
    * - htlc refund 53 renames sides (to = original from, htlc.hpp:187-196);
    *   the template names the htlc id only, so no side confusion is possible.
@@ -218,6 +222,15 @@ HistorySummary.SUMMARIZERS = HistorySummary.SUMMARIZERS || {};
       { coll: amount(p.additional_collateral, J.assets),
         debt: amount(p.debt_covered, J.assets) });
   }
+  /* Tag 46 execute_bid, virtual (market.hpp:262-280, reflected
+   * market.hpp:309-310): collateral + debt legs, same sentence as tag 45
+   * with an "Executed" verb. Half-missing payloads stay label-only. */
+  function sumExecuteBid(p, J) {
+    if (!p || !p.bidder || !p.collateral || !p.debt) return null;
+    return t("account.sum_execute_bid", "Executed bid %(coll)s for %(debt)s",
+      { coll: amount(p.collateral, J.assets),
+        debt: amount(p.debt, J.assets) });
+  }
   /* Tags 39/40/41 blind (confidential.hpp:150-191): input/output COUNTS only,
    * never amounts (crypto stays unaudited/deferred per the design). */
   function sumBlind(p) {
@@ -256,6 +269,7 @@ HistorySummary.SUMMARIZERS = HistorySummary.SUMMARIZERS || {};
   HistorySummary.SUMMARIZERS[35] = sumCustom;
   HistorySummary.SUMMARIZERS[37] = sumBalanceClaim;
   HistorySummary.SUMMARIZERS[45] = sumBid;
+  HistorySummary.SUMMARIZERS[46] = sumExecuteBid;
   HistorySummary.SUMMARIZERS[39] = sumBlind;
   HistorySummary.SUMMARIZERS[40] = sumBlind;
   HistorySummary.SUMMARIZERS[41] = sumBlind;
