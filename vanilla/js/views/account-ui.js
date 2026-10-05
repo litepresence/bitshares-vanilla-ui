@@ -224,6 +224,15 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     var sym = String(symbol || "");
     var base = String(btsSymbol || "BTS");
     var pair = (sym === base) ? base + "_CNY" : sym + "_" + base;
+    /* Polish Task 4: monochrome glyph alongside each action label (icon+text
+     * always, never icon-only — the text carries meaning when the glyph is
+     * unknown or fails to load). Names mirror the nav semantics (transfer /
+     * deposit-withdraw / market / borrow); SETTLE shares the borrow glyph
+     * (the margin/settle family page hosts both flows). Guarded by
+     * Icon.known: unknown names skip the network and render text-only, never
+     * blank. Themed by the existing .icon-img filter (themes.css
+     * --icon-filter), so glyphs track surrounding text color in all themes. */
+    var ICONS = { SEND: "transfer", DEPOSIT: "deposit", TRADE: "trade", BORROW: "borrow", SETTLE: "settle" };
     var defs = [
       ["SEND", "#/transfer", "Send " + sym + " (transfer page)"],
       ["DEPOSIT", "#/deposit-withdraw", "Deposit or withdraw " + sym + " (gateway page)"],
@@ -236,8 +245,22 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       if (i > 0) span.appendChild(doc.createTextNode(" | "));
       var a = doc.createElement("a");
       a.setAttribute("href", d[1]);
-      a.textContent = d[0];
       a.title = d[2];
+      var withIcon = false;
+      try {
+        var iname = ICONS[d[0]];
+        if (iname && typeof Icon !== "undefined" && Icon &&
+            typeof Icon.img === "function" && typeof Icon.known === "function" &&
+            Icon.known(iname)) {
+          var glyph = Icon.img(iname, "nav-icon", "");
+          if (glyph) {
+            a.appendChild(glyph);
+            a.appendChild(doc.createTextNode(" " + d[0]));
+            withIcon = true;
+          }
+        }
+      } catch (e) { withIcon = false; }
+      if (!withIcon) a.textContent = d[0];
       span.appendChild(a);
     });
     return span;
