@@ -1331,13 +1331,6 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       }
       Promise.resolve(p).then(function (rows) {
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
-        Promise.resolve(rows).then(function (r2) {
-          if (typeof HistorySummary !== "undefined" && HistorySummary && typeof HistorySummary.enrich === "function") return HistorySummary.enrich(r2, acct.id);
-          return r2;
-        }).then(function (r3) {
-          histRowsCache = Array.isArray(r3) ? r3 : [];
-          AccountUI._history.renderHistory(doc, histBody, r3);
-        });
         /* Slice-16 (F1b): pulled history watcher on the existing fetch.
          * First-entry diff per plan; a notify fault never breaks history. */
         if (mode === "all") {
@@ -1359,6 +1352,16 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
             }
           } catch (e) { /* notify optional here */ }
         }
+        /* History one-liners Task 3 prerequisite: the enrich->render chain
+         * is RETURNED so a render throw rejects the outer promise and
+         * routes to .catch(showError) instead of an unhandled rejection. */
+        return Promise.resolve(rows).then(function (r2) {
+          if (typeof HistorySummary !== "undefined" && HistorySummary && typeof HistorySummary.enrich === "function") return HistorySummary.enrich(r2, acct.id);
+          return r2;
+        }).then(function (r3) {
+          histRowsCache = Array.isArray(r3) ? r3 : [];
+          AccountUI._history.renderHistory(doc, histBody, r3);
+        });
       }).catch(function (e) {
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
         showError(doc, histBody, e, t("account.err_history", "History unavailable on this node."));
