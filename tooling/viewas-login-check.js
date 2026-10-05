@@ -7,7 +7,10 @@
  *   3. #/settings renders NO section#viewing-as (mount removed).
  *   4. Source-shape: app.js goToViewingAs targets #/login via the shared
  *      goToSection helper (no second mechanism); settings.js holds no
- *      renderSection mount; auth-ui.js holds two (both branches).
+ *      renderSection mount; auth-ui.js holds three (both branches + the
+ *      post-unlock transient rebuild).
+ *   5. Post-unlock transient (Wallet.unlock().then) keeps the success
+ *      message + links AND mounts sign-block + viewing-as.
  * Created by: view-as-login relocation (after the d71e5b8 signing move).
  */
 "use strict";
@@ -138,7 +141,10 @@ global.ViewingAs = ViewingAs;
 
 /* Stubs: wallet lock flag, settings envelope, signing builder shell. */
 var lockedFlag = true;
-global.Wallet = { isUnlocked: function () { return !lockedFlag; } };
+global.Wallet = {
+  isUnlocked: function () { return !lockedFlag; },
+  unlock: function () { lockedFlag = false; return Promise.resolve(); }
+};
 global.Store = {
   loadSettings: function () { return { network: "mainnet", signing: "browser" }; },
   saveSettings: function () {},
@@ -275,7 +281,39 @@ lockedFlag = false;
   ok(settings.indexOf("ViewingAs.renderSection") === -1, "settings.js holds no viewing mount");
   var auth = fs.readFileSync(path.join(__dirname, "..", "vanilla", "js", "views", "auth-ui.js"), "utf8");
   var mounts = (auth.match(/ViewingAs\.renderSection\(doc\)/g) || []).length;
-  ok(mounts === 2, "auth-ui.js mounts viewing in both lock branches (got " + mounts + ")");
+  ok(mounts === 3, "auth-ui.js mounts viewing in both lock branches + post-unlock transient (got " + mounts + ")");
 })();
 
-console.log("viewas-login-check: " + pass + " passed, 0 failed");
+/* 5. Post-unlock transient: the Wallet.unlock().then rebuild keeps the
+ * success message + links AND mounts sign-block + viewing-as (the third
+ * render path — "visible regardless of lock state" holds here too). */
+(function () {
+  lockedFlag = true;
+  var doc = fakeDoc();
+  var root = mkEl("div");
+  root.ownerDocument = doc;
+  AuthUI.renderLogin(root);
+  var pwInput = findById(root, "login-password");
+  ok(pwInput, "transient: password field present before unlock");
+  pwInput.value = "pw";
+  var btn = findById(root, "login-do");
+  ok(btn && btn._listeners && typeof btn._listeners.click === "function", "transient: unlock button wired");
+  btn._listeners.click();
+  var done = function (n) {
+    return new Promise(function (res) {
+      (function tick(i) {
+        if (i <= 0) return res();
+        Promise.resolve().then(function () { tick(i - 1); });
+      })(n || 10);
+    });
+  };
+  done(10).then(function () {
+    ok(countById(root, "sign-block") === 1, "transient unlocked render keeps the signing block");
+    ok(countById(root, "viewing-as") === 1, "transient unlocked render keeps viewing-as");
+    console.log("viewas-login-check: " + pass + " passed, 0 failed");
+  }).catch(function (e) {
+    console.error("transient check failed: " + (e && e.stack || e));
+    process.exit(1);
+  });
+  return;
+})();

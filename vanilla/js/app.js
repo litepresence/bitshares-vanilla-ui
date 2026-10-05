@@ -1129,8 +1129,8 @@ var App = (function () {
         }
       } catch (e) { routed = false; }
       var label = routed
-        ? t("settings.sign_badge", "Extension signing active — details in Settings")
-        : t("settings.sign_badge_local", "In-page signing — details in Settings");
+        ? t("settings.sign_badge", "Extension signing active — details in Login")
+        : t("settings.sign_badge_local", "In-page signing — details in Login");
       var icon = routed ? "shield-ok" : "shield-bad";
       if (!old) {
         var a = document.createElement("a");

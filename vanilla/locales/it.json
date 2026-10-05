@@ -3689,8 +3689,8 @@
     "sign_sites_story_b": " asks to play as your account — approving lists it here, bound to that account only. Signatures still prompt every time. (That link goes nowhere — it is a fictional example.)",
     "sign_sites_empty": "No sites approved yet — approvals appear here with per-site revoke.",
     "sign_revoke": "Revoke",
-    "sign_badge": "Extension signing active — details in Settings",
-    "sign_badge_local": "In-page signing — details in Settings"
+    "sign_badge": "Extension signing active — details in Login",
+    "sign_badge_local": "In-page signing — details in Login"
   },
   "shell": {
     "brand": "BitShares",

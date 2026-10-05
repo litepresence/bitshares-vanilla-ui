@@ -317,6 +317,16 @@ var AuthUI = (function () {
             ["#/accounts", t("auth.open_accounts", "Open accounts")],
             ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
           ]));
+          /* Post-unlock transient: same mounts as both main branches —
+           * signing block + viewing-as stay visible regardless of lock
+           * state (third render path, no re-invoke to keep the success
+           * message + links; password wipe above untouched). */
+          mountSigning(doc, done, root);
+          try {
+            if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
+              done.appendChild(ViewingAs.renderSection(doc));
+            }
+          } catch (e) { /* login stands without viewing */ }
         })
         .catch(function (e) {
           f.input.value = "";
