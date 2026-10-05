@@ -366,7 +366,7 @@ var TradePanels = (function () {
     var line = DOM.el(doc, "p", "", "muted");
     wrap.appendChild(line);
     if (isLockedView(P)) {
-      line.textContent = t("trade.balance_locked", "Balance: 0 " + sym + " — unlock for balances");
+      line.textContent = t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + sym;
       return line;
     }
     line.textContent = t("trade.balance_loading", "Balance: loading…");
@@ -1066,7 +1066,7 @@ var TradePanels = (function () {
     if (lockedScaled) {
       var sellSym = st.side === "buy" ? ctx.baseSym : ctx.quoteSym;
       body.appendChild(DOM.el(doc, "p",
-        t("trade.balance_locked", "Balance: 0 " + sellSym + " — unlock for balances"), "muted"));
+        t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + sellSym, "muted"));
       var sRefs = lockedPasswordRow(doc, body, "buy");
       var sUnlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       sUnlockBtn.id = sid("unlock-and-review", "buy");
