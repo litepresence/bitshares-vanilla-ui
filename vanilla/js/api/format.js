@@ -347,10 +347,76 @@ var Format = (function () {
     return (c - k - f).toString();
   }
 
+  /* priceSig: 4-significant-figure display for EVERY price (global rule).
+   * Params:
+   *   @param {string} humanStr human decimal price string (already computed
+   *     via formatPrice/formatAmount — never raw integers; never money math).
+   *   @returns {string} 4-sig-fig string: plain fixed-point when its digit
+   *     count is <= 9, else mantissa-exponent `d.dddde±X` (1 leading digit +
+   *     exactly 3 decimals, trailing zeros kept, e.g. "1.230e-7").
+   * Rule: round to 4 sf via Number.toPrecision(4) (display-only magnitude;
+   *   integer money paths untouched), expand to plain fixed-point, count digit
+   *   characters = strip sign + decimal point + the single integer "0" for
+   *   values < 1 (so "0.0000001234" counts 10: the 10 fractional digits);
+   *   if > 9 emit sci, else emit plain. Zero ("0", "0.00", "-0") -> "0";
+   *   malformed (empty, NaN, non-finite) -> input unchanged (never throw,
+   *   never blank). Negative sign preserved. Plain keeps toPrecision's 4-sf
+   *   shape (trailing zeros significant, e.g. "1.230" stays "1.230" — NOT
+   *   trimmed to "1.23", which would drop to 3 sf); callers pass
+   *   already-rounded strings so this is idempotent. MAGNITUDE ONLY:
+   *   Number()/toPrecision here measure display width, never money.
+   *   Digits + "e" are language-neutral (no t() needed). Pure. ES5. */
+  function priceSig(humanStr) {
+    var original = humanStr;
+    var s = String(humanStr);
+    var t = s.trim();
+    if (t === "") return original;
+    var v = Number(t);
+    if (!isFinite(v)) return original;
+    if (v === 0) return "0";
+    var sig;
+    try { sig = v.toPrecision(4); } catch (e) { return original; }
+    var m = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(sig);
+    if (!m) return original;
+    var sign = m[1], intPart = m[2], fracPart = m[3] || "";
+    var exp = m[4] ? parseInt(m[4], 10) : 0;
+    if (!isFinite(exp)) return original;
+    var digits = intPart + fracPart;
+    var decimalPos = intPart.length + exp;
+    var i, zeros;
+    var plain;
+    if (decimalPos <= 0) {
+      zeros = "";
+      for (i = 0; i < -decimalPos; i++) zeros += "0";
+      plain = sign + "0." + zeros + digits;
+    } else if (decimalPos >= digits.length) {
+      zeros = "";
+      for (i = 0; i < decimalPos - digits.length; i++) zeros += "0";
+      plain = sign + digits + zeros;
+    } else {
+      plain = sign + digits.slice(0, decimalPos) + "." + digits.slice(decimalPos);
+    }
+    var noSign = plain.charAt(0) === "-" ? plain.slice(1) : plain;
+    var flat = noSign.split(".").join("");
+    if (noSign.charAt(0) === "0" && noSign.charAt(1) === ".") flat = flat.substring(1);
+    if (flat.length <= 9) return plain;
+    var leadZeros = 0;
+    while (leadZeros < digits.length && digits.charAt(leadZeros) === "0") leadZeros++;
+    var clean = digits.replace(/^0+/, "");
+    if (clean === "") return original;
+    while (clean.length < 4) clean += "0";
+    clean = clean.slice(0, 4);
+    var mantissa = clean.charAt(0) + "." + (clean.slice(1) + "000").slice(0, 3);
+    var sciExp = decimalPos - 1 - leadZeros;
+    var expStr = sciExp >= 0 ? "e+" + sciExp : "e" + sciExp;
+    return sign + mantissa + expStr;
+  }
+
   return {
     formatAmount: formatAmount,
     parseAmount: parseAmount,
     formatPrice: formatPrice,
+    priceSig: priceSig,
     sigFigPlaces: sigFigPlaces,
     parsePriceRatio: parsePriceRatio,
     pct1: pct1,
