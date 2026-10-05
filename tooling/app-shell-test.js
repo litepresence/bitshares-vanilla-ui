@@ -29,10 +29,11 @@ eq(T.validPoolMarket("TOOLONGTOKENNAME_X"), false, "overlong leg rejected");
 
 console.log("app-shell-test: " + passed + " passed, 0 failed");
 
-/* Pulldown panel shape (nav-pulldown Task 1): buildDirectory renders the
- * 7 primary bar links (via buildNavLink, icons intact) + a textless
- * separator + 6 section links + All pages, as a fixed overlay.
- * Fake-DOM, no browser, stdlib only. */
+/* Pulldown panel shape (nav-pulldown Task 3 owner rework): buildDirectory
+ * renders section links ONLY — the 7 sitemap headings + All pages, stacked
+ * vertically (flex column) — never the bar links (no duplication), with no
+ * separator. API Lab + ES Lab are in neither menu (they live on the Labs
+ * TOC page). Fake-DOM, no browser, stdlib only. */
 (function pulldownShape() {
   var fs = require("fs");
   var path = require("path");
@@ -117,17 +118,27 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   }
   global.MenuUI = { SECTIONS: [
     section("wallet", 2), section("trade", 2), section("earn", 2),
-    section("govern", 2), section("explore", 2), section("labs", 2)
+    section("govern", 2), section("explore", 2), section("labs", 2),
+    section("personal", 2)
   ] };
   var panel = App._test.buildDirectory(true);
-  // pulldown contents: 7 primary + 6 sections + All pages, icons on primary links
+  // pulldown contents: 7 section links + All pages, sections-only, vertical
   var links = panel.querySelectorAll("a");
-  assert.ok(links.length >= 14, "pulldown holds bar links + sections + all-pages");
-  assert.ok(panel.querySelector("a[href='#/pools'] img.nav-icon"), "pools link keeps its icon");
-  assert.ok(panel.querySelector("div[role='separator']"), "textless separator between bar links and sections");
+  assert.strictEqual(links.length, 8, "pulldown holds 7 sections + all-pages (got " + links.length + ")");
+  links.forEach(function (a) {
+    var href = a.attributes.href || "";
+    assert.ok(href.indexOf("#/menu") === 0, "sections-only: " + href + " lives under #/menu");
+  });
+  assert.ok(!panel.querySelector("a[href='#/pools']"), "no bar duplication (pools lives on the bar only)");
+  assert.ok(!panel.querySelector("a[href='#/']"), "no dashboard duplication");
+  assert.ok(panel.querySelector("a[href='#/menu/wallet'] img.nav-icon"), "section link keeps its icon");
+  assert.ok(panel.querySelector("a[href='#/menu']"), "All pages overview link present");
+  assert.ok(!panel.querySelector("div[role='separator']"), "separator gone with the bar links");
   var css = fs.readFileSync(path.join(__dirname, "..", "vanilla", "css", "app.css"), "utf8");
   assert.ok(/#nav-directory\s*\{[^}]*position:\s*fixed/.test(css), "directory is a fixed overlay, not in-flow");
-  console.log("pulldown-shape: 4 passed, 0 failed");
+  assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*display:\s*flex/.test(css), "pulldown lays out as flex");
+  assert.ok(/#nav\.open\s+#nav-directory\s*\{[^}]*flex-direction:\s*column/.test(css), "pulldown stacks vertically (one per row)");
+  console.log("pulldown-shape: 8 passed, 0 failed");
 })();
 
 /* Phone scroll-row bar + sheet pulldown (nav-pulldown Task 2): under 719px

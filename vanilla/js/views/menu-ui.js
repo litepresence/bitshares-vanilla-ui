@@ -1,5 +1,5 @@
 /* menu-ui.js — sitemap table-of-contents pages (#/menu + #/menu/:section).
- * Owns: the MenuUI.SECTIONS sitemap table (single source: 6 sections, 51
+ * Owns: the MenuUI.SECTIONS sitemap table (single source: 7 sections, 53
  *   page links, every list route exactly once), the #/menu overview renderer
  *   and the #/menu/:section renderer (card grids + in-page substring filter).
  *   Consumes: Icon.img for card glyphs (guarded — text-only cards when
@@ -44,9 +44,11 @@ var MenuUI = (function () {
   }
 
   /* SECTIONS: the sitemap. Binding order per the menu-sitemap design spec
-   * (§3) plus the Community card (help/community split 2026-10-04) and the
-   *   About card (about spec 2026-10-04):
-   *   wallet 14, trade 9, earn 7, govern 4, explore 9, labs 10 = 53.
+   * (§3) plus the Community card (help/community split 2026-10-04), the
+   *   About card (about spec 2026-10-04), and the Labs/Personal split
+   *   (nav-pulldown Task 3, owner ruling 2026-10-04: API Lab + ES Lab in
+   *   NEITHER menu, reached via the Labs TOC page):
+   *   wallet 14, trade 9, earn 7, govern 4, explore 9, labs 3, personal 7 = 53.
    * Icons are icon.js KNOWN names (decorative <img>, never load-bearing).
    * Detail routes (/pools/:id, /asset/:symbol, …) are never listed — their
    * list parents link onward, as in #1. */
@@ -120,12 +122,17 @@ var MenuUI = (function () {
         { href: "#/news", icon: "news", titleKey: "menu.p_news", titleDefault: "News", blurbKey: "menu.d_news", blurbDefault: "Project news and updates." }
       ] },
     { slug: "labs", icon: "cogs",
-      titleKey: "menu.section_labs", titleDefault: "Labs & Personal",
-      blurbKey: "menu.blurb_labs", blurbDefault: "Power tools, chat, and your setup.",
+      titleKey: "menu.section_labs", titleDefault: "Labs",
+      blurbKey: "menu.blurb_labs", blurbDefault: "Power tools for chain and node work.",
       links: [
         { href: "#/api-lab", icon: "insight", titleKey: "menu.p_apilab", titleDefault: "API Lab", blurbKey: "menu.d_apilab", blurbDefault: "Probe node methods with a 29-call catalog." },
         { href: "#/es-lab", icon: "zoom", titleKey: "menu.p_eslab", titleDefault: "ES Lab", blurbKey: "menu.d_eslab", blurbDefault: "Search the community history index." },
-        { href: "#/txbuilder", icon: "checkmark-circle", titleKey: "menu.p_txbuilder", titleDefault: "Transaction Builder", blurbKey: "menu.d_txbuilder", blurbDefault: "Compose many operations, sign once." },
+        { href: "#/txbuilder", icon: "checkmark-circle", titleKey: "menu.p_txbuilder", titleDefault: "Transaction Builder", blurbKey: "menu.d_txbuilder", blurbDefault: "Compose many operations, sign once." }
+      ] },
+    { slug: "personal", icon: "user",
+      titleKey: "menu.section_personal", titleDefault: "Personal",
+      blurbKey: "menu.blurb_personal", blurbDefault: "Chat, alerts, and your setup.",
+      links: [
         { href: "#/trollbox", icon: "text", titleKey: "menu.p_trollbox", titleDefault: "Trollbox", blurbKey: "menu.d_trollbox", blurbDefault: "On-chain public chat channels." },
         { href: "#/favourites", icon: "fi-star", titleKey: "menu.p_favourites", titleDefault: "Favourites", blurbKey: "menu.d_favourites", blurbDefault: "Pinned markets, assets, and accounts." },
         { href: "#/alerts", icon: "alarm", titleKey: "menu.p_alerts", titleDefault: "Price Alerts", blurbKey: "menu.d_alerts", blurbDefault: "Get notified when a market crosses your price." },
@@ -147,7 +154,7 @@ var MenuUI = (function () {
     return null;
   }
 
-  /* sectionSlugs: ["wallet","trade","earn","govern","explore","labs"].
+  /* sectionSlugs: ["wallet","trade","earn","govern","explore","labs","personal"].
    * Params: none. Returns a fresh array. Pure, unit-tested. */
   function sectionSlugs() {
     return SECTIONS.map(function (s) { return s.slug; });

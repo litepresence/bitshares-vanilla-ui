@@ -9,8 +9,8 @@ var MenuUI = require("../vanilla/js/views/menu-ui.js");
 var passed = 0;
 function eq(a, e, n) { assert.strictEqual(a, e, n + " (got " + JSON.stringify(a) + ")"); passed++; }
 function ok(c, n) { assert.ok(c, n); passed++; }
-eq(MenuUI.SECTIONS.length, 6, "six sections");
-eq(MenuUI._test.sectionSlugs().join(","), "wallet,trade,earn,govern,explore,labs", "slug order");
+eq(MenuUI.SECTIONS.length, 7, "seven sections");
+eq(MenuUI._test.sectionSlugs().join(","), "wallet,trade,earn,govern,explore,labs,personal", "slug order");
 var all = [];
 MenuUI.SECTIONS.forEach(function (s) { s.links.forEach(function (l) { all.push(l.href); }); });
 eq(all.length, 53, "53 listed pages");
@@ -21,5 +21,7 @@ eq(new Set(all).size, all.length, "no href listed twice (single-home)");
   ok(all.indexOf(h) !== -1, h + " listed");
 });
 eq(MenuUI._test.findSection("earn").links.length, 7, "earn has 7 links");
+eq(MenuUI._test.findSection("labs").links.length, 3, "labs holds api-lab, es-lab, txbuilder only");
+eq(MenuUI._test.findSection("personal").links.length, 7, "personal holds the 7 chat/setup pages");
 eq(MenuUI._test.findSection("nope"), null, "unknown slug is null");
 console.log("menu-test: " + passed + " passed");

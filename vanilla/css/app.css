@@ -70,7 +70,11 @@ body { margin: 0; background: var(--bg); color: var(--text);
   border: 1px solid var(--border); border-radius: 8px;
   padding: 8px; max-height: 70vh; overflow-y: auto;
   min-width: min(320px, calc(100vw - 32px)); }
-#nav.open #nav-directory { display: block; }
+#nav.open #nav-directory { display: flex; flex-direction: column; }
+/* Pulldown items stack vertically (nav-pulldown Task 3 owner ruling: one
+ * section link per row — the whole notion of a burger menu). The panel is
+ * a flex column so its anchors (blockified flex items) each take a full
+ * row at every viewport, 390px phones through 1440px+ desks. */
 /* Sitemap TOC pages (#/menu, #/menu/:section): responsive card grid —
  * 1 column on phones, 2 at tablet, 3 at desk. Full-card links (keyboard
  * focusable, visible ring), theme tokens only, 44px minimum targets. */

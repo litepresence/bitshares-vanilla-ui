@@ -38,37 +38,40 @@ var App = (function () {
     return dflt;
   }
 
-  /* Headings burger + sitemap pages (menu-sitemap slice): #nav holds the
-   *   7-link bar (ORIGINAL_NAV below), and the burger pulldown panel holds
-   *   those same 7 primary links + a textless separator + 6 heading links
-   *   + one "All pages" overview link — each heading navigates to its
-   *   #/menu/<slug> table-of-contents page, which lists that section's
-   *   pages as styled cards with its own filter. The old 46-link grouped
-   *   directory + burger filter + per-account follow/send shortcuts are
-   *   gone (follow moved to account-ui.js showAccount, where it is
-   *   contextual; lock lives in the header; theme in header+settings).
-   *   The heading table is MenuUI.SECTIONS (menu-ui.js, single source),
-   *   consumed guarded with a label-only fallback so the burger never
-   *   blanks when the script is missing. Detail routes (/pools/:id,
-   *   /asset/:symbol, …) open from their list parents — as in #1 — so
-   *   only sections get burger links. */
+  /* Headings burger + sitemap pages (menu-sitemap slice, nav-pulldown
+   *   Task 3 owner rework): #nav holds the 5-link bar (ORIGINAL_NAV below),
+   *   and the burger pulldown panel holds section links ONLY — the 7 sitemap
+   *   headings + one "All pages" overview link, stacked vertically (one per
+   *   row) — never the bar links (no duplication). API Lab + ES Lab are in
+   *   neither menu: they live on the Labs TOC page (#/menu/labs) alongside
+   *   the Transaction Builder. Each heading navigates to its #/menu/<slug>
+   *   table-of-contents page, which lists that section's pages as styled
+   *   cards with its own filter. The old 46-link grouped directory + burger
+   *   filter + per-account follow/send shortcuts are gone (follow moved to
+   *   account-ui.js showAccount, where it is contextual; lock lives in the
+   *   header; theme in header+settings). The heading table is
+   *   MenuUI.SECTIONS (menu-ui.js, single source), consumed guarded with a
+   *   label-only fallback so the burger never blanks when the script is
+   *   missing. Detail routes (/pools/:id, /asset/:symbol, …) open from their
+   *   list parents — as in #1 — so only sections get burger links. */
   var FALLBACK_SECTIONS = [
     { slug: "wallet", title: "Wallet" },
     { slug: "trade", title: "Trade" },
     { slug: "earn", title: "Earn & Protect" },
     { slug: "govern", title: "Govern" },
     { slug: "explore", title: "Explore" },
-    { slug: "labs", title: "Labs & Personal" }
+    { slug: "labs", title: "Labs" },
+    { slug: "personal", title: "Personal" }
   ];
 
   /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
    *   (MenuDataStructure.js:66-75: dashboard/market/lending/explorer +
    *   poolmart inHeader Always) — Dashboard, Exchange, Credit Offer,
-   *   Liquidity Pools, Explore — plus the two vanilla-original labs
-   *   (API Lab, ES Lab, same hrefs as the static index.html bar and the
-   *   Labs sitemap section) so boot rebuilds keep all 7 bar links. */
+   *   Liquidity Pools, Explore. The two vanilla-original labs (API Lab,
+   *   ES Lab) are reachable from the Labs sitemap section only, never the
+   *   bar (nav-pulldown Task 3 owner ruling), so boot rebuilds keep 5 links. */
   var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/credit-offer", "#/pools",
-    "#/explorer", "#/api-lab", "#/es-lab"];
+    "#/explorer"];
 
   /* Pool-market context (owner: Exchange tab follows the pool you're
    * visiting). Pool views publish their pair's QUOTE_BASE market id here;
@@ -116,16 +119,14 @@ var App = (function () {
    *   names #1 uses for account/voting affordances. Icons are decorative
    *   (aria-hidden <img>); the label span keeps the accessible name, so
    *   routing, order, and i18n strings are untouched — skin only. Only the
-   *   seven original links are iconified; grouped links stay text until an
+   *   five original links are iconified; grouped links stay text until an
    *   icon pass maps them (plain text never breaks). */
   var NAV_ICONS = {
     "#/": "dashboard",
     "#/market/BTS_USD": "trade",
     "#/credit-offer": "borrow",
     "#/pools": "poolmart",
-    "#/explorer": "server",
-    "#/api-lab": "insight",
-    "#/es-lab": "zoom"
+    "#/explorer": "server"
   };
 
   /* Explicit per-href labels for the header bar links (not a data-driven
@@ -141,8 +142,6 @@ var App = (function () {
       case "#/credit-offer": return t("credit.title", "Credit Offer");
       case "#/pools": return t("pools.title", "Liquidity Pools");
       case "#/explorer": return t("nav.explorer", "Explore");
-      case "#/api-lab": return t("menu.p_apilab", "API Lab");
-      case "#/es-lab": return t("menu.p_eslab", "ES Lab");
       default: return href;
     }
   }
@@ -184,9 +183,10 @@ var App = (function () {
 
   /* buildDirectory: burger pulldown panel (lives inside #nav, shown only
    *   while #nav.open via app.css as a fixed overlay positioned below the
-   *   header at open). Holds the 7 primary bar links (same buildNavLink
-   *   builder + icons as the bar) + a textless separator + the 6 sitemap
-   *   heading links + overview link. Headings come from MenuUI.SECTIONS
+   *   header at open). Holds section links ONLY — the 7 sitemap heading
+   *   links + overview link, stacked vertically (one per row, app.css
+   *   column layout) — never the bar links (nav-pulldown Task 3 owner
+   *   ruling: no duplication). Headings come from MenuUI.SECTIONS
    *   when loaded (icon + localized title + page count), else the
    *   label-only fallback. Any link click closes the panel (wired here);
    *   Esc + hashchange + outside-tap close it (wired once in finishBoot).
@@ -199,25 +199,6 @@ var App = (function () {
     /* Drawer focus target (lifecycle): focusable container so opening the
      * drawer can move focus inside it; harmless when never focused. */
     try { panel.setAttribute("tabindex", "-1"); } catch (e) { /* links stay tabbable */ }
-    /* Primary links first: the same bar links (reuse buildNavLink so icons,
-     * labels, and active-highlight stay identical), each closing the panel
-     * like the heading links below (same-hash taps have no hashchange). */
-    ORIGINAL_NAV.forEach(function (href) {
-      var primary = null;
-      try { primary = buildNavLink(href, iconOK); } catch (e) { primary = null; }
-      if (!primary) return;
-      try {
-        primary.addEventListener("click", function () { closeDirectory(true); });
-      } catch (e) { /* hashchange still closes */ }
-      panel.appendChild(primary);
-    });
-    /* Textless separator between bar links and section links (role only,
-     * no string — avoids i18n churn). */
-    try {
-      var sep = document.createElement("div");
-      sep.setAttribute("role", "separator");
-      panel.appendChild(sep);
-    } catch (e) { /* sections still follow */ }
     function headingLink(href, icon, label) {
       var a = document.createElement("a");
       a.setAttribute("href", href);
@@ -332,7 +313,7 @@ var App = (function () {
     } catch (e) { /* CSS position stands */ }
   }
 
-  /* buildNav: 7-link bar + pulldown panel (idempotent; preserves
+  /* buildNav: 5-link bar + pulldown panel (idempotent; preserves
    *   the .open state so a locale switch never collapses the menu). Theme
    *   switching lives in settings + the header-bar copy (finishBoot). */
   function buildNav(nav) {

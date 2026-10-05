@@ -947,9 +947,11 @@ var HelpUI = (function () {
       wrap.appendChild(ul);
     });
   }
-  /* GROUPS: help index sections (menu-sitemap slice) — same 6 headings as
-   * the sitemap. [i18nKey, enDefault, [topicKeys]]. Unknown future keys
-   * fall into "More" at render. Exported via _test for locale/test tooling.
+  /* GROUPS: help index sections (menu-sitemap slice) — same 7 headings as
+   * the sitemap (nav-pulldown Task 3 splits Labs & Personal the same way:
+   * Labs holds the power-tool topics, Personal the rest). [i18nKey,
+   * enDefault, [topicKeys]]. Unknown future keys fall into "More" at
+   * render. Exported via _test for locale/test tooling.
    * @type {Array.<[string, string, string[]]>} */
   var GROUPS = [
     ["menu.section_wallet", "Wallet", ["disclaimer", "wallets", "backups", "accounts-general", "accounts-proposed", "accounts-permissions", "accounts-membership", "transfer", "invoice", "vesting", "authorities", "lists", "register", "password", "referrals", "dashboard"]],
@@ -957,11 +959,12 @@ var HelpUI = (function () {
     ["menu.section_earn", "Earn & Protect", ["credit", "direct-debit", "htlc", "tickets", "airdrop"]],
     ["menu.section_govern", "Govern", ["voting", "witnesses", "workers", "committee", "proposals", "prediction", "pmo"]],
     ["menu.section_explore", "Explore", ["assets-mpa", "assets-uia", "assets-private", "assets-issue", "assets-feed", "topops", "fees", "charts", "history-index", "community"]],
-    ["menu.section_labs", "Labs & Personal", ["settings", "extension-install", "browser", "txbuilder", "api-lab", "es-lab", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu", "about-making"]]
+    ["menu.section_labs", "Labs", ["txbuilder", "api-lab", "es-lab", "browser"]],
+    ["menu.section_personal", "Personal", ["settings", "extension-install", "trollbox", "favourites", "alerts", "tour", "news", "uris", "glossary", "menu", "about-making"]]
   ];
 
   function paintIndexList(doc, wrap) {
-    /* Grouped index (menu-sitemap slice): same 6 headings as the sitemap so
+    /* Grouped index (menu-sitemap slice): same 7 headings as the sitemap so
      * help mirrors the burger. Unknown future keys fall into "More" — never
      * dropped. Group titles reuse menu.* keys with verbatim defaults. */
     var byKey = {};
