@@ -38,14 +38,15 @@ var App = (function () {
     return dflt;
   }
 
-  /* Headings burger + sitemap pages (menu-sitemap slice): #nav holds ONLY
-   *   the original 5-link bar (ORIGINAL_NAV below), and the burger panel
-   *   holds 6 heading links + one "All pages" overview link — each heading
-   *   navigates to its #/menu/<slug> table-of-contents page, which lists
-   *   that section's pages as styled cards with its own filter. The old
-   *   46-link grouped directory + burger filter + per-account follow/send
-   *   shortcuts are gone (follow moved to account-ui.js showAccount, where
-   *   it is contextual; lock lives in the header; theme in header+settings).
+  /* Headings burger + sitemap pages (menu-sitemap slice): #nav holds the
+   *   7-link bar (ORIGINAL_NAV below), and the burger pulldown panel holds
+   *   those same 7 primary links + a textless separator + 6 heading links
+   *   + one "All pages" overview link — each heading navigates to its
+   *   #/menu/<slug> table-of-contents page, which lists that section's
+   *   pages as styled cards with its own filter. The old 46-link grouped
+   *   directory + burger filter + per-account follow/send shortcuts are
+   *   gone (follow moved to account-ui.js showAccount, where it is
+   *   contextual; lock lives in the header; theme in header+settings).
    *   The heading table is MenuUI.SECTIONS (menu-ui.js, single source),
    *   consumed guarded with a label-only fallback so the burger never
    *   blanks when the script is missing. Detail routes (/pools/:id,
@@ -63,10 +64,11 @@ var App = (function () {
   /* ORIGINAL_NAV: the header bar mirrors #1 getHeader()
    *   (MenuDataStructure.js:66-75: dashboard/market/lending/explorer +
    *   poolmart inHeader Always) — Dashboard, Exchange, Credit Offer,
-   *   Liquidity Pools, Explore. Account/Transfer/Voting/Settings live in the
-   *   burger palette (as in #1's dropdown), reachable everywhere. */
+   *   Liquidity Pools, Explore — plus the two vanilla-original labs
+   *   (API Lab, ES Lab, same hrefs as the static index.html bar and the
+   *   Labs sitemap section) so boot rebuilds keep all 7 bar links. */
   var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/credit-offer", "#/pools",
-    "#/explorer"];
+    "#/explorer", "#/api-lab", "#/es-lab"];
 
   /* Pool-market context (owner: Exchange tab follows the pool you're
    * visiting). Pool views publish their pair's QUOTE_BASE market id here;
@@ -121,7 +123,9 @@ var App = (function () {
     "#/market/BTS_USD": "trade",
     "#/credit-offer": "borrow",
     "#/pools": "poolmart",
-    "#/explorer": "server"
+    "#/explorer": "server",
+    "#/api-lab": "insight",
+    "#/es-lab": "zoom"
   };
 
   /* Explicit per-href labels for the header bar links (not a data-driven
@@ -137,6 +141,8 @@ var App = (function () {
       case "#/credit-offer": return t("credit.title", "Credit Offer");
       case "#/pools": return t("pools.title", "Liquidity Pools");
       case "#/explorer": return t("nav.explorer", "Explore");
+      case "#/api-lab": return t("menu.p_apilab", "API Lab");
+      case "#/es-lab": return t("menu.p_eslab", "ES Lab");
       default: return href;
     }
   }
@@ -176,13 +182,16 @@ var App = (function () {
     return a;
   }
 
-  /* buildDirectory: 6 sitemap heading links + overview link (lives inside
-   *   #nav, shown only while #nav.open via app.css — no inline positioning).
-   *   Headings come from MenuUI.SECTIONS when loaded (icon + localized title
-   *   + page count), else the label-only fallback. Link click closes the
-   *   panel (wired here); Esc + hashchange close it (wired once in
-   *   finishBoot). Styling is class-driven in app.css so all three themes
-   *   keep working. Returns the panel div. Never throws. */
+  /* buildDirectory: burger pulldown panel (lives inside #nav, shown only
+   *   while #nav.open via app.css as a fixed overlay positioned below the
+   *   header at open). Holds the 7 primary bar links (same buildNavLink
+   *   builder + icons as the bar) + a textless separator + the 6 sitemap
+   *   heading links + overview link. Headings come from MenuUI.SECTIONS
+   *   when loaded (icon + localized title + page count), else the
+   *   label-only fallback. Any link click closes the panel (wired here);
+   *   Esc + hashchange + outside-tap close it (wired once in finishBoot).
+   *   Styling is class-driven in app.css so all three themes keep working.
+   *   Params: iconOK bool. Returns the panel div. Never throws. */
   function buildDirectory(iconOK) {
     var panel = document.createElement("div");
     panel.id = "nav-directory";
@@ -190,6 +199,25 @@ var App = (function () {
     /* Drawer focus target (lifecycle): focusable container so opening the
      * drawer can move focus inside it; harmless when never focused. */
     try { panel.setAttribute("tabindex", "-1"); } catch (e) { /* links stay tabbable */ }
+    /* Primary links first: the same bar links (reuse buildNavLink so icons,
+     * labels, and active-highlight stay identical), each closing the panel
+     * like the heading links below (same-hash taps have no hashchange). */
+    ORIGINAL_NAV.forEach(function (href) {
+      var primary = null;
+      try { primary = buildNavLink(href, iconOK); } catch (e) { primary = null; }
+      if (!primary) return;
+      try {
+        primary.addEventListener("click", function () { closeDirectory(true); });
+      } catch (e) { /* hashchange still closes */ }
+      panel.appendChild(primary);
+    });
+    /* Textless separator between bar links and section links (role only,
+     * no string — avoids i18n churn). */
+    try {
+      var sep = document.createElement("div");
+      sep.setAttribute("role", "separator");
+      panel.appendChild(sep);
+    } catch (e) { /* sections still follow */ }
     function headingLink(href, icon, label) {
       var a = document.createElement("a");
       a.setAttribute("href", href);
@@ -248,7 +276,63 @@ var App = (function () {
    *   (#nav.open #nav-directory in app.css). Kept so callers never throw. */
   function syncDirectory(nav) { return; }
 
-  /* buildNav: 5-link bar + sitemap headings (idempotent; preserves
+  /* directoryOutsideBound: outside-tap closer is wired exactly once
+   * (finishBoot may re-run on locale/boot paths; the flag survives). */
+  var directoryOutsideBound = false;
+
+  /* bindDirectoryOutsideOnce: document-level pointerdown that closes the
+   * pulldown when the tap lands outside both panel and toggle (touch:
+   * pointerdown fires before click, so the panel is gone before the
+   * underlying link can mis-fire). Taps inside either keep it open.
+   * Wired once, guarded; never throws. Params: none. */
+  function bindDirectoryOutsideOnce() {
+    if (directoryOutsideBound) return;
+    try {
+      if (typeof document === "undefined" || !document.addEventListener) return;
+      document.addEventListener("pointerdown", function (ev) {
+        try {
+          var nav = document.getElementById("nav");
+          if (!nav || !nav.classList.contains("open")) return;
+          var tgt = ev && /** @type {any} */ (ev.target);
+          if (!tgt) return;
+          var panel = document.getElementById("nav-directory");
+          var toggle = document.getElementById("nav-toggle");
+          if ((panel && (tgt === panel || (typeof panel.contains === "function" && panel.contains(tgt)))) ||
+              (toggle && (tgt === toggle || (typeof toggle.contains === "function" && toggle.contains(tgt))))) {
+            return;
+          }
+          closeDirectory(false);
+        } catch (e) { /* tap ignored, panel keeps state */ }
+      });
+      directoryOutsideBound = true;
+    } catch (e) { /* click-toggle + Esc still work */ }
+  }
+
+  /* positionDirectory: pin the fixed overlay below the header's live bottom
+   * edge (the bar wraps, so no constant fits) with an 8px right gutter.
+   * Params: none (reads live DOM). Never throws — CSS fallback stands. */
+  function positionDirectory() {
+    try {
+      if (typeof document === "undefined") return;
+      var panel = document.getElementById("nav-directory");
+      if (!panel || !panel.style) return;
+      var header = null;
+      try {
+        header = document.querySelector("header.topbar") ||
+          document.querySelector(".topbar") ||
+          document.querySelector("header");
+      } catch (e) { header = null; }
+      if (header && typeof header.getBoundingClientRect === "function") {
+        var rect = header.getBoundingClientRect();
+        if (rect && typeof rect.bottom === "number") {
+          panel.style.top = (rect.bottom + 4) + "px";
+        }
+      }
+      panel.style.right = "8px";
+    } catch (e) { /* CSS position stands */ }
+  }
+
+  /* buildNav: 7-link bar + pulldown panel (idempotent; preserves
    *   the .open state so a locale switch never collapses the menu). Theme
    *   switching lives in settings + the header-bar copy (finishBoot). */
   function buildNav(nav) {
@@ -259,7 +343,7 @@ var App = (function () {
     ORIGINAL_NAV.forEach(function (href) {
       nav.appendChild(buildNavLink(href, iconOK));
     });
-    /* Grouped directory: sitemap headings, visible only while open. */
+    /* Pulldown directory: visible only while open (fixed overlay). */
     try {
       nav.appendChild(buildDirectory(iconOK));
     } catch (e) { /* bar works without the directory */ }
@@ -1192,6 +1276,9 @@ var App = (function () {
         syncDirectory(nav);
         /* Focus-return on close lives in closeDirectory. Never throws. */
         if (open) {
+          /* Overlay position (lifecycle): pin below the header's live
+           * bottom edge (the bar wraps, so no constant fits). */
+          positionDirectory();
           /* Drawer focus (lifecycle): move focus into the opened drawer
            * (the #nav-directory container, tabindex=-1 above) so keyboard
            * users land inside it; close returns focus via closeDirectory. */
@@ -1201,6 +1288,8 @@ var App = (function () {
           } catch (e) { /* toggle keeps focus */ }
         }
       });
+      /* Outside-tap closes without stealing focus; Esc + hashchange below. */
+      bindDirectoryOutsideOnce();
       /* Esc closes + refocuses; route change closes without stealing focus. */
       try {
         document.addEventListener("keydown", function (ev) {
@@ -1228,7 +1317,7 @@ var App = (function () {
   if (typeof document !== "undefined") boot();
 
   return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
-    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText } };
+    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText, buildDirectory: buildDirectory, closeDirectory: closeDirectory } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }
