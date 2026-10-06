@@ -151,4 +151,37 @@ try {
   }
 })();
 
+/* DiscreteCharts smoke: stub canvas 2D, no DOM, no network. */
+(function () {
+  var DiscreteCharts = require("../vanilla/js/api/discrete-charts.js");
+  function stubCtx() {
+    return { calls: [], setTransform: function () {}, clearRect: function () {}, beginPath: function () { this.calls.push("begin"); }, arc: function () { this.calls.push("dot"); }, fill: function () { this.calls.push("fill"); }, moveTo: function () { this.calls.push("move"); }, lineTo: function () { this.calls.push("line"); }, stroke: function () { this.calls.push("stroke"); }, fillText: function () {}, setLineDash: function () {} };
+  }
+  function stubDoc(ctx) {
+    return { createElement: function () { return { className: "", style: {}, clientWidth: 300, width: 0, height: 0, getContext: function () { return ctx; }, setAttribute: function () {}, appendChild: function () {} }; } };
+  }
+  function stubHost() {
+    var kids = [];
+    return { clientWidth: 300, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
+  }
+  var pts = [
+    { timeMs: 1000, price: "1.0", volume: "A(10:5)", volumeBaseRaw: "10", volumeQuoteRaw: "5" },
+    { timeMs: 1000, price: "1.5", volume: "A(30:5)", volumeBaseRaw: "30", volumeQuoteRaw: "20" },
+    { timeMs: 2000, price: "2.0", volume: "A(40:5)", volumeBaseRaw: "40", volumeQuoteRaw: "20" }
+  ];
+  var ctx = stubCtx();
+  var r = DiscreteCharts.drawDiscretePrice(stubDoc(ctx), stubHost(), pts, { log: false, colors: {} });
+  eq(r.n, 3, "price paints 3 dots");
+  eq(ctx.calls.indexOf("dot") !== -1, true, "dots drawn as arcs");
+  var ctxLog = stubCtx();
+  var rLog = DiscreteCharts.drawDiscretePrice(stubDoc(ctxLog), stubHost(), pts, { log: true, colors: {} });
+  eq(rLog.n, 3, "log price keeps positive dots");
+  var ctx2 = stubCtx();
+  var r2 = DiscreteCharts.drawDiscreteVolume(stubDoc(ctx2), stubHost(), pts, { colors: {} });
+  eq(r2.n, 3, "volume paints 3 stems");
+  var ctx3 = stubCtx();
+  var r3 = DiscreteCharts.drawDiscretePrice(stubDoc(ctx3), stubHost(), [], { colors: {} });
+  eq(r3.n, 0, "empty points valid, honest empty (no throw)");
+})();
+
 console.log("discrete-timescale vectors: " + passed + " passed");
