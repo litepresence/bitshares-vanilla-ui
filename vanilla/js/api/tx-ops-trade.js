@@ -115,6 +115,83 @@ Tx._ser = Tx._ser || {};
     ]);
   }
 
+  /* Limit-order-update (op 77) in #4 FC_REFLECT order: fee, seller,
+   * order (1.7.x), new_price?, delta_amount_to_sell? (SIGNED),
+   * new_expiration?, on_fill?, extensions (always empty).
+   * Provenance: #4 libraries/protocol/include/graphene/protocol/market.hpp
+   * :117-136 (struct) + :299-300 (FC_REFLECT — WINS); #2
+   * src/bts/serializer/operations.js:1667-1675 (same order) +
+   * ChainTypes.js:141 (id 77); #3 src/lib/bitshares-api.js:1840-1889 (same
+   * order, incl. the :1870-1883 absent-on_fill-must-be-0x00 subtlety —
+   * present-but-empty 0x01 0x00 recovers the wrong signer, "Missing Active
+   * Authority"). No || defaults on money/ids: missing fee/seller/order throw
+   * via the shared writers below. Fee via get_required_fees (never #1 static
+   * tables, #3720 rule) — the builder passes a zero placeholder the fee rail
+   * fills before sign.
+   * SIGNED-DELTA NOTE: delta_amount_to_sell is share_type (signed int64 —
+   * negative removes funds from the order). The shared writeInt64LE /
+   * serializeAsset reject negatives by design (H4 hardening for non-negative
+   * money paths), and tx-primitives.js is owned elsewhere, so the delta goes
+   * through the local signed writer below (two's complement LE,
+   * range-checked — same layout as #3's BigInt writer; the unit vectors pin
+   * positive-delta byte-identity with the shared path). Fee, seller, order,
+   * new_price and new_expiration use the shared writers untouched. */
+
+  /* Signed int64 LE (two's complement) for the op-77 delta only. Accepts an
+   * optional-leading-"-" digit string, a safe integer, or a bigint; throws
+   * outside [-2^63, 2^63-1]. Positive values encode byte-identical to the
+   * shared unsigned writer (pinned by tooling/op77-update-test.js). */
+
+  function writeSignedInt64LE(value) {
+    var big;
+    if (typeof value === "bigint") big = value;
+    else if (typeof value === "string") {
+      if (!/^-?\d+$/.test(value)) throw new Error("signed int64 bad integer string: " + value);
+      try { big = BigInt(value); } catch (e) { throw new Error("signed int64 bad integer string: " + value); }
+    } else if (Number.isSafeInteger(value)) big = BigInt(value);
+    else throw new Error("signed int64 needs an integer string or safe integer, got: " + String(value).slice(0, 32));
+    if (big < -(1n << 63n) || big > ((1n << 63n) - 1n)) {
+      throw new Error("signed int64 out of range: " + String(value).slice(0, 32));
+    }
+    var out = new Uint8Array(8);
+    for (var i = 0; i < 8; i++) out[i] = Number((big >> BigInt(i * 8)) & 0xFFn);
+    return out;
+  }
+
+  /* Signed asset {amount, asset_id} for the op-77 delta (see note above).
+   * Missing amount/asset_id throws loudly — never zero-filled. */
+
+  function serializeSignedAsset(a) {
+    if (!a || typeof a !== "object") throw new Error("signed asset needs {amount, asset_id}");
+    return Tx._ser.concatBytes([writeSignedInt64LE(a.amount), Tx._ser.serializeObjectId(a.asset_id)]);
+  }
+
+  /* One on_fill vector payload: varint count + auto actions. Accepts the
+   * action array; non-array input throws loudly. An empty array encodes
+   * present-but-empty — callers that want ABSENT pass null for the whole
+   * on_fill (see the #3 subtlety in the op-77 header above). */
+
+  function serializeOnFillVector(actions) {
+    if (!Array.isArray(actions)) throw new Error("on_fill must be an array of auto actions or null");
+    var parts = [Tx._ser.varintUint32(actions.length)];
+    for (var i = 0; i < actions.length; i++) parts.push(serializeLimitOrderAutoAction(actions[i]));
+    return Tx._ser.concatBytes(parts);
+  }
+
+  function serializeLimitOrderUpdateOp(op) {
+    if (!op || typeof op !== "object") throw new Error("limit_order_update op must be an object");
+    return Tx._ser.concatBytes([
+      Tx._ser.serializeAsset(op.fee),
+      Tx._ser.serializeObjectId(op.seller),
+      Tx._ser.serializeObjectId(op.order),
+      Tx._ser.serializeOptional(op.new_price === undefined ? null : op.new_price, Tx._ser.serializePrice),
+      Tx._ser.serializeOptional(op.delta_amount_to_sell === undefined ? null : op.delta_amount_to_sell, serializeSignedAsset),
+      Tx._ser.serializeOptional(op.new_expiration === undefined ? null : op.new_expiration, Tx._ser.serializeTimestamp),
+      Tx._ser.serializeOptional(op.on_fill === undefined ? null : op.on_fill, serializeOnFillVector),
+      Tx._ser.varintUint32(0)
+    ]);
+  }
+
   /* vote_id "type:instance" string (or raw u32 number) -> u32 wire value
    * (instance<<8 | type). #4 vote.hpp:42-49; #3 bitshares-api.js:2126-2134.
    * Instance must fit 24 bits, type 8 bits — anything else throws. No float:
@@ -893,6 +970,7 @@ Tx._ser = Tx._ser || {};
   Tx._ser.serializeLimitOrderAutoAction = serializeLimitOrderAutoAction;
   Tx._ser.serializeLimitOrderCreateOp = serializeLimitOrderCreateOp;
   Tx._ser.serializeLimitOrderCancelOp = serializeLimitOrderCancelOp;
+  Tx._ser.serializeLimitOrderUpdateOp = serializeLimitOrderUpdateOp;
   Tx._ser.serializeCallOrderUpdateOp = serializeCallOrderUpdateOp;
   Tx._ser.serializeAssetCreateOp = serializeAssetCreateOp;
   Tx._ser.serializeAssetUpdateOp = serializeAssetUpdateOp;

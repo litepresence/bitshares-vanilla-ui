@@ -11,11 +11,11 @@
  * <script> order in index.html; node: module.require()d below).
  * Side effects: defines Tx.OP + Tx._ser.serializeOperationData +
  * Tx._ser.serializeTransaction on the shared `Tx` global.
- * Created by: building-vanilla-slices skill, slice-04-transfer plan
- * Task 2; split by the slice-18 readability pass. Serializer coverage
- * unchanged: ops 0-3, 6-8, 10-17, 19-24, 25-30, 32-35 (35 chat
- * 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73,
- * 75, 76. Full provenance record: git history of this file.
+  * Created by: building-vanilla-slices skill, slice-04-transfer plan
+  * Task 2; split by the slice-18 readability pass. Serializer coverage
+  * unchanged: ops 0-3, 6-8, 10-17, 19-24, 25-30, 32-35 (35 chat
+  * 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73,
+  * 75, 76, 77. Full provenance record: git history of this file.
  */
 var Tx = (typeof globalThis !== "undefined" && globalThis.Tx) ? globalThis.Tx : ((typeof Tx !== "undefined") ? Tx : {});
 Tx.OP = Tx.OP || {};
@@ -101,8 +101,9 @@ if (__txRequire && (typeof globalThis === "undefined" || !globalThis.Tx || !glob
     if (opType === 73) return Tx._ser.serializeCreditDealRepayOp(opData);
     if (opType === 75) return Tx._ser.serializeLiquidityPoolUpdateOp(opData);
     if (opType === 76) return Tx._ser.serializeCreditDealUpdateOp(opData);
+    if (opType === 77) return Tx._ser.serializeLimitOrderUpdateOp(opData);
     throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, " +
-      "43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76, got op " + opType);
+      "43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75, 76 and 77, got op " + opType);
   }
 
   /* Signing serialization: ref_block_num + ref_block_prefix + expiration +
@@ -212,11 +213,12 @@ if (__txRequire && (typeof globalThis === "undefined" || !globalThis.Tx || !glob
       // no-serializer note above). Do not "complete" this list.
       else if (opType === 75) parts.push(Tx._ser.serializeLiquidityPoolUpdateOp(opData));
       else if (opType === 76) parts.push(Tx._ser.serializeCreditDealUpdateOp(opData));
+      else if (opType === 77) parts.push(Tx._ser.serializeLimitOrderUpdateOp(opData));
       // Ops 51 (htlc_redeemed) and 53 (htlc_refund) are VIRTUAL (#4
       // operations.hpp:107,109; validate() asserts !"virtual operation" in
       // htlc.hpp:139,199-202) — they can never appear in a signed tx, so
       // they are NEVER dispatched here. Do not "complete" this list.
-      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75 and 76 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic except chat; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 77 adjust-via-cancel+recreate; 4/42/44/46/51/53/74 virtual), got op " + opType);
+      else throw new Error("tx.js supports ops 0-3, 6, 7, 8, 10-17, 19-24, 25-28, 29, 30, 32-35(chat 9198/9199 only), 37, 43, 45, 47, 48, 49, 50, 52, 54-58, 59-73, 75, 76 and 77 (5 faucet-covered; 9 no UI path; 18 issuer-only; 31 chain-parameters; 35 generic except chat; 36 predicates-not-approvals; 38 issuer-only; 39/40/41 blind-downscoped; 4/42/44/46/51/53/74 virtual), got op " + opType);
     }
     parts.push(Tx._ser.varintUint32((tx.extensions || []).length));
     return Tx._ser.concatBytes(parts);
@@ -224,6 +226,7 @@ if (__txRequire && (typeof globalThis === "undefined" || !globalThis.Tx || !glob
 
   Tx.OP = {
       transfer: 0, limit_order_create: 1, limit_order_cancel: 2,
+      limit_order_update: 77,
       call_order_update: 3, account_update: 6, account_whitelist: 7,
       account_upgrade: 8,
       asset_create: 10, asset_update: 11, asset_update_bitasset: 12,

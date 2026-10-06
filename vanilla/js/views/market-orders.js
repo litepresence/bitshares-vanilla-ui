@@ -9,9 +9,13 @@
  *   bins over fill integer amounts, canvas 2D, collapsible, mounted by
  *   MarketBook into the mkt-trades pane from already-fetched rows — no new
  *   chain call).
- *   Cancel CONFIRM/SEND/RESULT flows are owned by
- *   TradeUI (slice-06) — this file only mounts buttons + boxes and re-renders
- *   the list when TradeUI reports done.
+  *   Cancel CONFIRM/SEND/RESULT flows are owned by
+  *   TradeUI (slice-06) — this file only mounts buttons + boxes and re-renders
+  *   the list when TradeUI reports done. The op-77 Adjust (limit_order_update)
+  *   form + review + send IS owned here (deferred-verdicts Q1 build order):
+  *   per-row Adjust buttons paint orderUpdateBox into the same shared slot,
+  *   with local send/fee/prove helpers (private copies of the trade-cancel.js
+  *   originals per the same per-file convention, credited at each site).
  * Consumes: Market.myOrders/.settleOrders/.sortSettles (read-only fetch, via
  *   global — same as before the split), Wallet.isUnlocked (read-only gate,
  *   never modified), Format (formatAmount/formatPrice/settleEstimate — BigInt,
@@ -201,10 +205,11 @@ var MarketOrders = (function () {
         typeof TradeUI.cancelAllBox === "function";
     }
     /* paintOrders: my open orders as table + phone cards with per-row
-     * cancel (TradeUI confirm renders into the shared slot above the list).
-     * No-ops when live() is false. */
+     * cancel + adjust (TradeUI confirm / local update form both render into
+     * the shared slot above the list). No-ops when live() is false. */
     function paintOrders(mine, canCancel) {
       if (!live()) return;
+      var canUpdate = canUpdateNow();
       DOM.clear(body);
       if (mine.length === 0) {
         body.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market.") + t("market.place_order_hint", " Place one from the trade form on this page — it lists here until filled or cancelled."), "muted"));
@@ -226,7 +231,7 @@ var MarketOrders = (function () {
       var thead = doc.createElement("thead");
       var hr = doc.createElement("tr");
       [t("market.col_order", "Order"), t("market.col_side", "Side"), t("market.th_amount", "Amount"), t("market.col_price", "Price")].forEach(function (h) { hr.appendChild(DOM.el(doc, "th", h)); });
-      if (canCancel) hr.appendChild(DOM.el(doc, "th", t("market.col_action", "Action")));
+      if (canCancel || canUpdate) hr.appendChild(DOM.el(doc, "th", t("market.col_action", "Action")));
       thead.appendChild(hr);
       table.appendChild(thead);
       var tbody = doc.createElement("tbody");
@@ -239,9 +244,13 @@ var MarketOrders = (function () {
         tr.appendChild(DOM.el(doc, "td", view.side));
         tr.appendChild(DOM.el(doc, "td", view.amount));
         tr.appendChild(DOM.el(doc, "td", view.price));
-        if (canCancel) {
+        if (canCancel || canUpdate) {
           var td = doc.createElement("td");
-          td.appendChild(cancelButton(doc, o, assets, cancelBox, rerender));
+          if (canCancel) td.appendChild(cancelButton(doc, o, assets, cancelBox, rerender));
+          if (canUpdate) {
+            if (canCancel) td.appendChild(doc.createTextNode(" "));
+            td.appendChild(updateButton(doc, o, assets, cancelBox, rerender));
+          }
           tr.appendChild(td);
         }
         tbody.appendChild(tr);
@@ -251,6 +260,7 @@ var MarketOrders = (function () {
         card.appendChild(DOM.el(doc, "div", view.amount));
         card.appendChild(DOM.el(doc, "div", view.price));
         if (canCancel) card.appendChild(cancelButton(doc, o, assets, cancelBox, rerender));
+        if (canUpdate) card.appendChild(updateButton(doc, o, assets, cancelBox, rerender));
         var det = doc.createElement("details");
         det.className = "raw";
         var sum = doc.createElement("summary");
@@ -415,15 +425,47 @@ var MarketOrders = (function () {
     /* paintSettle: price/amount/date table sorted by settlement_date (input
      * already sorted). Amount human via Format (raw in title, never bare);
      * date via I18n.date with raw fallback; price shared estimate with offset
-     * title. Empty -> no_orders (brief contract). Phone cards + raw details
-     * mirror the my-orders pattern. No-ops when live() is false. */
+     * title. The estimate wears a plain "est. " glue prefix (no new locale
+     * key) in BOTH table cell and phone card so neither passes the offset
+     * estimate off as a settlement; a true global settlement (priceTitle
+     * null) stays bare, and the "—" fallback never takes the prefix. The
+     * card price div carries the same offset title as the table cell.
+      * Rows at the get_settle_orders limit (100) gain an honest first-page
+      * note (market.settle_first100). Empty -> no_orders plus the no-cancel
+      * note (market.settle_no_cancel): op-42 asset_settle_cancel is VIRTUAL
+      * (validate() asserts !"Virtual operation", no evaluator), so the tab
+      * never offers a cancel affordance — the note says why. Phone cards +
+      * raw details mirror the my-orders pattern. No-ops when live() is false.
+     * @param {Array} rows - sorted settle orders (Market.sortSettles output).
+     * @param {string} price - shared settlement/estimate price string.
+     * @param {string|null} priceTitle - offset title when price is an estimate.
+     * @param {number} prec - settled asset precision for amount display.
+     * @param {string} sym - settled asset symbol for amount display.
+     * @returns {void} Renders in place. */
     function paintSettle(rows, price, priceTitle, prec, sym) {
       if (!live()) return;
       DOM.clear(settleWrap);
       if (!rows || rows.length === 0) {
         settleWrap.appendChild(DOM.el(doc, "p", t("market.no_orders", "No open orders on this market."), "muted"));
+        /* WHY no cancel affordance anywhere on this tab: chain-doctor proved
+         * op-42 asset_settle_cancel is VIRTUAL (validate() asserts
+         * !"Virtual operation", no evaluator exists) — so NO cancel button
+         * and NO tag-42 tx may ever be offered; this display-only note says
+         * why instead of leaving a missing button unexplained. */
+        settleWrap.appendChild(DOM.el(doc, "p", t("market.settle_no_cancel", "Settlement orders cannot be cancelled — they execute at settlement (after the asset's force-settlement delay)."), "muted"));
         return;
       }
+      /* WHY: settleOrders fetches the first page only (assetId, 100 — the
+       * get_settle_orders limit); a full page means more rows may exist, so
+       * say so instead of implying completeness. */
+      if (rows.length === 100) {
+        settleWrap.appendChild(DOM.el(doc, "p", t("market.settle_first100", "Showing first 100 (get_settle_orders limit 100)"), "muted"));
+      }
+      /* WHY: price is the offset-adjusted settleEstimate whenever priceTitle
+       * carries the offset — prefix "est. " there so the table never shows
+       * an estimate as a settlement. Global settlement (title null) and the
+       * "—" fallback stay bare. Plain glue, no math change. */
+      var priceShown = (priceTitle && String(price) !== "—") ? "est. " + String(price) : String(price);
       var table = doc.createElement("table");
       table.className = "node-table";
       var thead = doc.createElement("thead");
@@ -448,7 +490,7 @@ var MarketOrders = (function () {
           if (dateRaw !== "—" && typeof I18n !== "undefined" && I18n && typeof I18n.date === "function") dateShown = I18n.date(dateRaw);
         } catch (e) { dateShown = dateRaw; }
         var tr = doc.createElement("tr");
-        var tdP = DOM.el(doc, "td", String(price));
+        var tdP = DOM.el(doc, "td", priceShown);
         if (priceTitle) tdP.title = priceTitle;
         tr.appendChild(tdP);
         var tdA = DOM.el(doc, "td", String(amt));
@@ -460,7 +502,9 @@ var MarketOrders = (function () {
         tbody.appendChild(tr);
         var card = doc.createElement("div");
         card.className = "node-card";
-        card.appendChild(DOM.el(doc, "div", String(price)));
+        var cardP = DOM.el(doc, "div", priceShown);
+        if (priceTitle) cardP.title = priceTitle;
+        card.appendChild(cardP);
         card.appendChild(DOM.el(doc, "div", String(amt)));
         card.appendChild(DOM.el(doc, "div", String(dateShown)));
         cards.appendChild(card);
@@ -656,6 +700,502 @@ var MarketOrders = (function () {
     ctx.textAlign = "right";
     ctx.fillText(t("market_orders.tape_max", "max") + " " + String(maxCount), g.w - 6, 15);
     ctx.textAlign = "left";
+  }
+
+  /* Per-row Adjust button: paints the local op-77 update form into the
+   * shared box (order id 1.7.x shown there). Done callback re-renders. */
+  function updateButton(doc, order, assets, box, rerender) {
+    var b = touchable(DOM.el(doc, "button", t("market.adjust_button", "Adjust")));
+    b.type = "button";
+    b.className = "btn-ghost";
+    b.setAttribute("aria-label", t("market.update_title", "Adjust order") + " " + String(order.id));
+    b.addEventListener("click", function () {
+      orderUpdateBox(doc, box, order, assets, rerender, null);
+    });
+    return b;
+  }
+
+  /* Update flow (op 77 limit_order_update, deferred-verdicts Q1): in-place
+   * adjust form for the user's own open order. Prefills price/amount/expiry
+   * from the 1.7.x object; Review sends only changed fields (the rest null);
+   * shared ConfirmDialog rows (order id, old→new price, delta amount, old→new
+   * expiry, live fee); unlock-at-sign; re-read proof. All-null is refused
+   * inline (the node may reject it — spec open point — so the UI requires
+   * >=1 changed field instead of spending a fee to find out).
+   * @param {Document} doc owner document.
+   * @param {HTMLElement} box shared slot the form/confirm/result paints into.
+   * @param {object} order raw limit order (must be the wallet account's own).
+   * @param {object} assets ctx.assets (quote/base id/symbol/precision).
+   * @param {Function} onDone re-render callback (wired to a dismiss button).
+   * @param {object|null} preset optional {price, amount, expiry} field
+   *   overrides (confirm-back path keeps the user's edits).
+   * @returns {void} Renders in place. */
+
+  /* Fee asset for op-77 (core asset; testnet TEST shares the 1.3.0 id). */
+  var UPDATE_FEE_ASSET = "1.3.0";
+
+  /* Placeholder fee payer for paint-time fee quotes: op-77 fees are
+   * account-invariant (flat schedule per op type via get_required_fees — the
+   * payer id never changes the price; committee-account 1.2.0 always
+   * exists). Same convention as trade-cancel.js QUOTE_PLACEHOLDER_PAYER:114;
+   * display-only, doGo rebuilds with the real seller and re-runs feeMulti. */
+  var UPDATE_QUOTE_PAYER = "1.2.0";
+
+  var UPDATE_PROVE_TIMEOUT_MS = 30000;
+  var UPDATE_PROVE_INTERVAL_MS = 2500;
+
+  /* True when the Adjust flow can run (unlocked AND every global the update
+   * path needs is loaded). Returns boolean, never throws. */
+  function canUpdateNow() {
+    try {
+      var hasTx = typeof Tx !== "undefined" && Tx &&
+        typeof Tx.buildTx === "function" && typeof Tx.feeMulti === "function" &&
+        typeof Tx.signRouted === "function" &&
+        Tx.OP && Tx.OP.limit_order_update === 77;
+      var hasChain = typeof Chain !== "undefined" && Chain &&
+        typeof Chain.db === "function" && typeof Chain.call === "function" &&
+        typeof Chain.net === "function";
+      var hasAcct = typeof Account !== "undefined" && Account &&
+        typeof Account.myAccountId === "function";
+      var hasFmt = typeof Format !== "undefined" && Format &&
+        typeof Format.parseAmount === "function" &&
+        typeof Format.parsePriceRatio === "function" &&
+        typeof Format.formatAmount === "function";
+      var hasUi = typeof Forms !== "undefined" && Forms &&
+        typeof Forms.labeledInput === "function" &&
+        typeof ConfirmDialog !== "undefined" && ConfirmDialog &&
+        typeof ConfirmDialog.show === "function";
+      var hasWallet = typeof Wallet !== "undefined" && Wallet;
+      return !!(unlockedNow() && hasTx && hasChain && hasAcct && hasFmt && hasUi && hasWallet);
+    } catch (e) { return false; }
+  }
+
+  /* Wallet-unlock read (same gate market-orders render uses, factored so the
+   * update path does not depend on the render closure). */
+  function unlockedNow() {
+    try {
+      return typeof Wallet !== "undefined" && Wallet &&
+        (typeof Wallet.isUnlocked === "function" ? Wallet.isUnlocked() : !!Wallet.keys);
+    } catch (e) { return false; }
+  }
+
+  /* Fee asset display meta for human fee lines (private copy of the
+   * trade-cancel.js helper — same per-file convention as the market-ui
+   * split, so this file never reaches into another view's locals). */
+  function updateFeeAssetMeta(feeAssetId) {
+    return Chain.db().then(function (dbId) {
+      return Chain.call(dbId, "get_assets", [[feeAssetId]]);
+    }).then(function (rows) {
+      if (!rows || !rows[0] || typeof rows[0].precision !== "number") {
+        throw new Error("bad-asset-shape for fee asset " + feeAssetId);
+      }
+      return { symbol: rows[0].symbol, precision: rows[0].precision };
+    });
+  }
+
+  function updateHumanFee(totalRaw, meta) {
+    return Format.formatAmount(String(totalRaw), meta.precision) + " " + meta.symbol;
+  }
+
+  /* Paint-time fee quote for an update op (display-only, never signed — same
+   * throwaway-ops rationale as trade-cancel.js quoteFeeHuman: feeMulti fills
+   * fees in place and buildTx pins a head block, both stale by send time).
+   * Never rejects: any failure resolves the honest dash fallback. */
+  function updateQuoteFeeHuman(ops) {
+    var dash = t("settings.dash", "—");
+    return Tx.buildTx(ops).then(function (unsigned) {
+      return Tx.feeMulti(unsigned.operations, UPDATE_FEE_ASSET).then(function (feeRes) {
+        return updateFeeAssetMeta(unsigned.operations[0][1].fee.asset_id).then(function (meta) {
+          return { feeHuman: updateHumanFee(feeRes.totalRaw, meta), feeRaw: String(feeRes.totalRaw) };
+        });
+      });
+    }).catch(function () {
+      return { feeHuman: dash, feeRaw: null };
+    });
+  }
+
+  /* Head block number for result screens (observation marker, not a txid —
+   * same convention as the cancel flow). */
+  function updateHeadBlock() {
+    return Chain.db().then(function (dbId) {
+      return Chain.call(dbId, "get_dynamic_global_properties", []);
+    }).then(function (props) {
+      return (props && props.head_block_number) || 0;
+    });
+  }
+
+  function updateSleep(ms) {
+    return new Promise(function (res) { setTimeout(res, ms); });
+  }
+
+  /* Broadcast with the same wire shape as the cancel flow (callback id +
+   * signedTx, plain fallback), then prove via the caller's poll fn. */
+  function updateSendTx(signed, prove) {
+    return Chain.net().then(function (netId) {
+      var callbackId = (Math.random() * 4294967296) >>> 0;
+      var via = "broadcast_transaction_with_callback";
+      return Chain.call(netId, "broadcast_transaction_with_callback", [callbackId, signed]).catch(function () {
+        via = "broadcast_transaction";
+        return Chain.call(netId, "broadcast_transaction", [signed]);
+      }).then(function () {
+        return updateProveTx(prove, via);
+      });
+    });
+  }
+
+  /* Prove-only poll tail (same 30s budget as the cancel flow). Resolves
+   * {found, head, via}; throws an honest do-NOT-rebroadcast error on
+   * timeout. */
+  function updateProveTx(prove, via) {
+    var deadline = Date.now() + UPDATE_PROVE_TIMEOUT_MS;
+    function round() {
+      var found = null;
+      return Promise.resolve().then(function () {
+        return prove();
+      }).then(function (f) {
+        found = f;
+        if (!found) {
+          if (Date.now() >= deadline) {
+            throw new Error("Sent (" + via + ") but the update was not observed within " +
+              (UPDATE_PROVE_TIMEOUT_MS / 1000) + "s; check your orders before retrying " +
+              "(do NOT blindly rebroadcast).");
+          }
+          return updateSleep(UPDATE_PROVE_INTERVAL_MS).then(round);
+        }
+        return updateHeadBlock().then(function (head) {
+          return { found: found, head: head, via: via };
+        });
+      });
+    }
+    return round();
+  }
+
+  /* Seed the update form from the raw 1.7.x object, or null when the shape
+   * is unusable (caller shows an honest error, never a half-seeded form).
+   * for_sale's asset id IS sell_price.base.asset_id per #4
+   * market_object.hpp:50,77,79 — the same convention orderView paints. */
+  function updateSeeds(order, assets) {
+    try {
+      if (!order || typeof order.id !== "string" || !/^1\.7\.\d+$/.test(order.id)) return null;
+      var q = assets.quote, b = assets.base;
+      if (!q || !b || !q.id || !b.id) return null;
+      var sp = order.sell_price;
+      if (!sp || !sp.base || !sp.quote) return null;
+      var sellId = sp.base.asset_id;
+      var sellPrec = sellId === q.id ? q.precision : (sellId === b.id ? b.precision : null);
+      var sellSym = sellId === q.id ? q.symbol : (sellId === b.id ? b.symbol : null);
+      if (typeof sellPrec !== "number" || !sellSym) return null;
+      var forSaleRaw = (order.for_sale !== undefined && order.for_sale !== null) ? String(order.for_sale) : null;
+      if (forSaleRaw === null || !/^\d+$/.test(forSaleRaw)) return null;
+      var cb = (sp.base.amount !== undefined && sp.base.amount !== null) ? String(sp.base.amount) : null;
+      var cq = (sp.quote.amount !== undefined && sp.quote.amount !== null) ? String(sp.quote.amount) : null;
+      if (cb === null || cq === null || !/^\d+$/.test(cb) || !/^\d+$/.test(cq)) return null;
+      var view = orderView(order, assets);
+      if (!view || view.price === "—") return null;
+      var expiryWire = (order.expiration !== undefined && order.expiration !== null) ? String(order.expiration) : "";
+      if (!expiryWire) return null;
+      var seller = (order.seller !== undefined && order.seller !== null) ? String(order.seller) : null;
+      return {
+        id: String(order.id), seller: seller, pair: q.symbol + "/" + b.symbol,
+        sellId: sellId, sellPrec: sellPrec, sellSym: sellSym, forSaleRaw: forSaleRaw,
+        priceHuman: view.price, cb: cb, cbId: sp.base.asset_id, cq: cq, cqId: sp.quote.asset_id,
+        expiryWire: expiryWire
+      };
+    } catch (e) { return null; }
+  }
+
+  /* New base leg for a changed price: cur_base * new_ratio / cur_ratio in
+   * exact BigInt (orientation + quote leg preserved, floor — the same
+   * rounding the place-order path uses). Equal values spelled differently
+   * ("2.50" vs "2.5") scale to the identical leg, so respellings read as
+   * unchanged. Throws on non-positive ratios (caller shows inline). */
+  function updateScaleBaseLeg(curBase, curHuman, newHuman) {
+    var c = Format.parsePriceRatio(curHuman);
+    var n = Format.parsePriceRatio(newHuman);
+    /* Explicit BigInt locals: Format is an any-typed global, so the chained
+     * expression below would mix inferred number/any operands (TS2365) —
+     * BigInt() of each ratio leg pins every operand to bigint first. */
+    var curNum = BigInt(c.num), curDen = BigInt(c.den);
+    var newNum = BigInt(n.num), newDen = BigInt(n.den);
+    if (curNum <= 0n || newNum <= 0n) throw new Error("bad price");
+    return (BigInt(curBase) * newNum * curDen / (newDen * curNum)).toString();
+  }
+
+  function orderUpdateBox(doc, box, order, assets, onDone, preset) {
+    DOM.clear(box);
+    if (typeof Tx === "undefined" || !Tx || typeof Chain === "undefined" || !Chain) {
+      showError(doc, box, t("trade.cancel_backend", "Trade backend missing: js/tx.js failed to load."));
+      return;
+    }
+    var seeds = updateSeeds(order, assets);
+    if (!seeds) {
+      showError(doc, box, t("market.err_asset_shape", "Unexpected asset data from the node; stopped instead of guessing."));
+      return;
+    }
+    var id = seeds.id;
+    function fieldVal(name, fallback) {
+      if (preset && preset[name] !== undefined && preset[name] !== null) return String(preset[name]);
+      return fallback;
+    }
+    var form = doc.createElement("div");
+    form.className = "mkt-update-form";
+    form.appendChild(DOM.el(doc, "h3", t("market.update_title", "Adjust order") + " " + id + "?"));
+    var priceF = Forms.labeledInput(doc, t("market.update_price", "New price "),
+      { type: "text", inputmode: "decimal", value: fieldVal("price", seeds.priceHuman) });
+    priceF.input.setAttribute("aria-label", t("market.update_price", "New price "));
+    var amountF = Forms.labeledInput(doc,
+      t("market.update_amount", "Amount for sale (new total) ") + "(" + seeds.sellSym + ")",
+      { type: "text", inputmode: "decimal", value: fieldVal("amount", Format.formatAmount(seeds.forSaleRaw, seeds.sellPrec)) });
+    amountF.input.setAttribute("aria-label", t("market.update_amount", "Amount for sale (new total) "));
+    var expVal = seeds.expiryWire.slice(0, 16);
+    var expiryF = Forms.labeledInput(doc, t("market.update_expiry", "New expiration "),
+      { type: "datetime-local", value: fieldVal("expiry", expVal) });
+    expiryF.input.setAttribute("aria-label", t("market.update_expiry", "New expiration "));
+    form.appendChild(priceF.row);
+    form.appendChild(amountF.row);
+    form.appendChild(expiryF.row);
+    var err = DOM.el(doc, "div", "", "error");
+    err.setAttribute("aria-live", "polite");
+    err.style.display = "none";
+    form.appendChild(err);
+    function failInline(msg) {
+      err.textContent = msg;
+      err.style.display = "";
+    }
+    var row = doc.createElement("div");
+    row.className = "confirm-actions";
+    var back = touchable(DOM.el(doc, "button", t("trade.keep_order", "Keep order")));
+    back.type = "button";
+    back.classList.add("btn-ghost");
+    back.addEventListener("click", function () { DOM.clear(box); });
+    var review = touchable(DOM.el(doc, "button", t("market.update_review", "Review update")));
+    review.type = "button";
+    row.appendChild(back);
+    row.appendChild(review);
+    form.appendChild(row);
+    box.appendChild(form);
+    /* Read + validate the three fields into a changed-only op fragment.
+     * Returns {newPrice, delta, newExpiry, priceHuman, deltaHuman, expiryWire}
+     * with nulls for unchanged legs, or throws the inline message. */
+    function readChanged() {
+      var priceStr = String(priceF.input.value || "").trim();
+      var amountStr = String(amountF.input.value || "").trim();
+      var expiryStr = String(expiryF.input.value || "").trim();
+      var newPrice = null, priceShown = null;
+      if (priceStr !== "" && priceStr !== seeds.priceHuman) {
+        var newBase;
+        try {
+          newBase = updateScaleBaseLeg(seeds.cb, seeds.priceHuman, priceStr);
+        } catch (e) {
+          throw new Error(t("market.update_bad_price", "Enter a price greater than zero."));
+        }
+        if (!/[1-9]/.test(newBase)) {
+          throw new Error(t("market.update_bad_price", "Enter a price greater than zero."));
+        }
+        if (newBase !== seeds.cb) {
+          newPrice = {
+            base: { amount: newBase, asset_id: seeds.cbId },
+            quote: { amount: seeds.cq, asset_id: seeds.cqId }
+          };
+          priceShown = seeds.priceHuman + " → " + priceStr;
+        }
+      }
+      var delta = null, deltaShown = null, deltaRawTitle = null;
+      if (amountStr !== "") {
+        var newRaw;
+        try {
+          newRaw = Format.parseAmount(amountStr, seeds.sellPrec);
+        } catch (e) {
+          throw new Error(t("market.update_bad_amount", "Enter an amount greater than zero."));
+        }
+        if (!/[1-9]/.test(newRaw)) {
+          throw new Error(t("market.update_bad_amount", "Enter an amount greater than zero."));
+        }
+        var diff = (BigInt(newRaw) - BigInt(seeds.forSaleRaw)).toString();
+        if (diff !== "0") {
+          delta = { amount: diff, asset_id: seeds.sellId };
+          var neg = diff.charAt(0) === "-";
+          var mag = neg ? diff.slice(1) : diff;
+          deltaShown = (neg ? "−" : "+") + Format.formatAmount(mag, seeds.sellPrec) + " " + seeds.sellSym;
+          deltaRawTitle = "raw " + diff;
+        }
+      }
+      var newExpiry = null, expiryShown = null;
+      if (expiryStr !== "" && expiryStr !== seeds.expiryWire.slice(0, 16)) {
+        var wire = expiryStr + ":00";
+        var ms = new Date(wire + "Z").getTime();
+        if (!isFinite(ms)) {
+          throw new Error(t("market.update_bad_expiry", "Enter an expiration in the future."));
+        }
+        if (ms < Date.now() + 60000) {
+          throw new Error(t("market.update_bad_expiry", "Enter an expiration in the future."));
+        }
+        newExpiry = wire;
+        expiryShown = seeds.expiryWire + " → " + wire;
+      }
+      if (newPrice === null && delta === null && newExpiry === null) {
+        throw new Error(t("market.update_no_change", "No changes — edit price, amount, or expiration."));
+      }
+      return {
+        newPrice: newPrice, delta: delta, newExpiry: newExpiry,
+        priceShown: priceShown, deltaShown: deltaShown, deltaRawTitle: deltaRawTitle,
+        expiryShown: expiryShown,
+        expectPriceBase: newPrice ? String(newPrice.base.amount) : null,
+        expectForSale: delta ? (BigInt(seeds.forSaleRaw) + BigInt(delta.amount)).toString() : null,
+        expectExpiry: newExpiry
+      };
+    }
+    review.addEventListener("click", function () {
+      err.style.display = "none";
+      var ch;
+      try {
+        ch = readChanged();
+      } catch (e) {
+        failInline((e && e.message) || t("common.unexpected_error", "Unexpected error"));
+        return;
+      }
+      var pending = DOM.status(box, t("trade.checking_fee", "Checking fee…"));
+      pending.className = "muted";
+      Promise.resolve().then(function () {
+        var paintOp = [Tx.OP.limit_order_update, {
+          fee: { amount: 0, asset_id: UPDATE_FEE_ASSET },
+          seller: UPDATE_QUOTE_PAYER,
+          order: id,
+          new_price: ch.newPrice,
+          delta_amount_to_sell: ch.delta,
+          new_expiration: ch.newExpiry,
+          on_fill: null,
+          extensions: []
+        }];
+        return updateQuoteFeeHuman([paintOp]);
+      }).catch(function () {
+        return { feeHuman: t("settings.dash", "—"), feeRaw: null };
+      }).then(function (Q) {
+        try { box.removeChild(pending); } catch (rm) { /* navigated away */ }
+        var rows = [
+          [t("trade.co_orderid", "Order ID"), id],
+          [t("trade.co_market", "Market"), seeds.pair]
+        ];
+        if (ch.priceShown !== null) {
+          rows.push([t("market.update_price_change", "Price (old → new)"), ch.priceShown,
+            "raw " + seeds.cb + "/" + seeds.cq]);
+        }
+        if (ch.deltaShown !== null) rows.push([t("market.update_amount_change", "Amount change"), ch.deltaShown, ch.deltaRawTitle]);
+        if (ch.expiryShown !== null) rows.push([t("market.update_expiry_change", "Expiration (old → new)"), ch.expiryShown]);
+        var dlg = null;
+        function doGo() {
+          var btns = dlg.getElementsByTagName("button");
+          var backBtn = btns[0], goBtn = btns[1];
+          backBtn.disabled = true;
+          goBtn.disabled = true;
+          var status = DOM.status(box, t("trade.checking_fee", "Checking fee…"));
+          status.className = "muted";
+          var wif = (Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
+          if (typeof Tx !== "undefined" && Tx && typeof Tx.wifOk === "function" ? !Tx.wifOk(wif) : !wif) {
+            box.removeChild(status);
+            showError(doc, box, new Error("wallet-locked"), t("common.wallet_locked", "Wallet is locked."));
+            backBtn.disabled = false;
+            goBtn.disabled = false;
+            return;
+          }
+          Account.myAccountId().then(function (myId) {
+            if (seeds.seller && seeds.seller !== myId) {
+              throw new Error("Order " + id + " belongs to " + seeds.seller + ", not your account.");
+            }
+            var op = [Tx.OP.limit_order_update, {
+              fee: { amount: 0, asset_id: UPDATE_FEE_ASSET },
+              seller: myId,
+              order: id,
+              new_price: ch.newPrice,
+              delta_amount_to_sell: ch.delta,
+              new_expiration: ch.newExpiry,
+              on_fill: null,
+              extensions: []
+            }];
+            return Tx.buildTx([op]).then(function (unsigned) {
+              return Tx.feeMulti(unsigned.operations, UPDATE_FEE_ASSET).then(function (feeRes) {
+                return updateFeeAssetMeta(unsigned.operations[0][1].fee.asset_id).then(function (meta) {
+                  return { unsigned: unsigned, feeRaw: feeRes.totalRaw, meta: meta };
+                });
+              });
+            }).then(function (R) {
+              return Tx.signRouted(R.unsigned, wif, {}).then(function (r) {
+                if (r.delegated) {
+                  status.textContent = t("market.update_broadcasting", "Broadcasting update…");
+                  return updateProveTx(updateProveUpdated(myId, id, ch), r.proof.via + "+extension").then(function (res) {
+                    return { res: res, R: R };
+                  });
+                }
+                status.textContent = t("market.update_broadcasting", "Broadcasting update…");
+                return updateSendTx(r.signed, updateProveUpdated(myId, id, ch)).then(function (res) {
+                  return { res: res, R: R };
+                });
+              });
+            });
+          }).then(function (out) {
+            DOM.clear(box);
+            box.appendChild(DOM.el(doc, "h3", t("market.update_done", "Order updated") + " (" + id + ")"));
+            var okText = (out.res.found && out.res.found.gone)
+              ? "Order " + id + " left the book (filled or cancelled) after the update was included at head block #" +
+                String(out.res.head) + " via " + out.res.via + "."
+              : "Confirmed at head block #" + String(out.res.head) + " via " + out.res.via + ".";
+            var okLine = DOM.el(doc, "p", okText, "xfer-ok");
+            okLine.setAttribute("aria-live", "polite");
+            box.appendChild(okLine);
+            box.appendChild(DOM.el(doc, "p",
+              "Update fee: " + updateHumanFee(out.R.feeRaw, out.R.meta) + ".", "muted"));
+            var done = touchable(DOM.el(doc, "button", t("trade.back_orders", "Back to orders")));
+            done.type = "button";
+            done.classList.add("btn-ghost");
+            done.addEventListener("click", function () { DOM.clear(box); onDone(); });
+            box.appendChild(done);
+          }).catch(function (e) {
+            try { box.removeChild(status); } catch (rm) { /* already gone */ }
+            showError(doc, box, e, t("market.fail_update", "Update failed."));
+            backBtn.disabled = false;
+            goBtn.disabled = false;
+          });
+        }
+        dlg = ConfirmDialog.show({ title: t("market.update_title", "Adjust order") + " " + id + "?",
+          rows: rows,
+          feeHuman: Q.feeHuman, feeTerm: t("trade.row_fee", "Fee"), feeRawTitle: Q.feeRaw,
+          backLabel: t("trade.keep_order", "Keep order"), sendLabel: t("market.confirm_adjust", "Confirm adjust"),
+          doc: doc,
+          onBack: function () { orderUpdateBox(doc, box, order, assets, onDone,
+            { price: priceF.input.value, amount: amountF.input.value, expiry: expiryF.input.value }); },
+          onSend: doGo });
+        box.appendChild(dlg);
+      });
+    });
+  }
+
+  /* Prove-fn: true once the re-read order shows the updated legs (or the
+   * order is gone from the book — filled/cancelled after inclusion, reported
+   * honestly by the caller). Null while the old values still read. */
+  function updateProveUpdated(myId, id, ch) {
+    return function () {
+      return Chain.db().then(function (dbId) {
+        return Chain.call(dbId, "get_limit_orders_by_account", [myId, 100]);
+      }).then(function (rows) {
+        var found = null;
+        (rows || []).forEach(function (o) {
+          if (o && o.id === id) found = o;
+        });
+        if (!found) return { gone: true };
+        if (ch.expectPriceBase !== null) {
+          var sp = found.sell_price;
+          if (!sp || !sp.base || String(sp.base.amount) !== String(ch.expectPriceBase)) return null;
+        }
+        if (ch.expectForSale !== null) {
+          if (found.for_sale === undefined || found.for_sale === null ||
+              String(found.for_sale) !== String(ch.expectForSale)) return null;
+        }
+        if (ch.expectExpiry !== null) {
+          if (String(found.expiration) !== String(ch.expectExpiry)) return null;
+        }
+        return { updated: found };
+      });
+    };
   }
 
   /* Per-row Cancel button: paints TradeUI's inline confirm into the shared
