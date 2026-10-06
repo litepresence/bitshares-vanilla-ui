@@ -136,7 +136,10 @@ var FeedHistory = (function () {
       if (!sp.base || !sp.quote) continue;
       var t = e.block_time || e.timestamp || null;
       var human = null;
-      try { human = Format.formatPrice(String(sp.base.amount), mpaPrec, String(sp.quote.amount), backingPrec, 8); }
+      /* Legs swapped: backing-per-MPA (quote-per-base), matching the
+       * exchange + pool overlays. Base-per-quote here rounds to 0.00000002
+       * and pins every producer + the median to the zero line. */
+      try { human = Format.formatPrice(String(sp.quote.amount), backingPrec, String(sp.base.amount), mpaPrec, 8); }
       catch (err) { continue; }
       var ts = _toUnix(t);
       if (!(ts > 0)) continue;

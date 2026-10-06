@@ -63,6 +63,13 @@ Plan: `docs/superpowers/plans/2026-10-06-feed-history.md` (6 tasks, all committe
 
 ## Test vectors (raw → human)
 
+- Orientation (all series backing-per-MPA): live HONEST.BTC legs base
+  1603644699 (prec 8) / quote 100000000000000 (BTS prec 5) →
+  `62357952.52050404`. The first cut computed base-per-quote (`0.00000002`),
+  pinning producers + median to the zero line while exchange/pool drew at
+  62M — fixed by swapping the `formatPrice` legs in `publisherPoints`
+  (locked in `tooling/feed-history-test.js`).
+
 - `medianOf(["1.5","1.7","1.6"])` → `"1.6"` (integer-compare, no float).
 - `normToBackingPerMpa("2", true)` → `"0.5"`.
 - Bucket: pubs `{1.2.1:[1000:1.5, 2000:1.7], 1.2.2:[1000:1.9]}`,

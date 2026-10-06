@@ -28,7 +28,20 @@ eq(FeedHistory.fillToBackingPerMpa({ base: "2", quote: "1" }, true), "0.5", "fil
   eq(g.series.length, 4, "producers + MEDIAN + EXCHANGE");
   eq(g.series[2], { name: "MEDIAN", values: ["1.9", "1.9", null] }, "median then gap");
 })();
-// exchangePoints: Market.trades envelope ({time, priceExact}) -> {t, priceHuman}.
+// publisherPoints orientation: backing-per-MPA (matches exchange/pool overlays).
+// Live HONEST.BTC legs: base 1603644699 (prec 8) / quote 100000000000000 (BTS prec 5).
+globalThis.Format = require("/workspace/vanilla/js/api/format.js");
+globalThis.Account = {
+  historyPaged: async function () {
+    return { rows: [{
+      id: "1.11.1398881145", block_num: 114999464, block_time: "2026-10-06T22:43:33",
+      op: [19, { asset_id: "1.3.5650",
+        feed: { settlement_price: {
+          base: { amount: "1603644699", asset_id: "1.3.5650" },
+          quote: { amount: "100000000000000", asset_id: "1.3.0" } } } }]
+    }], truncated: false };
+  }
+};
 globalThis.Market = {
   trades: async function (baseId, quoteId, limit) {
     eq([baseId, quoteId, limit], ["1.3.0", "1.3.5", 100], "trades args backing/mpa/100");
@@ -65,6 +78,9 @@ globalThis.PoolHistory = {
   }
 };
 (async function () {
+  var btc = await FeedHistory.publisherPoints("1.2.581357", "1.3.5650", { mpaPrec: 8, backingPrec: 5 });
+  eq(btc.length, 1, "one btc feed point");
+  eq(btc[0].priceHuman, "62357952.52050404", "backing-per-MPA orientation");
   var ex = await FeedHistory.exchangePoints("1.3.5", "1.3.0");
   eq(ex, [{ t: Math.floor(Date.parse("2026-10-06T22:10:42Z") / 1000), priceHuman: "34.5" }], "exchange maps trades envelope, drops bad rows");
   var pls = await FeedHistory.poolLines("1.3.5", "1.3.0", 1);
