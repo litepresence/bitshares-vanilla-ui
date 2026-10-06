@@ -45,6 +45,7 @@ declare var ExplorerRender: any;
 declare var ExplorerTabs: any;
 declare var ExplorerUI: any;
 declare var FavouritesUI: any;
+declare var FeedHistory: any;
 declare var FeesUI: any;
 declare var Format: any;
 declare var Forms: any;

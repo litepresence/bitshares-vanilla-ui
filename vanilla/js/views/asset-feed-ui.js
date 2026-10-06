@@ -215,8 +215,186 @@ var AssetFeedUI = (function () {
       dl.appendChild(el(d, "dt", t("explorer.th_mssr", "MSSR"))); var m2 = el(d, "dd", AssetOps.ratioToPct(info.bitasset.mssr) + "%"); m2.title = String(info.bitasset.mssr); dl.appendChild(m2);
       body.appendChild(dl);
     } catch (e) { body.appendChild(el(d, "p", t("asset.feed_unavailable", "Feed read-back unavailable."), "muted")); }
+    producersSection(d, body, root, g, info);
+    historySection(d, body, root, g, info, backing, backingPrec);
     publishForm(d, body, root, g, info, backing, backingPrec);
     producerForm(d, body, root, g, info);
+  }
+  /* producersSection: no-login authorized-producer read (op-13 allow-list +
+   * witness/committee flags). Rows: account link, 1.2.N, witness/committee/
+   * producer badge, last-publish time with stale tint. Never gates on unlock. */
+  function producersSection(d, body, root, g, info) {
+    body.appendChild(el(d, "h2", t("asset.producers_live_title", "Feed producers")));
+    var box = el(d, "div", null, "asset-feed-producers");
+    body.appendChild(box);
+    status(d, box, t("asset.loading_producers", "Loading producers…"));
+    if (typeof FeedHistory === "undefined" || !FeedHistory.producersFor) {
+      wipe(box); err(d, box, new Error("backend"), t("asset.producers_failed", "Could not load producers."));
+      return;
+    }
+    FeedHistory.producersFor(info.symbol).then(function (p) {
+      if (g !== gen) return;
+      wipe(box);
+      var flagNote = "";
+      if (p.witnessFed) flagNote = t("asset.witness_fed_note", "Witness-fed: all active witnesses may publish.");
+      else if (p.committeeFed) flagNote = t("asset.committee_fed_note", "Committee-fed: all active committee members may publish.");
+      if (flagNote) box.appendChild(el(d, "p", flagNote, "muted"));
+      if (!p.live.length) {
+        box.appendChild(el(d, "p", t("asset.no_producers", "No feeds published yet — producers appear here once they publish."), "muted"));
+        return;
+      }
+      var rows = p.live.map(function (l) {
+        return { publisher: String(l.publisher), time: l.time ? String(l.time) : t("settings.dash", "—") };
+      });
+      var table = TableRenderer.render({
+        columns: [
+          { key: "publisher", title: t("asset.producer_col", "Producer") },
+          { key: "time", title: t("asset.published_col", "Published") }
+        ],
+        rows: rows,
+        keyExtractor: function (r) { return r.publisher; },
+        onRowClick: function (r) {
+          try { location.hash = "#/account/" + encodeURIComponent(r.publisher); } catch (e) { /* nav stands */ }
+        }
+      });
+      box.appendChild(table);
+      /* Badge fill-in: resolve names + witness hits without blocking the table. */
+      rows.forEach(function (r) {
+        (async function () {
+          var name = null, kind = "producer";
+          try {
+            var acc = await Account.resolve(r.publisher);
+            if (acc && acc.name) name = acc.name;
+          } catch (e) { /* id stands */ }
+          if (p.witnessFed) {
+            try {
+              var db = await Chain.db();
+              var w = await Chain.call(db, "get_witness_by_account", [r.publisher]);
+              if (w) kind = "witness";
+            } catch (e) { /* producer stands */ }
+          }
+          if (g !== gen) return;
+          var label = (name ? name + " (" + r.publisher + ")" : r.publisher) + (kind === "producer" ? "" : " · " + kind);
+          try {
+            var tr = box.querySelector('tr[data-rowkey="' + r.publisher + '"] td');
+            if (tr) tr.textContent = label;
+          } catch (e) { /* table stands */ }
+        })();
+      });
+    }).catch(function (e) { if (g === gen) { wipe(box); err(d, box, e, t("asset.producers_failed", "Could not load producers.")); } });
+  }
+  /* historySection: chain-only multi-line history (per-producer + MEDIAN +
+   * EXCHANGE + ≤3 pools) via FeedHistory.bucketAll + ChartsLwc.drawOscPane.
+   * Days 7/30/90 (default 7); progress line; legend checkboxes (44px);
+   * fail-closed per source (a dead pool never blanks feed lines). */
+  function historySection(d, body, root, g, info, backing, backingPrec) {
+    body.appendChild(el(d, "h2", t("asset.feed_history_title", "Feed history")));
+    var box = el(d, "div", null, "asset-feed-history");
+    body.appendChild(box);
+    var sel = Forms.labeledSelect(d, t("asset.history_days", "Range") + " ", [["7", "7d"], ["30", "30d"], ["90", "90d"]], "7");
+    box.appendChild(sel.row);
+    var go = touch(el(d, "button", t("asset.plot_feeds", "Plot feeds")));
+    go.type = "button";
+    box.appendChild(go);
+    var prog = el(d, "p", "", "muted");
+    prog.setAttribute("aria-live", "polite");
+    box.appendChild(prog);
+    var host = el(d, "div", null, "feed-history-host");
+    box.appendChild(host);
+    var legend = el(d, "div", null, "feed-history-legend");
+    box.appendChild(legend);
+    var PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"];
+    var last = null, handle = null;
+    function draw(filter) {
+      if (!last) return;
+      var i, entries = [];
+      for (i = 0; i < last.series.length; i++) {
+        var s = last.series[i];
+        if (filter && filter[s.name] === false) continue;
+        entries.push({ name: s.name, color: PALETTE[i % PALETTE.length], values: s.values });
+      }
+      try {
+        if (typeof ChartsLwc !== "undefined" && ChartsLwc && typeof ChartsLwc.drawOscPane === "function") {
+          if (handle && typeof ChartsLwc.removePane === "function") {
+            try { ChartsLwc.removePane(handle); } catch (e) { /* redraw stands */ }
+          }
+          handle = ChartsLwc.drawOscPane(document, host, {
+            times: last.times, series: entries,
+            emptyText: t("asset.no_history", "No history in this range — publishers publish rarely; try 90d.")
+          });
+        }
+      } catch (e) { /* canvas fallback already painted or empty text stands */ }
+    }
+    go.addEventListener("click", function () {
+      go.disabled = true;
+      (async function () {
+        var days = parseInt(sel.select.value || "7", 10) || 7;
+        var stop = Math.floor(Date.now() / 1000);
+        var start = stop - days * 86400;
+        prog.textContent = t("asset.history_loading", "Loading feed history…");
+        var p = await FeedHistory.producersFor(info.symbol);
+        var pubs = (p.live || []).map(function (l) { return l.publisher; }).slice(0, 8);
+        if ((p.live || []).length > pubs.length) {
+          prog.textContent = t("asset.history_capped", "Showing first 8 publishers (capped for speed)…");
+        }
+        var byPub = {}, i;
+        for (i = 0; i < pubs.length; i++) {
+          prog.textContent = t("asset.history_pub", "Publisher %(i)s/%(n)s…", { i: String(i + 1), n: String(pubs.length) });
+          try {
+            byPub[pubs[i]] = await FeedHistory.publisherPoints(pubs[i], info.id, { mpaPrec: info.precision, backingPrec: backingPrec });
+          } catch (e) { byPub[pubs[i]] = []; }
+          byPub[pubs[i]] = (byPub[pubs[i]] || []).filter(function (pt) { return pt.t >= start && pt.t <= stop; });
+        }
+        prog.textContent = t("asset.history_exchange", "Loading exchange + pools…");
+        var ex = [];
+        try { ex = await FeedHistory.exchangePoints(info.id, backing); } catch (e) { ex = []; }
+        ex = (ex || []).filter(function (pt) { return pt.t >= start && pt.t <= stop; });
+        var pools = [];
+        try { pools = await FeedHistory.poolLines(info.id, backing, 3); } catch (e) { pools = []; }
+        pools = (pools || []).map(function (pl) {
+          return { poolId: pl.poolId, points: (pl.points || []).filter(function (pt) { return pt.t >= start && pt.t <= stop; }) };
+        });
+        var range = stop - start;
+        var lifetime = (p.asset && p.asset.bitasset && p.asset.bitasset.feed_lifetime_sec) || 86400;
+        var minFeeds = (p.asset && p.asset.bitasset && p.asset.bitasset.minimum_feeds) || 1;
+        var bucketSec = Math.max(Math.floor(lifetime / 4) || 3600, Math.floor(range / 200) || 3600);
+        last = FeedHistory.bucketAll(byPub, ex, pools, { start: start, stop: stop, bucketSec: bucketSec, minFeeds: minFeeds, lifetimeSec: lifetime });
+        if (g !== gen) return;
+        wipe(legend);
+        var filter = {};
+        last.series.forEach(function (s, idx) {
+          filter[s.name] = true;
+          var lab = d.createElement("label");
+          lab.style.display = "inline-flex";
+          lab.style.alignItems = "center";
+          lab.style.minHeight = "44px";
+          lab.style.marginRight = "12px";
+          var cb = d.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = true;
+          cb.style.width = "22px";
+          cb.style.height = "22px";
+          cb.addEventListener("change", function () { filter[s.name] = cb.checked; draw(filter); });
+          var sw = d.createElement("span");
+          sw.style.display = "inline-block";
+          sw.style.width = "12px";
+          sw.style.height = "12px";
+          sw.style.margin = "0 6px";
+          sw.style.background = PALETTE[idx % PALETTE.length];
+          lab.appendChild(cb);
+          lab.appendChild(sw);
+          lab.appendChild(d.createTextNode(s.name));
+          legend.appendChild(lab);
+        });
+        prog.textContent = "";
+        draw(filter);
+        if (!last.times.length || !last.series.some(function (s) { return (s.values || []).some(function (v) { return v !== null; }); })) {
+          prog.textContent = t("asset.no_history", "No history in this range — publishers publish rarely; try 90d.");
+        }
+      })().catch(function (e) {
+        if (g === gen) err(d, box, e, t("asset.history_failed", "Could not load feed history."));
+      }).finally(function () { go.disabled = false; });
+    });
   }
   /* publishForm: op-19 inputs with ratio previews (helpers only, no /1000).
    * Publisher defaults to public 1.2.0 (gate-repair); blank also falls back
