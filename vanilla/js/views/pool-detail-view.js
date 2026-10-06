@@ -363,11 +363,12 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         }
       } catch (e) { /* depth slice stands */ }
       /* ES-bucket cache is orientation-bound (timeframe-switch precedent):
-       * drop it so deepenPool re-merges under the new legs. */
-      P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
-      rebucket();
-      deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
-      try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* map best-effort */ }
+       * drop it so deepenPool re-merges under the new legs. Discrete repaints
+       * from the re-enriched tape with no deepen and no pool map (closed). */
+      repaintForMode();
+      if (!P.discrete) {
+        try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* map best-effort */ }
+      }
       try { if (orient && typeof orient.spotRepaint === "function") orient.spotRepaint(); } catch (e) { /* spot stands */ }
       try { if (orient && typeof orient.bookRepaint === "function") orient.bookRepaint(); } catch (e) { /* book stands */ }
       try {
@@ -387,6 +388,10 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     plots.appendChild(oscNote);
     var P = {
       doc: doc, bucket: 300, liveBuckets: POOL_BUCKETS.slice(), logScale: false,
+      /* Discrete mode (raw swaps, no buckets — session-only, no URL keys):
+       * the shared paintTimeframes sets P.discrete via its Discrete radio;
+       * numeric radios clear it. Empty text stays swaps-worded. */
+      discrete: false, discreteEmptyText: t("pool.no_swaps", "No swaps yet."),
       /* Minimal defaults (owner): price + pool map only. Every overlay,
        * oscillator, and the depth/VWAP plots stay available in the
        * Indicators pulldown — all default off. */
@@ -516,6 +521,38 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       } catch (e) { /* theme redraw best-effort */ }
       fetchPoolMap(doc, P, r, myGen, uiGen);
     } catch (e) { /* desk stands without the pool map */ }
+    /* rebucketDiscrete: Discrete-mode paint from the swap tape (raw points,
+     * no buckets, no ES depth — the tape IS the source). Orientation follows
+     * the current enrich (invert re-enriches P.swaps, then repaints here).
+     * Cap is the shared candle-count input; the note shows the ACTUAL point
+     * count ("N swaps"). Never throws outward. */
+    function rebucketDiscrete() {
+      var cap = 2000;
+      try {
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) cap = MarketInd.CANDLE_COUNT;
+      } catch (e) { /* default stands */ }
+      var vv = orientVol();
+      var pts = [];
+      try {
+        if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.swapsToPoints === "function") {
+          pts = PoolHistory.swapsToPoints(P.swaps, vv.asset, vv.prec, cap);
+        }
+      } catch (e) { pts = []; }
+      P.points = pts;
+      P.candles = { buckets: [] };
+      try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
+      try {
+        P.countNote.textContent = pts.length + " " + t("market.discrete_swaps", "swaps");
+      } catch (e) { /* count stands */ }
+    }
+    /* repaintForMode: route chart repaints by mode (Discrete skips ES depth
+     * + pool map — the tape IS the source and the map stays closed). */
+    function repaintForMode() {
+      P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+      if (P.discrete) { rebucketDiscrete(); return; }
+      rebucket();
+      deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+    }
     function rebucket() {
       /* Lazy-deep merge (2026-10-01 audit): background ES buckets cached by
        * deepenPool merge UNDER chain authority (fresh P.swaps win every
@@ -563,21 +600,16 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     try {
       MarketInd.paintTimeframes(doc, P, function () {
         if (!live(myGen, uiGen)) return;
-        P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
-        rebucket();
-        deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+        repaintForMode();
       });
       if (typeof MarketInd.paintCountInput === "function") {
         MarketInd.paintCountInput(doc, P, function () {
           if (!live(myGen, uiGen)) return;
-          P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
-          rebucket();
-          deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+          repaintForMode();
         });
       }
     } catch (e) { /* default bucket stands */ }
-    rebucket();
-    deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+    repaintForMode();
     /* Pool live tip (deep-candles 5/5): head-block poll + get_block op-63
      * scan. Each new head is fetched once; its transactions are scanned for
      * [63, body] rows in this pool, built into swap discretes (same shape as
@@ -631,7 +663,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
               else PoolHistory.enrich(out, poolLive.legA, P.precA, poolLive.legB, P.precB);
             } catch (e) { /* tape renders unpriced */ }
             P.swaps = out.concat(P.swaps).slice(0, 500);
-            rebucket();
+            if (P.discrete) rebucketDiscrete();
+            else rebucket();
           } catch (e) { /* scan skips */ }
         }).catch(function () { /* head fetch skips */ });
       } catch (e) { /* live tip skips */ }
