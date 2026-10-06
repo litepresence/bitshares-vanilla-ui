@@ -254,6 +254,34 @@ var AuthUI = (function () {
     } catch (e) { return null; }
   }
 
+  /* Card C: shared / multisig accounts (multisig-ux skill, login spec).
+   * Static text + two links only: no password field, no key handling, no
+   * chain call. Mounted in locked, unlocked, and post-unlock branches so
+   * co-owners always find the propose -> share-id -> approve story.
+   * Params: doc, wrap. Returns the section. Never throws. */
+  function multisigCard(doc, wrap) {
+    var s = doc.createElement("section");
+    DOM.append(s, DOM.el(doc, "h2", t("auth.multisig_title", "Shared / multisig accounts")));
+    DOM.append(s, DOM.el(doc, "p",
+      t("auth.multisig_body", "This wallet holds one key. Shared accounts need proposals + co-owner approvals, coordinated by proposal id (1.10.N). Browsing is public; only signing needs the password."),
+      "muted"));
+    var steps = doc.createElement("ul");
+    [t("auth.multisig_step_propose", "Propose the operation (Transfer has Send/Propose; assets, barter and borrowing link to proposals)."),
+     t("auth.multisig_step_share", "Share the 1.10.N proposal id with co-owners."),
+     t("auth.multisig_step_approve", "Co-owners approve (op 23) on the proposal page, or co-sign via the transaction builder.")].forEach(function (line) {
+      var li = doc.createElement("li");
+      li.textContent = line;
+      steps.appendChild(li);
+    });
+    s.appendChild(steps);
+    s.appendChild(linkPara(doc, [
+      ["#/proposals", t("auth.multisig_open_proposals", "View proposals")],
+      ["#/txbuilder", t("auth.multisig_open_txbuilder", "Open transaction builder")]
+    ]));
+    DOM.append(wrap, s);
+    return s;
+  }
+
   /* /login — dual-model selector (Login.jsx:20-108 concept). Card A unlocks
    * the local wallet (the only key path Wallet supports); card B looks an
    * account name up read-only and points back at card A. Neither the .bin
@@ -277,6 +305,7 @@ var AuthUI = (function () {
         ["#/accounts", t("auth.open_accounts", "Open accounts")],
         ["#/wallet", t("auth.wallet_manager", "Wallet manager")]
       ]));
+      multisigCard(doc, wrap);
       mountSigning(doc, wrap, root);
       /* View-as lives here now (owner relocation from Settings): inline
        * section, self-wiring (Go/Reset owned by the builder, no login
@@ -321,6 +350,7 @@ var AuthUI = (function () {
            * signing block + viewing-as stay visible regardless of lock
            * state (third render path, no re-invoke to keep the success
            * message + links; password wipe above untouched). */
+          multisigCard(doc, done);
           mountSigning(doc, done, root);
           try {
             if (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.renderSection === "function") {
@@ -405,6 +435,7 @@ var AuthUI = (function () {
       ["#/create-wallet-brainkey", t("auth.no_wallet_yet_create_one", "No wallet yet? Create one")],
       ["#/existing-account", t("common.import_existing", "Import existing account")]
     ]));
+    multisigCard(doc, wrap);
     mountSigning(doc, wrap, root);
     /* View-as (locked branch): same mount as the unlocked branch above —
      * visible regardless of lock state, always last. */

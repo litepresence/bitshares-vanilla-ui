@@ -589,6 +589,20 @@ var ProposalUI = (function () {
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
     ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.proposals_need_approvals_before_they_execute", "Proposals need approvals before they execute. Anyone can propose enclosed operations; approvers sign op 23, vetoes use op 24."), "muted"));
+    (function multisigStory() {
+      try {
+        var p = DOM.el(doc, "p",
+          t("proposal.multisig_story", "Shared account? One co-owner proposes, shares the 1.10.N id, the rest approve below. Multi-operation or multi-device work continues in the transaction builder."), "muted");
+        ctx.wrap.appendChild(p);
+        var links = DOM.el(doc, "p", null, "muted");
+        var a = doc.createElement("a");
+        a.setAttribute("href", "#/txbuilder");
+        a.textContent = t("proposal.open_txbuilder", "Open transaction builder");
+        try { touchable(a); } catch (e) { /* text stands */ }
+        links.appendChild(a);
+        ctx.wrap.appendChild(links);
+      } catch (e) { /* story line is display-only */ }
+    })();
     /* Public-by-default (gate-repair): locked viewers browse as the
      * committee-account until they unlock and act as themselves. */
     try {

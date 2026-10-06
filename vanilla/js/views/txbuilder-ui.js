@@ -93,7 +93,7 @@ var TxBuilderUI = (typeof globalThis !== "undefined" && globalThis.TxBuilderUI) 
       var empty = el("p", "empty", t("txbuilder.empty", "No operations queued. Build one from Transfer, Voting, or Pools — each confirm screen offers Add to TxBuilder — then review it here."));
       wrap.appendChild(empty);
       var links = el("p", null, "");
-      [[ "#/transfer", t("txbuilder.link_transfer", "Transfer") ], [ "#/voting", t("txbuilder.link_voting", "Voting") ], [ "#/pools", t("txbuilder.link_pools", "Pools") ]].forEach(function (pair) {
+      [[ "#/transfer", t("txbuilder.link_transfer", "Transfer") ], [ "#/voting", t("txbuilder.link_voting", "Voting") ], [ "#/pools", t("txbuilder.link_pools", "Pools") ], [ "#/proposals", t("txbuilder.link_proposals", "Proposals") ]].forEach(function (pair) {
         var a = document.createElement("a"); a.href = pair[0]; a.textContent = pair[1]; a.style.marginRight = "12px";
         /* A11y delta 2026-10-01: 44px touch floor (principle #7) — was
          * inline-block with 10px padding only. */

@@ -268,6 +268,23 @@ var BarterUI = (function () {
       var expIso = expV.length === 16 ? expV + ":00" : expV;
       var rev = (revV === "") ? null : parseInt(revV, 10);
       if (rev !== null && (!Number.isInteger(rev) || rev < 0)) throw new Error(t("barter.review_period_must_be_a_non_negative_integer", "Review period must be a non-negative integer."));
+      /* Wallet-equality guard (transfer-propose.js:335-338 precedent): the
+       * proposal below names Peer A the fee-payer, and signing uses the
+       * unlocked wallet's keys — so when a wallet is unlocked (myAccountId
+       * resolves) Peer A must BE that wallet, else the built proposal could
+       * never sign as its fee-payer. Locked (wallet-locked/no-account) falls
+       * through: the sign-time gate in confirmPropose owns that path, and a
+       * locked preview must stay readable. Keys reused from transfer.*. */
+      var wid = null;
+      try {
+        if (typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+          wid = await Account.myAccountId();
+        }
+      } catch (e) { wid = null; }
+      if (wid && String(prev.A.acct.id) !== String(wid)) {
+        throw new Error(t("transfer.proposer_mismatch_prefix", "Proposer must match the unlocked wallet account (fee-payer signs) — got ") +
+          prev.A.acct.name + " (" + prev.A.acct.id + t("transfer.proposer_mismatch_wallet_mid", "), wallet is ") + wid + ").");
+      }
       /* One barter leg -> [0, opData] with NO memo key (null-memo objects die at fee time — key absent, never present-but-null). */
       function leg(fromId, toId, it) {
         // No memo key: the null-memo object shape is rejected by the node at

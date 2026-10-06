@@ -1425,6 +1425,77 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
         wrap.appendChild(btn);
       } catch (e) { /* header stands without follow */ }
     })();
+    /* Authority badge (multisig-ux skill, account spec): one get_accounts
+     * read per render, human M/N counts, never blocks balances/orders.
+     * Single key reads "Single key"; shared reads "Shared account" with
+     * active/owner thresholds + links to proposals/txbuilder. Gen-free:
+     * the line checks root.isConnected before painting async results. */
+    (function authBadge() {
+      try {
+        var line = doc.createElement("p");
+        line.className = "muted";
+        try { line.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+        line.textContent = t("account.multisig_checking", "Checking authorities…");
+        wrap.appendChild(line);
+        function links() {
+          line.appendChild(doc.createTextNode(" "));
+          var a = doc.createElement("a");
+          a.setAttribute("href", "#/proposals");
+          a.textContent = t("account.multisig_view_proposals", "View proposals");
+          try { a.style.minHeight = "44px"; } catch (e) { /* native stands */ }
+          line.appendChild(a);
+          line.appendChild(doc.createTextNode(" · "));
+          var b = doc.createElement("a");
+          b.setAttribute("href", "#/txbuilder");
+          b.textContent = t("account.multisig_open_txbuilder", "Open transaction builder");
+          try { b.style.minHeight = "44px"; } catch (e2) { /* native stands */ }
+          line.appendChild(b);
+        }
+        function counts(auth) {
+          var th = (auth && typeof auth.weight_threshold === "number") ? auth.weight_threshold : 1;
+          var n = 0;
+          try {
+            n += (auth.account_auths || []).length;
+            n += (auth.key_auths || []).length;
+            n += (auth.address_auths || []).length;
+          } catch (e) { n = 0; }
+          if (!(n > 0)) n = 1;
+          if (!(th >= 1)) th = 1;
+          return { th: th, n: n };
+        }
+        Promise.resolve().then(async function () {
+          if (typeof Chain === "undefined" || !Chain || typeof Chain.db !== "function") throw new Error("no-chain");
+          var dbId = await Chain.db();
+          var rows = await Chain.call(dbId, "get_accounts", [[acct.id]]);
+          if (!rows || !rows[0]) throw new Error("unknown-account");
+          return rows[0];
+        }).then(function (full) {
+          try { if (root && root.isConnected === false) return; } catch (e) { /* paint stands */ }
+          var a = counts(full.active), o = counts(full.owner);
+          var shared = (a.th > 1 || a.n > 1 || o.th > 1 || o.n > 1);
+          line.textContent = "";
+          var head = doc.createElement("span");
+          head.textContent = shared
+            ? t("account.multisig_shared", "Shared account — active %(ath)s/%(an)s · owner %(oth)s/%(on)s.", { ath: a.th, an: a.n, oth: o.th, on: o.n })
+            : t("account.multisig_single", "Single key — active %(ath)s/%(an)s · owner %(oth)s/%(on)s.", { ath: a.th, an: a.n, oth: o.th, on: o.n });
+          line.appendChild(head);
+          if (!shared) {
+            line.appendChild(doc.createTextNode(" " + t("account.multisig_single_hint", "Shared account? Proposals live on the proposals page.")));
+          }
+          links();
+        }).catch(function () {
+          try { if (root && root.isConnected === false) return; } catch (e) { /* paint stands */ }
+          line.textContent = t("account.multisig_unavailable", "Authorities unavailable — proposals still list on the proposals page.");
+          try {
+            line.appendChild(doc.createTextNode(" "));
+            var a = doc.createElement("a");
+            a.setAttribute("href", "#/proposals");
+            a.textContent = t("account.multisig_view_proposals", "View proposals");
+            line.appendChild(a);
+          } catch (e) { /* text stands */ }
+        });
+      } catch (e) { /* header stands without badge */ }
+    })();
     /* Dense-table scope for the CSS below (smaller padding, tabular numbers
      * — columns untouched). */
     try { wrap.classList.add("acct"); } catch (e) { /* density skips */ }
