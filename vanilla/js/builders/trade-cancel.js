@@ -100,6 +100,39 @@ var TradeCancel = (function () {
     return Format.formatAmount(String(totalRaw), meta.precision) + " " + meta.symbol;
   }
 
+  /* Placeholder fee payer for paint-time fee quotes (trade-panels.js:128
+   * QUOTE_PLACEHOLDER_SELLER): limit_order_cancel fees are account-invariant
+   * (flat fee schedule per op type, answered by get_required_fees from the
+   * op shape + fee asset — the payer id never changes the price; the
+   * committee-account 1.2.0 always exists, so it is the honest
+   * placeholder). WHY quote at paint time: every other desk shows the fee
+   * BEFORE Sign & Send; op-2 cancel resolved it inside doGo AFTER Confirm
+   * and showed it only on the result panel. Display-only: doGo still
+   * rebuilds with the real fee_paying_account and re-runs feeMulti for the
+   * tx it actually signs. */
+  var QUOTE_PLACEHOLDER_PAYER = "1.2.0";
+
+  /* Paint-time fee quote for cancel ops (display-only, never signed).
+   * WHY a throwaway op set: feeMulti fills fees in place on the passed ops
+   * and buildTx pins a head block — both go stale, so doGo rebuilds with
+   * the real account. Never rejects: ANY failure resolves the honest dash
+   * fallback (the confirm must still paint; doGo surfaces the real error
+   * when the user proceeds).
+   * @param {Array} ops cancel ops with the placeholder payer (mutated, discarded)
+   * @returns {Promise<{feeHuman: string, feeRaw: string|null}>} display fee + raw title (null when unknown) */
+  function quoteFeeHuman(ops) {
+    var dash = t("settings.dash", "—");
+    return Tx.buildTx(ops).then(function (unsigned) {
+      return Tx.feeMulti(unsigned.operations, FEE_ASSET).then(function (feeRes) {
+        return feeAssetMeta(unsigned.operations[0][1].fee.asset_id).then(function (meta) {
+          return { feeHuman: humanFee(feeRes.totalRaw, meta), feeRaw: String(feeRes.totalRaw) };
+        });
+      });
+    }).catch(function () {
+      return { feeHuman: dash, feeRaw: null };
+    });
+  }
+
   /* Head block number for result screens (observation marker, not a txid —
    * history rows carry none, same convention as transfer-ui.js). */
   async function headBlock() {
@@ -196,9 +229,12 @@ var TradeCancel = (function () {
    * div.confirm-dialog (h3 + dl.confirm with Keep order carrying
    * btn-ghost + Confirm cancel in div.confirm-actions). The warning line
    * rides inside the dialog above its actions (old rows-then-notes-then-
-   * buttons order, textContent-only). No feeHuman here — the fee is
-   * resolved only after Confirm (inside doGo, same as before) and shown
-   * on the result panel. Unlock-gating (password only at signing),
+   * buttons order, textContent-only). The fee rides feeHuman with the
+   * keyed trade.row_fee term + raw title BEFORE Sign & Send (quoted at
+   * paint time with the placeholder payer, display-only — doGo still
+   * rebuilds with the real account and re-runs feeMulti for the actual
+   * tx; the result panel keeps its paid-fee line). Unlock-gating (password
+   * only at signing),
    * seller-ownership check, single-op cancel tx, proveGone inclusion
    * proof, and the inline result + dismiss path below are unchanged.
    * Paints into the box market-orders.js provides; onDone re-renders the
@@ -292,26 +328,49 @@ var TradeCancel = (function () {
         });
       });
     }
-    dlg = ConfirmDialog.show({ title: "Cancel order " + id + "?",
-      rows: rows,
-      backLabel: t("trade.keep_order", "Keep order"), sendLabel: t("trade.confirm_cancel", "Confirm cancel"),
-      doc: doc,
-      onBack: function () { clearBox(box); },
-      onSend: doGo });
-    /* Warning rides between the rows and the actions (old position,
-     * textContent-only; falls back to plain append when the actions row
-     * is unreachable). */
-    (function () {
-      var warn = el(doc, "p",
-        t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted");
-      var acts = null;
-      try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
-      try {
-        if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
-      } catch (e2) { /* fallback below */ }
-      try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
-    })();
-    box.appendChild(dlg);
+    /* Fee BEFORE sign (P1 defect fix): quote the display fee with the
+     * placeholder payer, then paint the confirm carrying it (feeHuman +
+     * keyed fee term + raw title, principle #6). doGo above is untouched —
+     * it rebuilds with the real fee_paying_account and re-runs feeMulti
+     * for the actual tx. Checking-fee holds the box until the quote lands;
+     * a failed quote paints the honest dash and doGo still fails exactly
+     * where it always did. The Promise.resolve wrapper turns a synchronous
+     * quote-op build throw into the same dash fallback (never blank). */
+    var pending = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
+    Promise.resolve().then(function () {
+      var paintOp = [Tx.OP.limit_order_cancel, {
+        fee: { amount: 0, asset_id: FEE_ASSET },
+        fee_paying_account: QUOTE_PLACEHOLDER_PAYER,
+        order: id,
+        extensions: []
+      }];
+      return quoteFeeHuman([paintOp]);
+    }).catch(function () {
+      return { feeHuman: t("settings.dash", "—"), feeRaw: null };
+    }).then(function (Q) {
+      try { box.removeChild(pending); } catch (rm) { /* navigated away */ }
+      dlg = ConfirmDialog.show({ title: "Cancel order " + id + "?",
+        rows: rows,
+        feeHuman: Q.feeHuman, feeTerm: t("trade.row_fee", "Fee"), feeRawTitle: Q.feeRaw,
+        backLabel: t("trade.keep_order", "Keep order"), sendLabel: t("trade.confirm_cancel", "Confirm cancel"),
+        doc: doc,
+        onBack: function () { clearBox(box); },
+        onSend: doGo });
+      /* Warning rides between the rows and the actions (old position,
+       * textContent-only; falls back to plain append when the actions row
+       * is unreachable). */
+      (function () {
+        var warn = el(doc, "p",
+          t("trade.cancel_warn", "Warning: canceling permanently removes this order from the book."), "muted");
+        var acts = null;
+        try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+        try {
+          if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
+        } catch (e2) { /* fallback below */ }
+        try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
+      })();
+      box.appendChild(dlg);
+    });
   }
 
   /* One-line human summary of a raw order for cancel confirms (pair + side
@@ -342,9 +401,11 @@ var TradeCancel = (function () {
    * Details) in div.confirm-dialog (h3 + dl.confirm with Keep orders
    * carrying btn-ghost + Confirm cancel-all in div.confirm-actions); the
    * ONE-transaction warning rides inside the dialog above its actions
-   * (old rows-then-notes-then-buttons order, textContent-only). No
-   * feeHuman here — the total fee is resolved only after Confirm (inside
-   * doGo, same as before) and shown on the result panel. Unlock-gating,
+   * (old rows-then-notes-then-buttons order, textContent-only). The total
+   * fee rides feeHuman with the keyed trade.row_fee term + raw title
+   * BEFORE Sign & Send (quoted at paint time with the placeholder payer,
+   * display-only — doGo still rebuilds with the real account and re-runs
+   * feeMulti; the result panel keeps its paid-total line). Unlock-gating,
    * N-op cancel tx, proveGone proof, and dismiss path below are unchanged.
    * Same prove/dismiss pattern as single cancel. */
   function cancelAllBox(doc, box, orders, assets, onDone) {
@@ -430,28 +491,49 @@ var TradeCancel = (function () {
           goBtn.disabled = false;
         });
       }
-      dlg = ConfirmDialog.show({ title: "Cancel all " + ids.length + " orders?",
-        rows: rows,
-        backLabel: t("trade.keep_orders", "Keep orders"), sendLabel: t("trade.confirm_cancel_all", "Confirm cancel-all"),
-        doc: doc,
-        onBack: function () { cancelAllBox(doc, box, orders, assets, onDone); },
-        onSend: doGo });
-      /* ONE-transaction warning rides between the rows and the actions
-       * (old position, textContent-only; falls back to plain append when
-       * the actions row is unreachable). */
-      (function () {
-        var warn = el(doc, "p",
-          "This sends ONE transaction canceling " + ids.length +
-          " orders on " + assets.quote.symbol + "/" + assets.base.symbol +
-          ". Warning: canceling permanently removes these orders from the book.", "muted");
-        var acts = null;
-        try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
-        try {
-          if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
-        } catch (e2) { /* fallback below */ }
-        try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
-      })();
-      box.appendChild(dlg);
+      /* Total fee BEFORE sign (same P1 fix as single cancel): quote the
+       * display total with the placeholder payer, then paint the confirm
+       * carrying it. doGo above is untouched — real account + fresh
+       * feeMulti for the actual tx. */
+      var pendingAll = showStatus(doc, box, t("trade.checking_fee", "Checking fee…"));
+      Promise.resolve().then(function () {
+        var paintOps = ids.map(function (oid) {
+          return [Tx.OP.limit_order_cancel, {
+            fee: { amount: 0, asset_id: FEE_ASSET },
+            fee_paying_account: QUOTE_PLACEHOLDER_PAYER,
+            order: oid,
+            extensions: []
+          }];
+        });
+        return quoteFeeHuman(paintOps);
+      }).catch(function () {
+        return { feeHuman: t("settings.dash", "—"), feeRaw: null };
+      }).then(function (Q) {
+        try { box.removeChild(pendingAll); } catch (rm) { /* navigated away */ }
+        dlg = ConfirmDialog.show({ title: "Cancel all " + ids.length + " orders?",
+          rows: rows,
+          feeHuman: Q.feeHuman, feeTerm: t("trade.row_fee", "Fee"), feeRawTitle: Q.feeRaw,
+          backLabel: t("trade.keep_orders", "Keep orders"), sendLabel: t("trade.confirm_cancel_all", "Confirm cancel-all"),
+          doc: doc,
+          onBack: function () { cancelAllBox(doc, box, orders, assets, onDone); },
+          onSend: doGo });
+        /* ONE-transaction warning rides between the rows and the actions
+         * (old position, textContent-only; falls back to plain append when
+         * the actions row is unreachable). */
+        (function () {
+          var warn = el(doc, "p",
+            "This sends ONE transaction canceling " + ids.length +
+            " orders on " + assets.quote.symbol + "/" + assets.base.symbol +
+            ". Warning: canceling permanently removes these orders from the book.", "muted");
+          var acts = null;
+          try { acts = (dlg.querySelector) ? dlg.querySelector(".confirm-actions") : null; } catch (e) { acts = null; }
+          try {
+            if (acts && acts.parentNode) { acts.parentNode.insertBefore(warn, acts); return; }
+          } catch (e2) { /* fallback below */ }
+          try { dlg.appendChild(warn); } catch (e3) { /* display-only */ }
+        })();
+        box.appendChild(dlg);
+      });
     });
   }
 

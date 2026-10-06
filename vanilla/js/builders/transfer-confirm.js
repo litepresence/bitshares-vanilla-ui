@@ -35,9 +35,13 @@
  * human rows + per-card raw drill-down). No receipt-toggle (out of scope);
  * no sign-only button (follow-up — needs export UI, not trivially safe).
  * Close is fail-closed: Back never signs (see showConfirm).
- * Fee is looked up IN THE TRANSFER ASSET (feeAssetId = assetId): one asset
- * lookup, fee displays in the same symbol the user typed. Tx.fee supports
- * any fee asset; the node answers the equivalent fee.
+  * Fee is looked up IN THE CHOSEN FEE ASSET (feeAssetId resolves from
+  *   vals.feeAsset — symbol or 1.3.x id, defaulting to the transfer asset):
+  *   one asset lookup for the transfer leg plus one more only when the choice
+  *   differs, fee displays in the chosen symbol at the right precision. The
+  *   locked preview (transfer-preview.js) resolves the same choice the same
+  *   way, so Review-after-unlock quotes the identical asset. Tx.fee supports
+  *   any fee asset; the node answers the equivalent fee via get_required_fees.
  * Tx.broadcast returns {blockNum, trxInBlock, via} — NO txid (history rows
  * carry none, see tx.js pollHistoryForTransfer). The result screen shows
  * block # + position and does not fabricate a txid.
@@ -157,8 +161,11 @@ var TransferConfirm = (function () {
    * render raw (every showError maps them first) and transfer-ui.js routes
    * on them via msg.indexOf, so they stay byte-stable codes. When batch-2a
    * keys gain real translations, that indexOf routing must move to codes.
-   * @param {any} vals
-   * @returns {Promise<any>} */
+   * @param {any} vals form values ({to, asset, amount, memo, encrypted,
+   *   feeAsset}): feeAsset is the fee-asset SYMBOL (transfer-ui.js feeSym)
+   *   or a 1.3.x id, optional — blank/missing means the transfer asset.
+   * @returns {Promise<any>} confirm context incl. feeAsset {id, symbol,
+   *   precision} describing the asset the fee is settled in. */
   async function review(vals) {
     if (!vals.to) throw new Error(t("transfer.recipient_required", "Recipient is required."));
     var to = await Account.resolve(vals.to);
@@ -194,6 +201,27 @@ var TransferConfirm = (function () {
     }
 
     var from = await Account.resolve(await Account.myAccountId());
+    /* Fee asset (transfer-desk punchlist MED): the caller's choice, resolved
+     * to id + display meta. Blank or the transfer asset itself costs no extra
+     * read; an id-shaped choice resolves via get_assets (one read, so the
+     * confirm can display the right symbol/precision); a symbol resolves via
+     * the same lookupAsset path as the transfer leg above. Unresolvable
+     * choices throw loudly — a fee is never charged in a mislabeled asset. */
+    var feeAsset = asset;
+    var wantFee = (vals && vals.feeAsset !== undefined && vals.feeAsset !== null)
+      ? String(vals.feeAsset).trim() : "";
+    if (wantFee && wantFee.toUpperCase() !== asset.symbol.toUpperCase() && wantFee !== asset.id) {
+      if (/^1\.3\.\d+$/.test(wantFee)) {
+        var dbFee = await Chain.db();
+        var feeRows = await Chain.call(dbFee, "get_assets", [[wantFee]]);
+        if (!feeRows || !feeRows[0] || typeof feeRows[0].precision !== "number") {
+          throw new Error(t("transfer.unknown_asset", "Unknown asset: %(sym)s.", {sym: wantFee}));
+        }
+        feeAsset = { id: feeRows[0].id, symbol: feeRows[0].symbol, precision: feeRows[0].precision };
+      } else {
+        feeAsset = await lookupAsset(wantFee);
+      }
+    }
     var unsigned = await Tx.buildTransfer({
       fromId: from.id,
       toId: to.id,
@@ -207,7 +235,7 @@ var TransferConfirm = (function () {
      * showConfirm). Anything else still throws here. */
     var fee = null, feeWarning = null;
     try {
-      fee = await Tx.fee(0, opData, asset.id);
+      fee = await Tx.fee(0, opData, feeAsset.id);
     } catch (feeErr) {
       if (feeErr && feeErr.message && feeErr.message.indexOf("fee-suspicious") === 0 &&
           feeErr.detail && feeErr.detail.fee) {
@@ -241,6 +269,7 @@ var TransferConfirm = (function () {
       memoKind: memoKind,
       unsigned: unsigned,
       fee: fee,
+      feeAsset: feeAsset,
       feeWarning: feeWarning,
       chainPrefix: chainPrefix,
       network: network
@@ -272,7 +301,12 @@ var TransferConfirm = (function () {
     if (ctx.memoKind === "encrypted") memoText = t("confirm.memo_encrypted", "Encrypted");
     else if (ctx.memoKind === "plain") memoText = t("confirm.memo_plain", "Plain: %(text)s", {text: ctx.memoText});
     else memoText = t("confirm.memo_none", "(none)");
-    var feeHuman = Format.formatAmount(String(ctx.fee.amount), ctx.asset.precision) + " " + ctx.asset.symbol;
+    /* Fee displays in the SETTLED fee asset (ctx.feeAsset from review(),
+     * defaulting to the transfer asset for older callers): symbol rides the
+     * human string so a non-transfer fee asset can never read as the
+     * transfer asset, raw stays in feeRawTitle (principle #6). */
+    var feeMeta = (ctx.feeAsset && typeof ctx.feeAsset.precision === "number") ? ctx.feeAsset : ctx.asset;
+    var feeHuman = Format.formatAmount(String(ctx.fee.amount), feeMeta.precision) + " " + feeMeta.symbol;
     /* Fee term stays the caller's keyed string (was the Fee row term);
      * Chain row term reuses txbuilder.chain_prefix (the old literal
      * "Chain ID" is gone, same value shown) and keeps the visible prefix

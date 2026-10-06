@@ -39,18 +39,17 @@
  * Confirm rows follow #3's op-0 table
  * (wallet-extension/src/popup/popup.js:5717-5722): From / To / Amount /
  * Memo, plus Fee and Network (plan Task 4 spec).
- * Fee asset selector (punchlist-2026-09-29 HIGH+MEDs): the form offers the
- * transfer asset plus the sender's non-zero balance assets when unlocked
- * (transfer asset alone when locked) and quotes get_required_fees in the
- * chosen asset — Tx.fee answers any asset the chain allows. The default
- * stays the transfer asset, so the default path is unchanged. The locked
- * preview looks the fee up AND displays it in the chosen asset (correct
- * precision/symbol — owned here). The unlocked Review delegates charging
- * to TransferConfirm.review, which settles feeAssetId = transfer asset id
- * today: the choice travels in the review vals as feeAsset (forward-compat
- * hook) with an inline note naming the settling asset, and full
- * pay-threading is the confirm-file follow-up below — a fee is never
- * charged in a mislabeled asset.
+  * Fee asset selector (punchlist-2026-09-29 HIGH+MEDs): the form offers the
+  * transfer asset plus the sender's non-zero balance assets when unlocked
+  * (transfer asset alone when locked) and quotes get_required_fees in the
+  * chosen asset — Tx.fee answers any asset the chain allows. The default
+  * stays the transfer asset, so the default path is unchanged. The locked
+  * preview looks the fee up AND displays it in the chosen asset (correct
+  * precision/symbol — owned here). The unlocked Review passes the choice
+  * as feeAsset into TransferConfirm.review, which settles feeAssetId in
+  * the chosen asset and returns its display meta for the confirm — the
+  * quote note below names the settling asset, and a fee is never charged
+  * in a mislabeled asset.
  * Asset dropdown (HIGH): unlocked restricts the asset to the sender's
  * non-zero balances (SendModal.jsx:288-304 concept); locked keeps the
  * free-text input, balances-load failure keeps it too (the form never
@@ -238,6 +237,36 @@ var TransferUI = (function () {
       if (typeof raw === "string" && AMOUNT_RE.test(raw) && Number(raw) > 0) return raw;
     } catch (e) { /* "" below */ }
     return "";
+  }
+  /* contactNames: local contacts + favourite accounts for the To datalist.
+   * WHY read-only reuse: account-ui.js owns CONTACTS_KEY
+   * ("bts-vanilla-contacts-v1", plain-name watch-list) and favourites-ui.js
+   * owns ACCOUNTS_KEY ("bts-vanilla-fav-accounts-v1", {name,id} pairs) —
+   * this form only SUGGESTS from both (same keys proposal-ui.js localTrust
+   * reads), never writes, so no new storage and no ownership split. The
+   * blur-check below stays the validator; the list is a hint only, and
+   * empty/broken storage yields no datalist with the form unchanged.
+   * @returns {string[]} deduped names/ids, possibly empty. Never throws. */
+  function contactNames() {
+    var out = [], seen = {};
+    function push(v) {
+      var s = String(v || "").trim();
+      if (!s || seen[s.toLowerCase()]) return;
+      seen[s.toLowerCase()] = 1;
+      out.push(s);
+    }
+    try {
+      if (typeof localStorage !== "undefined") {
+        var c = JSON.parse(localStorage.getItem("bts-vanilla-contacts-v1") || "[]");
+        (Array.isArray(c) ? c : []).forEach(function (x) { if (typeof x === "string") push(x); });
+        var f = JSON.parse(localStorage.getItem("bts-vanilla-fav-accounts-v1") || "[]");
+        (Array.isArray(f) ? f : []).forEach(function (x) {
+          if (x && typeof x === "object") { push(x.name); push(x.id); }
+          else if (typeof x === "string") push(x);
+        });
+      }
+    } catch (e) { /* empty stands */ }
+    return out;
   }
   /* shareHash: pre-filled transfer deep link (unit-tested). Params: to,
    * asset, amount, memo strings (any may be ""). Returns "#/transfer?..."
@@ -435,6 +464,25 @@ var TransferUI = (function () {
         setFieldError(toF, t("transfer.unknown_account_name", "Unknown account: %(name)s.", {name: v}));
       });
     });
+    /* To autocomplete (read-only reuse, no new storage): a datalist of
+     * contactNames() (contacts + favourite accounts). WHY a datalist, not a
+     * select: the field stays free text (any account remains typable) with
+     * suggestions only; the blur-check + review gating above stay the
+     * validators. No strings, no new keys, no touch work (native options). */
+    try {
+      var _names = contactNames();
+      if (_names.length && toF.input && typeof toF.input.setAttribute === "function") {
+        var _dl = doc.createElement("datalist");
+        _dl.id = "xfer-to-list";
+        _names.forEach(function (n) {
+          var _o = doc.createElement("option");
+          _o.value = n;
+          _dl.appendChild(_o);
+        });
+        wrap.appendChild(_dl);
+        toF.input.setAttribute("list", "xfer-to-list");
+      }
+    } catch (e) { /* free text stands */ }
 
     /* Asset field (punchlist HIGH). assetF.input is SWAPPABLE: unlocked it
      * becomes a <select> restricted to the sender's non-zero balances once
@@ -799,8 +847,9 @@ var TransferUI = (function () {
     /* Equivalent-fee quote in an alternate fee asset (unlocked, alternate
      * only — the default path shows nothing new). Memo-less shape: the
      * recipient and memo keys may not resolve yet, so this is a QUOTE and
-     * the confirm settles the exact fee in the transfer asset (named in
-     * the note). Hidden on any failure. */
+     * the confirm settles the exact fee in the CHOSEN fee asset (named in
+     * the note — TransferConfirm.review threads the same choice into its
+     * Tx.fee call). Hidden on any failure. */
     function refreshFeeQuote() {
       DOM.clear(feeQuote);
       if (locked) return;
@@ -831,7 +880,7 @@ var TransferUI = (function () {
         if (feeSym !== stampSym || assetVal().toUpperCase() !== stampT) return; /* stale */
         feeQuote.textContent = t("confirm.fee", "Fee") + " (" + b.symbol + "): " +
           Format.formatAmount(String(fee.amount), b.precision);
-        feeQuote.appendChild(doc.createTextNode(t("transfer.confirm_settles_the_fee_in", " — Confirm settles the fee in ") + stampT + "."));
+        feeQuote.appendChild(doc.createTextNode(t("transfer.confirm_settles_the_fee_in", " — Confirm settles the fee in ") + stampSym + "."));
       }).catch(function () { /* quote hidden; confirm stays source of truth */ });
     }
 
@@ -1035,8 +1084,8 @@ var TransferUI = (function () {
             amount: amountF.input.value,
             memo: memoF.input.value,
             encrypted: encBox.checked,
-            feeAsset: feeSym /* forward-compat hook; review settles the
-              transfer asset today, see header */
+            feeAsset: feeSym /* the chosen fee asset; review settles +
+              displays it, see header */
           });
         }).then(function (ctx) {
           DOM.clear(root);

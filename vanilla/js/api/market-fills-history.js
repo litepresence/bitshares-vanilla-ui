@@ -329,11 +329,33 @@ var MarketFills = (function () {
     } catch (e) { return null; }
   }
 
+  /* cmpPrice: exact human-decimal-string compare via Format.parsePriceRatio
+   * cross-multiplication (BigInt, never Number — WHY: binary float ties
+   * "12345678.12345679" vs "12345678.12345678" (16 significant digits over
+   * the 53-bit mantissa), freezing whichever wicked first and hiding the true
+   * high/low; a.num/a.den vs b.num/b.den <=> a.num*b.den vs b.num*a.den is
+   * exact for any decimal places. Equal-places zero-padded string compare
+   * would agree — cross-multiply needs no padding step.
+   * @param {string} a first human price. @param {string} b second human price.
+   * @returns {number} 1 when a is higher, -1 when lower, 0 when equal or when
+   *   either leg is unparseable (fail-open: first-seen wick stands, same rule
+   *   as the volume skip below). Pure. */
+  function cmpPrice(a, b) {
+    try {
+      var r1 = Format.parsePriceRatio(String(a));
+      var r2 = Format.parsePriceRatio(String(b));
+      var left = r1.num * r2.den, right = r2.num * r1.den;
+      if (left > right) return 1;
+      if (left < right) return -1;
+      return 0;
+    } catch (e) { return 0; }
+  }
+
   /* fillsToCandles: discrete datestamp bucketing (dex-ux discrete_to_candles
    * port + upstream slot-match rule: slot = floor(unix/bucket)*bucket).
-   * OHLC from the oriented human price (ordering uses Number() on human
-   * strings, VALUES stay exact strings); volume is the BASE leg per bucket
-   * (raw ints summed, formatted once). Buckets keyed oldest-first
+   * OHLC from the oriented human price (ordering uses cmpPrice exact BigInt
+   * cross-multiplication, VALUES stay exact strings); volume is the BASE leg
+   * per bucket (raw ints summed, formatted once). Buckets keyed oldest-first
    * (newest-last) shaped for MarketInd.maybeDraw ({timeMs, time slot ISO,
    * open/high/low/close, baseVolume} + raw leg pairs). Empty fills -> []. */
   function fillsToCandles(fills, bucketSec, baseId, precB, precQ, quoteId) {
@@ -376,8 +398,8 @@ var MarketFills = (function () {
       }
       bk.n++;
       bk.close = price;
-      if (Number(price) > Number(bk.high)) { bk.high = price; bk.hiB = bRaw; bk.hiQ = qRaw; }
-      if (Number(price) < Number(bk.low)) { bk.low = price; bk.loB = bRaw; bk.loQ = qRaw; }
+      if (cmpPrice(price, bk.high) > 0) { bk.high = price; bk.hiB = bRaw; bk.hiQ = qRaw; }
+      if (cmpPrice(price, bk.low) < 0) { bk.low = price; bk.loB = bRaw; bk.loQ = qRaw; }
       if (bRaw !== null && qRaw !== null) {
         try {
           bk.volRaw = bk.volRaw + BigInt(bRaw);

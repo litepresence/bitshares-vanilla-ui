@@ -2,8 +2,9 @@
  *
  * What it owns: OP_KEYS/OP_LABELS (op labels — AccountUI re-exports
  *   OP_LABELS so dashboard-ui.js keeps working), opTypeOf/opLabel/timeText,
- *   orderCells/renderOpenOrders (read-only table + phone cards; cancel
- *   lives on the market desk by design), renderHistory (time + label +
+ *   orderCells/cancelLink/renderOpenOrders (read-only table + phone cards
+ *   with a per-row Cancel deep-link to the market desk, which owns the
+ *   confirm), renderHistory (time + label +
  *   raw-JSON details list). Consumes: TableRenderer (open-orders table
  *   shell), I18n.t (display strings) — script-tag globals guarded at call
  *   time. Globals/side effects: DOM under the given section element only;
@@ -300,9 +301,39 @@ AccountUI._history = AccountUI._history || {};
     };
   }
 
+  /* Market-desk Cancel deep-link for one open order (href only, no confirm
+   * here). WHY a deep link instead of mounting TradeUI.orderCancelBox
+   * inline: the market desk already owns the cancel confirm
+   * (market-orders.js:244 per-row Cancel buttons) with unlock gating and
+   * fee-before-sign; reusing it here would drag wallet/unlock/Chain
+   * coupling into this read-only account view (cross-file surgery for zero
+   * new behavior). One tap lands on #/market/<SELL>_<BUY> where that row's
+   * Cancel button waits. Symbols ride the hash (never raw integers on
+   * screen); a row missing either symbol yields no link (never a broken
+   * href). The shared touchable floor applies when loaded (guarded: plain
+   * anchor when absent, e.g. minimal test docs).
+   * @param {Document} doc owner document.
+   * @param {any} o Account.openOrders row ({sell: {symbol}, buy: {symbol}}).
+   * @returns {HTMLElement|null} Cancel anchor, or null when the pair is unknown. */
+  function cancelLink(doc, o) {
+    var sell = (o && o.sell && o.sell.symbol) ? String(o.sell.symbol) : "";
+    var buy = (o && o.buy && o.buy.symbol) ? String(o.buy.symbol) : "";
+    if (!sell || !buy) return null;
+    var a = doc.createElement("a");
+    a.setAttribute("href", "#/market/" + sell + "_" + buy);
+    a.className = "subtle-btn";
+    a.textContent = t("trade.cancel_button", "Cancel");
+    try {
+      if (typeof touchable === "function") touchable(a);
+    } catch (e) { /* label stands without the touch floor */ }
+    return a;
+  }
+
   /* Open-orders section: table + phone cards, same patterns as balances.
-   * Read-only by design (cancel lives on the market desk). Each row shows
-   * what the order sells, what it asks at what price, plus id/expiration. */
+   * Read-only here — each row/card carries a Cancel deep-link to the market
+   * desk (#/market/<SELL>_<BUY>), which owns the confirm/unlock/fee flow.
+   * Each row shows what the order sells, what it asks at what price, plus
+   * id/expiration and the Cancel link. */
   function renderOpenOrders(doc, section, orders) {
     if (!orders || orders.length === 0) {
       var empty = doc.createElement("p");
@@ -339,6 +370,28 @@ AccountUI._history = AccountUI._history || {};
         }
       }
     } catch (e) { /* table stands without raw titles */ }
+    /* Cancel-link pass: Action header + one deep-link cell per row (same
+     * post-pass shape as the titles above — TableRenderer cells are
+     * text-only, so the anchor lands here, never as a string). A row with
+     * an unknown pair keeps an honest dash, never a broken href. */
+    try {
+      var heads = table.getElementsByTagName("thead");
+      if (heads.length && heads[0].rows.length) {
+        var hth = doc.createElement("th");
+        hth.setAttribute("scope", "col");
+        hth.textContent = t("market.col_action", "Action");
+        heads[0].rows[0].appendChild(hth);
+      }
+      var cbodies = table.getElementsByTagName("tbody");
+      var ctrs = cbodies.length ? cbodies[0].rows : [];
+      for (var ci = 0; ci < ctrs.length && ci < orders.length; ci++) {
+        var ctd = doc.createElement("td");
+        var clk = cancelLink(doc, orders[ci]);
+        if (clk) { ctd.appendChild(clk); }
+        else { ctd.textContent = t("settings.dash", "—"); }
+        ctrs[ci].appendChild(ctd);
+      }
+    } catch (e2) { /* table stands without cancel links */ }
     section.appendChild(table);
 
     var cards = doc.createElement("div");
@@ -354,6 +407,8 @@ AccountUI._history = AccountUI._history || {};
       meta.className = "muted";
       meta.textContent = o.id + " @ " + ps(o.priceDisplay);
       card.appendChild(meta);
+      var cl = cancelLink(doc, o);
+      if (cl) card.appendChild(cl);
       cards.appendChild(card);
     });
     section.appendChild(cards);
