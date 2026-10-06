@@ -2,7 +2,7 @@
 
 The vanilla-UI build as a user/assistant dialog: each verbatim user prompt followed by the assistant's reply text (the final visible response only -- no reasoning or tool-call internals). Numbering matches docs/vanilla-ui-prompts.md exactly. Times are UTC.
 
-Generated 2026-10-04 00:14 UTC from opencode.db: 413 prompts across 14 sessions (13 distinct titles — two sessions share one title). 1496 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
+Generated 2026-10-06 17:55 UTC from opencode.db: 413 prompts across 14 sessions (13 distinct titles — two sessions share one title). 1790 `@general subagent` worker sessions excluded (agent-generated, not user prompts).
 
 ---
 
@@ -272,7 +272,7 @@ Workspace is as ready as it gets without starting the actual work. What I found 
 
 **Fixed now:**
 - **`tooling/check_rot.py` created** (stdlib only, per the §8 spec) and self-tested three ways: missing `vanilla/` → pass-note exit 0; fixture with `package.json` + React CDN + React import + a `.ts` file → all 4 violations caught, exit 1; clean fixture → pass, exit 0. Fixtures removed afterward, so the tree is untouched apart from the new tool.
-- **Notes/tooling homes:** `tooling/` now exists; inventory notes go to `docs/parity/` (created with the Phase 2 skeleton) or `docs/` — no placeholder files needed yet.
+- **Notes/tooling homes:** `tooling/` now exists; inventory notes go to `vanilla/notes/` (created with the Phase 2 skeleton) or `docs/` — no placeholder files needed yet.
 
 **Deliberately not done (they're Phase 1/2 work, not prep):**
 - `vanilla/` skeleton, `format.js`, inventory docs (`routes.md`, `chain-calls.md`, op-coverage matrix) — these need the brainstorm→plan→execute cycle per skill, not ad-hoc creation.
@@ -420,7 +420,7 @@ The future UX of BitShares is officially under construction. Status:
 - Caught and fixed in verification: a worker seeded legacy dead node hosts → replaced with the probe-verified 2026 list (7/8 endpoints live; roelandp DNS-dead from here, kept last under failover).
 - Rot gate passes, all `node --check` clean, no placeholders, DOM-shim smoke test clean, parity note written with all six fields.
 
-**One handoff needs a browser (mine can't render):** open `python3 -m http.server 8080 --directory vanilla`, walk the five checks in `docs/parity/slice-01-settings.md` §3 (node switch, testnet toggle, offline panel, 360px/1440px, theme trio) and paste back results or screenshots — then slice 1 is fully green and we start the wallet slice.
+**One handoff needs a browser (mine can't render):** open `python3 -m http.server 8080 --directory vanilla`, walk the five checks in `vanilla/notes/slice-01-settings.md` §3 (node switch, testnet toggle, offline panel, 360px/1440px, theme trio) and paste back results or screenshots — then slice 1 is fully green and we start the wallet slice.
 
 ---
 
@@ -432,7 +432,7 @@ update slice-01-settings.md to give more verbose instructions to my unit tester,
 
 **Assistant:**
 
-Done — the browser pass in `docs/parity/slice-01-settings.md` §3 is now a click-by-click script instead of five terse checkboxes:
+Done — the browser pass in `vanilla/notes/slice-01-settings.md` §3 is now a click-by-click script instead of five terse checkboxes:
 
 - **Setup block** (serve command, what the landing page should look like, DevTools console open, red-error = auto-FAIL rule, blank-page stop condition).
 - **Steps A–E**, each with numbered actions, exact URLs/text to look for (`4018d784` vs `39f5e2ed` badge prefixes, 6 mainnet rows vs 2 testnet rows, roelandp-down-is-expected), timing bounds (30s), and explicit PASS/FAIL criteria — including the F5 persistence check, the offline→Retry→reconnect loop, and the 360px/1440px + theme-trio screenshots.
@@ -562,7 +562,7 @@ Slice 2 is built — everything provable headlessly is proven. The full picture:
 
 1. **Testnet faucet is dead** — `faucet.testnet.bitshares.eu` returns 404 on every path with a self-signed cert (browsers refuse it outright). So the live round-trip (register → on-chain key match → positive import discovery) could not run; the negative proof did (fresh keys → empty `get_key_references`, unknown brainkey → clean `no-chain-keys`). Options: (a) accept the cross-implementation + negative proofs as sufficient for now and re-run the round-trip when a faucet lives, (b) fund a test account another way if you have a testnet account with funds — I can register via an existing account as registrar instead of the faucet, or (c) you may know a working testnet faucet I should try. My recommendation is (a) + keep the round-trip as a standing re-run item — nothing in the code depends on the faucet existing.
 
-2. **Browser passes for your tester** — `docs/parity/slice-02-wallet.md` has a PENDING browser section (create/unlock/lock/backup/import flows, theme trio, 360px + 1440px), alongside slice 1's Step B re-test of the F5 fix. Both are click-by-click.
+2. **Browser passes for your tester** — `vanilla/notes/slice-02-wallet.md` has a PENDING browser section (create/unlock/lock/backup/import flows, theme trio, 360px + 1440px), alongside slice 1's Step B re-test of the F5 fix. Both are click-by-click.
 
 Also logged: a mapping correction for future slices — the database method is `get_account_by_name`, not `get_account` (the latter returns `method_not_found`). And the audit flagged 2 pre-existing `#fff` literals in `app.css` for the theme trio to catch.
 
@@ -766,7 +766,7 @@ Slice 4 is built and it broadcasts for real. The money moment, in full:
 
 **Headless pass on my side:** transfer page renders the locked gate correctly with zero console errors; rot gate passes; no float math; no SLIP traces.
 
-**For your tester:** `docs/parity/slice-04-transfer.md` has the click-by-click browser section (unlock → form → confirm → send → result, both memo modes, both viewports, theme trio). Note the wallet will need a brainkey imported first — the tester can generate a fresh one in-app (testnet) since faucet registration for brand-new test accounts goes through `testnet-faucet.xbts.io` if needed.
+**For your tester:** `vanilla/notes/slice-04-transfer.md` has the click-by-click browser section (unlock → form → confirm → send → result, both memo modes, both viewports, theme trio). Note the wallet will need a brainkey imported first — the tester can generate a fresh one in-app (testnet) since faucet registration for brand-new test accounts goes through `testnet-faucet.xbts.io` if needed.
 
 Roadmap updated: slices 1–4 built, browser passes out with the tester. Next is slice 5 (Exchange read-only) — say the word.
 
@@ -1191,7 +1191,7 @@ Yes — compact now. Here's why the timing is right and what's protected:
 - `docs/afk-resume.md` (just written) — the full restart bundle: immediate next dispatch (4b spec pointer), slice order, every verified fact I normally carry (faucet hosts, fixture, conventions, directives, git rules), plus gotchas like `/tmp` volatility and the exact headless loop.
 - Git history, all plans/skills/notes/parity docs, SLICES.md roadmap, todos (if the todo store persists — if not, the resume file re-seeds it, tail item included).
 
-**After you compact:** re-add the keep-rolling tail todo, read `docs/afk-resume.md`, retry the 4b dispatch, and keep marching. One thing compaction won't preserve: my live read of the current screenshots — but those PNGs are all on disk (`/tmp` ones may vanish; the important ones live in `docs/parity/`), so re-read as needed.
+**After you compact:** re-add the keep-rolling tail todo, read `docs/afk-resume.md`, retry the 4b dispatch, and keep marching. One thing compaction won't preserve: my live read of the current screenshots — but those PNGs are all on disk (`/tmp` ones may vanish; the important ones live in `vanilla/notes/`), so re-read as needed.
 
 Good night — the build is parked in a clean, resumable state.
 
@@ -1668,7 +1668,7 @@ Yes — beyond the three you named, the notes + code show a few more UX debts:
 **Burger menu (`vanilla/js/app.js:164-232,454-483`)**
 - 46-link `#nav-directory` absolute panel, `max-height:70vh`, inline styles. No search, no active-link highlight, doesn't close on navigate, no Esc/focus-return.
 - Toggle forced visible at all widths via inline `display:inline-flex` — fights `app.css:30-35` (`#nav-toggle` hidden on desktop). Crowded by duplicate theme `<select>` in bar + nav.
-- Open-state tap never verified on device — `docs/parity/viewport-gaps.md:27,79` marks it human-test debt.
+- Open-state tap never verified on device — `vanilla/notes/viewport-gaps.md:27,79` marks it human-test debt.
 
 **Dashboard (`vanilla/js/dashboard-ui.js:1-80`, router `router.js:73-80`)**
 - Currently watched-account overview (`committee-account 1.2.0` when locked) — reads as account-clone, not home. Old `DashboardPage` had starred/featured tabs + login gate + scam banner + footer block/latency.
@@ -1765,7 +1765,7 @@ write as spec and put all phases in sidebar todo list then get busy
 
 All five phases are spec'd, built, gated, and committed. Sidebar todos all green.
 
-**Spec:** `docs/superpowers/specs/2026-09-28-masterful-wallet-desk-design.md` (+ parity note `docs/parity/masterful-desk.md`)
+**Spec:** `docs/superpowers/specs/2026-09-28-masterful-wallet-desk-design.md` (+ parity note `vanilla/notes/masterful-desk.md`)
 
 **Shipped (6 commits):**
 - **A — burger palette** (`app.js`, `app.css`): search filter over 46 links, active-page highlight, Esc/close-on-navigate/focus-return, filter autofocus on open, duplicate theme copy removed. Toggle now always visible via CSS, zero inline positioning.
@@ -1894,7 +1894,7 @@ Both rounds shipped. Two commits on top of the keepalive fix:
 - Swap-price candles + VWAP + all indicators through the **shared** MarketInd stack; **synthetic book** through shared MarketBook (12 CPMM slices, taker haircut, best-first, positive spread verified: +0.00001036); Recent/My tabs with executed amounts; click-fill into the swap form; spot on the strip.
 - Two bugs the screenshots caught: ask-precision swap (invisible at equal precisions — new mixed-precision vector pins it) and loose ES matching across chains (mainnet swaps on a testnet desk — strict guard + leg filter + mainnet-only ES rule).
 
-Gates all green (rot, i18n 2143 keys, 3 vector suites, zero console errors on every shot). Parity note: `docs/parity/slice-12-pool-desk.md`.
+Gates all green (rot, i18n 2143 keys, 3 vector suites, zero console errors on every shot). Parity note: `vanilla/notes/slice-12-pool-desk.md`.
 
 ---
 
@@ -2430,7 +2430,7 @@ They exist — just not on `#/swap`.
   * `router.js:222` → `PoolDetailUI.renderPoolDetail`, `router.js:224` → `PoolSwapUI.renderSwap` (quote-only, no chart).
   * Detail chart: `pool-detail-ui.js:134-196` — `POOL_BUCKETS=[60,300,900,1800,3600]`, `PoolHistory.swapsToCandles` → shared `MarketInd` LWC candles + osc stack + VWAP, same menu as exchange.
   * Swap page: `pool-swap-ui.js:76-132` — only Pool/My exchanges tables via `Pool.history`, no `PoolHistory`/`MarketInd`.
-  * Built in `docs/parity/slice-12-pool-desk.md`: ES-override + “pools mirror the exchange desk”.
+  * Built in `vanilla/notes/slice-12-pool-desk.md`: ES-override + “pools mirror the exchange desk”.
 
 Navigate:
 
@@ -3002,7 +3002,7 @@ Good morning — the night shift is done. HEAD `5d4681b`, tree clean, **129/129 
 
 **Honest flags:** networkx never existed in dex-ux (verified across all commits — the Pool map plot is the answer, verdict note filed). Extension Tier 1 is scaffolded but explicitly **unverified in-browser** — run its TEST-PLAN.md. Everything tonight is headless-proven only; tab click-throughs and a moving-market check need your eyes. Dial-backs if needed: candy `7863e57`, retro passes `60da574`/`37fef4a`/`e8d20e3`.
 
-Full evidence: `docs/parity/retro-evening-2026-09-29.md`.
+Full evidence: `vanilla/notes/retro-evening-2026-09-29.md`.
 
 ---
 
@@ -3136,7 +3136,7 @@ All caught up — batch report:
 * **Pool map drag** (`2f2e781`): nodes ~40% smaller, padded rings, halo labels, pointer drag (deterministic layout kept — no physics engine, by doctrine), 37 vectors green, live drag-probed.
 * **Explore** (`991c8d9`): nav → **Explore**, subtab → **Blockchain**, striping on all subtabs, live `● Live • Block #…` pulse off the existing block feed (~3s, flash highlight, reduced-motion safe), zero extra socket.
 
-Screenshots 1–12 filed under `docs/parity/pool-book-compare-*`. Still missing: the footer-corner and header shots you mentioned after those ("two new images" / "two more photos") — nothing new arrived beyond the 7 + 5 already filed, so the connected-green and header-forgery items went off code references instead. If you have more shots, send them and I'll iterate.
+Screenshots 1–12 filed under `vanilla/notes/pool-book-compare-*`. Still missing: the footer-corner and header shots you mentioned after those ("two new images" / "two more photos") — nothing new arrived beyond the 7 + 5 already filed, so the connected-green and header-forgery items went off code references instead. If you have more shots, send them and I'll iterate.
 
 ---
 
@@ -3621,8 +3621,8 @@ Against `AGENTS.md §1-§3` + `SLICES.md`:
 | Objective | State |
 |---|---|
 | #1 never-rot | ✅ `tooling/check_rot.py PASS` today, zero runtime deps, no build to run |
-| #2 retro look | ⚠️ code-done, proof-pending: 35 shots in `docs/parity/original-pages/`, punchlist 92 fixed/31 deferred/`punchlist-2026-09-29.json`, but zero human browser passes |
-| #3 every astro op | ⚠️ `docs/parity/op-coverage-matrix.md: MISSING 0` (§A 33/§B 17+2/§C 20+11+10/§D 7) — but 10× DEFERRED + 7× out-of-scope need your sign-off (blind C23, forum/trollbox C36-37, top-ops C3, escrow, op-35, QR, `.bin`) |
+| #2 retro look | ⚠️ code-done, proof-pending: 35 shots in `vanilla/notes/original-pages/`, punchlist 92 fixed/31 deferred/`punchlist-2026-09-29.json`, but zero human browser passes |
+| #3 every astro op | ⚠️ `vanilla/notes/op-coverage-matrix.md: MISSING 0` (§A 33/§B 17+2/§C 20+11+10/§D 7) — but 10× DEFERRED + 7× out-of-scope need your sign-off (blind C23, forum/trollbox C36-37, top-ops C3, escrow, op-35, QR, `.bin`) |
 | #4 modern glow | ⚠️ headless-only (reactive store, search, confirms done; click-through unproven) |
 | #5 three themes | ⚠️ trio sweeps `6720a8c/071b766/9f786b2/7791941` headless-only; open question in `SLICES.md:142`: ref-theme direction (darkTheme default vs light `#337ab7`) |
 | #6 human numbers | ✅ `vanilla/js/format.js` single module + vectors per note (`2000→20%`, `74900 p2→749.00`); final audit verdict is `DONE-WITH-BROWSER-ITEMS` |
@@ -3910,8 +3910,8 @@ Your direction resolves the open `SLICES.md:142` question: **default = old-UI mi
 - `vanilla/css/themes.css:13-48` maps every token to `#1`'s `darkTheme` SCSS (`branding.js:72-75` default): `--bg #2a2a2a / --panel #3f3f3f / --accent #1ec3fa / --button-bg #049cce / --buy #6ba583 / --sell #e3745b`, cross-checked vs `PALETTE.md` dark column. Default wiring triple-confirmed (`store.js:97-104`, `app.js:514-519`, `:root` bare in `themes.css:11-12`). Remaining: retro parity gaps per page + human trio screenshots (still ⏳).
 
 **Light (`vanilla-ui-theme` = tub photo) — photo found, implementation complete, 2 doc debts + 2 contrast items.**
-- Photo is real: `docs/parity/vanilla-theme/tub.jpg` (DeConna Homemade Vanilla, golden lid / cream label / chocolate script / sky logo), palette in `README.md:1-19`. All 9 swatches land in `themes.css:96-115`, including the 2026-09-30 a11y darkening `#1E9ED7→#0F6E99` (5.24/5.66 measured in-comment).
-- Debts: (a) `themes.css:72-73` cites a nonexistent workspace-root `"Homemade Vanilla Ice Cream.jpg"` — real path is `docs/parity/vanilla-theme/tub.jpg`; (b) `README.md:11` still lists sky as `#1E9ED7 (white text)` while code ships `#0F6E99` — README misleads next reader.
+- Photo is real: `vanilla/notes/vanilla-theme/tub.jpg` (DeConna Homemade Vanilla, golden lid / cream label / chocolate script / sky logo), palette in `README.md:1-19`. All 9 swatches land in `themes.css:96-115`, including the 2026-09-30 a11y darkening `#1E9ED7→#0F6E99` (5.24/5.66 measured in-comment).
+- Debts: (a) `themes.css:72-73` cites a nonexistent workspace-root `"Homemade Vanilla Ice Cream.jpg"` — real path is `vanilla/notes/vanilla-theme/tub.jpg`; (b) `README.md:11` still lists sky as `#1E9ED7 (white text)` while code ships `#0F6E99` — README misleads next reader.
 - Contrast risks: (c) `--warn #C8961E` contract says "graphic/large use only" (`themes.css:86-87`) but `app.css:889,906` renders small explorer text/pills in it (~2.5–3:1, fail); (d) `--buy #1DA866`/`--sell #D35A41` render small text (`app.css:252-253`, `:25`, `:247`) with no measured ratios — same measure-and-record treatment accent got.
 - Banner: two `#warn-banner` rules — `app.css:60` (token-driven, dead: later rule wins) and `app.css:717` (fixed pale-gold `#fffbe6`, antd provenance, renders fixed-light in all 3 themes). Dead rule should go; surviving rule needs an explicit per-theme decision.
 
@@ -3925,7 +3925,7 @@ Your direction resolves the open `SLICES.md:142` question: **default = old-UI mi
 
 1. **Docs/provenance (comments only):** fix `themes.css:72-73` photo path; amend `README.md:11` with `#0F6E99` darkening note; rewrite `SLICES.md:147,154` + `AGENTS.md §3.4` dex-ux-source lines to Crypo (keep bitshares-dex-ux as picker/plot behavior reference only); fix `1680/1687` citation.
 2. **Light-theme contrast:** measure `--buy/--sell` on cream + white like accent got; fix `--warn` small-text uses (explorer pills/copy to `--text` or bold-graphic-only); rule on `#warn-banner` per-theme (keep antd fixed-light explicitly or tokenize); delete dead `app.css:60`.
-3. **Default parity:** page-by-page retro check vs `docs/parity/original-pages/` in ref-ui-theme only; log deviations before/after per `AGENTS.md §3.1`.
+3. **Default parity:** page-by-page retro check vs `vanilla/notes/original-pages/` in ref-ui-theme only; log deviations before/after per `AGENTS.md §3.1`.
 4. **Trio verification:** 360px + 1440px × 3 themes screenshots (market/pools/transfer/settings minimum), zero console errors; German-overflow glance for tub-cream long strings.
 5. **Gates:** `check_rot.py` PASS, `node --check` touched files, note deltas appended to slice parity notes (no new slice).
 
@@ -3963,11 +3963,11 @@ Recorded. Consolidated theme plan (still read-only — no edits made):
 ## Naming (for the build spec + AGENTS note)
 - Workspace project: **bitshares-vanilla-ui**.
 - **default theme = ref-ui-theme** — mirrors old `bitshares-ui` styling cues (`branding.js:72-75` darkTheme default; mapping `vanilla/css/themes.css:13-48`). Either name valid.
-- **vanilla-theme = vanilla-ui-theme** — light, from `docs/parity/vanilla-theme/tub.jpg` (DeConna carton). Either name valid.
+- **vanilla-theme = vanilla-ui-theme** — light, from `vanilla/notes/vanilla-theme/tub.jpg` (DeConna carton). Either name valid.
 - **dex-ux-theme = crypo theme** — dark, sourced from extracted Crypo template at `reference/crypo/crypo/Crypo/` (no tarball on disk; that directory is the authority). Either name valid; **id stays `dex-ux-theme`** (stored-prefs migration `store.js:33-42` already shipped — no rename). Standing-directive lines claiming dex-ux-theme "follows bitshares-dex-ux CSS" (`SLICES.md:147,154`, `AGENTS.md §3.4`) get rewritten to Crypo-authoritative, keeping dex-ux as picker/plot-behavior reference only.
 
 ## Work plan
-1. **Provenance/docs (comments only):** `themes.css:72-73` photo path → `docs/parity/vanilla-theme/tub.jpg`; `README.md:11` amend `#1E9ED7 → #0F6E99` a11y note; Crypo-authority rewrite per above; fix `1680/1687 → 1679/1685` citation; AGENTS naming-alias note (3 themes × aliases + project name).
+1. **Provenance/docs (comments only):** `themes.css:72-73` photo path → `vanilla/notes/vanilla-theme/tub.jpg`; `README.md:11` amend `#1E9ED7 → #0F6E99` a11y note; Crypo-authority rewrite per above; fix `1680/1687 → 1679/1685` citation; AGENTS naming-alias note (3 themes × aliases + project name).
 2. **Per-theme banner tokens (your call):** replace fixed-light `#warn-banner` (`app.css:717`, dead `:60` deleted) with `--banner-bg/--banner-text/--banner-border` per theme — ref: ambered dark surface w/ white text; vanilla: ochre-tinted cream w/ chocolate text (differentiated from `--bg #FAF6EA`); crypo: `#2a2e39`-ground w/ `#fbbc06` accents. Delete dead rule, own the decision in-comment.
 3. **Warn small-text (my visual call):** explorer pills/copy off `--warn` onto body text or a darker `--warn-text`; confirm via headless trio shots at 360px + 1440px (plus buy/sell ratio measurements on cream/white, same treatment accent got). Human device pass stays the gate.
 4. **Default parity + trio verification:** ref-theme page checks vs `original-pages/`; 3-theme screenshot sweep (market/pools/transfer/settings min), zero console errors; gates (`check_rot.py`, `node --check`) green with note deltas.
@@ -4287,7 +4287,7 @@ continue
 8. Everything new keyed via `t()` + 10 locale dicts (en real, en-identical stubs per batch convention); phone-stack/desktop-row responsive; trio screenshots.
 
 ### Touch list (for build mode)
-- `vanilla/js/dashboard-ui.js` (+~200 lines: landing branch, pulse band, cards/steps/CTA sections), `vanilla/js/router.js` (locked-vs-unlocked home rule), `vanilla/css/app.css` (hero + band + cards, token-only), `vanilla/assets/hero.webp` (vendored), `vanilla/locales/*.json`, parity-note delta in `docs/parity/slice-01-settings.md` + matrix A1 row.
+- `vanilla/js/dashboard-ui.js` (+~200 lines: landing branch, pulse band, cards/steps/CTA sections), `vanilla/js/router.js` (locked-vs-unlocked home rule), `vanilla/css/app.css` (hero + band + cards, token-only), `vanilla/assets/hero.webp` (vendored), `vanilla/locales/*.json`, parity-note delta in `vanilla/notes/slice-01-settings.md` + matrix A1 row.
 - Verification: `node --check`, rot + i18n gates, headless trio shots, new `tooling/splash-test.js` vectors (locked/unlocked routing, fail-open cells, count formatting incl. large uint64s).
 
 Two micro-questions, then I wait for build mode:
@@ -4835,7 +4835,7 @@ when the 5 step "welcome to bitshares vanilla" popup is open when you first get 
 
 **Assistant:**
 
-Fixed and verified. The full diagnosis is in `docs/parity/tour-scroll-fix.md` — short version:
+Fixed and verified. The full diagnosis is in `vanilla/notes/tour-scroll-fix.md` — short version:
 
 ## Why it was jerky
 Not page weight — a **scroll-hijack loop**. Every async chain fill on the landing page (market chips, pulse cells, balances) tripped the tour's `#view` observer, which rebuilt the entire popup card **and re-fired `scrollIntoView({behavior:"smooth"})`**. Each new smooth-scroll canceled the in-flight one and fought your own manual scrolling. Streaming data + fighting scroll animations = jank, by construction.
@@ -4900,7 +4900,7 @@ All phases complete — tree clean, everything committed. Final report:
 
 ## Two headlines for the AMA
 1. **The type gate caught a real shipped bug on day one**: every Same-T Borrow/Repay/Update/Delete click threw `ReferenceError` (a dropped `myGen` token) — dead feature, now fixed and in the tester manual as a regression check. That's your answer to "why bother with types."
-2. **Kacper-dare verdict** (`docs/parity/type-safety-report.md`): nothing in the codebase needs TypeScript-the-language — all 92 errors yielded to JSDoc, with the two remaining `any`-bridges named as optional follow-ups. The dare stands open, citable.
+2. **Kacper-dare verdict** (`vanilla/notes/type-safety-report.md`): nothing in the codebase needs TypeScript-the-language — all 92 errors yielded to JSDoc, with the two remaining `any`-bridges named as optional follow-ups. The dare stands open, citable.
 
 Ready for your `git push` whenever you are — same verify checklist (commit count, README images, no `reference/`/fixtures/`build/`).
 
@@ -5295,7 +5295,7 @@ Done and committed (`fbdd0df`). Full report:
 - Foreign-community honest result: the Chinese/EU community endpoints in old lists are overwhelmingly dead; the surviving foreign-operated nodes are the XBTS set (already ours).
 
 ## On first-connect discovery in the app: don't
-Technically possible (GitHub API + raw fetch both send CORS headers), but: unauthenticated limits would throttle every visitor identically, probing hundreds of strangers' sockets stalls first paint and burns mobile bandwidth, and it makes github.com load-bearing for wallet startup — a doctrine refusal. The pipeline stays **offline and scheduled** (discover → probe → curate → ship); the app keeps fast probe-all + custom add. If you ever want it anyway, thecompatible shape is an explicit opt-in button in Settings — never automatic. Recorded in `docs/parity/node-discovery-2026-10-02.md`.
+Technically possible (GitHub API + raw fetch both send CORS headers), but: unauthenticated limits would throttle every visitor identically, probing hundreds of strangers' sockets stalls first paint and burns mobile bandwidth, and it makes github.com load-bearing for wallet startup — a doctrine refusal. The pipeline stays **offline and scheduled** (discover → probe → curate → ship); the app keeps fast probe-all + custom add. If you ever want it anyway, thecompatible shape is an explicit opt-in button in Settings — never automatic. Recorded in `vanilla/notes/node-discovery-2026-10-02.md`.
 
 Still uncommitted from the explorer round (awaiting your order as usual): the Live-line/staleness work, bar/flash/age fixes, activity refresh, and their tests.
 
@@ -6404,7 +6404,7 @@ Committed locally as `d762e07` — 42 files, all gates green:
 
 - **Audit**: `check_types` PASS, `check_rot` PASS, money math only in vendored chart lib + `format.js`, no TODO/FIXME outside vendor/dict, no WIF secrets staged.
 - **Tests**: explorer-readability 61/61, market-intel 37/37, gov-analytics 33/33, app-shell 11/11.
-- **New**: avoided-explorer-features section appended to `docs/parity/slice-09-explorer.md` (rich lists need unbounded scans, no `get_asset_holders` in `database_api.hpp`, aggregates/charts refused, tx-hash location-less `:200`, visuals + R1e joins documented).
+- **New**: avoided-explorer-features section appended to `vanilla/notes/slice-09-explorer.md` (rich lists need unbounded scans, no `get_asset_holders` in `database_api.hpp`, aggregates/charts refused, tx-hash location-less `:200`, visuals + R1e joins documented).
 - **Commit**: `Market intel + gov analytics + explorer readability + shell/help round` — working tree clean.
 
 Push is yours — no creds in this env: `git push` from your terminal (fast-forward expected; `origin/master` was in sync at session start).
@@ -6577,7 +6577,7 @@ Phase 6: Write a design document for most impactful features that could be added
 
 **Assistant:**
 
-Phase 6 doc is written: `docs/parity/phase-06-es-design.md` (todo checked off).
+Phase 6 doc is written: `vanilla/notes/phase-06-es-design.md` (todo checked off).
 
 What's in it, built from the three recon reports:
 
@@ -6606,7 +6606,7 @@ Phase 1 committed as `9be2122`, Phase 7 doc filed. Standing:
 - `HistoryCap`: canonical `ES_BASE`, index allowlist, dated sweep snapshot + live override, five gate predicates, and `esSearch` as the single raw-ES seam. Existing direct ES fetches noted for Phase 4 migration.
 - Proof: `history-cap-test.js` 30/30, node-health 45/45 (was 40), all prior suites green, types + rot + i18n clean, zero user-string churn.
 
-**Phase 7 — filed** (`docs/parity/phase-07-history-and-node-api-design.md`): A1–A5 history surfaces ranked, B1–B7 unused database-API features ranked (`get_trade_history` tops — the honest answer to fill archives), zero NEEDS-VERIFY items, 6 runtime-unprobed methods flagged NEEDS-PROBE.
+**Phase 7 — filed** (`vanilla/notes/phase-07-history-and-node-api-design.md`): A1–A5 history surfaces ranked, B1–B7 unused database-API features ranked (`get_trade_history` tops — the honest answer to fill archives), zero NEEDS-VERIFY items, 6 runtime-unprobed methods flagged NEEDS-PROBE.
 
 Next up when you say go: **Phase 2** (shared notice builder + fallback swap across the 8 inventoried surfaces) — the natural next slice since Phase 1's gates have nothing to display through yet.
 
@@ -6811,7 +6811,7 @@ we've implemented a lot of features today that were not in the bitshares-ui orig
 
 **Assistant:**
 
-Survey complete — 102 repos listed, 8 surveys, 39 verdicts. Full aggregation in `docs/parity/org-survey-2026-10-03.md`. The short version:
+Survey complete — 102 repos listed, 8 surveys, 39 verdicts. Full aggregation in `vanilla/notes/org-survey-2026-10-03.md`. The short version:
 
 **Worth building (my ranked top 5):**
 1. **CoinTracking CSV export** (bitshares-report) — 11 proven columns, pure strings + our `format.js`. Smallest effort, biggest missing-vs-reference gap.
@@ -7014,7 +7014,7 @@ A standalone `#/api-lab` route — a Swagger-feel node prober with zero new depe
 
 - **`vanilla/js/api/api-lab.js`** (269 lines) — 29-entry WS catalog (Database 23 incl. fee tier, History 2, Network 3 incl. broadcast, Debug 1 probe) plus pure `coerce` (curated strings → typed RPC params) and `run`. No DOM, no signing.
 - **`vanilla/js/views/api-lab-ui.js`** (~478 lines) — the desk: per-session advanced-use gate modal, method pulldown with group optgroups + filter, curated param boxes with bidirectional raw-JSON mirror, Run/Reset/Copy-link, raw `<pre>` + human-hint line, 20-deep session history, deep-link read/write, broadcast unlock+confirm.
-- **Wiring** — route before `*` in `router.js`, a generic `Router.query()` hash-query helper, script tags in `index.html`, nav entry, ambient lines in `globals.d.ts`, parity note at `docs/parity/api-lab.md`.
+- **Wiring** — route before `*` in `router.js`, a generic `Router.query()` hash-query helper, script tags in `index.html`, nav entry, ambient lines in `globals.d.ts`, parity note at `vanilla/notes/api-lab.md`.
 
 ## What's good
 
@@ -7044,7 +7044,7 @@ add a document to the workspace to call the other agent out on issues you uncove
 
 **Assistant:**
 
-Done — written to `docs/parity/api-lab-review.md`, alongside the other review notes.
+Done — written to `vanilla/notes/api-lab-review.md`, alongside the other review notes.
 
 It documents all four findings with file:line evidence (F1 missing i18n entries at ship time, F2 the `METHODS[7]` magic index, F3 the 478-line split debt, F4 stale gate wording), credits what verified clean, and names the owner for each fix. Tone is factual review, not a flame — F1 was already fixed by someone else, F2 is a two-line fix still outstanding.
 
@@ -7115,11 +7115,11 @@ Build complete. AFK loop ends here — everything actionable is done; only human
 **Proof (all observed, not assumed):**
 - 62 unit vectors green (`es-lab-test` 32, `es-lab-ui-test` 10, `explorer-ops-test` 20); `check_types` PASS; `check_i18n` PASS (3230 keys, drift-free); rot shows only the pre-existing `globals.d.ts` note.
 - Live vs `es.bitshares.dev`: all 7 templates return shaped rows; pref-off → `es-disabled` with zero fetch; 1ms timeout → `es-unavailable`.
-- Headless Chromium (zero console errors on every shot): deep-link auto-run renders the holders table with **human balances** (389782179.81523 — live p5 via in-page `get_objects`), linked accounts, raw pre, reachable strip. Theme trio + 390px phone saved in `docs/parity/es-lab-*.png`.
+- Headless Chromium (zero console errors on every shot): deep-link auto-run renders the holders table with **human balances** (389782179.81523 — live p5 via in-page `get_objects`), linked accounts, raw pre, reachable strip. Theme trio + 390px phone saved in `vanilla/notes/es-lab-*.png`.
 
 **Two real bugs caught pre-browser:** fills fields were symbols (index text-matches IDs only — fixed with honest hints), and `resolveAccount` misused `Chain.db(name)` (it takes no args — fixed to the db→call pattern).
 
-**PENDING on your return (needs a human):** click-through at both widths, a name→id resolve against a live node, one non-BTS precision eyeball-check. All marked in `docs/parity/es-lab.md`. Also: my earlier `docs/parity/api-lab-review.md` is still untracked awaiting your disposition — I didn't commit another task's document on my own authority.
+**PENDING on your return (needs a human):** click-through at both widths, a name→id resolve against a live node, one non-BTS precision eyeball-check. All marked in `vanilla/notes/es-lab.md`. Also: my earlier `vanilla/notes/api-lab-review.md` is still untracked awaiting your disposition — I didn't commit another task's document on my own authority.
 
 ---
 
@@ -7246,7 +7246,7 @@ Good morning — the full build is done and committed (8 commits). Everything yo
 
 **Two bonus finds, both fixed:** a pre-existing rot-gate failure (a comment containing the literal `globals.d.ts`) and 17 hyphenated help topics that never had locale keys (English-only by construction) — both now green/keyed.
 
-**Verification:** rot gate, type gate, i18n drift gate (3392 keys), and all node tests pass; headless shots confirm the theme trio plus phone/desktop widths with zero console errors, and the burger/filter/follow were exercised live against testnet. Parity note at `docs/parity/menu-sitemap.md`.
+**Verification:** rot gate, type gate, i18n drift gate (3392 keys), and all node tests pass; headless shots confirm the theme trio plus phone/desktop widths with zero console errors, and the burger/filter/follow were exercised live against testnet. Parity note at `vanilla/notes/menu-sitemap.md`.
 
 **One thing for you:** the human browser pass (burger feel at 360px, follow toggle on a real wallet) — flagged OPEN in the parity note whenever you're back at a keyboard.
 
@@ -7268,7 +7268,7 @@ Done — 3 commits, all green.
 
 **Footer:** REPORT now goes to `#/community` internally (no more new-tab `t.me` link); HELP → `#/help` unchanged.
 
-Also updated: sitemap Labs section gained the Community card (52 links, single-home invariant holds), locale keys in all 10 dicts, and all gates pass (rot, types, i18n at 3397 keys, node suites). Shots of both pages verified with zero console errors; parity addendum at `docs/parity/help-split.md`. Human browser pass remains with the tester whenever convenient.
+Also updated: sitemap Labs section gained the Community card (52 links, single-home invariant holds), locale keys in all 10 dicts, and all gates pass (rot, types, i18n at 3397 keys, node suites). Shots of both pages verified with zero console errors; parity addendum at `vanilla/notes/help-split.md`. Human browser pass remains with the tester whenever convenient.
 
 ---
 
@@ -7478,7 +7478,7 @@ Server's down (those PIDs were the shell matching its own command line — no 80
 - **Catalog:** 29 methods, every entry citing `#4` header lines (`database_api.hpp` / `api.hpp`); deliberately *not* the old UI's `eval(js)` console.
 - **Proof:** live testnet vectors (`committee-account→1.2.0`, `BTS p5`, fee `86869`), in-browser end-to-end via headless Chromium (gate click → desk → live `get_account_by_name`, zero console errors), theme trio + 1440/390px shots all clean.
 - **Gates:** `check_rot` PASS, `check_types` PASS tree-wide, `check_i18n` drift-free (25 keys backfilled), syntax clean, no TODOs, no deps.
-- **Commits:** `7a6f1b4` spec → `5868066` build → `a845ba1` + `bb1a6f3` + `8552bdf` polish/notes. Independent review round already tandemed (fixed a magic-index default, recorded in `docs/parity/api-lab-review.md`).
+- **Commits:** `7a6f1b4` spec → `5868066` build → `a845ba1` + `bb1a6f3` + `8552bdf` polish/notes. Independent review round already tandemed (fixed a magic-index default, recorded in `vanilla/notes/api-lab-review.md`).
 
 **Left for humans:** tester browser pass (same ⏳ as slices 2–17) and never firing a real broadcast without your sign-off. Known debt logged: `api-lab-ui.js` is 478 lines — split candidate for the slice-18 readability pass.
 
@@ -7494,7 +7494,7 @@ rate limit resolved.  continue.
 
 Good morning — the whole backlog is finished and committed. The tree is clean, all gates green.
 
-**About page** (`#/about`, footer ABOUT link, sitemap card): hero + CTAs, six philosophy blocks, honest-limits section. Verified at 1440px and 390px with zero console errors; parity note at `docs/parity/about.md`.
+**About page** (`#/about`, footer ABOUT link, sitemap card): hero + CTAs, six philosophy blocks, honest-limits section. Verified at 1440px and 390px with zero console errors; parity note at `vanilla/notes/about.md`.
 
 **Principle #10 + 11-language program** (the big one):
 - `AGENTS.md` now has **#10 — EVERY LANGUAGE, FULLY** with a §3.9 elaboration (placeholders verbatim, shared glossary, no unverified strings).
@@ -7504,7 +7504,7 @@ Good morning — the whole backlog is finished and committed. The tree is clean,
 - **All 11 audited** by separate workers with unified glossaries (repairs: hi 375, ja 199, de 157, tr 146, it 143, ko 121, fr 112, zh 78, ru 72, pt 67, es 28), every patch validator-green.
 - Two real bugs auditors surfaced are fixed: literal-`\n` vs real-newline drift in two placeholders (plus a gate upgrade that decodes JS escapes), and stale "ten languages" copy → twelve.
 
-**For the tester:** language-switch read-through in all 12 locales, plus the earlier browser passes. Known code-side follow-ups are logged in `docs/parity/i18n-program.md` (English-plural `"s"` concatenation, gendered fragments, Russian plurals) — translation is done; those need an i18n-engineering pass, not more words.
+**For the tester:** language-switch read-through in all 12 locales, plus the earlier browser passes. Known code-side follow-ups are logged in `vanilla/notes/i18n-program.md` (English-plural `"s"` concatenation, gendered fragments, Russian plurals) — translation is done; those need an i18n-engineering pass, not more words.
 
 One heads-up: a parallel view-as session landed commits interleaved with mine overnight — I left its files untouched, translated its 12 viewing keys, and noted the overlap in the parity note.
 
@@ -8110,7 +8110,7 @@ Tier 2 upgrade is built, tested, and committed — all 8 phases. Five commits on
 
 What exists now: SW signing gate (validate → rate-limit → approve → sign → broadcast), approval page with full op fields, provider + wallet-as-dApp routing across all 9 signing call sites, auto-prefer-extension mode, Settings allowlist with revoke, shield badge left of the lock, install guide (`#/help/extension-install`), 33 new i18n keys × 12 dicts. Verified: gate tests 50/50, wallet seam 13/13, rot/types/i18n green, pack byte-stable (763/764 files).
 
-Decisions I made while you were away (all logged in `docs/parity/extension-tier2.md` §3 for your ruling): solid-shield-only badge, page-WIF hygiene deferred to follow-up, ack-based SW broadcast, generic (not per-op-prose) approval rendering, MV2 memory-fallback fail-closed, no auto-approve fast path anywhere.
+Decisions I made while you were away (all logged in `vanilla/notes/extension-tier2.md` §3 for your ruling): solid-shield-only badge, page-WIF hygiene deferred to follow-up, ack-based SW broadcast, generic (not per-op-prose) approval rendering, MV2 memory-fallback fail-closed, no auto-approve fast path anywhere.
 
 Two things need you — neither runnable headless: the **human browser drills** (install, per-origin approve/deny, 60s timeout, XSS drill, two-browser guide walkthrough per TEST-PLAN.md) and the **testnet approval proof** on the existing fixture. The AFK tail item stays open until you say otherwise.
 
