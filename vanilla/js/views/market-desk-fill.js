@@ -231,6 +231,47 @@ MarketDesk._fill = MarketDesk._fill || {};
 
     MarketInd.paintCountNote(state);
 
+    /* Discrete mode: raw per-fill points, no buckets, no deepen, no
+     * VWAP/depth/pool-map (those paint from candles()/book and stand down
+     * on empty bucket sets by themselves). Transport cap 1000 (ES page
+     * budget + chain limit arg); the count note shows the ACTUAL point
+     * count via state.points, never the requested count. */
+    if (state.discrete) {
+      var dCount = 2000;
+      try {
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) dCount = MarketInd.CANDLE_COUNT;
+      } catch (e) { /* default stands */ }
+      var dLim = Math.min(Math.max(1, dCount | 0), 1000);
+      try {
+        if (typeof MarketFills === "undefined" || !MarketFills ||
+            typeof MarketFills.fillsForMarket !== "function" ||
+            typeof MarketFills.fillsToPoints !== "function") throw new Error("history-unavailable");
+        MarketFills.fillsForMarket(b.id, q.id, dLim).then(function (fres) {
+          try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
+          var dpts = [];
+          try {
+            dpts = MarketFills.fillsToPoints((fres && fres.fills) || [], b.id, b.precision, q.precision, q.id, dCount);
+          } catch (e) { dpts = []; }
+          state.points = dpts;
+          state.candles = { buckets: [], closes: [] };
+          try { state.deep = false; } catch (e) { /* flag best-effort */ }
+          MarketInd.maybeDraw(state);
+          try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
+        }).catch(function () {
+          state.points = [];
+          state.candles = { buckets: [], closes: [] };
+          try { state.deep = false; } catch (e) { /* flag best-effort */ }
+          MarketInd.maybeDraw(state);
+          try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }
+        });
+      } catch (e) {
+        state.points = [];
+        state.candles = { buckets: [], closes: [] };
+        MarketInd.maybeDraw(state);
+      }
+      return;
+    }
+
     Market.candles(b.id, q.id, state.bucket, MarketInd.CANDLE_COUNT).then(function (c) {
       /* Newest paint wins: invalidate older in-flight tips before painting. */
       try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }

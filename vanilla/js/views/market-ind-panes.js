@@ -505,11 +505,23 @@ MarketInd._panes = MarketInd._panes || {};
     }
   }
 
-  /* Refresh the "N × timeframe candles" note under the timeframe radios. */
+  /* Refresh the "N × timeframe candles" note under the timeframe radios.
+   * Discrete mode instead names the ACTUAL plotted point count ("N fills" —
+   * the tape may hold fewer than the requested count on thin markets). */
   function paintCountNote(state) {
     if (state.countNote) {
-      state.countNote.textContent =
-        CANDLE_COUNT + " × " + bucketLabel(state.bucket) + " candles";
+      if (state.discrete) {
+        var n = 0;
+        try {
+          if (state.points && Array.isArray(state.points)) n = state.points.length;
+          else if (state.chartData && Array.isArray(state.chartData.buckets)) n = state.chartData.buckets.length;
+        } catch (e) { n = 0; }
+        state.countNote.textContent =
+          String(n) + " " + t("market.discrete_fills", "fills");
+      } else {
+        state.countNote.textContent =
+          CANDLE_COUNT + " × " + bucketLabel(state.bucket) + " candles";
+      }
     }
   }
 
@@ -583,6 +595,7 @@ MarketInd._panes = MarketInd._panes || {};
       touchable(radio);
       radio.addEventListener("change", function () {
         state.bucket = b;
+        state.discrete = false;
         paintCountNote(state);
         onBucket();
         try {
@@ -593,6 +606,32 @@ MarketInd._panes = MarketInd._panes || {};
       lab.appendChild(DOM.el(doc, "span", bucketLabel(b)));
       state.tfBox.appendChild(lab);
     });
+    /* Discrete mode (raw fills, no buckets): always offered last (dex-ux
+     * order_book.html radio order). Selecting it sets state.discrete and
+     * keeps state.bucket as the return target; numeric radios above clear
+     * the flag. The count input beside the radios caps the points. */
+    (function () {
+      var dlab = doc.createElement("label");
+      dlab.className = "mkt-tf";
+      var dradio = doc.createElement("input");
+      dradio.type = "radio";
+      dradio.name = "mkt-tf";
+      dradio.value = "discrete";
+      dradio.checked = !!state.discrete;
+      dradio.setAttribute("aria-label", t("market.tf_discrete", "Discrete") + " fills");
+      touchable(dradio);
+      dradio.addEventListener("change", function () {
+        state.discrete = true;
+        paintCountNote(state);
+        onBucket();
+        try {
+          if (typeof MarketDesk !== "undefined" && MarketDesk && typeof MarketDesk.syncUrl === "function") MarketDesk.syncUrl(state);
+        } catch (e) { /* URL stays */ }
+      });
+      dlab.appendChild(dradio);
+      dlab.appendChild(DOM.el(doc, "span", t("market.tf_discrete", "Discrete")));
+      state.tfBox.appendChild(dlab);
+    })();
     paintCountNote(state);
   }
 
@@ -615,7 +654,110 @@ MarketInd._panes = MarketInd._panes || {};
    * (indicator toggles must reflect instantly); the cache saves only the
    * per-candle Number()/string reads plus array allocs. Rendered charts are
    * identical: same arrays, same order, same values. */
+  /* drawDiscrete: Discrete-mode paint (one caller: maybeDraw's flag branch;
+   * drawCharts re-dispatches here via the chartData.discrete marker so
+   * resize/theme/invert redraws stay live). Tears down LWC + osc + VWAP +
+   * depth + pool-map artefacts, then paints price dots + the auto volume
+   * pane on canvas (DiscreteCharts — no LWC in Discrete). Pool desks share
+   * this path (P carries priceHost/oscHost/panes like the exchange state).
+   * Params: state (needs .doc/.priceHost/.oscHost/.points). Never throws. */
+  function drawDiscrete(state) {
+    try {
+      var sdoc = state.doc;
+      if (!sdoc || !state.priceHost || !state.oscHost) return;
+      var pts = Array.isArray(state.points) ? state.points : [];
+      var C = themeChartColors();
+      var frame = { paneBg: C.paneBg, grid: C.grid, text: C.text, accent: C.accent, muted: C.muted };
+      var emptyText = state.discreteEmptyText ||
+        t("market.discrete_no_fills", "No fills yet — place an order or try another pair.");
+      /* Release LWC handles (stale canvases/listeners retire via removePane). */
+      try {
+        if (!state.panes) state.panes = {};
+        if (typeof MarketCharts !== "undefined" && MarketCharts &&
+            typeof MarketCharts.removePane === "function") {
+          MarketCharts.removePane(state.panes.price);
+          Object.keys(state.panes.oscs || {}).forEach(function (k) {
+            MarketCharts.removePane(state.panes.oscs[k]);
+          });
+        }
+      } catch (e) { /* teardown must not throw */ }
+      state.panes.price = null;
+      state.panes.oscs = {};
+      /* Detach osc panes, VWAP strip, depth + pool-map slices (owned wraps
+       * are re-mounted by their owners on return to buckets — detach only,
+       * never destroy). */
+      try {
+        if (!state.paneEls) state.paneEls = {};
+        Object.keys(state.paneEls).forEach(function (k) {
+          var slot = state.paneEls[k];
+          if (slot && slot.wrap && slot.wrap.parentNode) {
+            try { slot.wrap.parentNode.removeChild(slot.wrap); } catch (e2) { /* gone */ }
+          }
+        });
+      } catch (e) { /* panes stand */ }
+      state.paneEls = {};
+      try {
+        if (state.depthWrap && state.depthWrap.parentNode) state.depthWrap.parentNode.removeChild(state.depthWrap);
+      } catch (e) { /* slice order is chrome */ }
+      try {
+        if (state.graphWrap && state.graphWrap.parentNode) state.graphWrap.parentNode.removeChild(state.graphWrap);
+      } catch (e) { /* slice order is chrome */ }
+      if (state.vwapWrap && state.vwapWrap.parentNode) {
+        try { state.vwapWrap.parentNode.removeChild(state.vwapWrap); } catch (e) { /* gone */ }
+        state.vwapWrap = null;
+      }
+      /* Discrete volume pane: auto-mounted below price, owned here so the
+       * bucketed path never sees it (removed on return below). */
+      var dvBody = state.discreteVolBody || null;
+      if (!state.discreteVolWrap || state.discreteVolWrap.parentNode !== state.oscHost) {
+        var dvWrap = sdoc.createElement("div");
+        dvWrap.className = "mkt-osc-pane";
+        var dvHead = sdoc.createElement("div");
+        dvHead.className = "mkt-osc-head";
+        dvHead.appendChild(DOM.el(sdoc, "span", t("market.discrete_volume", "Discrete volume"), "mkt-osc-title"));
+        dvWrap.appendChild(dvHead);
+        dvBody = sdoc.createElement("div");
+        dvBody.className = "mkt-osc-body";
+        dvWrap.appendChild(dvBody);
+        state.discreteVolWrap = dvWrap;
+        state.discreteVolBody = dvBody;
+        try { state.oscHost.appendChild(dvWrap); } catch (e) { /* host gone */ }
+      }
+      try {
+        if (typeof DiscreteCharts !== "undefined" && DiscreteCharts) {
+          DiscreteCharts.drawDiscretePrice(sdoc, state.priceHost, pts, {
+            log: !!state.logScale, colors: frame, emptyText: emptyText
+          });
+          DiscreteCharts.drawDiscreteVolume(sdoc, dvBody, pts, {
+            colors: frame, emptyText: emptyText
+          });
+        }
+      } catch (e) { /* panes stand on honest empties */ }
+      state.chartData = { buckets: [], discrete: true, points: pts };
+      try { paintCountNote(state); } catch (e) { /* note best-effort */ }
+    } catch (e) { /* discrete paint must never break the desk */ }
+  }
+
   function maybeDraw(state) {
+    /* Discrete mode (raw fills, no buckets): dots + auto volume stems on
+     * dependency-free canvas, everything else closed. Indicator selections
+     * stay retained in state.over/state.osc (menu only disables controls)
+     * for the return to buckets. VWAP/depth/pool-map slices detach here;
+     * the bucketed path re-appends its owned wraps on return. Never throws. */
+    if (state.discrete) {
+      drawDiscrete(state);
+      return;
+    }
+    /* Leaving Discrete: retire the auto volume pane (owned by drawDiscrete;
+     * recreated on re-entry). Depth/pool-map/VWAP wraps re-mount through
+     * their own pin blocks below. */
+    try {
+      if (state.discreteVolWrap && state.discreteVolWrap.parentNode) {
+        state.discreteVolWrap.parentNode.removeChild(state.discreteVolWrap);
+      }
+    } catch (e) { /* pane stands */ }
+    state.discreteVolWrap = null;
+    state.discreteVolBody = null;
     var buckets = (state.candles && Array.isArray(state.candles.buckets))
       ? state.candles.buckets : [];
     var firstMs = buckets.length > 0 ? ((buckets[0] && buckets[0].timeMs) || 0) : 0;
@@ -682,6 +824,13 @@ MarketInd._panes = MarketInd._panes || {};
    * the container may hold just the pool-map slice, or nothing at all when
    * every plot is off — never a blank box. */
   function drawCharts(state) {
+    /* Discrete re-dispatch: resize/theme/log redraws enter here but the
+     * discrete paint lives in drawDiscrete (via maybeDraw) — repaint from
+     * cached state.points, never refetch. */
+    if (state.chartData && state.chartData.discrete) {
+      maybeDraw(state);
+      return;
+    }
     if (!state.chartData) return;
     var d = state.chartData;
     var doc = state.doc;
@@ -1086,6 +1235,30 @@ MarketInd._panes = MarketInd._panes || {};
         }
       });
     } catch (e) { /* button toggle still works */ }
+    /* Discrete mode: everything but price is closed, so the whole menu is
+     * inspectable but non-functional (greyed). Selections are RETAINED in
+     * state.over/state.osc for the return to buckets — only the controls
+     * are disabled, never the state (pool P shares this path via P.discrete). */
+    if (state.discrete) {
+      try {
+        var dnote = doc.createElement("p");
+        dnote.className = "muted";
+        dnote.textContent = t("market.discrete_unavailable", "Indicators unavailable in Discrete.");
+        try {
+          if (panel.firstChild) panel.insertBefore(dnote, panel.firstChild);
+          else panel.appendChild(dnote);
+        } catch (e) { panel.appendChild(dnote); }
+      } catch (e) { /* menu still disables below */ }
+      try {
+        var ctrls = panel.querySelectorAll ? panel.querySelectorAll("input, button") : [];
+        for (var di = 0; di < ctrls.length; di++) {
+          try {
+            ctrls[di].disabled = true;
+            ctrls[di].title = t("market.discrete_unavailable", "Indicators unavailable in Discrete.");
+          } catch (e2) { /* next control */ }
+        }
+      } catch (e) { /* menu stands enabled rather than broken */ }
+    }
     return { button: btn, panel: panel, close: function () { setOpen(false); } };
   }
   MarketInd._panes.drawCharts = drawCharts;

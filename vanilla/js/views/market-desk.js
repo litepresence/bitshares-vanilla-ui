@@ -253,6 +253,10 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
        * (no refetch); overlays default OFF (price + pool map only — every
        * overlay stays available in the Indicators pulldown). */
       bucket: seed.bucket, tfInit: false, logScale: seed.logScale,
+      /* Discrete mode (raw fills, no buckets): a mode flag, never a bucket
+       * size. state.bucket stays numeric as the return target when leaving
+       * Discrete (readDeskQuery seeds both). */
+      discrete: seed.discrete === true,
       /* Toggleable plots (menu "Plots" group): VWAP strip + depth slice + pool map.
        * Only the price pane is always on; pool map defaults on, depth + VWAP
        * default off (all three stay toggleable in the Indicators pulldown). */
@@ -946,6 +950,63 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
             return ("0000000" + h.toString(16)).slice(-8);
           } catch (e) { return null; }
         }
+        /* discreteHash: FNV-1a over the discrete tape (count + last point).
+         * HASH INPUTS — everything the discrete tip paints: point count,
+         * last timeMs, last human price, last base raw. Equal hash means an
+         * unmoved tape, so the repaint is skipped. Null never bails (paint
+         * when in doubt). Params: pts (points array). Returns 8-hex string
+         * or null. Never throws. */
+        function discreteHash(pts) {
+          try {
+            if (!Array.isArray(pts)) return null;
+            var last = pts.length ? pts[pts.length - 1] : null;
+            var s = String(pts.length) + "|" +
+              String(last ? last.timeMs : "") + "|" +
+              String(last ? last.price : "") + "|" +
+              String(last ? last.volumeBaseRaw : "");
+            var h = 0x811c9dc5;
+            for (var i = 0; i < s.length; i++) {
+              h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+            }
+            return ("0000000" + h.toString(16)).slice(-8);
+          } catch (e) { return null; }
+        }
+        /* refreshDiscreteTip: Discrete-mode live tip (raw fills, no buckets,
+         * no deepen — the tape IS the source). Re-fetches the fill tape with
+         * the same lim rule as fill() and repaints only when the tape moved.
+         * Params: seq (generation guard, shared with full-fill). The ticker
+         * refresh below still runs (strip is mode-independent). Never throws. */
+        function refreshDiscreteTip(seq) {
+          var cap = 2000;
+          try {
+            if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) cap = MarketInd.CANDLE_COUNT;
+          } catch (e) { /* default stands */ }
+          var lim = Math.min(Math.max(1, cap | 0), 1000);
+          try {
+            if (typeof MarketFills === "undefined" || !MarketFills ||
+                typeof MarketFills.fillsForMarket !== "function" ||
+                typeof MarketFills.fillsToPoints !== "function") return;
+            MarketFills.fillsForMarket(b.id, q.id, lim).then(function (fres) {
+              if (!deskAlive() || seq !== state.tipSeq) return;
+              var pts = [];
+              try {
+                pts = MarketFills.fillsToPoints((fres && fres.fills) || [], b.id, b.precision, q.precision, q.id, cap);
+              } catch (e) { pts = []; }
+              var h = discreteHash(pts);
+              var key = String(h) + "|" + String(state.liveMode || "off");
+              if (h !== null && state._tipHash === key) return;
+              state._tipHash = key;
+              state.points = pts;
+              state.candles = { bucket: state.bucket, start: null, end: null, buckets: [], closes: [], deep: false };
+              try { state.deep = false; } catch (e) { /* flag best-effort */ }
+              try {
+                if (typeof MarketInd !== "undefined" && MarketInd &&
+                    typeof MarketInd.maybeDraw === "function") MarketInd.maybeDraw(state);
+              } catch (e) { /* chart best-effort */ }
+              paintNote();
+            }).catch(function () { /* tip best-effort; live/poll retries */ });
+          } catch (e) { /* MarketFills missing: live/poll retries */ }
+        }
         function refreshTip() {
           if (!deskAlive()) return;
           if (state.loading) return;
@@ -962,7 +1023,11 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
               count = MarketInd.CANDLE_COUNT;
             }
           } catch (e) { /* default stands */ }
-          try {
+          /* Discrete tip carries raw fills (no tip-window merge, no deepen);
+           * the ticker refresh below still runs (strip is mode-independent). */
+          if (state.discrete) {
+            try { refreshDiscreteTip(seq); } catch (e) { /* tip best-effort */ }
+          } else try {
             Market.candles(b.id, q.id, state.bucket, TIP_COUNT).then(function (c) {
               if (!deskAlive() || seq !== state.tipSeq) return;
               var merged = (c && c.buckets) || [];
