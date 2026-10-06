@@ -40,7 +40,7 @@ var PoolNetUI = (function () {
    * stepFrame/drawScene/loop/wake read S.phys; nothing else branches. */
   var PHYS = {
     calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
-              springRest: 1.1, springK: 0.0015, pull: 0.008, btsPullX: 3,
+              springRest: 1.1, springK: 0.015, pull: 0.008, btsPullX: 3,
               stillTol: 0.35, stillFrames: 25, minFrames: 0, curved: false },
     lively: { repPow: 2, repK: 2.6, repCap: 40, carry: 0.92, temp0: 10, cool: 0.995, tempMin: 0.5,
               springRest: 2.4, springK: 0.006, pull: 0.003, btsPullX: 3,

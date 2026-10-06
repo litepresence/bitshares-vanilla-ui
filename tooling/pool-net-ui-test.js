@@ -81,7 +81,7 @@ var skel = { pools: [
   ok(phys.lively.curved === true && phys.calm.curved !== true, "curves only lively");
   ok(phys.calm.carry === 0.8 && phys.calm.stillFrames === 25 && phys.calm.temp0 === 6 &&
     phys.calm.cool === 0.98 && phys.calm.tempMin === 1 && phys.calm.pull === 0.008 &&
-    phys.calm.springRest === 1.1 && phys.calm.repCap === 5,
+    phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
   ok(phys.lively.repPow === 2 && phys.lively.minFrames === 180, "lively degree-mass repulsion + min-run gate");
   function simState(mode) {
