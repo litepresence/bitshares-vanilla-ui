@@ -54,5 +54,67 @@ const skel = { pools: [
   ok(PN.brandOf("GDEX.BTC") === "gdex", "brand group gdex");
 })();
 
-console.log(pass + " passed, " + fail + " failed");
-process.exit(fail ? 1 : 0);
+// 6. Merge: live rows overlay skeleton (new added, known deduped).
+(function () {
+  const live = [{ id: "1.19.2", asset_a_id: "1.3.0", asset_b_id: "1.3.2", sym_a: "BTS", sym_b: "BTC" },
+                { id: "1.19.9", asset_a_id: "1.3.1", asset_b_id: "1.3.2", sym_a: "USD", sym_b: "BTC" }];
+  const g0 = PN.fromSkeleton(skel);
+  const g1 = PN.mergeLive(g0, live);
+  ok(g1.edges.length === 3, "merge adds new, dedups known");
+  ok(g1.nodes.length === 3, "merge adds no phantom assets");
+})();
+
+// 7. BFS path + orphan null.
+(function () {
+  const live = [{ id: "1.19.2", asset_a_id: "1.3.0", asset_b_id: "1.3.2", sym_a: "BTS", sym_b: "BTC" },
+                { id: "1.19.9", asset_a_id: "1.3.1", asset_b_id: "1.3.2", sym_a: "USD", sym_b: "BTC" }];
+  const g1 = PN.mergeLive(PN.fromSkeleton(skel), live);
+  const p = PN.findPath(g1, "1.3.1", "1.3.0");
+  ok(p && p.hops.length >= 2, "path exists via union");
+  ok(PN.findPath({ nodes: [], edges: [] }, "1.3.1", "1.3.0") === null, "orphan null");
+  ok(PN.findPath(g1, "1.3.0", "1.3.0").hops.length === 1, "self path is one hop");
+})();
+
+// 8. Batched load: paginates 100-per-page until a short page.
+(function () {
+  const pages = [
+    Array.from({ length: 100 }, (_, i) => ({ id: "1.19." + (i + 1) })),
+    [{ id: "1.19.101" }, { id: "1.19.102" }]
+  ];
+  let calls = 0;
+  function listFn(startId) {
+    calls++;
+    return Promise.resolve(pages[calls - 1] || []);
+  }
+  PN.loadAllBatched(listFn, 100).then(function (all) {
+    ok(all.length === 102, "batched load concatenates pages");
+    ok(calls === 2, "batched load stops after short page");
+    // Empty first page resolves empty (offline/empty chain, honest []).
+    PN.loadAllBatched(function () { return Promise.resolve([]); }, 100).then(function (none) {
+      ok(none.length === 0, "batched load empty first page");
+      finish();
+    }).catch(function () { ok(false, "batched load empty first page"); finish(); });
+  }).catch(function () { ok(false, "batched load concatenates pages"); finish(); });
+  return; // async tail finishes below; sync tests already counted above.
+  function finish() {
+    // 9. Cache: chain re-validates, stale ids drop (node stub for localStorage).
+    (function () {
+      const keep = {};
+      globalThis.localStorage = {
+        getItem: function (k) { return Object.prototype.hasOwnProperty.call(keep, k) ? keep[k] : null; },
+        setItem: function (k, v) { keep[k] = String(v); },
+        removeItem: function (k) { delete keep[k]; }
+      };
+      const skelIds = ["1.19.1", "1.19.2"];
+      let r = PN.reconcileExtraIds(skelIds, ["1.19.1", "1.19.2", "1.19.9"]);
+      ok(r.added.length === 1 && r.added[0] === "1.19.9", "cache learns new live id");
+      ok(PN.readExtraIds().length === 1, "cache persists new live id");
+      r = PN.reconcileExtraIds(skelIds, ["1.19.1", "1.19.2"]);
+      ok(r.dropped.length === 1 && r.dropped[0] === "1.19.9", "stale id dropped on re-validate");
+      ok(PN.readExtraIds().length === 0, "cache empty after pool deleted");
+      delete globalThis.localStorage;
+    })();
+    console.log(pass + " passed, " + fail + " failed");
+    process.exit(fail ? 1 : 0);
+  }
+})();
