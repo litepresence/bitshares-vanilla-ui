@@ -546,13 +546,16 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       } catch (e) { /* count stands */ }
     }
     /* repaintForMode: route chart repaints by mode (Discrete skips ES depth
-     * + pool map — the tape IS the source and the map stays closed). */
+     * + pool map — the tape IS the source and the map stays closed). Rides P
+     * (state.redraw/state.paintNote precedent) so deepenPool's adopted-tape
+     * callbacks — which live outside this closure — route the same way. */
     function repaintForMode() {
       P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
       if (P.discrete) { rebucketDiscrete(); return; }
       rebucket();
       deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
     }
+    try { P.repaintForMode = repaintForMode; } catch (e) { /* callbacks fall back to bucketed */ }
     function rebucket() {
       /* Lazy-deep merge (2026-10-01 audit): background ES buckets cached by
        * deepenPool merge UNDER chain authority (fresh P.swaps win every
@@ -735,6 +738,10 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       PoolHistory.swapsForPool(r.id, 1000, { network: net, legA: r.asset_a_id, legB: r.asset_b_id }).then(function (res) {
         P._deepFlight = false;
         if (!live(myGen, uiGen)) return;
+        /* A deepen flight landing while Discrete is active stands down:
+         * the raw tape IS the source and ES depth is meaningless there.
+         * Returning to buckets re-runs deepen through repaintForMode. */
+        if (P.discrete) return;
         var swaps = (res && res.swaps) || [];
         if (!swaps.length) return;
         /* Orientation-bound (invert wiring): the ES tape enriches + buckets
@@ -758,6 +765,10 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           try {
             MarketInd.paintTimeframes(doc, P, function () {
               if (!live(myGen, uiGen)) return;
+              /* Mode router rides P (state.redraw/state.paintNote precedent):
+               * chartPane assigns it below; the fallback preserves the old
+               * bucketed behavior when absent. */
+              if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
               P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
               rebucket();
               deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
@@ -765,6 +776,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
             if (typeof MarketInd.paintCountInput === "function") {
               MarketInd.paintCountInput(doc, P, function () {
                 if (!live(myGen, uiGen)) return;
+                if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
                 P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
                 rebucket();
                 deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);

@@ -654,6 +654,63 @@ MarketInd._panes = MarketInd._panes || {};
    * (indicator toggles must reflect instantly); the cache saves only the
    * per-candle Number()/string reads plus array allocs. Rendered charts are
    * identical: same arrays, same order, same values. */
+  /* syncIndMenu: reflect state.discrete on the rendered Indicators menu
+   * (one .mkt-indmenu-panel per desk — exchange and pool never coexist).
+   * Discrete disables every control with the unavailable title + an
+   * explanatory note; buckets restore. Construction-time disabled boxes
+   * (missing indicator fns) carry no marker and are never touched, so they
+   * stay disabled with their own reasons. Marker-guarded + idempotent:
+   * controls this function disabled get data-dd="1" and only those are ever
+   * re-enabled. Called from the draw paths so EVERY mode switch lands
+   * correctly no matter how it was entered (deep link, radio click).
+   * Params: doc, state. Never throws. */
+  function syncIndMenu(doc, state) {
+    try {
+      if (!doc || typeof doc.querySelector !== "function") return;
+      var panel = doc.querySelector(".mkt-indmenu-panel");
+      if (!panel) return;
+      var msg = t("market.discrete_unavailable", "Indicators unavailable in Discrete.");
+      var note = null;
+      try { note = panel.querySelector("[data-discrete-note]"); } catch (e) { note = null; }
+      var ctrls = [];
+      try { ctrls = panel.querySelectorAll ? panel.querySelectorAll("input, button") : []; } catch (e) { ctrls = []; }
+      var i;
+      if (state.discrete) {
+        if (!note) {
+          try {
+            note = doc.createElement("p");
+            note.className = "muted";
+            try { note.setAttribute("data-discrete-note", "1"); } catch (e) { /* marker below still stands */ }
+            note.textContent = msg;
+            if (panel.firstChild) panel.insertBefore(note, panel.firstChild);
+            else panel.appendChild(note);
+          } catch (e) { /* controls still disable below */ }
+        }
+        for (i = 0; i < ctrls.length; i++) {
+          try {
+            ctrls[i].disabled = true;
+            ctrls[i].title = msg;
+            try { ctrls[i].setAttribute("data-dd", "1"); } catch (e2) { /* disabled stands */ }
+          } catch (e2) { /* next control */ }
+        }
+      } else {
+        if (note && note.parentNode) {
+          try { note.parentNode.removeChild(note); } catch (e) { /* gone */ }
+        }
+        for (i = 0; i < ctrls.length; i++) {
+          try {
+            var marked = false;
+            try { marked = ctrls[i].getAttribute && ctrls[i].getAttribute("data-dd") === "1"; } catch (e2) { marked = false; }
+            if (!marked) continue;
+            ctrls[i].disabled = false;
+            ctrls[i].title = "";
+            try { ctrls[i].removeAttribute("data-dd"); } catch (e2) { /* enabled stands */ }
+          } catch (e2) { /* next control */ }
+        }
+      }
+    } catch (e) { /* menu sync must never break the desk */ }
+  }
+
   /* drawDiscrete: Discrete-mode paint (one caller: maybeDraw's flag branch;
    * drawCharts re-dispatches here via the chartData.discrete marker so
    * resize/theme/invert redraws stay live). Tears down LWC + osc + VWAP +
@@ -664,8 +721,7 @@ MarketInd._panes = MarketInd._panes || {};
   function drawDiscrete(state) {
     try {
       var sdoc = state.doc;
-      if (!sdoc || !state.priceHost || !state.oscHost) return;
-      var pts = Array.isArray(state.points) ? state.points : [];
+      if (!sdoc || !state.priceHost || !state.oscHost) return;      var pts = Array.isArray(state.points) ? state.points : [];
       var C = themeChartColors();
       var frame = { paneBg: C.paneBg, grid: C.grid, text: C.text, accent: C.accent, muted: C.muted };
       var emptyText = state.discreteEmptyText ||
@@ -735,6 +791,9 @@ MarketInd._panes = MarketInd._panes || {};
       } catch (e) { /* panes stand on honest empties */ }
       state.chartData = { buckets: [], discrete: true, points: pts };
       try { paintCountNote(state); } catch (e) { /* note best-effort */ }
+      /* Menu follows the mode (covers mid-session switches — the
+       * construction-time pass only handles deep-link entry). */
+      try { syncIndMenu(sdoc, state); } catch (e) { /* menu best-effort */ }
     } catch (e) { /* discrete paint must never break the desk */ }
   }
 
@@ -758,6 +817,8 @@ MarketInd._panes = MarketInd._panes || {};
     } catch (e) { /* pane stands */ }
     state.discreteVolWrap = null;
     state.discreteVolBody = null;
+    /* Menu follows the mode back (re-enables what the discrete pass marked). */
+    try { syncIndMenu(state.doc, state); } catch (e) { /* menu best-effort */ }
     var buckets = (state.candles && Array.isArray(state.candles.buckets))
       ? state.candles.buckets : [];
     var firstMs = buckets.length > 0 ? ((buckets[0] && buckets[0].timeMs) || 0) : 0;

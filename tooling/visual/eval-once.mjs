@@ -9,21 +9,24 @@ import { chromium } from "playwright-core";
 const url = process.argv[2];
 const expr = process.argv[3] || "document.title";
 const waitMs = Number(process.argv[4] || 8000);
+/* 4th arg: "mainnet" keeps the default network (no testnet override). */
+const forceTestnet = process.argv[5] !== "mainnet";
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
 const errors = [];
 page.on("console", (m) => { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
 page.on("pageerror", (e) => errors.push("pageerror: " + String(e).slice(0, 300)));
-await page.addInitScript(() => {
+await page.addInitScript((wantTestnet) => {
   try {
+    if (!wantTestnet) return;
     const raw = localStorage.getItem("bts-vanilla-settings-v1");
     const s = raw ? JSON.parse(raw) : {};
     s.network = "testnet";
     s.activeNode = "wss://testnet.xbts.io/ws";
     localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
   } catch {}
-});
+}, forceTestnet);
 await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
 await page.waitForTimeout(waitMs);
 let out;

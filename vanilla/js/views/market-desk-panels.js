@@ -553,6 +553,10 @@ MarketDesk._panels = MarketDesk._panels || {};
         try {
           if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
         } catch (e) { /* headless: keep going */ }
+        /* A deepen flight landing while Discrete is active stands down:
+         * bucketed candles must never paint over raw dots (state.points
+         * stands; returning to buckets re-runs deepen through fill). */
+        if (state.discrete) return;
         state.deepKey = key;
         var count = 2000;
         try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) count = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
