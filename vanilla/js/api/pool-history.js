@@ -41,6 +41,33 @@ var PoolHistory = (function () {
   var ES_MAX_PAGES = 2;
   var ES_MAX_EVENTS = 1000;
 
+  /* Fixed decimals for BigInt-computed price strings (follows #1's
+   * Price.toReal reward — `parseFloat(real.toFixed(8))`,
+   * MarketClasses.js:284). Kept as the default — sub-satoshi tapes use the
+   * magnitude-aware places below (4 sig figs, same rule as MarketCandles and
+   * MarketFills; pool 1.19.58 proved fixed-8 collapses a 5% move at 2e-8 to
+   * one flat "0.00000002" candle). */
+  var PRICE_PLACES = 8;
+
+  /* Ceiling for magnitude-aware places (see MarketCandles.SIGFIG_MAX —
+   * duplicated plain code keeps this file self-contained, same convention
+   * as the market-fills split). */
+  var SIGFIG_MAX = 12;
+
+  /* Magnitude-aware places for already-human price strings (Number for
+   * magnitude only, never money). Falls back to PRICE_PLACES when the
+   * formatter is absent or the set is empty/zero-only. Never throws. */
+  function _sigPlaces(humans) {
+    try {
+      if (typeof Format !== "undefined" && Format &&
+          typeof Format.sigFigPlaces === "function") {
+        var p = Format.sigFigPlaces(humans);
+        if (Number.isInteger(p) && p >= 0 && p <= 18) return p > SIGFIG_MAX ? SIGFIG_MAX : p;
+      }
+    } catch (e) { /* fallback stands */ }
+    return PRICE_PLACES;
+  }
+
   /* Chain fallback bounds: newest-first block scan, concurrent batches. */
   var SCAN_BATCH = 8;
   var SCAN_MAX_BLOCKS = 2000;
@@ -265,9 +292,11 @@ var PoolHistory = (function () {
   /* Price orientation (#5 parse_price_history rule): price is always BUY-leg
    * per SELL-leg in pool-leg terms — legs sort by asset id (a<b consensus),
    * so paid=A&recv=B -> recv/paid, paid=B&recv=A -> paid/recv. Exact BigInt
-   * ratio via Format; precisions resolved by the caller. Returns human
-   * string or null (zero legs never divide). */
-  function priceHuman(sw, precA, precB, assetA, assetB) {
+   * ratio via Format; precisions resolved by the caller. places defaults to
+   * PRICE_PLACES (backward compat — the "2.00000000" vectors pin it);
+   * enrich passes the magnitude-aware value so sub-satoshi tapes keep their
+   * variation. Returns human string or null (zero legs never divide). */
+  function priceHuman(sw, precA, precB, assetA, assetB, places) {
     try {
       var paidA = String(sw.paid.asset) === String(assetA);
       var paidB = String(sw.paid.asset) === String(assetB);
@@ -279,7 +308,8 @@ var PoolHistory = (function () {
       else return null;
       if (!/^\d+$/.test(String(num)) || !/^\d+$/.test(String(den))) return null;
       if (BigInt(den) <= 0n) return null;
-      return Format.formatPrice(String(num), numPrec, String(den), denPrec, 8);
+      var pl = (Number.isInteger(places) && places >= 0 && places <= 18) ? places : PRICE_PLACES;
+      return Format.formatPrice(String(num), numPrec, String(den), denPrec, pl);
     } catch (e) { return null; }
   }
 
@@ -338,13 +368,33 @@ var PoolHistory = (function () {
   }
 
   /* Enrich swaps with the oriented human price (one pass; unknown assets
-   * keep a null price and drop from candles, never the tape). Returns the
+   * keep a null price and drop from candles, never the tape). places defaults
+   * to magnitude-aware (probe every swap at SIGFIG_MAX, choose once via
+   * _sigPlaces, then price at that precision — the market-fills fillsToCandles
+   * pattern; empty/zero-only falls back to PRICE_PLACES and renders as
+   * today). An explicit integer 0..18 overrides (single pass). Returns the
    * same array (mutated with .price), newest first.
    * Robustness: non-array input throws named "bad swaps" (never raw). */
-  function enrich(swaps, assetA, precA, assetB, precB) {
+  function enrich(swaps, assetA, precA, assetB, precB, places) {
     if (!Array.isArray(swaps)) throw new Error("bad swaps: expected array, got: " + String(swaps).slice(0, 32));
+    var pl = (Number.isInteger(places) && places >= 0 && places <= 18) ? places : null;
+    if (pl === null) {
+      /* Upgrade-only (never below PRICE_PLACES): normal tapes keep their
+       * pinned 8-place strings (vectors + the tape price-band filter count
+       * on it); sub-satoshi tapes open to 9..12 so a 5% move at 2e-8 stops
+       * printing one flat candle. */
+      try {
+        var probe = [];
+        (swaps || []).forEach(function (sw) {
+          var p = priceHuman(sw, precA, precB, assetA, assetB, SIGFIG_MAX);
+          if (p !== null && p !== undefined) probe.push(p);
+        });
+        pl = _sigPlaces(probe);
+        if (!(pl >= PRICE_PLACES)) pl = PRICE_PLACES;
+      } catch (e) { pl = PRICE_PLACES; }
+    }
     (swaps || []).forEach(function (sw) {
-      sw.price = priceHuman(sw, precA, precB, assetA, assetB);
+      sw.price = priceHuman(sw, precA, precB, assetA, assetB, pl);
     });
     return swaps;
   }
@@ -374,6 +424,18 @@ var PoolHistory = (function () {
     var taker = Number(args.taker_units) || 0;
     if (!Number.isInteger(taker) || taker < 0 || taker > 10000) taker = 0; // hostile fee defaults to 0 haircut (never inflate out)
     if (balA <= 0n || balB <= 0n) return { bids: [], asks: [] };
+    /* Level-price places (same collapse as the swap tape: fixed 8 prints one
+     * flat "0.00000002" book on sub-satoshi pools like 1.19.58). Probe the
+     * spot at SIGFIG_MAX once, choose via _sigPlaces, then price every
+     * level at that precision — normal pools keep 8, tiny ones open up. */
+    var levelPlaces = PRICE_PLACES;
+    try {
+      var spotProbe = Format.formatPrice(balB.toString(), precB, balA.toString(), precA, SIGFIG_MAX);
+      levelPlaces = _sigPlaces([spotProbe]);
+      /* Upgrade-only like enrich above: the "2.00601805"/"1.99400000"
+       * book vectors pin 8 places for normal pools. */
+      if (!(levelPlaces >= PRICE_PLACES)) levelPlaces = PRICE_PLACES;
+    } catch (e) { levelPlaces = PRICE_PLACES; }
     function side(sellReserve, outReserve, sellPrec, outPrec, sellIsA) {
       var levels = [];
       SLICES.forEach(function (fr) {
@@ -389,10 +451,11 @@ var PoolHistory = (function () {
           if (out <= 0n) return;
           /* Price B-per-A: asks pay B (sellPrec) for A; bids receive B
            * for A sold. Precisions ride their own legs (equal-precision
-           * tests can't catch a swap — documented). */
+           * tests can't catch a swap — documented). Places ride the
+           * spot probe above (sub-satoshi books keep their spread). */
           var price = sellIsA
-            ? Format.formatPrice(out.toString(), outPrec, sell.toString(), sellPrec, 8)
-            : Format.formatPrice(sell.toString(), sellPrec, out.toString(), outPrec, 8);
+            ? Format.formatPrice(out.toString(), outPrec, sell.toString(), sellPrec, levelPlaces)
+            : Format.formatPrice(sell.toString(), sellPrec, out.toString(), outPrec, levelPlaces);
           var amtSell = Format.formatAmount(sell.toString(), sellPrec);
           var amtOut = Format.formatAmount(out.toString(), outPrec);
           levels.push({

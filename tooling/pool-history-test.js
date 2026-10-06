@@ -222,6 +222,37 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     eq([c[0].baseVolume, c[1].baseVolume], ["2.5000", "3.0000"], "1D smoke: B-leg volume per slot");
   })();
 
+  // 8. Sub-satoshi tapes keep their variation (pool 1.19.58: ~2e-8 legs;
+  // fixed-8 enrich printed one flat "0.00000002" candle for a 5% move).
+  // enrich is upgrade-only: normal tapes keep pinned 8-place strings.
+  (function () {
+    const A = "1.3.0", B = "1.3.1";
+    const tiny = [
+      { time: "2026-10-06T12:49:39Z", paid: { amount: "100000000", asset: A }, received: { amount: "1610", asset: B } },
+      { time: "2026-10-06T12:48:09Z", paid: { amount: "100000000", asset: A }, received: { amount: "1690", asset: B } },
+    ];
+    PH.enrich(tiny, A, 5, B, 8);
+    eq(tiny.map((s) => s.price), ["0.00000001610", "0.00000001690"], "tiny enrich keeps 5% move distinct");
+    const c = PH.swapsToCandles(tiny, 300, B, 8);
+    eq(c.length, 1, "tiny: one bucket");
+    eq(c[0].high !== c[0].low, true, "tiny: candle shows high/low variation (was flat)");
+    // explicit places still honored (single pass, back-compat).
+    const one = [{ paid: { amount: "100000000", asset: A }, received: { amount: "1610", asset: B } }];
+    PH.enrich(one, A, 5, B, 8, 8);
+    eq(one[0].price, "0.00000002", "tiny enrich explicit 8 stays 8");
+    // normal tapes untouched by the probe.
+    const norm = [
+      { time: "2026-10-06T12:49:39Z", paid: { amount: "100000", asset: "1.3.1" }, received: { amount: "20000", asset: "1.3.2" } },
+      { time: "2026-10-06T12:48:09Z", paid: { amount: "100000", asset: "1.3.1" }, received: { amount: "22000", asset: "1.3.2" } },
+    ];
+    PH.enrich(norm, "1.3.1", 5, "1.3.2", 4);
+    eq(norm.map((s) => s.price), ["2.00000000", "2.20000000"], "normal enrich stays 8-place");
+    // tiny synth book keeps distinct levels (was: every level one price).
+    const tb = PH.synthBook({ balanceA_raw: "1291515628227", balanceB_raw: "20874513", precA: 5, precB: 8, taker_units: 50 });
+    eq(new Set(tb.asks.map((l) => l.price)).size, tb.asks.length, "tiny book asks distinct");
+    eq(new Set(tb.bids.map((l) => l.price)).size, tb.bids.length, "tiny book bids distinct");
+  })();
+
   console.log("Pool-history vectors: " + pass + " pass, " + fail + " fail");
   process.exit(fail ? 1 : 0);
 })();

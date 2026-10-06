@@ -1116,6 +1116,26 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     tabMy.type = "button"; tabMy.id = "pool-hist-tab-my"; tabMy.setAttribute("role", "tab");
     tabs.appendChild(tabPool); tabs.appendChild(tabMy);
     hist.appendChild(tabs);
+    /* Swap filter row (client-side over the fetched tape — no refetch, no
+     * new chain call; ephemeral, persist nothing): side select (buy =
+     * received leg A, sell = paid leg A — A is the charted goods in this
+     * desk's B-per-A orientation) + min/max price bounds on the displayed
+     * 8-place Price column (Format.parseAmount at 8 places; blank/invalid
+     * bounds are ignored, never blocking — forgiving per principle #4) +
+     * account substring (id or name fragment, case-insensitive).
+     * paintTape reads these controls at every paint, so the background
+     * deepenPool late-fill keeps active filters. */
+    var fltSide = Forms.labeledSelect(doc, t("market.col_side", "Side") + " ",
+      [["all", t("market.kind_all", "All")], ["buy", t("account.buy_th", "Buy")], ["sell", t("account.sell_th", "Sell")]], "all");
+    hist.appendChild(fltSide.row);
+    var fltMin = Forms.labeledInput(doc, t("market.flt_min_price", "Min price") + " ", { inputmode: "decimal", autocomplete: "off" });
+    hist.appendChild(fltMin.row);
+    var fltMax = Forms.labeledInput(doc, t("market.flt_max_price", "Max price") + " ", { inputmode: "decimal", autocomplete: "off" });
+    hist.appendChild(fltMax.row);
+    var fltAcct = Forms.labeledInput(doc, t("account.card_account", "Account") + " ", {
+      placeholder: t("common.name_or_id_hint", "name or 1.2.N"), autocomplete: "off"
+    });
+    hist.appendChild(fltAcct.row);
     var poolBody = u.el(doc, "div"); poolBody.id = "pool-hist-pool"; poolBody.setAttribute("role", "tabpanel");
     var myBody = u.el(doc, "div"); myBody.id = "pool-hist-my"; myBody.setAttribute("role", "tabpanel");
     /* APG tab-panel association (both panels exist with stable ids). */
@@ -1167,20 +1187,130 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     poolBody.removeChild(note);
     /* paintTape: render one tape state into poolBody (extracted so the
      * background deepenPool can late-fill the list when chain-first came up
-     * empty — same three branches, same keys, no new words). */
+     * empty — same three branches, same keys, no new words). Caches the
+     * tape for filter repaints, then applies the filter row client-side;
+     * the 50-row cap is kept and the N= line names the filtered total so
+     * caps never hide silently. */
+    /* lastTape: most recent tape state for filter repaints (filter changes
+     * never refetch). */
+    var lastTape = { swaps: [], source: null };
     function paintTape(swaps, source) {
+      lastTape = { swaps: swaps || [], source: source || null };
+      var filtered = applyTapeFilter(lastTape.swaps, readTapeFilter());
       while (poolBody.firstChild) poolBody.removeChild(poolBody.firstChild);
-      if (!source) {
+      if (!lastTape.source) {
         poolBody.appendChild(u.el(doc, "p", t("pool_detail.s2", "Pool history unavailable (chain-only; no external index)."), "muted"));
-      } else if (!swaps.length) {
+      } else if (!lastTape.swaps.length) {
         poolBody.appendChild(u.el(doc, "p", t("pool.no_swaps", "No swaps yet.") + t("pool.swaps_hint", " Swaps appear after the first exchange in this pool — run one from the Swap panel above."), "muted"));
+      } else if (!filtered.length) {
+        poolBody.appendChild(u.el(doc, "p", t("pool.no_filter_match", "No swaps match these filters."), "muted"));
+        poolBody.appendChild(u.el(doc, "p", tapeCount(0, 0), "muted"));
       } else {
+        var shown = filtered.slice(0, 50);
         var scroller = doc.createElement("div");
         scroller.className = "pool-hist-scroll";
-        scroller.appendChild(tapeTable(doc, swaps.slice(0, 50), r));
+        scroller.appendChild(tapeTable(doc, shown, r));
         poolBody.appendChild(scroller);
+        poolBody.appendChild(u.el(doc, "p", tapeCount(shown.length, filtered.length), "muted"));
       }
     }
+    /* readTapeFilter: current pool-tape filter values (side/all + raw bound
+     * + account strings — parsing happens in applyTapeFilter). Never throws
+     * (missing controls read as unfiltered).
+     * @returns {{side: string, min: string, max: string, acct: string}} */
+    function readTapeFilter() {
+      var side = "all", mn = "", mx = "", ac = "";
+      try { side = fltSide.select.value || "all"; } catch (e) { side = "all"; }
+      try { mn = fltMin.input.value; } catch (e) { mn = ""; }
+      try { mx = fltMax.input.value; } catch (e) { mx = ""; }
+      try { ac = fltAcct.input.value; } catch (e) { ac = ""; }
+      return { side: side, min: String(mn || "").trim(), max: String(mx || "").trim(), acct: String(ac || "").trim() };
+    }
+    /* swapSide: buy when the swap RECEIVED leg A (bought the charted goods),
+     * sell when it PAID leg A. Null on unknown legs (matches no side
+     * filter, kept when side is all). Orientation-independent (legs never
+     * swap under the Invert toggle — only prices re-enrich).
+     * @param {any} sw enriched swap (paid/received {amount, asset})
+     * @returns {string|null} "buy", "sell", or null. */
+    function swapSide(sw) {
+      try {
+        if (sw && sw.received && String(sw.received.asset) === String(r.asset_a_id)) return "buy";
+        if (sw && sw.paid && String(sw.paid.asset) === String(r.asset_a_id)) return "sell";
+      } catch (e) { /* null below */ }
+      return null;
+    }
+    /* swapPrice12: tape Price string (B-per-A from enrich, 8 places on
+     * normal pools, up to 12 on sub-satoshi ones) as a raw int via
+     * parseAmount round-trip — exact, never float. Parsed at 12 so longer
+     * strings never throw (8-place strings pad up fine, comparisons stay
+     * exact). Null when the row never enriched: bounded filters exclude it,
+     * unbounded keep it.
+     * @param {any} sw enriched swap
+     * @returns {string|null} digit string or null. */
+    function swapPrice12(sw) {
+      try {
+        if (!sw || sw.price === null || sw.price === undefined) return null;
+        return Format.parseAmount(String(sw.price), 12);
+      } catch (e) { return null; }
+    }
+    /* tapeBound12: human decimal bound -> 12-place raw int string, or null
+     * for blank/invalid (ignored, never blocking — forgiving per #4).
+     * Parses at 12 to match swapPrice12 above (a typed 8-place bound pads
+     * up exactly; sub-satoshi bounds keep their figs).
+     * @param {string} s raw input
+     * @returns {string|null} */
+    function tapeBound12(s) {
+      var v = String(s || "").trim();
+      if (!v) return null;
+      try { return Format.parseAmount(v, 12); } catch (e) { return null; }
+    }
+    /* applyTapeFilter: side + price-band + account-substring over fetched
+     * swaps (client-side only — no refetch). Price compares exact BigInt at
+     * 12 places (never float); account matches case-insensitively.
+     * @param {any[]} swaps unfiltered tape swaps
+     * @param {{side: string, min: string, max: string, acct: string}} flt
+     * @returns {any[]} filtered swaps. */
+    function applyTapeFilter(swaps, flt) {
+      var minR = tapeBound12(flt.min), maxR = tapeBound12(flt.max);
+      var minB = null, maxB = null;
+      try { if (minR !== null) minB = BigInt(minR); } catch (e) { minB = null; }
+      try { if (maxR !== null) maxB = BigInt(maxR); } catch (e) { maxB = null; }
+      var aq = flt.acct ? flt.acct.toLowerCase() : "";
+      return (swaps || []).filter(function (sw) {
+        if (flt.side === "buy" || flt.side === "sell") {
+          if (swapSide(sw) !== flt.side) return false;
+        }
+        if (minB !== null || maxB !== null) {
+          var p12 = swapPrice12(sw);
+          if (p12 === null) return false;
+          var pv = null;
+          try { pv = BigInt(p12); } catch (e) { return false; }
+          if (minB !== null && pv < minB) return false;
+          if (maxB !== null && pv > maxB) return false;
+        }
+        if (aq && String((sw && sw.account) || "").toLowerCase().indexOf(aq) === -1) return false;
+        return true;
+      });
+    }
+    /* tapeCount: cap label in pure symbols (numbers + "/" + "N=" need no
+     * translation — principle #10). "N=47" when everything shows, "50/231"
+     * when the 50-row cap cuts the filtered tape, so caps never hide
+     * silently.
+     * @param {number} shown rows rendered
+     * @param {number} total filtered rows
+     * @returns {string} */
+    function tapeCount(shown, total) {
+      return shown >= total ? ("N=" + total) : (shown + "/" + total);
+    }
+    /* Tape filter repaints (reactive per #4): every control repaints from
+     * the cached tape — never a refetch. */
+    function refilterTape() {
+      paintTape(lastTape.swaps, lastTape.source);
+    }
+    fltSide.select.addEventListener("change", refilterTape);
+    fltMin.input.addEventListener("input", refilterTape);
+    fltMax.input.addEventListener("input", refilterTape);
+    fltAcct.input.addEventListener("input", refilterTape);
     paintTape((tape && tape.swaps) || [], tape ? tape.source : null);
     try {
       if (histHook) histHook.setTape = function (swaps, source) {
@@ -1211,20 +1341,58 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       var viewBtn = u.touchable(u.el(doc, "button", t("referrals.look_up", "Look up")));
       viewBtn.type = "button";
       myBodyEl.appendChild(viewBtn);
+      /* My-swaps filter row: side + min/max price only (account stays the
+       * fAcct lookup above — no second account control here). Same
+       * client-side contract as the pool-tape row: ephemeral, no refetch. */
+      var fSide = Forms.labeledSelect(doc, t("market.col_side", "Side") + " ",
+        [["all", t("market.kind_all", "All")], ["buy", t("account.buy_th", "Buy")], ["sell", t("account.sell_th", "Sell")]], "all");
+      myBodyEl.appendChild(fSide.row);
+      var fMin = Forms.labeledInput(doc, t("market.flt_min_price", "Min price") + " ", { inputmode: "decimal", autocomplete: "off" });
+      myBodyEl.appendChild(fMin.row);
+      var fMax = Forms.labeledInput(doc, t("market.flt_max_price", "Max price") + " ", { inputmode: "decimal", autocomplete: "off" });
+      myBodyEl.appendChild(fMax.row);
       var listBox = u.el(doc, "div");
       myBodyEl.appendChild(listBox);
+      /* lastMine: this account's pool swaps (unfiltered cache — filter
+       * changes repaint, never refetch). Null until the first paint. */
+      var lastMine = null;
       /* drawMine: paint one account's pool swaps (empty -> hint).
-       * No-ops when the route generation moved on. Long lists scroll in
-       * place inside .pool-hist-scroll (same metrics as .trades-scroll). */
+       * Caches the unfiltered rows, then applies the side/price filter row
+       * above client-side via the shared applyTapeFilter (acct blank — the
+       * fAcct lookup already scoped the rows); the 20-row cap is kept and
+       * the N= line names the filtered total. No-ops when the route
+       * generation moved on. Long lists scroll in place inside
+       * .pool-hist-scroll (same metrics as .trades-scroll). */
       function drawMine(mine) {
         if (!live(g1, g2)) return;
+        lastMine = mine || [];
+        var side = "all", mn = "", mx = "";
+        try { side = fSide.select.value || "all"; } catch (e) { side = "all"; }
+        try { mn = fMin.input.value; } catch (e) { mn = ""; }
+        try { mx = fMax.input.value; } catch (e) { mx = ""; }
+        var filtered = applyTapeFilter(lastMine, { side: side, min: String(mn || "").trim(), max: String(mx || "").trim(), acct: "" });
         u.clearBox(listBox);
-        if (!mine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + t("pool.my_swaps_hint", " Run one from the Swap panel above — your swaps in this pool list here."), "muted")); return; }
+        if (!filtered.length) {
+          if (lastMine.length) { listBox.appendChild(u.el(doc, "p", t("pool.no_filter_match", "No swaps match these filters."), "muted")); }
+          else { listBox.appendChild(u.el(doc, "p", t("pool.no_my_exchanges", "No swaps for your account in this pool.") + t("pool.my_swaps_hint", " Run one from the Swap panel above — your swaps in this pool list here."), "muted")); }
+          listBox.appendChild(u.el(doc, "p", tapeCount(0, 0), "muted"));
+          return;
+        }
+        var shown = filtered.slice(0, 20);
         var scroller = doc.createElement("div");
         scroller.className = "pool-hist-scroll";
-        scroller.appendChild(tapeTable(doc, mine.slice(0, 20), row));
+        scroller.appendChild(tapeTable(doc, shown, row));
         listBox.appendChild(scroller);
+        listBox.appendChild(u.el(doc, "p", tapeCount(shown.length, filtered.length), "muted"));
       }
+      /* Mine filter repaints: every control repaints from the cached rows. */
+      function refilterMine() {
+        if (lastMine === null) return;
+        drawMine(lastMine);
+      }
+      fSide.select.addEventListener("change", refilterMine);
+      fMin.input.addEventListener("input", refilterMine);
+      fMax.input.addEventListener("input", refilterMine);
       /* lockedHint: locked-wallet empty state with a Wallet link. */
       function lockedHint() {
         if (!live(g1, g2)) return;

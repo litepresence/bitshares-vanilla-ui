@@ -217,8 +217,32 @@ MarketDesk._panels = MarketDesk._panels || {};
     acctRow.appendChild(doc.createTextNode(" "));
     acctRow.appendChild(viewBtn);
     host.appendChild(acctRow);
+    /* Fill filter row (client-side over fetched rows — no refetch, no new WS
+     * method; ephemeral, persist nothing): side select (buy = the fill
+     * acquired the BASE leg, sell = it paid the base leg — the Buy/Sell
+     * panels quote the same way) + min/max price bounds on the displayed
+     * 8-place price (Format.parseAmount at 8 places; blank/invalid bounds
+     * are ignored, never blocking — forgiving per principle #4) + account
+     * substring (op account_id; every fetched row shares one account, so
+     * this rarely narrows — it stays so both desks filter identically).
+     * Repaints from the cached fills on every keystroke/selection. */
+    var fltSide = Forms.labeledSelect(doc, t("market.col_side", "Side") + " ",
+      [["all", t("market.kind_all", "All")], ["buy", t("account.buy_th", "Buy")], ["sell", t("account.sell_th", "Sell")]], "all");
+    host.appendChild(fltSide.row);
+    var fltMin = Forms.labeledInput(doc, t("market.flt_min_price", "Min price") + " ", { inputmode: "decimal", autocomplete: "off" });
+    host.appendChild(fltMin.row);
+    var fltMax = Forms.labeledInput(doc, t("market.flt_max_price", "Max price") + " ", { inputmode: "decimal", autocomplete: "off" });
+    host.appendChild(fltMax.row);
+    var fltAcct = Forms.labeledInput(doc, t("account.card_account", "Account") + " ", {
+      placeholder: t("common.name_or_id_hint", "name or 1.2.N"), autocomplete: "off"
+    });
+    host.appendChild(fltAcct.row);
     var myBody = doc.createElement("div");
     host.appendChild(myBody);
+    /* lastFills: the most recent fetched pair-fills (unfiltered cache for
+     * filter repaints — filter changes never refetch). Null until the first
+     * paint. */
+    var lastFills = null;
     /* lockedHint: locked-wallet empty state with a Wallet link. */
     function lockedHint() {
       DOM.clear(myBody);
@@ -283,15 +307,25 @@ MarketDesk._panels = MarketDesk._panels || {};
       return { block: String(blk), price: String(price), amount: String(amt) };
     }
     /* paintFills: op-4 pair fills for the typed/unlocked account as a
-     * table (empty -> honest hint). No-ops when live() is false. */
+     * table (empty -> honest hint). Caches the unfiltered rows for filter
+     * repaints, then applies the filter row client-side; the 30-row cap is
+     * kept and the N= line names the filtered total so caps never hide
+     * silently. No-ops when live() is false. */
     function paintFills(fills) {
       if (!live()) return;
+      lastFills = fills || [];
+      var filtered = applyFillFilter(lastFills, readFillFilter());
       DOM.clear(myBody);
-      if (fills.length === 0) {
-        myBody.appendChild(DOM.el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
+      if (filtered.length === 0) {
+        if (lastFills.length) {
+          myBody.appendChild(DOM.el(doc, "p", t("market.no_filter_match", "No fills match these filters."), "muted"));
+        } else {
+          myBody.appendChild(DOM.el(doc, "p", t("market.no_my_trades", "No fills for your account on this market.") + t("market.my_trades_hint", " Place an order from the Buy/Sell panels — unlock the wallet to see your fills."), "muted"));
+        }
+        myBody.appendChild(DOM.el(doc, "p", fillCount(0, 0), "muted"));
         return;
       }
-      var shown = fills.slice(0, 30);
+      var shown = filtered.slice(0, 30);
       var rows = shown.map(fillCells);
       /* TableRenderer pilot: the table shell comes from the shared renderer
        * (same Block/Price/Amount titles, order, and left alignment as the
@@ -321,8 +355,119 @@ MarketDesk._panels = MarketDesk._panels || {};
       scroller.appendChild(table);
       myBody.appendChild(scroller);
       myBody.appendChild(cards);
+      myBody.appendChild(DOM.el(doc, "p", fillCount(shown.length, filtered.length), "muted"));
       rawDetails(doc, myBody, t("market.raw_my_fills", "Raw my fills"), shown.map(function (f) { return f.row; }));
     }
+    /* readFillFilter: current filter control values (side/all + raw bound
+     * + account strings — parsing happens in applyFillFilter). Never throws
+     * (missing controls read as unfiltered).
+     * @returns {{side: string, min: string, max: string, acct: string}} */
+    function readFillFilter() {
+      var side = "all", mn = "", mx = "", ac = "";
+      try { side = fltSide.select.value || "all"; } catch (e) { side = "all"; }
+      try { mn = fltMin.input.value; } catch (e) { mn = ""; }
+      try { mx = fltMax.input.value; } catch (e) { mx = ""; }
+      try { ac = fltAcct.input.value; } catch (e) { ac = ""; }
+      return { side: side, min: String(mn || "").trim(), max: String(mx || "").trim(), acct: String(ac || "").trim() };
+    }
+    /* fillSide: buy when the fill RECEIVED the base leg (acquired base —
+     * the Buy panel direction), sell when it PAID the base leg. The pair
+     * filter above guarantees one leg is base, so null only fires on
+     * malformed ops (matches no side filter, kept when side is all).
+     * @param {{op: any}} f pair-fill
+     * @returns {string|null} "buy", "sell", or null. */
+    function fillSide(f) {
+      try {
+        var pays = (f.op && f.op.pays) || null, recv = (f.op && f.op.receives) || null;
+        if (recv && recv.asset_id === b.id) return "buy";
+        if (pays && pays.asset_id === b.id) return "sell";
+      } catch (e) { /* null below */ }
+      return null;
+    }
+    /* fillPrice8: the displayed fill price as an 8-place raw integer string
+     * (same leg math + formatPrice places as fillCells, then a parseAmount
+     * round-trip — exact, never float). Null when unpriceable: bounded
+     * filters exclude the row, unbounded filters keep it.
+     * @param {{op: any}} f pair-fill
+     * @returns {string|null} digit string or null. */
+    function fillPrice8(f) {
+      try {
+        var fp = f.op.fill_price || null;
+        if (!fp || !fp.base || !fp.quote) return null;
+        if (!/^-?\d+$/.test(String(fp.base.amount)) || !/^-?\d+$/.test(String(fp.quote.amount))) return null;
+        var rawB = fp.base.asset_id === b.id ? String(fp.base.amount) : (fp.quote.asset_id === b.id ? String(fp.quote.amount) : null);
+        var rawQ = fp.base.asset_id === q.id ? String(fp.base.amount) : (fp.quote.asset_id === q.id ? String(fp.quote.amount) : null);
+        if (rawB === null || rawQ === null) return null;
+        return Format.parseAmount(Format.formatPrice(rawB, b.precision, rawQ, q.precision, 8), 8);
+      } catch (e) { return null; }
+    }
+    /* fillAcct: op account_id string ("" when absent — matches only the
+     * blank account filter).
+     * @param {{op: any}} f pair-fill
+     * @returns {string} */
+    function fillAcct(f) {
+      try {
+        var a = f.op && (f.op.account_id || f.op.account);
+        return String(a || "");
+      } catch (e) { return ""; }
+    }
+    /* bound8: human decimal bound -> 8-place raw int string, or null for
+     * blank/invalid (ignored, never blocking — forgiving per #4).
+     * @param {string} s raw input
+     * @returns {string|null} */
+    function bound8(s) {
+      var v = String(s || "").trim();
+      if (!v) return null;
+      try { return Format.parseAmount(v, 8); } catch (e) { return null; }
+    }
+    /* applyFillFilter: side + price-band + account-substring over fetched
+     * rows (client-side only — no refetch). Price compares exact BigInt at
+     * 8 places (never float); account matches case-insensitively.
+     * @param {any[]} fills unfiltered pair-fills
+     * @param {{side: string, min: string, max: string, acct: string}} flt
+     * @returns {any[]} filtered pair-fills. */
+    function applyFillFilter(fills, flt) {
+      var minR = bound8(flt.min), maxR = bound8(flt.max);
+      var minB = null, maxB = null;
+      try { if (minR !== null) minB = BigInt(minR); } catch (e) { minB = null; }
+      try { if (maxR !== null) maxB = BigInt(maxR); } catch (e) { maxB = null; }
+      var aq = flt.acct ? flt.acct.toLowerCase() : "";
+      return (fills || []).filter(function (f) {
+        if (flt.side === "buy" || flt.side === "sell") {
+          if (fillSide(f) !== flt.side) return false;
+        }
+        if (minB !== null || maxB !== null) {
+          var p8 = fillPrice8(f);
+          if (p8 === null) return false;
+          var pv = null;
+          try { pv = BigInt(p8); } catch (e) { return false; }
+          if (minB !== null && pv < minB) return false;
+          if (maxB !== null && pv > maxB) return false;
+        }
+        if (aq && fillAcct(f).toLowerCase().indexOf(aq) === -1) return false;
+        return true;
+      });
+    }
+    /* fillCount: cap label in pure symbols (numbers + "/" + "N=" need no
+     * translation — principle #10). "N=47" when everything shows, "30/47"
+     * when the 30-row cap cuts the filtered list, so caps never hide
+     * silently.
+     * @param {number} shown rows rendered
+     * @param {number} total filtered rows
+     * @returns {string} */
+    function fillCount(shown, total) {
+      return shown >= total ? ("N=" + total) : (shown + "/" + total);
+    }
+    /* Filter repaints (reactive per #4): every control repaints from the
+     * cached fills — never a refetch. No-op before the first fetch. */
+    function refilterMine() {
+      if (lastFills === null) return;
+      paintFills(lastFills);
+    }
+    fltSide.select.addEventListener("change", refilterMine);
+    fltMin.input.addEventListener("input", refilterMine);
+    fltMax.input.addEventListener("input", refilterMine);
+    fltAcct.input.addEventListener("input", refilterMine);
     /* Typed-account lookup: resolve the input, then paint that account's
      * fills for this pair via public Account.history. Blank + locked keeps
      * the hint; blank + unlocked reloads the wallet auto-load. */

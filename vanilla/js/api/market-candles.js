@@ -169,6 +169,33 @@ var MarketCandles = (function () {
     return BigInt(closeB) * BigInt(openQ) < BigInt(openB) * BigInt(closeQ);
   }
 
+  /* Bucket orientation (the inverted-market fix — see MarketsStore._priceChart
+   * in #1, the `quoteAsset.id === key.quote` branch): get_market_history
+   * returns legs in chain-canonical order, NOT necessarily the requested
+   * (baseId, quoteId) order. #1 detects the swapped case via row.key.quote
+   * and swaps the legs back (plus a high/low cross — reciprocal flips the
+   * ordering — plus the volume-leg swap). This file previously assumed the
+   * matched case always, so an inverted market priced swapped raws at
+   * unswapped precisions (reciprocal times 10^2Δp — a decimal-place-looking
+   * error), while the book/ticker (server-rendered base-per-quote strings)
+   * stayed correct: the plot/book mismatch.
+   * Params: row (bucket with key.{base,quote}), baseId/quoteId requested ids.
+   * Returns true when the wire legs are swapped vs the request, false when
+   * matched, null when the key names a foreign pair (unmappable — caller
+   * treats the row as a gap, never renders wrong money). A missing key (or
+   * missing legs) assumes matched: backward-compatible, never blanks a chart
+   * over absent metadata. Pure. */
+  function _isSwapped(row, baseId, quoteId) {
+    try {
+      var k = row ? row.key : null;
+      var kb = k ? k.base : null, kq = k ? k.quote : null;
+      if (typeof kb !== "string" || typeof kq !== "string" || !kb || !kq) return false;
+      if (kq === quoteId && kb === baseId) return false;
+      if (kq === baseId && kb === quoteId) return true;
+      return null;
+    } catch (e) { return false; }
+  }
+
   /* OHLCV candles with timeframe + gap interpolation (slice-07 Task 3).
    * History api: get_market_history(a, b, bucket, start, end), api.hpp:229-237.
    * Params: baseId/quoteId asset ids; bucketSec defaults to 3600 (largest
@@ -266,8 +293,18 @@ var MarketCandles = (function () {
       var magProbe = [];
       Object.keys(bySlot).forEach(function (k) {
         var rr = bySlot[k] || {};
-        var legs = [[rr.open_base, rr.open_quote], [rr.high_base, rr.high_quote],
-          [rr.low_base, rr.low_quote], [rr.close_base, rr.close_quote]];
+        var sw = _isSwapped(rr, baseId, quoteId);
+        if (sw === null) return; /* foreign pair: a gap, never a probe */
+        /* Oriented legs (matched: wire order stands; swapped: wire base↔quote
+         * trade places AND high↔low cross — the reciprocal flips ordering,
+         * #1 else-branch verbatim). Precisions always follow the ASSET. */
+        var oBw = String(rr.open_base), oQw = String(rr.open_quote);
+        var hBw = String(rr.high_base), hQw = String(rr.high_quote);
+        var lBw = String(rr.low_base), lQw = String(rr.low_quote);
+        var cBw = String(rr.close_base), cQw = String(rr.close_quote);
+        var legs = sw
+          ? [[oQw, oBw], [lQw, lBw], [hQw, hBw], [cQw, cBw]]
+          : [[oBw, oQw], [hBw, hQw], [lBw, lQw], [cBw, cQw]];
         for (var li = 0; li < legs.length; li++) {
           var bRaw = String(legs[li][0]), qRaw = String(legs[li][1]);
           if (!_isIntStr(bRaw) || !_isIntStr(qRaw)) continue;
@@ -284,19 +321,33 @@ var MarketCandles = (function () {
       var row = bySlot[s] || null;
       var entry = null;
       if (row) {
-        var oB = String(row.open_base), oQ = String(row.open_quote);
-        var cB = String(row.close_base), cQ = String(row.close_quote);
-        var hB = String(row.high_base), hQ = String(row.high_quote);
-        var lB = String(row.low_base), lQ = String(row.low_quote);
-        if (_isIntStr(oB) && _isIntStr(oQ) && _isIntStr(cB) && _isIntStr(cQ) &&
-          _isIntStr(hB) && _isIntStr(hQ) && _isIntStr(lB) && _isIntStr(lQ)) {
+        var sw = _isSwapped(row, baseId, quoteId);
+        var oBw = String(row.open_base), oQw = String(row.open_quote);
+        var cBw = String(row.close_base), cQw = String(row.close_quote);
+        var hBw = String(row.high_base), hQw = String(row.high_quote);
+        var lBw = String(row.low_base), lQw = String(row.low_quote);
+        if (sw === null) {
+          /* Foreign pair legs: unmappable, a gap (never wrong money). */
+        } else if (_isIntStr(oBw) && _isIntStr(oQw) && _isIntStr(cBw) && _isIntStr(cQw) &&
+          _isIntStr(hBw) && _isIntStr(hQw) && _isIntStr(lBw) && _isIntStr(lQw)) {
+          /* Oriented pairs (swapped: legs trade places, high↔low cross).
+           * The cross ALSO swaps within the pair: wire low_base is the QUOTE
+           * leg, so oriented highBase takes the wire low_QUOTE (#1
+           * get_asset_price(low_quote, baseAsset, low_base, quoteAsset)). */
+          var oB = sw ? oQw : oBw, oQ = sw ? oBw : oQw;
+          var cB = sw ? cQw : cBw, cQ = sw ? cBw : cQw;
+          var hB = sw ? lQw : hBw, hQ = sw ? lBw : hQw;
+          var lB = sw ? hQw : lBw, lQ = sw ? hBw : lQw;
           try {
           var o = Format.formatPrice(oB, precs[baseId], oQ, precs[quoteId], places);
           var h = Format.formatPrice(hB, precs[baseId], hQ, precs[quoteId], places);
           var l = Format.formatPrice(lB, precs[baseId], lQ, precs[quoteId], places);
           var c = Format.formatPrice(cB, precs[baseId], cQ, precs[quoteId], places);
-          var bv = row.base_volume !== undefined && row.base_volume !== null ? String(row.base_volume) : null;
-          var qv = row.quote_volume !== undefined && row.quote_volume !== null ? String(row.quote_volume) : null;
+          var bvW = row.base_volume !== undefined && row.base_volume !== null ? String(row.base_volume) : null;
+          var qvW = row.quote_volume !== undefined && row.quote_volume !== null ? String(row.quote_volume) : null;
+          /* Oriented volumes (swapped: wire base_volume is the quote leg). */
+          var bv = sw ? qvW : bvW;
+          var qv = sw ? bvW : qvW;
           var cn = Number(c);
           cn = isNaN(cn) ? null : cn; // pixels only, not money
           entry = {

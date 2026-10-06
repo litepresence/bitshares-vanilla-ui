@@ -25,6 +25,14 @@ var MarketPicker = (function () {
    * rule as the desk's LAST_KEY). Value: JSON array of "QUOTE_BASE" ids. */
   var FAV_KEY = "bts-vanilla-fav-markets-v1";
 
+  /* Discovery sample cap (database get_top_markets limit — experimental,
+   * chain-capped at 100; we ask the same 20 the explorer markets tab uses).
+   * WHY 20: the per-row tickData fetch below stays bounded (same N+1 bound
+   * as the curated 20-row slice), and the sample note stays honestly "N=20".
+   * Chain-sorted by base volume desc — kept verbatim, never re-sorted by
+   * volume client-side, never summed (each row shows its own ticker Vol). */
+  var DISCOVER_N = 20;
+
   /* Batch-2b i18n (slice-17): display strings resolve via I18n.t with
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
@@ -117,8 +125,7 @@ var MarketPicker = (function () {
   /* Paint one CHANGE cell: verbatim text (percents pass through untrimmed per
    * the D1 rule) + sign class for theme-token color (text only, no layout
    * shift). Non-interactive span — no touch target. Never throws. */
-  function paintChg(cell, raw) {
-    if (raw === null || raw === undefined) return;
+  function paintChg(cell, raw) {    if (raw === null || raw === undefined) return;
     cell.textContent = String(raw);
     var k = chgSign(String(raw).trim());
     if (k === null) return;
@@ -134,6 +141,34 @@ var MarketPicker = (function () {
         cell.classList.add("mkt-pk-chg-zero");
       }
     } catch (e) { /* text stands uncolored */ }
+  }
+
+  /* fuzzyScore: substring-or-subsequence match score for the picker filter
+   * (P2 — bare indexOf hid "BTS_CNY" behind a "BTSCNY" typo with zero rows).
+   * WHY score, not boolean: typo-tolerant search (principle #4) ranks the
+   * near-miss below the exact hit instead of hiding either; pure string ops,
+   * no dep, never Number-on-money (ids are symbols, not amounts).
+   * @param {string} id QUOTE_BASE market id.
+   * @param {string} f uppercased trimmed filter ("" matches everything).
+   * @returns {number} lower ranks first: substring position (prefix = 0);
+   *   subsequence hits sit above 1000 (start + gap penalty); Infinity hides
+   *   the row. Never throws. */
+  function fuzzyScore(id, f) {
+    var s = String(id || "").toUpperCase();
+    if (!f) return 0;
+    var at = s.indexOf(f);
+    if (at !== -1) return at;
+    var si = 0, fi = 0, start = -1, last = -1;
+    while (si < s.length && fi < f.length) {
+      if (s.charAt(si) === f.charAt(fi)) {
+        if (start === -1) start = si;
+        last = si;
+        fi++;
+      }
+      si++;
+    }
+    if (fi !== f.length) return Infinity;
+    return 1000 + start + (last - start + 1 - f.length);
   }
   function network() {
     try {
@@ -292,6 +327,73 @@ var MarketPicker = (function () {
     return fetchP;
   }
 
+  /* Discovery ids from database get_top_markets (database_api.hpp:646 —
+   * EXPERIMENTAL, chain-sorted by base volume desc; the explorer markets tab
+   * calls it the same way). Legs resolve to symbols via ONE batched
+   * get_objects (id -> symbol); legs already shaped like symbols pass through
+   * uppercased. Malformed pairs drop; the curated list below always stands.
+   * @returns {Promise<string[]>} QUOTE_BASE ids, chain order, capped at
+   *   DISCOVER_N. Resolves [] on any failure (additive, never load-bearing);
+   *   only non-empty wins are cached so a later picker open retries. */
+  var _discoverCache = null;
+  var _discoverPending = null;
+  function fetchDiscover() {
+    if (_discoverCache !== null) return Promise.resolve(_discoverCache);
+    if (_discoverPending) return _discoverPending;
+    if (typeof Chain === "undefined" || !Chain ||
+        typeof Chain.db !== "function" || typeof Chain.call !== "function" ||
+        typeof Market === "undefined" || !Market) {
+      return Promise.resolve([]);
+    }
+    var p = Chain.db().then(function (dbId) {
+      return Chain.call(dbId, "get_top_markets", [DISCOVER_N]);
+    }).then(function (rows) {
+      var legs = [], seen = {};
+      (rows || []).forEach(function (r) {
+        if (!r) return;
+        ["quote", "base"].forEach(function (k) {
+          var v = r[k];
+          if (typeof v !== "string" || !v) return;
+          if (!/^1\.3\.\d+$/.test(v)) return;
+          if (!seen[v]) { seen[v] = true; legs.push(v); }
+        });
+      });
+      if (!legs.length) return { rows: rows, byId: {} };
+      return Chain.db().then(function (dbId2) {
+        return Chain.call(dbId2, "get_objects", [legs]).then(function (objs) {
+          var byId = {};
+          (objs || []).forEach(function (o, idx) {
+            if (o && typeof o.symbol === "string") byId[legs[idx]] = o.symbol;
+          });
+          return { rows: rows, byId: byId };
+        });
+      });
+    }).then(function (shaped) {
+      var out = [], have = {};
+      (shaped.rows || []).forEach(function (r) {
+        if (!r || out.length >= DISCOVER_N) return;
+        function legSym(v) {
+          if (typeof v !== "string" || !v) return null;
+          if (/^1\.3\.\d+$/.test(v)) return shaped.byId[v] || null;
+          return v.toUpperCase();
+        }
+        var q = legSym(r.quote), b = legSym(r.base);
+        if (!q || !b || q === b) return;
+        var id = q + "_" + b;
+        try { Market.parseId(id); } catch (e) { return; }
+        if (have[id]) return;
+        have[id] = true;
+        out.push(id);
+      });
+      if (out.length) _discoverCache = out;
+      return out;
+    }).catch(function () { return []; });
+    _discoverPending = p;
+    p.then(function () { _discoverPending = null; },
+      function () { _discoverPending = null; });
+    return p;
+  }
+
   /* Paint the market picker list (search + kind radios + favorites + typed entry).
    * Retro round 2 D2: rows read as the original MY/FIND MARKETS table —
    * star first-column, MARKET/VOL/PRICE/CHANGE header, one row per pair.
@@ -305,6 +407,10 @@ var MarketPicker = (function () {
     if (list.indexOf(currentID) === -1 && currentID) list.unshift(currentID);
     var favs = loadFavs();
     var favOnly = false;
+    /* Discovery ids (get_top_markets sample, chain volume order) fill in
+     * async; the curated list above paints immediately so discovery never
+     * blocks the 4-pair fallback. Excludes curated ids (no dup rows). */
+    var discoverIds = [];
 
     var tabs = doc.createElement("div");
     tabs.className = "mkt-tabs";
@@ -384,16 +490,24 @@ var MarketPicker = (function () {
     search.setAttribute("aria-label", t("market.search_label", "Search markets"));
     touchable(search);
     section.appendChild(search);
+    /* Discovery block (sample note + rows) sits ABOVE the curated list and
+     * starts empty — fetchDiscover fills it, never the typed QUOTE_BASE
+     * fallback below (that form is untouched). */
+    var discWrap = doc.createElement("div");
+    discWrap.className = "mkt-discover";
+    section.appendChild(discWrap);
     var ul = doc.createElement("ul");
     /* Fixed-height scroll region (desk-grid.css: 12-row fold); the curated
      * list scrolls in place like the original market sidebar. */
     ul.className = "mkt-picker-list picker-scroll";
     section.appendChild(ul);
 
-    /* Unique symbols across the picker list for the batched kind lookup. */
+    /* Unique symbols across the curated list AND the discovery sample for
+     * the batched kind lookup (discovery resolves async — the union simply
+     * grows on the repaint). */
     function pickerSymbols() {
       var seen = {}, out = [];
-      list.forEach(function (id) {
+      list.concat(discoverIds).forEach(function (id) {
         try {
           var p = Market.parseId(id);
           [p.quote, p.base].forEach(function (s) {
@@ -421,45 +535,10 @@ var MarketPicker = (function () {
       return kindOf(sym, rec);
     }
 
-    /* paint: render the filtered picker rows (search + kind + fav-only).
-     * Params: filter (raw search string, matched case-insensitively).
-     * PERF (output-identical): header + rows build into a DocumentFragment
-     * (capped at 20 rows, same slice as before) with a single append — one
-     * paint instead of one per row. Same nodes, same order, same wiring. */
-    function paint(filter) {
-      DOM.clear(ul);
-      var f = String(filter || "").trim().toUpperCase();
-      var rows = [];
-      list.forEach(function (id) {
-        if (f && id.toUpperCase().indexOf(f) === -1) return;
-        /* Starred tab = MY MARKETS (favs only); All keeps favs-first sort. */
-        if (favOnly && !isFav(favs, id)) return;
-        var k = rowKind(id);
-        /* Fail OPEN: unknown kinds ignore the kind filter, never vanish. */
-        if (_kindFilter !== "ALL" && k !== null && k !== _kindFilter) return;
-        rows.push(id);
-      });
-      rows.sort(function (a, b) {
-        var fa = isFav(favs, a) ? 0 : 1, fb = isFav(favs, b) ? 0 : 1;
-        if (fa !== fb) return fa - fb;
-        return a < b ? -1 : (a > b ? 1 : 0);
-      });
-      /* N+1 guard (dexux-plots.md ban): curated lists are ≤5 rows, but the
-       * per-row ticker fetch below must never grow unbounded — hard slice. */
-      rows = rows.slice(0, 20);
-      if (rows.length === 0) {
-        ul.appendChild(DOM.el(doc, "li", t("market.no_match", "No markets match.") + t("market.try_spelling_hint", " Try another spelling, or open any market from the picker."), "muted"));
-        return;
-      }
-      /* Column header (original MARKET/VOL/PRICE/CHANGE language). */
-      var batch = null;
-      try {
-        if (doc && typeof doc.createDocumentFragment === "function") batch = doc.createDocumentFragment();
-      } catch (e) { batch = null; }
-      function emit(n) {
-        if (batch) batch.appendChild(n);
-        else ul.appendChild(n);
-      }
+    /* headLi: the MARKET/VOL/PRICE/CHANGE column header row (original table
+     * language). Shared by the curated list and the discovery sample below.
+     * @returns {HTMLElement} the header li. */
+    function headLi() {
       var head = doc.createElement("li");
       head.className = "mkt-picker-row mkt-picker-head";
       head.setAttribute("aria-hidden", "true");
@@ -468,65 +547,165 @@ var MarketPicker = (function () {
       head.appendChild(DOM.el(doc, "span", t("market.vol_label", "Vol"), "mkt-pk-num"));
       head.appendChild(DOM.el(doc, "span", t("market.th_price", "Price"), "mkt-pk-num"));
       head.appendChild(DOM.el(doc, "span", t("market.chg_label", "24h Δ"), "mkt-pk-num"));
-      emit(head);
-      rows.forEach(function (id) {
-        var li = doc.createElement("li");
-        li.className = "mkt-picker-row";
-        var fav = isFav(favs, id);
-        /* Star FIRST column (original table language); the name link stays
-         * plain text (no ★ prefix — the column owns the state). */
-        var star = touchable(doc.createElement("button"));
-        star.className = "mkt-star mkt-pk-star";
-        try {
-          if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
-            star.appendChild(Icon.img("fi-star", fav ? "star-icon" : "star-icon star-off", ""));
-          } else {
-            star.textContent = fav ? "★" : "☆";
-          }
-        } catch (e) {
+      return head;
+    }
+
+    /* rowLi: one picker row (star + QUOTE_BASE link + VOL/PRICE/CHANGE cells
+     * fed by the shared tickData cache). Shared by the curated list and the
+     * discovery sample — discovery reuses this builder per row and never sums
+     * volumes: each row shows its own ticker Vol cell, fail-open "—".
+     * @param {string} id QUOTE_BASE market id.
+     * @returns {HTMLElement} the row li. */
+    function rowLi(id) {
+      var li = doc.createElement("li");
+      li.className = "mkt-picker-row";
+      var fav = isFav(favs, id);
+      /* Star FIRST column (original table language); the name link stays
+       * plain text (no ★ prefix — the column owns the state). */
+      var star = touchable(doc.createElement("button"));
+      star.className = "mkt-star mkt-pk-star";
+      try {
+        if (typeof Icon !== "undefined" && Icon && typeof Icon.img === "function") {
+          star.appendChild(Icon.img("fi-star", fav ? "star-icon" : "star-icon star-off", ""));
+        } else {
           star.textContent = fav ? "★" : "☆";
         }
-        star.type = "button";
-        star.setAttribute("aria-pressed", fav ? "true" : "false");
-        star.setAttribute("aria-label", t("market.favorite_prefix", "Favorite ") + id);
-        star.addEventListener("click", function () {
-          favs = toggleFav(loadFavs(), id);
-          paint(search.value);
-        });
-        li.appendChild(star);
-        /* Icon wiring (fi-star.svg; #1 market sidebar shows ★ only on
-         * starred rows — the first-column button above carries that now). */
-        var a = doc.createElement("a");
-        a.className = "mkt-pk-mkt";
-        a.textContent = id;
-        a.setAttribute("href", "#/market/" + id);
-        touchable(a);
-        if (id === currentID) a.setAttribute("aria-current", "page");
-        li.appendChild(a);
-        /* VOL / PRICE / CHANGE columns (mirrors #1 FIND MARKETS columns):
-         * same per-row ticker fetch as before, split into three cells;
-         * fail-open "—", fills in when the lookup lands. */
-        var volCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
-        var priceCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
-        var chgCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
-        li.appendChild(volCell);
-        li.appendChild(priceCell);
-        li.appendChild(chgCell);
-        tickData(id, function (r) {
-          if (!r) return;
-          if (r.vol !== null) {
-            volCell.textContent = trim6(r.vol);
-            try { volCell.title = r.vol; } catch (e) { /* text stands */ }
-          }
-          if (r.latest !== null) {
-            priceCell.textContent = ps(r.latest);
-            try { priceCell.title = r.latest; } catch (e) { /* text stands */ }
-          }
-          if (r.chg !== null) paintChg(chgCell, r.chg);
-        });
-        emit(li);
+      } catch (e) {
+        star.textContent = fav ? "★" : "☆";
+      }
+      star.type = "button";
+      star.setAttribute("aria-pressed", fav ? "true" : "false");
+      star.setAttribute("aria-label", t("market.favorite_prefix", "Favorite ") + id);
+      star.addEventListener("click", function () {
+        favs = toggleFav(loadFavs(), id);
+        paint(search.value);
+        renderDiscover();
       });
-      if (batch) ul.appendChild(batch);
+      li.appendChild(star);
+      /* Icon wiring (fi-star.svg; #1 market sidebar shows ★ only on
+       * starred rows — the first-column button above carries that now). */
+      var a = doc.createElement("a");
+      a.className = "mkt-pk-mkt";
+      a.textContent = id;
+      a.setAttribute("href", "#/market/" + id);
+      touchable(a);
+      if (id === currentID) a.setAttribute("aria-current", "page");
+      li.appendChild(a);
+      /* VOL / PRICE / CHANGE columns (mirrors #1 FIND MARKETS columns):
+       * same per-row ticker fetch as before, split into three cells;
+       * fail-open "—", fills in when the lookup lands. */
+      var volCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
+      var priceCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
+      var chgCell = DOM.el(doc, "span", "—", "muted mkt-pk-num");
+      li.appendChild(volCell);
+      li.appendChild(priceCell);
+      li.appendChild(chgCell);
+      tickData(id, function (r) {
+        if (!r) return;
+        if (r.vol !== null) {
+          volCell.textContent = trim6(r.vol);
+          try { volCell.title = r.vol; } catch (e) { /* text stands */ }
+        }
+        if (r.latest !== null) {
+          priceCell.textContent = ps(r.latest);
+          try { priceCell.title = r.latest; } catch (e) { /* text stands */ }
+        }
+        if (r.chg !== null) paintChg(chgCell, r.chg);
+      });
+      return li;
+    }
+
+    /* emitRows: header + rows into a host ul via one fragment append (the old
+     * PERF shape: one paint instead of one per row).
+     * @param {HTMLElement} hostUl the ul to fill. @param {string[]} ids row ids. */
+    function emitRows(hostUl, ids) {
+      var batch = null;
+      try {
+        if (doc && typeof doc.createDocumentFragment === "function") batch = doc.createDocumentFragment();
+      } catch (e) { batch = null; }
+      function emit(n) {
+        if (batch) batch.appendChild(n);
+        else hostUl.appendChild(n);
+      }
+      emit(headLi());
+      ids.forEach(function (id) { emit(rowLi(id)); });
+      if (batch) hostUl.appendChild(batch);
+    }
+
+    /* matchRow: shared search+kind+fav gate for one id (curated keeps its
+     * fuzzy-score sort; discovery keeps chain volume order — both filter the
+     * same way). Returns the fuzzy score, or Infinity when the row hides.
+     * @param {string} id QUOTE_BASE id. @param {string} f uppercased filter.
+     * @returns {number} fuzzy score or Infinity. Never throws. */
+    function matchRow(id, f) {
+      var score = fuzzyScore(id, f);
+      if (score === Infinity) return Infinity;
+      /* Starred tab = MY MARKETS (favs only). */
+      if (favOnly && !isFav(favs, id)) return Infinity;
+      var k = rowKind(id);
+      /* Fail OPEN: unknown kinds ignore the kind filter, never vanish. */
+      if (_kindFilter !== "ALL" && k !== null && k !== _kindFilter) return Infinity;
+      return score;
+    }
+
+    /* paint: render the filtered curated rows (search + kind + fav-only).
+     * Params: filter (raw search string, matched case-insensitively).
+     * Sort is fuzzy-score first, then favs-first, then A–Z (empty filter
+     * scores 0 everywhere, so the default order is favs-first as before).
+     * Capped at 20 rows (N+1 guard: the per-row ticker fetch never grows
+     * unbounded). Same nodes, same wiring as before. */
+    function paint(filter) {
+      DOM.clear(ul);
+      var f = String(filter || "").trim().toUpperCase();
+      var scored = [];
+      list.forEach(function (id) {
+        var score = matchRow(id, f);
+        if (score === Infinity) return;
+        scored.push({ id: id, score: score });
+      });
+      scored.sort(function (a, b) {
+        if (a.score !== b.score) return a.score - b.score;
+        var fa = isFav(favs, a.id) ? 0 : 1, fb = isFav(favs, b.id) ? 0 : 1;
+        if (fa !== fb) return fa - fb;
+        return a.id < b.id ? -1 : (a.id > b.id ? 1 : 0);
+      });
+      /* N+1 guard (dexux-plots.md ban): curated lists are ≤5 rows, but the
+       * per-row ticker fetch below must never grow unbounded — hard slice. */
+      var rows = scored.map(function (r) { return r.id; }).slice(0, 20);
+      if (rows.length === 0) {
+        ul.appendChild(DOM.el(doc, "li", t("market.no_match", "No markets match.") + t("market.try_spelling_hint", " Try another spelling, or open any market from the picker."), "muted"));
+        return;
+      }
+      /* Column header (original MARKET/VOL/PRICE/CHANGE language). */
+      emitRows(ul, rows);
+    }
+
+    /* renderDiscover: the get_top_markets sample ABOVE the curated list —
+     * chain volume order kept verbatim (never re-sorted, never summed), same
+     * filter gate as curated, same row builders. The "N=… sample" prefix is
+     * a technical size label (numbers, exempt per #10); the honesty note
+     * reuses the explorer sample key verbatim (no new locale keys). Empty
+     * while loading or on any fetch failure: the curated list stands alone. */
+    function renderDiscover() {
+      DOM.clear(discWrap);
+      if (!discoverIds.length) return;
+      var f = String(search.value || "").trim().toUpperCase();
+      var rows = [];
+      discoverIds.forEach(function (id) {
+        if (list.indexOf(id) !== -1) return;
+        if (matchRow(id, f) === Infinity) return;
+        rows.push(id);
+      });
+      rows = rows.slice(0, DISCOVER_N);
+      if (!rows.length) return;
+      discWrap.appendChild(DOM.el(doc, "p",
+        "N=" + String(DISCOVER_N) + " sample — " +
+        t("explorer.markets_experimental", "Experimental get_top_markets sample — top 20 by base volume, chain-sorted desc; not a full market list. Values are chain human strings verbatim."),
+        "muted"));
+      var dul = doc.createElement("ul");
+      dul.className = "mkt-picker-list picker-scroll";
+      emitRows(dul, rows);
+      discWrap.appendChild(dul);
     }
     /* paintTabs: All/Starred ARIA selection follows favOnly. */
     function paintTabs() {
@@ -534,16 +713,16 @@ var MarketPicker = (function () {
       tabStar.setAttribute("aria-selected", favOnly ? "true" : "false");
     }
     tabAll.addEventListener("click", function () {
-      favOnly = false; paintTabs(); paint(search.value);
+      favOnly = false; paintTabs(); paint(search.value); renderDiscover();
     });
     tabStar.addEventListener("click", function () {
-      favOnly = true; paintTabs(); paint(search.value);
+      favOnly = true; paintTabs(); paint(search.value); renderDiscover();
     });
     kinds.addEventListener("change", function (ev) {
       var t = ev && ev.target;
-      if (t && t.value) { _kindFilter = t.value; paint(search.value); }
+      if (t && t.value) { _kindFilter = t.value; paint(search.value); renderDiscover(); }
     });
-    search.addEventListener("input", function () { paint(search.value); });
+    search.addEventListener("input", function () { paint(search.value); renderDiscover(); });
     /* Keyboard nav (principle #4): arrows move through visible pairs,
      * Enter follows the focused link natively. Never throws. */
     ul.addEventListener("keydown", function (ev) {
@@ -566,7 +745,16 @@ var MarketPicker = (function () {
       } catch (e) { /* keyboard nav skips */ }
     });
     paint("");
-    ensureKinds(pickerSymbols()).then(function () { paint(search.value); });
+    renderDiscover();
+    ensureKinds(pickerSymbols()).then(function () { paint(search.value); renderDiscover(); });
+    /* Discovery arrives async (one get_top_markets + one batched get_objects):
+     * curated ids win the dedupe, kinds cover the union, then both lists
+     * repaint. Fail-open: any rejection leaves the curated list standing. */
+    fetchDiscover().then(function (ids) {
+      discoverIds = (ids || []).filter(function (id) { return list.indexOf(id) === -1; });
+      renderDiscover();
+      ensureKinds(pickerSymbols()).then(function () { paint(search.value); renderDiscover(); });
+    });
 
     var form = doc.createElement("form");
     form.className = "mkt-direct";
