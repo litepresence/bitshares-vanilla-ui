@@ -119,4 +119,36 @@ try {
   }
 })();
 
+/* swapsToPoints: newest-first tape in, oldest-first points out. */
+(function () {
+  var PoolHistory = require("../vanilla/js/api/pool-history.js");
+  var G = (typeof globalThis !== "undefined") ? globalThis : global;
+  var savedFormat = G.Format;
+  G.Format = { formatAmount: function (raw, prec) { return "A(" + raw + ":" + prec + ")"; } };
+  try {
+    var swaps = [
+      { time: "2026-10-05T02:00:00", price: "2.0", paid: { amount: "20", asset: "1.3.1" }, received: { amount: "40", asset: "1.3.2" } },
+      { time: "2026-10-05T01:00:00", price: "1.0", paid: { amount: "10", asset: "1.3.1" }, received: { amount: "10", asset: "1.3.2" } },
+      { time: "2026-10-05T01:00:00", price: "1.5", paid: { amount: "30", asset: "1.3.2" }, received: { amount: "20", asset: "1.3.1" } },
+      { time: "2026-10-05T00:00:00", price: null, paid: { amount: "1", asset: "1.3.1" }, received: { amount: "1", asset: "1.3.2" } }
+    ];
+    /* assetB 1.3.2, precB 5, cap 10. */
+    var pts = PoolHistory.swapsToPoints(swaps, "1.3.2", 5, 10);
+    eq(pts.length, 3, "null-price swap skipped");
+    eq(pts[0].price, "1.5", "tie slot: older of the pair first");
+    eq(pts[1].price, "1.0", "tie slot: newer of the pair second");
+    eq(pts[0].volumeBaseRaw, "30", "paid-B leg is the base volume");
+    eq(pts[1].volumeBaseRaw, "10", "received-B leg is the base volume");
+    eq(pts[1].volume, "A(10:5)", "B-leg human volume");
+    eq(pts[2].price, "2.0", "newest swap last");
+    var capped = PoolHistory.swapsToPoints(swaps.slice(0, 3), "1.3.2", 5, 2);
+    eq(capped.length, 2, "cap slices newest 2");
+    eq(capped[1].price, "2.0", "newest swap survives the cap");
+    assert.throws(function () { PoolHistory.swapsToPoints(swaps, "1.3.2", 5, 0); }, /bad-count/, "cap 0 throws bad-count");
+    eq(PoolHistory.swapsToPoints([], "1.3.2", 5, 10).length, 0, "empty tape valid");
+  } finally {
+    if (savedFormat === undefined) delete G.Format; else G.Format = savedFormat;
+  }
+})();
+
 console.log("discrete-timescale vectors: " + passed + " passed");

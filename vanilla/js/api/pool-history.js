@@ -367,6 +367,46 @@ var PoolHistory = (function () {
     });
   }
 
+  /* swapsToPoints: enriched swaps -> discrete scatter points (Discrete
+   * timescale). Same price/volume contract as swapsToCandles (enriched
+   * .price, B-leg volume whether paid or received) but NO bucketing:
+   * every priced swap is one point (dex-ux discrete parity — raw tape,
+   * never aggregated). Params: swaps (newest-first tape), assetB id,
+   * precB numeric B precision, cap 1..5000 integer (shared candle-count
+   * input — newest cap entries survive, painted oldest-first). Returns
+   * oldest-first [{timeMs, price, volume (B-leg human), volumeBaseRaw,
+   * volumeQuoteRaw}]. Swaps with null price, bad time, or non-digit legs
+   * are skipped, never reject. Empty swaps are VALID ([]).
+   * Throws "bad-count" on cap < 1, "bad precision" on bad precB.
+   * Pure except Format.formatAmount (BigInt money math only). */
+  function swapsToPoints(swaps, assetB, precB, cap) {
+    if (cap === undefined) cap = 2000;
+    cap = Math.floor(cap);
+    if (!(cap >= 1)) throw new Error("bad-count");
+    if (!Number.isInteger(precB) || precB < 0 || precB > 12) throw new Error("bad precision: " + JSON.stringify(precB));
+    var list = Array.isArray(swaps) ? swaps.slice(0, cap) : [];
+    var newest = [];
+    list.forEach(function (sw) {
+      if (!sw || sw.price === null || sw.price === undefined) return;
+      var unix = Math.floor(Date.parse(sw.time) / 1000);
+      if (!(unix > 0)) return;
+      var bRaw = null, aRaw = null;
+      try {
+        if (String(sw.received.asset) === String(assetB) && /^\d+$/.test(String(sw.received.amount))) {
+          bRaw = String(sw.received.amount); aRaw = /^\d+$/.test(String(sw.paid.amount)) ? String(sw.paid.amount) : null;
+        } else if (String(sw.paid.asset) === String(assetB) && /^\d+$/.test(String(sw.paid.amount))) {
+          bRaw = String(sw.paid.amount); aRaw = /^\d+$/.test(String(sw.received.amount)) ? String(sw.received.amount) : null;
+        }
+      } catch (e) { bRaw = null; aRaw = null; }
+      if (bRaw === null || aRaw === null) return;
+      var vol = "0";
+      try { vol = Format.formatAmount(bRaw, precB); } catch (e) { vol = "0"; }
+      newest.push({ timeMs: unix * 1000, price: String(sw.price), volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: aRaw });
+    });
+    newest.reverse();
+    return newest;
+  }
+
   /* Enrich swaps with the oriented human price (one pass; unknown assets
    * keep a null price and drop from candles, never the tape). places defaults
    * to magnitude-aware (probe every swap at SIGFIG_MAX, choose once via
@@ -481,7 +521,7 @@ var PoolHistory = (function () {
 
   return {
     swapsForPool: swapsForPool, chainSwaps: chainSwaps, esSwaps: esSwaps,
-    enrich: enrich, priceHuman: priceHuman, swapsToCandles: swapsToCandles,
+    enrich: enrich, priceHuman: priceHuman, swapsToCandles: swapsToCandles, swapsToPoints: swapsToPoints,
     filterLegs: filterLegs,
     synthBook: synthBook, ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     ES_SIZE: ES_SIZE, ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
