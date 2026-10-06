@@ -357,6 +357,74 @@ var TradePanels = (function () {
     return { line: line, schedule: schedule, update: update };
   }
 
+  /* Scaled fee preview for the locked branch (same dash-until-valid contract
+   * as mountFeePreview, but over N orders: scaledOrders math + one createOp
+   * per order — seller is the wallet account when known, else
+   * QUOTE_PLACEHOLDER_SELLER (limit_order_create fees are account-invariant,
+   * so the placeholder answers the same) — then ONE feeMulti total over all
+   * N ops, exactly like reviewScaled. No market-fee row: the scaled confirm
+   * carries none either, so preview and confirm agree.
+   * WHY a second preview, not a flag: single builds one op from
+   * amount×price, scaled builds N ops from n×low×high×total — the scraper
+   * shapes differ, and doctrine prefers the small duplicate over a shared
+   * abstraction with a mode flag. Debounced 400ms + seq-guarded like the
+   * single preview; invalid quotes dash, never blank, never throw.
+   * @param {Document} doc @param {HTMLElement} wrap @param {any} P tab state
+   * @param {string} side "buy"|"sell"
+   * @param {Function} getVals liveVals-style scraper returning
+   *   {n, low, high, total, fok, key, custom}.
+   * @returns {{line: HTMLElement, schedule: Function, update: Function}} */
+  function mountScaledFeePreview(doc, wrap, P, side, getVals) {
+    var line = DOM.el(doc, "p", t("trade.fee_preview_dash", "Fee (preview): —"), "muted");
+    line.id = "trade-scaled-fee-preview-" + side;
+    wrap.appendChild(line);
+    var timer = null;
+    var seq = 0;
+    function schedule() {
+      try { if (timer !== null) clearTimeout(timer); } catch (e) { /* gone */ }
+      seq++;
+      var s = seq;
+      try {
+        timer = setTimeout(function () { update(s); }, 400);
+      } catch (e) { /* timers unavailable: preview stands */ }
+    }
+    async function update(s) {
+      timer = null;
+      if (s === undefined) s = seq;
+      if (s !== seq) return;
+      var vals;
+      try { vals = getVals(); }
+      catch (e) { return; }
+      if (!vals) {
+        line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        return;
+      }
+      try {
+        var calc = scaledOrders(P, {
+          n: vals.n, low: vals.low, high: vals.high, total: vals.total, side: side
+        });
+        var seller = (P.me && P.me.id) ? P.me.id : QUOTE_PLACEHOLDER_SELLER;
+        var expWire = previewExpiryWire({ key: vals.key, custom: vals.custom });
+        var ops = calc.orders.map(function (o) {
+          return TradeCore.createOp(seller, calc.sellAssetId, o.sellRaw,
+            calc.recvAssetId, o.recvRaw, expWire, !!vals.fok);
+        });
+        var feeRes = await Tx.feeMulti(ops, TradeCore.FEE_ASSET);
+        if (s !== seq) return;
+        var feeMeta = await TradeCore.feeAssetMeta(ops[0][1].fee.asset_id);
+        if (s !== seq) return;
+        line.textContent = t("trade.fee_preview", "Fee (preview): ") + TradeCore.humanFee(feeRes.totalRaw, feeMeta);
+        try { line.title = String(feeRes.totalRaw); } catch (e) { /* title best-effort */ }
+      } catch (e) {
+        if (s !== seq) return;
+        line.textContent = t("trade.fee_preview_dash", "Fee (preview): —");
+        try { line.title = (e && e.message) ? e.message : ""; } catch (x) { /* gone */ }
+      }
+    }
+    schedule();
+    return { line: line, schedule: schedule, update: update };
+  }
+
   /* Spend-asset balance line. Locked: honest "0 <SYM>" + unlock hint (never
    * blank, never a real balance we cannot know). Unlocked: async spendable
    * balance via balancesMap, human via Format; failures stay honest inline. */
@@ -515,8 +583,8 @@ var TradePanels = (function () {
         ctx: ctx, me: me, scaledOpen: false,
         buy: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
         sell: { amount: "", price: "", total: "", fok: false, key: "YEAR", custom: "" },
-        scaledBuy: { n: "3", low: "", high: "", total: "", side: "buy", key: "YEAR", custom: "" },
-        scaledSell: { n: "3", low: "", high: "", total: "", side: "sell", key: "YEAR", custom: "" },
+        scaledBuy: { n: "3", low: "", high: "", total: "", side: "buy", fok: false, key: "YEAR", custom: "" },
+        scaledSell: { n: "3", low: "", high: "", total: "", side: "sell", fok: false, key: "YEAR", custom: "" },
         mounts: { buy: buyMount, sell: sellMount },
         modeBar: null
       };
@@ -672,6 +740,10 @@ var TradePanels = (function () {
     v = val("trade-total"); if (v !== null) st.total = v;
     v = val("trade-expiry"); if (v !== null) st.key = v;
     v = val("trade-expiry-custom"); if (v !== null) st.custom = v;
+    try {
+      var ff = mountEl.querySelector("#" + sid("trade-fok", side));
+      if (ff) st.fok = !!ff.checked;
+    } catch (e) { /* checkbox stands */ }
     st.side = side;
   }
 
@@ -1098,11 +1170,43 @@ var TradePanels = (function () {
     totalF.err.style.display = "none";
     totalF.row.appendChild(totalF.err);
     body.appendChild(totalF.row);
+    /* Fill-or-kill per panel (namespaced trade-fok-<side>, same shape as the
+     * single form above): scaled hardcoded fill_or_kill:false while single
+     * exposed the checkbox — the chain field exists on every
+     * limit_order_create, so scaled threads spec.fok into each of the N ops.
+     * WHY per-panel, not one shared: the two columns live at once. */
+    var fokBox = doc.createElement("input");
+    fokBox.type = "checkbox";
+    fokBox.id = sid("trade-fok", side);
+    fokBox.checked = !!st.fok;
+    var fokRow = Forms.fieldRow(doc, t("trade.fok_label", "Fill or kill "), fokBox);
+    fokRow.appendChild(DOM.el(doc, "span",
+      t("trade.fok_hint", " (cancel unless the whole order fills at once)"), "muted"));
+    body.appendChild(fokRow);
     var exp = TradeCore.renderExpiry(doc, body, st, side);
+    /* liveScaledVals: scrape the scaled inputs (n/low/high/total/fill-or-kill/
+     * expiry) for the fee preview and review screen — the scaled twin of the
+     * single form's liveVals. */
+    function liveScaledVals() {
+      return {
+        n: nF.input.value, low: lowF.input.value,
+        high: highF.input.value, total: totalF.input.value,
+        fok: fokBox.checked, key: exp.select.value, custom: exp.custom.value
+      };
+    }
     if (lockedScaled) {
-      var sellSym = side === "buy" ? ctx.baseSym : ctx.quoteSym;
-      body.appendChild(DOM.el(doc, "p",
-        t("trade.balance_locked", "Balance: 0 — unlock for balances") + " " + sellSym, "muted"));
+      /* Try-before-you-buy parity with the locked single panel: the same
+       * spend-asset balance line plus a live N-op fee preview (placeholder
+       * seller) BEFORE the Unlock button — quotes stay public, the password
+       * is asked only at review. */
+      mountBalanceLine(doc, body, P, side);
+      var feePrev = mountScaledFeePreview(doc, body, P, side, liveScaledVals);
+      [nF, lowF, highF, totalF].forEach(function (f) {
+        f.input.addEventListener("input", feePrev.schedule);
+      });
+      exp.select.addEventListener("change", feePrev.schedule);
+      exp.custom.addEventListener("input", feePrev.schedule);
+      fokBox.addEventListener("change", feePrev.schedule);
       var sRefs = lockedPasswordRow(doc, body, side);
       var sUnlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       sUnlockBtn.id = sid("unlock-and-review", side);
@@ -1116,11 +1220,12 @@ var TradePanels = (function () {
         st.high = highF.input.value;
         st.total = totalF.input.value;
         st.side = side;
+        st.fok = fokBox.checked;
         st.key = exp.select.value;
         st.custom = exp.custom.value;
         unlockAndReviewScaled(doc, body, mount, P, {
           n: st.n, low: st.low, high: st.high, total: st.total,
-          side: st.side, key: st.key, custom: st.custom
+          side: st.side, fok: st.fok, key: st.key, custom: st.custom
         }, sRefs, sUnlockBtn);
       });
       return;
@@ -1136,13 +1241,14 @@ var TradePanels = (function () {
       st.low = lowF.input.value;
       st.high = highF.input.value;
       st.total = totalF.input.value;
+      st.fok = fokBox.checked;
       st.key = exp.select.value;
       st.custom = exp.custom.value;
       prevBtn.disabled = true;
       var status = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
       reviewScaled(P, {
         n: st.n, low: st.low, high: st.high, total: st.total,
-        side: st.side, key: st.key, custom: st.custom
+        side: st.side, fok: st.fok, key: st.key, custom: st.custom
       }).then(function (R) {
         paintConfirmScaled(doc, mount, P, R, side);
       }).catch(function (e) {
@@ -1229,20 +1335,22 @@ var TradePanels = (function () {
 
   /* Scaled review: preview math + ONE buildTx + ONE feeMulti over all N
    * ops (per-op fees summed + displayed). Chain-state gate removed (owner
-   * directive): no client balance pre-check — chain validates on broadcast. */
+   * directive): no client balance pre-check — chain validates on broadcast.
+   * spec.fok threads into EVERY op (was hardcoded false); the confirm shows
+   * it on the Fill-or-Kill row. */
   async function reviewScaled(P, spec) {
     var calc = scaledOrders(P, spec);
     var ctx = P.ctx;
     var expWire = TradeCore.expiryWire(spec);
     var ops = calc.orders.map(function (o) {
       return TradeCore.createOp(P.me.id, calc.sellAssetId, o.sellRaw,
-        calc.recvAssetId, o.recvRaw, expWire, false);
+        calc.recvAssetId, o.recvRaw, expWire, !!spec.fok);
     });
     var unsigned = await Tx.buildTx(ops);
     var feeRes = await Tx.feeMulti(unsigned.operations, TradeCore.FEE_ASSET);
     var feeMeta = await TradeCore.feeAssetMeta(unsigned.operations[0][1].fee.asset_id);
     return {
-      calc: calc, expWire: expWire, unsigned: unsigned,
+      calc: calc, expWire: expWire, fok: !!spec.fok, unsigned: unsigned,
       feeRaw: feeRes.totalRaw, feeMeta: feeMeta
     };
   }
@@ -1301,6 +1409,7 @@ var TradePanels = (function () {
     confirmRow(t("trade.row_seller", "Seller"), P.me.name + " (" + P.me.id + ")");
     confirmRow("Fee (total, " + R.calc.orders.length + " ops)", TradeCore.humanFee(R.feeRaw, R.feeMeta), R.feeRaw);
     confirmRow(t("trade.row_expiration", "Expiration"), R.expWire);
+    confirmRow(t("trade.row_fok", "Fill or Kill"), R.fok ? t("trade.yes", "Yes") : t("trade.no", "No"));
     confirmRow(t("trade.row_network", "Network"), networkName());
     mount.appendChild(list);
     mount.appendChild(DOM.el(doc, "p", t("trade.chain_hint", "Chain validates balances and fees on broadcast."), "muted"));

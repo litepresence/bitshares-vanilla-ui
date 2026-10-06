@@ -179,7 +179,16 @@ var CreditUI = (function () {
     titles.forEach(function (t) { hr.appendChild(DOM.el(doc, "th", t)); });
     var thead = doc.createElement("thead"); thead.appendChild(hr); return thead;
   }
-  /* Table (desktop, sticky first col via .node-table) + cards (phone <560px). */
+  /* Table (desktop, sticky first col via .node-table) + cards (phone <560px).
+   * Actions cell: Open (r.href) plus owner/borrower deep links (r.links
+   * [{text, href}] from offerRows / borrower-deal rows). WHY one combined
+   * cell: the header keeps its single "" column — existing callers without
+   * links (deal tables) render byte-identical to before, no column churn.
+   * @param {Document} doc owner document
+   * @param {string[]} headers header titles (trailing "" owns the actions cell)
+   * @param {any[]} rows [{cells, href?, links?}]
+   * @param {function(any): string[]} cardLines phone-card lines per row
+   * @returns {HTMLElement} table + cards box */
   function deskTable(doc, headers, rows, cardLines) {
     var box = DOM.el(doc, "div");
     if (!rows.length) { box.appendChild(DOM.el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
@@ -190,8 +199,15 @@ var CreditUI = (function () {
       var tr = doc.createElement("tr");
       r.cells.forEach(function (c) {
         var td = DOM.el(doc, "td", c.text); if (c.raw) td.title = t("account.raw_prefix", "raw ") + c.raw; tr.appendChild(td); });
-      if (r.href) { var td = doc.createElement("td");
-        var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); td.appendChild(a); tr.appendChild(td); }
+      if (r.href || (r.links && r.links.length)) {
+        var td = doc.createElement("td"), first = true;
+        if (r.href) { var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); td.appendChild(a); first = false; }
+        (r.links || []).forEach(function (L) {
+          if (!first) td.appendChild(doc.createTextNode(" · "));
+          var la = DOM.el(doc, "a", L.text); la.setAttribute("href", L.href); td.appendChild(la); first = false;
+        });
+        tr.appendChild(td);
+      }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); box.appendChild(table);
@@ -200,6 +216,10 @@ var CreditUI = (function () {
       var c = DOM.el(doc, "div", null, "node-card");
       cardLines(r).forEach(function (ln) { c.appendChild(DOM.el(doc, "div", ln)); });
       if (r.href) { var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", r.href); c.appendChild(a); }
+      (r.links || []).forEach(function (L) {
+        c.appendChild(doc.createTextNode(" · "));
+        var la = DOM.el(doc, "a", L.text); la.setAttribute("href", L.href); c.appendChild(la);
+      });
       cards.appendChild(c);
     });
     box.appendChild(cards); return box;
@@ -309,12 +329,23 @@ var CreditUI = (function () {
     btn.addEventListener("click", function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
     return btn;
   }
-  /* ---- offer rows: table cells + phone card lines (all amounts/rates human) */
+  /* ---- offer rows: table cells + phone card lines (all amounts/rates human).
+   * Owner rows for the My-offers deskTable: cells + Open href + owner
+   * Update/Delete deep links (#/credit-offer/<id>#update|#delete — the detail
+   * view honors the fragment by scrolling to the owner form). WHY links, not
+   * buttons: hash deep links stay shareable + router-routable with zero JS
+   * state; the destructive confirms still gate inside the detail forms.
+   * Non-owners never see these: offerRows only feeds offersByOwner(me.id).
+   * Labels reuse samet.update/samet.delete (existing keys — no new locale).
+   * @param {any[]} list normalized owned offer rows
+   * @returns {any[]} deskTable rows ({o, href, links, cells}) */
   function offerRows(list) {
     return list.map(function (o) {
       var cur = amt(o.current_raw, o.prec, o.sym, o.asset_id), tot = amt(o.total_raw, o.prec, o.sym, o.asset_id);
       var rt = rateText(o.rate_units);
       return { o: o, href: "#/credit-offer/" + o.id,
+        links: [{ text: t("samet.update", "Update"), href: "#/credit-offer/" + o.id + "#update" },
+          { text: t("samet.delete", "Delete"), href: "#/credit-offer/" + o.id + "#delete" }],
         cells: [{ text: o.id }, { text: (o.owner_name || o.owner), raw: o.owner }, { text: o.sym || o.asset_id },
           { text: cur.text, raw: cur.raw }, { text: tot.text, raw: tot.raw },
           { text: rt.text, raw: rt.raw }, { text: Credit.durToHuman(o.max_dur_sec) }, { text: o.enabled ? t("credit.yes", "yes") : t("credit.no", "no") }] };
@@ -346,9 +377,14 @@ var CreditUI = (function () {
    * a dash, never blank). LOAN = Borrow button per row. Row click (never on
    * links/buttons) and the Borrow button both open the loan modal
    * (openLoanModal — name verified from commit 123f034); Enter on a focused
-   * row too. hostBox owns the modal overlay so a list reload clears a stale
-   * modal. Header words Available/Expiration/Loan are batch-3-keyed. */
-  function openOffersTable(doc, hostBox, myGen, rows) {
+   *   row too. hostBox owns the modal overlay so a list reload clears a stale
+   *   modal. Header words Available/Expiration/Loan are batch-3-keyed. Owner
+   *   rows (o.owner === myIdOrNull) also carry Update/Delete deep links
+   *   (#/credit-offer/<id>#update|#delete) in the same Open cell — WHY gated:
+   *   non-owners must not be offered destructive forms (the detail gates too,
+   *   but the list must not advertise them). Labels reuse samet.update/delete.
+   * @param {string|null} [myIdOrNull] wallet account id for owner gating (null = no owner links) */
+  function openOffersTable(doc, hostBox, myGen, rows, myIdOrNull) {
     var box = DOM.el(doc, "div");
     if (!rows.length) { box.appendChild(DOM.el(doc, "p", t("credit.nothing_here_yet", "Nothing here yet.") + t("credit.offers_hint", " Offers appear once anyone creates one — draft yours in the Create offer form on this desk."), "muted")); return box; }
     var table = doc.createElement("table"); table.className = "node-table offers-table";
@@ -381,7 +417,15 @@ var CreditUI = (function () {
       bb.addEventListener("click", function (e) { e.stopPropagation(); openLoanModal(doc, hostBox, myGen, o); });
       tdB.appendChild(bb); tr.appendChild(tdB);
       var tdO = doc.createElement("td");
-      var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", "#/credit-offer/" + o.id); tdO.appendChild(a); tr.appendChild(tdO);
+      var a = DOM.el(doc, "a", t("credit.open", "Open")); a.setAttribute("href", "#/credit-offer/" + o.id); tdO.appendChild(a);
+      /* Owner-row deep links (myIdOrNull gate above): same Open cell, no new column. */
+      if (myIdOrNull && o.owner === myIdOrNull) {
+        tdO.appendChild(doc.createTextNode(" · "));
+        var ua = DOM.el(doc, "a", t("samet.update", "Update")); ua.setAttribute("href", "#/credit-offer/" + o.id + "#update"); tdO.appendChild(ua);
+        tdO.appendChild(doc.createTextNode(" · "));
+        var da = DOM.el(doc, "a", t("samet.delete", "Delete")); da.setAttribute("href", "#/credit-offer/" + o.id + "#delete"); tdO.appendChild(da);
+      }
+      tr.appendChild(tdO);
       tr.addEventListener("click", function (e) {
         var n = e.target;
         while (n && n !== tr) { if (n.tagName === "A" || n.tagName === "BUTTON") return; n = n.parentElement; }
@@ -409,6 +453,12 @@ var CreditUI = (function () {
       cb.addEventListener("click", function () { openLoanModal(doc, hostBox, myGen, o); });
       c.appendChild(cb);
       var ca = DOM.el(doc, "a", t("credit.open", "Open")); ca.setAttribute("href", "#/credit-offer/" + o.id); c.appendChild(ca);
+      if (myIdOrNull && o.owner === myIdOrNull) {
+        c.appendChild(doc.createTextNode(" · "));
+        var cua = DOM.el(doc, "a", t("samet.update", "Update")); cua.setAttribute("href", "#/credit-offer/" + o.id + "#update"); c.appendChild(cua);
+        c.appendChild(doc.createTextNode(" · "));
+        var cda = DOM.el(doc, "a", t("samet.delete", "Delete")); cda.setAttribute("href", "#/credit-offer/" + o.id + "#delete"); c.appendChild(cda);
+      }
       cards.appendChild(c);
     });
     box.appendChild(cards); return box;
@@ -566,9 +616,22 @@ var CreditUI = (function () {
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
     ctx.wrap.appendChild(DOM.el(doc, "h2", t("credit.my_offers", "My offers")));
     var mineBox = DOM.el(doc, "div"); ctx.wrap.appendChild(mineBox);
+    /* My-deals (borrower) section: deals surface per-offer in the detail view
+     * only, so a borrower with deals across offers had no desk-level view.
+     * Read via Credit.dealsByBorrower (existing get_credit_deals_by_borrower,
+     * no invented method); each row Opens its deal detail (#/deal/:id).
+     * Heading + empty
+     * note are NEW keys (reported for the mirror round — locales untouched
+     * here); loading/error reuse credit.loading_deals/could_not_load_deals.
+     * WHY after My offers: same "mine" grouping, before the create form. */
+    ctx.wrap.appendChild(DOM.el(doc, "h2", t("credit.my_deals_borrower", "My deals (borrower)")));
+    var dealsMineBox = DOM.el(doc, "div"); ctx.wrap.appendChild(dealsMineBox);
     ctx.wrap.appendChild(DOM.el(doc, "h2", t("credit.create_offer", "Create offer")));
     if (locked0) ctx.wrap.appendChild(signNotice(doc));
     createBox(doc, ctx.wrap, myGen);
+    /* Owner id for open-list owner-link gating (set once me resolves; filter
+     * clicks after that see it, earlier ones render without owner links). */
+    var myId = null;
     /* Open-offers list: auto-loads ALL chain offers (list_credit_offers);
      * the Owner/Asset filter row + List button refine the SAME table
      * (owner-first, then asset, else all). My-offers + create form below stay
@@ -579,7 +642,7 @@ var CreditUI = (function () {
       Promise.resolve(rowsPromise).then(function (rows) {
         if (myGen !== gen) return; DOM.clear(listBox);
         listBox.appendChild(DOM.el(doc, "h2", t("credit.all_offers", "← All offers")));
-        listBox.appendChild(openOffersTable(doc, listBox, myGen, rows));
+        listBox.appendChild(openOffersTable(doc, listBox, myGen, rows, myId));
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("credit.could_not_load_offers", "Could not load offers."));
       }).then(function () { go.disabled = false; });
@@ -595,11 +658,36 @@ var CreditUI = (function () {
     });
     Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }).then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (myGen !== gen) return;
+      myId = me.id;
       if (!isUnlockedNow()) mineBox.appendChild(viewingAsNotice(doc));
       Credit.offersByOwner(me.id, {}).then(function (rows) {
         if (myGen !== gen) return; DOM.clear(mineBox);
         mineBox.appendChild(deskTable(doc, [t("credit.offer", "Offer"), t("credit.owner", "Owner"), t("credit.asset", "Asset"), t("credit.current", "Current"), t("credit.total", "Total"), t("credit.fee_rate", "Fee rate"), t("credit.max_duration", "Max duration"), t("credit.enabled", "Enabled"), ""], offerRows(rows), offerCards));
       }).catch(function () { if (myGen === gen) { DOM.clear(mineBox); mineBox.appendChild(DOM.el(doc, "p", t("credit.no_owned_offers", "No owned offers.") + t("credit.owned_hint", " Create one in the Create offer form below — owned offers list here."), "muted")); } });
+      /* Borrower deals for the desk section above (empty -> honest note, never
+       * the deskTable nothing-here offers-hint which belongs to offers). Each
+       * row Opens its deal detail (#/deal/:id — renderDealDetail landed in
+       * credit-detail-ui.js, route /deal/:id in router.js — WHY not the offer:
+       * the row IS a deal (1.22.x) and the deal page carries repay/collateral
+       * actions the offer page lacks). */
+      Credit.dealsByBorrower(me.id, {}).then(function (deals) {
+        if (myGen !== gen) return; DOM.clear(dealsMineBox);
+        if (!deals.length) { dealsMineBox.appendChild(DOM.el(doc, "p", t("credit.no_borrower_deals", "No borrower deals yet — deals appear after you borrow against an offer."), "muted")); return; }
+        var drows = deals.map(function (d) {
+          var debt = amt(d.debt_raw, d.debt_prec, d.debt_sym, d.debt_id);
+          var coll = amt(d.coll_raw, d.coll_prec, d.coll_sym, d.coll_id);
+          var brt = safeRate(d.rate_units);
+          return { d: d, href: "#/deal/" + d.id,
+            cells: [{ text: d.id }, { text: d.offer_id },
+              { text: debt.text, raw: debt.raw }, { text: coll.text, raw: coll.raw },
+              { text: brt.text, raw: brt.raw },
+              { text: (d.auto_repay === null || d.auto_repay === undefined) ? "—" : Credit.autoRepayWord(d.auto_repay) }] };
+        });
+        dealsMineBox.appendChild(deskTable(doc,
+          [t("credit.deal", "Deal"), t("credit.offer", "Offer"), t("credit.debt", "Debt"), t("credit.collateral", "Collateral"), t("credit.rate", "Rate"), t("credit.auto_repay", "Auto-repay"), ""],
+          drows,
+          function (r) { return [r.d.id + " · " + t("credit.offer", "Offer") + " " + r.d.offer_id, t("credit.debt", "Debt") + " " + r.cells[2].text, t("credit.collateral", "Collateral") + " " + r.cells[3].text, t("credit.rate", "Rate") + " " + r.cells[4].text]; }));
+      }).catch(function (e) { if (myGen === gen) { DOM.clear(dealsMineBox); showError(doc, dealsMineBox, e, t("credit.could_not_load_deals", "Could not load deals.")); } });
       showOpenOffers(Credit.offers({}));
     }).catch(function () { if (myGen === gen) showOpenOffers(Credit.offers({})); });
   }

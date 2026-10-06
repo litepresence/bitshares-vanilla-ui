@@ -215,6 +215,7 @@ var Router = (function () {
     { path: "/accounts", title: "Accounts", render: function (root) { AccountsUI.renderAccounts(root); } },
     { path: "/market/:marketID", title: "Exchange", render: renderMarketPage },
     { path: "/credit-offer/:id", title: "Credit Offer", render: function (root, params) { CreditDetailUI.renderOfferDetail(root, params && params.id); } },
+    { path: "/deal/:id", title: "Credit Deal", render: function (root, params) { CreditDetailUI.renderDealDetail(root, params && params.id); } },
     { path: "/credit-offer", title: "Credit Offer", render: function (root) { CreditUI.renderOffers(root); } },
     { path: "/samet", title: "Same-T Funds", render: function (root) { SametUI.renderSamet(root); } },
     { path: "/settings/:tab", title: "Settings", render: renderSettings },

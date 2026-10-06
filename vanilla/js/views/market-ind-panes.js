@@ -491,9 +491,14 @@ MarketInd._panes = MarketInd._panes || {};
       if (!isGlobal && feed.settle.offset !== undefined && feed.settle.offset !== null) {
         settleFull += " (offset " + String(feed.settle.offset) + "/10000)";
       }
+      /* WHY: the non-global cell renders the offset-adjusted settleEstimate
+       * (Format.settleEstimate), not a chain settlement_price — tag it
+       * "(est.)" via plain glue on the existing key (no new locale key) so
+       * the strip never passes an estimate off as a settlement. Global stays
+       * bare; the offset title above stands untouched. */
       cell(isGlobal
         ? t("market.stat_global_settle", "Global Settlement")
-        : t("market.stat_settle", "Settlement Price"), ps(String(feed.settle.value)), settleFull);
+        : t("market.stat_settle", "Settlement Price") + " (est.)", ps(String(feed.settle.value)), settleFull);
     }
   }
 

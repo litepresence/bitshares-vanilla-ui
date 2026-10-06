@@ -395,8 +395,20 @@ var MiscUI = (function () {
               cardLines: [(l.label || ("line " + (i + 1))) + ": " + h] };
           })));
           box.appendChild(ui.el(doc, "p", "Total: " + Format.formatAmount(String(total), info.precision) + " " + info.symbol, ""));
+          /* Prefill the transfer form (hashQuery contract, transfer-ui.js):
+           * asset + human total + note ride as ?asset=&amount=&memo= so the
+           * recipient does not retype them (memo omitted when empty, the
+           * shareHash omit-empties convention). Symbol (not the raw invoice
+           * asset ref) is prefilled: the transfer asset field resolves
+           * symbols, so an id-shaped invoice ref still lands reviewable. */
+          var totalHuman = Format.formatAmount(String(total), info.precision);
+          var noteText = String(inv.note || inv.memo || "");
+          var payHref = "#/transfer/" + encodeURIComponent(String(inv.to)) +
+            "?asset=" + encodeURIComponent(info.symbol) +
+            "&amount=" + encodeURIComponent(totalHuman) +
+            (noteText ? "&memo=" + encodeURIComponent(noteText) : "");
           var pay = ui.touchable(ui.el(doc, "a", t("misc.pay_via_transfer", "Pay via transfer")));
-          pay.setAttribute("href", "#/transfer/" + encodeURIComponent(String(inv.to)));
+          pay.setAttribute("href", payHref);
           box.appendChild(pay);
           box.appendChild(ui.el(doc, "p", "Paying opens the transfer page for " + String(inv.to) + " — enter the total above there.", "muted"));
         }).catch(function (e) { if (live(myGen, uiGen)) ui.showError(doc, box, e, t("misc.could_not_render_the_invoice_amounts", "Could not render the invoice amounts.")); });
@@ -474,6 +486,18 @@ var MiscUI = (function () {
         stateEl.setAttribute("aria-live", "polite"); ctx.wrap.appendChild(stateEl);
         var reBtn = ui.touchable(ui.el(doc, "button", t("misc.recheck_payment", "Re-check payment")));
         reBtn.type = "button"; ctx.wrap.appendChild(reBtn);
+        /* Pay via transfer (same prefill contract as the packed-invoice link
+         * above): the transfer form parses ?asset=&amount=&memo=
+         * (transfer-ui.js hashQuery), so the checkout request carries over
+         * verbatim instead of dropping asset/total/note. Static anchor, no
+         * liveness needed; key reused, no new i18n. */
+        ctx.wrap.appendChild(doc.createTextNode(" "));
+        var payQ = ui.touchable(ui.el(doc, "a", t("misc.pay_via_transfer", "Pay via transfer")));
+        payQ.setAttribute("href", "#/transfer/" + encodeURIComponent(qTo) +
+          "?asset=" + encodeURIComponent(qAsset) +
+          "&amount=" + encodeURIComponent(qAmount) +
+          (qMemo ? "&memo=" + encodeURIComponent(qMemo) : ""));
+        ctx.wrap.appendChild(payQ);
         /* One paid check: resolve the `to` account, describe the asset, then
          * Format-only human->raw for the match, then scan recent history for
          * the inbound op-0 (pair-or-object rows, tx-send.js

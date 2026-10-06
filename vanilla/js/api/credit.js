@@ -1,6 +1,6 @@
 /* Credit: credit offers (1.21.x) + deals (1.22.x) + margin/call-order (1.8.x) reads, builders, rate math.
- * Same-T funds (1.20.x) live in credit-samet.js (split OUT on the ~380-line cap — pre-authorized).
- * Owns: offer/deal list/by-owner/by-asset reads (symbols joined via lookup_asset_symbols), margin
+ * Same-T funds (1.20.x) live in builders/credit-samet.js (split OUT on the ~380-line cap — pre-authorized).
+ * Owns: offer/deal list/by-owner/by-asset/by-borrower reads (symbols joined via lookup_asset_symbols), margin
  *   positions via the PROVEN method (ambiguity I: get_margin_positions first, get_call_orders_by_account
  *   fallback; see positionsMethod), seven builders for ops 3/69/70/71/72/73/76 ([opId, opData], zero
  *   fee for live fee-fill), THE ONLY fee-rate converters at denom 1M + TCR converters at divisor
@@ -256,6 +256,17 @@ var Credit = (function () {
   }
   /* Deals under one offer id (debt+collateral symbols joined). Params: offerId 1.21.x, opts {limit, startId}. */
   async function dealsByOffer(offerId, opts) { _assertId(offerId, OFFER_RE, "offerId"); return _deals("get_credit_deals_by_offer_id", offerId, opts); }
+  /**
+   * Deals by borrower name-or-id (debt+collateral symbols joined). Uses the
+   * EXISTING database call get_credit_deals_by_borrower (#4
+   * database_api.hpp:1069 "by the name or ID of a borrower account") — no
+   * invented method. Name-or-id like offersByOwner, so no id assert; paging
+   * via opts, chain-capped at api_limit_get_credit_offers (101).
+   * @param {string} nameOrId borrower account name or 1.2.x id
+   * @param {any} [opts] paging {limit, startId}
+   * @returns {Promise<any[]>} normalized deal rows (borrower_name joined)
+   */
+  async function dealsByBorrower(nameOrId, opts) { return _deals("get_credit_deals_by_borrower", String(nameOrId), opts); }
   /* Raw call-order -> plain row (collateral/debt accept {amount,asset_id} or raw+id shapes). */
   function _normPos(c) {
     if (!c || typeof c !== "object" || !c.id) throw new Error("unknown-position");
@@ -450,7 +461,7 @@ var Credit = (function () {
   }
 
   return { offer: offer, deal: deal, offers: offers, offersByOwner: offersByOwner, offersByAsset: offersByAsset,
-    dealsByOffer: dealsByOffer,
+    dealsByOffer: dealsByOffer, dealsByBorrower: dealsByBorrower,
     positions: positions, positionsMethod: positionsMethod,
     rateUnitsToHuman: rateUnitsToHuman, rateHumanToUnits: rateHumanToUnits,
     tcrUnitsToHuman: tcrUnitsToHuman, tcrHumanToUnits: tcrHumanToUnits,

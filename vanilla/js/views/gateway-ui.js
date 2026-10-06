@@ -117,6 +117,26 @@ var GatewayUI = (function () {
     if (typeof prec === "number" && /^\d+$/.test(String(raw))) { try { return Format.formatAmount(String(raw), prec); } catch (e) {} }
     return String(raw);
   }
+  /* defaultWithdrawAmount: gateway fee/min-aware human default for the
+   * transfer prefill. WHY min-then-fee, verbatim host values: the row's
+   * minimum is the smallest amount the host accepts, so it is the prefill
+   * when stated; the withdraw fee is the only scale hint when no minimum
+   * is stated. No invented sums — both candidates are host-stated raw ints
+   * rendered via Format at the row precision, so the result stays
+   * Format.parseAmount-compatible for the transfer form. Zero/unknown
+   * yields "" (caller omits &amount; the form gates the user to fill it).
+   * @param {object} row normalized coin row (minAmountRaw/withdrawFeeRaw/precision).
+   * @returns {string} human amount or "". Never throws. */
+  function defaultWithdrawAmount(row) {
+    try {
+      if (!row || typeof row.precision !== "number") return "";
+      var minOk = /^\d+$/.test(String(row.minAmountRaw)) ? String(row.minAmountRaw) : null;
+      var feeOk = /^\d+$/.test(String(row.withdrawFeeRaw)) ? String(row.withdrawFeeRaw) : null;
+      var raw = minOk !== null ? minOk : feeOk;
+      if (raw === null || !/[1-9]/.test(raw)) return "";
+      return Format.formatAmount(raw, row.precision);
+    } catch (e) { return ""; }
+  }
   /* Health timestamp -> locale date-time via I18n.date (R-A-W6 V9 funnel:
    * prefs-locale tag, medium date+time; falls back to the old bare call when
    * i18n.js failed to load). h.at is Date.now() epoch ms — new Date() parses
@@ -470,7 +490,14 @@ var GatewayUI = (function () {
       Gateway.withdrawPrefill(entry.id, row.symbol).then(function (pre) {
         if (myGen !== gen) return;
         go.disabled = false;
-        if (typeof location !== "undefined") location.hash = "#/transfer/" + encodeURIComponent(pre.to) + "?asset=" + encodeURIComponent(pre.assetSymbol) + "&memo=" + encodeURIComponent(pre.memoPrefix + addr);
+        /* Amount prefill (fee/min-aware): the transfer form parses &amount=
+         * via its AMOUNT_RE gate + Format.parseAmount at review, so the
+         * defaultWithdrawAmount human above lands directly editable there.
+         * Omitted when the host states neither usable minimum nor fee. */
+        var amt = defaultWithdrawAmount(row);
+        var hash = "#/transfer/" + encodeURIComponent(pre.to) + "?asset=" + encodeURIComponent(pre.assetSymbol) + "&memo=" + encodeURIComponent(pre.memoPrefix + addr);
+        if (amt) hash += "&amount=" + encodeURIComponent(amt);
+        if (typeof location !== "undefined") location.hash = hash;
       }).catch(function (e) {
         if (myGen !== gen) return;
         go.disabled = false;

@@ -263,8 +263,18 @@ var BorrowUI = (function () {
           listBox.appendChild(DOM.el(doc, "p", "No margin positions for " + R.me.name + ". The adjust form stays disabled until a position exists (no safe target, no broadcast).", "muted"));
           return;
         }
-        listBox.appendChild(posTable(doc, R.rows));
-        adjustBox(doc, formBox, myGen, R.me, R.rows);
+        /* P1 wiring: adjust form first so its prefill API exists, then the
+         * table's shortcuts fill it. WHY this order: buttons are display-only
+         * (select + human inputs); Review/fee/confirm still owns op-3 bytes. */
+        var adjApi = adjustBox(doc, formBox, myGen, R.me, R.rows);
+        listBox.appendChild(posTable(doc, R.rows, function (pos, mode) {
+          try {
+            if (mode === "repay") adjApi.fillRepay(pos);
+            else if (mode === "close") adjApi.fillClose(pos);
+            else adjApi.fillAdjust(pos);
+            try { formBox.scrollIntoView({ block: "start" }); } catch (e) { /* focus stands */ }
+          } catch (e) { /* display-only shortcut; Review path still validates */ }
+        }));
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox, e, t("borrow.could_not_load_positions", "Could not load positions."));
       }).then(function () { go.disabled = false; });
@@ -278,8 +288,34 @@ var BorrowUI = (function () {
    * CR cell comes from p._cr (enriched by the loader: previewRatio via Format,
    * feed-valued with danger/warning/safe suffix, nominal honestly labelled).
    * Missing feed -> "—" with MCR title when known. No float here — Format owns
-   * integers; this only paints strings. */
-  function posTable(doc, rows) {
+   * integers; this only paints strings.
+   * Per-row Adjust/Repay/Close shortcuts (P1): display-only buttons that call
+   *   onPick(pos, mode) so the caller can pre-select the adjust form below.
+   *   WHY buttons, not direct broadcasts: op-3 bytes stay built ONLY by the
+   *   adjustBox Review -> Credit.buildCallUpdate -> fee -> confirm path, so
+   *   the broadcast stays byte-identical in effect; buttons merely fill the
+   *   select + human delta inputs and focus.
+   * @param {Document} doc owner document.
+   * @param {Array} rows position rows from Credit.positions.
+   * @param {Function} [onPick] optional callback function(pos, mode) where
+   *   mode is "adjust"|"repay"|"close". Never throws outward.
+   * @returns {HTMLElement} the container element. */
+  function posTable(doc, rows, onPick) {
+    /* mkPick: one shortcut button (display-only). WHY helper: table rows and
+     * phone cards share the same three shortcuts; a single builder keeps
+     * labels + mode wiring identical. Never throws (click guards onPick).
+     * @param {Object} pos the row's position object.
+     * @param {string} mode "adjust"|"repay"|"close".
+     * @param {string} label button text.
+     * @returns {HTMLButtonElement} the wired button. */
+    function mkPick(pos, mode, label) {
+      var b = touchable(DOM.el(doc, "button", label));
+      b.type = "button";
+      b.addEventListener("click", function () {
+        try { if (typeof onPick === "function") onPick(pos, mode); } catch (e) { /* display-only; Review validates */ }
+      });
+      return b;
+    }
     var box = DOM.el(doc, "div");
     var table = doc.createElement("table"); table.className = "node-table";
     var hr = doc.createElement("tr");
@@ -311,7 +347,14 @@ var BorrowUI = (function () {
       tr.appendChild(tdCr);
       var link = doc.createElement("td");
       var a = DOM.el(doc, "a", t("borrow.market", "Market")); a.setAttribute("href", "#/market/" + p.coll_sym + "_" + p.debt_sym);
-      link.appendChild(a); tr.appendChild(link); tbody.appendChild(tr);
+      link.appendChild(a);
+      /* P1 shortcuts: Adjust selects the row; Repay fills full-repay debt;
+       * Close fills both legs full-negative. Display-only — the adjustBox
+       * Review path still builds + confirms op-3. */
+      link.appendChild(mkPick(p, "adjust", t("borrow.adjust", "Adjust")));
+      link.appendChild(mkPick(p, "repay", t("borrow.repay_full", "Repay in full")));
+      link.appendChild(mkPick(p, "close", t("borrow.close_position", "Close position")));
+      tr.appendChild(link); tbody.appendChild(tr);
     });
     table.appendChild(tbody); box.appendChild(table);
     var cards = DOM.el(doc, "div", null, "node-cards");
@@ -324,11 +367,30 @@ var BorrowUI = (function () {
       c.appendChild(DOM.el(doc, "div", "Debt " + debt.text));
       var crLine = (p._cr && p._cr.x) ? p._cr.x : t("borrow.hdr_cr", "Collateral ratio") + " —";
       c.appendChild(DOM.el(doc, "div", crLine));
+      /* Phone parity for the P1 shortcuts: same three modes as the table. */
+      var crow = DOM.el(doc, "div", null, "xfer-field");
+      crow.appendChild(mkPick(p, "adjust", t("borrow.adjust", "Adjust")));
+      crow.appendChild(mkPick(p, "repay", t("borrow.repay_full", "Repay in full")));
+      crow.appendChild(mkPick(p, "close", t("borrow.close_position", "Close position")));
+      c.appendChild(crow);
       box.appendChild(cards); cards.appendChild(c);
     });
     return box;
   }
-  /* Op-3 adjust: signed deltas + optional TCR; negative debt warns explicitly. */
+  /* Op-3 adjust: signed deltas + optional TCR; negative debt warns explicitly.
+   * Prefill API (P1): the returned helpers pre-select the position + fill
+   *   human delta inputs from the row's raw legs (Format only, never float).
+   *   WHY fill, not broadcast: the Review button below still resolves precs,
+   *   runs Credit.buildCallUpdate, estimates the fee via get_required_fees,
+   *   and confirms — so op-3 bytes are byte-identical in effect to a manual
+   *   entry of the same numbers.
+   * @param {Document} doc owner document.
+   * @param {HTMLElement} box container the form renders into.
+   * @param {number} myGen route generation guard.
+   * @param {Object} me resolved account {id, name}.
+   * @param {Array} positions rows from Credit.positions.
+   * @returns {{sel: HTMLSelectElement, fillAdjust: Function, fillRepay: Function, fillClose: Function}}
+   *   the select + three prefill helpers. */
   function adjustBox(doc, box, myGen, me, positions) {
     var sel = doc.createElement("select"); touchable(sel);
     positions.forEach(function (p) {
@@ -344,6 +406,56 @@ var BorrowUI = (function () {
     if (!isUnlockedNow()) box.appendChild(signNotice(doc));
     var btn = touchable(DOM.el(doc, "button", t("borrow.review_adjust", "Review adjust"))); btn.type = "button"; box.appendChild(btn);
     var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
+    /* rawToHuman: chain raw int + asset precision -> human decimal for prefilling
+     * the signed delta inputs. WHY Format-only: binary float never touches money;
+     * null prec (join miss) yields null so callers leave the input blank instead
+     * of guessing. Params: raw (string), prec (number|null). Returns string|null. */
+    function rawToHuman(raw, prec) {
+      if (typeof prec !== "number") return null;
+      try {
+        if (!/^-?\d+$/.test(String(raw))) return null;
+        return Format.formatAmount(String(raw), prec);
+      } catch (e) { return null; }
+    }
+    /* selectPos: point the position dropdown at the picked row. Display-only.
+     * @param {Object} pos position row (call_id). No return. Never throws. */
+    function selectPos(pos) {
+      try { if (pos && pos.call_id) sel.value = pos.call_id; } catch (e) { /* select stands */ }
+    }
+    /* fillAdjust: select the row and focus collateral (user edits deltas).
+     * @param {Object} pos position row. No return. Never throws. */
+    function fillAdjust(pos) {
+      selectPos(pos);
+      try { fColl.input.focus(); } catch (e) { /* focus best-effort */ }
+    }
+    /* fillRepay: select the row + prefill delta_debt=-debt_raw (full repay in
+     * human units) and clear delta_collateral (pure repay keeps collateral).
+     * WHY clear, not zero-fill: signed("") parses as "0" in Review, so a blank
+     * means no collateral change — identical bytes to typing it manually.
+     * @param {Object} pos position row (debt_raw/debt_prec). No return. */
+    function fillRepay(pos) {
+      selectPos(pos);
+      try {
+        var h = pos ? rawToHuman(pos.debt_raw, pos.debt_prec) : null;
+        if (h !== null) fDebt.input.value = "-" + h;
+        fColl.input.value = "";
+        try { fDebt.input.focus(); } catch (e2) { /* focus best-effort */ }
+      } catch (e) { /* inputs stand; Review validates */ }
+    }
+    /* fillClose: select the row + prefill BOTH legs full-negative
+     * (delta_collateral=-coll_raw, delta_debt=-debt_raw) so one Review closes
+     * the position. Missing precisions leave that leg blank (no guess).
+     * @param {Object} pos position row. No return. Never throws. */
+    function fillClose(pos) {
+      selectPos(pos);
+      try {
+        var hc = pos ? rawToHuman(pos.coll_raw, pos.coll_prec) : null;
+        var hd = pos ? rawToHuman(pos.debt_raw, pos.debt_prec) : null;
+        if (hc !== null) fColl.input.value = "-" + hc;
+        if (hd !== null) fDebt.input.value = "-" + hd;
+        try { fColl.input.focus(); } catch (e2) { /* focus best-effort */ }
+      } catch (e) { /* inputs stand; Review validates */ }
+    }
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
       DOM.clear(out); btn.disabled = true;
@@ -437,6 +549,7 @@ var BorrowUI = (function () {
         showError(doc, out, e, t("borrow.could_not_prepare_the_adjust", "Could not prepare the adjust.")); btn.disabled = false;
       });
     });
+    return { sel: sel, fillAdjust: fillAdjust, fillRepay: fillRepay, fillClose: fillClose };
   }
 
   /* Get-started stepper: Borrow.jsx STEPS chrome only (introduction/concept/
@@ -862,11 +975,20 @@ var BorrowUI = (function () {
     });
   }
   /* Existing-bids table (desktop) + phone cards; legs human via the joined
-   * precisions, raw integers in title (never shown bare). Empty -> honest note. */
+   * precisions, raw integers in title (never shown bare). Empty -> honest note.
+   * P2 finality note: bids cannot be cancelled — op 45 bid_collateral is the
+   *   only signed bid op; op 46 execute_bid is VIRTUAL (operations.hpp:101-102,
+   *   never signed), so a placed bid only executes or expires. Sentence only,
+   *   no behaviour change.
+   * @param {Document} doc owner document.
+   * @param {Array} bids rows from get_collateral_bids.
+   * @param {Object} R settle context {asset, backingPrec, debtPrec}.
+   * @returns {HTMLElement} the container element. */
   function bidsTable(doc, bids, R) {
     var box = DOM.el(doc, "div");
     if (!bids || !bids.length) {
       box.appendChild(DOM.el(doc, "p", "No collateral bids on " + R.asset.symbol + t("borrow.bids_suffix", " yet. Place one from the bid form below — bids list here."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("borrow.bids_no_cancel", "Bids cannot be cancelled once placed — they execute or expire."), "muted"));
       return box;
     }
     var table = doc.createElement("table"); table.className = "node-table";
@@ -900,6 +1022,7 @@ var BorrowUI = (function () {
       cards.appendChild(c);
     });
     box.appendChild(cards);
+    box.appendChild(DOM.el(doc, "p", t("borrow.bids_no_cancel", "Bids cannot be cancelled once placed — they execute or expire."), "muted"));
     return box;
   }
   /* Op-45 bid form: bidder (defaults to the wallet account) + collateral/debt

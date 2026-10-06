@@ -226,6 +226,21 @@ var PoolUI = (function () {
   }
   function pctText(u) { return Pool.pctUnitsToHuman(u) + "%"; } /* u16 hundredths -> "1.5%" */
   function whoText(me) { return me.name + " (" + me.id + ")"; }
+  /* Network label from Store (sole settings owner); mainnet when unreadable.
+   * WHY a verbatim copy (trade-panels.js:110 precedent — doctrine prefers
+   * duplication over a shared import for two files): the confirm Network row
+   * must name the live network, never a hardcoded "testnet" (P0 :653 fix).
+   * Params: none. Returns "testnet"|"mainnet" (mainnet default). Never throws.
+   * @returns {string} */
+  function networkName() {
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+        var s = Store.loadSettings();
+        if (s && (s.network === "testnet" || s.network === "mainnet")) return s.network;
+      }
+    } catch (e) { /* default stands */ }
+    return "mainnet";
+  }
   function sendConfirm(doc, out, cfg, myGen) { /* confirm + publish: fresh-WIF sign, re-read proof, result */
     DOM.clear(out);
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
@@ -305,10 +320,110 @@ var PoolUI = (function () {
       DOM.clear(out); showError(doc, out, e, cfg.fail || t("credit.could_not_prepare_the_transaction", "Could not prepare the transaction.")); done();
     });
   }
+  /** Live delete-readiness check for a liquidity pool (shared pre-check).
+   * WHY live, WHY fail-closed: the static "withdraw all liquidity first"
+   * warning trusts the render-time row; balances/supply move after every
+   * deposit/withdraw, so the Review delete gate must re-read at click time.
+   * Delete is owner-only cleanup valid only when share supply AND both legs
+   * read 0 — any non-zero or unreadable leg blocks with the leg named.
+   * CHAIN TRUTH: balances <- Pool.get (liquidity_pool_object), supply <-
+   * Asset.describe share_asset current_supply (dynamic join; null when
+   * offline/join-miss -> blocked as unverified, never enabled blind).
+   * NEW I18N KEY (follow-up mirrors to 12 locales): pool.delete_not_empty
+   * ("Not empty — %(legs)s must read 0 before delete.").
+   * @param {string} poolId pool object id (1.19.x)
+   * @param {string} shareId share asset id (1.3.x)
+   * @returns {Promise<{ok:boolean, note:(string|null), legs:Array<string>}>}
+   *   ok true + note null when empty; ok false + localized note otherwise.
+   *   Never throws — read failures return ok:false with an honest note. */
+  async function deleteCheck(poolId, shareId) {
+    var legs = [];
+    try {
+      var row = await Pool.get(String(poolId));
+      var sid = String(shareId || row.share_id || "");
+      var supplyRaw = null, supplyPrec = null, supplySym = sid;
+      try {
+        var desc = await Asset.describe(sid);
+        if (desc) {
+          if (desc.supply_raw !== null && desc.supply_raw !== undefined) supplyRaw = String(desc.supply_raw);
+          supplyPrec = (typeof desc.precision === "number") ? desc.precision : null;
+          supplySym = desc.symbol || sid;
+        }
+      } catch (e) { supplyRaw = null; }
+      var balA = (row.balance_a_raw !== null && row.balance_a_raw !== undefined) ? String(row.balance_a_raw) : null;
+      var balB = (row.balance_b_raw !== null && row.balance_b_raw !== undefined) ? String(row.balance_b_raw) : null;
+      /* Name each non-zero leg with its human amount (raw in amtText title
+       * path — display text stays human per #6); unknown reads block too. */
+      if (balA === null) legs.push("A ?");
+      else if (balA !== "0") {
+        var hA = amtText(balA, row.asset_a_id, (typeof row.prec_a === "number") ? row.prec_a : null, row.sym_a || row.asset_a_id);
+        legs.push("A " + hA.text);
+      }
+      if (balB === null) legs.push("B ?");
+      else if (balB !== "0") {
+        var hB = amtText(balB, row.asset_b_id, (typeof row.prec_b === "number") ? row.prec_b : null, row.sym_b || row.asset_b_id);
+        legs.push("B " + hB.text);
+      }
+      if (supplyRaw === null) legs.push("supply ?");
+      else if (supplyRaw !== "0") {
+        var hS = amtText(supplyRaw, sid, supplyPrec, supplySym);
+        legs.push("supply " + hS.text);
+      }
+      var empty = (balA === "0" && balB === "0" && supplyRaw === "0");
+      if (empty) return { ok: true, note: null, legs: [] };
+      return { ok: false, note: t("pool.delete_not_empty", "Not empty — %(legs)s must read 0 before delete.", { legs: legs.length ? legs.join(", ") : "?" }), legs: legs };
+    } catch (e) {
+      return { ok: false, note: t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."), legs: legs };
+    }
+  }
+  /** Review-button section with optional live readiness gate.
+   * WHY the gate: destructive confirms (pool delete) must not offer Sign &
+   * Send while the chain still shows value inside — the button stays disabled
+   * until cfg.checkReady resolves ok. Existing callers without checkReady
+   * behave byte-identically (enabled immediately); delete callers pass
+   * function () { return PoolUI._ui.deleteCheck(poolId, shareId); } (detail
+   * wiring belongs to the pool-detail-actions worker — this file only owns
+   * the gate + check).
+   * @param {Document} doc owner document
+   * @param {HTMLElement} box mount element for button + output
+   * @param {number} myGen route generation (liveness token)
+   * @param {string} label button label
+   * @param {any} cfg {build, rows, title, ok, fail, btn?, checkReady?}
+   * @returns {HTMLButtonElement} the review button */
   function reviewSection(doc, box, myGen, label, cfg) {
     var btn = touchable(DOM.el(doc, "button", label)); btn.type = "button"; box.appendChild(btn);
     var out = DOM.el(doc, "div", null, "xfer-out"); box.appendChild(out);
     cfg.btn = btn;
+    /* LIVE GATE (delete pre-check): when cfg.checkReady is present the button
+     * starts disabled with a checking note; it enables only on ok:true. The
+     * blocked note names the remaining legs (deleteCheck above). Stale gens
+     * never enable. No gate -> immediate enable (all current callers). */
+    if (cfg && typeof cfg.checkReady === "function") {
+      btn.disabled = true;
+      var gateNote = DOM.el(doc, "p", t("pool.loading", "Loading pools…"), "muted");
+      try { gateNote.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
+      box.appendChild(gateNote);
+      /* TYPE NOTE: cfg is any (seam without shared types — group 1 owns
+       * types.js); pin the gate fn + result to any so member reads never
+       * narrow to never under checkJs. */
+      var gateFn = /** @type {any} */ ((cfg && cfg.checkReady));
+      Promise.resolve().then(function () { return gateFn(); }).then(function (res) {
+        var resAny = /** @type {any} */ (res);
+        if (myGen !== gen) return;
+        var ok = !!(resAny && resAny.ok);
+        if (ok) {
+          btn.disabled = false;
+          try { if (gateNote.parentNode) gateNote.parentNode.removeChild(gateNote); } catch (e2) { /* gone */ }
+        } else {
+          btn.disabled = true;
+          try { gateNote.textContent = (resAny && resAny.note) ? String(resAny.note) : t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."); } catch (e3) { /* checking text stands */ }
+        }
+      }).catch(function () {
+        if (myGen !== gen) return;
+        btn.disabled = true;
+        try { gateNote.textContent = t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."); } catch (e4) { /* checking text stands */ }
+      });
+    }
     /* SIGN-TIME GATE: password asked only here, never at render. A locked
      * click shows an honest notice + inline unlock; success flows into review
      * (read-only until the user presses Sign & Send). */
@@ -331,11 +446,27 @@ var PoolUI = (function () {
     a.setAttribute("href", "#/asset/" + sym);
     return a;
   }
-  function poolTable(doc, rows) { /* dexux-ref density: POOL ID / EXCHANGE /
-    *   SHARE / A / A QTY / B / B QTY / TAKER / WITHDRAWAL. EXCHANGE opens the
-    *   detail desk (#/pools/:id), which owns the inline swap and stake panels
-    *   — the list stays a list (no separate STAKE column: same destination).
+  /** Pool table (dense dexux-ref columns + optional per-owned-row Unstake link).
+   * WHY the extra column lives only on the mine table (opts.mine): the main
+   * list is strangers' pools (Swap/Stake ⇄ already opens the desk); owned rows
+   * get a 1-tap Unstake deep link to the detail desk whose Review unstake is
+   * already 1-tap there — this restores 1-tap unstake from the list.
+   * WHY the href stays clean "#/pools/<id>" (no literal "#unstake" fragment):
+   * Router.currentPath would fold a second "#" into the :id segment
+   * ("1.19.7#unstake" fails Pool POOL_RE -> unknown-pool); the unstake intent
+   * rides in the click handler below, which navigates cleanly then focuses
+   * the detail's Review unstake button (middle-click/copy-link stay safe).
+   * @param {Document} doc owner document
+   * @param {Array<any>} rows joined pool rows (Pool.list/mine shape)
+   * @param {{mine?:boolean}} [opts] when mine true, append the Unstake column
+   * @returns {HTMLElement} table, or empty-state paragraph */
+  function poolTable(doc, rows, opts) { /* dexux-ref density: POOL ID / EXCHANGE /
+    *   SHARE / A / A QTY / B / B QTY / TAKER / WITHDRAWAL (+ UNSTAKE on mine).
+    *   EXCHANGE opens the detail desk (#/pools/:id), which owns the inline
+    *   swap and stake panels — the list stays a list (no separate STAKE
+    *   column: same destination).
     *   Sort: Pool ID / Taker / Withdrawal headers toggle page-sort. */
+    var mine = !!(opts && opts.mine);
     if (!rows.length) return DOM.el(doc, "p", t("pool.no_pools", "No pools found.") + t("pool.zero_supply_hint", " Create one from the Stake form on this desk — it needs a zero-supply share asset from #/assets/create first."), "muted");
     var view = rows.slice();
     function sortVal(r) {
@@ -362,6 +493,9 @@ var PoolUI = (function () {
       { key: "taker", label: t("pool.taker_row", "Taker fee"), sortable: true },
       { key: "withdrawal", label: t("pool.withdrawal_row", "Withdrawal fee"), sortable: true }
     ];
+    /* Owned-row Unstake header (existing key pool.stake_unstake_col, default
+     * "Stake/Unstake" — reused, no new copy). Main list keeps 9 columns. */
+    if (mine) cols.push({ key: null, label: t("pool.stake_unstake_col", "Stake/Unstake") });
     cols.forEach(function (c) {
       var th = doc.createElement("th");
       if (c.sortable) {
@@ -375,10 +509,12 @@ var PoolUI = (function () {
         b.addEventListener("click", function () {
           if (sortKey === c.key) sortDir = -1 * sortDir;
           else { sortKey = c.key; sortDir = 1; }
-          var box = th;
+          /* TYPE NOTE: th widens under doc:Document (was any before the
+           * poolTable JSDoc); pin to any so the TABLE walk assigns freely. */
+          var box = /** @type {any} */ (th);
           while (box && box.tagName !== "TABLE") box = box.parentElement;
           if (box && box.parentElement) {
-            var fresh = poolTable(doc, rows);
+            var fresh = poolTable(doc, rows, opts);
             box.parentElement.replaceChild(fresh, box);
           }
         });
@@ -415,6 +551,59 @@ var PoolUI = (function () {
       var cB = DOM.el(doc, "td", aB.text, "num"); cB.title = t("account.raw_prefix", "raw ") + aB.raw; tr.appendChild(cB);
       tr.appendChild(DOM.el(doc, "td", pctText(r.taker_units), "num"));
       tr.appendChild(DOM.el(doc, "td", pctText(r.withdrawal_units), "num"));
+      /* Per-owned-row Unstake deep link (mine only): visible text + aria reuse
+       * pool.review_unstake ("Review unstake" — no new copy). Click navigates
+       * to the clean detail hash, then focuses the detail's Review unstake
+       * button (poll ≤1s, best-effort — the desk is usable without the focus
+       * when the poll misses). Never throws outward. */
+      if (mine) {
+        var tdU = doc.createElement("td");
+        var ul = DOM.el(doc, "a", t("pool.review_unstake", "Review unstake"));
+        try { ul.setAttribute("href", "#/pools/" + r.id); } catch (e) { /* label stands */ }
+        try {
+          ul.setAttribute("aria-label", t("pool.review_unstake", "Review unstake") + " " + r.id);
+          ul.title = t("pool.review_unstake", "Review unstake") + " " + r.id;
+        } catch (e2) { /* label stands */ }
+        touchable(ul);
+        (function (poolId, link) {
+          link.addEventListener("click", function () {
+            try {
+              var want = "#/pools/" + poolId;
+              var go = function () {
+                try {
+                  if (typeof window !== "undefined" && window.location && window.location.hash !== want) {
+                    window.location.hash = want;
+                  }
+                } catch (e) { /* href fallback navigates */ }
+                var tries = 0;
+                var timer = setInterval(function () {
+                  tries += 1;
+                  try {
+                    var btns = (typeof document !== "undefined" && document.querySelectorAll)
+                      ? document.querySelectorAll("button") : [];
+                    for (var i = 0; i < btns.length; i++) {
+                      var label = String(btns[i].textContent || "").trim();
+                      if (label === t("pool.review_unstake", "Review unstake")) {
+                        try {
+                          if (btns[i].scrollIntoView) btns[i].scrollIntoView();
+                          if (btns[i].focus) btns[i].focus({ preventScroll: true });
+                        } catch (e2) { /* landed anyway */ }
+                        clearInterval(timer);
+                        return;
+                      }
+                    }
+                  } catch (e3) { /* next tick */ }
+                  if (tries >= 20) { try { clearInterval(timer); } catch (e4) { /* done */ } }
+                }, 50);
+              };
+              /* Let the href update the hash first (middle-click/copy-link use
+               * the clean href above); the focus poll runs either way. */
+              setTimeout(go, 0);
+            } catch (e) { /* detail desk still opens via href */ }
+          });
+        })(r.id, ul);
+        tdU.appendChild(ul); tr.appendChild(tdU);
+      }
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); return table;
@@ -614,7 +803,7 @@ var PoolUI = (function () {
         if (myGen !== gen) return;
         if (locked) mineBox.appendChild(viewingAsNotice(doc));
         Pool.mine(me.id).then(function (rows) {
-          if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows));
+          if (myGen !== gen) return; mineBox.appendChild(poolTable(doc, rows, { mine: true }));
         }).catch(function () { if (myGen === gen) { mineBox.appendChild(DOM.el(doc, "p", t("pool.no_mine", "No owned pools.") + t("pool.owned_hint", " Stake both legs in any pool above — owned pools list here."), "muted")); } });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap,e,t("trade.fail_account", "Could not load your account.")); });
     })();
@@ -650,15 +839,15 @@ var PoolUI = (function () {
           [t("pool.orientation_row", "Orientation"),  "A < B by id: " + op.asset_a + " / " + op.asset_b],
           [t("pool.taker_row", "Taker fee"),  pctText(op.taker_fee_percent), "raw " + op.taker_fee_percent],
           [t("pool.withdrawal_row", "Withdrawal fee"),  pctText(op.withdrawal_fee_percent), "raw " + op.withdrawal_fee_percent],
-          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  "testnet"]];
+          [t("borrow.fee", "Fee"),  fee.text, "raw " + fee.raw], [t("borrow.network", "Network"),  networkName()]];
       },
       title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
   return { renderPools: renderPools,
     _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, unlockBox: unlockBox, field: field, tableHead: tableHead,
-      feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText,
-      sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
+      feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText, networkName: networkName,
+      sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection, deleteCheck: deleteCheck,
       routeReady: routeReady, routeFail: routeFail, autoRetry: autoRetry, dropSubs: dropSubs,
       isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, viewingAsId: VIEWING_AS_ID,
       live: function (g) { return g === gen; } } };

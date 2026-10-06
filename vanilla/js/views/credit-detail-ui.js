@@ -47,9 +47,34 @@ var CreditDetailUI = (function () {
     if (myGen !== gen) return false;
     try { return U().live(uiGen); } catch (e) { return false; }
   }
+  /* cleanId: the router strips ? but NOT a second-# fragment before matching,
+   * so params.id can arrive as "1.21.5#update" — strip fragment + query so the
+   * object read sees a bare id. Never throws (non-strings yield "").
+   * @param {any} id route param (maybe fragment-suffixed)
+   * @returns {string} bare object id */
+  function cleanId(id) {
+    try { return String(id || "").split("#")[0].split("?")[0]; }
+    catch (e) { return ""; }
+  }
+  /* pendingFrag: "#/credit-offer/<id>#update|#delete" fragment (router keeps
+   * the second-# suffix inside :id, so the view reads location.hash itself —
+   * asset-ui.js hashSubParent precedent). Returns "update"/"delete"/null.
+   * Never throws (node smoke tests have no location).
+   * @returns {string|null} requested owner form, if any */
+  function pendingFrag() {
+    try {
+      var h = (typeof location !== "undefined" && location.hash) || "";
+      var parts = String(h).split("#");
+      if (parts.length < 3) return null;
+      var f = parts[parts.length - 1].split("?")[0].trim().toLowerCase();
+      if (f === "update" || f === "delete") return f;
+      return null;
+    } catch (e) { return null; }
+  }
   /* Route entry: #/credit-offer/:id — detail + accept + deals + owner forms. */
   function renderOfferDetail(root, id) {
     if (!root) return;
+    id = cleanId(id);
     var ui;
     try { ui = U(); } catch (e) {
       root.innerHTML = "";
@@ -119,13 +144,103 @@ var CreditDetailUI = (function () {
       dealTables(doc, dealsBox, myGen, uiGen, o, a);
       if (R.me && R.me.id === o.owner) {
         ctx.wrap.appendChild(ui.el(doc, "h2", t("credit.owner_update_delete", "Owner: update / delete")));
-        updateBox(doc, ctx.wrap, uiGen, o, a, R.me);
-        deleteBox(doc, ctx.wrap, uiGen, o, R.me);
+        /* Owner forms mount in anchors so #update/#delete deep links from the
+         * desk have a scroll target. Confirm+fee logic inside updateBox /
+         * deleteBox is untouched — honoring the fragment scrolls + focuses
+         * only (no auto-Review: destructive actions still need an explicit
+         * click + confirm). Non-owners never reach here (forms hidden). */
+        var frag = pendingFrag();
+        var updAnchor = ui.el(doc, "div"); ctx.wrap.appendChild(updAnchor);
+        updateBox(doc, updAnchor, uiGen, o, a, R.me);
+        var delAnchor = ui.el(doc, "div"); ctx.wrap.appendChild(delAnchor);
+        deleteBox(doc, delAnchor, uiGen, o, R.me);
+        try {
+          var target = (frag === "delete") ? delAnchor : (frag === "update" ? updAnchor : null);
+          if (target && live(myGen, uiGen)) {
+            if (target.scrollIntoView) target.scrollIntoView();
+            var ctl = (typeof target.querySelector === "function") ? target.querySelector("input, select, button") : null;
+            if (ctl && typeof ctl.focus === "function") ctl.focus();
+          }
+        } catch (e) { /* paint stands */ }
       }
     }).catch(function (e) {
       if (!live(myGen, uiGen)) return; ui.clearBox(ctx.wrap);
       ctx.wrap.appendChild(DOM.pageHead(doc, "Offer " + String(id), "merchant"));
       ui.showError(doc, ctx.wrap, e, t("credit.unknown_offer", "Unknown offer."));
+      var back = ui.el(doc, "a", t("credit.all_offers", "← All offers")); back.setAttribute("href", "#/credit-offer");
+      ctx.wrap.appendChild(back);
+    });
+  }
+  /* Route entry: #/deal/:id — one credit deal (1.22.x) with its repay /
+   * auto-repay forms preselected. Resolves the deal for its offer id, then
+   * renders the deal summary plus the shared dealTables (repay + auto-repay
+   * reviewSections) with the select preselected to this deal; the select
+   * stays as the ephemeral fallback for sibling deals. Never auto-Reviews:
+   * repay spends money, so it still needs an explicit click + confirm
+   * (pendingFrag precedent above). Unknown id -> empty state with the
+   * all-offers way out, never blank. No money math (ui.amt + Format do
+   * it); no serializers.
+   * @param {HTMLElement} root router mount element
+   * @param {string} dealId deal object id (1.22.x) */
+  function renderDealDetail(root, dealId) {
+    if (!root) return;
+    dealId = cleanId(dealId);
+    var ui;
+    try { ui = U(); } catch (e) {
+      root.innerHTML = "";
+      var d0 = root.ownerDocument || document, w0 = d0.createElement("div");
+      w0.className = "wrap"; root.appendChild(w0);
+      w0.appendChild(d0.createTextNode(t("credit.credit_detail_backend_missing_credit_ui_js_fa", "Credit detail backend missing: credit-ui.js failed to load.")));
+      return;
+    }
+    var ctx = ui.routeReady(root, t("credit.deal", "Deal"), function () { renderDealDetail(root, dealId); });
+    if (!ctx) return;
+    var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
+    var lockedD = false;
+    try { lockedD = !ui.isUnlockedNow(); } catch (e) { lockedD = false; }
+    ui.showStatus(doc, ctx.wrap, "Loading deal " + dealId + "…");
+    if (lockedD) ctx.wrap.appendChild(ui.viewingAsNotice(doc));
+    Promise.resolve().then(async function () {
+      var d = await Credit.deal(String(dealId));
+      var o = await Credit.offer(d.offer_id);
+      var a = await Asset.describe(o.asset_id);
+      /* Debt/collateral legs render as symbols (raw ids in title — the
+       * offer-detail join precedent); misses degrade to bare ids. */
+      var debtA = null, collA = null, borName = d.borrower;
+      try { debtA = await Asset.describe(d.debt_id); } catch (e) { debtA = null; }
+      try { collA = await Asset.describe(d.coll_id); } catch (e) { collA = null; }
+      try { borName = (await Account.resolve(d.borrower)).name; } catch (e) { borName = d.borrower; }
+      return { d: d, o: o, a: a, debtA: debtA, collA: collA, borName: borName };
+    }).then(function (R) {
+      if (!live(myGen, uiGen)) return;
+      ui.clearBox(ctx.wrap);
+      var d = R.d, o = R.o, a = R.a;
+      ctx.wrap.appendChild(DOM.pageHead(doc, "Deal " + d.id, "merchant"));
+      if (lockedD) ctx.wrap.appendChild(ui.viewingAsNotice(doc));
+      var backO = ui.el(doc, "a", "← " + t("credit.offer", "Offer") + " " + o.id);
+      backO.setAttribute("href", "#/credit-offer/" + o.id);
+      ctx.wrap.appendChild(backO);
+      ctx.wrap.appendChild(doc.createTextNode(" · "));
+      var backAll = ui.el(doc, "a", t("credit.all_offers", "← All offers"));
+      backAll.setAttribute("href", "#/credit-offer");
+      ctx.wrap.appendChild(backAll);
+      var debt = ui.amt(d.debt_raw, R.debtA ? R.debtA.precision : null, R.debtA ? R.debtA.symbol : d.debt_id, d.debt_id);
+      var coll = ui.amt(d.coll_raw, R.collA ? R.collA.precision : null, R.collA ? R.collA.symbol : d.coll_id, d.coll_id);
+      var arWord = (d.auto_repay === null || d.auto_repay === undefined) ? "—" : Credit.autoRepayWord(d.auto_repay);
+      ctx.wrap.appendChild(ui.confirmList(doc, [[t("credit.deal", "Deal"), d.id], [t("credit.offer", "Offer"), o.id],
+        [t("credit.borrower", "Borrower"), R.borName, "raw " + d.borrower],
+        [t("credit.debt", "Debt"), debt.text, "raw " + debt.raw],
+        [t("credit.collateral", "Collateral"), coll.text, "raw " + coll.raw],
+        [t("credit.rate", "Rate"), Credit.rateUnitsToHuman(d.rate_units) + "%", "raw " + String(d.rate_units)],
+        [t("credit.auto_repay", "Auto-repay"), arWord]]));
+      ctx.wrap.appendChild(ui.el(doc, "h2", t("credit.repay", "Repay") + " / " + t("credit.auto_repay", "Auto-repay")));
+      if (lockedD) ctx.wrap.appendChild(ui.signNotice(doc));
+      var dealsBox = ui.el(doc, "div"); ctx.wrap.appendChild(dealsBox);
+      dealTables(doc, dealsBox, myGen, uiGen, o, a, d.id);
+    }).catch(function (e) {
+      if (!live(myGen, uiGen)) return; ui.clearBox(ctx.wrap);
+      ctx.wrap.appendChild(DOM.pageHead(doc, "Deal " + String(dealId), "merchant"));
+      ui.showError(doc, ctx.wrap, e, t("credit.unknown_credit_deal", "Unknown credit deal."));
       var back = ui.el(doc, "a", t("credit.all_offers", "← All offers")); back.setAttribute("href", "#/credit-offer");
       ctx.wrap.appendChild(back);
     });
@@ -188,8 +303,13 @@ var CreditDetailUI = (function () {
       },
       title: t("credit.confirm_accept", "Confirm accept"), ok: function () { return t("credit.deal_opened_accept_broadcast", "Deal opened (accept broadcast)."); }, fail: t("credit.could_not_prepare_the_accept", "Could not prepare the accept.") });
   }
-  /* Deals-by-offer table + repay / auto-repay forms for a picked deal. */
-  function dealTables(doc, box, myGen, uiGen, o, a) {
+  /* Deals-by-offer table + repay / auto-repay forms for a picked deal.
+   * preselectId (optional 1.22.x): preselects the deal select (per-deal
+   * route below) — the select stays as the ephemeral fallback, switching
+   * it just repoints the repay forms below. Never auto-Reviews: repay
+   * spends money, so it still needs an explicit click + confirm.
+   * @param {string} [preselectId] deal id to preselect, if listed. */
+  function dealTables(doc, box, myGen, uiGen, o, a, preselectId) {
     var ui = U();
     ui.showStatus(doc, box, t("credit.loading_deals", "Loading deals…"));
     Credit.dealsByOffer(o.id, {}).then(function (deals) {
@@ -197,17 +317,24 @@ var CreditDetailUI = (function () {
       var rows = deals.map(function (d) {
         var debt = ui.amt(d.debt_raw, d.debt_prec, d.debt_sym, d.debt_id);
         var coll = ui.amt(d.coll_raw, d.coll_prec, d.coll_sym, d.coll_id);
-        return { d: d, cells: [{ text: d.id }, { text: (d.borrower_name || d.borrower), raw: d.borrower }, { text: debt.text, raw: debt.raw },
+        return { d: d, href: "#/deal/" + d.id, cells: [{ text: d.id }, { text: (d.borrower_name || d.borrower), raw: d.borrower }, { text: debt.text, raw: debt.raw },
           { text: coll.text, raw: coll.raw },
           { text: Credit.rateUnitsToHuman(d.rate_units) + "%", raw: String(d.rate_units) },
           { text: (d.auto_repay === null || d.auto_repay === undefined) ? "—" : Credit.autoRepayWord(d.auto_repay) }] };
       });
-      box.appendChild(ui.deskTable(doc, [t("credit.deal", "Deal"), t("credit.borrower", "Borrower"), t("credit.debt", "Debt"), t("credit.collateral", "Collateral"), t("credit.rate", "Rate"), t("credit.auto_repay", "Auto-repay")], rows,
+      box.appendChild(ui.deskTable(doc, [t("credit.deal", "Deal"), t("credit.borrower", "Borrower"), t("credit.debt", "Debt"), t("credit.collateral", "Collateral"), t("credit.rate", "Rate"), t("credit.auto_repay", "Auto-repay"), ""], rows,
         function (r) { return [r.d.id + " · borrower " + (r.d.borrower_name || r.d.borrower), "Debt " + r.cells[2].text, "Collateral " + r.cells[3].text, "Rate " + r.cells[4].text]; }));
       if (!deals.length) { box.appendChild(ui.el(doc, "p", t("credit.no_deals_on_this_offer_yet", "No deals on this offer yet.") + t("credit.deals_hint", " Deals appear after someone borrows against this offer."), "muted")); return; }
       var sel = doc.createElement("select"); ui.touchable(sel);
       deals.forEach(function (d) {
         var op = doc.createElement("option"); op.value = d.id; op.textContent = d.id; sel.appendChild(op); });
+      /* Preselected deal (per-deal route): point the select at it when
+       * listed; otherwise the first deal stands. */
+      if (preselectId) {
+        var listed = false;
+        deals.forEach(function (d) { if (d.id === preselectId) listed = true; });
+        if (listed) { try { sel.value = preselectId; } catch (e) { /* first stands */ } }
+      }
       /* Forms seam (Task 2.2): single-select row — div.xfer-field > label > select. */
       var selRow = Forms.fieldRow(doc, t("credit.deal_2", "Deal "), sel);
       box.appendChild(selRow);
@@ -326,7 +453,7 @@ var CreditDetailUI = (function () {
       title: t("credit.confirm_offer_delete", "Confirm offer delete"), ok: function () { return t("credit.offer_deleted", "Offer deleted."); }, fail: t("credit.could_not_prepare_the_delete", "Could not prepare the delete.") });
   }
 
-  return { renderOfferDetail: renderOfferDetail };
+  return { renderOfferDetail: renderOfferDetail, renderDealDetail: renderDealDetail };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.CreditDetailUI === "undefined") { globalThis.CreditDetailUI = CreditDetailUI; }

@@ -103,11 +103,20 @@ var SametUI = (function () {
     ctx.wrap.appendChild(ui.el(doc, "h2", t("samet.create_fund", "Create fund")));
     if (lockedS) ctx.wrap.appendChild(ui.signNotice(doc));
     sametCreateBox(doc, ctx.wrap, uiGen);
+    /** Draw one fund table: deskTable + per-row action buttons.
+     * WHY actions on BOTH lists: the all-funds list IS the borrowable
+     * liquidity — gating Borrow+Repay to My funds left others' funds with
+     * zero actions, which defeats the core Same-T flow (draw against ANY
+     * fund, repay your own debt). Owner-only Update/Delete stay on My funds.
+     * @param {HTMLElement} box list mount (cleared + rebuilt)
+     * @param {any[]} rows normalized fund rows
+     * @param {boolean} mine true = My funds (full actions) / false = all funds (borrow+repay only)
+     * @returns {void} */
     function draw(box, rows, mine) {
       ui.clearBox(box);
       var rs = fundRows(ui, rows);
       box.appendChild(ui.deskTable(doc, [t("samet.fund", "Fund"), t("samet.owner", "Owner"), t("samet.asset", "Asset"), t("samet.balance", "Balance"), t("samet.fee_rate", "Fee rate"), t("samet.unpaid", "Unpaid")], rs, fundCards));
-      if (mine) rs.forEach(function (r) { rowActions(doc, box, myGen, uiGen, r.f); });
+      rs.forEach(function (r) { rowActions(doc, box, myGen, uiGen, r.f, mine ? null : ["borrow", "repay"]); });
     }
     go.addEventListener("click", function () {
       if (!live(myGen, uiGen)) return; go.disabled = true; ui.clearBox(listBox);
@@ -135,12 +144,18 @@ var SametUI = (function () {
    * @param {number} myGen route generation (liveness token)
    * @param {number} uiGen shared-gate generation (CreditUI routeReady token)
    * @param {any} f fund row (id/asset_id/sym/rate_units/prec/unpaid_raw)
+   * @param {string[]|null} [only] kind allowlist (null = all four; the
+   *   all-funds list passes ["borrow","repay"] — Update/Delete are owner-only
+   *   and live on My funds, while borrow+repay act as the caller, never as
+   *   the owner, so they are safe on others' funds)
    * @returns {void} */
-  function rowActions(doc, box, myGen, uiGen, f) {
+  function rowActions(doc, box, myGen, uiGen, f, only) {
     var ui = U();
     var line = ui.el(doc, "div", null, "xfer-field");
     line.appendChild(ui.el(doc, "span", f.id + " "));
-    [[t("samet.borrow_repay", "Borrow+Repay"), "borrow"], [t("samet.repay", "Repay"), "repay"], [t("samet.update", "Update"), "update"], [t("samet.delete", "Delete"), "delete"]].forEach(function (k) {
+    [[t("samet.borrow_repay", "Borrow+Repay"), "borrow"], [t("samet.repay", "Repay"), "repay"], [t("samet.update", "Update"), "update"], [t("samet.delete", "Delete"), "delete"]]
+      .filter(function (k) { return !only || only.indexOf(k[1]) !== -1; })
+      .forEach(function (k) {
       var b = ui.touchable(ui.el(doc, "button", k[0])); b.type = "button";
       b.addEventListener("click", function () {
         if (live(myGen, uiGen)) openAction(doc, box, myGen, uiGen, f, k[1]);

@@ -17,9 +17,13 @@
  *   columns id/seller/amount/price), QuickTradeHelper getOrders/getFees
  *   (walk bids until the amount is covered; market_fee_percent/100 label +
  *   min(max_fee, amount*pct/10000) + checkFeeStatusAsync). Confirm names <-
- *   popup.js:5724-5731; fill_or_kill=true <- QuickTrade.jsx:657 (convert
- *   takes liquidity now; old vanilla limit path used false — noted here).
- *   Expiry stays fixed 1-year (old path + QuickTrade 365-day shape).
+  *   popup.js:5724-5731; fill_or_kill=true <- QuickTrade.jsx:657 (convert
+  *   takes liquidity now; old vanilla limit path used false — noted here).
+  *   Slippage haircut (Pool.minReceive pattern, duplicated below): the walked
+  *   receive total shaves s% down to min_to_receive, so dust book moves
+  *   between Review and broadcast no longer kill the whole FoK convert; the
+  *   confirm surfaces the walked total, the pct, and the signed min.
+  *   Expiry stays fixed 1-year (old path + QuickTrade 365-day shape).
  *   P = BASE per 1 QUOTE orientation is the desk's (trade-form.js); here the
  *   effective price is RECEIVE per 1 SELL (receive_human/sell_human).
  * Trade-form math: quoteToBaseRaw/baseToQuoteRaw + market-fee trio are
@@ -337,6 +341,30 @@ var InstantTradeUI = (function () {
       return fee.toString();
     } catch (e) { return null; }
   }
+  /* slipMin: slippage haircut floor(quote * (1 - s)) in integer math —
+   * DUPLICATE of the Pool.minReceive pattern (pool.js:206-215: same
+   * parsePriceRatio scale, s% -> s/100, 0-100 gate). WHY duplicated, not
+   * called: index.html loads this file BEFORE pool.js, so call-time Pool use
+   * is load-order fragile — same doctrine as the quote converters above.
+   * WHY haircut at all: convert signs ONE fill_or_kill limit order at the
+   * walked receive total; on thin books the book moves a dust unit between
+   * Review and broadcast and the exact min kills the whole convert (Review
+   * "Insufficient liquidity" is the no-coverage case — this covers the
+   * covered-but-moved case). Shaving s% off min_to_receive tolerates dust
+   * moves while FoK still guards real slippage.
+   * @param {string} quoteRaw walked receive raw (digit string).
+   * @param {string} pctHuman display percent ("0.5"); "" defaults to "0.5".
+   * @returns {string} min raw string. Throws on bad percent (review maps
+   *   inline) or bad amount. Pure BigInt; Format only. */
+  function slipMin(quoteRaw, pctHuman) {
+    if (typeof quoteRaw !== "string" || !/^\d+$/.test(quoteRaw)) throw new Error("bad amount: " + String(quoteRaw).slice(0, 32));
+    var s = (pctHuman === undefined || pctHuman === null || String(pctHuman).trim() === "") ? "0.5" : String(pctHuman).trim();
+    if (!/^(\d+)(?:\.(\d+))?$/.test(s)) throw new Error("bad slippage percent: " + JSON.stringify(pctHuman));
+    var r = Format.parsePriceRatio(s); /* exact decimal ratio; *100 scale below turns s% into s/100 */
+    if (r.num > r.den * 100n) throw new Error("slippage must be 0-100");
+    var den100 = r.den * 100n;
+    return ((BigInt(quoteRaw) * (den100 - r.num)) / den100).toString();
+  }
   /* fetchMarketFeeOpts: read market-fee flag/pct/max for an asset id (one get_assets).
    * WHY null-open: non-fee assets simply hide the market-fee preview, never error.
    * Param assetId; returns {pct, symbol, precision, maxRaw} or null. */
@@ -430,7 +458,10 @@ var InstantTradeUI = (function () {
       try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
       return;
     }
-    var init = { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", M: null, pairErr: "" };
+    /* P.slip default mirrors Pool.DEFAULT_SLIPPAGE_PCT ("0.5" — pool.js:47);
+     * kept as the literal (not a call-time Pool read) for the same load-order
+     * reason as slipMin above. */
+    var init = { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", slip: "0.5", M: null, pairErr: "" };
     if (typeof marketID === "string" && marketID) {
       try {
         var pr = parsePair(marketID);
@@ -513,6 +544,16 @@ var InstantTradeUI = (function () {
     swapCell.appendChild(swapBtn);
     duo.appendChild(sellBox); duo.appendChild(swapCell); duo.appendChild(recvBox);
     wrap.appendChild(duo);
+    /* Slippage tolerance (pre-Review input — survives load()/Back via P.slip
+     * like the amounts). Label reuses the pool key verbatim (no new locale
+     * keys); "%" is an untranslatable unit symbol. */
+    var slipF = fieldRow(doc, t("pool.slippage_field", "Slippage %") + " ", { id: "it-slippage", value: P.slip || "0.5", placeholder: "0.5", inputmode: "decimal", unit: "%" });
+    slipF.input.setAttribute("aria-label", t("pool.slippage_field", "Slippage %"));
+    wrap.appendChild(slipF.row);
+    /* Forced-FoK label (pre-Review honesty: the convert always signs
+     * fill_or_kill:true — the form says so before Review, the confirm repeats
+     * it). Composed from existing keys only. */
+    wrap.appendChild(DOM.el(doc, "p", t("instant.fill_or_kill", "Fill or Kill") + ": " + t("trade.yes", "Yes"), "muted"));
     var loadBtn = touchable(DOM.el(doc, "button", t("instant.load_market", "Load market")));
     loadBtn.id = "it-load"; loadBtn.type = "button"; wrap.appendChild(loadBtn);
     var out = DOM.el(doc, "div"); out.id = "it-quote-out"; wrap.appendChild(out);
@@ -574,10 +615,11 @@ var InstantTradeUI = (function () {
       load();
     });
     reviewBtn.addEventListener("click", function () {
-      setFieldError(sellAmtF, ""); setFieldError(recvAmtF, "");
+      setFieldError(sellAmtF, ""); setFieldError(recvAmtF, ""); setFieldError(slipF, "");
       P.sellSym = (sellSymF.input.value || "").trim().toUpperCase();
       P.receiveSym = (recvSymF.input.value || "").trim().toUpperCase();
       P.sellAmount = sellAmtF.input.value; P.receiveAmount = recvAmtF.input.value;
+      P.slip = slipF.input.value;
       if (!P.M) { load(); return; }
       reviewBtn.disabled = true;
       var status = showStatus(doc, walkBox, t("instant.checking_balance_and_fee", "Checking balance and fee…"));
@@ -585,7 +627,8 @@ var InstantTradeUI = (function () {
         .catch(function (e) {
           if (myGen !== gen) return;
           var msg = (e && e.message) ? e.message : String(e || t("instant.could_not_prepare_the_order", "Could not prepare the order."));
-          if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 || msg.indexOf("Amount must be") === 0 || msg.indexOf("Insufficient") === 0 || msg.indexOf("Price is too small") === 0) setFieldError(sellAmtF, msg);
+          if (msg.indexOf("slippage") !== -1) setFieldError(slipF, msg);
+          else if (msg.indexOf("bad amount") === 0 || msg.indexOf("too many decimals") === 0 || msg.indexOf("Amount must be") === 0 || msg.indexOf("Insufficient") === 0 || msg.indexOf("Price is too small") === 0) setFieldError(sellAmtF, msg);
           try { walkBox.removeChild(status); } catch (x) { /* gone */ }
           reviewBtn.disabled = false;
           showError(doc, walkBox, msg, t("instant.could_not_prepare_the_order", "Could not prepare the order."));
@@ -968,6 +1011,14 @@ var InstantTradeUI = (function () {
       receiveRaw = walk.receiveRaw;
     }
     if (!/[1-9]/.test(sellRaw) || !/[1-9]/.test(receiveRaw)) throw new Error(t("instant.price_is_too_small_for_this_amount_one_leg_ro", "Price is too small for this amount: one leg rounds to zero."));
+    /* Slippage haircut on the walked receive total (slipMin = Pool.minReceive
+     * pattern): min_to_receive shaves s% so a dust book move between Review
+     * and broadcast no longer FoK-kills a covered convert. Floor-to-zero
+     * keeps the walked exact (today's behavior — never invents "1", never
+     * regresses dust converts that only just cover). */
+    var slipPct = (P.slip === undefined || P.slip === null || String(P.slip).trim() === "") ? "0.5" : String(P.slip).trim();
+    var minRaw = slipMin(receiveRaw, slipPct);
+    if (!/[1-9]/.test(minRaw)) minRaw = receiveRaw;
     var expWire = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, -5);
     var bals = await Account.balances(me.id), sellBal = null, feeHave = 0n;
     bals.forEach(function (b) {
@@ -983,7 +1034,7 @@ var InstantTradeUI = (function () {
     var ops = [[Tx.OP.limit_order_create, {
       fee: { amount: 0, asset_id: FEE_ASSET }, seller: me.id,
       amount_to_sell: { amount: String(sellRaw), asset_id: ctx.sellId },
-      min_to_receive: { amount: String(receiveRaw), asset_id: ctx.receiveId },
+      min_to_receive: { amount: String(minRaw), asset_id: ctx.receiveId },
       expiration: expWire, fill_or_kill: true, extensions: [] }]];
     var unsigned = await Tx.buildTx(ops), feeRes = await Tx.feeMulti(unsigned.operations, FEE_ASSET);
     var feeMeta = await feeAssetMeta(FEE_ASSET);
@@ -996,7 +1047,7 @@ var InstantTradeUI = (function () {
     try { effHuman = effectiveHuman(sellRaw, receiveRaw, ctx.sellPrec, ctx.receivePrec); }
     catch (e) { effHuman = ""; }
     return {
-      me: me, sellRaw: sellRaw, recvRaw: receiveRaw, expWire: expWire,
+      me: me, sellRaw: sellRaw, recvRaw: receiveRaw, minRaw: minRaw, slipPct: slipPct, expWire: expWire,
       unsigned: unsigned, feeRaw: feeRes.totalRaw, feeMeta: feeMeta,
       previewWarn: previewWarn, walkRows: walk.rows, effHuman: effHuman
     };
@@ -1016,16 +1067,22 @@ var InstantTradeUI = (function () {
     function row(term, text, title) {
       list.appendChild(DOM.el(doc, "dt", term));
       var dd = DOM.el(doc, "dd", text); if (title) dd.title = title; list.appendChild(dd); }
-    var sellHuman, recvHuman;
+    var sellHuman, recvHuman, minHuman;
     try { sellHuman = Format.formatAmount(R.sellRaw, ctx.sellPrec); }
     catch (e) { sellHuman = R.sellRaw; }
     try { recvHuman = Format.formatAmount(R.recvRaw, ctx.receivePrec); }
     catch (e) { recvHuman = R.recvRaw; }
+    try { minHuman = Format.formatAmount(R.minRaw, ctx.receivePrec); }
+    catch (e) { minHuman = R.minRaw; }
     row(t("instant.side_2", "Side"), t("trade.col_sell", "Sell") + " " + ctx.sellSym + " → " + t("trade.col_receive", "Receive") + " " + ctx.receiveSym);
     row(t("instant.seller", "Seller"), R.me.name + " (" + R.me.id + ")");
     row(t("instant.price", "Price") + t("instant.effective_paren", " (effective)"), (R.effHuman ? R.effHuman + " " + ctx.receiveSym + t("instant.per_mid", " per ") + ctx.sellSym : "—"), String(R.recvRaw) + "/" + String(R.sellRaw));
     row(t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + ctx.sellSym, R.sellRaw);
-    row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), recvHuman + " " + ctx.receiveSym, R.recvRaw);
+    /* Buy row carries the SIGNED min (haircut by slippage), raw in title;
+     * the walked exact lives in the Slippage row + the effective-price title
+     * above — never a hidden substitution. */
+    row(t("instant.buy_min_to_receive", "Buy (Min to Receive)"), minHuman + " " + ctx.receiveSym, R.minRaw);
+    row(t("pool.slippage_row", "Slippage"), R.slipPct + "% (" + recvHuman + " " + ctx.receiveSym + " → " + minHuman + " " + ctx.receiveSym + ")", R.minRaw);
     row(t("market.col_order", "Order") + t("instant.orders_walk_suffix", "s walk"), String((R.walkRows || []).length) + t("instant.level_suffix", " level") + (((R.walkRows || []).length === 1) ? "" : "s"));
     row(t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw);
     row(t("instant.expiration", "Expiration"), R.expWire + " (1 year)");
@@ -1074,7 +1131,7 @@ var InstantTradeUI = (function () {
           deskA.textContent = t("instant.open_the_full_desk", "Open the full desk");
           deskP.appendChild(deskA); done.appendChild(deskP);
           again.addEventListener("click", function () {
-            if (myGen === gen) paintConvert(doc, root, myGen, { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", M: null, pairErr: "" });
+            if (myGen === gen) paintConvert(doc, root, myGen, { sellSym: "", receiveSym: "", sellAmount: "", receiveAmount: "", activeInput: "sell", slip: "0.5", M: null, pairErr: "" });
           });
         })
         .catch(function (e) {
