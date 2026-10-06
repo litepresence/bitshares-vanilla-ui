@@ -17,6 +17,7 @@ eq(FeedHistory.isFeedOp({ op: [19, { asset_id: "1.3.5" }] }, "1.3.9"), false, "o
 eq(FeedHistory.isFeedOp({ op: [0, {}] }, "1.3.5"), false, "non-19 rejected");
 eq(FeedHistory.fillToBackingPerMpa({ base: "2", quote: "1" }, false), "2", "fill straight");
 eq(FeedHistory.fillToBackingPerMpa({ base: "2", quote: "1" }, true), "0.5", "fill flipped");
+eq(FeedHistory.invertValues(["2", "0.5", null, "0", "bad"]), ["0.5", "2", null, null, null], "invert series (zero/bad/null stay gaps)");
 // bucketAll: median of actives, gap when active < minFeeds (never zero-fill).
 (function () {
   var byPub = {

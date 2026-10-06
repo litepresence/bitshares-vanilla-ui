@@ -35,6 +35,8 @@ TABLE = [
     ("history_pub", "Publisher %(i)s/%(n)s\u2026"),
     ("history_exchange", "Loading exchange + pools\u2026"),
     ("history_failed", "Could not load feed history."),
+    ("invert_btn", "Invert"),
+    ("orientation_note", "%(m)s per %(b)s"),
 ]
 
 

@@ -198,6 +198,7 @@ var AssetFeedUI = (function () {
     var backing = info.bitasset.short_backing_asset, db = await Chain.db();
     var bMeta = await Chain.call(db, "get_assets", [[backing]]);
     var backingPrec = (bMeta && bMeta[0]) ? bMeta[0].precision : 5;
+    var backingSym = (bMeta && bMeta[0] && bMeta[0].symbol) ? bMeta[0].symbol : backing;
     body.appendChild(el(d, "h2", info.symbol + " · current feed"));
     try {
       var raw = await Chain.call(db, "lookup_asset_symbols", [[info.symbol]]);
@@ -216,7 +217,7 @@ var AssetFeedUI = (function () {
       body.appendChild(dl);
     } catch (e) { body.appendChild(el(d, "p", t("asset.feed_unavailable", "Feed read-back unavailable."), "muted")); }
     producersSection(d, body, root, g, info);
-    historySection(d, body, root, g, info, backing, backingPrec);
+    historySection(d, body, root, g, info, backing, backingPrec, backingSym);
     publishForm(d, body, root, g, info, backing, backingPrec);
     producerForm(d, body, root, g, info);
   }
@@ -285,9 +286,10 @@ var AssetFeedUI = (function () {
   }
   /* historySection: chain-only multi-line history (per-producer + MEDIAN +
    * EXCHANGE + ≤3 pools) via FeedHistory.bucketAll + ChartsLwc.drawOscPane.
-   * Days 7/30/90 (default 7); progress line; legend checkboxes (44px);
-   * fail-closed per source (a dead pool never blanks feed lines). */
-  function historySection(d, body, root, g, info, backing, backingPrec) {
+   * Days 7/30/90 (default 7); progress line; Invert toggle (exact reciprocal
+   * at draw time, no refetch) with orientation caption; legend checkboxes
+   * (44px); fail-closed per source (a dead pool never blanks feed lines). */
+  function historySection(d, body, root, g, info, backing, backingPrec, backingSym) {
     body.appendChild(el(d, "h2", t("asset.feed_history_title", "Feed history")));
     var box = el(d, "div", null, "asset-feed-history");
     body.appendChild(box);
@@ -296,6 +298,12 @@ var AssetFeedUI = (function () {
     var go = touch(el(d, "button", t("asset.plot_feeds", "Plot feeds")));
     go.type = "button";
     box.appendChild(go);
+    var inv = touch(el(d, "button", t("asset.invert_btn", "Invert")));
+    inv.type = "button";
+    inv.setAttribute("aria-pressed", "false");
+    box.appendChild(inv);
+    var ori = el(d, "p", "", "muted");
+    box.appendChild(ori);
     var prog = el(d, "p", "", "muted");
     prog.setAttribute("aria-live", "polite");
     box.appendChild(prog);
@@ -304,14 +312,39 @@ var AssetFeedUI = (function () {
     var legend = el(d, "div", null, "feed-history-legend");
     box.appendChild(legend);
     var PALETTE = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"];
-    var last = null, handle = null;
+    var last = null, handle = null, inverted = false, curFilter = null;
+    /* paintOri: orientation caption under the buttons (symbols, never ids).
+     * Standard orientation is backing-per-MPA; inverted flips to MPA-per-
+     * backing. Params: none (reads inverted + info). Never throws. */
+    function paintOri() {
+      var top = inverted ? info.symbol : backingSym, bot = inverted ? backingSym : info.symbol;
+      var txt = "";
+      try { txt = t("asset.orientation_note", "%(m)s per %(b)s", { m: top, b: bot }); }
+      catch (e) { txt = ""; }
+      ori.textContent = txt || (top + " per " + bot);
+    }
+    paintOri();
+    inv.addEventListener("click", function () {
+      inverted = !inverted;
+      inv.setAttribute("aria-pressed", inverted ? "true" : "false");
+      paintOri();
+      draw(curFilter || {});
+    });
     function draw(filter) {
       if (!last) return;
       var i, entries = [];
       for (i = 0; i < last.series.length; i++) {
         var s = last.series[i];
         if (filter && filter[s.name] === false) continue;
-        entries.push({ name: s.name, color: PALETTE[i % PALETTE.length], values: s.values });
+        var vals = s.values;
+        if (inverted) {
+          try {
+            if (typeof FeedHistory !== "undefined" && FeedHistory && typeof FeedHistory.invertValues === "function") {
+              vals = FeedHistory.invertValues(vals);
+            }
+          } catch (e) { vals = s.values; }
+        }
+        entries.push({ name: s.name, color: PALETTE[i % PALETTE.length], values: vals });
       }
       try {
         if (typeof ChartsLwc !== "undefined" && ChartsLwc && typeof ChartsLwc.drawOscPane === "function") {
@@ -362,6 +395,7 @@ var AssetFeedUI = (function () {
         if (g !== gen) return;
         wipe(legend);
         var filter = {};
+        curFilter = filter;
         last.series.forEach(function (s, idx) {
           filter[s.name] = true;
           var lab = d.createElement("label");

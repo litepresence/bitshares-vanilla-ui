@@ -31,10 +31,12 @@ var FeedHistory = (function () {
     arr.sort(_cmpHuman);
     return arr[Math.floor(arr.length / 2)];
   }
-  function normToBackingPerMpa(priceHuman, pairFlipped) {
-    if (!pairFlipped) return String(priceHuman);
-    var f = _decFrac(priceHuman);
-    if (!f || f.num === 0n) return String(priceHuman);
+  /* Exact reciprocal of a human decimal string at 8 places (pure, BigInt —
+   * never float). Null/blank/unparseable/zero -> null (a gap, never a zero
+   * line and never a divide-by-zero throw). */
+  function invertHuman(human) {
+    var f = _decFrac(human);
+    if (!f || f.num === 0n) return null;
     var scale = 100000000n;
     var inv = (f.den * scale) / f.num;
     var s = inv.toString();
@@ -42,6 +44,18 @@ var FeedHistory = (function () {
     var head = s.slice(0, -8).replace(/^0+(?=\d)/, "") || "0";
     var tail = s.slice(-8).replace(/0+$/, "");
     return tail ? head + "." + tail : head;
+  }
+  function normToBackingPerMpa(priceHuman, pairFlipped) {
+    if (!pairFlipped) return String(priceHuman);
+    var inv = invertHuman(priceHuman);
+    return (inv === null) ? String(priceHuman) : inv;
+  }
+  /* Whole aligned series through the reciprocal (gaps stay gaps). */
+  function invertValues(values) {
+    return (values || []).map(function (v) {
+      if (v === null || v === undefined) return null;
+      return invertHuman(v);
+    });
   }
   function bucketAll(feedPtsByProducer, exPts, poolPtsList, opts) {
     opts = opts || {};
@@ -250,7 +264,8 @@ var FeedHistory = (function () {
   return { medianOf: medianOf, normToBackingPerMpa: normToBackingPerMpa, bucketAll: bucketAll,
     badgeFor: badgeFor, producersFor: producersFor, WITNESS_FED: WITNESS_FED, COMMITTEE_FED: COMMITTEE_FED,
     isFeedOp: isFeedOp, publisherPoints: publisherPoints,
-    fillToBackingPerMpa: fillToBackingPerMpa, exchangePoints: exchangePoints, poolLines: poolLines };
+    fillToBackingPerMpa: fillToBackingPerMpa, exchangePoints: exchangePoints, poolLines: poolLines,
+    invertValues: invertValues };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.FeedHistory === "undefined") { globalThis.FeedHistory = FeedHistory; }
 if (typeof module !== "undefined") { module.exports = FeedHistory; }

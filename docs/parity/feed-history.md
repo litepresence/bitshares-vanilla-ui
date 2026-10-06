@@ -69,6 +69,10 @@ Plan: `docs/superpowers/plans/2026-10-06-feed-history.md` (6 tasks, all committe
   pinning producers + median to the zero line while exchange/pool drew at
   62M — fixed by swapping the `formatPrice` legs in `publisherPoints`
   (locked in `tooling/feed-history-test.js`).
+- Invert toggle: exact reciprocal at draw time (`FeedHistory.invertValues`,
+  BigInt 8dp, gaps stay gaps), no refetch; orientation caption
+  (`asset.orientation_note`, symbols never ids); legend filter preserved
+  across toggles.
 
 - `medianOf(["1.5","1.7","1.6"])` → `"1.6"` (integer-compare, no float).
 - `normToBackingPerMpa("2", true)` → `"0.5"`.

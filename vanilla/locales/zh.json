@@ -401,6 +401,7 @@
       "asset.holders_balance",
       "asset.holders_title",
       "asset.holders_unavailable",
+      "asset.invert_btn",
       "asset.issue",
       "asset.issue_memo_no_key",
       "asset.issue_memo_warning",
@@ -449,6 +450,7 @@
       "asset.only_issuer_producers",
       "asset.op_col",
       "asset.open_an_account",
+      "asset.orientation_note",
       "asset.owner_key_note",
       "asset.payer_field",
       "asset.payer_row",
@@ -6951,7 +6953,9 @@
     "history_capped": "Showing first 8 publishers (capped for speed)…",
     "history_pub": "Publisher %(i)s/%(n)s…",
     "history_exchange": "Loading exchange + pools…",
-    "history_failed": "Could not load feed history."
+    "history_failed": "Could not load feed history.",
+    "invert_btn": "Invert",
+    "orientation_note": "%(m)s per %(b)s"
   },
   "pool": {
     "a_to_b_col": "A→B 输出（原始）",
