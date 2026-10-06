@@ -100,13 +100,14 @@ MarketDesk._query = MarketDesk._query || {};
     var q = (raw && typeof raw === "object") ? raw : {};
     var keys = indKeys(indApi);
     var seed = {
-      bucket: 3600, over: {}, osc: {},
+      bucket: 3600, discrete: false, over: {}, osc: {},
       logScale: false, showVwap: false, showDepth: false, showPoolMap: true,
       depthLogX: true, depthLogY: true, tradesTab: "recent", groupDec: null
     };
     try {
       var tf = parseInt(q.tf, 10);
       if (Number.isInteger(tf) && tf > 0 && tf <= 86400 * 30) seed.bucket = tf;
+      if (typeof q.tf === "string" && q.tf.trim().toLowerCase() === "discrete") seed.discrete = true;
       keyList(q.over, keys.over).forEach(function (k) { seed.over[k] = [{}]; });
       keyList(q.osc, keys.osc).forEach(function (k) { seed.osc[k] = true; });
       seed.logScale = flag01(q.log, false);
@@ -129,19 +130,25 @@ MarketDesk._query = MarketDesk._query || {};
     var parts = [];
     try {
       var s = state || {};
-      if (Number.isInteger(s.bucket) && s.bucket > 0 && s.bucket !== 3600) parts.push("tf=" + s.bucket);
+      /* Discrete mode (raw fills, no buckets): tf=discrete serializes the
+       * mode; over/osc/vwap/depth/pmap are meaningless without buckets and
+       * stay suppressed so a shared link never resurrects dead plots. Log,
+       * depth scales, trades tab and grouping ride along (still meaningful). */
+      var isDiscrete = !!(s && s.discrete);
+      if (isDiscrete) parts.push("tf=discrete");
+      if (!isDiscrete && Number.isInteger(s.bucket) && s.bucket > 0 && s.bucket !== 3600) parts.push("tf=" + s.bucket);
       var ol = Object.keys(s.over || {}).filter(function (k) {
         return KEY_RE.test(k) && s.over[k] && s.over[k].length;
       });
-      if (ol.length) parts.push("over=" + ol.join(","));
+      if (!isDiscrete && ol.length) parts.push("over=" + ol.join(","));
       var sl = Object.keys(s.osc || {}).filter(function (k) {
         return KEY_RE.test(k) && !!s.osc[k];
       });
-      if (sl.length) parts.push("osc=" + sl.join(","));
+      if (!isDiscrete && sl.length) parts.push("osc=" + sl.join(","));
       if (s.logScale) parts.push("log=1");
-      if (s.showVwap) parts.push("vwap=1");
-      if (s.showDepth) parts.push("depth=1");
-      if (s.showPoolMap === false) parts.push("pmap=0");
+      if (!isDiscrete && s.showVwap) parts.push("vwap=1");
+      if (!isDiscrete && s.showDepth) parts.push("depth=1");
+      if (!isDiscrete && s.showPoolMap === false) parts.push("pmap=0");
       if (s.depthLogX === false) parts.push("dx=0");
       if (s.depthLogY === false) parts.push("dy=0");
       if (s.tradesTab === "my") parts.push("trades=my");

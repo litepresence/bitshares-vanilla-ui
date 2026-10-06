@@ -122,6 +122,9 @@ MarketInd._panes = MarketInd._panes || {};
 /* Short label for a bucket size in seconds (label text only, not money). */
 
   function bucketLabel(b) {
+    /* Discrete mode is a raw-fill view, not a bucket size (dex-ux
+     * order_book.html Discrete radio parity) — label text only, not money. */
+    if (b === "discrete") return "Discrete";
     var known = { 60: "1m", 300: "5m", 900: "15m", 1800: "30m", 3600: "1h", 14400: "4h", 86400: "1D", 604800: "1W" };
     if (known[b]) return known[b];
     if (b >= 3600 && b % 3600 === 0) return (b / 3600) + "h";
@@ -1096,7 +1099,7 @@ MarketInd._panes = MarketInd._panes || {};
   MarketInd._panes.CANDLE_COUNT = CANDLE_COUNT;
   MarketInd._panes.reconcileBuckets = reconcileBuckets;
   MarketInd._panes.bucketLabel = bucketLabel;
-  MarketInd._panes._test = { validCount: validCount };
+  MarketInd._panes._test = { validCount: validCount, bucketLabel: bucketLabel, reconcileBuckets: reconcileBuckets };
   MarketInd._panes.OSC_ORDER = OSC_ORDER;
   MarketInd._panes.OVERLAY_DEFS = OVERLAY_DEFS;
   MarketInd._panes.overlayLabel = overlayLabel;
