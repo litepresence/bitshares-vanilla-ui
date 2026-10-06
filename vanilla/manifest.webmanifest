@@ -1,0 +1,22 @@
+{
+  "name": "BitShares Wallet",
+  "short_name": "BitShares",
+  "description": "Local-key BitShares wallet — no signup: browse any account freely, keys stay on device, every transaction signs locally.",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

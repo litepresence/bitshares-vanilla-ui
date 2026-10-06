@@ -272,6 +272,9 @@ var DashboardUI = (function () {
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
     if (!doc) return;
     var myGen = ++gen;
+    /* Prompt pulse teardown: the landing's timer/subscription belong to the
+     * previous generation — the tick's gen-check is only the backstop. */
+    try { stopPulseLive(); } catch (e0) { /* tick backstop covers */ }
     DOM.clear(root);
     /* Landing rule (Option B, 2026-10-01): locked visitors get the splash,
      * unlocked visitors get the watched-account dashboard unchanged. The
@@ -443,8 +446,8 @@ var DashboardUI = (function () {
       logo.className = "dashboard-gate-logo";
       card.appendChild(logo);
     } catch (e) { /* gate works without the mark */ }
-    card.appendChild(DOM.el(doc, "h2", t("dashboard.welcome", "Welcome to BitShares")));
-    card.appendChild(DOM.el(doc, "p", t("dashboard.tagline", "Your Decentralized Platform"), "muted"));
+    card.appendChild(DOM.el(doc, "h2", t("dashboard.welcome", "Trade BTS with keys you hold")));
+    card.appendChild(DOM.el(doc, "p", t("dashboard.tagline", "Browse markets free — create a wallet to trade."), "muted"));
     var row = doc.createElement("p");
     row.className = "dashboard-gate-row";
     var create = doc.createElement("a");
@@ -842,10 +845,17 @@ var DashboardUI = (function () {
       ["#/transfer", t("news.transfer_send_assets", "Transfer — send assets")]
     ]));
     section.appendChild(linkPara(doc, [
-      ["#/explorer", t("news.explorer_blocks_and_transactions", "Explorer — blocks and transactions")],
+      ["#/explorer", t("news.explorer_blocks_and_transactions", "Explore the chain")],
       ["#/voting", t("news.voting_witnesses_committee_workers", "Voting — witnesses, committee, workers")],
       ["#/settings", t("news.settings_nodes_and_themes", "Settings — nodes and themes")],
       ["#/help", t("news.help_how_each_part_works", "Help — how each part works")]
+    ]));
+    /* Depth row: pools, HTLC, and credit one tap away (lens 3). Labels reuse
+     * their home-view keys — no new keys, no drift. */
+    section.appendChild(linkPara(doc, [
+      ["#/pools", t("txbuilder.link_pools", "Pools")],
+      ["#/htlc", t("menu.p_htlc", "HTLC")],
+      ["#/credit-offer", t("nav.credit", "Credit")]
     ]));
     wrap.appendChild(section);
   }
@@ -871,22 +881,33 @@ var DashboardUI = (function () {
   /* Hero: framed owner art + motto h1 + honest subcopy + CTAs. The motto is
    * the promise; the subcopy translates it (keys stay yours, nothing to
    * install, nothing that rots). Both locked CTAs from the old gate card
-   * survive here (Create + Login). */
+   * survive here (Create + Login). The ghost Explore keeps chain depth one
+   * tap away (marketing-auditor lens 3) without demoting Create; the browse
+   * row below repeats the card destinations as text links for narrow screens.
+   * @param {Document} doc owner document.
+   * @returns {HTMLElement} the hero section. */
   function landingHero(doc) {
     var s = doc.createElement("section");
     s.className = "splash-hero";
     try {
       var img = doc.createElement("img");
       img.src = "assets/hero.webp";
-      img.alt = "";
+      /* Alt names the scene for screen readers (the h1 carries the meaning
+       * for sighted users); lazy load + async decode keep first paint cheap
+       * (marketing-auditor lens 5 — performance is discoverability). */
+      img.alt = "BitShares trading desk preview";
+      try {
+        img.setAttribute("loading", "lazy");
+        img.setAttribute("decoding", "async");
+      } catch (e2) { /* art still shows */ }
       img.className = "splash-hero-img";
       s.appendChild(img);
     } catch (e) { /* hero works without art */ }
-    s.appendChild(DOM.pageHead(doc, t("splash.hero_title", "bitshares-vanilla-ui is dependency-free and static-servable."), "dashboard"));
+    s.appendChild(DOM.pageHead(doc, t("splash.hero_title", "BitShares wallet in your browser — nothing to install."), "dashboard"));
     s.appendChild(DOM.el(doc, "p",
-      t("splash.hero_sub", "Your keys. Your coins."), "muted"));
+      t("splash.hero_sub", "Your keys. Your funds, on-chain."), "muted"));
     s.appendChild(DOM.el(doc, "p",
-      t("splash.hero_sub2", "Nothing but fresh vanilla html/js/css in between."), "muted"));
+      t("splash.hero_sub2", "Browse markets free. Unlock only to sign."), "muted"));
     var row = doc.createElement("p");
     row.className = "splash-cta-row";
     var create = doc.createElement("a");
@@ -898,28 +919,85 @@ var DashboardUI = (function () {
     var desk = doc.createElement("a");
     desk.href = "#/market/" + encodeURIComponent(defaultMarket());
     desk.className = "btn btn-ghost";
-    desk.textContent = t("splash.cta_exchange", "Open exchange");
+    desk.textContent = t("splash.cta_exchange", "Trade on the exchange");
     touchable(desk);
     row.appendChild(desk);
+    /* Ghost Explore reuses the explorer quick-link key (same destination as
+     * the dashboard quick link, so both relabel identically — one key, no
+     * drift). */
+    var explore = doc.createElement("a");
+    explore.href = "#/explorer";
+    explore.className = "btn btn-ghost";
+    explore.textContent = t("news.explorer_blocks_and_transactions", "Explore the chain");
+    touchable(explore);
+    row.appendChild(explore);
     s.appendChild(row);
     s.appendChild(linkPara(doc, [
       ["#/login", t("auth.login", "Login")],
       ["#/accounts", t("account.manager_title", "Accounts")]
     ]));
+    /* Browse row: HTLC / voting / pools / credit one tap away (lens 3).
+     * Labels reuse their home-view keys — no new keys, no drift. */
+    s.appendChild(linkPara(doc, [
+      ["#/pools", t("splash.card_pool_t", "Pools")],
+      ["#/htlc", t("htlc.title", "HTLC")],
+      ["#/voting", t("vote.title", "Voting")],
+      ["#/credit-offer", t("nav.credit", "Credit")]
+    ]));
     return s;
   }
 
+  /* Pulse live-refresh budget (marketing-auditor lens 2 — busy box: numbers
+   * tick in place, stale data says so). One db id, one Promise.all wave per
+   * refill — the same wave fetchPulse always ran. Refills fire every
+   * PULSE_REFRESH_MS while the landing is mounted plus on head-block advance
+   * (connection-status push, headBlock-guarded so latency telemetry on the
+   * same topic never refetches). Unchanged numbers cause zero DOM writes
+   * (pulseHash bail, market-desk.js tipHash precedent). Stale-route teardown
+   * is the existing generation check: every continuation verifies myGen and
+   * the timer/subscription self-clear otherwise. */
+  var PULSE_REFRESH_MS = 15000;
+  var _pulseTimer = null, _pulseHash = null, _pulseOff = null, _pulseHead = 0;
+
+  /* Human labels for the pulse cells (splash.pulse_<k> keys stay — only the
+   * defaults change: the old fallback was the raw id, leaking "head" etc. to
+   * the screen when i18n.js failed to load). Values match en.json. */
+  var PULSE_LABELS = {
+    head: "Head block",
+    time: "Head time",
+    accounts: "Accounts",
+    assets: "Assets",
+    witnesses: "Witnesses",
+    committee: "Committee"
+  };
+
+  /* Cell -> chain call for stale titles (the vote helpers bottom out in the
+   * named WS methods — vote.js:80 get_witness_count, vote.js:98
+   * get_committee_count — so titles name the real call). */
+  var PULSE_CALLS = {
+    head: "get_dynamic_global_properties",
+    time: "get_dynamic_global_properties",
+    accounts: "get_account_count",
+    assets: "get_asset_count",
+    witnesses: "get_witness_count",
+    committee: "get_committee_count"
+  };
+
   /* Chain pulse band (Crypo number-band slot, real numbers only): head
    * block + time, account/asset/witness/committee counts, top-market 24h
-   * volume row. One db id, one Promise.all wave; every cell fails open to
-   * "—" (dead method or offline node never blanks the band). Counts render
-   * verbatim (thousands-grouping stays deferred per Tier-2). Aggregate DEX
-   * volume has no chain call (#4 has only per-market volume), so the row
-   * is labeled single-market honestly. */
+   * volume row. One db id, one Promise.all wave; every cell fails open to a
+   * named-stale label (dead method or offline node never blanks the band).
+   * Counts render verbatim (thousands-grouping stays deferred per Tier-2).
+   * Aggregate DEX volume has no chain call (#4 has only per-market volume),
+   * so the row stays labeled single-market honestly.
+   * @param {Document} doc owner document.
+   * @param {HTMLElement} wrap landing wrapper to append to.
+   * @param {number} myGen render generation (stale-route guard).
+   * @returns {void} */
   function paintPulse(doc, wrap, myGen) {
     var s = doc.createElement("section");
     s.className = "pulse-band";
-    s.appendChild(DOM.el(doc, "h2", t("splash.pulse_title", "Chain pulse")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.pulse_title", "Live chain numbers")));
     var grid = doc.createElement("div");
     grid.className = "pulse-grid";
     s.appendChild(grid);
@@ -927,7 +1005,7 @@ var DashboardUI = (function () {
     ["head", "time", "accounts", "assets", "witnesses", "committee"].forEach(function (k) {
       var cell = doc.createElement("div");
       cell.className = "pulse-cell";
-      cell.appendChild(DOM.el(doc, "div", t("splash.pulse_" + k, k), "muted"));
+      cell.appendChild(DOM.el(doc, "div", t("splash.pulse_" + k, PULSE_LABELS[k] || k), "muted"));
       var v = DOM.el(doc, "div", "…", "num");
       cell.appendChild(v);
       grid.appendChild(cell);
@@ -938,16 +1016,153 @@ var DashboardUI = (function () {
     vol.textContent = t("splash.topvol_loading", "Top market 24h vol: …");
     s.appendChild(vol);
     wrap.appendChild(s);
+    _pulseHash = null;
     fetchPulse(myGen).then(function (r) {
       if (myGen !== gen) return;
-      cells.head.textContent = fmtCount(r.head);
-      cells.time.textContent = (r.time === null || r.time === undefined) ? "—" : String(r.time);
-      cells.accounts.textContent = fmtCount(r.accounts);
-      cells.assets.textContent = fmtCount(r.assets);
-      cells.witnesses.textContent = fmtCount(r.witnesses);
-      cells.committee.textContent = fmtCount(r.committee);
-      vol.textContent = topVolText(r.topVol);
+      paintPulseCells(cells, vol, r);
     });
+    startPulseLive(cells, vol, myGen);
+  }
+
+  /* pulseHash: FNV-1a (32-bit, Math.imul-exact) over the shaped pulse wave.
+   * HASH INPUTS — everything paintPulseCells writes, nothing else: the six
+   * shaped counts/time plus the top-market row's base/quote/volume strings
+   * (topVolText renders those verbatim).
+   * @param {object} r shaped pulse result (shapePulse shape).
+   * @returns {string|null} 8-hex hash, null on failure (null never bails —
+   * paint when in doubt). Never throws. */
+  function pulseHash(r) {
+    try {
+      if (!r || typeof r !== "object") return null;
+      var s = String(r.head) + "|" + String(r.time) + "|" +
+        String(r.accounts) + "|" + String(r.assets) + "|" +
+        String(r.witnesses) + "|" + String(r.committee) + "|";
+      var tv = (r.topVol && typeof r.topVol === "object") ? r.topVol : null;
+      s += tv ? (String(tv.base) + "/" + String(tv.quote) + "|" +
+        String(tv.quote_volume)) : "null";
+      var h = 0x811c9dc5;
+      for (var i = 0; i < s.length; i++) {
+        h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+      }
+      return ("0000000" + h.toString(16)).slice(-8);
+    } catch (e) { return null; }
+  }
+
+  /* Stale-miss glyph (keyed splash.pulse_stale; default is the same "— stale"
+   * glyph as before, so English paint is byte-identical). WHY keyed yet still
+   * stale-labeled-not-silent: a missed call paints the glyph with the shared
+   * `stale` class hook (a theming hook for themes.css owners) plus a title
+   * naming the failed call — a dead feed says so, never fakes a value or
+   * goes blank. Resolved per paint via t() so a language switch applies on
+   * the next tick without reload.
+   * @returns {string} localized stale glyph. Never throws. */
+  function staleMiss() {
+    return t("splash.pulse_stale", "— stale");
+  }
+
+  /* setPulseCell: write one pulse value.
+   * @param {HTMLElement} el value div (class "num").
+   * @param {string|null} text display text, or null when the call missed.
+   * @param {string} method WS method name for the stale title.
+   * Misses render staleMiss() with the shared `stale` class plus a title
+   * naming the failed call; hits render verbatim with the title cleared.
+   * Never throws. */
+  function setPulseCell(el, text, method) {
+    try {
+      if (text === null || text === undefined) {
+        el.textContent = staleMiss();
+        el.className = "num stale";
+        try { el.title = "Stale: " + String(method) + " failed"; } catch (e2) { /* glyph stands */ }
+      } else {
+        el.textContent = text;
+        el.className = "num";
+        try { el.title = ""; } catch (e3) { /* text stands */ }
+      }
+    } catch (e) { /* cell keeps its previous paint */ }
+  }
+
+  /* paintPulseCells: write a shaped pulse result into the live cells.
+   * @param {object} cells id->value-div map from paintPulse.
+   * @param {HTMLElement} vol top-volume paragraph.
+   * @param {object} r shaped pulse result (shapePulse shape). A null-shaped
+   * field is a miss (named-stale, never a bare dash); topVol keeps its honest
+   * unavailable line. Equal pulseHash means identical pixels — zero DOM
+   * writes (the value-hash bail). Never throws. */
+  function paintPulseCells(cells, vol, r) {
+    try {
+      if (!r || typeof r !== "object") return;
+      var h = pulseHash(r);
+      if (h !== null && h === _pulseHash) return;
+      _pulseHash = h;
+      setPulseCell(cells.head, (r.head === null || r.head === undefined) ? null : fmtCount(r.head), PULSE_CALLS.head);
+      setPulseCell(cells.time, (r.time === null || r.time === undefined) ? null : String(r.time), PULSE_CALLS.time);
+      setPulseCell(cells.accounts, (r.accounts === null || r.accounts === undefined) ? null : fmtCount(r.accounts), PULSE_CALLS.accounts);
+      setPulseCell(cells.assets, (r.assets === null || r.assets === undefined) ? null : fmtCount(r.assets), PULSE_CALLS.assets);
+      setPulseCell(cells.witnesses, (r.witnesses === null || r.witnesses === undefined) ? null : fmtCount(r.witnesses), PULSE_CALLS.witnesses);
+      setPulseCell(cells.committee, (r.committee === null || r.committee === undefined) ? null : fmtCount(r.committee), PULSE_CALLS.committee);
+      vol.textContent = topVolText(r.topVol);
+    } catch (e) { /* cells keep their previous paint */ }
+  }
+
+  /* stopPulseLive: clear the pulse timer + connection subscription (stale
+   * route teardown). WHY separate: renderDashboard calls it on every entry
+   * (prompt cleanup) AND every tick/sub callback self-clears on generation
+   * mismatch (async backstop) — either path alone leaks.
+   * @returns {void} Never throws. */
+  function stopPulseLive() {
+    try { if (_pulseTimer !== null) clearInterval(_pulseTimer); } catch (e) { /* gone */ }
+    _pulseTimer = null;
+    try { if (typeof _pulseOff === "function") _pulseOff(); } catch (e2) { /* unsubscribed */ }
+    _pulseOff = null;
+  }
+
+  /* startPulseLive: 15s refill + head-block-advance refill while the landing
+   * is mounted.
+   * @param {object} cells id->value-div map from paintPulse.
+   * @param {HTMLElement} vol top-volume paragraph.
+   * @param {number} myGen render generation (stale-route guard).
+   * The interval re-runs the single-db-id Promise.all wave; the connection
+   * subscription refills only when headBlock advances (latency telemetry on
+   * the same topic never refetches). Every continuation checks myGen and
+   * self-clears otherwise. @returns {void} Never throws. */
+  function startPulseLive(cells, vol, myGen) {
+    stopPulseLive();
+    _pulseHead = 0;
+    try {
+      if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function") {
+        var st0 = Chain.status();
+        if (st0 && typeof st0.headBlock === "number") _pulseHead = st0.headBlock;
+      }
+    } catch (e) { /* 0 stands: the first push only records */ }
+    /* refill: one guarded pulse wave + hash-bailed paint. WHY inner: the
+     * interval and the head-advance subscription share it. */
+    function refill() {
+      if (myGen !== gen) { stopPulseLive(); return; }
+      fetchPulse(myGen).then(function (r) {
+        if (myGen !== gen) return;
+        paintPulseCells(cells, vol, r);
+      });
+    }
+    try {
+      _pulseTimer = setInterval(refill, PULSE_REFRESH_MS);
+    } catch (e2) { _pulseTimer = null; }
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
+        _pulseOff = Store.subscribe("connection", function (st) {
+          if (myGen !== gen) { stopPulseLive(); return; }
+          try {
+            var hb = st && st.headBlock;
+            if (typeof hb !== "number") return;
+            if (_pulseHead && hb > _pulseHead) {
+              _pulseHead = hb;
+              refill();
+            } else if (!_pulseHead) {
+              _pulseHead = hb;
+            }
+          } catch (e3) { /* the interval covers */ }
+        });
+      }
+    } catch (e4) { /* the interval alone still refreshes */ }
   }
 
   /* One-wave pulse fetch. Returns {head,time,accounts,assets,witnesses,
@@ -1023,7 +1238,7 @@ var DashboardUI = (function () {
    * are chain-human strings — displayed verbatim, never summed. */
   function topVolText(row) {
     if (!row || typeof row.base !== "string" || typeof row.quote !== "string") {
-      return t("splash.topvol_unavailable", "Top market 24h vol: unavailable on this node.");
+      return t("splash.topvol_unavailable", "Top-market volume is offline — check Settings → Nodes.");
     }
     var vol = (row.quote_volume !== undefined && row.quote_volume !== null) ? String(row.quote_volume) : "—";
     return t("splash.topvol_prefix", "Top market 24h vol (single market):") +
@@ -1031,22 +1246,30 @@ var DashboardUI = (function () {
   }
 
   /* Product doorways (Kraken-card slot, CSS-only): one line each + deep
-   * link. No art files — the hero carries the page's single image. */
+   * link. No art files — the hero carries the page's single image. HTLC and
+   * Govern cards reuse the help-index teaser keys (same meaning, one key, no
+   * drift) so chain depth stays one tap away (marketing-auditor lens 3).
+   * @param {Document} doc owner document.
+   * @returns {HTMLElement} the cards section. */
   function landingCards(doc) {
     var s = doc.createElement("section");
     s.className = "prod-cards";
-    s.appendChild(DOM.el(doc, "h2", t("splash.cards_title", "What you can do here")));
+    s.appendChild(DOM.el(doc, "h2", t("splash.cards_title", "Trade, pool, explore — start here")));
     var grid = doc.createElement("div");
     grid.className = "prod-grid";
     [
       ["#/market/" + encodeURIComponent(defaultMarket()),
-        t("splash.card_dex_t", "Exchange"), t("splash.card_dex_d", "Trade on the order-book DEX.")],
+        t("splash.card_dex_t", "Exchange"), t("splash.card_dex_d", "Buy and sell on the open market.")],
       ["#/pools",
-        t("splash.card_pool_t", "Pools"), t("splash.card_pool_d", "Provide liquidity and swap.")],
+        t("splash.card_pool_t", "Pools"), t("splash.card_pool_d", "Earn a cut by pooling two assets.")],
+      ["#/htlc",
+        t("htlc.title", "HTLC"), t("help.topic_htlc_text", "Hash-locked swaps that either pay or refund.")],
+      ["#/voting",
+        t("menu.section_govern", "Govern"), t("help.topic_voting_text", "Vote witnesses, committee, workers — or hand it to a proxy.")],
       ["#/explorer",
-        t("splash.card_explore_t", "Explorer"), t("splash.card_explore_d", "Blocks, assets and chain data.")],
+        t("splash.card_explore_t", "Explorer"), t("splash.card_explore_d", "Read blocks and account history.")],
       ["#/wallet",
-        t("splash.card_wallet_t", "Wallet"), t("splash.card_wallet_d", "Keys that never leave this device.")]
+        t("splash.card_wallet_t", "Wallet"), t("splash.card_wallet_d", "Hold keys on this device only.")]
     ].forEach(function (c) {
       var a = doc.createElement("a");
       a.href = c[0];
@@ -1070,7 +1293,7 @@ var DashboardUI = (function () {
     grid.className = "trust-grid";
     [
       [t("splash.trust_keys_t", "Keys never leave your device"),
-        t("splash.trust_keys_d", "Signing happens locally in your browser. No server ever sees a password or a key.")],
+        t("splash.trust_keys_d", "Signing happens locally on your device. No server ever sees a password or a key.")],
       [t("splash.trust_browse_t", "Browse everything with no account"),
         t("splash.trust_browse_d", "Reads never ask for login. The password is requested only at signing.")],
       [t("splash.trust_numbers_t", "Human numbers, shown fees"),
@@ -1086,7 +1309,11 @@ var DashboardUI = (function () {
     return s;
   }
 
-  /* Three DEX-honest steps (Crypo steps slot — no bank-linking here). */
+  /* Three DEX-honest steps (Crypo steps slot — no bank-linking here).
+   * WHY chain-first: newcomers browse before they commit — step 1 needs no
+   * wallet at all (lens 1: one next action, no jargon on first sight).
+   * @param {Document} doc owner document.
+   * @returns {HTMLElement} the steps section. */
   function landingSteps(doc) {
     var s = doc.createElement("section");
     s.className = "splash-steps";
@@ -1094,14 +1321,14 @@ var DashboardUI = (function () {
     var grid = doc.createElement("div");
     grid.className = "steps-grid";
     [
-      ["1", t("splash.step1_t", "Create a wallet"),
-        t("splash.step1_d", "A brainkey is generated on this device. Write it on paper."),
+      ["1", t("splash.step1_t", "Look around"),
+        t("splash.step1_d", "No login needed — browse the chain first."),
+        "#/explorer"],
+      ["2", t("splash.step2_t", "Create a wallet"),
+        t("splash.step2_d", "A brainkey is generated on this device. Write it on paper."),
         "#/create-wallet-brainkey"],
-      ["2", t("splash.step2_t", "Fund it"),
-        t("splash.step2_d", "Testnet faucet or a gateway deposit — tiny first."),
-        "#/deposit-withdraw"],
-      ["3", t("splash.step3_t", "Trade the book"),
-        t("splash.step3_d", "Limit orders on a real order book. Cancel anything."),
+      ["3", t("splash.step3_t", "Trade / pool / vote"),
+        t("splash.step3_d", "Limit orders, liquidity pools, and ballots — all on-chain."),
         "#/market/" + encodeURIComponent(defaultMarket())]
     ].forEach(function (c) {
       var d = doc.createElement("div");
@@ -1121,22 +1348,35 @@ var DashboardUI = (function () {
     return s;
   }
 
-  /* Final CTA band. */
+  /* Final CTA band: dual CTA (create + explore) so chain-first visitors who
+   * will never make a wallet still have one honest next action (lens 1).
+   * @param {Document} doc owner document.
+   * @returns {HTMLElement} the CTA band section. */
   function landingFinal(doc) {
     var s = doc.createElement("section");
     s.className = "cta-band";
     s.appendChild(DOM.el(doc, "h2", t("splash.final_t", "Ready when you are.")));
+    var row = doc.createElement("p");
+    row.className = "splash-cta-row";
     var a = doc.createElement("a");
     a.href = "#/create-wallet-brainkey";
     a.className = "btn";
     a.textContent = t("splash.final_cta", "Create a wallet");
-    s.appendChild(a);
+    touchable(a);
+    row.appendChild(a);
+    var explore = doc.createElement("a");
+    explore.href = "#/explorer";
+    explore.className = "btn btn-ghost";
+    explore.textContent = t("news.explorer_blocks_and_transactions", "Explore the chain");
+    touchable(explore);
+    row.appendChild(explore);
+    s.appendChild(row);
     return s;
   }
 
   return {
     renderDashboard: renderDashboard,
-    _test: { landingFor: landingFor, fmtCount: fmtCount, asCount: asCount, topVolText: topVolText, shapePulse: shapePulse, tickRow: tickRow, clearTickMisses: clearTickMisses, _tickCache: _tickCache }
+    _test: { landingFor: landingFor, fmtCount: fmtCount, asCount: asCount, topVolText: topVolText, shapePulse: shapePulse, pulseHash: pulseHash, paintPulseCells: paintPulseCells, setPulseCell: setPulseCell, tickRow: tickRow, clearTickMisses: clearTickMisses, _tickCache: _tickCache }
   };
 })();
 

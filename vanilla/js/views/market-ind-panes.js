@@ -387,6 +387,44 @@ MarketInd._panes = MarketInd._panes || {};
     return trim6(s);
   }
 
+  /* stripKey: fingerprint of everything renderStrip paints (pure, never throws).
+   * WHY cry-wolf guard: the 15s fill() (market-desk-fill.js:147,151) rebuilt
+   *   the strip on every tick, replaying the candy-tick flash on identical
+   *   values until the flash meant nothing. Same unchanged-triple guard as the
+   *   live-tip ticker-bail (market-desk.js:1000-1008 latest|highestBid|
+   *   lowestAsk), extended to the change/volume + feed/settle cells
+   *   renderStrip also paints — triple-only would strand the once-per-desk
+   *   feed paint (fetchFeed lands after stats under the same triple). Equal
+   *   key means identical chips, so renderStrip skips DOM.clear+rebuild: no
+   *   churn, no flash; the flash fires only on real moves.
+   * @param {any} st - state.ticker (or null while loading).
+   * @param {any} assets - state.assets (base symbol suffixes the volume cell).
+   * @param {any} feed - state.feed ({feed, settle{value,global,offset}} or null).
+   * @returns {string|null} Short comparable key; null on failure (null never
+   *   bails — paint when in doubt). */
+  function stripKey(st, assets, feed) {
+    try {
+      if (!st) return "__loading__";
+      var raw = (st && st.raw) || {};
+      var sym = "";
+      try { sym = (assets && assets.base && assets.base.symbol) || ""; } catch (e) { sym = ""; }
+      var fFeed = "", sVal = "", sGlob = "", sOff = "";
+      try {
+        if (feed) {
+          if (feed.feed !== null && feed.feed !== undefined) fFeed = String(feed.feed);
+          if (feed.settle) {
+            if (feed.settle.value !== null && feed.settle.value !== undefined) sVal = String(feed.settle.value);
+            sGlob = feed.settle.global ? "1" : "0";
+            if (feed.settle.offset !== undefined && feed.settle.offset !== null) sOff = String(feed.settle.offset);
+          }
+        }
+      } catch (e) { /* feed parts stand empty */ }
+      return String(st.latest) + "|" + String(st.highestBid) + "|" + String(st.lowestAsk) + "|" +
+        String(raw.percent_change) + "|" + String(raw.base_volume) + "|" + sym + "|" +
+        fFeed + "|" + sVal + "|" + sGlob + "|" + sOff;
+    } catch (e) { return null; }
+  }
+
   /* Compact header stats strip: Latest / 24h change / 24h volume / Best
    * bid-ask, plus Feed Price + Settlement for bitasset markets (state.feed,
    * filled once per desk by market-desk.js fetchFeed — absent on non-MPA
@@ -394,9 +432,20 @@ MarketInd._panes = MarketInd._panes || {};
    * values render ps (4-sf) with the full chain string on title; ticker/volume
    * fields pass through verbatim (same fields as the side panel, no money
    * math). Moved verbatim out of fill; state carries {ticker, strip, assets,
-   * feed} exactly as before. */
+   * feed} exactly as before.
+   * @param {Document} doc - owner document for node creation.
+   * @param {object} state - desk state ({ticker, strip, assets, feed, _stripTick}).
+   * @returns {void} Renders in place; returns early (no DOM churn) when the
+   *   stripKey is unchanged — the candy-tick flash then fires only on real moves. */
   function renderStrip(doc, state) {
     var st = state.ticker;
+    /* Cry-wolf bail (stripKey above): unchanged strip paints identical chips,
+     * so skip DOM.clear+rebuild. Separate key from the live-tip _tickHash in
+     * market-desk.js (which pre-bails before calling here) — sharing one key
+     * would let the pre-set mark render done before this path paints. */
+    var key = stripKey(st, state.assets, state.feed);
+    if (key !== null && state._stripTick === key) return;
+    state._stripTick = key;
     DOM.clear(state.strip);
     if (!st) {
       state.strip.appendChild(DOM.el(doc, "span", t("market.loading_stats", "Loading stats…"), "muted"));

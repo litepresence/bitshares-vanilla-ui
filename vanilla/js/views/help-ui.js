@@ -132,7 +132,7 @@ var HelpUI = (function () {
       "This wallet is provided as-is, at your own risk. To the extent the law allows, its owners and contributors are not liable for any damages from using it — including lost use, lost profits, or lost data."
     ],
     "bitshares": [
-      "# The fast decentralized exchange",
+      "# The delegated-proof-of-stake exchange",
       "BitShares is a delegated-proof-of-stake blockchain with a built-in exchange: order matching happens in the protocol itself, so trading needs no central company holding your funds.",
       "It extends the blockchain idea beyond money — banking, exchanges, voting, auctions and more — run as distributed companies under public, auditable rules instead of human management.",
       "# What it enables",
@@ -143,7 +143,7 @@ var HelpUI = (function () {
       "That is also why backups are your job alone: lose the brainkey or password and nobody can recover your funds.",
       "# Design goals",
       "- No custody: traders keep their own private keys and funds at all times.",
-      "- High performance and low cost: fast confirmation with small fees, and fair transparent matching where every order is provably handled."
+      "- Blocks every few seconds; every operation lists its chain fee before you sign."
     ],
     "wallets": [
       "# A web app with a local vault",
@@ -323,9 +323,9 @@ var HelpUI = (function () {
       "One global book serves everyone with internet access, around the clock — there is no single server to fail and no opening bell.",
       "# Trade almost anything",
       "The protocol is asset-agnostic: any pair can trade, from USD against EUR down to long-tail pairs with thin liquidity.",
-      "# Secure and fast",
+      "# Secured by your keys, settled on-chain",
       "Funds and orders are guarded by industry-grade elliptic-curve cryptography; multi-signature setups from the Permissions article work here too.",
-      "This DEX confirms in real time — your only limits are physics and the planet's size.",
+      "Orders settle on-chain, in blocks a few seconds apart — the matching rules are public and re-checkable.",
       "# Matching you can verify",
       "Given a set of orders, anyone can re-check that they were matched correctly: the matching algorithm is public and provable, not a black box on a server.",
       "# Smartcoins complete the picture",

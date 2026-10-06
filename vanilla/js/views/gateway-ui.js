@@ -167,8 +167,8 @@ var GatewayUI = (function () {
     ctx.tab = findEntry(gatewayParam).id;
     ctx.action = "deposit"; ctx.account = ""; ctx.coin = null;
     ctx.wrap.appendChild(DOM.el(ctx.doc, "p",
-      t("gateway.intro_a", "Deposits never broadcast — you send external coins to the shown address. ") +
-      t("gateway.intro_b", "Withdraws continue in the standard transfer form with its live fee and confirm."), "muted"));
+      t("gateway.intro_a", "Send outside coins to the address shown. This page sends nothing. ") +
+      t("gateway.intro_b", "Withdraws finish in Transfer with a live fee preview."), "muted"));
     /* LOW punchlist: per-service display toggles (persisted viewSettings) +
      * terms/agreement disclosure. Batch-3-keyed literals; toggles hide tab
      * buttons (direct hashes still load); terms are display-only. */

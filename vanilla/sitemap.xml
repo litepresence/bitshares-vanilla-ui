@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WHY __BASE_URL__: sitemap locs must be absolute per deploy; the file is
+  served statically and the placeholder is replaced at deploy time via
+  sed "s|__BASE_URL__|https://bitshares.litepresence.com|g" (same pattern as
+  the og:url/og:image/canonical note in index.html). Never commit a domain. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>__BASE_URL__/</loc></url>
+  <url><loc>__BASE_URL__/#/</loc></url>
+  <url><loc>__BASE_URL__/#/market/BTS_USD</loc></url>
+  <url><loc>__BASE_URL__/#/pools</loc></url>
+  <url><loc>__BASE_URL__/#/explorer</loc></url>
+  <url><loc>__BASE_URL__/#/transfer</loc></url>
+  <url><loc>__BASE_URL__/#/voting</loc></url>
+  <url><loc>__BASE_URL__/#/assets</loc></url>
+  <url><loc>__BASE_URL__/#/about</loc></url>
+  <url><loc>__BASE_URL__/#/help</loc></url>
+  <url><loc>__BASE_URL__/#/login</loc></url>
+  <url><loc>__BASE_URL__/#/create-account</loc></url>
+  <url><loc>__BASE_URL__/#/fees</loc></url>
+</urlset>

@@ -8,7 +8,7 @@
  *   no signing, no keystore touch. Side effects: body-level overlay div +
  *   injected <style>, one class on the highlighted target, hashchange/
  *   keydown/resize/passive-scroll listeners + a #view MutationObserver (all
- *   removed on end) plus one session-long body observer (+ a hashchange hook for
+ *   removed on end) plus one session-long #view observer (+ a hashchange hook for
  *   dismissed profiles) that keeps the dashboard replay button injected
  *   across async fills and hash-only navigations — both idempotent and both
  *   also removed on end (handles kept for teardown, by design). Missing targets render centered with their
@@ -36,6 +36,17 @@ var TourUI = (function () {
    * so end() can disconnect/remove them — start() listeners already clean. */
   var upkeepObs = null;
   var onReplayHash = null;
+  /* Focus gate (busy-box entrance): true only when the session began via an
+   * explicit "Take tour" replay click (start(true)). Auto-start (fresh-profile
+   * first paint / 6s backstop via start(false)) never grabs focus — WHY:
+   * a screen-reader/keyboard first impression must invite instead of grab;
+   * yanking focus to Next on load hijacks the user's place on the page.
+   * @type {boolean} */
+  var userInvoked = false;
+  /* Focus return: element focused before start(), restored on end() when the
+   * tour moved focus (explicit sessions). Stored so close leaks nothing.
+   * @type {any} */
+  var returnFocusTo = null;
   /* Scroll-once tracker: smooth-scrollIntoView hijacks the user's own
    * scrolling when it re-fires, so it must run exactly once per real
    * step/target change — never on observer re-renders of the same card.
@@ -107,25 +118,27 @@ var TourUI = (function () {
    * .mkt-buy together, and boot can fire before the strip paints). Dots
    * and Next always land on the requested step; the hashchange + #view
    * observers upgrade the centered card to a highlight once its target
-   * materializes or the user follows the CTA. */
+   * materializes or the user follows the CTA. Bodies end with one honest
+   * CTA clause each (marketing-auditor lens 1 — one next action).
+   * @returns {Array} the five step definitions. */
   function steps() {
     var deskHash = "#/market/" + defaultMarketId();
     return [
       { targets: [".dashboard-gate", "#view .wrap"], centerOk: true,
-        title: ["tour.s1_title", "Welcome to BitShares Vanilla"],
-        body: ["tour.s1_body", "A plain HTML, JavaScript, and CSS wallet for the BitShares chain. Look around and play: every page reads public chain data with no login. Your password is asked only when you sign."] },
+        title: ["tour.s1_title", "Browse everything free, sign locally"],
+        body: ["tour.s1_body", "Every page reads public chain data with no login. Open a market to start — your password is asked only at signing."] },
       { targets: [".mkt-strip"], centerOk: true,
         cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
         title: ["tour.s2_title", "Pick a market"],
         body: ["tour.s2_body", "This strip lists starred and featured markets with live prices. Choose any chip to open that trading desk."] },
       { targets: [".mkt-charts"], centerOk: true,
         cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
-        title: ["tour.s3_title", "Desk plots"],
-        body: ["tour.s3_body", "Price candles, volume, and depth plus the indicators menu: overlays like SMA and EMA, oscillators like RSI, MACD, and Stochastic."] },
+        title: ["tour.s3_title", "See live price charts"],
+        body: ["tour.s3_body", "Price candles, volume, and depth plus the indicators menu: overlays like SMA and EMA, oscillators like RSI, MACD, and Stochastic. Open the exchange to see it live."] },
       { targets: [".mkt-buy"], centerOk: true,
         cta: { label: ["tour.s2_cta", "Open the Exchange"], hash: deskHash },
-        title: ["tour.s4_title", "Practice quoting"],
-        body: ["tour.s4_body", "The Buy and Sell panels accept any numbers for practice. Nothing leaves your machine until you review and sign with an unlocked wallet."] },
+        title: ["tour.s4_title", "Practice buying and selling"],
+        body: ["tour.s4_body", "The Buy and Sell panels accept any numbers for practice. Nothing leaves your machine until you review and sign with an unlocked wallet. Open the exchange to try it."] },
       { targets: [], centerOk: true,
         links: [
           ["#/pools", "pools.title", "Liquidity Pools"],
@@ -195,7 +208,11 @@ var TourUI = (function () {
   }
 
   /* Injects the tour stylesheet once (theme tokens with neutral fallbacks;
-   * phones get a full-width bottom sheet; reduced-motion kills motion). */
+   * phones get a full-width bottom sheet; reduced-motion kills motion).
+   * Dots stay touch-honest via touchable() inline 44px floor (see
+   * utils/touchable.js precedent — owned elsewhere, never restyled here);
+   * the 20px visual + 10px gap below is the SEEN dot, not the hit area.
+   * @returns {void} Never throws. */
   function ensureStyle() {
     if (typeof document === "undefined" || styleEl || document.getElementById("tour-style")) return;
     try {
@@ -213,8 +230,8 @@ var TourUI = (function () {
         "#tour-card .tour-cta{display:inline-block;margin:0 0 10px;min-height:44px;line-height:44px;}" +
         "#tour-card .tour-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}" +
         "#tour-card .tour-row > button{min-height:44px;min-width:44px;}" +
-        "#tour-card .tour-dots{display:flex;gap:6px;margin-left:auto;}" +
-        "#tour-card .tour-dot{width:12px;height:12px;border-radius:50%;border:1px solid currentColor;background:transparent;padding:0;min-height:12px;min-width:12px;}" +
+        "#tour-card .tour-dots{display:flex;gap:10px;margin-left:auto;}" +
+        "#tour-card .tour-dot{width:20px;height:20px;border-radius:50%;border:1px solid currentColor;background:transparent;padding:0;min-height:20px;min-width:20px;}" +
         "#tour-card .tour-dot[aria-current=\"step\"]{background:var(--accent,#1ec3fa);border-color:var(--accent,#1ec3fa);}" +
         "@media (max-width:600px){#tour-card{left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;max-height:60vh;overflow:auto;}}" +
         "@media (prefers-reduced-motion:reduce){#tour-card{transition:none!important;}.tour-target{transition:none!important;}}";
@@ -254,7 +271,10 @@ var TourUI = (function () {
   }
 
   /* Builds the tooltip card for step i (dots + Back/Next/Skip + step links).
-   * Params: i (index into steps()). Returns nothing. Never throws. */
+   * @param {number} i index into steps().
+   * @param {Array} list step definitions from steps().
+   * @param {any} target live highlight node or null (centered card).
+   * @returns {void} Never throws. */
   function renderCard(i, list, target) {
     if (typeof document === "undefined") return;
     ensureStyle();
@@ -369,6 +389,11 @@ var TourUI = (function () {
       } catch (e) { /* card still shows */ }
     }
     placeCard(target);
+    /* WHY gate focus on userInvoked: auto-start must invite instead of grab —
+     * a fresh-profile first paint that yanks screen-reader/keyboard focus to
+     * Next steals the user's place; explicit "Take tour" clicks expect focus
+     * to move into the dialog, so only those focus Next. */
+    if (!userInvoked) return;
     try {
       var focusBtn = /** @type {any} */ (box.querySelector("#tour-next"));
       if (focusBtn && typeof focusBtn.focus === "function") focusBtn.focus({ preventScroll: true });
@@ -393,7 +418,9 @@ var TourUI = (function () {
    * (hosts are usually present — the user is looking at one) plus two
    * delayed retries for a dashboard that repaints async after the skip.
    * Same-session hash-only navigation never re-boots, so waiting for the
-   * next full load would strand the replay. Never throws. */
+   * next full load would strand the replay. Returns focus to the element
+   * that held it before start() when this session moved focus. Never throws.
+   * @returns {void} */
   function end() {
     setDismissed();
     active = false;
@@ -408,7 +435,7 @@ var TourUI = (function () {
         window.removeEventListener("hashchange", onHash);
         window.removeEventListener("resize", onMove);
         window.removeEventListener("scroll", onMove);
-        /* Session replay upkeep (boot): disconnect the body observer and
+        /* Session replay upkeep (boot): disconnect the #view observer and
          * drop the named hashchange hook so end() leaks nothing. */
         if (onReplayHash) {
           try { window.removeEventListener("hashchange", onReplayHash); } catch (e2) { /* hook best-effort */ }
@@ -421,6 +448,21 @@ var TourUI = (function () {
     if (placeTimer) { try { clearTimeout(placeTimer); } catch (e) { /* done */ } placeTimer = null; }
     stopBootWait();
     clearReplayTimers();
+    /* WHY return focus only for explicit sessions: auto-start never took it,
+     * so restoring would yank a user who moved on mid-tour; explicit start
+     * moved focus into the card, so close hands it back (no new timer). */
+    try {
+      var wasInvoked = userInvoked;
+      var backTo = returnFocusTo;
+      userInvoked = false;
+      returnFocusTo = null;
+      if (wasInvoked && backTo && typeof backTo.focus === "function") {
+        try {
+          var stillLive = (typeof document === "undefined") || (typeof document.contains !== "function") || document.contains(backTo);
+          if (stillLive) backTo.focus({ preventScroll: true });
+        } catch (e2) { try { backTo.focus(); } catch (e3) { /* focus stays */ } }
+      }
+    } catch (e) { userInvoked = false; returnFocusTo = null; }
     try { ensureReplay(); } catch (e) { /* retry below */ }
     try {
       replayTimers.push(setTimeout(function () { try { ensureReplay(); } catch (e) { /* dashboard stands */ } }, 1500));
@@ -522,7 +564,11 @@ var TourUI = (function () {
   }
 
   /* Starts the tour (force=true replays even when dismissed). Safe to call
-   * repeatedly — a running tour restarts at step 1. Never throws. */
+   * repeatedly — a running tour restarts at step 1. Auto-start passes
+   * force=false (no focus grab — see userInvoked); the dashboard "Take tour"
+   * replay button passes force=true (focus moves into the dialog). Never throws.
+   * @param {any} force true only from the explicit replay click.
+   * @returns {void} */
   function start(force) {
     if (typeof document === "undefined") return;
     if (!force && dismissed()) return;
@@ -530,6 +576,14 @@ var TourUI = (function () {
       stopBootWait();
       clearReplayTimers();
       if (active) end();
+      /* WHY explicit-only focus: start(false) is the fresh-profile first
+       * paint / 6s backstop — grabbing Next there steals screen-reader and
+       * keyboard placement on first impression. start(true) is the user
+       * asking for the tour, so moving focus in is expected. */
+      userInvoked = (force === true);
+      try {
+        returnFocusTo = (typeof document !== "undefined" && document.activeElement) || null;
+      } catch (e) { returnFocusTo = null; }
       active = true;
       stepIdx = 0;
       document.addEventListener("keydown", onKey);
@@ -587,10 +641,16 @@ var TourUI = (function () {
     var kick = function () {
       try {
         /* replayUpkeep: session-long dashboard replay injector (idempotent —
-         * ensureReplay exits fast once the button exists). Watches body so
+         * ensureReplay exits fast once the button exists). Watches #view so
          * async fills and hash-only SPA navigations (which never re-boot)
          * still get the button. Never throws. The observer handle is kept
-         * in upkeepObs so end() can disconnect it (no longer fire-and-forget). */
+         * in upkeepObs so end() can disconnect it (no longer fire-and-forget).
+         * WHY #view, not document.body: a body-subtree observer fires on
+         * every mutation anywhere (including the tour card itself appended
+         * to body), paying per-mutation cost all session; the replay hosts
+         * (.dashboard-gate-row / .mkt-strip) live inside #view, so #view
+         * sees every fill/navigation that matters and nothing else.
+         * @returns {void} */
         var replayUpkeep = function () {
           try {
             if (typeof MutationObserver === "undefined") return;
@@ -598,7 +658,13 @@ var TourUI = (function () {
             upkeepObs = new MutationObserver(function () {
               try { ensureReplay(); } catch (e) { /* retry next mutation */ }
             });
-            upkeepObs.observe(document.body, { childList: true, subtree: true });
+            var upkeepRoot = document.getElementById("view");
+            if (!upkeepRoot) {
+              try { upkeepObs.disconnect(); } catch (e1) { /* gone */ }
+              upkeepObs = null;
+            } else {
+              upkeepObs.observe(upkeepRoot, { childList: true, subtree: true });
+            }
           } catch (e) { /* immediate attempt below stands */ }
           try { ensureReplay(); } catch (e) { /* retry on mutation */ }
         };

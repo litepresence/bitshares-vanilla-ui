@@ -79,7 +79,7 @@ var NewsUI = (function () {
      ["#/account/me", t("news.account_overview_balances_and_history", "Account overview — balances and history")],
      ["#/transfer", t("news.transfer_send_assets", "Transfer — send assets")],
      ["#/voting", t("news.voting_witnesses_committee_workers", "Voting — witnesses, committee, workers")],
-     ["#/explorer", t("news.explorer_blocks_and_transactions", "Explorer — blocks and transactions")],
+      ["#/explorer", t("news.explorer_blocks_and_transactions", "Explore the chain")],
      ["#/help", t("news.help_how_each_part_works", "Help — how each part works")],
      ["#/settings", t("news.settings_nodes_and_themes", "Settings — nodes and themes")]].forEach(function (pr) {
       var li = doc.createElement("li"), a = doc.createElement("a");

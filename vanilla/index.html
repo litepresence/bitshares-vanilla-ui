@@ -4,19 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' wss: https:; object-src 'none'; base-uri 'self'">
-<title>BitShares Wallet</title>
+<title>BitShares Wallet — Trade, Pools & Accounts</title>
 <link rel="stylesheet" href="css/themes.css">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/desk-grid.css">
 <link rel="icon" href="assets/favicon.ico">
-<meta name="description" content="Local-key browser wallet for BitShares — no account, no signup: browse any account freely while keys stay on your device and every transaction signs locally.">
-<meta name="theme-color" content="#111111">
-<meta property="og:title" content="BitShares Wallet">
-<meta property="og:type" content="website">
-<meta property="og:description" content="Local-key browser wallet for BitShares — no account, no signup: browse any account freely while keys stay on your device and every transaction signs locally.">
 <link rel="apple-touch-icon" href="assets/logo-ico-blue.png">
-<!-- DELIBERATELY OMITTED: og:image / og:url — both are domain-dependent and
-  differ per deploy; a hardcoded canonical would ship the wrong URL. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/logo-ico-blue.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/logo-ico-blue.png">
+<meta name="description" content="Local-key BitShares wallet — no signup: browse any account freely, keys stay on device, every transaction signs locally.">
+<meta name="theme-color" content="#111111">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f5efe3">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111111">
+<meta property="og:title" content="BitShares Wallet — Trade, Pools & Accounts">
+<meta property="og:type" content="website">
+<meta property="og:description" content="Local-key BitShares wallet — no signup: browse any account freely, keys stay on device, every transaction signs locally.">
+<meta property="og:site_name" content="BitShares Wallet">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="BitShares Wallet — Trade, Pools & Accounts">
+<meta name="twitter:description" content="Local-key BitShares wallet — no signup: browse any account freely, keys stay on device, every transaction signs locally.">
+<!-- DELIBERATELY OMITTED: og:image / og:url / canonical — all three are
+  domain-dependent and differ per deploy, so a hardcoded URL would ship the
+  wrong domain. WHY no placeholder tags in the file: crawlers read the
+  served bytes, so a literal __BASE_URL__ would leak into the index.
+  Per-deploy pattern (run at deploy time, never committed with a domain):
+  sed "s|__BASE_URL__|https://bitshares.litepresence.com|g"
+  injecting <meta property="og:url" content="__BASE_URL__/">,
+  <meta property="og:image" content="__BASE_URL__/assets/og-cover.png">,
+  <link rel="canonical" href="__BASE_URL__/">. -->
 </head>
 <body>
 <div id="warn-banner" role="note">
@@ -47,7 +64,7 @@
 </nav>
 <main id="view" aria-live="polite"></main>
 <footer id="appfoot" aria-label="Node status">
-  <span class="appfoot-left" id="appfoot-version">BITSHARES · v1.0.0 · <a href="#/help">Disclaimer</a></span>
+  <span class="appfoot-left" id="appfoot-version">BITSHARES · v1.0.0 · <a href="#/help/disclaimer">Disclaimer</a></span>
   <a class="appfoot-right" id="appfoot-status" href="#/settings" aria-label="Node status — open node settings" aria-live="polite">connecting…</a>
   <span class="appfoot-actions"><a id="foot-report" href="#/community">REPORT</a><a id="foot-about" href="#/about">About</a><a id="foot-help" href="#/help">Help</a></span>
 </footer>

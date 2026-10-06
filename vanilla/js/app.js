@@ -205,7 +205,9 @@ var App = (function () {
   function buildDirectory(iconOK) {
     var panel = document.createElement("div");
     panel.id = "nav-directory";
-    panel.setAttribute("role", "navigation");
+    /* No role="navigation" here (a11y: the panel lives inside <nav>, and a
+     * nested landmark confuses assistive tech — the plain div keeps the
+     * tabindex="-1" focus target below). */
     /* Drawer focus target (lifecycle): focusable container so opening the
      * drawer can move focus inside it; harmless when never focused. */
     try { panel.setAttribute("tabindex", "-1"); } catch (e) { /* links stay tabbable */ }

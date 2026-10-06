@@ -313,7 +313,7 @@ var HtlcUI = (function () {
       var box = DOM.el(doc, "div", null, "wrap"); root.appendChild(box);
        box.appendChild(DOM.pageHead(doc, t("htlc.list_title", "Hashed Timelock Contracts"), "htlc"));
       if (!isUnlockedNow()) box.appendChild(viewingAsNotice(doc));
-      box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Hash time-locked contract (HTLC) transfers redeemable with a secret preimage before expiry."), "muted"));
+      box.appendChild(DOM.el(doc, "p", t("htlc.list_sub", "Lock funds to a hash — the receiver redeems with the secret before expiry, or you are refunded. Readable by anyone; password asked only at signing."), "muted"));
       box.appendChild(DOM.el(doc, "h2", t("htlc.sent_prefix", "Sent (") + found.data.sent.length + t("htlc.sent_received_mid", ") · Received (") + found.data.received.length + ")"));
       box.appendChild(htlcTable(doc, found.data.sent, found.data.received));
       box.appendChild(DOM.el(doc, "h2", t("htlc.new_title", "New HTLC")));

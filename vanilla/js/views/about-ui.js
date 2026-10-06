@@ -146,8 +146,9 @@ var AboutUI = (function () {
   }
 
   /* renderAbout: #/about — hero, CTAs, philosophy, limits, links,
-   * making-of story, lazy build-dialog archive.
-   * Params: root (element). Returns nothing. A missing root is a no-op. */
+   * making-of story, lazy build-dialog archive. A missing root is a no-op.
+   * @param {HTMLElement} root router mount element.
+   * @returns {void} */
   function renderAbout(root) {
     if (!root) return;
     var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
@@ -159,7 +160,7 @@ var AboutUI = (function () {
     DOM.append(wrap,
       DOM.pageHead(doc, t("about.hero_title", "BitShares, in your browser. Nothing to install."), "info-circle-o"),
       DOM.el(doc, "p",
-        t("about.hero_lede", "A complete wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser."),
+        t("about.hero_lede", "A wallet for the BitShares blockchain — markets, accounts, governance, and exploration — running as plain web files. No framework, no installer, no account with us. Your keys never leave this browser."),
         "muted"));
     var grid = doc.createElement("div");
     grid.className = "menu-grid";
@@ -172,21 +173,21 @@ var AboutUI = (function () {
       DOM.el(doc, "p",
         t("about.s1_body", "Accounts live in an encrypted vault on your device, and every transaction is signed locally before broadcast. The nodes you connect to never see your secrets — which is also why backups are yours alone: lose the brainkey and nobody can recover your funds.")));
     DOM.append(wrap,
-      DOM.el(doc, "h2", t("about.s2_title", "A real exchange, not a screenshot")),
+      DOM.el(doc, "h2", t("about.s2_title", "Trade on the real order book")),
       DOM.el(doc, "p",
         t("about.s2_body", "Order books, liquidity pools, swaps, borrowing, credit, prediction markets, and voting all settle on-chain. What you see is the chain itself — books you can trade against, not pictures of books.")));
     DOM.append(wrap,
-      DOM.el(doc, "h2", t("about.s3_title", "Built to outlive its builders")),
+      DOM.el(doc, "h2", t("about.s3_title", "Runs for years with no updates")),
       DOM.el(doc, "p",
-        t("about.s3_body", "The wallet it replaces died under a hundred stale packages and a toolchain nobody can reproduce. This one depends on nothing with a release cycle: no framework, no package manager, no build step. If everyone walks away for ten years, it still runs in a browser.")));
+        t("about.s3_body", "The wallet it replaces died under a hundred stale packages and a toolchain nobody can reproduce. Built to avoid release-cycle dependencies: no framework, no package manager, no build step — the smallest thing that can still run in a browser a decade from now.")));
     DOM.append(wrap,
-      DOM.el(doc, "h2", t("about.s4_title", "Familiar, but alive")),
+      DOM.el(doc, "h2", t("about.s4_title", "Same pages, live updates")),
       DOM.el(doc, "p",
-        t("about.s4_body", "Returning users feel at home instantly — the same pages, panels, and words as the classic wallet — while balances, books, and connection status update live in place. Fast forgiving search everywhere, three themes, and layouts that work from a 360px phone to a 4K trading desk.")));
+        t("about.s4_body", "Returning users feel at home instantly — the same pages, panels, and words as the classic wallet — while balances, books, and connection status update live in place. Forgiving search across markets, accounts, and assets, three themes, and layouts that work from a 360px phone to a 4K trading desk.")));
     DOM.append(wrap,
       DOM.el(doc, "h2", t("about.s5_title", "Numbers you can trust")),
       DOM.el(doc, "p",
-        t("about.s5_body", "The chain speaks integers; you never see them. Every amount sits at its asset's decimals, every percent at its true value, and every fee is previewed from the live chain before you sign — never estimated, never guessed.")));
+        t("about.s5_body", "The chain speaks integers; you never see them. Every amount sits at its asset's decimals, every percent at its true value, and every fee is read from the live chain before you sign.")));
     DOM.append(wrap,
       DOM.el(doc, "h2", t("about.s6_title", "Honest limits")),
       DOM.el(doc, "p",

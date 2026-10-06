@@ -21,11 +21,21 @@ var Router = (function () {
   /* Batch-1 i18n (slice-17 Task 2): shell chrome strings only (404, home).
    * Route titles + per-view placeholders stay hardcoded
    * English for later per-view batches. Same t() fallback shape as
-   * settings.js: I18n when loaded, verbatim default otherwise. */
-  function t(key, dflt) {
+   * settings.js: I18n when loaded, verbatim default otherwise. vars fills
+   * %(name)s placeholders (vote-ballot.js shape) so keyed templates like
+   * seo.title_account render with the name even on file://.
+   * @param {string} key dotted i18n key.
+   * @param {string} dflt verbatim English default (keeps served-source
+   *   English-identical when dict fetch fails).
+   * @param {Object} [vars] placeholder values (e.g. {name} for titles).
+   * @returns {string} localized string, never blank, never throws. */
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt, vars);
     } catch (e) { /* default below */ }
+    if (vars && typeof dflt === "string") return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+      return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+    });
     return dflt;
   }
 
@@ -286,6 +296,116 @@ var Router = (function () {
     { path: "*", title: "Page Not Found", render: render404 }
   ];
 
+  /* ROUTE_META: per-hash-surface SEO titles + descriptions (marketing-auditor
+   *   lens 5: unique title ≤60ch + description ≤155ch per routable surface).
+   *   WHY one shared document: hash routes never reload, so paintMeta swaps
+   *   the title/meta per render instead of shipping separate files (static-only
+   *   doctrine — no SSR, no plugin). WHY keyed seo.* pairs, not literals:
+   *   each entry holds the i18n key plus its verbatim English default, and
+   *   metaFor resolves via t() per render — so the served source stays
+   *   English-identical (crawler-safe) while a language switch applies on the
+   *   next navigation with no reload. The account title keeps its
+   *   {name}/30ch-cap logic: the raw name (sliced, never translated per
+   *   batch-2b) fills the %(name)s placeholder, glue stays in the default.
+   *   Descriptions are honest (live-chain wording, no counts or volumes — a
+   *   dead feed says so, never fakes it). Pure strings: no chain calls.
+   *   "/account/:name" is a template (never an exact path — metaFor
+   *   interpolates it); "/help" also covers "/help/**" depths.
+   * @type {Object<string, {titleKey: string, title: string, descKey: string, description: string}>} */
+  var ROUTE_META = {
+    "/": { titleKey: "seo.title_dashboard", title: "Dashboard — BitShares Wallet", descKey: "seo.desc_dashboard", description: "BitShares dashboard — balances, markets and chain activity at a glance. Browse freely; keys stay on your device." },
+    "/market/BTS_USD": { titleKey: "seo.title_market", title: "BTS/USD Exchange — BitShares Wallet", descKey: "seo.desc_market", description: "Trade BTS for USD on the BitShares order book — live bids, asks and history, signed locally on your device." },
+    "/pools": { titleKey: "seo.title_pools", title: "Liquidity Pools — BitShares Wallet", descKey: "seo.desc_pools", description: "Browse BitShares liquidity pools — pairs, balances and activity read live from the chain. No login needed." },
+    "/explorer": { titleKey: "seo.title_explorer", title: "Blockchain Explorer — BitShares Wallet", descKey: "seo.desc_explorer", description: "Explore BitShares blocks, transactions and assets — live chain data, browsable with no login." },
+    "/transfer": { titleKey: "seo.title_transfer", title: "Send Funds — BitShares Wallet", descKey: "seo.desc_transfer", description: "Send BitShares assets to any account. Review every field, then sign locally — keys never leave your device." },
+    "/account/:name": { titleKey: "seo.title_account", title: "Account %(name)s — BitShares Wallet", descKey: "seo.desc_account", description: "View this BitShares account — balances, orders and history read live from the chain. No login needed." },
+    "/voting": { titleKey: "seo.title_voting", title: "Vote Witnesses — BitShares Wallet", descKey: "seo.desc_voting", description: "Vote for BitShares witnesses, committee members and workers. Every ballot is signed locally on your device." },
+    "/about": { titleKey: "seo.title_about", title: "About — BitShares Wallet", descKey: "seo.desc_about", description: "About this BitShares wallet — local keys, no signup, no tracking. Browse freely and sign locally." },
+    "/help": { titleKey: "seo.title_help", title: "Help — BitShares Wallet", descKey: "seo.desc_help", description: "BitShares wallet help — guides for accounts, trading, voting and recovery. Start here when stuck." },
+    "/login": { titleKey: "seo.title_login", title: "Log In — BitShares Wallet", descKey: "seo.desc_login", description: "Unlock your local BitShares wallet — password, brainkey or imported keys. Keys never leave this device." }
+  };
+
+  /* metaFor: resolve the SEO meta for one normalized path. Params: path
+   *   (leading-slash, query-stripped — currentPath() output), params (match()
+   *   params; account_name feeds the Account title, capped at 30 chars so the
+   *   title keeps its ≤60ch budget), fallbackTitle (route.title for surfaces
+   *   outside the top-10 — returned verbatim so other routes keep prior tab
+   *   text). Returns {title, description} (description null = leave the meta
+   *   tag untouched). Resolution runs through t() per call (keyed entries in
+   *   ROUTE_META, account name as an unwrapped %(name)s var) so the active
+   *   locale applies on every navigation. Fails: never throws — bad input
+   *   yields the fallback. No chain calls.
+   * @param {string} path
+   * @param {Object} [params]
+   * @param {string} [fallbackTitle]
+   * @returns {{title: string, description: (string|null)}} */
+  function metaFor(path, params, fallbackTitle) {
+    var p = (typeof path === "string" && path) ? path : "/";
+    if (Object.prototype.hasOwnProperty.call(ROUTE_META, p)) {
+      var hit = ROUTE_META[p];
+      return { title: t(hit.titleKey, hit.title), description: t(hit.descKey, hit.description) };
+    }
+    /* Dynamic account surface: /account/<name> reuses the template with the
+     * matched (or path-derived) name, sliced to 30 chars per spec. The name
+     * stays raw (never translated — batch-2b values-unwrapped precedent) and
+     * fills the template's %(name)s placeholder. */
+    if (p === "/account" || p.indexOf("/account/") === 0) {
+      var tmpl = ROUTE_META["/account/:name"];
+      var raw = "";
+      try {
+        if (params && typeof params.account_name === "string" && params.account_name) {
+          raw = params.account_name;
+        } else {
+          raw = decodeURIComponent(p.slice("/account/".length).split("/")[0] || "");
+        }
+      } catch (e) { raw = ""; }
+      raw = String(raw || "").slice(0, 30) || "Account";
+      return { title: t(tmpl.titleKey, tmpl.title, { name: raw }), description: t(tmpl.descKey, tmpl.description) };
+    }
+    /* Help depths (/help, /help/**) share the Help surface. */
+    if (p === "/help" || p.indexOf("/help/") === 0) {
+      var help = ROUTE_META["/help"];
+      return { title: t(help.titleKey, help.title), description: t(help.descKey, help.description) };
+    }
+    return { title: (typeof fallbackTitle === "string" && fallbackTitle) ? fallbackTitle : "BitShares Wallet", description: null };
+  }
+
+  /* paintMeta: swap the document title + meta description for one surface.
+   * Params: title (string, shown on the tab), description (string|null —
+   *   null keeps the current meta content, used for non-top-10 surfaces).
+   *   Callers pass metaFor-resolved strings (already through t(), so the
+   *   active locale is baked in); paintMeta itself paints verbatim.
+   *   Returns nothing. Fails: never throws — missing DOM (node smoke tests)
+   *   is a no-op; a missing meta tag is created under <head>. file:// safe:
+   *   same-document touch only, no fetch, no baseURI math. No chain calls.
+   * @param {string} title
+   * @param {string|null} [description]
+   * @returns {void} */
+  function paintMeta(title, description) {
+    if (typeof document === "undefined") return;
+    try {
+      if (typeof title === "string" && title) document.title = title;
+      if (typeof description !== "string" || !description) return;
+      var meta = null;
+      try {
+        if (document.querySelector) meta = document.querySelector('meta[name="description"]');
+      } catch (e) { meta = null; }
+      if (meta && typeof meta.setAttribute === "function") {
+        meta.setAttribute("content", description);
+        return;
+      }
+      try {
+        var head = document.head || (document.getElementsByTagName ?
+          document.getElementsByTagName("head")[0] : null);
+        if (!head || typeof document.createElement !== "function") return;
+        var made = document.createElement("meta");
+        made.setAttribute("name", "description");
+        made.setAttribute("content", description);
+        head.appendChild(made);
+      } catch (e) { /* head keeps prior tags */ }
+    } catch (e) { /* paint stands */ }
+  }
+
   /* splitSegments: "/a/b" -> ["a","b"] (root -> []). Params: path string.
    * Returns the segment array. Fails: never (falsy path yields []). */
   function splitSegments(path) {
@@ -435,7 +555,12 @@ var Router = (function () {
       fn = render404;
       params = {};
     }
-    if (typeof document !== "undefined") document.title = title;
+    /* SEO swap (marketing-auditor lens 5): every render — top-10 surfaces get
+     * unique title+description, all others keep their route title verbatim
+     * with the meta tag untouched (metaFor fallback). Guarded inside
+     * paintMeta for node smoke tests. */
+    var meta = metaFor(path, params, title);
+    paintMeta(meta.title, meta.description);
     /* Pool-market context hygiene: the header Exchange tab follows pool
      * pages only. Leaving pools/market clears it (market routes set
      * their own context implicitly by being the desk). currentPath() yields

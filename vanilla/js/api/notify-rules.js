@@ -1,5 +1,7 @@
 /* notify-rules.js — price-alert rule store + exact trigger engine + watcher + sweep.
- * Owns: rule CRUD + persistence (notify_alerts_v1 envelope), pairKey, the
+ * Owns: rule CRUD + persistence (notify_alerts_v1 envelope), per-pair
+ *   last-fired summaries (notify_fired_v1 envelope, time + threshold + actual
+ *   recorded at fire time from data already in hand), pairKey, the
  *   decimal-exact HIGHER/LOWER compare, the pulled checkAlerts engine with
  *   fulfilled-rule self-delete, the pulled checkHistory watcher (fill-only +
  *   transfer-to-me), and the 7-day sweepStale hygiene. No view DOM, no
@@ -9,7 +11,7 @@
  *   fallback under node). Nothing fires while the page is closed: both
  *   engines are pulled by existing ticker/history reads.
  * Globals/side effects: single global NotifyRules (+ module.exports);
- *   persists notify_alerts_v1. Toast/pref writes go through Notify.
+ *   persists notify_alerts_v1 + notify_fired_v1. Toast/pref writes go through Notify.
  * Created by: building-vanilla-slices skill, slice-16 cap-breach split —
  *   rule/engine half moved behavior-identically OUT of notify.js (toast
  *   queue + prefs + browser gate + txConfirmed stay there).
@@ -28,6 +30,12 @@
 var NotifyRules = (function () {
   "use strict";
   var RULES_KEY = "notify_alerts_v1";
+  /* WHY a second key (not a field on the rules envelope): checkAlerts
+   * self-deletes fired rules and sweepStale rewrites the rules envelope, so
+   * history kept inside it would be wiped by the same write that deletes the
+   * rule. A sibling envelope with the same guarded _get/_set + versioned
+   * {v, at, ...} shape survives both, costs no new dependency or timer. */
+  var FIRED_KEY = "notify_fired_v1";
   var STALE_MS = 7 * 24 * 3600 * 1000;
   var _mem = {};
   /* Guarded storage read: localStorage, else in-memory (node/headless). */
@@ -115,6 +123,79 @@ var NotifyRules = (function () {
   /* Persist rules under the versioned envelope. */
   function _saveRules(rulesArr) {
     _set(RULES_KEY, JSON.stringify({ v: 1, at: Date.now(), rules: rulesArr }));
+  }
+  /**
+   * Load last-fired summaries keyed by QUOTE_BASE pair key.
+   * Corrupt/missing storage yields {} (never throws; history is best-effort).
+   * @returns {Object<string, {at:number, price:string, actual:string, type:string}>} Pair key to summary copies.
+   */
+  function _loadFiredMap() {
+    var raw = _get(FIRED_KEY);
+    if (!raw) return {};
+    try {
+      var env = JSON.parse(raw);
+      var src = env && env.fired && typeof env.fired === "object" ? env.fired : {};
+      var out = {}, k;
+      for (k in src) {
+        if (!Object.prototype.hasOwnProperty.call(src, k)) continue;
+        var e = src[k];
+        /* WHY strict shape here: fired lines render threshold + actual +
+         * time, so a half-written entry (crashed mid-save) must not paint. */
+        if (e && typeof e.at === "number" && isFinite(e.at) &&
+            typeof e.price === "string" && e.price &&
+            typeof e.actual === "string" && e.actual &&
+            (e.type === "1" || e.type === "2")) {
+          out[String(k).toUpperCase()] = { at: e.at, price: e.price, actual: e.actual, type: e.type };
+        }
+      }
+      return out;
+    } catch (e) { return {}; }
+  }
+  /**
+   * Persist the fired map under the versioned envelope (text only).
+   * @param {Object<string, {at:number, price:string, actual:string, type:string}>} map Pair key to summary.
+   * @returns {void}
+   */
+  function _saveFiredMap(map) {
+    _set(FIRED_KEY, JSON.stringify({ v: 1, at: Date.now(), fired: map || {} }));
+  }
+  /**
+   * Record one batch of fired rules as the pair's last-fired summary.
+   * Last entry in the batch wins (deterministic; no new reads to rank them).
+   * @param {string} wantPairKey Uppercase QUOTE_BASE pair key.
+   * @param {Array<{rule:{price:string, type:string}, actual:string}>} firedArr Fired entries from data already in hand.
+   * @param {number} nowMs Wall-clock ms captured once per checkAlerts call.
+   * @returns {void}
+   */
+  function _recordFired(wantPairKey, firedArr, nowMs) {
+    var map = _loadFiredMap(), i;
+    for (i = 0; i < firedArr.length; i++) {
+      /* WHY the two guards (not || {}): tsc checkJs types {} as lacking
+       * rule/actual, so defaulting would fail the type gate; explicit
+       * falsy skips keep the seam typed and the runtime identical. */
+      var f = firedArr[i];
+      if (!f) continue;
+      var r = f.rule;
+      if (!r) continue;
+      if (typeof r.price !== "string" || !r.price) continue;
+      if (typeof f.actual !== "string" || !f.actual) continue;
+      if (r.type !== "1" && r.type !== "2") continue;
+      map[wantPairKey] = { at: nowMs, price: r.price, actual: f.actual, type: r.type };
+    }
+    _saveFiredMap(map);
+  }
+  /**
+   * Last-fired summary for a pair, or null when nothing fired yet.
+   * @param {string} quote Quote symbol.
+   * @param {string} base Base symbol.
+   * @returns {{at:number, price:string, actual:string, type:string}|null} Copy of the summary, never a live reference.
+   */
+  function lastFired(quote, base) {
+    var k = pairKey(quote, base);
+    var map = _loadFiredMap();
+    var e = map[k];
+    if (!e) return null;
+    return { at: e.at, price: e.price, actual: e.actual, type: e.type };
   }
   /* rules: all stored rules as copies (incl. unresolvedSince badge data). */
   function rules() {
@@ -211,7 +292,15 @@ var NotifyRules = (function () {
         price: r.price }, actual: actual });
       return false;
     });
-    if (fired.length > 0) _saveRules(kept);
+    /* WHY persist here (not in the view, not on a timer): this is the only
+     * instant the threshold + actual coexist — the rule self-deletes below,
+     * so waiting would lose the threshold. One wall-clock stamp per batch,
+     * text-only write, guarded so storage failure never changes the
+     * fire/delete outcome. No polling, no new timers. */
+    if (fired.length > 0) {
+      try { _recordFired(want, fired, Date.now()); } catch (e) { /* history best-effort */ }
+      _saveRules(kept);
+    }
     return { fired: fired, kept: mine.length - fired.length };
   }
   /* Classify one account-history op tuple [code-or-name, body]: fill_order is
@@ -290,7 +379,8 @@ var NotifyRules = (function () {
     STALE_MS: STALE_MS,
     pairKey: pairKey, rules: rules, rulesFor: rulesFor,
     hasAny: hasAny, addRule: addRule, removeRule: removeRule, compare: compare,
-    checkAlerts: checkAlerts, checkHistory: checkHistory, sweepStale: sweepStale
+    checkAlerts: checkAlerts, checkHistory: checkHistory, sweepStale: sweepStale,
+    lastFired: lastFired
   };
 })();
 /* Expose the single NotifyRules global to Node for headless smoke tests (no-op in browsers). */

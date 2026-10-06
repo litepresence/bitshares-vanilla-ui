@@ -95,6 +95,35 @@ var NotifyUI = (function () {
     return out;
   }
 
+  /**
+   * Format a wall-clock ms stamp as raw display glue (local time, no keys).
+   * Never throws; empty string when the stamp is unusable.
+   * WHY local + raw: the stored at-ms is a value, not a translatable string
+   * (i18n-batch dynamic-concat rule), and no new t() key may be minted for it.
+   * @param {number} ms Wall-clock milliseconds.
+   * @returns {string} Raw time text (may be "").
+   */
+  function fmtTime(ms) {
+    try {
+      if (typeof ms !== "number" || !isFinite(ms)) return "";
+      var d = new Date(ms);
+      if (isNaN(d.getTime())) return "";
+      /* WHY toLocaleString (not ISO): a fired-at stamp reads in the user's
+       * own clock; the string stays raw glue, never wrapped in t(). */
+      return d.toLocaleString();
+    } catch (e) { return ""; }
+  }
+  /**
+   * Format "now" for a latest-price fill (fetch instant, not chain time).
+   * WHY fetch instant: get_ticker carries no timestamp, so the only honest
+   * time without a new call is when this read landed. Never throws.
+   * @returns {string} Raw time text (may be "").
+   */
+  function fmtNow() {
+    try { return new Date().toLocaleTimeString(); }
+    catch (e) { return ""; }
+  }
+
   /* Direction WORDS (locale-en exchange.price_alert block, English-first). */
   function dirWord(type) { return type === "1" ? t("notify.higher", "Higher Than") : t("notify.lower", "Lower Than"); }
 
@@ -152,6 +181,24 @@ var NotifyUI = (function () {
       groups(rs).forEach(function (g) {
         listBox.appendChild(DOM.el(doc, "h2",
           g.quote + "/" + g.base + " (" + String(g.rows.length) + ")"));
+        /* WHY this line: a fired rule self-deletes, so without history the
+         * payoff vanishes. Past summary only — muted, read-only, no Delete,
+         * no aria-live (the form error stays the single polite announcer).
+         * WHY these words: no new t() key may be minted, so past-ness comes
+         * from existing keyed words (bell label + direction + latest) plus
+         * raw threshold/actual/time glue — never presented as a live rule. */
+        try {
+          var past = (RL && typeof RL.lastFired === "function")
+            ? RL.lastFired(g.quote, g.base) : null;
+          if (past && past.price && past.actual) {
+            var when = fmtTime(past.at);
+            listBox.appendChild(DOM.el(doc, "p",
+              t("notify.bell", "Price Alert") + " · " +
+              dirWord(past.type) + " " + String(past.price) + " · " +
+              t("notify.latest_prefix", "latest ") + String(past.actual) +
+              (when ? " · " + when : ""), "muted"));
+          }
+        } catch (e) { /* history best-effort; live rules still paint */ }
         g.rows.forEach(function (r) {
           var row = doc.createElement("div");
           row.className = "alert-row";
@@ -173,7 +220,17 @@ var NotifyUI = (function () {
           listBox.appendChild(row);
           pairMeta(g.quote, g.base).then(function (m) {
             if (!live() || !host.live(uiGen)) return;
-            if (m.latest) latest.textContent = t("notify.latest_prefix", "latest ") + m.latest;
+            /* WHY the time suffix: get_ticker carries no timestamp, so the
+             * honest time without a new call is the fetch instant, refreshed
+             * via this existing pairMeta path (connection-open redraw calls
+             * drawList again — no polling, no new timers). No per-row
+             * aria-live: rows stay silent, the form error is the one polite
+             * announcer. Values + punctuation stay raw, never wrapped. */
+            if (m.latest) {
+              var tick = fmtNow();
+              latest.textContent = t("notify.latest_prefix", "latest ") + m.latest +
+                (tick ? " · " + tick : "");
+            }
           });
         });
       });

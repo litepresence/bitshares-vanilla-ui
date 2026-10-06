@@ -287,6 +287,12 @@ var retry = touchable(el(doc, "button", t("vote.retry", "Retry"))); retry.type =
     st.supply = supplyRaw || "";
 
     wrap.appendChild(DOM.pageHead(doc, t("vote.title", "Voting"), "voting"));
+    /* Ballot intro (keyed vote.ballot_intro): one honest framing line — stake
+     * elects witnesses/committee and funds workers (glossary terms), and the
+     * counts/shares below are labeled live chain reads, never estimates.
+     * Static text, no chain data; sits directly under the h1 so screen
+     * readers meet context before the account strip. */
+    wrap.appendChild(el(doc, "p", t("vote.ballot_intro", "Your stake elects witnesses and committee and funds workers — all counts and shares below are live chain reads."), "muted"));
     var meLine = el(doc, "p", null, "muted");
     meLine.textContent = t("vote.voting_as", "Voting as: ") + me.name + " (" + me.id + ")";
     wrap.appendChild(meLine);
