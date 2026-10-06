@@ -819,7 +819,7 @@ var PoolUI = (function () {
         listBox.appendChild(pagerBar(pageRows, hasNext));
       }).catch(function (e) {
         if (myGen !== gen) return; DOM.clear(listBox); showError(doc, listBox,e,t("pool.load_failed", "Could not load pools."));
-      }).then(function () { go.disabled = false; });
+      }).then(function () { go.disabled = false; netRedraw(); });
     }
     function resetAndLoad() {
       if (myGen !== gen) return;
@@ -887,6 +887,20 @@ var PoolUI = (function () {
       } catch (eSel) { /* last values stand */ }
       return { a: a, b: b, s: s, aId: lastResolved.aId, bId: lastResolved.bId };
     };
+    /* Pool-net canvas (Task 6): paint PoolNetUI into the band when the script
+     * loaded; absent leaves the loading note standing. Redraws after every
+     * table page so star/union follows the resolved inputs; destroy rides
+     * dropSubs so route-leave stops the rAF loop and observer. */
+    var netHandle = null;
+    try {
+      if (typeof PoolNetUI !== "undefined" && PoolNetUI && typeof PoolNetUI.mount === "function") {
+        netHandle = PoolNetUI.mount(doc, netBody, getSelection);
+        openSubs.push(function () { try { if (netHandle) netHandle.destroy(); } catch (eNet) { /* down */ } });
+      }
+    } catch (eNetMount) { netHandle = null; }
+    function netRedraw() {
+      try { if (netHandle && netHandle.redraw) netHandle.redraw(); } catch (e) { /* view stands */ }
+    }
     /* Public list loads locked or not. Mine resolves the wallet account when
      * unlocked, else defaults to committee-account 1.2.0 with an honest
      * notice — both are public get_liquidity_pools_by_owner reads, never throws. */
