@@ -130,7 +130,7 @@ var PoolNet = (function () {
   */
   function mergeLive(g, liveRows) {
     var seen = {}, byPool = {}, nodes = {};
-    var edges = (g && g.edges ? g.edges : []).slice();
+    var edges = (g && g.edges ? g.edges : []).map(function (e) { return { poolId: e.poolId, a: e.a, b: e.b, share: e.share }; });
     (g && g.nodes ? g.nodes : []).forEach(function (n) { nodes[n.assetId] = n; });
     edges.forEach(function (e) { seen[e.poolId] = 1; byPool[e.poolId] = e; });
     (liveRows || []).forEach(function (r) {
