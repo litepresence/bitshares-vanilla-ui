@@ -43,7 +43,51 @@ var FeedHistory = (function () {
     var tail = s.slice(-8).replace(/0+$/, "");
     return tail ? head + "." + tail : head;
   }
-  function bucketAll() { return { times: [], series: [] }; }
+  function bucketAll(feedPtsByProducer, exPts, poolPtsList, opts) {
+    opts = opts || {};
+    var start = opts.start || 0, stop = opts.stop || 0, step = opts.bucketSec || 3600;
+    var minFeeds = (opts.minFeeds === undefined || opts.minFeeds === null) ? 1 : opts.minFeeds;
+    var lifetime = (opts.lifetimeSec === undefined || opts.lifetimeSec === null) ? 86400 : opts.lifetimeSec;
+    if (!(stop > start) || !(step > 0)) return { times: [], series: [] };
+    var times = [], t;
+    for (t = start; t <= stop; t += step) times.push(t);
+    var pubs = Object.keys(feedPtsByProducer || {});
+    function lastKnown(pts, bt) {
+      var best = null, i;
+      for (i = 0; i < (pts || []).length; i++) {
+        if (pts[i].t <= bt) best = pts[i];
+        else break;
+      }
+      return best;
+    }
+    var series = [], prodVals = {}, b, i;
+    pubs.forEach(function (p) { prodVals[p] = []; });
+    var medVals = [];
+    for (b = 0; b < times.length; b++) {
+      var bt = times[b], actives = [];
+      for (i = 0; i < pubs.length; i++) {
+        var lk = lastKnown((feedPtsByProducer || {})[pubs[i]], bt);
+        if (lk && (bt - lk.t) <= lifetime) { prodVals[pubs[i]].push(lk.priceHuman); actives.push(lk.priceHuman); }
+        else prodVals[pubs[i]].push(null);
+      }
+      medVals.push(actives.length >= minFeeds ? medianOf(actives) : null);
+    }
+    pubs.forEach(function (p) { series.push({ name: p, values: prodVals[p] }); });
+    series.push({ name: "MEDIAN", values: medVals });
+    function resample(pts) {
+      var vals = [], k;
+      for (k = 0; k < times.length; k++) {
+        var lk2 = lastKnown(pts || [], times[k]);
+        vals.push(lk2 ? lk2.priceHuman : null);
+      }
+      return vals;
+    }
+    series.push({ name: "EXCHANGE", values: resample(exPts || []) });
+    (poolPtsList || []).forEach(function (pl) {
+      series.push({ name: "POOL " + pl.poolId, values: resample(pl.points || []) });
+    });
+    return { times: times, series: series };
+  }
   var WITNESS_FED = 128, COMMITTEE_FED = 256;
   function badgeFor(acct, flags) {
     if (acct && acct.witnessHit) return "witness";
@@ -104,9 +148,55 @@ var FeedHistory = (function () {
     out.forEach(function (p) { if (!seen[p.t]) { seen[p.t] = 1; ded.push(p); } });
     return ded;
   }
+  function fillToBackingPerMpa(fill, flipped) {
+    var p = (fill && fill.priceHuman !== undefined) ? String(fill.priceHuman) : String((fill && fill.base) || "");
+    if (fill && fill.priceHuman !== undefined) return normToBackingPerMpa(p, !!flipped);
+    return normToBackingPerMpa(p, !!flipped);
+  }
+  async function exchangePoints(mpaId, backingId) {
+    try {
+      var rows = null;
+      if (typeof MarketFills !== "undefined" && MarketFills && typeof MarketFills.chainFills === "function") {
+        rows = await MarketFills.chainFills(backingId, mpaId, 200);
+      } else if (typeof Market !== "undefined" && Market && typeof Market.trades === "function") {
+        rows = await Market.trades(backingId, mpaId, 200);
+      }
+      rows = rows || [];
+      return rows.map(function (r) {
+        var ts = r.t || r.time || 0;
+        var px = r.priceHuman || r.price || null;
+        if (!(ts > 0) || !px) return null;
+        return { t: ts, priceHuman: normToBackingPerMpa(String(px), false) };
+      }).filter(function (x) { return !!x; }).sort(function (a, b) { return a.t - b.t; });
+    } catch (e) { return []; }
+  }
+  async function poolLines(mpaId, backingId, cap) {
+    var n = (cap === undefined || cap === null) ? 3 : cap;
+    try {
+      if (typeof Pool === "undefined" || !Pool.list) return [];
+      var pools = await Pool.list({ assetA: mpaId, assetB: backingId });
+      pools = (pools || []).slice(0, n);
+      var out = [];
+      for (var i = 0; i < pools.length; i++) {
+        var pid = pools[i].id, swaps = [];
+        try {
+          if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.swapsForPool === "function") {
+            swaps = await PoolHistory.swapsForPool(pid, 200, {});
+          }
+        } catch (e) { swaps = []; }
+        var pts = (swaps || []).map(function (s) {
+          if (!(s.t > 0) || !s.priceHuman) return null;
+          return { t: s.t, priceHuman: normToBackingPerMpa(String(s.priceHuman), false) };
+        }).filter(function (x) { return !!x; });
+        out.push({ poolId: pid, points: pts });
+      }
+      return out;
+    } catch (e) { return []; }
+  }
   return { medianOf: medianOf, normToBackingPerMpa: normToBackingPerMpa, bucketAll: bucketAll,
     badgeFor: badgeFor, producersFor: producersFor, WITNESS_FED: WITNESS_FED, COMMITTEE_FED: COMMITTEE_FED,
-    isFeedOp: isFeedOp, publisherPoints: publisherPoints };
+    isFeedOp: isFeedOp, publisherPoints: publisherPoints,
+    fillToBackingPerMpa: fillToBackingPerMpa, exchangePoints: exchangePoints, poolLines: poolLines };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.FeedHistory === "undefined") { globalThis.FeedHistory = FeedHistory; }
 if (typeof module !== "undefined") { module.exports = FeedHistory; }

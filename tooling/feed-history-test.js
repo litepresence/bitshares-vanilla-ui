@@ -15,5 +15,7 @@ eq(FeedHistory.badgeFor({}, { witnessFed: false }), "producer", "default produce
 eq(FeedHistory.isFeedOp({ op: [19, { asset_id: "1.3.5" }] }, "1.3.5"), true, "op19 match");
 eq(FeedHistory.isFeedOp({ op: [19, { asset_id: "1.3.5" }] }, "1.3.9"), false, "op19 asset mismatch");
 eq(FeedHistory.isFeedOp({ op: [0, {}] }, "1.3.5"), false, "non-19 rejected");
+eq(FeedHistory.fillToBackingPerMpa({ base: "2", quote: "1" }, false), "2", "fill straight");
+eq(FeedHistory.fillToBackingPerMpa({ base: "2", quote: "1" }, true), "0.5", "fill flipped");
 if (fail) { console.log(pass + " pass " + fail + " fail"); process.exit(1); }
 console.log("all pass");
