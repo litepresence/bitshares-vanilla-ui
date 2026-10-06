@@ -12,5 +12,8 @@ eq(FeedHistory.medianOf([]), null, "median empty -> null");
 eq(FeedHistory.normToBackingPerMpa("2", true), "0.5", "flipped inverts");
 eq(FeedHistory.badgeFor({ witnessHit: true }, { witnessFed: true }), "witness", "witness badge");
 eq(FeedHistory.badgeFor({}, { witnessFed: false }), "producer", "default producer");
+eq(FeedHistory.isFeedOp({ op: [19, { asset_id: "1.3.5" }] }, "1.3.5"), true, "op19 match");
+eq(FeedHistory.isFeedOp({ op: [19, { asset_id: "1.3.5" }] }, "1.3.9"), false, "op19 asset mismatch");
+eq(FeedHistory.isFeedOp({ op: [0, {}] }, "1.3.5"), false, "non-19 rejected");
 if (fail) { console.log(pass + " pass " + fail + " fail"); process.exit(1); }
 console.log("all pass");

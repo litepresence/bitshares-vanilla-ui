@@ -69,8 +69,44 @@ var FeedHistory = (function () {
     });
     return { asset: info, bitasset: bit, flags: flags, witnessFed: witnessFed, committeeFed: committeeFed, live: live, authorized: live.map(function (l) { return { id: l.publisher, name: "", kind: "producer" }; }) };
   }
+  function isFeedOp(entry, assetId) {
+    var o = null;
+    if (entry && Array.isArray(entry.op)) o = entry.op;
+    else if (entry && entry.op && Array.isArray(entry.op)) o = entry.op;
+    if (!o || o[0] !== 19) return false;
+    var d = o[1] || {};
+    return d.asset_id === assetId;
+  }
+  async function publisherPoints(publisherId, assetId, opts) {
+    opts = opts || {};
+    var mpaPrec = opts.mpaPrec, backingPrec = opts.backingPrec;
+    var walk = await Account.historyPaged(publisherId, 100, 5);
+    var rows = walk.rows || [];
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var e = rows[i];
+      if (e && Array.isArray(e) && e[1]) e = e[1];
+      if (!isFeedOp(e, assetId)) continue;
+      var op = e.op[1], feed = op.feed || {};
+      var sp = feed.settlement_price || {};
+      if (!sp.base || !sp.quote) continue;
+      var t = e.block_time || e.timestamp || null;
+      var human = null;
+      try { human = Format.formatPrice(String(sp.base.amount), mpaPrec, String(sp.quote.amount), backingPrec, 8); }
+      catch (err) { continue; }
+      var ts = 0;
+      try { ts = Math.floor(new Date(String(t).replace(" ", "T") + "Z").getTime() / 1000); } catch (err2) { continue; }
+      if (!(ts > 0)) continue;
+      out.push({ t: ts, priceHuman: human });
+    }
+    out.sort(function (a, b) { return a.t - b.t; });
+    var seen = {}, ded = [];
+    out.forEach(function (p) { if (!seen[p.t]) { seen[p.t] = 1; ded.push(p); } });
+    return ded;
+  }
   return { medianOf: medianOf, normToBackingPerMpa: normToBackingPerMpa, bucketAll: bucketAll,
-    badgeFor: badgeFor, producersFor: producersFor, WITNESS_FED: WITNESS_FED, COMMITTEE_FED: COMMITTEE_FED };
+    badgeFor: badgeFor, producersFor: producersFor, WITNESS_FED: WITNESS_FED, COMMITTEE_FED: COMMITTEE_FED,
+    isFeedOp: isFeedOp, publisherPoints: publisherPoints };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.FeedHistory === "undefined") { globalThis.FeedHistory = FeedHistory; }
 if (typeof module !== "undefined") { module.exports = FeedHistory; }
