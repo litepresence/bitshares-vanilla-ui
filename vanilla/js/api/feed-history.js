@@ -138,8 +138,7 @@ var FeedHistory = (function () {
       var human = null;
       try { human = Format.formatPrice(String(sp.base.amount), mpaPrec, String(sp.quote.amount), backingPrec, 8); }
       catch (err) { continue; }
-      var ts = 0;
-      try { ts = Math.floor(new Date(String(t).replace(" ", "T") + "Z").getTime() / 1000); } catch (err2) { continue; }
+      var ts = _toUnix(t);
       if (!(ts > 0)) continue;
       out.push({ t: ts, priceHuman: human });
     }
@@ -153,41 +152,93 @@ var FeedHistory = (function () {
     if (fill && fill.priceHuman !== undefined) return normToBackingPerMpa(p, !!flipped);
     return normToBackingPerMpa(p, !!flipped);
   }
+  /* ISO/block-time -> unix seconds (pure). Numeric strings pass through
+   * (ms detected by magnitude); zone-less ISO is UTC (chain times are UTC —
+   * a trailing Z is added only when no zone designator is present, so a
+   * double-Z can never form). Unparseable -> 0 (caller drops it, never plots). */
+  function _toUnix(t) {
+    if (t === null || t === undefined) return 0;
+    var s = String(t).trim();
+    if (/^\d+$/.test(s)) {
+      var n = parseInt(s, 10);
+      return n > 100000000000 ? Math.floor(n / 1000) : n;
+    }
+    if (s.indexOf("T") === -1) s = s.replace(" ", "T");
+    if (!(/[zZ]|([+-]\d{2}:?\d{2})$/.test(s))) s += "Z";
+    var ms = Date.parse(s);
+    return isFinite(ms) ? Math.floor(ms / 1000) : 0;
+  }
+  /* Pair precisions for the overlay price helpers (callers pass them in opts
+   * when known; otherwise one get_assets read, 5/5 honest fallback). */
+  async function _precisions(mpaId, backingId, opts) {
+    opts = opts || {};
+    if (Number.isInteger(opts.mpaPrec) && Number.isInteger(opts.backingPrec)) {
+      return { mpaPrec: opts.mpaPrec, backingPrec: opts.backingPrec };
+    }
+    var mp = 5, bp = 5;
+    try {
+      var db = await Chain.db();
+      var metas = await Chain.call(db, "get_assets", [[mpaId, backingId]]);
+      (metas || []).forEach(function (a) {
+        if (a && a.id === mpaId && Number.isInteger(a.precision)) mp = a.precision;
+        if (a && a.id === backingId && Number.isInteger(a.precision)) bp = a.precision;
+      });
+    } catch (e) { /* 5s stand */ }
+    return { mpaPrec: mp, backingPrec: bp };
+  }
+  /* Exchange overlay: DEX fills for backing/mpa as backing-per-MPA points
+   * (chain-first, oldest-last). Primary: Market.trades (own envelope is
+   * already base-per-quote with exact 8-place strings); fallback: chainFills
+   * rows via the exported MarketFills.priceHuman. Fail-closed to [] (the feed
+   * lines stand alone with a muted note — never a blank chart). */
   async function exchangePoints(mpaId, backingId) {
     try {
-      var rows = null;
-      if (typeof MarketFills !== "undefined" && MarketFills && typeof MarketFills.chainFills === "function") {
-        rows = await MarketFills.chainFills(backingId, mpaId, 200);
-      } else if (typeof Market !== "undefined" && Market && typeof Market.trades === "function") {
-        rows = await Market.trades(backingId, mpaId, 200);
+      if (typeof Market !== "undefined" && Market && typeof Market.trades === "function") {
+        var rows = await Market.trades(backingId, mpaId, 100);
+        return (rows || []).map(function (r) {
+          var ts = _toUnix(r.time);
+          if (!(ts > 0) || !r.priceExact) return null;
+          return { t: ts, priceHuman: String(r.priceExact) };
+        }).filter(function (x) { return !!x; }).sort(function (a, b) { return a.t - b.t; });
       }
-      rows = rows || [];
-      return rows.map(function (r) {
-        var ts = r.t || r.time || 0;
-        var px = r.priceHuman || r.price || null;
+      if (typeof MarketFills === "undefined" || !MarketFills.chainFills) return [];
+      var pr = await _precisions(mpaId, backingId, {});
+      var res = await MarketFills.chainFills(backingId, mpaId, 100);
+      var fills = (res && res.fills) || [];
+      return fills.map(function (f) {
+        var px = MarketFills.priceHuman(f, backingId, pr.backingPrec, pr.mpaPrec, mpaId, 8);
+        var ts = _toUnix(f.time);
         if (!(ts > 0) || !px) return null;
-        return { t: ts, priceHuman: normToBackingPerMpa(String(px), false) };
+        return { t: ts, priceHuman: px };
       }).filter(function (x) { return !!x; }).sort(function (a, b) { return a.t - b.t; });
     } catch (e) { return []; }
   }
-  async function poolLines(mpaId, backingId, cap) {
+  /* Pool overlays: pools holding mpa+backing (capped), each as backing-per-MPA
+   * points via the exported PoolHistory.priceHuman (B-leg per A-leg with
+   * A=mpa, B=backing). swapsForPool envelope is {swaps, source} (chain
+   * fallback authoritative). Fail-closed per pool (one dead pool never
+   * blocks the others). */
+  async function poolLines(mpaId, backingId, cap, opts) {
     var n = (cap === undefined || cap === null) ? 3 : cap;
     try {
       if (typeof Pool === "undefined" || !Pool.list) return [];
+      if (typeof PoolHistory === "undefined" || !PoolHistory.swapsForPool) return [];
       var pools = await Pool.list({ assetA: mpaId, assetB: backingId });
       pools = (pools || []).slice(0, n);
+      var pr = await _precisions(mpaId, backingId, opts);
       var out = [];
       for (var i = 0; i < pools.length; i++) {
         var pid = pools[i].id, swaps = [];
         try {
-          if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.swapsForPool === "function") {
-            swaps = await PoolHistory.swapsForPool(pid, 200, {});
-          }
+          var res = await PoolHistory.swapsForPool(pid, 100, { legA: mpaId, legB: backingId });
+          swaps = (res && res.swaps) || [];
         } catch (e) { swaps = []; }
-        var pts = (swaps || []).map(function (s) {
-          if (!(s.t > 0) || !s.priceHuman) return null;
-          return { t: s.t, priceHuman: normToBackingPerMpa(String(s.priceHuman), false) };
-        }).filter(function (x) { return !!x; });
+        var pts = swaps.map(function (sw) {
+          var px = PoolHistory.priceHuman(sw, pr.mpaPrec, pr.backingPrec, mpaId, backingId, 8);
+          var ts = _toUnix(sw.time);
+          if (!(ts > 0) || !px) return null;
+          return { t: ts, priceHuman: px };
+        }).filter(function (x) { return !!x; }).sort(function (a, b) { return a.t - b.t; });
         out.push({ poolId: pid, points: pts });
       }
       return out;
