@@ -39,6 +39,24 @@ var PoolUI = (function () {
   }
   var gen = 0;
   var openSubs = [];
+  /* Pool-net selection bridge (Task 5 installs, Task 6 consumes): renderPools
+   * installs a live closure getter each render; the exported getSelection
+   * delegates to the latest installed getter, defaulting to BTS/empty when
+   * never rendered (headless calls, pre-route). Raw strings until Format
+   * renders; ids refresh on every loaded page. */
+  var selectionGetter = null;
+  /** Current pool filter selection for the pool-net canvas.
+   * WHY here: Task 6 mounts PoolNetUI with a getSelection callback; the
+   * inputs live in the renderPools closure, so this delegates to the
+   * installed getter. Order-free: a/b is an unordered pair downstream.
+   * @returns {{a:string,b:string,s:string,aId:(string|null),bId:(string|null)}}
+   *   trimmed raw inputs + last resolved asset ids (null unresolved). */
+  function getSelection() {
+    try {
+      if (typeof selectionGetter === "function") return selectionGetter();
+    } catch (e) { /* default below */ }
+    return { a: "BTS", b: "", s: "", aId: null, bId: null };
+  }
   /* Page-sort (honest scope): the chain offers no sorted pool endpoint, so
    * sortable headers reorder the LOADED page only, never the chain. */
   var sortKey = "id", sortDir = 1;
@@ -626,6 +644,9 @@ var PoolUI = (function () {
     ctx.wrap.className = "wrap wide";
     ctx.wrap.appendChild(DOM.el(doc, "p", t("pool.list_sub", "CPMM pools (x*y=k). Stake is a deposit of both legs for LP shares."), "muted"));
     var pager = { page: 0, size: 10, starts: ["1.19.0"] };
+    /* Last resolved leg ids for getSelection (Task 6 filterGraph {aId,bId});
+     * refreshed on every loaded page, null when unresolved/cleared. */
+    var lastResolved = { aId: null, bId: null };
     var POOL_ID_RE = /^1\.19\.\d+$/;
     /* Query seed (back-button-safe deep link, market-desk-query precedent):
      * filters + size + page + page startId restore from Router.query();
@@ -657,9 +678,54 @@ var PoolUI = (function () {
         history.replaceState(null, "", base + "#/pools" + (parts.length ? "?" + parts.join("&") : ""));
       } catch (e) { /* URL stays unshared — list still works */ }
     }
+    /* Pool-net band (Task 5 mount; Task 6 paints its canvas into netBody):
+     * collapsible section above the filters. Open state persists in
+     * localStorage "poolNetOpen" ("0" closed, anything else open; default
+     * open; storage failure keeps the in-memory default). Shared DOM helpers
+     * only — no local el(). */
+    var netOpen = true;
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetOpen") === "0") netOpen = false;
+    } catch (e) { /* default open stands */ }
+    var band = DOM.el(doc, "section", null, "pool-net-band");
+    try { band.setAttribute("id", "pool-net-band"); } catch (eBand) { band.id = "pool-net-band"; }
+    var bandHead = DOM.el(doc, "div", null, "pool-net-head");
+    bandHead.appendChild(DOM.el(doc, "h2", t("pool_net.title", "Pool network")));
+    var netToggle = DOM.el(doc, "button", netOpen ? t("pool_net.collapse", "Collapse") : t("pool_net.expand", "Expand"));
+    netToggle.type = "button";
+    netToggle.className = "subtle-btn";
+    try {
+      netToggle.setAttribute("aria-expanded", netOpen ? "true" : "false");
+      netToggle.setAttribute("aria-controls", "pool-net-body");
+    } catch (eAria) { /* label stands */ }
+    touchable(netToggle);
+    bandHead.appendChild(netToggle);
+    band.appendChild(bandHead);
+    var netBody = DOM.el(doc, "div", null, "pool-net-body");
+    try { netBody.setAttribute("id", "pool-net-body"); } catch (eBody) { netBody.id = "pool-net-body"; }
+    netBody.appendChild(DOM.el(doc, "p", t("pool_net.loading", "Loading network…"), "muted"));
+    if (!netOpen) { try { netBody.style.display = "none"; } catch (eHide) { /* visible fallback */ } }
+    band.appendChild(netBody);
+    netToggle.addEventListener("click", function () {
+      netOpen = !netOpen;
+      try {
+        netBody.style.display = netOpen ? "" : "none";
+        netToggle.textContent = netOpen ? t("pool_net.collapse", "Collapse") : t("pool_net.expand", "Expand");
+        netToggle.setAttribute("aria-expanded", netOpen ? "true" : "false");
+      } catch (eTog) { /* visual state stands */ }
+      try {
+        if (typeof localStorage !== "undefined") localStorage.setItem("poolNetOpen", netOpen ? "1" : "0");
+      } catch (eSave) { /* memory-only session */ }
+    });
+    ctx.wrap.appendChild(band);
     var filters = DOM.el(doc, "div", null, "pools-filters");
-    var fA = Forms.labeledInput(doc, t("pool.asset_a_field", "Asset A") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
-    var fB = Forms.labeledInput(doc, t("pool.asset_b_field", "Asset B") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
+    /* Order-free labels (Task 5): either input matches either leg (Task 4
+     * searches by_one / both-orders), so positional "Asset A/B" would lie
+     * here — "Asset 1/2 (any leg)" tells the truth. The create form below
+     * keeps pool.asset_a/b_field ("Asset A/B": op-59 orientation IS
+     * positional there). Query keys stay ?a=/?b=. */
+    var fA = Forms.labeledInput(doc, t("pool.asset_1_field", "Asset 1 (any leg)") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
+    var fB = Forms.labeledInput(doc, t("pool.asset_2_field", "Asset 2 (any leg)") + " ", { placeholder: t("common.symbol_or_id_hint", "symbol or 1.3.x") });
     var fS = Forms.labeledInput(doc, t("pool.share_asset_field", "Share asset") + " ", { placeholder: t("pool.share_or_pool_hint", "symbol, 1.3.x, or pool 1.19.x") });
     [fA, fB, fS].forEach(function (f) { filters.appendChild(f.row); });
     var sizeLab = DOM.el(doc, "label", t("pool.per_page", "Per page "));
@@ -676,7 +742,11 @@ var PoolUI = (function () {
     sizeWrap.appendChild(sizeLab);
     filters.appendChild(sizeWrap);
     var go = touchable(DOM.el(doc, "button", t("pool.list_btn", "List pools"))); go.type = "button";
+    /* Clearable (Task 5): one tap empties all three legs (incl. the BTS
+     * default) and reloads unfiltered — empty omits ?a=/?b= in writeQuery. */
+    var clearBtn = touchable(DOM.el(doc, "button", t("pool.clear_btn", "Clear"))); clearBtn.type = "button"; clearBtn.className = "subtle-btn";
     filters.appendChild(go);
+    filters.appendChild(clearBtn);
     ctx.wrap.appendChild(filters);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
     var mineBox = DOM.el(doc, "div");
@@ -724,6 +794,8 @@ var PoolUI = (function () {
         var rawS = String(fS.input.value || "").trim();
         if (POOL_ID_RE.test(rawS)) return { direct: true, rows: [await Pool.get(rawS)] };
         var a = await resolveOpt(fA.input.value), b = await resolveOpt(fB.input.value), s = await resolveOpt(fS.input.value);
+        lastResolved.aId = a ? a.id : null;
+        lastResolved.bId = b ? b.id : null;
         var rows = await Pool.list({ assetA: a ? a.id : null, assetB: b ? b.id : null,
           share: s ? s.id : null, limit: pager.size + 2, startId: pager.starts[pager.page] });
         return { direct: false, rows: rows || [] };
@@ -756,6 +828,13 @@ var PoolUI = (function () {
       loadPage();
     }
     go.addEventListener("click", resetAndLoad);
+    clearBtn.addEventListener("click", function () {
+      if (myGen !== gen) return;
+      fA.input.value = "";
+      fB.input.value = "";
+      fS.input.value = "";
+      resetAndLoad();
+    });
     /* Enter in any filter field runs the search (plain div, no form —
      * implicit submission does not exist here). */
     [fA, fB, fS].forEach(function (f) {
@@ -776,9 +855,14 @@ var PoolUI = (function () {
      * fall back to defaults — never throw, never blank. */
     (function restoreQuery() {
       var q = readQuery();
-      if (q.a) fA.input.value = String(q.a).slice(0, 64);
-      if (q.b) fB.input.value = String(q.b).slice(0, 64);
-      if (q.s) fS.input.value = String(q.s).slice(0, 64);
+      /* BTS default (Task 5): Asset 1 starts at BTS when ?a= is absent; an
+       * explicit ?a= (even empty — the Clear path) wins so Back/clear
+       * round-trips stay honest. Clearable: empty inputs omit ?a=/?b= in
+       * writeQuery and resolve to null (unfiltered) in loadPage. */
+      if (Object.prototype.hasOwnProperty.call(q, "a")) fA.input.value = String(q.a || "").slice(0, 64);
+      else fA.input.value = "BTS";
+      if (Object.prototype.hasOwnProperty.call(q, "b")) fB.input.value = String(q.b || "").slice(0, 64);
+      if (Object.prototype.hasOwnProperty.call(q, "s")) fS.input.value = String(q.s || "").slice(0, 64);
       var n = parseInt(q.size, 10);
       if (n === 25 || n === 50) {
         pager.size = n;
@@ -792,6 +876,17 @@ var PoolUI = (function () {
         pager.starts[p] = String(q.start);
       }
     })();
+    /* Selection bridge install (Task 5 -> Task 6): live raw inputs + last
+     * resolved ids. Task 6 calls PoolUI.getSelection() on filter changes. */
+    selectionGetter = function () {
+      var a = "", b = "", s = "";
+      try {
+        if (fA && fA.input) a = String(fA.input.value || "").trim();
+        if (fB && fB.input) b = String(fB.input.value || "").trim();
+        if (fS && fS.input) s = String(fS.input.value || "").trim();
+      } catch (eSel) { /* last values stand */ }
+      return { a: a, b: b, s: s, aId: lastResolved.aId, bId: lastResolved.bId };
+    };
     /* Public list loads locked or not. Mine resolves the wallet account when
      * unlocked, else defaults to committee-account 1.2.0 with an honest
      * notice — both are public get_liquidity_pools_by_owner reads, never throws. */
@@ -843,13 +938,14 @@ var PoolUI = (function () {
       },
       title: t("pool.confirm_create", "Confirm pool create"), ok: function () { return "Pool created."; }, fail: t("credit.could_not_prepare_the_create", "Could not prepare the create.") });
   }
-  return { renderPools: renderPools,
+  return { renderPools: renderPools, getSelection: getSelection,
     _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
       offlineBox: offlineBox, unlockBox: unlockBox, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText, networkName: networkName,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection, deleteCheck: deleteCheck,
       routeReady: routeReady, routeFail: routeFail, autoRetry: autoRetry, dropSubs: dropSubs,
       isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, viewingAsId: VIEWING_AS_ID,
+      getSelection: getSelection,
       live: function (g) { return g === gen; } } };
 })();
 

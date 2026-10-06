@@ -2405,6 +2405,8 @@
       "pool.a_to_b_col",
       "pool.amount_a_field",
       "pool.amount_b_field",
+      "pool.asset_1_field",
+      "pool.asset_2_field",
       "pool.asset_a_field",
       "pool.asset_a_qty_col",
       "pool.asset_b_field",
@@ -2412,6 +2414,7 @@
       "pool.b_to_a_col",
       "pool.backend_missing",
       "pool.book_title",
+      "pool.clear_btn",
       "pool.confirm_create",
       "pool.confirm_delete",
       "pool.confirm_stake",
@@ -2541,6 +2544,10 @@
       "pool_detail.s3",
       "pool_detail.s4",
       "pool_detail.title",
+      "pool_net.collapse",
+      "pool_net.expand",
+      "pool_net.loading",
+      "pool_net.title",
       "pools.title",
       "prediction.action",
       "prediction.active",
@@ -6901,6 +6908,9 @@
     "id_col": "ID пула",
     "impact_row": "Влияние на цену",
     "list_btn": "Список пулов",
+    "asset_1_field": "Asset 1 (any leg)",
+    "asset_2_field": "Asset 2 (any leg)",
+    "clear_btn": "Clear",
     "list_sub": "CPMM-пулы (x*y=k). Стейк — депозит обеих сторон за LP-доли.",
     "load_failed": "Не удалось загрузить пулы.",
     "loading": "Загрузка пулов…",
@@ -7492,5 +7502,11 @@
     "desc_help": "BitShares wallet help — guides for accounts, trading, voting and recovery. Start here when stuck.",
     "title_login": "Log In — BitShares Wallet",
     "desc_login": "Unlock your local BitShares wallet — password, brainkey or imported keys. Keys never leave this device."
+  },
+  "pool_net": {
+    "title": "Pool network",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "loading": "Loading network…"
   }
 }
