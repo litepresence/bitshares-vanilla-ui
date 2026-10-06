@@ -150,9 +150,29 @@ var Pool = (function () {
       var r2 = await _dbCall("list_liquidity_pools", [limit, startId, false]); _listForm = "3-arg"; return r2;
     }
   }
+  /* Raw pool array -> deduped by pool object id (1.19.x), first-seen wins, order stable. */
+  function _dedupPools(arr) {
+    var seen = {}, out = [];
+    (arr || []).forEach(function (p) {
+      var id = (p && p.id !== undefined && p.id !== null) ? String(p.id) : "";
+      if (!id || seen[id]) return;
+      seen[id] = 1;
+      out.push(p);
+    });
+    return out;
+  }
   /* Accepted list_liquidity_pools form cache ("unprobed" until first unfiltered list). */
   function listForm() { return _listForm || "unprobed"; }
-  /* Pool list with #1's method switch (Reference #14): both/one/none + share; symbols joined for display. */
+  /* Pool list with order-free search: a single leg (either side, BTS-safe) ->
+   * get_liquidity_pools_by_one_asset; both legs -> get_liquidity_pools_by_both_assets
+   * in BOTH orders concurrently (each leg catch []), merged + deduped by 1.19.x.
+   * MERGE NOTE: limit/startId apply PER LEG (up to 2*limit raw rows, deduped
+   * down); the caller pages each leg forward — no hasNext across the merge,
+   * so a short merged page does not mean the chain is exhausted. Share and
+   * unfiltered branches unchanged; symbols joined for display on every path.
+   * @param {{limit?: number, startId?: string, share?: string, assetA?: string, assetB?: string}} [opts]
+   * @returns {Promise<Array<object>>} joined pool rows (see _normPool + _join).
+   */
   async function list(opts) {
     opts = opts || {};
     var limit = (opts.limit === undefined || opts.limit === null) ? PAGE_DEFAULT : opts.limit;
@@ -161,9 +181,14 @@ var Pool = (function () {
     _assertId(startId, POOL_RE, "startId");
     var pools;
     if (opts.share) { _assertId(opts.share, ASSET_RE, "share"); pools = await _dbCall("get_liquidity_pools_by_share_asset", [[opts.share], false]); }
-    else if (opts.assetA && opts.assetB) { pools = await _dbCall("get_liquidity_pools_by_both_assets", [opts.assetA, opts.assetB, limit, startId]); }
-    else if (opts.assetA) { pools = await _dbCall("get_liquidity_pools_by_asset_a", [opts.assetA, limit, startId]); }
-    else if (opts.assetB) { pools = await _dbCall("get_liquidity_pools_by_asset_b", [opts.assetB, limit, startId]); }
+    else if (opts.assetA && opts.assetB) {
+      var both = await Promise.all([
+        _dbCall("get_liquidity_pools_by_both_assets", [opts.assetA, opts.assetB, limit, startId]).catch(function () { return []; }),
+        _dbCall("get_liquidity_pools_by_both_assets", [opts.assetB, opts.assetA, limit, startId]).catch(function () { return []; })
+      ]);
+      pools = _dedupPools((both[0] || []).concat(both[1] || []));
+    }
+    else if (opts.assetA || opts.assetB) { pools = await _dbCall("get_liquidity_pools_by_one_asset", [opts.assetA || opts.assetB, limit, startId]); }
     else { pools = await _listRaw(limit, startId); }
     return _join(pools || []);
   }

@@ -96,7 +96,7 @@ const skel = { pools: [
     }).catch(function () { ok(false, "batched load empty first page"); finish(); });
   }).catch(function () { ok(false, "batched load concatenates pages"); finish(); });
   return; // async tail finishes below; sync tests already counted above.
-  function finish() {
+  async function finish() {
     // 9. Cache: chain re-validates, stale ids drop (node stub for localStorage).
     (function () {
       const keep = {};
@@ -113,6 +113,71 @@ const skel = { pools: [
       ok(r.dropped.length === 1 && r.dropped[0] === "1.19.9", "stale id dropped on re-validate");
       ok(PN.readExtraIds().length === 0, "cache empty after pool deleted");
       delete globalThis.localStorage;
+    })();
+    // 10. Order-free Pool.list params (Task 4, no chain: stub Chain records method+params).
+    await (async function () {
+      const Pool = require("/workspace/vanilla/js/api/pool.js");
+      let calls;
+      function stub(handler) {
+        calls = [];
+        globalThis.Chain = {
+          db: () => Promise.resolve(1),
+          call: (id, m, p) => { calls.push([m, p]); if (handler) return handler(m, p); return Promise.resolve([]); }
+        };
+      }
+      function hasCall(method, params) {
+        return calls.some(function (c) { return c[0] === method && JSON.stringify(c[1]) === JSON.stringify(params); });
+      }
+      // 10a. Single assetA -> by_one (BTS-safe: any single leg, no legacy by_asset_a).
+      stub();
+      await Pool.list({ assetA: "1.3.0", limit: 10, startId: "1.19.0" });
+      ok(hasCall("get_liquidity_pools_by_one_asset", ["1.3.0", 10, "1.19.0"]), "single A -> by_one [asset,limit,start]");
+      ok(!calls.some(function (c) { return c[0] === "get_liquidity_pools_by_asset_a"; }), "single A never calls legacy by_asset_a");
+      // 10b. Single assetB -> by_one with the B leg.
+      stub();
+      await Pool.list({ assetB: "1.3.121", limit: 5, startId: "1.19.0" });
+      ok(hasCall("get_liquidity_pools_by_one_asset", ["1.3.121", 5, "1.19.0"]), "single B -> by_one [asset,limit,start]");
+      ok(!calls.some(function (c) { return c[0] === "get_liquidity_pools_by_asset_b"; }), "single B never calls legacy by_asset_b");
+      // 10c. Both -> both by_both orders concurrently (each catch []).
+      stub();
+      await Pool.list({ assetA: "1.3.0", assetB: "1.3.1", limit: 10, startId: "1.19.0" });
+      ok(calls.filter(function (c) { return c[0] === "get_liquidity_pools_by_both_assets"; }).length === 2, "both -> two by_both calls");
+      ok(hasCall("get_liquidity_pools_by_both_assets", ["1.3.0", "1.3.1", 10, "1.19.0"]), "both order A,B queried");
+      ok(hasCall("get_liquidity_pools_by_both_assets", ["1.3.1", "1.3.0", 10, "1.19.0"]), "both order B,A queried");
+      // 10d. Merge-dedup by 1.19.x (overlap collapses, symbols joined via stub [] -> bare ids).
+      function rawPool(id, a, b) {
+        return { id: id, asset_a: a, asset_b: b, share_asset: "1.3.999", balance_a: "100", balance_b: "100", taker_fee_percent: 0, withdrawal_fee_percent: 0 };
+      }
+      stub(function (m, p) {
+        if (m === "get_liquidity_pools_by_both_assets") {
+          if (p[0] === "1.3.0") return Promise.resolve([rawPool("1.19.1", "1.3.0", "1.3.1"), rawPool("1.19.2", "1.3.0", "1.3.2")]);
+          return Promise.resolve([rawPool("1.19.2", "1.3.0", "1.3.2"), rawPool("1.19.3", "1.3.1", "1.3.2")]);
+        }
+        if (m === "lookup_asset_symbols") return Promise.resolve([]);
+        return Promise.resolve([]);
+      });
+      const merged = await Pool.list({ assetA: "1.3.0", assetB: "1.3.1", limit: 10, startId: "1.19.0" });
+      ok(merged.length === 3, "both merge dedups 1.19.2 (got " + merged.length + ")");
+      ok(JSON.stringify(merged.map(function (r) { return r.id; }).sort()) === JSON.stringify(["1.19.1", "1.19.2", "1.19.3"]), "merged ids exact set");
+      // 10e. One leg failing resolves [] for that leg, never rejects the merge.
+      stub(function (m, p) {
+        if (m === "get_liquidity_pools_by_both_assets") {
+          if (p[0] === "1.3.0") return Promise.reject(new Error("boom leg-fail"));
+          return Promise.resolve([rawPool("1.19.9", "1.3.1", "1.3.0")]);
+        }
+        if (m === "lookup_asset_symbols") return Promise.resolve([]);
+        return Promise.resolve([]);
+      });
+      const partial = await Pool.list({ assetA: "1.3.0", assetB: "1.3.1", limit: 10, startId: "1.19.0" });
+      ok(partial.length === 1 && partial[0].id === "1.19.9", "failing leg degrades to surviving leg");
+      // 10f. Limit/start validation kept (signature unchanged).
+      let threw = false;
+      try { await Pool.list({ limit: 0 }); } catch (e) { threw = true; }
+      ok(threw, "limit 0 still rejected");
+      threw = false;
+      try { await Pool.list({ startId: "1.2.3" }); } catch (e) { threw = true; }
+      ok(threw, "bad startId still rejected");
+      delete globalThis.Chain;
     })();
     console.log(pass + " passed, " + fail + " failed");
     process.exit(fail ? 1 : 0);
