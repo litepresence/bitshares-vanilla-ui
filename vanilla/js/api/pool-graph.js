@@ -791,6 +791,22 @@ var PoolGraph = (function () {
     return { empty: false, nodes: hits.length, edges: mids.length };
   }
 
+  /* navForHit: pure hit record -> hash string (no location write, so the
+   * headless audit vectors can prove every edge/node target without a DOM).
+   * Edge-mid hits (poolId, no sym) route to the swap desk #/pools/:id (raw
+   * 1.19.x, router.js:272); node hits route to #/asset/:symbol
+   * (encodeURIComponent so dots stay verbatim and slashes stay route-safe,
+   * router.js:243). Null hit -> null (no navigation). Behavior of the
+   * click/keydown handlers below is byte-identical to the inline strings
+   * they replace.
+   * @param {Object|null} h Hit record ({sym} or {edgeMid, poolId}).
+   * @returns {string|null} Hash target, or null for a null hit. */
+  function navForHit(h) {
+    if (!h) return null;
+    if (h.edgeMid) return "#/pools/" + String(h.poolId);
+    return "#/asset/" + encodeURIComponent(String(h.sym));
+  }
+
   /* One-time wiring: click + Enter navigation (kept), node hover cursor, and direct
    * node dragging. Pointer events cover mouse + touch; touch-action:none applies ONLY
    * while a drag is active so page scroll is untouched otherwise. NO physics — a drag
@@ -831,8 +847,8 @@ var PoolGraph = (function () {
         });
         if (!best) return;
         try {
-          if (best.edgeMid) window.location.hash = "#/pools/" + best.poolId;
-          else window.location.hash = "#/asset/" + encodeURIComponent(best.sym);
+          var target = navForHit(best);
+          if (target) window.location.hash = target;
         } catch (e) { /* navigation best-effort */ }
       });
       canvas.addEventListener("pointerdown", function (ev) {
@@ -898,7 +914,10 @@ var PoolGraph = (function () {
           var core = null, first = null;
           hs.forEach(function (h) { if (!h.edgeMid && !first) first = h; if (!h.edgeMid && h.assetId === CORE_ID) core = h; });
           var tgt = core || first;
-          if (tgt) { ev.preventDefault(); window.location.hash = "#/asset/" + encodeURIComponent(tgt.sym); }
+          if (tgt) {
+            var keyTarget = navForHit(tgt);
+            if (keyTarget) { ev.preventDefault(); window.location.hash = keyTarget; }
+          }
         } catch (e) { /* navigation best-effort */ }
       });
     } catch (e) { /* headless: hits stored, no listeners */ try { canvas._graphHits = hits; } catch (x) {} }
@@ -906,6 +925,7 @@ var PoolGraph = (function () {
 
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
+    _navForTest: navForHit,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
       mapTheme: mapTheme } };

@@ -274,6 +274,20 @@ function ok(cond, name) {
   eq(r.bottom.color, "warn", "indirect reach is yellow");
   ok(r.bottom.text.indexOf("2 hops") !== -1, "reach names hop count");
 })();
+// Task 2 (link audit, plot B: desk provenance slices — every node hit ->
+// #/asset/:symbol, every edge-mid hit -> #/pools/:id). Pure resolver vectors.
+(function () {
+  function eqNav(got, want, name) { ok(got === want, name + " (got " + JSON.stringify(got) + ", want " + JSON.stringify(want) + ")"); }
+  const nav = (typeof PG._navForTest === "function") ? PG._navForTest : null;
+  ok(typeof PG._navForTest === "function", "_navForTest exported (pure hit -> hash)");
+  if (!nav) return;
+  eqNav(nav({ x: 10, y: 10, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "node tap -> asset page");
+  eqNav(nav({ edgeMid: true, x: 50, y: 50, poolId: "1.19.66" }), "#/pools/1.19.66", "edge-mid tap -> swap desk");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "XBTSX.BTC" }), "#/asset/XBTSX.BTC", "dotted symbol verbatim (encodeURIComponent, slash-safe)");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "A/B" }), "#/asset/A%2FB", "slash in symbol escaped (route-safe)");
+  eqNav(nav(null), null, "null hit -> null (no navigation)");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (core-or-first) resolves to asset page");
+})();
 (async function () {
   let calls = 0;
   const poolsByAsset = {};

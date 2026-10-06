@@ -120,5 +120,24 @@ var skel = { pools: [
   }
 })();
 
+/* Task 2 (link audit: every node -> #/asset/:symbol, every edge-mid ->
+ * #/pools/:id). Pure resolver vectors against stub hit records (plot A:
+ * full-network band, incl. the Task-1 switch — nav is preset-independent).
+ * Twin rows + keyboard Enter resolve through the same mapping. */
+(function () {
+  function eqNav(got, want, name) {
+    ok(got === want, name + " (got " + JSON.stringify(got) + ", want " + JSON.stringify(want) + ")");
+  }
+  var nav = (typeof PoolNetUI._navForTest === "function") ? PoolNetUI._navForTest : null;
+  ok(typeof PoolNetUI._navForTest === "function", "_navForTest exported (pure hit -> hash)");
+  if (!nav) return;
+  eqNav(nav({ x: 10, y: 10, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "node tap -> asset page");
+  eqNav(nav({ edgeMid: true, x: 50, y: 50, poolId: "1.19.66" }), "#/pools/1.19.66", "edge-mid tap -> swap desk");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "XBTSX.BTC" }), "#/asset/XBTSX.BTC", "dotted symbol verbatim (encodeURIComponent, slash-safe)");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "A/B" }), "#/asset/A%2FB", "slash in symbol escaped (route-safe)");
+  eqNav(nav(null), null, "null hit -> null (no navigation)");
+  eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (BTS-or-first) resolves to asset page");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

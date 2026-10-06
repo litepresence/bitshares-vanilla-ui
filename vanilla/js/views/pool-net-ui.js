@@ -475,6 +475,21 @@ var PoolNetUI = (function () {
     } catch (e) { /* navigation best-effort */ }
   }
 
+  /* navForHit: pure hit record -> hash string (no location write, so the
+   * headless audit vectors can prove every edge/node target without a DOM).
+   * Edge-mid hits (poolId, no sym) route to the swap desk #/pools/:id (raw
+   * 1.19.x, router.js:272); node hits route to #/asset/:symbol
+   * (encodeURIComponent so dots stay verbatim and slashes stay route-safe,
+   * router.js:243). Null hit -> null (no navigation). Behavior of every
+   * handler below is byte-identical to the inline strings it replaces.
+   * @param {Object|null} h Hit record ({sym} or {edgeMid, poolId}).
+   * @returns {string|null} Hash target, or null for a null hit. */
+  function navForHit(h) {
+    if (!h) return null;
+    if (h.edgeMid) return "#/pools/" + String(h.poolId);
+    return "#/asset/" + encodeURIComponent(String(h.sym));
+  }
+
   /* One-time canvas wiring: tap nav + node drag + pan + pinch + wheel zoom +
    * Enter key (pool-graph.js _wire precedent: touch-action none only mid-gesture
    * so page scroll is untouched otherwise; moved drags suppress the click). */
@@ -531,8 +546,8 @@ var PoolNetUI = (function () {
       if (!p) return;
       var found = bestAt(st, p);
       if (!found) return;
-      if (found.kind === "edge") navigate("#/pools/" + found.hit.poolId);
-      else navigate("#/asset/" + encodeURIComponent(found.hit.sym));
+      if (found.kind === "edge") navigate(navForHit({ edgeMid: true, poolId: found.hit.poolId }));
+      else navigate(navForHit(found.hit));
     });
 
     var pointers = {};
@@ -676,7 +691,7 @@ var PoolNetUI = (function () {
         tgt = tgt || first;
         if (tgt) {
           if (ev.preventDefault) ev.preventDefault();
-          navigate("#/asset/" + encodeURIComponent(tgt.sym));
+          navigate(/** @type {string} */ (navForHit(tgt)));
         }
       } catch (e) { /* navigation best-effort */ }
     });
@@ -1069,7 +1084,7 @@ var PoolNetUI = (function () {
         } catch (e) { /* summary stands */ }
         if (!edges.length) return;
         var shown = edges.slice(0, TWIN_CAP);
-        function goPool(pid) { navigate("#/pools/" + pid); }
+        function goPool(pid) { navigate(/** @type {string} */ (navForHit({ edgeMid: true, poolId: pid }))); }
         var TR = null;
         try { TR = (typeof TableRenderer !== "undefined" && TableRenderer) ? TableRenderer : null; } catch (e) { TR = null; }
         var built = false;
@@ -1113,7 +1128,7 @@ var PoolNetUI = (function () {
               var tr = doc.createElement("tr");
               var tdP = doc.createElement("td");
               var link = doc.createElement("a");
-              try { link.setAttribute("href", "#/pools/" + e.poolId); } catch (e2) { /* text stands */ }
+              try { link.setAttribute("href", /** @type {string} */ (navForHit({ edgeMid: true, poolId: e.poolId }))); } catch (e2) { /* text stands */ }
               link.textContent = e.poolId;
               tdP.appendChild(link);
               var tdA = doc.createElement("td");
@@ -1315,6 +1330,7 @@ var PoolNetUI = (function () {
     paintGraph: paintGraph,
     _physForTest: _physForTest,
     _defaultPhysForTest: _defaultPhysForTest,
+    _navForTest: navForHit,
     _stepForTest: stepFrame,
     _layoutForTest: circleLayout,
     _drawForTest: drawScene
