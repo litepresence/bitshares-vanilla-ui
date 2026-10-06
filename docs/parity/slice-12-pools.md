@@ -144,3 +144,85 @@ twin: canvas aria-label refreshed with each render's verdicts. Vectors 96
 (rewrote 5e/5f as mapTheme combos: mixed/indirect/orphan/disjoint/empty/
 null/same-asset + determinism/containment/separation). Headless direct
 pair: green corners, green bottom, blue BTS, yellow path edges, zero errors.
+
+## Delta 2026-10-06 — pool-net v2: lively physics + Calm/Lively switch + link audit (Tasks 1–3)
+
+Calm stays the shipped default (byte-identical v1 constants); Lively adds the
+pyvis-barnesHut character beside it behind a persisted segmented switch; every
+edge on both plots provably routes to its swap desk and every node to its
+asset page. Commits `8de4dc9` (preset + switch), `f9ac027` (calm `springK`
+`0.0015` → `0.015` v1 byte-identical + lock vector), `c0736f1` (nav audit).
+
+### Preset mapping table (pyvis → PHYS, `pool-net-ui.js:41-48`)
+
+| pyvis character | Calm (v1, unchanged) | Lively |
+|---|---|---|
+| Repulsion law | `repPow: 1` (linear-ish, `min((k*k)/(d*d+1)*2, 5)`) | `repPow: 2` inverse-square degree-mass: `min(2.6·k²·deg/(d³+1), 40)`, `deg = 1+deg_a+deg_b` |
+| Springs | `springRest: 1.1`, `springK: 0.015` | long + weak: `springRest: 2.4`, `springK: 0.006` |
+| Carryover/damping | `carry: 0.8` | `carry: 0.92` (high — keeps the tumble alive) |
+| Center pull | `pull: 0.008` | weak: `pull: 0.003` (`btsPullX: 3` both) |
+| Energy | `temp0: 6`, `cool: 0.98`, `tempMin: 1` | hotter + slower cool: `temp0: 10`, `cool: 0.995`, `tempMin: 0.5` |
+| Sleep gate | `stillTol: 0.35`, `stillFrames: 25`, `minFrames: 0` | late + min-run: `stillTol: 0.2`, `stillFrames: 90`, `minFrames: 180` |
+| Edges | straight (`curved: false`) | quadratic midpoint offset `((edgeIndex % 5) − 2) · 6px` (`curved: true`) |
+
+`stepFrame`/`drawScene`/`loop`/`wake` read `S.phys` (`PHYS[S.phys] ||
+PHYS.calm`); nothing else branches. `loop` counts `S.frames`, `wake` resets
+`S.frames = 0` and re-seeds `S.temp = P.temp0` so a flip re-settles from
+current positions. `prefers-reduced-motion` (`S.reduced`) freezes either mode
+— no new branch.
+
+### Switch behavior
+
+Segmented Calm/Lively control in the band header (`pool-net-ui.js:780-816`):
+`aria-pressed`, 44px `touchable`, `role="group"` labelled by
+`pool_net.phys_label` (`"Network motion"`). Persists `localStorage poolNetPhys`
+(`"lively"` → lively, anything else/absent/storage-failure → calm; default
+calm). Keys `pool_net.phys_calm` (`"Calm"`) / `pool_net.phys_lively`
+(`"Lively"`) / `pool_net.phys_label` resolved via `I18n.t` verbatim defaults;
+all 12 dicts carry them nested under `pool_net` (Task-1 commit synced the 11
+non-en as honest English stubs — verified present, no Task-3 edit needed).
+
+### Link audit table (evidence first; zero handler-behavior change)
+
+Pure `navForHit(h)` in both files (`pool-net-ui.js:487-491`,
+`pool-graph.js:804-808`): `{edgeMid, poolId}` → `"#/pools/" + poolId` (raw
+`1.19.x`, `router.js:272`); `{sym}` → `"#/asset/" + encodeURIComponent(sym)`
+(dots verbatim, slashes route-safe, `router.js:243`); null → null. Every
+existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
+`href`), byte-identical strings.
+
+| Plot | Element | Target | Proven by |
+|---|---|---|---|
+| pool-net band canvas | node tap | `#/asset/:symbol` | ui-test nav vectors (incl. `XBTSX.BTC` dot verbatim) |
+| pool-net band canvas | edge-mid tap | `#/pools/:id` | ui-test nav vectors (`1.19.66`) |
+| pool-net band | keyboard Enter | BTS-or-first node asset page | existing handler via `navForHit` |
+| pool-net twin | node row link | `#/asset/:symbol` | `href` via `navForHit` |
+| pool-net twin | edge row (`goPool`) | `#/pools/:id` | `goPool` via `navForHit` |
+| desk pool-graph canvas | node click | `#/asset/:symbol` | graph-test nav vectors |
+| desk pool-graph canvas | edge-mid click | `#/pools/:id` | graph-test nav vectors |
+| desk pool-graph | keydown Enter | node asset page | handler via `navForHit` |
+
+Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
+no record fixes were needed — resolver + wiring only.
+
+### Gate evidence (Task 3 run, 2026-10-06)
+
+- `python3 tooling/check_rot.py` → PASSED (dependency-free, static-servable).
+- `bash tooling/check_types.sh` → PASS (checkJs, zero emit).
+- `python3 tooling/check_i18n.py` → OK: 12 dicts key-complete (3729 keys),
+  allowlists exact, stubs honest, 4902 `t()` call sites drift-free.
+- `node tooling/pool-net-test.js` → 36 passed, 0 failed.
+- `node tooling/pool-net-ui-test.js` → 25 passed, 0 failed (7 v1 + preset,
+  default, switch-persistence, calm-lock, nav-target vectors).
+- `node tooling/pool-graph-test.js` → 103 pass, 0 fail (96 v1 + nav vectors).
+- Headless serve `python3 -m http.server` → `js/views/pool-net-ui.js` 200,
+  `data/pools.json` 200, `index.html` 200.
+- `shot.mjs` `#/pools` @1440 and @390 → `consoleErrors: []` on both
+  (`/tmp/poolv2-1440.png`, `/tmp/poolv2-390.png`). Human browser pass (tap
+  node/edge nav, Clear flow, collapse-reload persistence, trio, phone touch)
+  stays the gate — queued for tester.
+
+Anti-rot (§4.5): (a) yes — preset table + pure resolver, platform APIs only
+(Canvas/rAF/localStorage/matchMedia), no new import; (b) nothing new depended
+on; (c) smallest deletable: lively preset (calm band + audit stand).
+`check_rot.py` PASS.
