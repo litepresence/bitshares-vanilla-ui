@@ -69,4 +69,54 @@ try {
   }
 } catch (e) { /* registry without _test: label covered manually */ }
 
+/* fillsToPoints: newest-first fills in, oldest-first points out. */
+(function () {
+  var MarketFills = require("../vanilla/js/api/market-fills-history.js");
+  var G = (typeof globalThis !== "undefined") ? globalThis : global;
+  var savedFormat = G.Format;
+  /* Deterministic Format stub: price names its legs, volume echoes raw. */
+  G.Format = {
+    formatPrice: function (bRaw, bP, qRaw, qP, pl) { return "P(" + bRaw + "/" + qRaw + ":" + bP + "," + qP + "," + pl + ")"; },
+    formatAmount: function (raw, prec) { return "A(" + raw + ":" + prec + ")"; }
+  };
+  try {
+    var fills = [
+      { time: "2026-10-05T02:00:00", paid: { amount: "300", asset: "1.3.0" }, received: { amount: "30", asset: "1.3.1" } },
+      { time: "2026-10-05T01:00:00", paid: { amount: "100", asset: "1.3.0" }, received: { amount: "10", asset: "1.3.1" } },
+      { time: "2026-10-05T01:00:00", paid: { amount: "200", asset: "1.3.0" }, received: { amount: "25", asset: "1.3.1" } },
+      { time: "bogus", paid: { amount: "1", asset: "1.3.0" }, received: { amount: "1", asset: "1.3.1" } },
+      { time: "2026-10-05T03:00:00", paid: { amount: "5", asset: "1.3.999" }, received: { amount: "5", asset: "1.3.1" } }
+    ];
+    /* baseId 1.3.0, precB 5, precQ 4, quoteId 1.3.1, cap 10. */
+    var pts = MarketFills.fillsToPoints(fills, "1.3.0", 5, 4, "1.3.1", 10);
+    eq(pts.length, 3, "two bad rows skipped, three points kept");
+    eq(pts[0].volumeBaseRaw, "200", "tie slot: older of the pair first");
+    eq(pts[1].volumeBaseRaw, "100", "tie slot: newer of the pair second");
+    eq(pts[0].timeMs === pts[1].timeMs, true, "same slot is two points");
+    eq(pts[2].timeMs > pts[1].timeMs, true, "newest fill last");
+    eq(pts[0].volume, "A(200:5)", "base-leg human volume");
+    /* Same-second fills stay SEPARATE points (the point of Discrete). */
+    var same = [
+      { time: "2026-10-05T01:00:00", paid: { amount: "100", asset: "1.3.0" }, received: { amount: "10", asset: "1.3.1" } },
+      { time: "2026-10-05T01:00:00.500", paid: { amount: "200", asset: "1.3.0" }, received: { amount: "25", asset: "1.3.1" } }
+    ];
+    var pts2 = MarketFills.fillsToPoints(same, "1.3.0", 5, 4, "1.3.1", 10);
+    eq(pts2.length, 2, "same-second fills are two points, never merged");
+    /* Cap slices newest-first BEFORE oldest-first paint order. */
+    var pts3 = MarketFills.fillsToPoints(fills.slice(0, 3), "1.3.0", 5, 4, "1.3.1", 2);
+    eq(pts3.length, 2, "cap slices to newest 2");
+    eq(pts3[1].volumeBaseRaw, "300", "newest fill survives the cap");
+    /* Inverted orientation: baseId on the received leg still maps. */
+    var inv = [{ time: "2026-10-05T04:00:00", paid: { amount: "10", asset: "1.3.1" }, received: { amount: "100", asset: "1.3.0" } }];
+    var pts4 = MarketFills.fillsToPoints(inv, "1.3.0", 5, 4, "1.3.1", 10);
+    eq(pts4.length, 1, "inverted legs map");
+    eq(pts4[0].volumeBaseRaw, "100", "inverted base raw is the received leg");
+    /* Bad cap throws named, empty fills are valid. */
+    assert.throws(function () { MarketFills.fillsToPoints(fills, "1.3.0", 5, 4, "1.3.1", 0); }, /bad-count/, "cap 0 throws bad-count");
+    eq(MarketFills.fillsToPoints([], "1.3.0", 5, 4, "1.3.1", 10).length, 0, "empty fills valid");
+  } finally {
+    if (savedFormat === undefined) delete G.Format; else G.Format = savedFormat;
+  }
+})();
+
 console.log("discrete-timescale vectors: " + passed + " passed");

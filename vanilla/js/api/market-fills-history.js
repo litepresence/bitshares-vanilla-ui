@@ -423,6 +423,57 @@ var MarketFills = (function () {
     });
   }
 
+  /* fillsToPoints: raw fills -> discrete scatter points (Discrete timescale).
+   * Same orientation/volume contract as fillsToCandles (priceHuman legs,
+   * base-leg volume) but NO bucketing, NO merging: every mappable fill is
+   * one point, same-second fills stay separate (dex-ux plotlyChart parity —
+   * the Discrete radio routes away from candle renderers into per-fill
+   * markers, reference/bitshares-dex-ux/main.js chartHandler).
+   * Params: fills (newest-first, chainFills/fillsForMarket shape), baseId,
+   *   precB/precQ numeric precisions, quoteId, cap (1..5000 integer, the
+   *   shared candle-count input — the newest cap entries survive, painted
+   *   oldest-first). Returns oldest-first [{timeMs, price, volume (base-leg
+   *   human), volumeBaseRaw, volumeQuoteRaw}]. Empty fills are VALID ([]).
+   * Malformed fills (bad time, unmappable legs, zero quote) are skipped,
+   * never reject. Throws "bad-count" on a non-integer cap < 1.
+   * Pure except Format (BigInt money math only); Number() never touches money. */
+  function fillsToPoints(fills, baseId, precB, precQ, quoteId, cap) {
+    if (cap === undefined) cap = 2000;
+    cap = Math.floor(cap);
+    if (!(cap >= 1)) throw new Error("bad-count");
+    var list = Array.isArray(fills) ? fills.slice(0, cap) : [];
+    var places = PRICE_PLACES;
+    try {
+      var probe = [];
+      list.forEach(function (f) {
+        var p = priceHuman(f, baseId, precB, precQ, quoteId, SIGFIG_MAX);
+        if (p !== null && p !== undefined) probe.push(p);
+      });
+      places = _sigPlaces(probe);
+    } catch (e) { places = PRICE_PLACES; }
+    var newest = [];
+    list.forEach(function (f) {
+      var price = priceHuman(f, baseId, precB, precQ, quoteId, places);
+      if (price === null || price === undefined) return;
+      var unix = Math.floor(Date.parse(f && f.time) / 1000);
+      if (!(unix > 0)) return;
+      var bRaw = null, qRaw = null;
+      try {
+        var b = String(baseId), qid = String(quoteId);
+        var pA = String(f.paid.asset), rA = String(f.received.asset);
+        if (pA === b && rA === qid) { bRaw = String(f.paid.amount); qRaw = String(f.received.amount); }
+        else if (pA === qid && rA === b) { bRaw = String(f.received.amount); qRaw = String(f.paid.amount); }
+        if (!_isIntStr(String(bRaw)) || !_isIntStr(String(qRaw))) { bRaw = null; qRaw = null; }
+      } catch (e) { bRaw = null; qRaw = null; }
+      if (bRaw === null || qRaw === null) return;
+      var vol = "0";
+      try { vol = Format.formatAmount(bRaw, precB); } catch (e) { vol = "0"; }
+      newest.push({ timeMs: unix * 1000, price: price, volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: qRaw });
+    });
+    newest.reverse();
+    return newest;
+  }
+
   /* mergeDeep: ES backfill under chain authority. Keyed on timeMs; chain
    * wins every overlap (fresher + authoritative); result sorted ascending,
    * sliced to the last `cap` (default 2000). Pure. */
@@ -444,7 +495,7 @@ var MarketFills = (function () {
   }
 
   return {
-    fillsForMarket: fillsForMarket, fillsToCandles: fillsToCandles, mergeDeep: mergeDeep,
+    fillsForMarket: fillsForMarket, fillsToCandles: fillsToCandles, fillsToPoints: fillsToPoints, mergeDeep: mergeDeep,
     esQuery: esQuery, esFill: esFill, priceHuman: priceHuman,
     chainFills: chainFills, esFills: esFills,
     ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS, ES_SIZE: ES_SIZE,
