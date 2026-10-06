@@ -209,6 +209,7 @@ var Asset = (function () {
       market_fee_hundredths: opts.market_fee_percent !== undefined ? opts.market_fee_percent : 0,
       permissions: opts.issuer_permissions !== undefined ? opts.issuer_permissions : 0,
       flags: opts.flags !== undefined ? opts.flags : 0, description: description, nft: _parseNft(description),
+      bitasset_data_id: (join.is_smartcoin && found.bitasset_data_id) ? found.bitasset_data_id : null,
       is_smartcoin: !!join.is_smartcoin, is_prediction_market: bitObj ? !!bitObj.is_prediction_market : false, bitasset: bitasset };
   }
 

@@ -44,7 +44,33 @@ var FeedHistory = (function () {
     return tail ? head + "." + tail : head;
   }
   function bucketAll() { return { times: [], series: [] }; }
-  return { medianOf: medianOf, normToBackingPerMpa: normToBackingPerMpa, bucketAll: bucketAll };
+  var WITNESS_FED = 128, COMMITTEE_FED = 256;
+  function badgeFor(acct, flags) {
+    if (acct && acct.witnessHit) return "witness";
+    if (acct && acct.committeeHit) return "committee";
+    return "producer";
+  }
+  async function _dbCall(method, params) {
+    var dbId = await Chain.db();
+    return Chain.call(dbId, method, params || []);
+  }
+  async function producersFor(symbolOrId) {
+    if (typeof Asset === "undefined" || !Asset.describe) throw new Error("asset-unavailable");
+    var info = await Asset.describe(symbolOrId);
+    if (!info.is_smartcoin) throw new Error("not-market-issued");
+    var bid = info.bitasset_data_id;
+    var objs = bid ? await _dbCall("get_objects", [[bid]]) : [];
+    var bit = (objs && objs[0]) || {};
+    var feeds = bit.feeds || [];
+    var flags = info.flags || 0;
+    var witnessFed = (flags & WITNESS_FED) !== 0, committeeFed = (flags & COMMITTEE_FED) !== 0;
+    var live = feeds.map(function (f) {
+      return { publisher: f[0], time: (f[1] && f[1][0]) || null, feed: (f[1] && f[1][1]) || null };
+    });
+    return { asset: info, bitasset: bit, flags: flags, witnessFed: witnessFed, committeeFed: committeeFed, live: live, authorized: live.map(function (l) { return { id: l.publisher, name: "", kind: "producer" }; }) };
+  }
+  return { medianOf: medianOf, normToBackingPerMpa: normToBackingPerMpa, bucketAll: bucketAll,
+    badgeFor: badgeFor, producersFor: producersFor, WITNESS_FED: WITNESS_FED, COMMITTEE_FED: COMMITTEE_FED };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.FeedHistory === "undefined") { globalThis.FeedHistory = FeedHistory; }
 if (typeof module !== "undefined") { module.exports = FeedHistory; }
