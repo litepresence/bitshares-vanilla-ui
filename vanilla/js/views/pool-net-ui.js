@@ -702,7 +702,7 @@ var PoolNetUI = (function () {
         twin = doc.createElement("details");
         twin.className = "pool-net-twin";
       } catch (e) { twin = null; }
-      var twinSummary = mk("summary", t("pool_net.twin", "Pool rows"));
+      var twinSummary = mk("summary", t("pool_net.twin", "Pool rows (%(n)s)", { n: "0" }));
       var twinBox = mk("div", null, "pool-net-twinbox");
       try {
         wrap.appendChild(statusEl);
@@ -1090,7 +1090,7 @@ var PoolNetUI = (function () {
         var hasPool = false;
         try { hasPool = (typeof Pool !== "undefined" && Pool && typeof Pool.list === "function"); } catch (e) { hasPool = false; }
         if (!hasPool) {
-          if (!(S.full.edges || []).length) setStatus(t("pool_net.offline", "Network unavailable — no skeleton pools cached."));
+          if (!(S.full.edges || []).length) setStatus(t("pool_net.offline_empty", "Network unavailable — no skeleton pools cached."));
           return;
         }
         function pageFn(startId) {

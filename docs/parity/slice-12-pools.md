@@ -106,7 +106,33 @@ the pair's own BTS links glow). Pure `nodePaintRole`/`edgePaintRole`
 Headless `#/pools/1.19.66`: blue BTS, green HONEST.BTC leg, blue link
 between them, zero console errors.
 
-## Delta 2026-10-02 — owner-spec map language rebuild (corners + takeover)
+## Delta 2026-10-06 — pool-net Task 7: locale keys + headless verification (owner gate: human browser pass)
+
+`pool-net-ui.js` used 27 `pool_net.*` call sites but `en.json` only held 4
+keys (title/collapse/expand/loading from Task 5) — every verdict, hover
+card, legend, twin, and offline note rendered via the `t()` English
+fallback, invisible to `check_i18n`. New `tooling/add_pool_net_task7_i18n.py`
+(Task-5 band-script pattern) adds the 23 missing keys with verbatim
+defaults to all 12 dicts (non-en land allowlisted as honest English stubs);
+`check_i18n.py` call-site drift (4876 sites) is clean for every `pool_net.*`
+key. Code dedup to keep the gate exact (no key may carry two defaults):
+`twin` initial summary now uses the `%(n)s` template (`n: "0"` until
+`rebuildTwin` counts — was bare `"Pool rows"` vs `"Pool rows (%(n)s)"`);
+the no-skeleton offline note moves to new `pool_net.offline_empty` (was a
+second `pool_net.offline` default). Net keys: 4 → 27.
+
+Headless proof (human pass stays the gate — tap node/edge nav, Clear flow,
+collapse-reload persistence, dex-ux trio shot, phone touch):
+`python3 -m http.server 7334` + 6 `shot.mjs` captures, zero console errors
+on all: 1440px band mounts (header + COLLAPSE + `515 pools · 176 assets`
+ready line on live mainnet merge), star verdict `Pools touching BTS: 109`
+(BTS default + star filter end-to-end on live data), canvas paints full
+network + 11 brand chips; 360px stacks cleanly; vanilla-ui-theme light
+renders; COLLAPSE click flips to EXPAND and hides the band. `check_rot.py`
+PASS, `check_types.sh` PASS, `pool-net-test.js` 36/36, `pool-net-ui-test.js`
+7/7, `pool-graph-test.js` 96/96, `check_i18n.py` OK (12 dicts key-complete,
+pool_net drift-free; feed-workstream keys rode along in the same dicts to keep
+this commit gate-green — feed code files stay with their workstream).
 Supersedes the banner + first color pass (removed with vectors, noted):
 `mapTheme()` computes legs (green/yellow/red by own BTS hops), node roles
 (BTS blue, legs by verdict, rest grey), path pools (both shortest BTS paths
