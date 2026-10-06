@@ -31,6 +31,15 @@ User memory: bitshares-dex-ux had interesting networkx plots worth mimicking.
    graph library, since layout is deterministic layered rings (no physics
    engine needed at ≤25 nodes).
 
+## Correction 2026-10-06 — actual source is bitshares-networks
+
+- User correction: the pool-map idea came from `squidKid-deluxe/bitshares-networks`
+  (HTML, `pools/pool_mapper.py`: pyvis + networkx full-pool network, BFS
+  `nx.shortest_path(G, source=asset, target="1.3.0")` pricing to BTS, edge-width by
+  BTS value, hover balances/prices, drag-to-untangle, DETACH/ATTACH filters) —
+  NOT from dex-ux. `pool-graph.js` provenance header now credits bitshares-networks
+  (idea-only, never imported).
+
 ## Rule restated
 
 If a future dex-ux checkout grows a real network plot, port its MATH

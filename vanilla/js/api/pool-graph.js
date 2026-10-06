@@ -22,10 +22,13 @@
  *   id/asset_a/asset_b/balance_a/balance_b (raw ints) <- liquidity_pool_object.hpp:44-60.
  *   BTS core = 1.3.0 literal (lookup_asset_symbols ["BTS"] would confirm; describe fallback
  *   unnecessary — id is consensus, symbol only labels).
- * PROVENANCE (dex-ux behavior-only, MATH IDEA ONLY — never a dependency, never imported):
- *   reference/bitshares-dex-ux networkx pool-connection plots proposed the 2-layer provenance
- *   map idea; this file ports the IDEA (layered rings + core-path highlight) to dependency-free
- *   canvas. Verified absent from the dex-ux checkout: no ES, no networkx runtime — chain only.
+ * PROVENANCE (bitshares-networks behavior-only, MATH IDEA ONLY — never a dependency, never imported):
+ *   squidKid-deluxe/bitshares-networks pools/pool_mapper.py (pyvis + networkx full-pool
+ *   network: BFS shortest-path pricing to BTS 1.3.0, edge-width by BTS value, hover
+ *   balances/prices, drag-to-untangle) proposed the pool-connection map idea; this file
+ *   ports the IDEA (layered rings + core-path highlight) to dependency-free canvas.
+ *   Verified: dex-ux checkout has NO networkx (see docs/parity/dexux-networkx-verdict.md);
+ *   no ES, no networkx/pyvis runtime here — chain only.
  * MONEY DISCIPLINE (#6): balances stay RAW digit strings; size = BigInt(a)+BigInt(b);
  *   Number() ONLY for canvas pixels (radii/angles), never money. RPC BUDGET: <=9 calls per
  *   buildGraph (2 L1 + <=6 L2 + 1 symbol join); failures -> honest partial (missing legs []),
@@ -311,7 +314,7 @@ var PoolGraph = (function () {
     return pos;
   }
 
-  /* Deterministic force relaxation (networkx spring_layout IDEA ONLY — same
+  /* Deterministic force relaxation (bitshares-networks pyvis-physics IDEA ONLY — same
    * doctrine as the rings: math ported, never a dependency, never imported).
    * layout() seeds (rings: pair center, layers outward); relax() settles to a
    * static equilibrium synchronously at paint time. Fixed RELAX_ITERS,
