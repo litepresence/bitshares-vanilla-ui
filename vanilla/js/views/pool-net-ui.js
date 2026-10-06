@@ -32,6 +32,33 @@ var PoolNetUI = (function () {
   var NODE_BASE_R = 5, NODE_DEG_STEP = 1.2, NODE_MAX_DEG = 5, NODE_MAX_R = 11;
   var TWIN_CAP = 200;
   var BTS_BLUE = "#1E9ED7";
+  var PHYS_KEY = "poolNetPhys";
+
+  /* PHYS presets: calm (v1 shipped behavior, byte-identical constants) vs lively
+   * (pyvis-barnesHut character: inverse-square degree-mass repulsion, long weak
+   * springs, high carryover, weak center pull, late sleep gate, curved edges).
+   * stepFrame/drawScene/loop/wake read S.phys; nothing else branches. */
+  var PHYS = {
+    calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
+              springRest: 1.1, springK: 0.0015, pull: 0.008, btsPullX: 3,
+              stillTol: 0.35, stillFrames: 25, minFrames: 0, curved: false },
+    lively: { repPow: 2, repK: 2.6, repCap: 40, carry: 0.92, temp0: 10, cool: 0.995, tempMin: 0.5,
+              springRest: 2.4, springK: 0.006, pull: 0.003, btsPullX: 3,
+              stillTol: 0.2, stillFrames: 90, minFrames: 180, curved: true }
+  };
+
+  /* Headless test seams (no DOM, no chain): preset table + default reader. */
+  function _physForTest() { return PHYS; }
+  function _defaultPhysForTest() { return "calm"; }
+
+  /* Persisted preset reader: "lively" -> lively, anything else (or no
+   * storage at all) -> calm. Default is calm, storage failure keeps calm. */
+  function readPhys() {
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem(PHYS_KEY) === "lively") return "lively";
+    } catch (e) { /* calm stands */ }
+    return "calm";
+  }
 
   /* Selection getter shape (PoolUI.getSelection bridge: trimmed raw inputs
    * plus last resolved asset ids, null when unresolved/cleared).
@@ -169,13 +196,15 @@ var PoolNetUI = (function () {
    * @param {{nodes: Array, edges: Array}} view Filtered graph.
    * @param {Object} geom assetId -> {x, y} world coords.
    * @param {Object} paint {scale, ox, oy, pathSet, selPool, dim, meta,
-   *   hoverNode, hoverEdge} display-only state.
+   *   hoverNode, hoverEdge, phys} display-only state (phys selects the
+   *   PHYS preset for edge curvature; positions are preset-independent).
    * @returns {{hits: Array, mids: Array}} Screen-space hit lists.
    * Failure: never throws (a broken frame must not kill the loop).
    */
   function drawScene(ctx, W, H, view, geom, paint) {
     var hits = [], mids = [];
     try {
+      var P = PHYS[(paint && paint.phys) || "calm"] || PHYS.calm;
       var border = _cssTok("--border", "#5a5a5a"), text = _cssTok("--text", "#c5cbce"),
         muted = _cssTok("--muted", "#758696"),
         buy = _cssTok("--buy", "#26de81");
@@ -203,7 +232,7 @@ var PoolNetUI = (function () {
         brandById[n.assetId] = brandOf(n.sym);
       });
       function dimmed(id) { return !!(paint.dim && paint.dim[brandById[id]]); }
-      edges.forEach(function (e) {
+      edges.forEach(function (e, ei) {
         var p = geom[e.a], q = geom[e.b];
         if (!p || !q) return;
         var hot = paint.selPool && String(e.poolId) === String(paint.selPool);
@@ -219,7 +248,15 @@ var PoolNetUI = (function () {
           }
           ctx.beginPath();
           ctx.moveTo(SX(p.x), SY(p.y));
-          ctx.lineTo(SX(q.x), SY(q.y));
+          if (P.curved && typeof ctx.quadraticCurveTo === "function") {
+            var mx = (SX(p.x) + SX(q.x)) / 2, my = (SY(p.y) + SY(q.y)) / 2;
+            var vx = SX(q.x) - SX(p.x), vy = SY(q.y) - SY(p.y);
+            var vlen = Math.sqrt(vx * vx + vy * vy) || 1;
+            var off = ((((ei || 0) % 5) + 5) % 5 - 2) * 6;
+            ctx.quadraticCurveTo(mx - (vy / vlen) * off, my + (vx / vlen) * off, SX(q.x), SY(q.y));
+          } else {
+            ctx.lineTo(SX(q.x), SY(q.y));
+          }
           ctx.stroke();
           if (hot) { try { ctx.restore(); } catch (x) { /* state stands */ } }
           ctx.globalAlpha = 1;
@@ -277,7 +314,7 @@ var PoolNetUI = (function () {
     var out = drawScene(g.ctx, g.W, g.H, graph, circleLayout((graph && graph.nodes) || [], g.W, g.H), {
       scale: 1, ox: 0, oy: 0, pathSet: pathSet,
       selPool: opts.selPool || null, dim: opts.dimBrands || {},
-      meta: opts.meta || {}, hoverNode: null, hoverEdge: null
+      meta: opts.meta || {}, hoverNode: null, hoverEdge: null, phys: opts.phys || "calm"
     });
     try {
       canvas.setAttribute("tabindex", "0");
@@ -288,11 +325,14 @@ var PoolNetUI = (function () {
     return { empty: out.hits.length === 0 && out.mids.length === 0, nodes: out.hits.length, edges: out.mids.length };
   }
 
-  /* One physics step (fixed): repulsion k^2/d + Hooke springs + center
+  /* One physics step (preset-driven): repulsion + Hooke springs + center
    * gravity (x3 for BTS prominence) + wall clamp; velocity damping keeps it
-   * overdamped so the sleep gate always terminates the loop. Positions are
+   * overdamped so the sleep gate always terminates the loop. Calm reads the
+   * v1 shipped constants verbatim; lively reads inverse-square degree-mass
+   * repulsion, longer springs, higher carryover, weaker pull. Positions are
    * world coords; Number() here is pixels only, never money. */
   function stepFrame(S) {
+    var P = PHYS[S.phys] || PHYS.calm;
     var ids = Object.keys(S.geom);
     var n = ids.length;
     if (n < 2) return 0;
@@ -310,7 +350,14 @@ var PoolNetUI = (function () {
         var d = Math.sqrt(dx * dx + dy * dy), ux, uy;
         if (d > 0.01) { ux = dx / d; uy = dy / d; }
         else { var ang = ((i * 7 + j) * 2.399963); ux = Math.cos(ang); uy = Math.sin(ang); d = 0.01; }
-        var f = Math.min((k * k) / (d * d + 1) * 2, 5);
+        /* Lively weights repulsion by endpoint degree mass (hubs push
+         * harder, pyvis-barnesHut character); calm keeps the v1 formula.
+         * Missing deg entries count 0 (isolated nodes) — never NaN. */
+        var da = (S.deg && S.deg[a]) || 0, db = (S.deg && S.deg[b]) || 0;
+        var deg = 1 + da + db;
+        var f = P.repPow === 2
+          ? Math.min(P.repK * k * k * deg / (d * d * d + 1), P.repCap)
+          : Math.min((k * k) / (d * d + 1) * 2, P.repCap);
         ax[a] += ux * f; ay[a] += uy * f;
         ax[b] -= ux * f; ay[b] -= uy * f;
       }
@@ -319,21 +366,21 @@ var PoolNetUI = (function () {
       if (!e || !S.geom[e.a] || !S.geom[e.b] || e.a === e.b) return;
       var ex = S.geom[e.a].x - S.geom[e.b].x, ey = S.geom[e.a].y - S.geom[e.b].y;
       var ed = Math.sqrt(ex * ex + ey * ey) || 0.01;
-      var f2 = (ed - k * 1.1) * 0.015;
+      var f2 = (ed - k * P.springRest) * P.springK;
       ax[e.a] -= (ex / ed) * f2 * ed * 0.1; ay[e.a] -= (ey / ed) * f2 * ed * 0.1;
       ax[e.b] += (ex / ed) * f2 * ed * 0.1; ay[e.b] += (ey / ed) * f2 * ed * 0.1;
     });
     for (i = 0; i < n; i++) {
       var id = ids[i];
-      var pull = 0.008 * (id === CORE_ID ? 3 : 1);
+      var pull = P.pull * (id === CORE_ID ? P.btsPullX : 1);
       ax[id] += (cx - S.geom[id].x) * pull;
       ay[id] += (cy - S.geom[id].y) * pull;
     }
     for (i = 0; i < n; i++) {
       var id2 = ids[i];
       var v = S.vel[id2] || { x: 0, y: 0 };
-      v.x = (v.x + ax[id2]) * 0.8;
-      v.y = (v.y + ay[id2]) * 0.8;
+      v.x = (v.x + ax[id2]) * P.carry;
+      v.y = (v.y + ay[id2]) * P.carry;
       var step = Math.sqrt(v.x * v.x + v.y * v.y);
       if (step > S.temp && step > 0) { v.x = v.x / step * S.temp; v.y = v.y / step * S.temp; step = S.temp; }
       if (step > maxStep) maxStep = step;
@@ -342,7 +389,7 @@ var PoolNetUI = (function () {
       S.geom[id2].x = nx < PAD ? PAD : (nx > S.W - PAD ? S.W - PAD : nx);
       S.geom[id2].y = ny < PAD ? PAD : (ny > S.H - PAD ? S.H - PAD : ny);
     }
-    S.temp = Math.max(S.temp * 0.98, 1);
+    S.temp = Math.max(S.temp * P.cool, P.tempMin);
     return maxStep;
   }
 
@@ -361,7 +408,9 @@ var PoolNetUI = (function () {
     } catch (e) { /* stopped anyway */ }
   }
 
-  /* Wake the settle loop (drag/zoom/filter/resize wake; sleep cancels it). */
+  /* Wake the settle loop (drag/zoom/filter/resize/phys-flip wake; sleep
+   * cancels it). Re-reads the preset so a Calm/Lively flip re-energizes
+   * from current positions; resets the frame counter for the min-run gate. */
   function wake(S) {
     if (!S || S.dead || S.settled === false && S.running) return;
     if (S.reduced || S.dead) return;
@@ -370,18 +419,21 @@ var PoolNetUI = (function () {
     if (Object.keys(S.geom).length < 2) return;
     S.running = true;
     S.still = 0;
-    S.temp = 6;
+    S.frames = 0;
+    S.temp = (PHYS[S.phys] || PHYS.calm).temp0;
     loop(S);
   }
 
   function loop(S) {
     if (!S || S.dead || !S.visible || S.reduced) { if (S) S.running = false; return; }
+    var P = PHYS[S.phys] || PHYS.calm;
+    S.frames = (S.frames || 0) + 1;
     var moved = 0;
     try { moved = stepFrame(S); } catch (e) { moved = 0; }
     try { render(S); } catch (e) { /* next frame */ }
-    if (moved < 0.35) S.still++;
+    if (moved < P.stillTol) S.still++;
     else S.still = 0;
-    if (S.still >= 25) {
+    if (S.still >= P.stillFrames && (S.frames || 0) >= (P.minFrames || 0)) {
       S.running = false;
       S.settled = true;
       return;
@@ -403,7 +455,7 @@ var PoolNetUI = (function () {
     var out = drawScene(g.ctx, g.W, g.H, S.view, S.geom, {
       scale: S.scale, ox: S.ox, oy: S.oy, pathSet: S.pathSet,
       selPool: S.selPool, dim: S.dim, meta: S.meta,
-      hoverNode: S.hoverNode, hoverEdge: S.hoverEdge
+      hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: S.phys
     });
     S.hits = out.hits;
     S.mids = out.mids;
@@ -666,14 +718,16 @@ var PoolNetUI = (function () {
         }
       } catch (e) { reduced = false; }
 
+      var phys0 = readPhys();
       var S = {
         canvas: null, doc: doc, W: 300, H: 320,
         full: { nodes: [], edges: [] }, view: { nodes: [], edges: [] },
-        geom: {}, vel: {}, meta: {}, dim: {}, pathSet: {}, pathFull: null,
+        geom: {}, vel: {}, deg: {}, meta: {}, dim: {}, pathSet: {}, pathFull: null,
         sel: { aId: null, bId: null, s: "" }, selPool: null, sig: "",
         scale: 1, ox: 0, oy: 0, hits: [], mids: [],
-        hoverNode: null, hoverEdge: null,
-        running: false, settled: true, still: 0, temp: 6, visible: true,
+        hoverNode: null, hoverEdge: null, phys: phys0,
+        running: false, settled: true, still: 0, frames: 0,
+        temp: (PHYS[phys0] || PHYS.calm).temp0, visible: true,
         dead: false, reduced: reduced, loaded: false, raf: 0, observer: null,
         drag: null, pinch: null, hover: null, wake: null, onResize: null
       };
@@ -704,7 +758,49 @@ var PoolNetUI = (function () {
       } catch (e) { twin = null; }
       var twinSummary = mk("summary", t("pool_net.twin", "Pool rows (%(n)s)", { n: "0" }));
       var twinBox = mk("div", null, "pool-net-twinbox");
+      /* Calm/Lively switch (v2): segmented control at the top of the band
+       * body. Flipping persists poolNetPhys and re-energizes the loop from
+       * current positions via wake(S); reduced-motion freeze in wake/loop
+       * covers both presets, so there is no branch here. */
+      var physBar = mk("div", null, "pool-net-phys");
+      var calmBtn = mk("button", t("pool_net.phys_calm", "Calm"));
+      var livelyBtn = mk("button", t("pool_net.phys_lively", "Lively"));
       try {
+        calmBtn.type = "button";
+        livelyBtn.type = "button";
+        calmBtn.className = "pool-net-physbtn";
+        livelyBtn.className = "pool-net-physbtn";
+        calmBtn.setAttribute("aria-pressed", S.phys === "calm" ? "true" : "false");
+        livelyBtn.setAttribute("aria-pressed", S.phys === "lively" ? "true" : "false");
+        if (typeof touchable === "function") { touchable(calmBtn); touchable(livelyBtn); }
+      } catch (e) { /* labels stand */ }
+      var D2 = _dom();
+      try {
+        if (D2 && D2.attrs) {
+          D2.attrs(physBar, { role: "group", "aria-label": t("pool_net.phys_label", "Network motion") });
+        } else {
+          physBar.setAttribute("role", "group");
+        }
+      } catch (e) { /* buttons stand unlabeled */ }
+      function setPhys(mode) {
+        S.phys = (mode === "lively") ? "lively" : "calm";
+        try {
+          if (typeof localStorage !== "undefined") localStorage.setItem(PHYS_KEY, S.phys);
+        } catch (e) { /* memory-only session */ }
+        try {
+          calmBtn.setAttribute("aria-pressed", S.phys === "calm" ? "true" : "false");
+          livelyBtn.setAttribute("aria-pressed", S.phys === "lively" ? "true" : "false");
+        } catch (e) { /* state stands */ }
+        wake(S);
+      }
+      try {
+        calmBtn.addEventListener("click", function () { setPhys("calm"); });
+        livelyBtn.addEventListener("click", function () { setPhys("lively"); });
+      } catch (e) { /* static preset stands */ }
+      try {
+        physBar.appendChild(calmBtn);
+        physBar.appendChild(livelyBtn);
+        wrap.appendChild(physBar);
         wrap.appendChild(statusEl);
         wrap.appendChild(canvas);
         wrap.appendChild(hoverEl);
@@ -837,6 +933,17 @@ var PoolNetUI = (function () {
           }
         } catch (e) { g = S.full; }
         S.view = g;
+        /* Degree map for lively repulsion mass: {assetId: edgeCount},
+         * rebuilt wherever geometry is rebuilt (here — the only such
+         * place: mount seeds empty, every paint flows through this). */
+        S.deg = {};
+        try {
+          (S.view.edges || []).forEach(function (e) {
+            if (!e) return;
+            S.deg[e.a] = (S.deg[e.a] || 0) + 1;
+            S.deg[e.b] = (S.deg[e.b] || 0) + 1;
+          });
+        } catch (e) { /* unweighted repulsion stands */ }
         S.pathSet = {};
         S.pathFull = null;
         if (sel.aId && sel.bId && String(sel.aId) !== String(sel.bId)) {
@@ -1203,7 +1310,15 @@ var PoolNetUI = (function () {
     }
   }
 
-  return { mount: mount, paintGraph: paintGraph };
+  return {
+    mount: mount,
+    paintGraph: paintGraph,
+    _physForTest: _physForTest,
+    _defaultPhysForTest: _defaultPhysForTest,
+    _stepForTest: stepFrame,
+    _layoutForTest: circleLayout,
+    _drawForTest: drawScene
+  };
 })();
 
 if (typeof globalThis !== "undefined" && typeof globalThis.PoolNetUI === "undefined") { globalThis.PoolNetUI = PoolNetUI; }
