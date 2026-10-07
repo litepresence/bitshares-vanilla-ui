@@ -209,7 +209,7 @@ export function classify(m, width) {
     if (th >= 44 || tw >= 44) continue;
     fails.push({
       id: "A2-touch-floor",
-      detail: Math.round(tw) + "x" + Math.round(th),
+      detail: Math.round(tw) + "x" + Math.round(th) + (t.hint ? " " + JSON.stringify(t.hint) : ""),
       selector: t.selector || "",
     });
   }
@@ -278,13 +278,23 @@ export function measureInPage() {
     clippedText: [], viewportMeta: "", consoleErrors: [],
   };
 
-  /* A short, readable selector -- enough to grep app.css by, not a full path. */
+  /* A short, readable selector -- enough to grep app.css by, not a full path.
+   * Inputs carry their identifying attributes, because a punchlist row reading
+   * "input 18x18" is not actionable and eight identical rows are useless. */
   function sel(el) {
     if (!el) return "";
     var s = el.tagName.toLowerCase();
     if (el.id) return s + "#" + el.id;
     var cls = ((el.getAttribute && el.getAttribute("class")) || "").trim().split(/\s+/).filter(Boolean);
-    if (cls.length) return s + "." + cls.slice(0, 2).join(".");
+    if (cls.length) s += "." + cls.slice(0, 2).join(".");
+    if (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA") {
+      var bits = [];
+      if (el.type) bits.push("[type=" + el.type + "]");
+      if (el.name) bits.push("[name=" + el.name + "]");
+      if (el.placeholder) bits.push("[placeholder=" + String(el.placeholder).slice(0, 24) + "]");
+      if (bits.length) s += bits.join("");
+      else if (!cls.length) s += "(no id/class/attrs)";
+    }
     return s;
   }
   function shown(el) {
@@ -302,6 +312,20 @@ export function measureInPage() {
     var vm = doc.querySelector('meta[name="viewport"]');
     out.viewportMeta = vm ? String(vm.getAttribute("content") || "") : "";
   } catch (e) { /* no meta is a finding, not a crash */ }
+
+  /* The EFFECTIVE touch target. A radio/checkbox wrapped in a <label> is
+   * tapped via the label, so a 18x18 input inside a 44px label is NOT a
+   * defect -- measuring the bare input would flood the report with false
+   * positives (viewport-gaps.md:36 documents exactly this pattern). */
+  function targetBox(el) {
+    var b = el.getBoundingClientRect();
+    var lab = el.closest ? el.closest("label") : null;
+    if (lab) {
+      var lb = lab.getBoundingClientRect();
+      if (lb.width > b.width || lb.height > b.height) return { w: Math.max(b.width, lb.width), h: Math.max(b.height, lb.height) };
+    }
+    return { w: b.width, h: b.height };
+  }
 
   try {
     out.overflowPx = Math.max(0, Math.round(de.scrollWidth - de.clientWidth));
@@ -328,20 +352,35 @@ export function measureInPage() {
       var el = ctrls[c];
       if (out.smallTargets.length >= 8) break;
       if (!shown(el)) continue;
-      var b = el.getBoundingClientRect();
-      if (b.height < 44 && b.width < 44) {
-        out.smallTargets.push({ selector: sel(el), w: Math.round(b.width), h: Math.round(b.height) });
+      var b2 = targetBox(el);
+      if (b2.h < 44 && b2.w < 44) {
+        out.smallTargets.push({
+          selector: sel(el),
+          w: Math.round(b2.w), h: Math.round(b2.h),
+          /* A short text/attr hint so the punchlist row is actionable -- a row
+           * reading "a 38x13" tells the fixer nothing. */
+          hint: (el.tagName === "A"
+            ? (el.textContent || "").trim().slice(0, 40) || (el.getAttribute("href") || "")
+            : (el.placeholder || el.getAttribute("aria-label") || "").trim().slice(0, 40)),
+        });
       }
     }
 
-    /* Widest descendant of #view = the real content width. A full-bleed panel
-     * nested inside a narrow wrapper still wins, which is the point. */
+    /* Widest descendant of #view that FITS the viewport = the real content
+     * width. Clipped over-wide elements are excluded on purpose: a hidden
+     * overflow is an A1 finding, and counting it here would report a
+     * meaningless ratio >1 instead of the stranded-column number A3 wants.
+     * "Fits" is tested as width <= viewport width rather than by right-edge
+     * containment, so the body's default margin cannot disqualify a
+     * full-bleed panel. A full-bleed panel nested in a narrow wrapper still
+     * wins. */
     var view = doc.getElementById("view");
     if (view) {
       var best = 0, bestSel = "";
       var kids = view.querySelectorAll("*");
       for (var k = 0; k < kids.length; k++) {
         var kb = kids[k].getBoundingClientRect();
+        if (kb.width <= 0 || kb.width > de.clientWidth) continue;
         if (kb.width > best) { best = kb.width; bestSel = sel(kids[k]); }
       }
       out.contentSelector = bestSel;
@@ -364,4 +403,164 @@ export function measureInPage() {
   return out;
 }
 
-export const _internal = { ROOT, HERE, TESTNET_NODE };
+/* slugFor: a filesystem-safe stem for a route hash.
+ * Params: hash route hash. Returns: string. Pure, never throws. */
+export function slugFor(hash) {
+  return String(hash).replace(/^#\/?/, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "root";
+}
+
+/* settle: wait for the route to actually render rather than sleeping blind.
+ * #view is the router's render target (index.html:65).
+ * Failure: falls back to the fixed wait, so a never-rendering route is still
+ * measured -- and its emptiness shows up as a finding, not a silent pass. */
+async function settle(page, waitMs) {
+  try {
+    await page.waitForFunction(function () {
+      var v = document.getElementById("view");
+      return !!v && v.children.length > 0;
+    }, { timeout: Math.min(waitMs, 20000) });
+  } catch (e) { /* falls through to the fixed wait */ }
+  await page.waitForTimeout(waitMs);
+}
+
+/* sweep: measure every route at every viewport against live testnet.
+ * Params: opts { port, viewportId?, routeFilter?, waitMs?, shotsDir?, reportPath? }.
+ *   Defaults: port 8081, waitMs 6000, shotsDir docs/parity/viewport-shots,
+ *   reportPath docs/parity/viewport-audit-2.json.
+ * Returns: Promise<Report>. Report = { ranAt, network, node, viewports,
+ *   routesSwept, results, skips }. Skipped routes come back in Report.skips
+ *   with their recorded reason -- never counted as passes.
+ * Failure: a route that throws mid-measure records metrics.overflowPx = -1 and
+ *   an A4-console entry naming the error; the run never aborts. */
+export async function sweep(opts) {
+  opts = opts || {};
+  var port = opts.port || 8081;
+  var waitMs = opts.waitMs || 6000;
+  var shotsDir = opts.shotsDir || join(ROOT, "docs", "parity", "viewport-shots");
+  var reportPath = opts.reportPath || join(ROOT, "docs", "parity", "viewport-audit-2.json");
+  var viewports = VIEWPORTS.filter(function (v) { return !opts.viewportId || v.id === opts.viewportId; });
+  var routes = expandRoutes().filter(function (r) {
+    return !opts.routeFilter || r.hash.indexOf(opts.routeFilter) !== -1;
+  });
+
+  mkdirSync(shotsDir, { recursive: true });
+  ensureBrowsers();
+
+  /* Dev-only dep, imported lazily so the pure exports stay importable without
+   * it. playwright-core is CJS, so `chromium` may sit on .default. */
+  var pw = await import("./node_modules/playwright-core/index.js");
+  var chromium = pw.chromium || (pw.default && pw.default.chromium);
+  var browser = await chromium.launch();
+  var results = [];
+
+  /* Skips are reported whether or not the route filter narrows the sweep. */
+  var skips = ROUTES.filter(function (r) { return r.group === "skip"; })
+    .map(function (r) { return { hash: r.hash, reason: r.note || "no reason recorded" }; });
+
+  try {
+    for (var vi = 0; vi < viewports.length; vi++) {
+      var vp = viewports[vi];
+      var context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+
+      /* Same bootstrap shot.mjs uses (shot.mjs:47-66): pin testnet, dismiss the
+       * tour so it never covers the page under test. */
+      await context.addInitScript(function ({ node, flag }) {
+        try {
+          var raw = localStorage.getItem("bts-vanilla-settings-v1");
+          var s = raw ? JSON.parse(raw) : {};
+          s.network = "testnet";
+          s.activeNode = node;
+          localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
+          localStorage.setItem("bts-vanilla-tour-dismissed-v1", flag);
+        } catch (e) { /* app defaults stand */ }
+      }, { node: TESTNET_NODE, flag: "1" });
+
+      for (var ri = 0; ri < routes.length; ri++) {
+        var r = routes[ri];
+        var page = await context.newPage();
+        var errors = [];
+        page.on("console", function (m) { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
+        page.on("pageerror", function (e) { errors.push("pageerror: " + String(e).slice(0, 300)); });
+        try {
+          page.on("unhandledrejection", function (reason) { errors.push("unhandled: " + String(reason).slice(0, 300)); });
+        } catch (e) { /* older playwright-core: pageerror coverage stands */ }
+
+        var metrics = { overflowPx: -1, scrollRegion: "", widestSelector: "", smallTargets: [],
+          contentRatio: 0, contentSelector: "", clippedText: [], viewportMeta: "", consoleErrors: errors };
+
+        try {
+          await page.goto("http://localhost:" + port + "/" + r.hash,
+            { waitUntil: "domcontentloaded", timeout: 30000 });
+          await settle(page, waitMs);
+          metrics = await page.evaluate(measureInPage);
+          metrics.consoleErrors = errors;
+        } catch (e) {
+          errors.push("sweep: " + String((e && e.message) || e).slice(0, 200));
+          metrics.consoleErrors = errors;
+        }
+
+        var verdict = classify(metrics, vp.width);
+        var shot = null;
+        if (shouldShot(r.hash, verdict.verdict)) {
+          shot = join(shotsDir, slugFor(r.hash) + "-" + vp.id + ".png");
+          try { await page.screenshot({ path: shot }); } catch (e) { shot = null; }
+        }
+
+        results.push({
+          hash: r.hash, group: r.group, viewport: vp.id, width: vp.width,
+          verdict: verdict.verdict, fails: verdict.fails, notes: verdict.notes,
+          metrics: metrics, shot: shot,
+        });
+        process.stderr.write("[" + (ri + 1) + "/" + routes.length + " " + vp.id + "] "
+          + r.hash + " -> " + verdict.verdict + "\n");
+        await page.close();
+      }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  var report = {
+    ranAt: new Date().toISOString(),
+    network: "testnet",
+    node: TESTNET_NODE,
+    viewports: viewports,
+    routesSwept: routes.length,
+    results: results,
+    skips: skips,
+  };
+  try { writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n"); } catch (e) { /* stdout still carries the summary */ }
+  return report;
+}
+
+/* isMain: true only when this file is the entrypoint, so importing it for its
+ * pure exports never launches a browser. */
+function isMain() {
+  return process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+}
+
+if (isMain()) {
+  var a = process.argv.slice(2).reduce(function (acc, cur, i, arr) {
+    if (cur.startsWith("--")) acc[cur.slice(2)] = arr[i + 1] && !arr[i + 1].startsWith("--") ? arr[i + 1] : "1";
+    return acc;
+  }, {});
+  var report = await sweep({
+    port: Number(a.port || 8081),
+    viewportId: a.viewport || null,
+    routeFilter: a.routes || null,
+    waitMs: Number(a.wait || 6000),
+  });
+  var fails = report.results.filter(function (r) { return r.verdict === "FAIL"; });
+  console.log(JSON.stringify({
+    swept: report.results.length,
+    fail: fails.length,
+    passWithNote: report.results.filter(function (r) { return r.verdict === "PASS w/ note"; }).length,
+    pass: report.results.filter(function (r) { return r.verdict === "PASS"; }).length,
+    skips: report.skips.length,
+    failures: fails.map(function (r) {
+      return { hash: r.hash, viewport: r.viewport, fails: r.fails };
+    }),
+  }, null, 2));
+  if (fails.length) process.exitCode = 2;
+}

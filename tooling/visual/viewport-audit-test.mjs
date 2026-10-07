@@ -205,8 +205,32 @@ if (!hasPw) {
   m = await page.evaluate(A.measureInPage);
   ok(Number(m.contentRatio) < 0.55, "a 720px column at 2560 reads as stranded (got " + m.contentRatio + ")");
 
+  /* A CLIPPED over-wide element must not distort contentRatio -- a hidden
+   * overflow is an A1 finding, and folding it into the ratio would report a
+   * meaningless number >1 instead of the stranded-column figure. */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setContent("<div id='view' style='overflow:hidden'>"
+    + "<div style='width:900px'>clipped</div></div>");
+  m = await page.evaluate(A.measureInPage);
+  ok(Number(m.contentRatio) <= 1.001,
+    "a clipped over-wide child is excluded from contentRatio (got " + m.contentRatio + ")");
+
+  /* An 18x18 radio inside a 44px label is NOT a defect -- the label is the
+   * touch target (viewport-gaps.md:36 pattern). */
+  await page.setContent("<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    + "<label style='display:block;min-height:44px'>"
+    + "<input type='radio' style='width:18px;height:18px'>label text</label>");
+  m = await page.evaluate(A.measureInPage);
+  eq(m.smallTargets.length, 0, "a radio wrapped in a 44px label is not flagged (got " + JSON.stringify(m.smallTargets) + ")");
+
+  /* ...but a bare 18x18 radio with no label still is. */
+  await page.setContent("<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    + "<input type='radio' style='width:18px;height:18px'>");
+  m = await page.evaluate(A.measureInPage);
+  eq(m.smallTargets.length, 1, "an unlabelled 18x18 radio IS flagged");
+
   await br.close();
-  passed += 10;
+  passed += 14;
 }
 
 console.log("viewport-audit-test: " + passed + " assertions PASS");
