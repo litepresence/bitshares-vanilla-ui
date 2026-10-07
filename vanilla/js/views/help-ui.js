@@ -866,7 +866,7 @@ var HelpUI = (function () {
     wrap.appendChild(DOM.el(doc, "p", t("help.ai_help_hint", "Ask an AI assistant about BitShares against a structured mirror of this repository."), "muted"));
     var aiul = doc.createElement("ul");
     var aili = doc.createElement("li"), aia = doc.createElement("a");
-    aia.href = "https://deepwiki.com/bitshares/bitshares-vanilla-ui";
+    aia.href = "https://deepwiki.com/litepresence/bitshares-vanilla-ui";
     aia.textContent = t("help.ai_deepwiki", "Project wiki on DeepWiki (deepwiki.com)");
     try { aia.target = "_blank"; aia.rel = "noopener"; } catch (e) { /* same-tab fallback */ }
     aili.appendChild(aia); aiul.appendChild(aili);
@@ -907,7 +907,7 @@ var HelpUI = (function () {
       ["help.code", "Code", [
         ["https://github.com/bitshares", "help.link_gh_org", "BitShares on GitHub (github.com/bitshares)"],
         ["https://github.com/bitshares/bitshares-core", "help.link_gh_core", "Core blockchain (bitshares-core)"],
-        ["https://github.com/bitshares/bitshares-vanilla-ui", "help.link_gh_vanilla", "This wallet (bitshares-vanilla-ui)"]]],
+        ["https://github.com/litepresence/bitshares-vanilla-ui", "help.link_gh_vanilla", "This wallet (bitshares-vanilla-ui)"]]],
       ["help.explorers", "Explorers", [
         ["https://btslens.pages.dev", "help.link_exp_lens", "BTS Lens explorer (btslens.pages.dev)"],
         ["https://bitshares.network", "help.link_exp_network", "BitShares.network explorer"],

@@ -197,7 +197,7 @@ var AboutUI = (function () {
     var ul = doc.createElement("ul");
     [["#/help", t("help.help", "Help")],
      ["#/community", t("help.community_title", "Community")],
-     ["https://github.com/bitshares/bitshares-vanilla-ui", t("about.link_source", "Source code")]].forEach(function (pair) {
+     ["https://github.com/litepresence/bitshares-vanilla-ui", t("about.link_source", "Source code")]].forEach(function (pair) {
       var li = doc.createElement("li"), a = doc.createElement("a");
       a.setAttribute("href", pair[0]);
       a.textContent = pair[1];
