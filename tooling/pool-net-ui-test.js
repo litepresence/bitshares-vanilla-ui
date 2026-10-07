@@ -482,5 +482,19 @@ var skel = { pools: [
   ok(w({ X: { volBaseRaw: "not-a-number" } }, "X") === 1.0, "malformed volume renders thin");
 })();
 
+// Ramp vectors: grey->blue ink, pure (no DOM, no chain).
+(function () {
+  var NP = null;
+  try { NP = require("../vanilla/js/views/pool-net-paint.js"); } catch (e) { NP = null; }
+  if (!NP || typeof NP._rampForTest !== "function") { ok(false, "paint exposes _rampForTest"); return; }
+  var r = NP._rampForTest;
+  ok(r(0, "#758696", "#1E9ED7") === "rgb(117, 134, 150)", "t=0 is grey");
+  ok(r(1, "#758696", "#1E9ED7") === "rgb(30, 158, 215)", "t=1 is BitShares blue");
+  ok(r(0.5, "#000000", "#ffffff") === "rgb(128, 128, 128)", "midpoint is a true mix");
+  ok(r(9, "#758696", "#1E9ED7") === "rgb(30, 158, 215)", "clamps high");
+  ok(r(-2, "#758696", "#1E9ED7") === "rgb(117, 134, 150)", "clamps low");
+  ok(r(0.5, "banana", "#1E9ED7") === "rgb(117, 134, 150)", "garbage grey fails closed");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

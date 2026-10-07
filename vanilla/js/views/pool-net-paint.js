@@ -70,6 +70,34 @@ var NetPaint = (function () {
     return "other";
   }
 
+  /* Volume ramp: t in [0,1] -> grey-to-blue ink (owner 2026-10-07: color
+   * replaces the old digit-length thickness — same t metric, same /14
+   * scale, so a given blue means the same thing on every map/filter.
+   * Pure: parse failures fail closed to grey. Verbatim twin lives in
+   * pool-graph.js — doctrine prefers the duplication over a shared import
+   * for two files. */
+  function _ramp(t, greyHex, blueHex) {
+    function chan(h, i) { return parseInt(h.substr(i, 2), 16); }
+    function rgb(h) {
+      try {
+        var s = String(h).trim();
+        var m = /^#([0-9a-fA-F]{6})$/.exec(s);
+        if (m) return [chan(m[1], 0), chan(m[1], 2), chan(m[1], 4)];
+        var m3 = /^#([0-9a-fA-F]{3})$/.exec(s);
+        if (m3) return [chan(m3[1].charAt(0) + m3[1].charAt(0), 0), chan(m3[1].charAt(1) + m3[1].charAt(1), 0), chan(m3[1].charAt(2) + m3[1].charAt(2), 0)];
+        var mg = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(s);
+        if (mg) return [Number(mg[1]), Number(mg[2]), Number(mg[3])];
+      } catch (e) { /* grey below */ }
+      return null;
+    }
+    var g = rgb(greyHex), b = rgb(blueHex);
+    if (!g || !b) return "rgb(117, 134, 150)";
+    var k = Number(t);
+    if (!(k > 0)) k = 0;
+    if (k > 1) k = 1;
+    function mix(i) { return Math.round(g[i] + (b[i] - g[i]) * k); }
+    return "rgb(" + mix(0) + ", " + mix(1) + ", " + mix(2) + ")";
+  }
   /* Fill for a brand group: bts-blue tracks --accent (BitShares blue in all
    * three themes), the rest are the fixed §4 data hues. */
   function brandFill(group) {
@@ -320,7 +348,8 @@ var NetPaint = (function () {
     fitCanvas: fitCanvas,
     brandOf: brandOf,
     brandFill: brandFill,
-    _edgeWidthForTest: _edgeWidth
+    _edgeWidthForTest: _edgeWidth,
+    _rampForTest: _ramp
   };
 })();
 
