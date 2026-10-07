@@ -102,7 +102,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     if (!root) return;
     cleanupDetail();
     var u = U(), retry = function () { renderPoolDetail(root, poolId); };
-    var ctx = u.routeReady(root, "Pool " + poolId, retry);
+    var ctx = u.routeReady(root, t("pool.swap_desk", "Swap Desk"), retry);
     if (!ctx) return;
     var doc = ctx.doc, uiGen = ctx.myGen, myGen = ++gen;
     ctx.wrap.className = "wrap mkt-wrap";
@@ -113,7 +113,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       var wrap = u.el(doc, "div", null, "wrap mkt-wrap"); root.appendChild(wrap);
       var desk = u.el(doc, "div", null, "mkt mkt-pool"); wrap.appendChild(desk);
       var head = doc.createElement("section"); head.className = "mkt-head"; desk.appendChild(head);
-      head.appendChild(DOM.pageHead(doc, "Pool " + row.id, "pools"));
+      head.appendChild(DOM.pageHead(doc, t("pool.swap_desk", "Swap Desk"), "pools"));
       /* Copy-link share (account shareRow precedent — copy-link only, no QR
        * by decision). Static pool hash; the router resolves #/pools/:id. */
       try {
@@ -177,6 +177,9 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     try { joined = (await Pool.list({ share: row.share_id }))[0] || null; } catch (e) { joined = null; }
     if (!live(myGen, uiGen)) return;
     var r = joined || row;
+    /* Pool id lives here in the stats strip (owner call — the h1 above is
+     * just "Swap Desk"), alongside balances and spot. */
+    strip.appendChild(u.el(doc, "span", "Pool: " + r.id));
     var aA = u.amtText(r.balance_a_raw, r.asset_a_id, r.prec_a === undefined ? null : r.prec_a, r.sym_a);
     var aB = u.amtText(r.balance_b_raw, r.asset_b_id, r.prec_b === undefined ? null : r.prec_b, r.sym_b);
     strip.appendChild(u.el(doc, "span", "Balance A: " + aA.text)); strip.lastChild.title = t("account.raw_prefix", "raw ") + aA.raw;

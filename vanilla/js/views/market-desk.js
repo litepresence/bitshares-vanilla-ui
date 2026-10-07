@@ -288,7 +288,7 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
     var head = doc.createElement("section");
     head.className = "mkt-head";
     desk.appendChild(head);
-    head.appendChild(DOM.pageHead(doc, pair.quote + " / " + pair.base, "trade"));
+    head.appendChild(DOM.pageHead(doc, t("market.exchange_desk", "Exchange Desk"), "trade"));
     var sub = DOM.el(doc, "p", t("market.loading", "Loading market…"), "muted");
     head.appendChild(sub);
     /* LOW punchlist: header star favourite next to the pair (same FAV_KEY the
