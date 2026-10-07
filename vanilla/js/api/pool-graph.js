@@ -1163,7 +1163,10 @@ var PoolGraph = (function () {
           });
         }
       });
-      /* Release the drag; a drag that moved suppresses the click that follows it. */
+      /* Release the drag; a drag that moved suppresses the click that follows it.
+       * A moved release re-energizes the lively loop explicitly (band wake
+       * policy: the drop is a user gesture, so neighbors visibly react;
+       * without this the release lands dead on a paused map). */
       function endDrag() {
         try {
           var moved = !!(canvas._graphDrag && canvas._graphDrag.moved);
@@ -1171,6 +1174,11 @@ var PoolGraph = (function () {
           canvas.style.touchAction = "";
           canvas.style.cursor = "pointer";
           if (moved) canvas._graphSuppressClick = true;
+          if (moved) {
+            var liveS = null;
+            try { liveS = canvas._graphLiveS; } catch (e) { liveS = null; }
+            if (liveS) wake(liveS, true);
+          }
         } catch (e) {}
       }
       canvas.addEventListener("pointerup", endDrag);

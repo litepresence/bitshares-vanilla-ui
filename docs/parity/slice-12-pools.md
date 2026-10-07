@@ -225,6 +225,17 @@ furniture builders), ui left as composer with all 10 exports delegating —
 all 49 vectors pass unmodified, gates green, live flip verified. Stale
 pre-switch probes deleted; scenario probe ported to the switch.
 
+Refine — desk switch overlays canvas + drag-release wakes (user call):
+both trading-desk Physics switches moved from pane headers into
+relative stage wrappers over the map lower-left (band parity, same
+`.pool-net-stage` CSS; header-space lookup retargeted so refetches can't
+duplicate); `endDrag` in `pool-graph.js` now wakes the live state
+explicitly on moved-release (previously the drop landed dead on a paused
+map — offsets are visual-only, so no throw velocity, just a 3s
+re-energize). Verified headless on both desks: overlay positioned +
+`role=switch`, drag-under-lively moves and keeps/reacts the loop, zero
+errors. Nothing else on either desk changed.
+
 Refine — switch overlays canvas lower-left (user call): `Physics`
 control moved into a relative `.pool-net-stage` wrapper, absolutely
 positioned over the art (panel pill, readable in all themes) instead of

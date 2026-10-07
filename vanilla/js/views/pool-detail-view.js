@@ -494,7 +494,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       graphTitle.textContent = t("pool_detail.pool_map", "Pool map");
       graphHead.appendChild(graphTitle);
       /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition
-       * to this pane): ONE labeled on/off control in the map pane header.
+       * to this pane): ONE labeled on/off control, overlaid on the canvas
+       * lower-left via the stage wrapper below (band parity, owner call).
        * Shared poolNetPhys key with the exchange desk + pools band (default
        * calm/off); labels reuse pool_net.phys keys (already translated — no
        * new strings). Flip persists via PoolGraph.setPhys and repaints with
@@ -534,7 +535,17 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       graphWrap.appendChild(graphHead);
       var graphCanvas = doc.createElement("canvas");
       graphCanvas.className = "mkt-canvas";
-      graphWrap.appendChild(graphCanvas);
+      /* On-canvas switch overlay (owner call, band parity): the Physics box
+       * built above floats over the map lower-left inside a relative stage
+       * wrapper instead of sitting in the pane header. */
+      var graphStage = doc.createElement("div");
+      graphStage.className = "pool-net-stage";
+      graphStage.appendChild(graphCanvas);
+      try {
+        var movedBox = graphHead.querySelector ? graphHead.querySelector("[data-phys-switch]") : null;
+        if (movedBox) graphStage.appendChild(movedBox);
+      } catch (eSw) { /* switch stays in header */ }
+      graphWrap.appendChild(graphStage);
       var graphNote = u.el(doc, "p", "Loading pool map…", "muted");
       graphNote.setAttribute("aria-live", "polite");
       graphWrap.appendChild(graphNote);

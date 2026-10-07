@@ -483,7 +483,8 @@ MarketDesk._fill = MarketDesk._fill || {};
   }
 
   /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition to
-   * this pane): ONE labeled on/off control in the map pane header. Reads and
+   * this pane): ONE labeled on/off control, overlaid on the canvas
+   * lower-left via a stage wrapper (band parity, owner call). Reads and
    * writes the shared poolNetPhys key (PoolGraph.readPhys/setPhys when loaded,
    * guarded localStorage otherwise — same key the pool desk and the pools
    * band use, default calm/off). Labels reuse the pool_net.phys dict keys
@@ -531,9 +532,9 @@ MarketDesk._fill = MarketDesk._fill || {};
       var head = state.graphWrap.firstChild;
       if (!head || typeof doc.createElement !== "function") return;
       var existing = null;
-      try { existing = head.querySelector ? head.querySelector("[data-phys-switch]") : null; } catch (e) { existing = null; }
+      try { existing = state.graphWrap.querySelector ? state.graphWrap.querySelector("[data-phys-switch]") : null; } catch (e) { existing = null; }
       if (!existing) {
-        var kids = head.children || [];
+        var kids = state.graphWrap.getElementsByTagName ? state.graphWrap.getElementsByTagName("*") : [];
         for (var k = 0; k < kids.length; k++) {
           try {
             if (kids[k] && kids[k].getAttribute && kids[k].getAttribute("data-phys-switch")) { existing = kids[k]; break; }
@@ -564,7 +565,29 @@ MarketDesk._fill = MarketDesk._fill || {};
         paintPhysSwitch(box, next);
         try { redrawPoolMap(doc, state, true); } catch (e) { /* map stands */ }
       });
-      head.appendChild(box);
+      /* On-canvas overlay (owner call, band parity): the switch floats over
+       * the map lower-left inside a relative stage wrapper, not in the pane
+       * header. Falls back to the header when the canvas is absent. */
+      var placed = false;
+      try {
+        var cv = state.graphCanvas;
+        if (cv && cv.parentNode) {
+          var stage = cv.parentNode;
+          var staged = false;
+          try {
+            staged = stage && stage.className && String(stage.className).indexOf("pool-net-stage") !== -1;
+          } catch (e2) { staged = false; }
+          if (!staged) {
+            stage = doc.createElement("div");
+            stage.className = "pool-net-stage";
+            cv.parentNode.insertBefore(stage, cv);
+            stage.appendChild(cv);
+          }
+          stage.appendChild(box);
+          placed = true;
+        }
+      } catch (e) { /* header fallback below */ }
+      if (!placed) head.appendChild(box);
     } catch (e) { /* desk stands without the switch */ }
   }
 
