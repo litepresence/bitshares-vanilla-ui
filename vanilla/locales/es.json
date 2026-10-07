@@ -3487,6 +3487,11 @@
       "txbuilder.total_prefix",
       "txbuilder.unlock_memo_hint",
       "txbuilder.unsigned_mid",
+      "unlockconfirm.cancel",
+      "unlockconfirm.empty_password",
+      "unlockconfirm.password",
+      "unlockconfirm.unlock_failed",
+      "unlockconfirm.unlock_post",
       "uri.error_bad-account",
       "uri.error_bad-account-transfer",
       "uri.error_bad-asset",
@@ -7694,5 +7699,12 @@
     "open_desk": "Open %(id)s",
     "spark_label": "7-day trend for %(id)s",
     "selector_title": "Market Selector"
+  },
+  "unlockconfirm": {
+    "password": "Password",
+    "empty_password": "Enter your wallet password.",
+    "unlock_failed": "Unlock failed.",
+    "cancel": "Back",
+    "unlock_post": "Unlock & post"
   }
 }

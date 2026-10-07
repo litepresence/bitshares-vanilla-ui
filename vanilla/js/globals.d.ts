@@ -182,6 +182,7 @@ declare var TradePanels: any;
 declare var TransferPreview: any;
 declare var TransferPropose: any;
 declare var Overlay: any;
+declare var UnlockConfirm: any;
 declare var TableRenderer: any;
 declare var EventDelegate: any;
 declare var nobleGetPublicKey: any;
