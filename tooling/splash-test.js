@@ -45,8 +45,10 @@ eq(T.asCount(NaN), null, "NaN -> null");
 eq(T.asCount(Number.MAX_SAFE_INTEGER + 1), null, "unsafe -> null");
 
 /* topVolText — single-market row, verbatim volume, honest label. */
-eq(T.topVolText(null), "Top market 24h vol: unavailable on this node.", "null row");
-eq(T.topVolText({}), "Top market 24h vol: unavailable on this node.", "empty row");
+/* Unavailable copy is the honest one from 96c1ce3 (marketing audit): it
+ * names the fix (Settings -> Nodes) instead of blaming the node. */
+eq(T.topVolText(null), "Top-market volume is offline — check Settings → Nodes.", "null row");
+eq(T.topVolText({}), "Top-market volume is offline — check Settings → Nodes.", "empty row");
 eq(T.topVolText({ base: "BTS", quote: "CNY", quote_volume: "123.45" }),
   "Top market 24h vol (single market): BTS/CNY 123.45", "full row");
 eq(T.topVolText({ base: "BTS", quote: "CNY" }),

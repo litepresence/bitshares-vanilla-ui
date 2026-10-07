@@ -371,8 +371,21 @@ async function marketSmoke() {
   doc.body.appendChild(root);
   Desk.renderMarket(root, "BTS_USD");
   await sleep(400);
+  /* Since 01876d9 the desk H1 is the desk title ("Exchange Desk"); the pair
+   * identity moved to the sub line under it, so assert both: title present,
+   * pair still readable in the head. */
   const h1 = root.querySelector("h1");
-  check(h1 && /BTS/.test(h1.textContent), "desk h1 painted (" + (h1 && h1.textContent) + ")");
+  check(h1 && /Exchange Desk/.test(h1.textContent), "desk h1 painted (" + (h1 && h1.textContent) + ")");
+  const head = root.querySelector(".mkt-head");
+  /* The stub DOM keeps textContent per node (no live aggregation), so walk
+   * the subtree the way a browser would surface head.textContent. */
+  const deepText = (n) => {
+    let s = n && n.textContent ? String(n.textContent) : "";
+    (n && n.children || []).forEach((c) => { s += " " + deepText(c); });
+    return s;
+  };
+  const headText = deepText(head);
+  check(head && /USD/.test(headText), "pair shown in desk head (" + headText.slice(0, 60) + ")");
   for (const [fn, want] of [["fill", 1], ["paintBook", 1], ["renderMyTrades", 1], ["saveLast", 1]]) {
     check(seen[fn] >= want, "registry wired: " + fn + " called (" + seen[fn] + "x)");
   }

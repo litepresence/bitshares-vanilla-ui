@@ -15,7 +15,10 @@ var all = [];
 MenuUI.SECTIONS.forEach(function (s) { s.links.forEach(function (l) { all.push(l.href); }); });
 eq(all.length, 52, "52 listed pages");
 eq(new Set(all).size, all.length, "no href listed twice (single-home)");
-["#/", "#/transfer", "#/market/BTS_USD", "#/samet", "#/barter", "#/spotlight",
+/* Trade lands on the selector ladder, not a desk (pair-context 2026-10-07:
+ * both categories run category -> selector -> desk). #/market/:marketID stays
+ * routable, it is simply no longer a navbar destination. */
+["#/", "#/transfer", "#/markets", "#/samet", "#/barter", "#/spotlight",
  "#/direct-debit", "#/api-lab", "#/es-lab", "#/txbuilder", "#/ops", "#/top-ops",
  "#/registration", "#/voting", "#/fees", "#/news", "#/community", "#/about"].forEach(function (h) {
   ok(all.indexOf(h) !== -1, h + " listed");
