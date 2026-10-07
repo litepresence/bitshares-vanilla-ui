@@ -1053,10 +1053,15 @@ var PoolGraph = (function () {
        * exchange desk). Hover wins over the triangle; everything else stays
        * thin grey. The user highlight keeps its soft glow. */
       var st = edgeStyle(e.poolId, hi, pathSet, hoverEdge);
-      /* Resolve the token NAME to a real colour. Assigning the name straight to
-       * strokeStyle is silently invalid and the canvas keeps its default
-       * black stroke — which is exactly what "all the edges are black" was. */
-      var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : border);
+      /* Base ink is the size ramp (owner 2026-10-07 — color replaced the
+       * flat border grey; interaction tokens keep overriding). sizeRaw is
+       * the BigInt-sum digit string, so digit length is the whole metric. */
+      var baseT = 0;
+      try {
+        var raw = String(e.sizeRaw == null ? "" : e.sizeRaw).replace(/^0+/, "");
+        baseT = (/^\d+$/.test(String(e.sizeRaw == null ? "" : e.sizeRaw)) && raw) ? Math.min(raw.length / 14, 1) : 0;
+      } catch (e2) { baseT = 0; }
+      var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : _ramp(baseT, muted, accent));
       ctx.strokeStyle = col;
       ctx.lineWidth = st.width;
       /* The pair's own line + its route to BTS are the ONLY glowing lines, in
@@ -1224,8 +1229,14 @@ var PoolGraph = (function () {
     var id = String(poolId);
     if (hoverEdge && id === String(hoverEdge)) return { color: "warn", width: 3 };
     if ((pathSet && pathSet[id]) || (hi && hi[id])) return { color: "path", width: 2.5 };
-    return { color: "border", width: 1.2 };
+    return { color: "ramp", width: 1.25 };
   }
+
+  /* sizeT: pool-size parameter for the ramp — stripped digit length over
+   * 14 (the bands' scale, so a given blue means the same thing on every
+   * map). Counts only, never values — no floats on money.
+   * @param {any} sizeRaw digit string (BigInt-sum shape from buildGraph).
+   * @returns {number} t in [0,1]. Never throws. */
 
   /* withAlpha: a canvas-safe colour at reduced opacity, so the "path" lines
    * can read as a soft blue-grey on any panel without a per-theme token.

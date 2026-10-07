@@ -358,8 +358,8 @@ function ok(cond, name) {
       "every stroked line got a real colour (never a token name)");
     ok(rc.log.strokes.some((s) => /^rgba\(0,123,255,0\.550\)$/.test(s.color)),
       "the pair's own line is a desaturated ACCENT at rest (bluish grey, --accent fallback headless)");
-    ok(rc.log.strokes.some((s) => s.color === "#2a2e39"),
-      "an unrelated line is muted grey (--border fallback)");
+    ok(rc.log.strokes.some((s) => /^rgb\(/.test(s.color)),
+      "an unrelated line wears ramp ink (grey->blue by pool size, not flat grey)");
     ok(rc.log.strokes.some((s) => s.width === 2.5), "the path line is the thicker one");
     ok(rc.log.shadows.indexOf(12) !== -1, "the path line glows");
 
@@ -377,9 +377,10 @@ function ok(cond, name) {
       "no other shadow radius appears (hovered line gets no glow)");
   })();
 
-  /* LINE COLOUR CONTRACT (2026-10-07): yellow means HOVERED and nothing
-   * else; the triangle (the pair's own pool + both legs' BTS routes) is
-   * green; every other line stays muted grey. */
+  /* LINE COLOUR CONTRACT (2026-10-07, ramp 2026-10-07): yellow means
+   * HOVERED and nothing else; the triangle (the pair's own pool + both
+   * legs' BTS routes) is green; every other line wears the grey->blue
+   * size ramp at one constant width. */
   const es = (typeof PG._edgeStyleForTest === "function") ? PG._edgeStyleForTest : null;
   ok(typeof PG._edgeStyleForTest === "function", "_edgeStyleForTest exported (pure colour decision)");
   if (es) {
@@ -389,15 +390,54 @@ function ok(cond, name) {
     ok(es("1.19.5", HI, TRI, "").color === "path", "the pair's own pool is a PATH line at rest");
     ok(es("1.19.6", HI, TRI, "").color === "path", "a leg->BTS hop is a path line too");
     ok(es("1.19.7", {}, TRI, "").color === "path", "the other leg's BTS route is a path line");
-    ok(es("1.19.8", HI, TRI, "").color === "border", "an unrelated pool stays muted grey");
-    ok(es("1.19.9", {}, {}, "").color === "border", "no path set at all -> grey");
-    ok(es("1.19.9", {}, {}, "1.19.8").color === "border", "hovering one line does not tint another");
+    ok(es("1.19.8", HI, TRI, "").color === "ramp", "an unrelated pool takes ramp ink");
+    ok(es("1.19.9", {}, {}, "").color === "ramp", "no path set at all -> ramp");
+    ok(es("1.19.9", {}, {}, "1.19.8").color === "ramp", "hovering one line does not tint another");
     const atRest = es("1.19.6", HI, TRI, "");
     ok(atRest.color !== "warn", "NOTHING is yellow at rest");
     /* The path token must never be "buy"/green again: it was a misreading. */
-    ok(["path", "warn", "border"].indexOf(es("1.19.5", {}, TRI, "").color) !== -1,
-      "only three tokens exist: path, warn, border");
+    ok(["path", "warn", "ramp"].indexOf(es("1.19.5", {}, TRI, "").color) !== -1,
+      "only three tokens exist: path, warn, ramp");
   }
+
+  /* RAMP INK (owner 2026-10-07): base edges wear grey->blue by pool size
+   * (not flat border grey), one constant width; path/hover keep overriding.
+   * Needs the drawGraph paint path (recCtx logs strokes). */
+  (function () {
+    function recCtx2() {
+      var log = { strokes: [] };
+      var ctx = { fillStyle: "", strokeStyle: "", lineWidth: 1, font: "", textAlign: "",
+        globalAlpha: 1, shadowColor: "", shadowBlur: 0,
+        setTransform: function () {}, clearRect: function () {},
+        save: function () {}, restore: function () {},
+        beginPath: function () {}, moveTo: function () {}, lineTo: function () {},
+        arc: function () {}, fill: function () {}, fillText: function () {}, strokeText: function () {},
+        stroke: function () { log.strokes.push({ color: String(ctx.strokeStyle), width: Number(ctx.lineWidth) }); }
+      };
+      return { ctx: ctx, log: log };
+    }
+    function blueMinusRed(c) {
+      var m = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(String(c));
+      return m ? (Number(m[3]) - Number(m[1])) : null;
+    }
+    var G2 = {
+      nodes: [{ assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTS" }, { assetId: "1.3.7", sym: "CNY" }],
+      edges: [{ poolId: "1.19.5", a: "1.3.1", b: "1.3.2", sizeRaw: "10000000" },
+              { poolId: "1.19.8", a: "1.3.2", b: "1.3.7", sizeRaw: "5" }]
+    };
+    var rc2 = recCtx2();
+    var canvas2 = { clientWidth: 400, parentNode: null, style: {}, width: 0, height: 0,
+      getContext: function () { return rc2.ctx; }, addEventListener: function () {} };
+    PG.drawGraph({}, canvas2, G2, { assetA: "9.9.9", assetB: "8.8.8", highlightPools: [] });
+    var base = rc2.log.strokes.filter(function (s) { return s.width > 1.1 && s.width !== 3 && s.width !== 2.5; });
+    ok(base.length >= 2, "both base edges painted (got " + base.length + ")");
+    var inks = base.map(function (s) { return blueMinusRed(s.color); });
+    ok(inks[0] !== null && inks[1] !== null, "base edges wear rgb ramp ink (got " + JSON.stringify(base.map(function (s) { return s.color; })) + ")");
+    if (inks[0] !== null && inks[1] !== null) {
+      ok(Math.abs(inks[0] - inks[1]) > 5, "big pool bluer than small pool");
+    }
+    ok(base.every(function (s) { return s.width === 1.25; }), "base edges share one constant width");
+  })();
 
   /* withAlpha: the path colour must be a REAL canvas colour at reduced
    * opacity — a token name (or an unparseable string) would paint black. */

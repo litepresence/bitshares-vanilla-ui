@@ -1723,7 +1723,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         var bits = [];
         if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
         if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        P.graphNote.textContent = t("pool_detail.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ".";
+        P.graphNote.textContent = t("pool_detail.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ". " +
+          t("pool_net.ramp", "Pool size: small → large");
       }
     } catch (e) { /* canvas best-effort */ }
   }

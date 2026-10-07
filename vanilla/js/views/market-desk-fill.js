@@ -652,7 +652,8 @@ MarketDesk._fill = MarketDesk._fill || {};
         var bits = [];
         if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
         if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        state.graphNote.textContent = t("market.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ".";
+        state.graphNote.textContent = t("market.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ". " +
+          t("pool_net.ramp", "Pool size: small → large");
       }
     } catch (e) { /* canvas best-effort */ }
   }
