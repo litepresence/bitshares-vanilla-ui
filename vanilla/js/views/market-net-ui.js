@@ -363,7 +363,7 @@ var MarketNetUI = (function () {
       tr.appendChild(tdC);
       var hv = humanVol(r.baseVol, precs[r.a], r.symA, r.quoteVol, precs[r.b], r.symB);
       var tdV = mk(doc, "td", hv.text, "num");
-      try { tdV.title = "raw " + hv.raw; } catch (e) { /* text stands */ }
+      try { tdV.title = t("account.raw_prefix", "raw ") + hv.raw; } catch (e) { /* text stands */ }
       tr.appendChild(tdV);
       var tdS = doc.createElement("td");
       var ph = mk(doc, "span", "\u2014", "muted");
@@ -557,6 +557,17 @@ var MarketNetUI = (function () {
         var liveIds = shown.map(function (r) { return deskForProbe(r.symA, r.symB); });
         MN.reconcileCache(CURATED[network()] || CURATED.mainnet, liveIds);
       } catch (e) { /* cache is a speedup, never load-bearing */ }
+      /* Band mounts right after the table (parallel with sparklines):
+       * the mapper starts while the 8 history calls fly; spark canvases
+       * fill in when ready. Spark logic itself unchanged. */
+      var deskByPool = {};
+      try { deskByPool = poolDeskMap(poolRows, xDesc.id, xDesc.symbol); } catch (e) { deskByPool = {}; }
+      (function () {
+        var rawA = aName, rawB = bName;
+        mountBand(doc, wrap, function () {
+          return { a: rawA, b: rawB, s: "", aId: xDesc ? xDesc.id : null, bId: yDesc ? yDesc.id : null };
+        }, deskByPool, myGen);
+      })();
       /* Lazy top-8 sparklines (spec §2: 1 get_market_history each, after the
        * table — the table stays interactive before the mapper finishes). */
       var jobs = shown.slice(0, SPARK_N).map(function (r) {
@@ -571,16 +582,7 @@ var MarketNetUI = (function () {
           return cv;
         })(), r, r._deskId).catch(function () { /* placeholder stands */ });
       });
-      return Promise.all(jobs).then(function () { return shown; });
-    }).then(function (shown) {
-      if (!live()) return;
-      var deskByPool = {};
-      try { deskByPool = poolDeskMap(poolRows, xDesc.id, xDesc.symbol); } catch (e) { deskByPool = {}; }
-      var rawA = aName, rawB = bName;
-      mountBand(doc, wrap, function () {
-        return { a: rawA, b: rawB, s: "", aId: xDesc ? xDesc.id : null, bId: yDesc ? yDesc.id : null };
-      }, deskByPool, myGen);
-      void shown;
+      return Promise.all(jobs);
     }).catch(function (e) {
       if (!live()) return;
       clearBox(listBox);
@@ -611,7 +613,8 @@ var MarketNetUI = (function () {
    * password is asked only at signing (no signing on this page at all).
    * @param {HTMLElement} root router mount element.
    * @returns {Promise<void>} resolves when the table + sparkline settle
-   *   lands (band mounts alongside; headless tests await this). */
+   *   lands (band mounts right after the table, before spark settle;
+   *   headless tests await this). */
   function renderMarkets(root) {
     if (!root) return Promise.resolve();
     var myGen = ++gen;
