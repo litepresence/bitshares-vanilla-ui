@@ -1082,12 +1082,13 @@ var InstantTradeUI = (function () {
     var sendBtn = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
-    /* attemptSend: sign + broadcast. Locked wallets detour through the
+    /* attemptSend: sign + broadcast. A locked wallet detours through the
      * shared review + unlock modal (compact summary — the full review above
-     * stays on the page behind it) and re-enter here after unlock; a wallet
-     * that yields no active key after unlock fails loudly instead of
-     * looping the modal (depth guard). Params: depth (0 first try). */
-    function attemptSend(depth) {
+     * stays on the page behind it); after unlock the order is RE-REVIEWED
+     * (same as the old inline row: R was built for the viewing-as account
+     * while locked, so auto-sending it under the wallet key would prove
+     * against the wrong account — the note below says so). */
+    function attemptSend() {
       if (myGen !== gen) return;
       backBtn.disabled = true; sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
@@ -1095,10 +1096,6 @@ var InstantTradeUI = (function () {
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
         backBtn.disabled = false; sendBtn.disabled = false;
-        if (depth >= 1) {
-          showError(doc, wrap, "wallet-unlocked-without-active-key", t("instant.order_failed", "Order failed."));
-          return;
-        }
         if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
           showError(doc, wrap, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("instant.order_failed", "Order failed."));
           return;
@@ -1114,7 +1111,10 @@ var InstantTradeUI = (function () {
           feeHuman: null,
           needPassword: true,
           submitLabel: t("instant.unlock_sign", "Unlock & sign"),
-          onUnlocked: function () { attemptSend(1); },
+          onUnlocked: function () {
+            if (myGen !== gen) return;
+            wrap.appendChild(DOM.el(doc, "p", t("instant.unlocked_repreview_note", "Unlocked — press Back and review again so the order uses your account."), "muted"));
+          },
           onCancel: function () {}
         });
         return;
@@ -1149,7 +1149,7 @@ var InstantTradeUI = (function () {
           backBtn.disabled = false; sendBtn.disabled = false;
         });
     }
-    sendBtn.addEventListener("click", function () { attemptSend(0); });
+    sendBtn.addEventListener("click", function () { attemptSend(); });
   }
 
   /* Order ids snapshot before send (diffed after). */

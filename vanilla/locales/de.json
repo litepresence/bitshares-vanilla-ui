@@ -1911,6 +1911,7 @@
       "instant.unknown_market_asset",
       "instant.unlock_sign",
       "instant.unlock_your_wallet_to_trade",
+      "instant.unlocked_repreview_note",
       "instant.via_mid",
       "instant.viewing_as",
       "instant.walk_suffix",
@@ -6360,7 +6361,8 @@
     "walkthrough_paying_mid": " trifft Bids, zahlend ",
     "walkthrough_trade_prefix": "Trade ",
     "uc_title": "Unlock to sign",
-    "unlock_sign": "Unlock & sign"
+    "unlock_sign": "Unlock & sign",
+    "unlocked_repreview_note": "Entsperrt — drücken Sie Zurück und prüfen Sie erneut, damit die Order Ihr Konto verwendet."
   },
   "news": {
     "account_overview_balances_and_history": "Kontoübersicht — Salden und Historie",

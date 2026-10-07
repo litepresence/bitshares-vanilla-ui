@@ -1911,6 +1911,7 @@
       "instant.unknown_market_asset",
       "instant.unlock_sign",
       "instant.unlock_your_wallet_to_trade",
+      "instant.unlocked_repreview_note",
       "instant.via_mid",
       "instant.viewing_as",
       "instant.walk_suffix",
@@ -6360,7 +6361,8 @@
     "walkthrough_paying_mid": " 吃买单支付 ",
     "walkthrough_trade_prefix": "交易 ",
     "uc_title": "Unlock to sign",
-    "unlock_sign": "Unlock & sign"
+    "unlock_sign": "Unlock & sign",
+    "unlocked_repreview_note": "已解锁 — 请返回并重新复核，以便订单使用您的账户。"
   },
   "news": {
     "account_overview_balances_and_history": "账户总览 — 余额与历史",

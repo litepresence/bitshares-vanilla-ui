@@ -4,8 +4,9 @@
 Adds trade.{uc_title,uc_amount,uc_price,uc_orders,uc_range,uc_total} and
 instant.{uc_title,unlock_sign} with verbatim English defaults matching the
 UnlockConfirm call sites, and removes the orphaned inline-row keys
-(trade.password_label, trade.unlocking, instant.password, instant.unlock,
-instant.unlocked_repreview_note — no call sites remain), in all 12
+(trade.password_label, trade.unlocking, instant.password, instant.unlock —
+no call sites remain; instant.unlocked_repreview_note STAYS: the modal
+keeps the re-review step), in all 12
 vanilla/locales/*.json. Non-en dicts take honest English stubs.
 _meta.translated inventories kept sorted, as check_i18n expects. Idempotent.
 
@@ -22,7 +23,6 @@ STALE_KEYS = [
     "trade.unlocking",
     "instant.password",
     "instant.unlock",
-    "instant.unlocked_repreview_note",
 ]
 
 NEW_KEYS = {

@@ -1911,6 +1911,7 @@
       "instant.unknown_market_asset",
       "instant.unlock_sign",
       "instant.unlock_your_wallet_to_trade",
+      "instant.unlocked_repreview_note",
       "instant.via_mid",
       "instant.viewing_as",
       "instant.walk_suffix",
@@ -6360,7 +6361,8 @@
     "walkthrough_paying_mid": " 매수호가에 체결되며 지불액: ",
     "walkthrough_trade_prefix": "거래 ",
     "uc_title": "Unlock to sign",
-    "unlock_sign": "Unlock & sign"
+    "unlock_sign": "Unlock & sign",
+    "unlocked_repreview_note": "잠금이 해제되었습니다 — 주문이 내 계정을 사용하도록 뒤로 가서 다시 검토하십시오."
   },
   "news": {
     "account_overview_balances_and_history": "계정 개요 — 잔액과 기록",

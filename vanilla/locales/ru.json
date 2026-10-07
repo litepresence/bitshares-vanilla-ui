@@ -1911,6 +1911,7 @@
       "instant.unknown_market_asset",
       "instant.unlock_sign",
       "instant.unlock_your_wallet_to_trade",
+      "instant.unlocked_repreview_note",
       "instant.via_mid",
       "instant.viewing_as",
       "instant.walk_suffix",
@@ -6360,7 +6361,8 @@
     "walkthrough_paying_mid": " бьёт по бидам с оплатой ",
     "walkthrough_trade_prefix": "Сделка ",
     "uc_title": "Unlock to sign",
-    "unlock_sign": "Unlock & sign"
+    "unlock_sign": "Unlock & sign",
+    "unlocked_repreview_note": "Разблокировано — нажмите Назад и проверьте снова, чтобы ордер использовал ваш аккаунт."
   },
   "news": {
     "account_overview_balances_and_history": "Обзор аккаунта — балансы и история",
