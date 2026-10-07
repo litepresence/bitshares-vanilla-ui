@@ -37,10 +37,9 @@ async function energy(sec) {
 console.log("waiting 25s for settle...");
 await page.waitForTimeout(25000);
 console.log("SETTLED?", JSON.stringify(await geomSum()));
-// 1. flip to Lively late
+// 1. flip Physics ON late (switch replaced the Calm/Lively buttons)
 await page.evaluate(() => {
-  const btns = Array.from(document.querySelectorAll("#pool-net-band .pool-net-physbtn"));
-  btns.find((b) => /lively/i.test(b.textContent || "")).click();
+  document.querySelector("#pool-net-band .pool-net-physwitch").click();
 });
 await page.waitForTimeout(500);
 console.log("POST-FLIP:", JSON.stringify(await geomSum()));

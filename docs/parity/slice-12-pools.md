@@ -218,6 +218,13 @@ filter) re-seeds and runs another 3s. Zoom is camera-only (no wake). Ends the st
 tails can't outlive the cap. Browser proof: idle paused @180, flip runs,
 paused @180 again, zero errors.
 
+Refine — `pool-net-ui.js` split 1468→589 + 4 modules (readability): `api/pool-net-phys.js`
+(simulation + loop via injected `S.paint`), `pool-net-paint.js` (pure render),
+`pool-net-gestures.js` (input via hooks), `pool-net-chrome.js` (band
+furniture builders), ui left as composer with all 10 exports delegating —
+all 49 vectors pass unmodified, gates green, live flip verified. Stale
+pre-switch probes deleted; scenario probe ported to the switch.
+
 Refine — switch overlays canvas lower-left (user call): `Physics`
 control moved into a relative `.pool-net-stage` wrapper, absolutely
 positioned over the art (panel pill, readable in all themes) instead of
