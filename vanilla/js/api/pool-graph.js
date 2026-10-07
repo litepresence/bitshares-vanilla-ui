@@ -648,7 +648,7 @@ var PoolGraph = (function () {
           var d = S.drawOpts || {};
           drawGraph(S.doc, S.canvas, S.graph,
             { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, nav: d.nav,
-              _pos: S.geom, hoverEdge: (S.canvas && S.canvas._graphHoverEdge) || "" });
+              _pos: S.geom });
         } catch (e) { /* next frame */ }
       }
       if (moved < P.stillTol) S.still = (S.still || 0) + 1; else S.still = 0;
@@ -920,6 +920,10 @@ var PoolGraph = (function () {
     if (!g) return null;
     var accent = _cssTok("--accent", "#007bff"), border = _cssTok("--border", "#2a2e39"),
       text = _cssTok("--text", "#c5cbce"), buy = _cssTok("--buy", "#26de81"),
+      /* "Path" lines (the pair's own pool + its route to BTS): a desaturated
+       * accent so they read as a soft blue-grey on any panel, with a glow in
+       * the full accent. Resolved once per frame, never a token name. */
+      pathCol = withAlpha(accent, 0.55),
       muted = _cssTok("--muted", "#758696"), warn = _cssTok("--warn", "#fbbc06"),
       danger = _cssTok("--danger", "#f74745"), live = _cssTok("--live", "#7bd500");
     var ctx = g.ctx, nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
@@ -962,16 +966,13 @@ var PoolGraph = (function () {
       pos[id] = o ? { x: base[id].x + o.dx, y: base[id].y + o.dy } : { x: base[id].x, y: base[id].y };
     });
     try { canvas._graphBase = base; } catch (e) {}
-    /* The repaint opts carry the live hover + nav mode so a hover repaint
-     * recolors the line (and a click after it navigates the same way). */
+    /* Nav mode is remembered so a later hover repaint navigates the same way.
+     * The HOVER is NOT stored here: it lives on the canvas and drawGraph reads
+     * it live. Storing a snapshot meant the map repainted one frame behind —
+     * no yellow while hovering, then a stuck yellow after leaving. */
     try {
       canvas._graphNav = (opts && opts.nav) ? opts.nav : null;
-      canvas._graphRepaint = { doc: doc, graph: graph, opts: (function () {
-        var o = {};
-        for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
-        o.hoverEdge = canvas._graphHoverEdge || "";
-        return o;
-      })() };
+      canvas._graphRepaint = { doc: doc, graph: graph, opts: opts };
     } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
     /* Map text contract: corner verdicts per leg + bottom pair verdict, all from one mapTheme call. */
@@ -1005,7 +1006,13 @@ var PoolGraph = (function () {
     } catch (e) { /* plain edges stand */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
-    var hoverEdge = (opts && opts.hoverEdge != null) ? String(opts.hoverEdge) : "";
+    /* Live hover from the canvas (single source of truth); an explicit
+     * opts.hoverEdge still wins so a caller can paint a state directly. */
+    var hoverEdge = "";
+    try {
+      if (opts && opts.hoverEdge != null) hoverEdge = String(opts.hoverEdge);
+      else if (canvas && canvas._graphHoverEdge) hoverEdge = String(canvas._graphHoverEdge);
+    } catch (e) { hoverEdge = ""; }
     edges.forEach(function (e) {
       var p = pos[e.a], q = pos[e.b];
       if (!p || !q) return;
@@ -1019,15 +1026,22 @@ var PoolGraph = (function () {
        * exchange desk). Hover wins over the triangle; everything else stays
        * thin grey. The user highlight keeps its soft glow. */
       var st = edgeStyle(e.poolId, hi, pathSet, hoverEdge);
-      var hot = !!hi[String(e.poolId)];
-      ctx.strokeStyle = st.color;
+      /* Resolve the token NAME to a real colour. Assigning the name straight to
+       * strokeStyle is silently invalid and the canvas keeps its default
+       * black stroke — which is exactly what "all the edges are black" was. */
+      var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : border);
+      ctx.strokeStyle = col;
       ctx.lineWidth = st.width;
-      if (hot && st.color !== "warn") {
-        try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (e) { /* glow best-effort */ }
+      /* The pair's own line + its route to BTS are the ONLY glowing lines, in
+       * their own colour (owner: the glow is wanted, on these). The hovered
+       * line never glows — yellow alone means "this one is live". */
+      var glowing = (st.color === "path");
+      if (glowing) {
+        try { ctx.save(); ctx.shadowColor = accent; ctx.shadowBlur = 12; } catch (e2) { /* glow best-effort */ }
       }
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
-      if (hot) {
-        try { ctx.restore(); } catch (e) { /* state stands */ }
+      if (glowing) {
+        try { ctx.restore(); } catch (e3) { /* state stands */ }
       }
       /* Both legs AND their symbols ride along: the swap desk navigates an
        * edge to the pool, the exchange desk to the ORDER BOOK for those two
@@ -1165,20 +1179,51 @@ var PoolGraph = (function () {
   }
 
   /* edgeStyle: the ONE place a line's colour is decided (owner 2026-10-07).
-   * Precedence: HOVERED wins and is YELLOW — yellow means "this line is under
-   * your pointer and a click opens it", nothing else. Then the TRIANGLE (the
-   * pair's own pool + both legs' routes to BTS) is GREEN. Everything else is
-   * the muted border grey. Pure, so the audit vectors pin the contract.
+   * Precedence, and only three states:
+   *   HOVERED -> yellow ("warn"): this line is under your pointer and a click
+   *     opens it. Nothing else is ever yellow.
+   *   THE PAIR'S OWN LINE + ITS ROUTE TO BTS (the "path" set: the leg<->leg
+   *     pool plus both legs' hops to BTS) -> bluish grey with a glow. It is
+   *     the structure you are here to read, so it is the only thing that
+   *     glows; it must not shout for attention, hence a desaturated accent.
+   *   EVERYTHING ELSE -> the muted grey border colour.
+   * Pure, so the audit vectors pin the contract.
    * @param {string} poolId Edge pool id.
-   * @param {Object} hi Highlighted pools (user highlight, keeps its glow).
-   * @param {Object} pathSet Triangle pools (leg edge + BTS path).
+   * @param {Object} hi Highlighted pools (user highlight).
+   * @param {Object} pathSet The pair's own pool + its BTS route.
    * @param {string} hoverEdge Hovered pool id ("" when none).
    * @returns {{color: string, width: number}} token name + line width. */
   function edgeStyle(poolId, hi, pathSet, hoverEdge) {
     var id = String(poolId);
     if (hoverEdge && id === String(hoverEdge)) return { color: "warn", width: 3 };
-    if ((hi && hi[id]) || (pathSet && pathSet[id])) return { color: "buy", width: 2.5 };
+    if ((pathSet && pathSet[id]) || (hi && hi[id])) return { color: "path", width: 2.5 };
     return { color: "border", width: 1.2 };
+  }
+
+  /* withAlpha: a canvas-safe colour at reduced opacity, so the "path" lines
+   * can read as a soft blue-grey on any panel without a per-theme token.
+   * Parses #rgb / #rrggbb / #rrggbbaa / rgb() / rgba() and returns the input
+   * untouched when it cannot (never throws, never paints an invalid value —
+   * an unparseable colour would silently fall back to black). */
+  function withAlpha(color, alpha) {
+    try {
+      var c = String(color || "").trim();
+      var m = /^#([0-9a-f]{3,8})$/i.exec(c);
+      if (m) {
+        var h = m[1];
+        if (h.length === 3 || h.length === 4) h = h.split("").map(function (x) { return x + x; }).join("");
+        if (h.length !== 6 && h.length !== 8) return c;
+        var r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+        var a0 = (h.length === 8) ? parseInt(h.slice(6, 8), 16) / 255 : 1;
+        return "rgba(" + r + "," + g + "," + b + "," + (a0 * alpha).toFixed(3) + ")";
+      }
+      var rgb = /^rgba?\(([^)]+)\)$/i.exec(c);
+      if (rgb) {
+        var parts = rgb[1].split(",").map(function (x) { return x.trim(); });
+        if (parts.length >= 3) return "rgba(" + parts[0] + "," + parts[1] + "," + parts[2] + "," + alpha.toFixed(3) + ")";
+      }
+      return c;
+    } catch (e) { return String(color || ""); }
   }
 
   /* EDGE_TOL: how close (CSS px) the pointer must be to a line to mean it.
@@ -1383,6 +1428,7 @@ var PoolGraph = (function () {
     _segDistForTest: segDist,
     _marketIdForTest: marketIdForEdge,
     _edgeStyleForTest: edgeStyle,
+    _withAlphaForTest: withAlpha,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
       mapTheme: mapTheme } };

@@ -27,11 +27,18 @@ destinations for the same line depending on which desk you were on.
 | Click a line | opens **that pool** | opens the **order book** for the two assets the line joins |
 | Click a node | opens that asset (unchanged) | same |
 
-- **Yellow means hovered. Nothing else.** The "triangle" — the pool joining
-  your two desk legs *plus* both legs' routes to BTS — is now **green** as one
-  visual unit (it used to be the same bold yellow bucket as the path lines).
-  Every other line stays muted grey. The colour decision lives in one pure
-  function, `edgeStyle(poolId, hi, pathSet, hoverEdge)`.
+- **The line colours (final spec, 2026-10-07):**
+  - most lines — muted grey (`--border`)
+  - the pair's own pool **and** its route back to BTS — **bluish grey with a
+    glow** (`--accent` at 55% alpha, glow in the full accent; the only glowing
+    lines on the map)
+  - **any** line under the pointer — **yellow** (`--warn`), thicker, no glow;
+    yellow means exactly one thing and never sticks once the pointer leaves
+
+  The decision lives in one pure function,
+  `edgeStyle(poolId, hi, pathSet, hoverEdge) -> {color, width}` with three
+  tokens only: `path`, `warn`, `border`. An intermediate revision painted the
+  triangle green; that was a misreading of the request and is gone.
 - **The whole line is the target.** `hitAt()` resolves a pointer to a node
   first (a line ends at its nodes, so dragging stays reliable), else to the
   nearest edge **segment** within 8px. Leaving the canvas clears the hover, so
@@ -44,10 +51,16 @@ destinations for the same line depending on which desk you were on.
 
 ## Evidence
 
-- `tooling/pool-graph-test.js` → **170 pass, 0 fail** (was 136). New vectors:
-  - **colour contract** (11): hover beats the triangle; triangle pools green;
-    unrelated pools grey; hovering one line never tints another; *nothing is
-    yellow at rest*.
+- `tooling/pool-graph-test.js` → **190 pass, 0 fail** (was 136). New vectors:
+  - **painter** (10, the regression guard): every stroke reaches the canvas as
+    a resolvable colour, never a token name; path line = `rgba(…,0.55)` and
+    glows; hovered line = `--warn`, thicker, no glow; plain lines = `--border`.
+  - **colour contract** (11): hover beats the path set; the pair's own pool and
+    both BTS routes are `path`; unrelated pools grey; hovering one line never
+    tints another; *nothing is yellow at rest*.
+  - **`withAlpha`** (7): hex3/hex6/rgb()/rgba() → `rgba()` at the requested
+    alpha; an unparseable input is returned untouched (never a crash, never an
+    invalid colour).
   - **line hit test** (17): `segDist` clamps to segment ends; midpoint, a
     quarter along, three quarters along (50px off the midpoint) all hit the
     same edge; ~36px off is an honest miss; a node inside its radius still wins.
@@ -58,10 +71,47 @@ destinations for the same line depending on which desk you were on.
   errors. Both desks: loop parked, gesture reaction off, hover registers the
   probed edge, hover clears on leaving, and the click lands —
   swap desk `#/pools/1.19.42`, exchange desk `#/market/GDEX.ETH_XBTSX.ETH`.
+- `tooling/visual/probe-desk-map-colors.mjs` → **DESK-MAP-COLORS OK**, sampled
+  from the real canvas on both desks:
+
+  | | at rest | hovering a line | after leaving |
+  |---|---|---|---|
+  | Swap desk | 0 yellow · 11 bluish · 67 grey | **12 yellow** | 0 yellow |
+  | Exchange desk | 0 yellow · 19 bluish · 55 grey | **3 yellow** | 0 yellow |
+
+  (`other` counts are glow/anti-aliasing blends, allowed up to a 20% share;
+  an all-black map resolves no token at all and fails.)
 - Unchanged and green: `pool-net-ui-test` 76 · `pool-net-test` 39 ·
   `market-net-test` 22 · `market-net-ui-test` 23 · `node-network-test` 30.
 - Gates: `check_rot.py` PASSED · `check_i18n.py` OK (3770 keys) ·
   `check_types.sh` PASS.
+
+## The black-edges bug (three layers, all real)
+
+1. **The painter assigned a token NAME.** `edgeStyle` returns `"warn"` /
+   `"buy"` / `"border"`, and that name went straight into `ctx.strokeStyle`.
+   An invalid colour is *silently ignored* by the canvas, which keeps its
+   previous stroke — default **black**. Every line went black. The painter now
+   resolves the name to a real colour; a black line also means "green on the
+   desktop" for anyone reading the diff later.
+2. **The hover repainted one frame behind.** `drawGraph` rebuilt
+   `canvas._graphRepaint` *after* painting, storing a snapshot of the hover
+   value. So hovering painted no yellow, and leaving painted a **stuck** yellow
+   (the stale value). The hover now lives on the canvas and `drawGraph` reads
+   it live — one source of truth.
+3. **No test painted anything.** The suite had vectors for the *decision* and
+   for navigation, and none for the painter — so a right answer in the pure
+   function could still produce a black map. There is now a recording-canvas
+   stub that asserts the values reaching the canvas are resolvable colours
+   (`#rrggbb` / `rgb()`), that the path line is `rgba(…,0.55)` and glows, that
+   the hovered line is `--warn` and does not, and that no token name can leak
+   through again.
+
+The browser probe's own first version also read only `rgb()` from the theme
+and so parsed **no** hex token, reporting real green/yellow lines as "other";
+it parses hex now. `DESK-MAP-COLORS` samples the actual painted pixels (a
+block per point, since a 1–2px antialiased line defeats single-pixel reads)
+and asserts the recognised-colour share, so an all-black map still fails.
 
 ## Bugs caught by the probe while building this
 

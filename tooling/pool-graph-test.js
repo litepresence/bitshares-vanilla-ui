@@ -312,6 +312,71 @@ function ok(cond, name) {
   eqNav(nav({ edgeMid: true, x: 1, y: 1, poolId: "1.19.66" }, { mode: "pool" }), "#/pools/1.19.66",
     "explicit pool mode -> pool");
 
+  /* THE PAINTER ITSELF (2026-10-07). The decision function above was right and
+   * the map still rendered BLACK, because the painter assigned the token NAME
+   * ("warn"/"buy"/"border") straight to ctx.strokeStyle — an invalid colour,
+   * which the canvas silently ignores. A green decision is not a green pixel:
+   * these vectors paint through a recording stub and assert the values that
+   * actually reach the canvas are resolvable colours. */
+  (function () {
+    function recCtx() {
+      const log = { strokes: [], shadows: [] };
+      const ctx = {
+        setTransform() {}, clearRect() {}, save() {}, restore() {},
+        beginPath() {}, moveTo(x, y) { this._x = x; this._y = y; },
+        lineTo() {}, stroke() { log.strokes.push({ color: ctx.strokeStyle, width: ctx.lineWidth }); },
+        fill() {}, arc() {}, fillText() {}, strokeText() {},
+        set strokeStyle(v) { this._stroke = v; }, get strokeStyle() { return this._stroke; },
+        set lineWidth(v) { this._lw = v; }, get lineWidth() { return this._lw; },
+        set shadowColor(v) { this._sc = v; }, get shadowColor() { return this._sc; },
+        set shadowBlur(v) { this._sb = v; log.shadows.push(v); }, get shadowBlur() { return this._sb; },
+        fillStyle: "", font: "", textAlign: ""
+      };
+      return { ctx, log };
+    }
+    function recCanvas(h) {
+      const c = recCtx();
+      return {
+        canvas: { clientWidth: 400, parentNode: null, style: {}, width: 0, height: 0,
+          getContext: () => c.ctx, addEventListener: () => {} },
+        log: c.log
+      };
+    }
+    /* A tiny 3-node graph with one leg<->leg pool (the triangle line). */
+    const G = {
+      nodes: [{ assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTS" }, { assetId: "1.3.7", sym: "CNY" }],
+      edges: [{ poolId: "1.19.5", a: "1.3.1", b: "1.3.2", sizeRaw: "10" },
+              { poolId: "1.19.8", a: "1.3.2", b: "1.3.7", sizeRaw: "10" }]
+    };
+    const isColor = (v) => typeof v === "string" && (v.charAt(0) === "#" || /^rgba?\(/.test(v));
+    ok(isColor("#26de81") && !isColor("buy"), "token NAMES are not colours (the black-edge bug)");
+
+    let rc = recCanvas();
+    PG.drawGraph({}, rc.canvas, G, { assetA: "1.3.1", assetB: "1.3.2", highlightPools: [] });
+    ok(rc.log.strokes.length >= 2, "painted both edges (" + rc.log.strokes.length + ")");
+    ok(rc.log.strokes.every((s) => isColor(s.color)),
+      "every stroked line got a real colour (never a token name)");
+    ok(rc.log.strokes.some((s) => /^rgba\(0,123,255,0\.550\)$/.test(s.color)),
+      "the pair's own line is a desaturated ACCENT at rest (bluish grey, --accent fallback headless)");
+    ok(rc.log.strokes.some((s) => s.color === "#2a2e39"),
+      "an unrelated line is muted grey (--border fallback)");
+    ok(rc.log.strokes.some((s) => s.width === 2.5), "the path line is the thicker one");
+    ok(rc.log.shadows.indexOf(12) !== -1, "the path line glows");
+
+    rc = recCanvas();
+    PG.drawGraph({}, rc.canvas, G, { assetA: "1.3.1", assetB: "1.3.2", highlightPools: ["1.19.5"], hoverEdge: "1.19.8" });
+    ok(rc.log.strokes.every((s) => isColor(s.color)), "hovered paint: still only real colours");
+    ok(rc.log.strokes.some((s) => s.color === "#fbbc06" && s.width === 3),
+      "the HOVERED line is YELLOW and thicker (--warn fallback)");
+    ok(rc.log.strokes.some((s) => /^rgba\(0,123,255,0\.550\)$/.test(s.color)),
+      "the path line stays bluish grey while ANOTHER line is hovered");
+    /* The glow belongs to the path set only — never to the hovered line, or
+     * yellow would stop being a unique signal. */
+    ok(rc.log.shadows.indexOf(12) !== -1, "the path line still glows");
+    ok(rc.log.shadows.every((v) => v === 12 || v === 0),
+      "no other shadow radius appears (hovered line gets no glow)");
+  })();
+
   /* LINE COLOUR CONTRACT (2026-10-07): yellow means HOVERED and nothing
    * else; the triangle (the pair's own pool + both legs' BTS routes) is
    * green; every other line stays muted grey. */
@@ -319,17 +384,33 @@ function ok(cond, name) {
   ok(typeof PG._edgeStyleForTest === "function", "_edgeStyleForTest exported (pure colour decision)");
   if (es) {
     const HI = { "1.19.5": 1 }, TRI = { "1.19.5": 1, "1.19.6": 1, "1.19.7": 1 };
-    ok(es("1.19.5", HI, TRI, "1.19.5").color === "warn", "hover beats the triangle -> yellow");
+    ok(es("1.19.5", HI, TRI, "1.19.5").color === "warn", "hover beats the path set -> yellow");
     ok(es("1.19.5", HI, TRI, "1.19.5").width === 3, "hovered line is the thickest");
-    ok(es("1.19.5", HI, TRI, "").color === "buy", "the pair's own pool is green at rest");
-    ok(es("1.19.6", HI, TRI, "").color === "buy", "a leg->BTS path pool is green (same triangle)");
-    ok(es("1.19.7", {}, TRI, "").color === "buy", "the other leg's BTS path pool is green");
+    ok(es("1.19.5", HI, TRI, "").color === "path", "the pair's own pool is a PATH line at rest");
+    ok(es("1.19.6", HI, TRI, "").color === "path", "a leg->BTS hop is a path line too");
+    ok(es("1.19.7", {}, TRI, "").color === "path", "the other leg's BTS route is a path line");
     ok(es("1.19.8", HI, TRI, "").color === "border", "an unrelated pool stays muted grey");
-    ok(es("1.19.9", {}, {}, "").color === "border", "no highlight at all -> grey");
+    ok(es("1.19.9", {}, {}, "").color === "border", "no path set at all -> grey");
     ok(es("1.19.9", {}, {}, "1.19.8").color === "border", "hovering one line does not tint another");
-    ok(es("1.19.5", {}, {}, "").color === "border", "a highlight list alone (no triangle) is grey here");
     const atRest = es("1.19.6", HI, TRI, "");
-    ok(atRest.color !== "warn", "NOTHING is yellow at rest (was the old leg-line yellow)");
+    ok(atRest.color !== "warn", "NOTHING is yellow at rest");
+    /* The path token must never be "buy"/green again: it was a misreading. */
+    ok(["path", "warn", "border"].indexOf(es("1.19.5", {}, TRI, "").color) !== -1,
+      "only three tokens exist: path, warn, border");
+  }
+
+  /* withAlpha: the path colour must be a REAL canvas colour at reduced
+   * opacity — a token name (or an unparseable string) would paint black. */
+  const wa = (typeof PG._withAlphaForTest === "function") ? PG._withAlphaForTest : null;
+  ok(typeof PG._withAlphaForTest === "function", "_withAlphaForTest exported");
+  if (wa) {
+    ok(wa("#1ec3fa", 0.5) === "rgba(30,195,250,0.500)", "hex6 -> rgba at alpha");
+    ok(wa("#abc", 0.5) === "rgba(170,187,204,0.500)", "hex3 expands to hex6");
+    ok(/^rgba\(0,0,0,0\.500\)$/.test(wa("#000000", 0.5)), "black hex stays black (no surprise)");
+    ok(wa("rgb(1,2,3)", 0.25) === "rgba(1,2,3,0.250)", "rgb() -> rgba()");
+    ok(/^rgba\(1,2,3,0\.250\)$/.test(wa("rgba(1, 2, 3, 0.9)", 0.25)), "rgba() alpha is replaced, not stacked");
+    ok(wa("warn", 0.5) === "warn", "an unparseable input is returned untouched (never a crash)");
+    ok(wa("", 0.5) === "", "empty input is safe");
   }
 
   /* LINE HIT TEST: the whole line is the target, not a dot at its midpoint —
