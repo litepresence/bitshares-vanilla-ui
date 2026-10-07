@@ -155,7 +155,12 @@ var a = touchable(DOM.el(document, "a", "", "mkt-bell subtle-btn"));
     return a;
   }
   return {
-    el: DOM.el, mark: mark, live: live,
+    /* touchable re-exported alongside el: notify-ui.js:150 binds
+     * `host.touchable` for its indirection, and this module never exported
+     * it -- so the Price Alerts page died with "touchable is not a function"
+     * on every render. Found by the two-ended viewport audit (A4-console on
+     * #/alerts, both viewports). Re-exported the same way `el` is. */
+    el: DOM.el, touchable: touchable, mark: mark, live: live,
     mountToasts: mountToasts, paintToasts: paintToasts, bellFor: bellFor
   };
 })();
