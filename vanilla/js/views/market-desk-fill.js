@@ -303,6 +303,7 @@ MarketDesk._fill = MarketDesk._fill || {};
    * Loading note -> render. Failures -> honest partial/empty note. */
   function fetchPoolMap(doc, state) {
     if (!state.graphWrap || !state.graphCanvas || !state.graphNote) return;
+    ensurePhysSwitch(doc, state);
     if (!state.assets) return;
     var q = state.assets.quote, b = state.assets.base, myId = state.id;
     try { state.graphNote.textContent = t("market.loading_pool_map", "Loading pool map…"); } catch (e) {}
@@ -481,7 +482,93 @@ MarketDesk._fill = MarketDesk._fill || {};
     } catch (e) { /* feed optional, strip stands */ }
   }
 
-  function redrawPoolMap(doc, state) {
+  /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition to
+   * this pane): ONE labeled on/off control in the map pane header. Reads and
+   * writes the shared poolNetPhys key (PoolGraph.readPhys/setPhys when loaded,
+   * guarded localStorage otherwise — same key the pool desk and the pools
+   * band use, default calm/off). Labels reuse the pool_net.phys dict keys
+   * (already translated — no new strings). A flip repaints through
+   * redrawPoolMap with explicit=true (bounded run even under reduced-motion);
+   * auto repaints stay frozen under reduced-motion (PoolGraph.drawLive
+   * policy). Idempotent: refetches repaint the existing switch. Never throws. */
+  function readPhysMode() {
+    try {
+      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readPhys === "function") {
+        return PoolGraph.readPhys();
+      }
+    } catch (e) { /* storage below */ }
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetPhys") === "lively") return "lively";
+    } catch (e) { /* calm stands */ }
+    return "calm";
+  }
+  function persistPhys(m) {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetPhys", m); } catch (e) { /* memory-only */ }
+  }
+  function paintPhysSwitch(box, mode) {
+    try {
+      var btn = box.querySelector ? box.querySelector("[data-phys-btn]") : null;
+      var st = box.querySelector ? box.querySelector("[data-phys-state]") : null;
+      if (!btn || !st) {
+        var kids = box.children || [];
+        for (var i = 0; i < kids.length; i++) {
+          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-btn")) btn = kids[i];
+          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
+        }
+      }
+      var on = mode === "lively";
+      if (btn) {
+        btn.setAttribute("role", "switch");
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+        btn.setAttribute("aria-label", t("pool_net.phys", "Physics"));
+      }
+      if (st) st.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
+    } catch (e) { /* switch stands */ }
+  }
+  function ensurePhysSwitch(doc, state) {
+    try {
+      if (!doc || !state.graphWrap) return;
+      var head = state.graphWrap.firstChild;
+      if (!head || typeof doc.createElement !== "function") return;
+      var existing = null;
+      try { existing = head.querySelector ? head.querySelector("[data-phys-switch]") : null; } catch (e) { existing = null; }
+      if (!existing) {
+        var kids = head.children || [];
+        for (var k = 0; k < kids.length; k++) {
+          try {
+            if (kids[k] && kids[k].getAttribute && kids[k].getAttribute("data-phys-switch")) { existing = kids[k]; break; }
+          } catch (e2) { /* next child */ }
+        }
+      }
+      if (existing) { paintPhysSwitch(existing, readPhysMode()); return; }
+      var box = DOM.el(doc, "span", null, "pool-net-phys");
+      try { box.setAttribute("data-phys-switch", "1"); } catch (e) { /* paint stands */ }
+      box.appendChild(DOM.el(doc, "span", t("pool_net.phys", "Physics"), "pool-net-physlabel"));
+      var btn = DOM.el(doc, "button", null, "pool-net-physwitch");
+      btn.type = "button";
+      try { btn.setAttribute("data-phys-btn", "1"); } catch (e) { /* paint stands */ }
+      btn.appendChild(DOM.el(doc, "span", null, "pool-net-physknob"));
+      try { if (typeof touchable === "function") touchable(btn); } catch (e) { /* click still works */ }
+      var st = DOM.el(doc, "span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
+      try { st.setAttribute("data-phys-state", "1"); } catch (e) { /* paint stands */ }
+      box.appendChild(btn);
+      box.appendChild(st);
+      paintPhysSwitch(box, readPhysMode());
+      btn.addEventListener("click", function () {
+        var next = (readPhysMode() === "lively") ? "calm" : "lively";
+        try {
+          if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setPhys === "function") {
+            PoolGraph.setPhys(next);
+          } else persistPhys(next);
+        } catch (e) { persistPhys(next); }
+        paintPhysSwitch(box, next);
+        try { redrawPoolMap(doc, state, true); } catch (e) { /* map stands */ }
+      });
+      head.appendChild(box);
+    } catch (e) { /* desk stands without the switch */ }
+  }
+
+  function redrawPoolMap(doc, state, explicit) {
     if (!state.graphData || !state.graphCanvas) return;
     if (state.showPoolMap === false) return;
     if (!deskAlive(state)) return;
@@ -491,8 +578,26 @@ MarketDesk._fill = MarketDesk._fill || {};
       [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
         (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
       });
-      PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
-        { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      /* Task 5 physics branch: lively animates through PoolGraph.drawLive
+       * (same painter via the _pos seam — look/verdicts/hit-test unchanged);
+       * calm (default) keeps the settle-once drawGraph path byte-identical.
+       * explicit=true only from the Physics flip (bounded run under
+       * reduced-motion); auto repaints stay frozen there. */
+      var liveOn = false;
+      try {
+        liveOn = readPhysMode() === "lively" &&
+          typeof PoolGraph.drawLive === "function";
+      } catch (e) { liveOn = false; }
+      if (liveOn) {
+        PoolGraph.drawLive(doc, state.graphCanvas, gd.graph,
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit });
+      } else {
+        try {
+          if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(state.graphCanvas);
+        } catch (e) { /* static paint stands */ }
+        PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      }
       var n = (gd.graph.edges || []).length;
       if (!n) state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
       else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = t("market.no_bts_path", "No BTS path — treat pair as unverified.");

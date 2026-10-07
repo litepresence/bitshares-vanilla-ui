@@ -436,6 +436,270 @@ var PoolGraph = (function () {
       } catch (x) { return {}; }
     }
   }
+  /* Desk physics driver (market-net Task 5 — physics ONLY.
+   * Calm (default) paints the settle-once relax() equilibrium exactly as
+   * before; lively animates the SAME per-iteration math frame-by-frame
+   * (_liveStep below is one relax iteration verbatim, temp-capped) with a
+   * temp/cool/sleep schedule and a 180-frame cap, then rests. Presets come
+   * from PoolNetUI._physForTest() when the band module is loaded (one shared
+   * preset shape), else the built-in FALLBACK so this module stays standalone
+   * for headless tests. Force constants stay relax's shipped values (k clamp
+   * 24..60, gravity, walls) — presets carry RUN-CONTROL ONLY (temp0/cool/
+   * tempMin/stillTol/stillFrames/minFrames/maxFrames), which is why the rest
+   * layout is unchanged. Reduced-motion: auto runs stay frozen, an explicit
+   * flip runs bounded (band wake policy verbatim, minus the band's visibility
+   * observer — desk canvases paint while mounted). Per-frame paints reuse
+   * drawGraph via the opts._pos seam (same painter, colors, verdicts,
+   * hit-testing — no painter swap). Never throws outward. */
+  var PHYS_KEY = "poolNetPhys";
+  var PHYS_FALLBACK = {
+    calm:   { temp0: 6, cool: 0.98, tempMin: 1, stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 180 },
+    lively: { temp0: 7, cool: 0.984, tempMin: 0.2, stillTol: 0.25, stillFrames: 120, minFrames: 60, maxFrames: 180 }
+  };
+  /* Session override from setPhys (readPhys prefers it over storage). */
+  var _physMode = null;
+  /* Preset table: band's live values when loaded, else the fallback.
+   * Runtime lookup (never cached) so band load order never matters. */
+  function _phys() {
+    try {
+      if (typeof PoolNetUI !== "undefined" && PoolNetUI && typeof PoolNetUI._physForTest === "function") {
+        var p = PoolNetUI._physForTest();
+        if (p && p.calm && p.lively) return p;
+      }
+    } catch (e) { /* fallback stands */ }
+    return PHYS_FALLBACK;
+  }
+  /* Default preset name (storage decides via readPhys; the NAME default is calm). */
+  function _defaultPhys() { return "calm"; }
+  /* Shared-key reader: in-memory setPhys wins, then localStorage poolNetPhys,
+   * else calm. Default calm, storage failure keeps calm. Never throws. */
+  function readPhys() {
+    if (_physMode === "lively" || _physMode === "calm") return _physMode;
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem(PHYS_KEY) === "lively") return "lively";
+    } catch (e) { /* calm stands */ }
+    return "calm";
+  }
+  /* Shared-key writer for the pane switches (both desks call this).
+   * Normalizes anything-not-lively to calm. Returns the stored mode. */
+  function setPhys(mode) {
+    var m = (mode === "lively") ? "lively" : "calm";
+    _physMode = m;
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(PHYS_KEY, m); } catch (e) { /* memory-only */ }
+    return m;
+  }
+  /* Reduced-motion probe (band precedent: guarded matchMedia, false headless). */
+  function _reduced() {
+    try {
+      if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+        return !!window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      }
+    } catch (e) { /* not reduced */ }
+    return false;
+  }
+  /* One live frame: a single relax() iteration over geom IN PLACE (repulsion
+   * k^2/d + golden-angle split, log-weighted springs, L0-anchored gravity,
+   * temp-capped move, wall clamp — the relax body verbatim, temp-driven).
+   * Params mirror relax(); temp is this frame's displacement cap.
+   * Returns the frame's max displacement (sleep-gate input). Never throws. */
+  function _liveStep(graph, geom, w, h, opts, temp) {
+    try {
+      w = (typeof w === "number" && w > 0) ? w : 300;
+      h = (typeof h === "number" && h > 0) ? h : 180;
+      if (!(temp > 0)) temp = 1;
+      var ids = Object.keys(geom || {}).sort();
+      var n = ids.length, i, j;
+      if (n < 2) return 0;
+      var o = (opts && typeof opts === "object") ? opts : {};
+      var inL0 = {};
+      if (o.assetA) inL0[o.assetA] = 1;
+      if (o.assetB) inL0[o.assetB] = 1;
+      var deg = {};
+      var edges = [];
+      ((graph && graph.edges) || []).forEach(function (e) {
+        if (!e || !geom[e.a] || !geom[e.b] || e.a === e.b) return;
+        deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1;
+        edges.push({ a: e.a, b: e.b, w: _edgeWeight(e.sizeRaw) });
+      });
+      var rad = {};
+      ids.forEach(function (id) { rad[id] = _nodeRadius(deg[id] || 0); });
+      var k = 0.5 * Math.sqrt((w * h) / n);
+      if (!(k >= 24)) k = 24;
+      if (!(k <= 60)) k = 60;
+      var cx = w / 2, cy = h / 2, PAD = EDGE_PAD;
+      function clampX(x, r) { return x < PAD + r ? PAD + r : (x > w - PAD - r ? w - PAD - r : x); }
+      function clampY(y, r) { return y < PAD + r ? PAD + r : (y > h - PAD - r ? h - PAD - r : y); }
+      var dx = {}, dy = {};
+      for (i = 0; i < n; i++) { dx[ids[i]] = 0; dy[ids[i]] = 0; }
+      for (i = 0; i < n; i++) {
+        for (j = i + 1; j < n; j++) {
+          var a = ids[i], b = ids[j];
+          var ddx = geom[a].x - geom[b].x, ddy = geom[a].y - geom[b].y;
+          var d = Math.sqrt(ddx * ddx + ddy * ddy), ux, uy;
+          if (d > 0.01) { ux = ddx / d; uy = ddy / d; }
+          else { var ang = ((i * 7 + j) * 2.399963); ux = Math.cos(ang); uy = Math.sin(ang); d = 0.01; }
+          var fr = (k * k) / d;
+          dx[a] += ux * fr; dy[a] += uy * fr;
+          dx[b] -= ux * fr; dy[b] -= uy * fr;
+        }
+      }
+      for (i = 0; i < edges.length; i++) {
+        var e = edges[i];
+        var ex = geom[e.a].x - geom[e.b].x, ey = geom[e.a].y - geom[e.b].y;
+        var ed = Math.sqrt(ex * ex + ey * ey) || 0.01;
+        var fa = (ed * ed / k) * e.w / ed;
+        dx[e.a] -= ex * fa; dy[e.a] -= ey * fa;
+        dx[e.b] += ex * fa; dy[e.b] += ey * fa;
+      }
+      for (i = 0; i < n; i++) {
+        var id2 = ids[i];
+        var pull = RELAX_GRAV * (inL0[id2] ? RELAX_L0_GRAV : 1);
+        dx[id2] += (cx - geom[id2].x) * pull;
+        dy[id2] += (cy - geom[id2].y) * pull;
+      }
+      var maxStep = 0;
+      for (i = 0; i < n; i++) {
+        var id3 = ids[i];
+        var mx = dx[id3], my = dy[id3];
+        var ml = Math.sqrt(mx * mx + my * my);
+        if (ml > temp && ml > 0) { mx = mx / ml * temp; my = my / ml * temp; }
+        geom[id3].x = clampX(geom[id3].x + mx, rad[id3]);
+        geom[id3].y = clampY(geom[id3].y + my, rad[id3]);
+        var step = Math.sqrt(mx * mx + my * my);
+        if (step > maxStep) maxStep = step;
+      }
+      return maxStep;
+    } catch (e) { return 0; }
+  }
+  /* Synchronous headless loop (tests + wake settle): calm delegates to
+   * relax() (settle-once, zero live frames); lively iterates _liveStep with
+   * the preset schedule until the sleep gate or the 180-frame cap.
+   * Returns {pos, frames} (pos is a NEW map; seed untouched). Never throws. */
+  function _runLive(graph, seed, w, h, opts, mode) {
+    if (mode !== "lively") {
+      var still = null;
+      try { still = relax(graph, seed, w, h, opts); } catch (e) { still = {}; }
+      return { pos: still, frames: 0 };
+    }
+    var P = _phys().lively || PHYS_FALLBACK.lively;
+    var geom = {};
+    try {
+      Object.keys(seed || {}).forEach(function (id) {
+        geom[id] = { x: seed[id].x, y: seed[id].y };
+      });
+    } catch (e) { return { pos: {}, frames: 0 }; }
+    if (Object.keys(geom).length < 2) return { pos: geom, frames: 0 };
+    var temp = P.temp0, stillN = 0, frames = 0, maxFrames = P.maxFrames || 180;
+    while (frames < maxFrames) {
+      var moved = _liveStep(graph, geom, w, h, opts, temp);
+      temp = Math.max(temp * P.cool, P.tempMin);
+      frames++;
+      if (moved < P.stillTol) stillN++; else stillN = 0;
+      if (stillN >= P.stillFrames && frames >= (P.minFrames || 0)) break;
+    }
+    return { pos: geom, frames: frames };
+  }
+  /* Wake the desk loop. ALWAYS re-seeds temp/still/frames (even when already
+   * running — an early return here would starve later re-energizes, band wake
+   * lesson verbatim). Reduced-motion AUTO wakes stay frozen; an EXPLICIT user
+   * gesture (Physics flip) runs bounded. A running loop picks up fresh temp
+   * next frame (no restart); a stopped loop (re)starts via _drive (headless
+   * S without a canvas settles synchronously through _raf's sync fallback).
+   * S shape: {graph, geom, w, h, opts, phys, temp, still, frames, running,
+   * settled, reduced, dead?, forced?, canvas?, doc?, drawOpts?}. */
+  function wake(S, explicit) {
+    if (!S || S.dead) return;
+    var P = _phys()[S.phys] || _phys().calm;
+    if (S.reduced && !explicit) return;
+    if (!S.geom || Object.keys(S.geom).length < 2) return;
+    S.still = 0; S.frames = 0; S.temp = P.temp0;
+    if (explicit) S.forced = true;
+    if (S.running) return;
+    S.running = true; S.settled = false;
+    _drive(S);
+  }
+  /* Frame driver: one _liveStep + preset cool + optional repaint through the
+   * existing drawGraph path (opts._pos seam), until the sleep gate or the
+   * 180-frame cap. Superseded loops (canvas._graphLiveS moved on) stop. */
+  function _drive(S) {
+    function frame() {
+      if (!S || S.dead) { if (S) S.running = false; return; }
+      try {
+        if (S.canvas && S.canvas._graphLiveS && S.canvas._graphLiveS !== S) { S.running = false; return; }
+      } catch (e) { /* ownership stands */ }
+      var P = _phys()[S.phys] || _phys().calm;
+      S.frames = (S.frames || 0) + 1;
+      var moved = 0;
+      try { moved = _liveStep(S.graph, S.geom, S.w, S.h, S.opts, S.temp); } catch (e) { moved = 0; }
+      S.temp = Math.max(S.temp * P.cool, P.tempMin);
+      if (S.canvas && S.doc) {
+        try {
+          var d = S.drawOpts || {};
+          drawGraph(S.doc, S.canvas, S.graph,
+            { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, _pos: S.geom });
+        } catch (e) { /* next frame */ }
+      }
+      if (moved < P.stillTol) S.still = (S.still || 0) + 1; else S.still = 0;
+      if ((P.maxFrames && (S.frames || 0) >= P.maxFrames) ||
+          (S.still >= P.stillFrames && (S.frames || 0) >= (P.minFrames || 0))) {
+        S.running = false; S.settled = true; S.forced = false;
+        return;
+      }
+      S.settled = false;
+      _raf(frame);
+    }
+    frame();
+  }
+  /* Stop a canvas's live loop (calm branch + teardown call this; a stopped
+   * loop leaves the last painted frame standing). Never throws. */
+  function stopLive(canvas) {
+    try {
+      if (canvas && canvas._graphLiveS) {
+        try { canvas._graphLiveS.dead = true; canvas._graphLiveS.running = false; } catch (e) {}
+      }
+      if (canvas) { try { canvas._graphLiveS = null; } catch (e) {} }
+    } catch (e) { /* stopped anyway */ }
+  }
+  /* Lively entrypoint for the desk panes (redrawPoolMap's lively branch).
+   * opts {assetA, assetB, highlightPools, explicit}: explicit true only for a
+   * direct user flip (runs bounded even under reduced-motion). Calm mode or a
+   * reduced-motion AUTO call paints once statically (current behavior) and
+   * never starts a loop. Stops any prior loop on the canvas first. */
+  function drawLive(doc, canvas, graph, opts) {
+    opts = opts || {};
+    if (!canvas || !graph) return null;
+    stopLive(canvas);
+    var w = 300, h = 180;
+    try {
+      if (canvas.clientWidth) w = canvas.clientWidth;
+      else if (canvas.parentNode && canvas.parentNode.clientWidth) w = canvas.parentNode.clientWidth;
+    } catch (e) { /* 300 stands */ }
+    if (!(w > 0)) w = 300;
+    var assetA = opts.assetA, assetB = opts.assetB;
+    var seed = {};
+    try { seed = layout(graph, assetA, assetB, w, h); } catch (e) { seed = {}; }
+    var geom = {};
+    try {
+      Object.keys(seed).forEach(function (id) { geom[id] = { x: seed[id].x, y: seed[id].y }; });
+    } catch (e) { geom = {}; }
+    var S = { graph: graph, geom: geom, w: w, h: h, opts: { assetA: assetA, assetB: assetB },
+      phys: readPhys(), temp: 0, still: 0, frames: 0, running: false, settled: false,
+      dead: false, reduced: _reduced(), forced: false,
+      canvas: canvas, doc: doc,
+      drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] } };
+    var P = _phys()[S.phys] || _phys().calm;
+    S.temp = P.temp0;
+    try { canvas._graphLiveS = S; } catch (e) { /* static paint below still stands */ }
+    if (S.phys !== "lively" || (S.reduced && !opts.explicit)) {
+      try {
+        drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] });
+      } catch (e) { /* note below carries it */ }
+      S.running = false; S.settled = true;
+      return S;
+    }
+    wake(S, !!opts.explicit);
+    return S;
+  }
   /* Pair provenance vs BTS core (pure, unit-tested): direct = either leg
    * paired straight with BTS (1 hop); indirect = shortest connecting path
    * via pools (min hops of both legs); none = neither leg reaches BTS.
@@ -669,7 +933,11 @@ var PoolGraph = (function () {
       try { canvas.setAttribute("role", "img"); canvas.setAttribute("aria-label", t("pool.map_touch_aria", "Pool map. No pools touch these assets — pick a pair with a pool, or create one at #/pools.")); } catch (e) {}
       return { empty: true };
     }
-    var base = relax(graph, layout(graph, assetA, assetB, g.w, g.h),
+    /* Live-loop seam (Task 5, one line): a caller-provided _pos map skips the
+     * layout→relax seed and paints those positions through the identical
+     * downstream path (offsets, verdicts, edges, labels, hit-test). Absent
+     * _pos the calm settle-once path is byte-identical. */
+    var base = (opts && opts._pos) ? opts._pos : relax(graph, layout(graph, assetA, assetB, g.w, g.h),
       g.w, g.h, { assetA: assetA, assetB: assetB });
     var offs = _offsetsFor(canvas, graph, assetA, assetB);
     var pos = {};
@@ -925,6 +1193,9 @@ var PoolGraph = (function () {
 
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
+    setPhys: setPhys, readPhys: readPhys, drawLive: drawLive, stopLive: stopLive,
+    _physForTest: _phys, _defaultPhysForTest: _defaultPhys,
+    _runLiveForTest: _runLive, _wakeForTest: wake, _stepForTest: _liveStep,
     _navForTest: navForHit,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,

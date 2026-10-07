@@ -493,6 +493,44 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       graphTitle.className = "mkt-osc-title";
       graphTitle.textContent = t("pool_detail.pool_map", "Pool map");
       graphHead.appendChild(graphTitle);
+      /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition
+       * to this pane): ONE labeled on/off control in the map pane header.
+       * Shared poolNetPhys key with the exchange desk + pools band (default
+       * calm/off); labels reuse pool_net.phys keys (already translated — no
+       * new strings). Flip persists via PoolGraph.setPhys and repaints with
+       * explicit=true (bounded run even under reduced-motion); auto repaints
+       * stay frozen there. Never throws. */
+      try {
+        var physBox = u.el(doc, "span", null, "pool-net-phys");
+        try { physBox.setAttribute("data-phys-switch", "1"); } catch (eSw) { /* paint stands */ }
+        physBox.appendChild(u.el(doc, "span", t("pool_net.phys", "Physics"), "pool-net-physlabel"));
+        var physBtn = u.el(doc, "button", null, "pool-net-physwitch");
+        try { physBtn.type = "button"; } catch (eSw) { /* click still works */ }
+        try { physBtn.setAttribute("data-phys-btn", "1"); } catch (eSw) { /* paint stands */ }
+        physBtn.appendChild(u.el(doc, "span", null, "pool-net-physknob"));
+        try {
+          if (typeof u.touchable === "function") u.touchable(physBtn);
+          else if (typeof touchable === "function") touchable(physBtn);
+        } catch (eSw) { /* click still works */ }
+        var physState = u.el(doc, "span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
+        try { physState.setAttribute("data-phys-state", "1"); } catch (eSw) { /* paint stands */ }
+        physBox.appendChild(physBtn);
+        physBox.appendChild(physState);
+        try { paintPoolPhysSwitch(physBox, readPoolPhysMode()); } catch (eSw) { /* default stands */ }
+        (function (box) {
+          physBtn.addEventListener("click", function () {
+            var next = (readPoolPhysMode() === "lively") ? "calm" : "lively";
+            try {
+              if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setPhys === "function") {
+                PoolGraph.setPhys(next);
+              } else persistPoolPhys(next);
+            } catch (eSw) { persistPoolPhys(next); }
+            try { paintPoolPhysSwitch(box, next); } catch (eSw) { /* map stands */ }
+            try { redrawPoolMap(doc, P, myGen, uiGen, true); } catch (eSw) { /* map stands */ }
+          });
+        })(physBox);
+        graphHead.appendChild(physBox);
+      } catch (eSw) { /* desk stands without the switch */ }
       graphWrap.appendChild(graphHead);
       var graphCanvas = doc.createElement("canvas");
       graphCanvas.className = "mkt-canvas";
@@ -1536,6 +1574,44 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     try { cb(false); } catch (e) {}
   }
 
+  /* Pool-map Physics pref (Task 5): shared poolNetPhys key with the exchange
+   * desk + pools band, default calm/off. PoolGraph.readPhys wins when the
+   * lazy script loaded, else guarded localStorage. Never throws. */
+  function readPoolPhysMode() {
+    try {
+      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readPhys === "function") {
+        return PoolGraph.readPhys();
+      }
+    } catch (e) { /* storage below */ }
+    try {
+      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetPhys") === "lively") return "lively";
+    } catch (e) { /* calm stands */ }
+    return "calm";
+  }
+  function persistPoolPhys(m) {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetPhys", m); } catch (e) { /* memory-only */ }
+  }
+  function paintPoolPhysSwitch(box, mode) {
+    try {
+      var btn = box.querySelector ? box.querySelector("[data-phys-btn]") : null;
+      var st = box.querySelector ? box.querySelector("[data-phys-state]") : null;
+      if (!btn || !st) {
+        var kids = box.children || [];
+        for (var i = 0; i < kids.length; i++) {
+          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-btn")) btn = kids[i];
+          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
+        }
+      }
+      var on = mode === "lively";
+      if (btn) {
+        btn.setAttribute("role", "switch");
+        btn.setAttribute("aria-checked", on ? "true" : "false");
+        btn.setAttribute("aria-label", t("pool_net.phys", "Physics"));
+      }
+      if (st) st.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
+    } catch (e) { /* switch stands */ }
+  }
+
   /* Fetch 2-layer pool graph for this pool's legs (lazy async, <=9 RPCs).
    * Stale-route guarded by live(). Failures -> honest empty note. */
   function fetchPoolMap(doc, P, r, myGen, uiGen) {
@@ -1566,7 +1642,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
   }
 
   /* Repaint the pool-map canvas from cached graphData (theme/resize path). Never throws outward. */
-  function redrawPoolMap(doc, P, myGen, uiGen) {
+  function redrawPoolMap(doc, P, myGen, uiGen, explicit) {
     if (!P.graphData || !P.graphCanvas) return;
     if (P.showPoolMap === false) return;
     if (!live(myGen, uiGen)) return;
@@ -1576,8 +1652,25 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
         (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
       });
-      PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
-        { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      /* Task 5 physics branch (exchange-desk parity): lively animates through
+       * PoolGraph.drawLive (same painter — look/verdicts/hit-test unchanged);
+       * calm keeps the settle-once drawGraph path. explicit=true only from
+       * the Physics flip. */
+      var liveOn = false;
+      try {
+        liveOn = readPoolPhysMode() === "lively" &&
+          typeof PoolGraph.drawLive === "function";
+      } catch (e) { liveOn = false; }
+      if (liveOn) {
+        PoolGraph.drawLive(doc, P.graphCanvas, gd.graph,
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit });
+      } else {
+        try {
+          if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(P.graphCanvas);
+        } catch (e) { /* static paint stands */ }
+        PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+      }
       var n = (gd.graph.edges || []).length;
       if (!n) P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
       else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = t("pool_detail.no_bts_path_unverified", "No BTS path — treat pair as unverified.");

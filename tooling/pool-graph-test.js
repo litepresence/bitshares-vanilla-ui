@@ -288,6 +288,75 @@ function ok(cond, name) {
   eqNav(nav(null), null, "null hit -> null (no navigation)");
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (core-or-first) resolves to asset page");
 })();
+// Task 5 (desk physics-only upgrade): preset-driven live loop (calm =
+// settle-once, lively = same relax math with temp/cool/sleep + 180-frame
+// cap; presets from PoolNetUI._physForTest when loaded, else a built-in
+// calm-equivalent fallback so the module stays standalone for tests).
+// RED first: no loop entrypoint exists yet (setPhys/readPhys/_phys etc.).
+(function () {
+  ok(typeof PG.setPhys === "function", "setPhys exported (pane switches share poolNetPhys)");
+  ok(typeof PG.readPhys === "function", "readPhys exported (shared poolNetPhys key)");
+  ok(typeof PG._physForTest === "function", "_physForTest exported (preset table)");
+  ok(typeof PG._defaultPhysForTest === "function" && PG._defaultPhysForTest() === "calm", "preset default calm");
+  if (typeof PG._physForTest !== "function") return;
+  var phys = PG._physForTest();
+  ok(!!(phys && phys.calm && phys.lively), "fallback presets: calm + lively present standalone (no PoolNetUI loaded)");
+  ok(phys.calm.maxFrames === 180 && phys.lively.maxFrames === 180, "180-frame cap on both presets");
+  // Guarded read-through: a loaded PoolNetUI table wins over the fallback.
+  var hadPNUI = Object.prototype.hasOwnProperty.call(globalThis, "PoolNetUI");
+  var savedPNUI = globalThis.PoolNetUI;
+  try {
+    globalThis.PoolNetUI = { _physForTest: function () { return { calm: { maxFrames: 11 }, lively: { maxFrames: 12 } }; } };
+    var thru = PG._physForTest();
+    ok(thru && thru.calm.maxFrames === 11 && thru.lively.maxFrames === 12, "presets read from PoolNetUI._physForTest when loaded");
+  } catch (e) { ok(false, "preset read-through throws: " + e); }
+  try { if (hadPNUI) globalThis.PoolNetUI = savedPNUI; else delete globalThis.PoolNetUI; } catch (e) {}
+  function demo3() {
+    return {
+      nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "A" }, { assetId: "1.3.2", sym: "B" }],
+      edges: [
+        { poolId: "1.19.1", a: "1.3.1", b: "1.3.2", sizeRaw: "50" },
+        { poolId: "1.19.2", a: "1.3.1", b: "1.3.0", sizeRaw: "60" }
+      ]
+    };
+  }
+  var OPTS3 = { assetA: "1.3.1", assetB: "1.3.2" };
+  if (typeof PG._runLiveForTest !== "function") { ok(false, "_runLiveForTest exported (headless loop smoke)"); }
+  else {
+    var g3 = demo3();
+    var seed3 = PG.layout(g3, "1.3.1", "1.3.2", 300, 180);
+    var lv = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "lively");
+    ok(lv && typeof lv.frames === "number" && lv.frames >= 1 && lv.frames <= 180,
+      "lively loop on 3-node graph terminates 1..180 frames (got " + (lv && lv.frames) + ")");
+    var ids3 = Object.keys((lv && lv.pos) || {}).sort();
+    eq(ids3, ["1.3.0", "1.3.1", "1.3.2"], "lively loop places all 3 nodes");
+    ids3.forEach(function (id) {
+      ok(isFinite(lv.pos[id].x) && isFinite(lv.pos[id].y), "lively finite coords " + id);
+      ok(lv.pos[id].x >= 30 && lv.pos[id].x <= 270 && lv.pos[id].y >= 30 && lv.pos[id].y <= 150,
+        "lively contained " + id);
+    });
+    var lv2 = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "lively");
+    eq(lv2, lv, "lively loop deterministic (same seed twice)");
+    var calm = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "calm");
+    eq(calm.pos, PG._test.relax(g3, seed3, 300, 180, OPTS3), "calm path = settle-once relax, unchanged");
+    eq(calm.frames, 0, "calm path runs zero live frames");
+  }
+  if (typeof PG._wakeForTest !== "function") { ok(false, "_wakeForTest exported (re-seed seam)"); }
+  else {
+    var W = 300, H = 180;
+    var Sg = demo3();
+    var seedW = PG.layout(Sg, "1.3.1", "1.3.2", W, H);
+    var S = { graph: Sg, geom: JSON.parse(JSON.stringify(seedW)), w: W, h: H, opts: OPTS3,
+      phys: "lively", temp: 0.5, still: 77, frames: 999,
+      running: true, settled: false, dead: false, reduced: false };
+    try { PG._wakeForTest(S); } catch (e) { ok(false, "wake on running loop throws: " + e); S = null; }
+    if (S) {
+      var t0 = PG._physForTest().lively.temp0;
+      ok(S.temp === t0 && S.still === 0 && S.frames === 0, "wake re-seeds temp/still/frames on a running loop (temp=" + S.temp + ")");
+      ok(S.running === true, "running loop stays running (no double-start)");
+    }
+  }
+})();
 (async function () {
   let calls = 0;
   const poolsByAsset = {};
