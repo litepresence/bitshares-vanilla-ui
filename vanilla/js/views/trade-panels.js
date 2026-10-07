@@ -5,9 +5,9 @@
  *   SINGLE/SCALED toggle (grid-area mode above both columns — shared
  *   P.scaledOpen, never per-side), locked quote panels
  *   (try-before-you-buy: isLockedView / wireThreeWay three-way quotes /
- *   mountFeePreview + mountBalanceLine / lockedPasswordRow /
- *   unlockAndReviewSingle + unlockAndReviewScaled with the password asked
- *   ONLY at review), the single-order review path (orderForm + reviewSingle
+ *   mountFeePreview + mountBalanceLine / unlockAndReviewSingle +
+ *   unlockAndReviewScaled with unlock in the shared UnlockConfirm modal —
+ *   summary rows, password ONLY at review), the single-order review path (orderForm + reviewSingle
  *   + paintConfirmSingle) and the scaled path (scaledForm + scaledOrders +
  *   reviewScaled + paintConfirmScaled), plus sellSym / pairLabel labels.
  *   Exact math, expiry wire, fee primitives and send+prove live in
@@ -15,7 +15,8 @@
  *   screen (paintResult) lives in builders/trade-cancel.js as before (lazy
  *   global). WIFs pass as JS values into Tx.sign — never into the DOM.
  * Consumes: TradeCore (math/expiry/fees/send, namespace-merged below), Tx
- *   (buildTx/feeMulti/sign), Format, Wallet (isUnlocked/unlock/active WIF),
+ *   (buildTx/feeMulti/sign), Format, Wallet (isUnlocked/active WIF),
+ *   UnlockConfirm (review + unlock modal),
  *   Account (myAccountId/resolve/balances), Chain (db/net/call), Store
  *   (network label), Market (never modified; ctx comes from the desk),
  *   TradeCancel (paintResult, lazy), Forms/DOM/touchable/ConfirmDialog
@@ -452,96 +453,129 @@ var TradePanels = (function () {
     return line;
   }
 
-  /* Password row for the locked "Unlock & review" button (same ids per side
-   * as the old renderUnlock form shape so help docs keep reading true).
-   * Returns refs. */
-  function lockedPasswordRow(doc, wrap, side) {
-    var f = Forms.labeledInput(doc, t("trade.password_label", "Password ") + " ", {
-      id: "trade-unlock-password-" + side, type: "password"
-    });
-    f.err = DOM.el(doc, "div", "", "error");
-    f.err.setAttribute("aria-live", "polite");
-    f.err.style.display = "none";
-    f.row.appendChild(f.err);
-    wrap.appendChild(f.row);
-    var errBox = DOM.el(doc, "div", null, "error");
-    errBox.setAttribute("aria-live", "polite");
-    wrap.appendChild(errBox);
-    return { pwField: f, pwErr: errBox };
+  /* lockedNow: keystore state read-only (drives the modal's needPassword;
+   * the password itself is only ever typed inside UnlockConfirm). */
+  function lockedNow() {
+    try {
+      if (typeof Wallet !== "undefined" && Wallet) {
+        if (typeof Wallet.isUnlocked === "function") return !Wallet.isUnlocked();
+        return !Wallet.keys;
+      }
+    } catch (e) { /* locked below */ }
+    return true;
+  }
+
+  /* orderSummaryRows: modal summary for a single order (raw input strings —
+   * NOT a validated review; reviewSingle validates downstream and
+   * paintConfirmSingle is the human-readable confirm). Params: P, side,
+   * vals ({amount, price}). Returns [[term, text], ...]. */
+  function singleSummaryRows(P, side, vals) {
+    var ctx = P.ctx;
+    return [
+      [t("trade.row_side", "Side"), (side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym],
+      [t("trade.uc_amount", "Amount"), String(vals.amount || "") + " " + ctx.quoteSym],
+      [t("trade.uc_price", "Price"), String(vals.price || "") + " " + ctx.baseSym + " per " + ctx.quoteSym]
+    ];
+  }
+
+  /* scaledSummaryRows: modal summary for scaled orders (raw inputs, same
+   * caveat as singleSummaryRows). Params: P, spec ({n, low, high, total,
+   * side}). Returns [[term, text], ...]. */
+  function scaledSummaryRows(P, spec) {
+    var ctx = P.ctx;
+    var sellS = spec.side === "buy" ? ctx.baseSym : ctx.quoteSym;
+    return [
+      [t("trade.row_side", "Side"), (spec.side === "buy" ? "Buy " : "Sell ") + ctx.quoteSym],
+      [t("trade.uc_orders", "Orders"), String(spec.n || "")],
+      [t("trade.uc_range", "Price range"), String(spec.low || "") + " – " + String(spec.high || "") + " " + ctx.baseSym + " per " + ctx.quoteSym],
+      [t("trade.uc_total", "Total to sell"), String(spec.total || "") + " " + sellS]
+    ];
+  }
+
+  /* modalGuard: shared UnlockConfirm backend check. Returns true when the
+   * modal opened, false after painting the page error (caller re-enables). */
+  function openUnlockModal(doc, body, btn, cfg) {
+    if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+      btn.disabled = false;
+      showError(doc, body, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+      return false;
+    }
+    cfg.title = t("trade.uc_title", "Unlock to continue");
+    cfg.feeHuman = null;
+    cfg.needPassword = lockedNow();
+    cfg.submitLabel = t("trade.unlock_review", "Unlock & review");
+    cfg.onCancel = function () { btn.disabled = false; };
+    UnlockConfirm.open(cfg);
+    return true;
   }
 
   /* Locked "Unlock & review" click: preserves the quote inputs in st, unlocks
-   * (password ONLY at signing per principle #9), resolves the wallet account,
-   * keeps the panels' input state on P, then proceeds down the EXISTING
-   * review path (reviewSingle -> paintConfirmSingle). Never clears inputs. */
-  function unlockAndReviewSingle(doc, body, mount, P, side, st, refs, btn) {
-    refs.pwErr.textContent = "";
+   * in the shared modal (summary rows — the EXISTING review path below is
+   * the human-readable confirm), resolves the wallet account, keeps the
+   * panels' input state on P, then proceeds down reviewSingle ->
+   * paintConfirmSingle. Never clears inputs. */
+  function unlockAndReviewSingle(doc, body, mount, P, side, st, btn) {
     btn.disabled = true;
-    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
     var vals = {
       amount: st.amount, price: st.price, fok: st.fok,
       key: st.key, custom: st.custom
     };
-    /* H2: password wiped from input + local once consumed (both outcomes). */
-    var pw = refs.pwField.input.value;
-    Promise.resolve()
-      .then(function () { return Wallet.unlock(pw); })
-      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
-      .then(function () { return Account.myAccountId(); })
-      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
-      .then(function (me) {
-        P.me = me;
-        try { body.removeChild(status); } catch (e) { /* gone */ }
-        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
-        return reviewSingle(P, side, vals).then(function (R) {
-          paintConfirmSingle(doc, mount, P, side, R);
-        }).catch(function (e) {
-          try { body.removeChild(status2); } catch (x) { /* gone */ }
-          throw e;
-        });
-      })
-      .catch(function (e) {
-        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
-        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
-        pw = null;
-        btn.disabled = false;
-        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed."));
-      });
+    var opened = openUnlockModal(doc, body, btn, {
+      rows: singleSummaryRows(P, side, vals),
+      onUnlocked: function () {
+        Promise.resolve()
+          .then(function () { return Account.myAccountId(); })
+          .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
+          .then(function (me) {
+            P.me = me;
+            var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
+            return reviewSingle(P, side, vals).then(function (R) {
+              paintConfirmSingle(doc, mount, P, side, R);
+            }).catch(function (e) {
+              try { body.removeChild(status2); } catch (x) { /* gone */ }
+              throw e;
+            });
+          })
+          .catch(function (e) {
+            btn.disabled = false;
+            showError(doc, body, (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed.")),
+              t("trade.fail_prepare", "Could not prepare the order."));
+          });
+      }
+    });
+    if (!opened) return;
   }
 
-  /* Locked scaled "Unlock & review": same gate as single orders — unlock,
-   * keep the scaled inputs on the panel's per-side state, then run the
-   * existing reviewScaled -> paintConfirmScaled path (confirm side follows
-   * spec.side, so each column confirms its own side). */
-  function unlockAndReviewScaled(doc, body, mount, P, spec, refs, btn) {
-    refs.pwErr.textContent = "";
+  /* Locked scaled "Unlock & review": same gate as single orders — modal
+   * unlock, keep the scaled inputs on the panel's per-side state, then run
+   * the existing reviewScaled -> paintConfirmScaled path (confirm side
+   * follows spec.side, so each column confirms its own side). */
+  function unlockAndReviewScaled(doc, body, mount, P, spec, btn) {
     btn.disabled = true;
-    var status = showStatus(doc, body, t("trade.unlocking", "Unlocking…"));
-    /* H2: password wiped from input + local once consumed (both outcomes). */
-    var pw = refs.pwField.input.value;
-    Promise.resolve()
-      .then(function () { return Wallet.unlock(pw); })
-      .then(function (r) { refs.pwField.input.value = ""; pw = null; return r; })
-      .then(function () { return Account.myAccountId(); })
-      .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
-      .then(function (me) {
-        P.me = me;
-        try { body.removeChild(status); } catch (e) { /* gone */ }
-        var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
-        return reviewScaled(P, spec).then(function (R) {
-          paintConfirmScaled(doc, mount, P, R, spec.side === "sell" ? "sell" : "buy");
-        }).catch(function (e) {
-          try { body.removeChild(status2); } catch (x) { /* gone */ }
-          throw e;
-        });
-      })
-      .catch(function (e) {
-        try { if (status.parentNode === body) body.removeChild(status); } catch (x) { /* gone */ }
-        try { refs.pwField.input.value = ""; } catch (wipeErr) { /* input gone */ }
-        pw = null;
-        btn.disabled = false;
-        refs.pwErr.textContent = (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed."));
-      });
+    var opened = openUnlockModal(doc, body, btn, {
+      rows: scaledSummaryRows(P, spec),
+      onUnlocked: function () {
+        Promise.resolve()
+          .then(function () { return Account.myAccountId(); })
+          .then(function (myId) { return Account.resolve(myId).then(function (me) { return { id: myId, name: me.name }; }); })
+          .then(function (me) {
+            P.me = me;
+            var status2 = showStatus(doc, body, t("trade.checking", "Checking balance and fee…"));
+            return reviewScaled(P, spec).then(function (R) {
+              paintConfirmScaled(doc, mount, P, R, spec.side === "sell" ? "sell" : "buy");
+            }).catch(function (e) {
+              try { body.removeChild(status2); } catch (x) { /* gone */ }
+              throw e;
+            });
+          })
+          .catch(function (e) {
+            btn.disabled = false;
+            showError(doc, body, (e && e.message) ? e.message : String(e || t("common.unlock_failed", "Unlock failed.")),
+              t("trade.fail_prepare", "Could not prepare the order."));
+          });
+      }
+    });
+    if (!opened) return;
   }
 
   /* Desk entry: renderDual(doc, buyMount, sellMount, ctx). Guards backends,
@@ -865,7 +899,6 @@ var TradePanels = (function () {
       st.custom = exp.custom.value;
     }
     if (locked) {
-      var refs = lockedPasswordRow(doc, body, side);
       var unlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       unlockBtn.id = sid("unlock-and-review", side);
       unlockBtn.type = "button";
@@ -880,7 +913,7 @@ var TradePanels = (function () {
         unlockAndReviewSingle(doc, body, mount, P, side, {
           amount: st.amount, price: st.price, fok: st.fok,
           key: st.key, custom: st.custom
-        }, refs, unlockBtn);
+        }, unlockBtn);
       });
       return;
     }
@@ -1207,7 +1240,6 @@ var TradePanels = (function () {
       exp.select.addEventListener("change", feePrev.schedule);
       exp.custom.addEventListener("input", feePrev.schedule);
       fokBox.addEventListener("change", feePrev.schedule);
-      var sRefs = lockedPasswordRow(doc, body, side);
       var sUnlockBtn = touchable(DOM.el(doc, "button", t("trade.unlock_review", "Unlock & review")));
       sUnlockBtn.id = sid("unlock-and-review", side);
       sUnlockBtn.type = "button";
@@ -1226,7 +1258,7 @@ var TradePanels = (function () {
         unlockAndReviewScaled(doc, body, mount, P, {
           n: st.n, low: st.low, high: st.high, total: st.total,
           side: st.side, fok: st.fok, key: st.key, custom: st.custom
-        }, sRefs, sUnlockBtn);
+        }, sUnlockBtn);
       });
       return;
     }

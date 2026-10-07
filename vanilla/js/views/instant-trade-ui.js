@@ -7,7 +7,8 @@
  *   like #/instant-trade/BTS_CNY auto-loads as sell=BTS receive=CNY (same
  *   SYM_SYM split as the old limit path, so the old auto-load does not
  *   regress). No new serializers. Consumes: Market, Tx, Format (only money
- *   entries), Wallet (unlock/WIF as JS value, never DOM), Account, Chain,
+ *   entries), Wallet (WIF as JS value, never DOM; unlock lives in the
+ *   shared UnlockConfirm modal), Account, Chain,
  *   Store. Global InstantTradeUI only; gen counter tears down stale work.
  * Refs (concepts only, never ported verbatim): QuickTrade.jsx:37-83 (sell/
  *   receive asset+amount state + active input), SellReceive.jsx (dual
@@ -176,22 +177,8 @@ var InstantTradeUI = (function () {
       return !!(typeof Wallet !== "undefined" && Wallet.keys);
     } catch (e) { return false; }
   }
-  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
-    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-    var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-    inp.setAttribute("placeholder", t("instant.password", "Password ")); inp.setAttribute("aria-label", t("instant.password", "Password "));
-    touchable(inp); row.appendChild(inp);
-    var b = touchable(DOM.el(doc, "button", t("instant.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
-    parent.appendChild(row);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
+  /* Signing gates at Sign & Send via the shared UnlockConfirm modal
+   * (attemptSend) — the inline password row is gone. Never throws. */
 
   /* SELL_RECEIVE pair split (QuickTradeRouter.jsx:33-36 shape: head=sell,
    * tail=receive; identical SYM_SYM shape to the old QUOTE_BASE loader, so
@@ -1095,20 +1082,42 @@ var InstantTradeUI = (function () {
     var sendBtn = touchable(DOM.el(doc, "button", t("common.sign_send", "Sign & Send")));
     sendBtn.id = "it-send"; sendBtn.type = "button"; wrap.appendChild(sendBtn);
     backBtn.addEventListener("click", function () { if (myGen === gen) paintConvert(doc, root, myGen, P); });
-    sendBtn.addEventListener("click", function () {
+    /* attemptSend: sign + broadcast. Locked wallets detour through the
+     * shared review + unlock modal (compact summary — the full review above
+     * stays on the page behind it) and re-enter here after unlock; a wallet
+     * that yields no active key after unlock fails loudly instead of
+     * looping the modal (depth guard). Params: depth (0 first try). */
+    function attemptSend(depth) {
+      if (myGen !== gen) return;
       backBtn.disabled = true; sendBtn.disabled = true;
       var status = showStatus(doc, wrap, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
       if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
         wrap.removeChild(status);
-        if (!wrap.querySelector || !wrap.querySelector(".xfer-sign-note")) {
-          var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-          note.className = "muted xfer-sign-note"; wrap.appendChild(note);
+        backBtn.disabled = false; sendBtn.disabled = false;
+        if (depth >= 1) {
+          showError(doc, wrap, "wallet-unlocked-without-active-key", t("instant.order_failed", "Order failed."));
+          return;
         }
-        unlockInline(doc, wrap, function () {
-          wrap.appendChild(DOM.el(doc, "p", t("instant.unlocked_repreview_note", "Unlocked — press Back and review again so the order uses your account."), "muted"));
+        if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+          showError(doc, wrap, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("instant.order_failed", "Order failed."));
+          return;
+        }
+        UnlockConfirm.open({
+          title: t("instant.uc_title", "Unlock to sign"),
+          rows: [
+            [t("instant.side_2", "Side"), t("trade.col_sell", "Sell") + " " + ctx.sellSym + " → " + t("trade.col_receive", "Receive") + " " + ctx.receiveSym],
+            [t("instant.sell_amount_to_sell", "Sell (Amount to Sell)"), sellHuman + " " + ctx.sellSym, R.sellRaw],
+            [t("instant.buy_min_to_receive", "Buy (Min to Receive)"), minHuman + " " + ctx.receiveSym, R.minRaw],
+            [t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw]
+          ],
+          feeHuman: null,
+          needPassword: true,
+          submitLabel: t("instant.unlock_sign", "Unlock & sign"),
+          onUnlocked: function () { attemptSend(1); },
+          onCancel: function () {}
         });
-        backBtn.disabled = false; sendBtn.disabled = false; return;
+        return;
       }
       var before;
       Promise.resolve().then(function () { return snapshotIds(R.me.id); })
@@ -1139,7 +1148,8 @@ var InstantTradeUI = (function () {
           wrap.removeChild(status); showError(doc, wrap, e, t("instant.order_failed", "Order failed."));
           backBtn.disabled = false; sendBtn.disabled = false;
         });
-    });
+    }
+    sendBtn.addEventListener("click", function () { attemptSend(0); });
   }
 
   /* Order ids snapshot before send (diffed after). */
