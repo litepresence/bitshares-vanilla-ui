@@ -287,7 +287,7 @@ separately — 488 vectors green + keepalive GREEN as of 2026-10-01).
 ## 13. Gateways (`#/deposit-withdraw`)
 
 1. Confirm exactly four integrations shown: XBTSX + IOB live coin lists;
-   GDEX manual-only; BIT20 disabled — each labeled honestly.
+   GDEX manual-only; BTWTY disabled — each labeled honestly.
 2. Withdraw path: prefills a transfer (single signing path) — confirm the
    handoff works to Review, then cancel.
 

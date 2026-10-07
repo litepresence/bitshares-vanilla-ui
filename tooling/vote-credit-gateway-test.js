@@ -142,7 +142,7 @@ async function main() {
   eq(Gateway.cacheGet("gw_test_key").data, { address: "ABC", memo: "m" }, "gateway cache round trip");
   eq(Gateway.cacheGet("gw_missing_key"), null, "gateway cache miss null");
   var ids = Gateway.list().map(function (e) { return e.id; });
-  eq(ids, ["XBTSX", "IOB", "GDEX", "BIT20"], "gateway registry ids");
+  eq(ids, ["XBTSX", "IOB", "GDEX", "BTWTY"], "gateway registry ids");
   var xbtsx = Gateway.list().filter(function (e) { return e.id === "XBTSX"; })[0];
   eq([xbtsx.enabled, typeof xbtsx.reason], [true, "object"], "gateway xbtsx enabled");
   var gdex = Gateway.list().filter(function (e) { return e.id === "GDEX"; })[0];
@@ -151,12 +151,12 @@ async function main() {
   await rejectsRe(Gateway.depositAddress("XBTSX", { account: "alice", coin: "" }), /bad-coin/, "gateway empty coin rejects pre-fetch");
   await rejectsRe(Gateway.depositAddress("NOPE", { account: "alice", coin: "BTC" }), /unknown-gateway/, "gateway unknown id rejects");
   await rejectsRe(Gateway.coins("NOPE"), /unknown-gateway/, "gateway coins unknown rejects");
-  await rejectsRe(Gateway.coins("BIT20"), /disabled/, "gateway coins disabled rejects");
+  await rejectsRe(Gateway.coins("BTWTY"), /disabled/, "gateway coins disabled rejects");
   await rejectsRe(Gateway.validateWithdrawAddress("XBTSX", { address: "" }), /bad-account/, "gateway empty withdraw address rejects");
   var h1 = await Gateway.health("NOPE");
   eq([h1.ok, h1.reason], [false, "unknown-gateway: NOPE"], "gateway health unknown shape");
   eq(typeof h1.at, "number", "gateway health carries timestamp");
-  await rejectsRe(Gateway.withdrawPrefill("BIT20", "BTC"), /disabled/, "gateway bit20 prefill disabled");
+  await rejectsRe(Gateway.withdrawPrefill("BTWTY", "BTC"), /disabled/, "gateway btwty prefill disabled");
 
   console.log(cur.name + ": " + cur.n + " passed, 0 failed");
   console.log(pass + " passed, " + fail + " failed");

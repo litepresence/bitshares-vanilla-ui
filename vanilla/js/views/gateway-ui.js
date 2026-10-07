@@ -1,5 +1,5 @@
 /* gateway-ui.js — #/deposit-withdraw desk (+ #/deposit-withdraw/:gateway tab link).
- * Owns: four gateway tabs (XBTSX/IOB live-first, GDEX/BIT20 disabled-first),
+ * Owns: four gateway tabs (XBTSX/IOB live-first, GDEX/BTWTY disabled-first),
  *   health dots + status line + Re-check, DEPOSIT/WITHDRAW toggle, coin select
  *   filtered by depositAllowed/withdrawalAllowed, deposit panels (Format-human
  *   facts + copyable address/memo + cached flag + verbatim host errors; NO QR —
@@ -33,7 +33,7 @@ var GatewayUI = (function () {
   var gen = 0;
   var openSubs = [];
   var coinCache = {}; /* session coin lists per gateway id (never persisted) */
-  var ORDER = ["XBTSX", "IOB", "GDEX", "BIT20"];
+  var ORDER = ["XBTSX", "IOB", "GDEX", "BTWTY"];
   /* No local el — use DOM.el */
 /* clearBox removed — use DOM.clear */
   /* showError: named Gateway errors -> human text. gateway-rejected stays
@@ -199,7 +199,7 @@ var GatewayUI = (function () {
         prefs = JSON.parse(localStorage.getItem(KEY) || "null");
       } catch (e) { prefs = null; }
       if (!prefs || typeof prefs !== "object") {
-        prefs = { XBTSX: true, IOB: true, GDEX: true, BIT20: true };
+        prefs = { XBTSX: true, IOB: true, GDEX: true, BTWTY: true };
       }
       ctx.gwShow = prefs;
       var det = ctx.doc.createElement("details");
@@ -315,7 +315,7 @@ var GatewayUI = (function () {
     ctx.bodyBox.appendChild(re);
   }
   /* disabledPanel: GDEX (dead-first, manual-only + landing + probe Retry) and
-   * BIT20 (never fetched until discovery proves a host — no host Retry). */
+   * BTWTY (never fetched until discovery proves a host — no host Retry). */
   function disabledPanel(ctx, entry) {
     var doc = ctx.doc, myGen = ctx.myGen;
     ctx.bodyBox.appendChild(DOM.el(doc, "h2", entry.id + t("gateway.unavailable_suffix", " — unavailable")));
@@ -335,11 +335,11 @@ var GatewayUI = (function () {
         Gateway.health("GDEX", { force: true }).then(function () { if (myGen === gen) { refreshHealth(ctx); loadTab(ctx); } });
       });
       ctx.bodyBox.appendChild(re);
-    } else if (entry.id === "BIT20") {
+    } else if (entry.id === "BTWTY") {
       ctx.bodyBox.appendChild(DOM.el(doc, "p",
-        t("gateway.bit20_a", "What unblocks this tab: on-chain discovery of a BIT20-prefixed asset family ") +
-        t("gateway.bit20_b", "and issuer account (see parity note). No endpoint is guessed, so there is ") +
-        t("gateway.bit20_c", "nothing to retry against yet."), "muted"));
+        t("gateway.btwty_a", "What unblocks this tab: on-chain discovery of a BTWTY-prefixed asset family ") +
+        t("gateway.btwty_b", "and issuer account (see parity note). No endpoint is guessed, so there is ") +
+        t("gateway.btwty_c", "nothing to retry against yet."), "muted"));
     }
   }
   /* liveTab: DEPOSIT/WITHDRAW toggle (the WORDS of XbtsxGateway.jsx) + coin

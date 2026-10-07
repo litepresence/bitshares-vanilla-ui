@@ -24,7 +24,7 @@
 | A5 | `/credit-offer` → CreditOfferPage (:520) | offers, offer, lend.astro | `/credit-offer` (:116) + `/credit-offer/:id` (:115) → PORTED (slice-13: offer 1.21.43 → deals 1.22.70/71) |
 | A6 | `/settings`, `/settings/:tab` (:524–528) | nodes, theme, visuals, page_themes.astro | `/settings`, `/settings/:tab` (:118–119) → PORTED (slice-01 nodes/latency/testnet; slice-17 switcher; 3 themes) |
 | A7 | `/invoice/:data` → Invoice (:529) | create_invoice, pay_invoice, stored_invoices, invoice_inventory.astro | `/invoice/:data` (:120) + `/invoice` (:121) → PORTED (slice-14 MiscUI) |
-| A8 | `/deposit-withdraw` (:533) | — (no astro equiv; gateway bridge) | `/deposit-withdraw` (:130) + `/:gateway` (:129) → PORTED (slice-15: XBTSX/IOB live, GDEX manual-only, BIT20 disabled) |
+| A8 | `/deposit-withdraw` (:533) | — (no astro equiv; gateway bridge) | `/deposit-withdraw` (:130) + `/:gateway` (:129) → PORTED (slice-15: XBTSX/IOB live, GDEX manual-only, BTWTY disabled) |
 | A9 | `/create-account` → LoginSelector (:538) | create_account.astro | `/create-account` (:131) → PORTED (`create-account-ui.js`: availability + brainkey + faucet register + verify) |
 | A10 | `/login` → Login (:542) | change_password.astro (partial) | `/login` (:132) → PORTED (`auth-ui.js`: unlock form + links) |
 | A11 | `/registration` → RegistrationSelector (:543) | create_account.astro | `/registration` (:133) → PORTED (`auth-ui.js` hub) |
@@ -125,8 +125,8 @@
 
 | # | Item | Reason |
 |---|---|---|
-| D1 | Historic gateways (RuDEX/Citadel/BlockTrades/…) | Out of business; SCOPE directive 2026-09-28: XBTSX/BIT20/GDEX/IOB only (slice-15) |
-| D2 | GDEX auto-provisioning / BIT20 auto-rates | GDEX DNS-dead → honest manual-only panel; BIT20 gateway-less → disabled (slice-15) |
+| D1 | Historic gateways (RuDEX/Citadel/BlockTrades/…) | Out of business; SCOPE directive 2026-09-28 (ID corrected 2026-10-07 BIT20→BTWTY): XBTSX/BTWTY/GDEX/IOB only (slice-15) |
+| D2 | GDEX auto-provisioning / BTWTY auto-rates | GDEX DNS-dead → honest manual-only panel; BTWTY endpoint-undiscovered → disabled (slice-15) |
 | D3 | Extension-wrapper adapter | Post-v1 hardening by design, never a v1 dependency (SLICES.md) |
 | D4 | dApp provider bridge (window.beet compat) | Out of v1 scope; if ever added, copies ref-#3 permission patterns |
 | D5 | TradingView charting_library | Proprietary; replaced by vendored lightweight-charts + canvas (SLICES.md charting decision) |

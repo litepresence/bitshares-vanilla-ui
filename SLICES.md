@@ -22,7 +22,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 | 12 | Pools + swap + stake | ✅ built (2 lifecycles 1.19.66/67, virgin max-rule, DEX-UX mirror, ES refused; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 13 | Credit + Same-T + borrow | ✅ built (offer 1.21.43→deals, fund 1.20.29/30, denom 1M, same-tx rule; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 14 | Proposals + tickets + misc | ✅ built (props 1.10.1488/89/91, vesting lifecycles, authority 1.17.4, tickets 1.18.61 proven blocks 100943508/09, F1-F6; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
-| 15 | Gateways | ✅ built (XBTSX/IOB live, GDEX/BIT20 honest-unavailable, memo fix; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
+| 15 | Gateways | ✅ built (XBTSX/IOB live, GDEX/BTWTY honest-unavailable, memo fix; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 16 | Notifications + alerts | ✅ built (engine wired, CSS, split; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 17 | i18n foundations | ✅ built (en+es+8 stubs, switcher, batch-1 en-identical, Store envelope; audit DONE-WITH-BROWSER-ITEMS; browser pass ⏳) |
 | 18 | Final readability pass | 🔨 (oversize list inventoried — see below; audit then fixes) |
@@ -122,8 +122,8 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - [x] Parity note `docs/parity/slice-14-proposals.md`, audit DONE-WITH-BROWSER-ITEMS
 
 ### 15. Gateways ✅ (browser ⏳)
-- [x] XBTSX + IOB live (45 + 2 coins); GDEX dead (DNS) → manual-only; BIT20 gateway-less → disabled; withdraw = transfer-prefill delegation; `backingCoin` memo fix proven live (`BTC:`)
-- [x] SCOPE (user, 2026-09-28): XBTSX/BIT20/GDEX/IOB only; all other historic partners OUT OF SCOPE (kept)
+- [x] XBTSX + IOB live (45 + 2 coins); GDEX dead (DNS) → manual-only; BTWTY (Bit20 Group) endpoint-undiscovered → disabled; withdraw = transfer-prefill delegation; `backingCoin` memo fix proven live (`BTC:`)
+- [x] SCOPE (user, 2026-09-28; ID corrected 2026-10-07 BIT20→BTWTY): XBTSX/BTWTY/GDEX/IOB only; all other historic partners OUT OF SCOPE (kept)
 - [x] Parity note `docs/parity/slice-15-gateways.md`, audit DONE-WITH-BROWSER-ITEMS
 
 ### 16. Notifications + alerts ✅ (browser ⏳)
@@ -169,7 +169,7 @@ Legend: ✅ done · 🔨 in progress · ⬜ queued · ⏳ waiting on human teste
 - R1c build: on-chain trollbox (op-35 custom ops, astro `Trollbox.jsx`/`Forum.jsx` pattern), ranked-ops via bounded chain-scan (NOT astro's ES endpoint — doctrine), dead-browser notice via feature detection (NOT UA sniff, NOT Chrome upsell). Defer + document: issue reporter, forum mirror.
 - R1d build: live-MPA settlement estimate (exact reciprocal-percent string math, #1's offset formula — #4 op comment sides with #1 over #2's offset-less dialog). Defer: QR, op-35-generic builder, escrow broadcast, scammer registry, settlement-bid extras.
 - R1e build: collateral ratio display + open-settlement-orders tab (`get_settle_orders`, #4 `database_api.hpp:558`); fee asset stays `1.3.0` default with switching deferred + noted. No explorer activity joins, no gateway history panels, no news feed (all deferred + documented).
-- R1f gateways: XBTSX/IOB/GDEX-manual/BIT20-disabled only — final.
+- R1f gateways: XBTSX/IOB/GDEX-manual/BTWTY-disabled only — final.
 - R2 matrix counts line fixed (table = truth; C3/C37 BUILDING, C23/C36 DEFERRED).
 - R3/R4 LTM: skipped for v1 — serializers-done suffices, documented; no faucet work without owner order.
 - R5 extension: Tier-1 human install drill gates v1; Tier-2 approval/signing-gate is follow-up. Documented in `docs/parity/extension-wrapper.md`.

@@ -1,6 +1,6 @@
 /* gateway.js — adapter registry + health + deposit fetchers + cache.
  *
- * Owns: the four slice-15 adapters (XBTSX, IOB, GDEX, BIT20), coin-list
+ * Owns: the four slice-15 adapters (XBTSX, IOB, GDEX, BTWTY), coin-list
  * normalization (raw ints stay raw strings), deposit-address HTTP fetchers,
  * withdraw-prefill derivation, health probing with timestamped cache, and
  * the namespaced localStorage address cache (gw_addr_/gw_last_/gw_health_/
@@ -200,13 +200,13 @@ var Gateway = (function () {
     { id: "XBTSX", name: "XBTS Native Chains", landing: "https://xbts.io/", wallet: "https://ex.xbts.io/", enabled: true, reason: null },
     { id: "IOB", name: "ioxbank", landing: "https://ioxbank.com", wallet: "https://dex.iobanker.com/", enabled: true, reason: null },
     { id: "GDEX", name: "GDEX", landing: "https://bitsharestalk.org/index.php?topic=33861", wallet: "Only manual deposit / withdraw", enabled: false, reason: "API unreachable from last probe — manual deposit/withdraw only (per the gateway's own status in #1)" },
-    { id: "BIT20", name: "BIT20", landing: null, wallet: null, enabled: false, reason: "no public deposit API discovered — discovery procedure pending (see parity note)" }
+    { id: "BTWTY", name: "BTWTY", landing: null, wallet: null, enabled: false, reason: "no public deposit API discovered — discovery procedure pending (see parity note)" }
   ];
   function entry(id) {
     for (var i = 0; i < REGISTRY.length; i++) if (REGISTRY[i].id === id) return REGISTRY[i];
     return null;
   }
-  /* assertEnabled: disabled adapters throw before any fetch (BIT20 never
+  /* assertEnabled: disabled adapters throw before any fetch (BTWTY never
    * fetched until ambiguity-B discovery proves a host; GDEX only after a
    * 200 re-probe flips it in health()). */
   function assertEnabled(id) {
@@ -302,14 +302,14 @@ var Gateway = (function () {
     /* health: one fetch per adapter, 10s timeout. NEVER throws — every
      * failure returns {ok:false, reason, at}. Fresh cache (<15 min) wins
      * unless {force:true} (views' Retry). A GDEX 200 flips it enabled
-     * (ambiguity D); BIT20 is never fetched (ambiguity B). */
+     * (ambiguity D); BTWTY is never fetched (ambiguity B). */
     health: function (id, opts) {
       var e = entry(id);
       if (!e) return Promise.resolve({ ok: false, reason: "unknown-gateway: " + id, at: Date.now() });
       var cached = cacheGet(healthKey(id));
       if (cached && !((opts || {}).force) && Date.now() - cached.at < HEALTH_STALE_MS) return Promise.resolve(cached.data);
       var job;
-      if (id === "BIT20") job = Promise.resolve({ ok: false, reason: "disabled: " + (e.reason || id), at: Date.now() });
+      if (id === "BTWTY") job = Promise.resolve({ ok: false, reason: "disabled: " + (e.reason || id), at: Date.now() });
       else if (id === "XBTSX") job = probeList(XBTSX_BASE + "/coin", null, "XBTSX");
       else if (id === "IOB") job = probeList(IOB_BASE + "/coins", null, "IOB");
       else if (id === "GDEX") {
@@ -335,7 +335,7 @@ var Gateway = (function () {
       if (id === "XBTSX") return xbtsxList();
       if (id === "IOB") return iobList();
       if (id === "GDEX") return gdexList();
-      if (id === "BIT20") return Promise.reject(namedError("disabled", entry("BIT20").reason));
+      if (id === "BTWTY") return Promise.reject(namedError("disabled", entry("BTWTY").reason));
       return Promise.reject(namedError("unknown-gateway", id));
     },
     /* depositAddress: {address, memo, cached}. Empty account throws
@@ -352,7 +352,7 @@ var Gateway = (function () {
       if (id === "XBTSX") return xbtsxDeposit(account, coin);
       if (id === "IOB") return iobDeposit(account, coin);
       if (id === "GDEX") return gdexDeposit(account, coin);
-      if (id === "BIT20") return Promise.reject(namedError("disabled", entry("BIT20").reason));
+      if (id === "BTWTY") return Promise.reject(namedError("disabled", entry("BTWTY").reason));
       return Promise.reject(namedError("unknown-gateway", id));
     },
     /* validateWithdrawAddress: thin passthrough of host check-address
@@ -381,7 +381,7 @@ var Gateway = (function () {
           return { valid: true, raw: body };
         });
       }
-      if (id === "IOB" || id === "BIT20") return Promise.reject(namedError("unproven", "no host validate shape for " + id));
+      if (id === "IOB" || id === "BTWTY") return Promise.reject(namedError("unproven", "no host validate shape for " + id));
       return Promise.reject(namedError("unknown-gateway", id));
     },
     /* withdrawPrefill: issuer/intermediate account + memo prefix from the

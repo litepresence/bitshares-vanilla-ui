@@ -1,7 +1,7 @@
-# Slice 15 parity note — gateways (XBTSX/BIT20/GDEX/IOB only)
+# Slice 15 parity note — gateways (XBTSX/BTWTY/GDEX/IOB only)
 
 Plan: `docs/superpowers/plans/2026-09-28-slice-15-gateways.md` (Tasks 1–3).
-User scope: XBTSX, BIT20, GDEX, IOB ONLY — all other historic partners
+User scope: XBTSX, BTWTY (Bit20 Group; scope written 2026-09-28 as BIT20 — corrected 2026-10-07), GDEX, IOB ONLY — all other historic partners
 (RuDEX/Citadel/BlockTrades/…) out of business → OUT OF SCOPE, not ported.
 Reads-only slice: withdraw proven as prefilled `#/transfer` delegation;
 deposit never broadcasts; `tx.js` untouched.
@@ -25,8 +25,10 @@ deposit never broadcasts; `tx.js` untouched.
   1.2.1787259`); deposit endpoint 404s verbatim → panel degrades.
 - GDEX `api.52bts.net` + `openapi…/coins` → DNS NXDOMAIN (sandbox AND headless
   browser) = host death → manual-only unavailable panel + probe Retry.
-- BIT20: no assets on-chain (`BIT20.*` all not found), `bit20` account exists
-  but gateway-less (`1.2.106303`) → tab disabled, no URL guessed.
+- BTWTY (Bit20 Group): BTWTY.* asset family exists on-chain (dozens of pool assets),
+  operator site `btwty.com`, but no public deposit-address API endpoint discovered
+  → tab disabled, no URL guessed. (Earlier note recorded this as BIT20.* not found —
+  that was the wrong prefix; the gateway id is BTWTY, corrected 2026-10-07.)
 - XBTSX list flipped POST-first→GET-first (ambiguity A long decided; the doomed
   POST logged a console 404 on every fetch). Remaining console signal:
   GDEX `api.52bts.net` DNS failure — honest and expected (dead host; UI shows
@@ -59,4 +61,4 @@ deposit never broadcasts; `tx.js` untouched.
 
 ## Anti-rot gate (§4.5): (a) yes — static adapters, hosts are data not code,
 gateway death = non-event; (b) nothing new depended on (fetch only);
-(c) smallest deletable: BIT20/GDEX tabs (XBTSX/IOB stand). `check_rot.py` PASS.
+(c) smallest deletable: BTWTY/GDEX tabs (XBTSX/IOB stand). `check_rot.py` PASS.
