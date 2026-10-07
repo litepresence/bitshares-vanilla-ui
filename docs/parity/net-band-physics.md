@@ -56,6 +56,13 @@ motion and runs bounded even under `prefers-reduced-motion`.
   selectors didn't).
 - `vanilla/css/app.css` — switch visuals halved (30×16 pill, 8px knob) inside a
   **44×44 hit area** so the touch floor survives; focus ring added.
+- **Label trimmed to the switch itself** (owner, later the same day): the
+  tooltip, the hint line, *and* the visible `On`/`Off` word are all gone. The
+  bar now reads just `Physics` + the pill. State still reaches assistive tech
+  through `role="switch"` + `aria-checked` (+ `aria-label="Physics"`), so
+  nothing is lost to a screen reader; sighted users read the knob's side and
+  the accent color. The retired `pool_net.phys_on` / `phys_off` keys were
+  deleted from all 12 dicts rather than left orphaned.
 
 ## Regression caught while testing this
 
@@ -67,9 +74,10 @@ all four surfaces.
 
 ## Evidence
 
-- `tooling/pool-net-ui-test.js` → **72 passed** (one preset + `calm` gone,
+- `tooling/pool-net-ui-test.js` → **76 passed** (one preset + `calm` gone,
   flag defaults, gesture-vs-auto wake vectors, persistence incl. corrupt value
-  and retired key, travel/settle guard, switch DOM contract).
+  and retired key, travel/settle guard, switch DOM contract incl. the
+  no-tooltip / no-hint / no-On-Off-word contract across all three builders).
 - `tooling/pool-graph-test.js` → **136 pass** (one preset, stale mode argument
   ignored, gesture gate, persistence, determinism).
 - `pool-net-test` 39 · `market-net-test` 22 · `market-net-ui-test` 23 ·
@@ -85,7 +93,9 @@ all four surfaces.
   | Market desk | **0px** | 13.2px |
 
 - Switch geometry at 1440px and 390px: button 44×44, track 30×16, no `title`,
-  zero hint elements — the half-size control keeps the full-size target.
+  zero hint elements, zero state elements — the half-size control keeps the
+  full-size target. Bar text is exactly `Physics` on all three surfaces, with
+  `aria-checked` flipping correctly and zero page errors.
 - Gates: `check_rot.py` PASSED · `check_i18n.py` OK (3772 keys, 4980 call
   sites) · `check_types.sh` PASS.
 

@@ -275,13 +275,19 @@ var skel = { pools: [
   ok(/\.pool-net-phystrack\s*\{[^}]*height:\s*16px/.test(css), "track height 16px (half of the old 44px pill)");
   ok(/\.pool-net-physhint/.test(css) === false, "no hint line styled");
   ok(/\.pool-net-physwitch[^}]*title:/.test(css) === false, "no tooltip styling on the switch");
+  ok(/\.pool-net-physstate/.test(css) === false, "no On/Off word styled");
   var src = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-chrome.js"), "utf8");
   ok(src.indexOf("pool-net-physhint") === -1, "chrome builds no hint element");
   ok(src.indexOf("phys_hint") === -1, "chrome references no hint key");
   ok(src.indexOf("physTrack") !== -1, "chrome builds the track child");
+  ok(src.indexOf("physState") === -1 && src.indexOf("phys_on") === -1 && src.indexOf("phys_off") === -1,
+    "chrome builds no On/Off word and references no phys_on/phys_off key");
   ["market-desk-fill.js", "pool-detail-view.js"].forEach(function (f) {
     var t = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", f), "utf8");
     ok(t.indexOf("physhint") === -1 && t.indexOf("phys_hint") === -1, f + ": no hint element or key");
+    ok(t.indexOf("physState") === -1 && t.indexOf("phys_on") === -1 && t.indexOf("phys_off") === -1 &&
+       t.indexOf("physstate") === -1 && t.indexOf("data-phys-state") === -1,
+      f + ": no On/Off word element, key, or lookup");
     ok(t.indexOf("pool-net-phystrack") !== -1, f + ": builds the track child");
   });
 })();

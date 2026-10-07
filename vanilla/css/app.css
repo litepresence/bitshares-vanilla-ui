@@ -1634,7 +1634,8 @@ p.muted[aria-live="polite"],
 /* Physics switch (2026-10-07): the BUTTON is the 44x44 touch target and the
  * visible pill is a child track, so the control can read small on the canvas
  * without dropping below the platform touch floor (principle #7). Half-size
- * visuals, full-size target; no tooltip, no hint line. */
+ * visuals, full-size target; no tooltip, no hint line, no On/Off word — the
+ * knob's side plus aria-checked are the whole label. */
 .pool-net-phys { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
 .pool-net-physlabel { font-weight: bold; }
 .pool-net-physwitch { position: relative; width: 44px; height: 44px;
@@ -1648,7 +1649,6 @@ p.muted[aria-live="polite"],
 .pool-net-physknob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px;
   border-radius: 50%; background: var(--muted); }
 .pool-net-physwitch[aria-checked="true"] .pool-net-physknob { left: 16px; background: var(--accent); }
-.pool-net-physstate { min-width: 2.5em; }
 .pool-net-phys:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
   border-radius: 6px; }
 .pool-net-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;

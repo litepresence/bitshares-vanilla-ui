@@ -91,9 +91,9 @@ var NetChrome = (function () {
       els.physSwitch.setAttribute("aria-checked", on ? "true" : "false");
       els.physSwitch.setAttribute("aria-label", t("pool_net.phys", "Physics"));
     } catch (e) { /* state stands */ }
-    try {
-      els.physState.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
-    } catch (e) { /* label stands */ }
+    /* No visible On/Off word (owner 2026-10-07): the knob's side and the
+     * accent color carry it visually, and role="switch" + aria-checked carry
+     * it to assistive tech. Nothing to paint here. */
   }
 
   /* setReact: the band switch. ON = gestures wake the simulation again
@@ -151,7 +151,7 @@ var NetChrome = (function () {
       statusEl: null, canvas: null, hoverEl: null, verdictEl: null, legendEl: null,
       twin: null, twinSummary: null, twinBox: null,
       physBar: null, physLabel: null, physSwitch: null, physTrack: null,
-      physKnob: null, physState: null,
+      physKnob: null,
       stage: null
     };
     els.statusEl = mk("p", t("pool_net.loading", "Loading network…"), "muted");
@@ -191,12 +191,12 @@ var NetChrome = (function () {
      * leaves the map unarranged for a new filter. Flipping persists
      * poolNetReact. Pan/zoom (scale/ox/oy) are untouched. Native <button>
      * gives Space/Enter keyboard handling; role="switch" + aria-checked
-     * exposes state to assistive tech. No tooltip and no hint line: the
-     * On/Off word beside the switch says which half you are in. */
+     * exposes state to assistive tech. No tooltip, no hint line, and no
+     * visible On/Off word — the knob's side plus aria-checked are the whole
+     * label (owner 2026-10-07). */
     els.physBar = mk("div", null, "pool-net-phys");
     els.physLabel = mk("span", t("pool_net.phys", "Physics"), "pool-net-physlabel");
     els.physSwitch = mk("button", null, "pool-net-physwitch");
-    els.physState = mk("span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
     try {
       els.physSwitch.type = "button";
       /* The button is the 44x44 HIT AREA (touchable enforces that floor);
@@ -217,7 +217,6 @@ var NetChrome = (function () {
     try {
       els.physBar.appendChild(els.physLabel);
       els.physBar.appendChild(els.physSwitch);
-      els.physBar.appendChild(els.physState);
       /* Stage: relative-positioned wrapper so the Physics switch overlays
        * the canvas lower-left (owner call) instead of sitting above the
        * band. Canvas keeps its in-flow size; the switch floats over art. */

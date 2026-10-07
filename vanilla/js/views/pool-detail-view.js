@@ -525,10 +525,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           if (typeof u.touchable === "function") u.touchable(physBtn);
           else if (typeof touchable === "function") touchable(physBtn);
         } catch (eSw) { /* click still works */ }
-        var physState = u.el(doc, "span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
-        try { physState.setAttribute("data-phys-state", "1"); } catch (eSw) { /* paint stands */ }
         physBox.appendChild(physBtn);
-        physBox.appendChild(physState);
         try { paintPoolPhysSwitch(physBox, readPoolReact()); } catch (eSw) { /* default stands */ }
         (function (box) {
           physBtn.addEventListener("click", function () {
@@ -1636,12 +1633,10 @@ PoolDetailUI._view = PoolDetailUI._view || {};
   function paintPoolPhysSwitch(box, on) {
     try {
       var btn = box.querySelector ? box.querySelector("[data-phys-btn]") : null;
-      var st = box.querySelector ? box.querySelector("[data-phys-state]") : null;
-      if (!btn || !st) {
+      if (!btn) {
         var kids = box.children || [];
         for (var i = 0; i < kids.length; i++) {
           if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-btn")) btn = kids[i];
-          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
         }
       }
       on = (on === false) ? false : true;
@@ -1650,7 +1645,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         btn.setAttribute("aria-checked", on ? "true" : "false");
         btn.setAttribute("aria-label", t("pool_net.phys", "Physics"));
       }
-      if (st) st.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
+      /* No visible On/Off word (owner 2026-10-07): the knob's side carries it
+       * visually, aria-checked carries it to assistive tech. */
     } catch (e) { /* switch stands */ }
   }
 

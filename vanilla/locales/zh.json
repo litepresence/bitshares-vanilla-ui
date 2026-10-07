@@ -2628,8 +2628,6 @@
       "pool_net.orphan",
       "pool_net.partial",
       "pool_net.phys",
-      "pool_net.phys_off",
-      "pool_net.phys_on",
       "pool_net.prompt",
       "pool_net.ready",
       "pool_net.title",
@@ -7672,9 +7670,7 @@
     "offline": "Network unavailable — showing shipped skeleton. Retry when connected.",
     "offline_empty": "Network unavailable — no skeleton pools cached.",
     "partial": "Live update incomplete — showing shipped pools.",
-    "phys": "Physics",
-    "phys_on": "On",
-    "phys_off": "Off"
+    "phys": "Physics"
   },
   "market_net": {
     "title": "Markets",

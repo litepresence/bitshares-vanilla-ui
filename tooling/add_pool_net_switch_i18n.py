@@ -3,12 +3,12 @@
 
 Removes the segmented-control keys (pool_net.phys_calm/phys_lively/phys_label,
 no longer referenced after the single-switch rebuild) and adds the switch keys
-(pool_net.phys/phys_on/phys_off) with verbatim English defaults
+(pool_net.phys) with verbatim English defaults
 matching vanilla/js/views/pool-net-chrome.js I18n.t calls, in all 12
-vanilla/locales/*.json. (A phys_hint key shipped briefly with the
-2026-10-07 gesture-reaction rework and was removed again the same day — the
-owner asked for no hint line on the switch; the On/Off word beside it is the
-whole label.)
+vanilla/locales/*.json. phys_on/phys_off (and a brief phys_hint) shipped with
+the 2026-10-07 gesture-reaction rework and were removed the same day at the
+owner's request: the switch now carries NO tooltip, NO hint line and NO visible
+On/Off word — the knob's side plus aria-checked are the whole label.
 Non-en dicts are fully-translated (untranslated=false), so new keys land
 allowlisted with honest English values. en.json _meta.translated inventory
 kept sorted, as check_i18n expects.
@@ -24,8 +24,6 @@ LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt
 STALE_KEYS = ["pool_net.phys_calm", "pool_net.phys_lively", "pool_net.phys_label"]
 NEW_KEYS = {
     "pool_net.phys": "Physics",
-    "pool_net.phys_on": "On",
-    "pool_net.phys_off": "Off",
 }
 
 

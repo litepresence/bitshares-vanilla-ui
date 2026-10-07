@@ -520,12 +520,10 @@ MarketDesk._fill = MarketDesk._fill || {};
   function paintPhysSwitch(box, mode) {
     try {
       var btn = box.querySelector ? box.querySelector("[data-phys-btn]") : null;
-      var st = box.querySelector ? box.querySelector("[data-phys-state]") : null;
-      if (!btn || !st) {
+      if (!btn) {
         var kids = box.children || [];
         for (var i = 0; i < kids.length; i++) {
           if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-btn")) btn = kids[i];
-          if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
         }
       }
       var on = (mode === false) ? false : true;
@@ -534,7 +532,8 @@ MarketDesk._fill = MarketDesk._fill || {};
         btn.setAttribute("aria-checked", on ? "true" : "false");
         btn.setAttribute("aria-label", t("pool_net.phys", "Physics"));
       }
-      if (st) st.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
+      /* No visible On/Off word (owner 2026-10-07): the knob's side carries it
+       * visually, aria-checked carries it to assistive tech. */
     } catch (e) { /* switch stands */ }
   }
   function ensurePhysSwitch(doc, state) {
@@ -566,10 +565,7 @@ MarketDesk._fill = MarketDesk._fill || {};
       track.appendChild(DOM.el(doc, "span", null, "pool-net-physknob"));
       btn.appendChild(track);
       try { if (typeof touchable === "function") touchable(btn); } catch (e) { /* click still works */ }
-      var st = DOM.el(doc, "span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
-      try { st.setAttribute("data-phys-state", "1"); } catch (e) { /* paint stands */ }
       box.appendChild(btn);
-      box.appendChild(st);
       paintPhysSwitch(box, readPhysMode());
       btn.addEventListener("click", function () {
         /* Flip ON = consent to motion (repaint explicit=true, bounded run
