@@ -423,28 +423,38 @@ var PoolNetUI = (function () {
     } catch (e) { /* stopped anyway */ }
   }
 
-  /* Wake the settle loop (drag/zoom/filter/resize/phys-flip wake; sleep
-   * cancels it). ALWAYS re-seeds temp/still/frames — even when the loop is
-   * already running: an early return here starves every later re-energize
-   * (phys-flip, drag-release, filter pages all no-op while the loop spins
-   * at floor temp on a parked layout — user-reported "switch does nothing").
-   * The running loop picks up fresh temp + preset next frame, so no restart
-   * dance is needed; a stopped loop is (re)started below. */
-  function wake(S) {
+  /* Wake the settle loop. ALWAYS re-seeds temp/still/frames — even when the
+   * loop is already running: an early return here starves every later
+   * re-energize (phys-flip, drag-release, filter pages all no-op while the
+   * loop spins at floor temp on a parked layout — user-reported "switch
+   * does nothing"). The running loop picks up fresh temp + preset next
+   * frame, so no restart dance is needed; a stopped loop is (re)started.
+   * Reduced-motion: AUTO wakes (load/filter/scroll/resize) stay frozen, but
+   * an EXPLICIT user gesture (Physics flip, drag-release throw) runs a
+   * bounded settle anyway — flipping the switch on IS informed consent to
+   * motion, and every run self-terminates via the sleep gate + maxFrames.
+   * @param {Object} S band state.
+   * @param {boolean} [explicit] true when the wake comes straight from a
+   *   user gesture (flip/release), never from timers/observers/loads. */
+  function wake(S, explicit) {
     if (!S || S.dead) return;
-    if (S.reduced || S.dead) return;
+    if ((S.reduced && !explicit) || S.dead) return;
     if (!S.visible) return;
     if (Object.keys(S.geom).length < 2) return;
     S.still = 0;
     S.frames = 0;
     S.temp = (PHYS[S.phys] || PHYS.calm).temp0;
+    if (explicit) S.forced = true;
     if (S.running) return;
     S.running = true;
     loop(S);
   }
 
   function loop(S) {
-    if (!S || S.dead || !S.visible || S.reduced) { if (S) S.running = false; return; }
+    if (!S || S.dead || !S.visible || (S.reduced && !S.forced)) {
+      if (S) { S.running = false; S.forced = false; }
+      return;
+    }
     var P = PHYS[S.phys] || PHYS.calm;
     S.frames = (S.frames || 0) + 1;
     var moved = 0;
@@ -459,6 +469,7 @@ var PoolNetUI = (function () {
         (S.still >= P.stillFrames && (S.frames || 0) >= (P.minFrames || 0))) {
       S.running = false;
       S.settled = true;
+      S.forced = false;
       try { render(S); } catch (e) { /* final paint stands */ }
       return;
     }
@@ -466,7 +477,7 @@ var PoolNetUI = (function () {
     _raf(function () {
       S.raf = 0;
       if (!S.dead && S.running) loop(S);
-      else S.running = false;
+      else { S.running = false; S.forced = false; }
     });
   }
 
@@ -831,9 +842,9 @@ var PoolNetUI = (function () {
        * poolNetPhys, re-spreads the layout from the circle seed (a preset
        * flip from a parked equilibrium has ~zero forces to work with — temp
        * alone cannot move it, so the flip re-runs the fresh-load spread
-       * instead), then re-energizes via wake(S); reduced-motion freeze in
-       * wake/loop covers both presets, so there is no branch here.
-       * Pan/zoom (scale/ox/oy) are untouched. Native <button> gives
+       * instead), then re-energizes via wake(S, true) — an explicit flip is
+       * consent to motion, so it runs bounded even under reduced-motion
+       * (ambient auto-runs stay frozen). Pan/zoom (scale/ox/oy) are untouched. Native <button> gives
        * Space/Enter keyboard handling; role="switch" + aria-checked exposes
        * state to assistive tech. */
       var physBar = mk("div", null, "pool-net-phys");
@@ -872,7 +883,7 @@ var PoolNetUI = (function () {
             S.vel = {};
           }
         } catch (e) { /* positions stand */ }
-        wake(S);
+        wake(S, true);
       }
       try {
         physSwitch.addEventListener("click", function () {
@@ -991,7 +1002,7 @@ var PoolNetUI = (function () {
           } catch (e) { /* hits stand */ }
         }
       };
-      S.wake = function () { wake(S); };
+      S.wake = function () { wake(S, true); };
 
       function symOf(id) {
         var nodes = (S.full.nodes || []);

@@ -207,5 +207,30 @@ var skel = { pools: [
   ok(S2.settled === true && S2.running === false, "stopped loop restarts and settles (temp re-seeded to " + S2.temp + ")");
 })();
 
+/* Reduced-motion policy (user env repro: frozen map, dead switch, dead
+ * release): AUTO wakes stay frozen, but an EXPLICIT gesture (Physics flip,
+ * drag-release throw) runs a bounded settle — the flip itself is consent. */
+(function () {
+  if (typeof PoolNetUI._wakeForTest !== "function") { ok(false, "_wakeForTest still exported"); return; }
+  var wake = PoolNetUI._wakeForTest;
+  function rmState(explicit) {
+    return {
+      phys: "calm", W: 300, H: 320, temp: 1, still: 25, frames: 900,
+      running: false, settled: true, dead: false, reduced: true, visible: true,
+      geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 }, "1.3.99": { x: 250, y: 260 } },
+      vel: {}, deg: { "1.3.0": 2, "1.3.1": 1 },
+      view: { edges: [{ a: "1.3.0", b: "1.3.1", poolId: "1.19.1" }] },
+      _explicit: explicit
+    };
+  }
+  var auto = rmState(false);
+  try { wake(auto); } catch (e) { ok(false, "auto wake reduced throws: " + e); return; }
+  ok(auto.running === false, "auto wake stays frozen under reduced-motion");
+  var exp = rmState(true);
+  try { wake(exp, true); } catch (e) { ok(false, "explicit wake reduced throws: " + e); return; }
+  ok(exp.settled === true && exp.running === false, "explicit wake runs bounded and settles under reduced-motion");
+  ok(exp.temp < 6 && exp.temp >= 1, "explicit wake re-seeded temp0 then cooled while settling (temp=" + exp.temp + ")");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

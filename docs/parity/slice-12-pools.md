@@ -211,6 +211,25 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
 
+### Follow-up — reduced-motion: explicit flips/releases run bounded (user env)
+
+User on Brave/Linux Mint 4K with the tour skipped: switch dead, release
+dead, map frozen from load — while headless Chromium (motion allowed) showed
+everything working. Reproduced exactly by forcing `reducedMotion: reduce`
+headless: `S.reduced=true`, loop never starts, flip only flips state,
+`running:false` forever. Almost certainly the user's OS/compositor advertises
+`prefers-reduced-motion` (or Brave maps it), freezing every wake — including
+explicit ones.
+
+Policy now: AUTO wakes (load/filter/scroll/resize) stay frozen under
+reduced-motion; EXPLICIT gestures (Physics flip, drag-release throw,
+wheel-zoom via the shared `S.wake`) run bounded — flipping the switch on IS
+informed consent, and every run self-terminates via sleep gate + `maxFrames`.
+`wake(S, explicit)` carries the flag; `loop` honors `S.forced` and clears it
+on every exit. Vectors: auto wake frozen, explicit wake settles (34/34).
+Browser proof (forced reduced-motion): flip → bounded ~27s run, settles,
+zero errors; ambient load stays frozen.
+
 ### Follow-up — Physics on/off switch replaces Calm/Lively buttons (user call)
 
 Owner verdict on the segmented control: buttons felt dead (no pointer
