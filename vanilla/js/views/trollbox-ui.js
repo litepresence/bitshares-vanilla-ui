@@ -1,13 +1,16 @@
 /* trollbox-ui.js — on-chain chat desk (#/trollbox, R1c slice-14 delta).
  * Owns: the #/trollbox route view (channel tabs, language select, plain-text
  *   message list, composer with live byte budget + get_required_fees preview,
- *   unlock-at-post + broadcast + storage read-back proof, 15s poll gated on
+ *   modal review + unlock at post (UnlockConfirm — no inline password row;
+ *   reads never gate, the password never leaves the modal) + broadcast +
+ *   storage read-back proof, 15s poll gated on
  *   document.visibilitychange). No chain math here beyond display (fee human
  *   strings come from Format; byte/budget counts are plain counts, not money).
  * Consumes: Trollbox (probe/pager/budget/builder, read-only), Chain (status,
- *   guarded), Account (myAccountId/resolve, guarded), Wallet (unlock/keys),
- *   Tx (fee/buildTx/sign + net broadcast via Chain), Format (fee display),
- *   I18n.t (guarded fallback). Side effects: DOM under the route root +
+ *   guarded), Account (myAccountId/resolve, guarded), Wallet (isUnlocked
+ *   check + active WIF at publish), UnlockConfirm.open (review + unlock
+ *   modal), Tx (fee/buildTx/sign + net broadcast via Chain), Format (fee
+ *   display), I18n.t (guarded fallback). Side effects: DOM under the route root +
  *   one module-level poll timer (cleared on every re-render).
  * Created by: building-vanilla-slices skill, R1c trollbox plan.
  * Refs: astro Trollbox.jsx (behavior) + nanoeffects/Trollbox.ts (probe/pager
@@ -276,21 +279,10 @@ var TrollboxUI = (function () {
       }
     }
 
-    /* Composer: textarea + byte budget + live fee preview + unlock-at-post. */
+    /* Composer: textarea + byte budget + live fee preview. Posting opens the
+     * shared review + unlock modal (UnlockConfirm) — no inline password row:
+     * the draft, budget and preview survive because nothing navigates. */
     wrap.appendChild(el(doc, "h2", t("trollbox.composer_title", "Post a message")));
-    var gate = el(doc, "p", t("trollbox.login_gate", "Unlock your wallet to post. Reading works without login."), "muted");
-    wrap.appendChild(gate);
-    var pwRow = doc.createElement("div"); pwRow.className = "trollbox-row";
-    var pwInput = doc.createElement("input");
-    pwInput.type = "password";
-    pwInput.setAttribute("aria-label", t("trollbox.password_label", "Wallet password"));
-    pwInput.placeholder = t("trollbox.password_label", "Wallet password");
-    pwInput.classList.add("touchable");
-    var unlockBtn = el(doc, "button", t("trollbox.unlock", "Unlock"));
-    unlockBtn.type = "button";
-    unlockBtn.classList.add("touchable");
-    pwRow.appendChild(pwInput); pwRow.appendChild(unlockBtn);
-    wrap.appendChild(pwRow);
     var area = doc.createElement("textarea");
     area.rows = 3;
     area.maxLength = 1024;
@@ -306,16 +298,14 @@ var TrollboxUI = (function () {
     wrap.appendChild(postBtn);
     var note = el(doc, "p", "", "muted"); note.setAttribute("aria-live", "polite"); wrap.appendChild(note);
 
+    /* unlockedNow: keystore state read-only (drives the modal's
+     * needPassword + the pre-publish guard; the password itself is only
+     * ever typed inside UnlockConfirm). */
     function unlockedNow() {
       try {
         if (typeof Wallet !== "undefined" && Wallet && typeof Wallet.isUnlocked === "function") return !!Wallet.isUnlocked();
       } catch (e) {}
       return false;
-    }
-    function refreshGate() {
-      var open = unlockedNow();
-      gate.style.display = open ? "none" : "";
-      pwRow.style.display = open ? "none" : "";
     }
 
     function paintBudget() {
@@ -336,6 +326,33 @@ var TrollboxUI = (function () {
       var s = S.feeSeq;
       S.feeTimer = setTimeout(function () { previewFee(s); }, 500);
     }
+    /* computeFee: ONE live get_required_fees call for a draft (never
+     * estimated). Needs a payer id — the unlocked account when available,
+     * else the 1.2.0 placeholder (fee depends on data bytes, not payer).
+     * Shared by the preview line and the post-review modal so both quote
+     * the same live fee. Params: text (trimmed draft). Returns
+     * {fee, prec}. Throws the build/chain error, or "navigated away" on a
+     * stale mount (callers treat it as silent). */
+    async function computeFee(text) {
+      var payer = "1.2.0";
+      try {
+        if (unlockedNow() && typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
+          payer = await Account.myAccountId();
+        }
+      } catch (e) { payer = "1.2.0"; }
+      if (myGen !== gen) throw new Error("navigated away");
+      var built = T.buildPost({ payerId: payer, username: "preview", channel: S.channel, lang: S.lang, text: text, maxBytes: S.maxBytes });
+      var fee = await Tx.fee(T.CUSTOM_OP_ID, built.opData, "1.3.0");
+      if (myGen !== gen) throw new Error("navigated away");
+      var dbId = await Chain.db();
+      var rows = await Chain.call(dbId, "get_assets", [[fee.asset_id || "1.3.0"]]);
+      if (myGen !== gen) throw new Error("navigated away");
+      var prec = (rows && rows[0] && typeof rows[0].precision === "number") ? rows[0].precision : 5;
+      return { fee: fee, prec: prec };
+    }
+    function feeHuman(f) {
+      return Format.formatAmount(String(f.fee.amount), f.prec) + " (" + String(f.fee.amount) + " raw)";
+    }
     async function previewFee(s) {
       if (myGen !== gen || s !== S.feeSeq) return;
       var text = (area.value || "").trim();
@@ -344,32 +361,15 @@ var TrollboxUI = (function () {
         feeLine.textContent = t("trollbox.over_chars", "Message exceeds 1024 characters — shorten it.");
         return;
       }
-      var payer = "1.2.0";
       try {
-        if (unlockedNow() && typeof Account !== "undefined" && Account && typeof Account.myAccountId === "function") {
-          payer = await Account.myAccountId();
-        }
-      } catch (e) { payer = "1.2.0"; }
-      if (myGen !== gen || s !== S.feeSeq) return;
-      var built;
-      try {
-        built = T.buildPost({ payerId: payer, username: "preview", channel: S.channel, lang: S.lang, text: text, maxBytes: S.maxBytes });
-      } catch (e) {
-        feeLine.textContent = (e && e.message) ? e.message : String(e);
-        return;
-      }
-      try {
-        var fee = await Tx.fee(T.CUSTOM_OP_ID, built.opData, "1.3.0");
+        var f = await computeFee(text);
         if (myGen !== gen || s !== S.feeSeq) return;
-        var dbId = await Chain.db();
-        var rows = await Chain.call(dbId, "get_assets", [[fee.asset_id || "1.3.0"]]);
-        if (myGen !== gen || s !== S.feeSeq) return;
-        var prec = (rows && rows[0] && typeof rows[0].precision === "number") ? rows[0].precision : 5;
-        feeLine.textContent = t("trollbox.fee_prefix", "Network fee: ") +
-          Format.formatAmount(String(fee.amount), prec) + " (" + String(fee.amount) + " raw)";
+        feeLine.textContent = t("trollbox.fee_prefix", "Network fee: ") + feeHuman(f);
       } catch (e) {
         if (myGen !== gen || s !== S.feeSeq) return;
-        feeLine.textContent = "";
+        if (e && e.message === "navigated away") return;
+        if (e && /bytes over|chars over|empty/i.test(e.message || "")) feeLine.textContent = (e && e.message) ? e.message : String(e);
+        else feeLine.textContent = "";
       }
     }
 
@@ -377,28 +377,61 @@ var TrollboxUI = (function () {
       S.draft = area.value || "";
       paintBudget(); scheduleFee();
     });
-    unlockBtn.addEventListener("click", function () {
-      var pw = pwInput.value || "";
-      note.textContent = "";
-      Promise.resolve().then(function () { return Wallet.unlock(pw); }).then(function () {
-        if (myGen !== gen) return;
-        try { pwInput.value = ""; } catch (e) {}
-        refreshGate(); scheduleFee();
-      }).catch(function () {
-        if (myGen !== gen) return;
-        note.textContent = t("common.unlock_failed", "Unlock failed.");
-      });
-    });
-
     postBtn.addEventListener("click", function () {
       if (S.posting) return;
       note.textContent = "";
       var text = (area.value || "").trim();
       if (!text) { note.textContent = t("trollbox.empty_text", "Message text is empty."); return; }
       if (text.length > T.TEXT_MAX_CHARS) { note.textContent = t("trollbox.over_chars", "Message exceeds 1024 characters — shorten it."); return; }
-      if (!unlockedNow()) { note.textContent = t("trollbox.login_gate", "Unlock your wallet to post. Reading works without login."); return; }
+      if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+        note.textContent = t("trollbox.post_failed_prefix", "Post failed: ") + "review backend missing: js/ui/unlock-confirm.js failed to load.";
+        return;
+      }
+      /* Review first: a FRESH live fee (never the preview line's — it may
+       * be stale) inside the shared modal. Locked users type the password
+       * there; unlocked users get confirm-only. Nothing navigates, so the
+       * draft survives either way. */
       S.posting = true;
       postBtn.disabled = true;
+      Promise.resolve()
+        .then(function () { return computeFee(text); })
+        .then(function (f) {
+          if (myGen !== gen) throw new Error("navigated away");
+          var sizeUsed = 0;
+          try { sizeUsed = T.utf8Length(text); } catch (e) { sizeUsed = text.length; }
+          UnlockConfirm.open({
+            title: t("trollbox.post_review_title", "Review message"),
+            rows: [
+              [t("trollbox.channel_row", "Channel"), "#" + S.channel + " (" + S.lang + ")"],
+              [t("trollbox.message_row", "Message"), text],
+              [t("trollbox.size_row", "Size"), String(sizeUsed) + " / " + String(S.maxBytes) + " " + t("trollbox.bytes_unit", "bytes")]
+            ],
+            feeHuman: feeHuman(f),
+            feeTerm: t("trollbox.fee", "Fee"),
+            feeRawTitle: String(f.fee.amount),
+            needPassword: !unlockedNow(),
+            submitLabel: t("trollbox.unlock_post", "Unlock & post"),
+            onUnlocked: function () { publishPost(text); },
+            onCancel: function () {
+              if (myGen !== gen) return;
+              S.posting = false;
+              postBtn.disabled = false;
+            }
+          });
+        })
+        .catch(function (e) {
+          if (myGen !== gen || (e && e.message === "navigated away")) return;
+          S.posting = false;
+          postBtn.disabled = false;
+          note.textContent = t("trollbox.post_failed_prefix", "Post failed: ") + ((e && e.message) ? e.message : String(e));
+        });
+    });
+
+    /* publishPost: the existing sign + broadcast chain, unchanged — it now
+     * runs from the modal's onUnlocked instead of the deleted inline row.
+     * Params: text (validated trimmed draft). */
+    function publishPost(text) {
+      if (myGen !== gen) return;
       note.textContent = t("trollbox.posting", "Posting…");
       Promise.resolve().then(async function () {
         var payerId = await Account.myAccountId();
@@ -426,7 +459,7 @@ var TrollboxUI = (function () {
         S.posting = false; postBtn.disabled = false;
         note.textContent = t("trollbox.post_failed_prefix", "Post failed: ") + ((e && e.message) ? e.message : String(e));
       });
-    });
+    }
 
     /* Poll backoff (fast 15s, slow 60s): hidden-over-a-minute and
      * error-streak (2+) drop to the slow cadence; visible + clean restore
@@ -468,7 +501,7 @@ var TrollboxUI = (function () {
     }
 
     /* Boot: tabs, budget, probe; 15s poll gated on visibility. */
-    paintTabs(); paintBadge(); paintBudget(); refreshGate();
+    paintTabs(); paintBadge(); paintBudget();
     runProbe();
     armPoll();
     try {
