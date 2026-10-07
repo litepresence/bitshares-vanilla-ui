@@ -84,9 +84,9 @@ var skel = { pools: [
     phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
   ok(phys.lively.repPow === 2 && phys.lively.minFrames === 400 &&
-    phys.lively.carry === 0.99 && phys.lively.cool === 0.9995 && phys.lively.tempMin === 1.5 &&
-    phys.lively.springK === 0.025 && phys.lively.maxFrames === 1500,
-    "lively underdamped tune (degree-mass + long run + stabilization budget)");
+    phys.lively.carry === 0.985 && phys.lively.cool === 0.999 && phys.lively.tempMin === 1.2 &&
+    phys.lively.springK === 0.014 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 1500,
+    "lively softened tune (degree-mass + long run + stabilization budget)");
   function simState(mode) {
     return {
       phys: mode, W: 300, H: 320, temp: 6, still: 0, frames: 0,

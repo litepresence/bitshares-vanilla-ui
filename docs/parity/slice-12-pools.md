@@ -158,10 +158,10 @@ asset page. Commits `8de4dc9` (preset + switch), `f9ac027` (calm `springK`
 | pyvis character | Calm (v1, unchanged) | Lively |
 |---|---|---|
 | Repulsion law | `repPow: 1` (linear-ish, `min((k*k)/(d*d+1)*2, 5)`) | `repPow: 2` inverse-square degree-mass: `min(2.6·k²·deg/(d²+400), 40)`, `deg = 1+deg_a+deg_b`, 400px² softening keeps close-range finite |
-| Springs | `springRest: 1.1`, `springK: 0.015` | long + strong (underdamped overshoot): `springRest: 2.0`, `springK: 0.025` |
-| Carryover/damping | `carry: 0.8` | `carry: 0.99` (underdamped — oscillation decays over ~14s, not ~2s) |
+| Springs | `springRest: 1.1`, `springK: 0.015` | long + firm (underdamped overshoot): `springRest: 2.2`, `springK: 0.014` |
+| Carryover/damping | `carry: 0.8` | `carry: 0.985` (underdamped — oscillation decays over ~11s, not ~2s) |
 | Center pull | `pull: 0.008` | weak: `pull: 0.003` (`btsPullX: 3` both) |
-| Energy | `temp0: 6`, `cool: 0.98`, `tempMin: 1` | hotter + slow cool: `temp0: 10`, `cool: 0.9995`, `tempMin: 1.5` |
+| Energy | `temp0: 6`, `cool: 0.98`, `tempMin: 1` | hotter + slow cool: `temp0: 10`, `cool: 0.999`, `tempMin: 1.2` |
 | Sleep gate | `stillTol: 0.35`, `stillFrames: 25`, `minFrames: 0` | late + min-run + budget: `stillTol: 0.25`, `stillFrames: 120`, `minFrames: 400`, `maxFrames: 1500` (calm `maxFrames: 900` pure backstop) |
 | Edges | straight (`curved: false`) | quadratic midpoint offset `((edgeIndex % 5) − 2) · 6px` (`curved: true`) |
 
@@ -210,6 +210,11 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
+
+Refine 2026-10-07 — "a bit jittery / high tension" (user feel): softened
+lively (`carry: 0.985`, `springK: 0.014`, `cool: 0.999`, `tempMin: 1.2`) —
+same ~11s run, 3× calmer tail creep, sleeps via gate; energy vector still
+13× calm. Tale of the tape in `pool-net-ui-test.js` energy block.
 
 ### Follow-up — reduced-motion: explicit flips/releases run bounded (user env)
 
