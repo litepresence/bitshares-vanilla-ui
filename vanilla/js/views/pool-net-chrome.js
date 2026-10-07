@@ -316,11 +316,33 @@ var NetChrome = (function () {
    * @param {Function} renderFn (S)->void repaint (composer-owned render).
    * @param {Function} [onToggle] (S, group, hidden)->void so the composer can
    *   re-filter and wake the loop. Absent = repaint only (headless). */
+  /* Ramp key: grey-to-blue edge scale (owner 2026-10-07 — color replaced
+   * thickness, so the scale needs its legend). Swatches are CSS classes
+   * (.pool-net-sw.ramp-lo/hi track --muted/--accent), never resolved hex —
+   * the key cannot disagree with the canvas ink. One label per mode.
+   * @returns {void}. Never throws. */
+  function appendRamp(doc, mk, t, els, market) {
+    try {
+      var row = mk("span", null, "pool-net-ramp");
+      var lo = doc.createElement("span");
+      lo.className = "pool-net-sw ramp-lo";
+      var hi = doc.createElement("span");
+      hi.className = "pool-net-sw ramp-hi";
+      row.appendChild(lo);
+      row.appendChild(hi);
+      var lab = market
+        ? t("market_net.ramp", "24h volume: low → high")
+        : t("pool_net.ramp", "Pool size: small → large");
+      row.appendChild(mk("span", lab, null));
+      try { row.setAttribute("aria-label", lab); } catch (e) { /* text stands */ }
+      els.legendEl.appendChild(row);
+    } catch (e) { /* legend stands without the key */ }
+  }
+
   function rebuildLegend(doc, mk, t, S, els, renderFn, onToggle) {
-    /* Market graphs have no brands (pool groupings) — the row stays empty
-     * rather than showing pool filters on market data. rebuildLegend is
-     * the only chip-adder, so an early return keeps it empty. */
-    if (isMarket(S)) return;
+    /* Market graphs have no brands (pool groupings) — the row skips chips
+     * but keeps the ramp key (volume meaning needs its legend too). */
+    if (isMarket(S)) { appendRamp(doc, mk, t, els, true); return; }
     try {
       var D = null;
       try { if (typeof DOM !== "undefined" && DOM) D = DOM; } catch (e) { D = null; }
@@ -375,6 +397,7 @@ var NetChrome = (function () {
       })(gr, chip);
       try { els.legendEl.appendChild(chip); } catch (e) { /* next chip */ }
     });
+    appendRamp(doc, mk, t, els, isMarket(S));
   }
 
   /* Screen-reader table twin (spec §6): the same pool rows as the canvas

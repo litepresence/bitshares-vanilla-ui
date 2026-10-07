@@ -12,7 +12,7 @@
  *   PoolNetState in pool-net-phys.js (drawScene takes view/geom/paint
  *   slices, never the whole S).
  * MONEY DISCIPLINE (#6): balances stay raw digit strings until render;
- *   _edgeWidth reads balance LENGTHS only — never Number(balance).
+ *   edgeT reads balance/volume LENGTHS only — never Number() on money.
  * Created by: pool-net-ui split (mechanical move from pool-net-ui.js,
  *   zero behavior change). Exposes global NetPaint.
  */
@@ -105,6 +105,30 @@ var NetPaint = (function () {
     return BRAND_FILLS[group] || BRAND_FILLS.other;
   }
 
+  /* edgeT: volume/size parameter for the ramp — stripped digit length
+   * over 14 (the old width formula's scale, kept so a given blue means the
+   * same thing on every map). Pool meta reads both balance legs, market
+   * meta reads volBaseRaw; missing/malformed data reads 0 (thin grey).
+   * Counts only, never values — no floats on money.
+   * @param {Object|null} meta edge meta map. @param {string} id edge id.
+   * @returns {number} t in [0,1]. Never throws. */
+  function edgeT(meta, id) {
+    try {
+      var m = meta ? meta[id] : null;
+      var digits = 0;
+      if (m) {
+        var a = m.balance_a_raw, b = m.balance_b_raw;
+        if (typeof a === "string" && /^\d+$/.test(a) && typeof b === "string" && /^\d+$/.test(b)) {
+          digits = a.replace(/^0+/, "").length + b.replace(/^0+/, "").length;
+        } else if (typeof m.volBaseRaw === "string" && /^\d+$/.test(m.volBaseRaw)) {
+          digits = m.volBaseRaw.replace(/^0+/, "").length;
+        }
+      }
+      if (!(digits > 0)) return 0;
+      return Math.min(digits / 14, 1);
+    } catch (e) { return 0; }
+  }
+
   /* Node radius, pixels only: 5 + degree step, capped at 11 (PoolGraph scale —
    * labels breathe; the 44px touch floor comes from hit tolerance, not ink). */
   function _nodeRadius(deg) {
@@ -112,27 +136,6 @@ var NetPaint = (function () {
     if (!(d > 0)) d = 0;
     if (d > NODE_MAX_DEG) d = NODE_MAX_DEG;
     return NODE_BASE_R + d * NODE_DEG_STEP;
-  }
-
-  /* Edge width, pixels only: log-weight from raw-digit balance lengths
-   * (big pools pull thicker lines) or volume digits (desk volume map —
-   * same formula, same look: big markets pull thicker lines); edges with
-   * neither render thin. Never Number(balance/volume) — lengths only. */
-  function _edgeWidth(meta, poolId) {
-    try {
-      var m = meta ? meta[poolId] : null;
-      var a = m && m.balance_a_raw, b = m && m.balance_b_raw;
-      if (typeof a === "string" && /^\d+$/.test(a) && typeof b === "string" && /^\d+$/.test(b)) {
-        var digits = a.replace(/^0+/, "").length + b.replace(/^0+/, "").length;
-        return 0.8 + Math.min(digits / 14, 1.6);
-      }
-      var v = m && m.volBaseRaw;
-      if (typeof v === "string" && /^\d+$/.test(v)) {
-        var vd = v.replace(/^0+/, "").length;
-        return 0.8 + Math.min(vd / 14, 1.6);
-      }
-    } catch (e) { /* thin below */ }
-    return 1.0;
   }
 
   /* Live PHYS table (single source of truth in PoolNetPhys); guarded
@@ -213,6 +216,10 @@ var NetPaint = (function () {
       var border = _cssTok("--border", "#5a5a5a"), text = _cssTok("--text", "#c5cbce"),
         muted = _cssTok("--muted", "#758696"),
         buy = _cssTok("--buy", "#26de81");
+      /* Ramp endpoints, resolved once per scene (never per edge): muted
+       * grey = low, theme accent (BitShares blue) = high. Follows the
+       * same token block so a theme flip re-resolves instead of sticking. */
+      var rampLo = _cssTok("--muted", "#758696"), rampHi = _cssTok("--accent", "#1E9ED7");
       var nodes = (view && view.nodes) || [], edges = (view && view.edges) || [];
       var scale = paint.scale || 1, ox = paint.ox || 0, oy = paint.oy || 0;
       function SX(x) { return x * scale + ox; }
@@ -243,8 +250,11 @@ var NetPaint = (function () {
         var onPath = paint.pathSet && paint.pathSet[e.poolId];
         var hov = paint.hoverEdge && String(e.poolId) === String(paint.hoverEdge);
         try {
-          ctx.strokeStyle = hot ? buy : ((onPath || hov) ? PATH_WARM : border);
-          ctx.lineWidth = (hot || onPath || hov) ? 2.5 : _edgeWidth(paint.meta, e.poolId);
+          /* Data ink is color-only (owner 2026-10-07): the ramp carries
+           * size/volume, every base edge shares one constant width.
+           * Interaction states keep overriding both. */
+          ctx.strokeStyle = hot ? buy : ((onPath || hov) ? PATH_WARM : _ramp(edgeT(paint.meta, e.poolId), rampLo, rampHi));
+          ctx.lineWidth = (hot || onPath || hov) ? 2.5 : 1.25;
           if (hot) {
             try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (x) { /* glow best-effort */ }
           }
@@ -348,7 +358,6 @@ var NetPaint = (function () {
     fitCanvas: fitCanvas,
     brandOf: brandOf,
     brandFill: brandFill,
-    _edgeWidthForTest: _edgeWidth,
     _rampForTest: _ramp
   };
 })();

@@ -459,27 +459,23 @@ var skel = { pools: [
   var status = findClass(wrap, "muted");
   ok(status && /1 markets/.test(status.textContent), "market status shows markets count (got " + JSON.stringify(status && status.textContent) + ")");
   var legend = findClass(wrap, "pool-net-legend");
-  ok(!legend || legend.children.length === 0, "market mode builds no brand chips");
+  function walkTags(root, tag, out) {
+    out = out || [];
+    if (root && root.tag === tag) out.push(root);
+    ((root && root.children) || []).forEach(function (c) { walkTags(c, tag, out); });
+    return out;
+  }
+  var chipBtns = legend ? walkTags(legend, "button") : [];
+  ok(chipBtns.length === 0, "market mode builds no brand chips");
+  var rampRows = legend ? walkTags(legend, "span").filter(function (s) {
+    return String(s.className || "").indexOf("pool-net-ramp") !== -1;
+  }) : [];
+  ok(rampRows.length === 1, "market mode legend carries the ramp key");
   try { handle.destroy(); } catch (e) { /* headless stands */ }
   try {
     if (realFetch === undefined) delete globalThis.fetch;
     else globalThis.fetch = realFetch;
   } catch (e) { /* harness stands */ }
-})();
-
-// Edge width vectors: balance digits (pool) and volume digits (market)
-// size identically; absent data renders thin.
-(function () {
-  var NP = null;
-  try { NP = require("../vanilla/js/views/pool-net-paint.js"); } catch (e) { NP = null; }
-  if (!NP || typeof NP._edgeWidthForTest !== "function") { ok(false, "paint exposes _edgeWidthForTest"); return; }
-  var w = NP._edgeWidthForTest;
-  var bal = w({ P: { balance_a_raw: "5000000", balance_b_raw: "250000" } }, "P");
-  var vol = w({ X: { volBaseRaw: "5000000250000" } }, "X");
-  ok(bal > 1.0 && vol === bal, "volume digits size identically to balance digits (got " + vol + " vs " + bal + ")");
-  ok(w({ Y: { volBaseRaw: "5000000" } }, "Y") === 0.8 + 7 / 14, "width follows the digit-length formula");
-  ok(w({}, "Z") === 1.0, "absent data renders thin");
-  ok(w({ X: { volBaseRaw: "not-a-number" } }, "X") === 1.0, "malformed volume renders thin");
 })();
 
 // Ramp vectors: grey->blue ink, pure (no DOM, no chain).
@@ -494,6 +490,47 @@ var skel = { pools: [
   ok(r(9, "#758696", "#1E9ED7") === "rgb(30, 158, 215)", "clamps high");
   ok(r(-2, "#758696", "#1E9ED7") === "rgb(117, 134, 150)", "clamps low");
   ok(r(0.5, "banana", "#1E9ED7") === "rgb(117, 134, 150)", "garbage grey fails closed");
+})();
+
+// Scene ink vectors: base edges wear the volume ramp (blue = big,
+// grey = small) at constant width; interaction states keep overriding.
+(function () {
+  var NP = null;
+  try { NP = require("../vanilla/js/views/pool-net-paint.js"); } catch (e) { NP = null; }
+  if (!NP || typeof NP.drawScene !== "function") { ok(false, "paint exposes drawScene"); return; }
+  function capCtx() {
+    var strokes = [];
+    var ctx = {
+      fillStyle: "", strokeStyle: "", lineWidth: 1, font: "", textAlign: "",
+      globalAlpha: 1, shadowColor: "", shadowBlur: 0,
+      setTransform: function () {}, clearRect: function () {},
+      save: function () {}, restore: function () {},
+      beginPath: function () {}, moveTo: function () {}, lineTo: function () {},
+      quadraticCurveTo: function () {}, closePath: function () {},
+      arc: function () {}, fill: function () {}, fillText: function () {}, strokeText: function () {},
+      stroke: function () { strokes.push({ color: String(ctx.strokeStyle), width: Number(ctx.lineWidth) }); }
+    };
+    return { ctx: ctx, strokes: strokes };
+  }
+  function num(m, i) {
+    var mm = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(String(((m || [])[i]) || ""));
+    return mm ? [Number(mm[1]), Number(mm[2]), Number(mm[3])] : null;
+  }
+  var view = { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" }],
+    edges: [{ poolId: "1.19.1", a: "1.3.0", b: "1.3.1" }, { poolId: "1.19.2", a: "1.3.0", b: "1.3.2" }] };
+  var geom = { "1.3.0": { x: 10, y: 10 }, "1.3.1": { x: 100, y: 10 }, "1.3.2": { x: 10, y: 100 } };
+  var meta = { "1.19.1": { balance_a_raw: "5000000", balance_b_raw: "250000" }, "1.19.2": { balance_a_raw: "5", balance_b_raw: "7" } };
+  var cap = capCtx();
+  NP.drawScene(cap.ctx, 300, 320, view, geom, { scale: 1, ox: 0, oy: 0, pathSet: {}, selPool: null,
+    meta: meta, hoverNode: null, hoverEdge: null, phys: "lively" });
+  var inks = cap.strokes.map(function (s) { return s.color; });
+  var widths = cap.strokes.map(function (s) { return s.width; });
+  var big = num(inks, 0), small = num(inks, 1);
+  ok(!!big && !!small, "both edges stroke rgb ink (got " + JSON.stringify(inks.slice(0, 2)) + ")");
+  if (big && small) {
+    ok((big[2] - big[0]) > (small[2] - small[0]), "big edge bluer than small edge (blueness " + (big[2] - big[0]) + " vs " + (small[2] - small[0]) + ")");
+  }
+  ok(widths[0] === 1.25 && widths[1] === 1.25, "base edges share one constant width (got " + JSON.stringify(widths.slice(0, 2)) + ")");
 })();
 
 console.log(pass + " passed, " + fail + " failed");
