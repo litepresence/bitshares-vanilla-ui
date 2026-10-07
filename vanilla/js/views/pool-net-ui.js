@@ -45,7 +45,7 @@ var PoolNetUI = (function () {
     calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
               springRest: 1.1, springK: 0.015, pull: 0.008, btsPullX: 3,
               stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 180, curved: false },
-    lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.997, tempMin: 0.2,
+    lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.984, tempMin: 0.2,
               springRest: 2.2, springK: 0.010, pull: 0.003, btsPullX: 3,
               stillTol: 0.25, stillFrames: 120, minFrames: 60, maxFrames: 180, curved: true }
   };

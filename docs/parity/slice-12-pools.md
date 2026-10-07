@@ -218,6 +218,15 @@ filter) re-seeds and runs another 3s. Zoom is camera-only (no wake). Ends the st
 tails can't outlive the cap. Browser proof: idle paused @180, flip runs,
 paused @180 again, zero errors.
 
+Refine — wind-down arc (user Q: would lower gravity/tension cut jitter?):
+measured no — halving either leaves the tail byte-identical (tails are
+temp-cap-quantized, not force-set; softer springs only sprawl wider).
+The real lever is cooling inside the 3s budget: `cool: 0.984` lands
+temp 7→0.4 across 180 frames, so the pause lands softly instead of
+freezing mid-fast-motion. Browser arc post-flip: 12904 → 4991 → 2009 →
+paused, zero errors. Gravity/tension left alone (weaker pull risks
+sprawl/drift with zero jitter benefit).
+
 Refine — zoom is camera-only (user call): wheel-zoom no longer wakes the
 loop (verified headless: zoom 1.0 to 1.49 with running false). Only moving
 nodes — drag-release throw, Physics flip re-spread, filter change —

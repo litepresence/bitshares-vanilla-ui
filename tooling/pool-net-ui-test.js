@@ -84,7 +84,7 @@ var skel = { pools: [
     phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
   ok(phys.lively.repPow === 2 && phys.lively.minFrames === 60 &&
-    phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.997 && phys.lively.tempMin === 0.2 &&
+    phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.984 && phys.lively.tempMin === 0.2 &&
     phys.lively.temp0 === 7 && phys.lively.repCap === 20 &&
     phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 180 &&
     phys.calm.maxFrames === 180,
