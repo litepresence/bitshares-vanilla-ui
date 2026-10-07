@@ -101,22 +101,8 @@ var HtlcUI = (function () {
   function signNotice(doc) {
     return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
-  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
-    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-    var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-    inp.setAttribute("placeholder", t("barter.password", "password")); inp.setAttribute("aria-label", t("htlc.password_ph", "Password"));
-    touchable(inp); row.appendChild(inp);
-    var b = touchable(DOM.el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; row.appendChild(b);
-    parent.appendChild(row);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent,e,t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
+  /* Unlocking runs in the shared UnlockConfirm modal (sendConfirm above)
+   * — no inline password row lives in this module. */
   function missingBackends() { /* first missing backend id, or null */
     var need = ["Htlc", "Tx", "Account", "Wallet", "Format", "Asset", "Chain", "Store"], miss = null;
     need.forEach(function (g) { if (typeof globalThis[g] === "undefined") miss = g; });
@@ -231,21 +217,46 @@ var HtlcUI = (function () {
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
       backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
-      onSend: function () {
+      onSend: function () { attemptSend(0); } });
+    /* attemptSend: sign-time gate (password asked only here — preview stays
+     * visible). Locked wallets detour through the shared review + unlock
+     * modal (same rows — the full confirm above stays on the page behind
+     * it); after unlock the transaction is RE-REVIEWED (same as the old
+     * inline row: the built pair may name the viewing-as account — the note
+     * says so). Params: depth (0 first try; re-entry shows the note). */
+    function attemptSend(depth) {
+      if (depth > 0) {
         if (myGen !== gen) return;
+        out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+        var btnsR = dlg.getElementsByTagName("button");
+        btnsR[0].disabled = false; btnsR[1].disabled = false;
+        return;
+      }
+      if (myGen !== gen) return;
+      (function () {
         var btns = dlg.getElementsByTagName("button");
         var backB = btns[0], sendB = btns[1];
         sendB.disabled = true; backB.disabled = true;
         var status = showStatus(doc, out, "Signing…");
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-        if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+        if (!wif) {
           out.removeChild(status);
-          if (!out.querySelector || !out.querySelector(".xfer-sign-note"))
-            out.appendChild(DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted")).className = "muted xfer-sign-note";
-          unlockInline(doc, out, function () {
-            out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          sendB.disabled = false; backB.disabled = false;
+          if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+            showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+            return;
+          }
+          UnlockConfirm.open({
+            title: t("htlc.uc_title", "Unlock to sign"),
+            rows: cfg.rows || [],
+            feeHuman: null,
+            needPassword: true,
+            submitLabel: t("common.sign_send", "Sign & Send"),
+            onUnlocked: function () { attemptSend(1); },
+            onCancel: function () {}
           });
-          sendB.disabled = false; backB.disabled = false; return; }
+          return;
+        }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
           status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Htlc.sendAndProve(unsigned, wif, cfg.prove);
@@ -260,7 +271,8 @@ var HtlcUI = (function () {
           out.removeChild(status);
           showError(doc, out,e,t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast).")); sendB.disabled = false; backB.disabled = false;
         });
-      } });
+      })();
+    }
     /* Principle #6 (raw in title): rows carry native r[2] raw titles
      * (ConfirmDialog.show sets dd.title); no post-show restore needed. */
     out.appendChild(dlg);
@@ -393,6 +405,38 @@ var HtlcUI = (function () {
     var fAsset = field(doc, t("asset_ops.title", "Asset"), { value: "BTS" });
     var fAmount = field(doc, t("confirm.amount", "Amount"), { inputmode: "decimal", placeholder: "1.23456" });
     [fTo, fAsset, fAmount].forEach(function (f) { box.appendChild(f.row); });
+    /* Component-wisdom Rec 2: non-blocking registry pre-checks. The review
+     * build still resolves via Account.resolve/Asset.describe at submit;
+     * these blur hints only surface typos early. */
+    (function () {
+      function inlineErr(field) {
+        var err = doc.createElement("div");
+        err.className = "error"; err.setAttribute("aria-live", "polite"); err.style.display = "none";
+        field.row.appendChild(err);
+        return err;
+      }
+      var toErr = inlineErr(fTo), asErr = inlineErr(fAsset);
+      fTo.input.addEventListener("blur", function () {
+        var v = fTo.input.value.trim();
+        if (!v) { toErr.style.display = "none"; toErr.textContent = ""; return; }
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+        Account.resolve(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== fTo.input) { toErr.style.display = "none"; toErr.textContent = ""; }
+        }).catch(function () {
+          toErr.textContent = t("htlc.unknown_account", "Account not found."); toErr.style.display = "";
+        });
+      });
+      fAsset.input.addEventListener("blur", function () {
+        var v = fAsset.input.value.trim();
+        if (!v) { asErr.style.display = "none"; asErr.textContent = ""; return; }
+        if (typeof Asset === "undefined" || !Asset || typeof Asset.describe !== "function") return;
+        Asset.describe(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== fAsset.input) { asErr.style.display = "none"; asErr.textContent = ""; }
+        }).catch(function () {
+          asErr.textContent = t("common.unknown_asset", "Unknown asset."); asErr.style.display = "";
+        });
+      });
+    })();
     var algoSel = selectOpts(doc, touchable(doc.createElement("select")), [["sha256", "sha256"], ["ripemd160", "ripemd160"]]);
     var algoRow = DOM.el(doc, "div", null, "xfer-field");
     algoRow.appendChild(DOM.el(doc, "span", t("htlc.hash_label", "Hash: "))); algoRow.appendChild(algoSel);
@@ -567,7 +611,7 @@ var HtlcUI = (function () {
       feeText: feeText, headBlock: headBlock, sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady, routeFail: routeFail, loadAccount: loadAccount, amtText: amtText, secsPicker: secsPicker,
       autoRetryOnOpen: autoRetryOnOpen, dropOpenSubs: dropOpenSubs,
-      isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, signNotice: signNotice, unlockInline: unlockInline,
+      isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, signNotice: signNotice,
       viewingAsId: VIEWING_AS_ID,
       missingBackends: missingBackends, presets: PRESETS } };
 })();

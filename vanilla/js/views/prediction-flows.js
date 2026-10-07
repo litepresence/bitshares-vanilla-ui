@@ -396,30 +396,32 @@ var PredictionFlows = (function () {
   /* No local confirm builder — the settle confirm below uses
    * ConfirmDialog.show (title/rows/Back/Sign&Send); unlock gates + status +
    * sendAndProve stay in its onSend. */
-    function unlockInlineP(parent, onUnlock) {
-      if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-      var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-      var inp = doc.createElement("input");
-      inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-      inp.setAttribute("placeholder", t("borrow.password", "password"));
-      inp.setAttribute("aria-label", t("borrow.password", "password"));
-      touchable(inp); row.appendChild(inp);
-      var b = touchable(DOM.el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
-      parent.appendChild(row);
-      b.addEventListener("click", function () {
-        b.disabled = true;
-        var pw = inp.value;
-        Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-          .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
-      });
-    }
-    function signGateLockedP(out, sendBtn, backBtn) {
-      if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-        var noteP = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-        noteP.className = "muted xfer-sign-note"; out.appendChild(noteP);
+  /* Unlocking runs in the shared UnlockConfirm modal (signGateLockedP
+   * above) — no inline password row lives in this module. */
+    /* Sign-time gate for the settle confirm below: locked clicks detour
+   * through the shared review + unlock modal (the confirm's own rows — the
+   * full confirm stays on the page behind it); after unlock the holding is
+   * re-reviewed so balances settle under the wallet account, never a stale
+   * 1.2.0 (the note says so).
+   * Params: modal {rows, feeHuman?, feeTerm?} for the modal summary. */
+    function signGateLockedP(out, sendBtn, backBtn, modal) {
+      modal = modal || {};
+      if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+        showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+        sendBtn.disabled = false; backBtn.disabled = false;
+        return;
       }
-      unlockInlineP(out, function () {
-        out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+      UnlockConfirm.open({
+        title: t("prediction.uc_title", "Unlock to sign"),
+        rows: modal.rows || [],
+        feeHuman: (modal.feeHuman === undefined) ? null : modal.feeHuman,
+        feeTerm: modal.feeTerm,
+        needPassword: true,
+        submitLabel: t("common.sign_send", "Sign & Send"),
+        onUnlocked: function () {
+          out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+        },
+        onCancel: function () {}
       });
       sendBtn.disabled = false; backBtn.disabled = false;
     }
@@ -740,7 +742,7 @@ var PredictionFlows = (function () {
             sendB.disabled = true; backB.disabled = true;
             var st = showStatus(doc, pfConfirm, t("common.status_broadcasting", "Broadcasting…"));
             var wif = (typeof Wallet !== "undefined" && Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
-            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB); return; }
+            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB, { rows: sRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {
               return AssetOps.sendAndProve(unsigned, wif, async function () {
                 try {

@@ -96,22 +96,8 @@ var BarterUI = (function () {
   function signNotice(doc) {
     return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
-  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
-    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-    var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-    inp.setAttribute("placeholder", t("barter.password", "password")); inp.setAttribute("aria-label", t("barter.password", "password"));
-    touchable(inp); DOM.append(row, inp);
-    var b = touchable(DOM.el(doc, "button", t("barter.unlock", "Unlock"))); b.type = "button"; DOM.append(row, b);
-    DOM.append(parent, row);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
+  /* Unlocking runs in the shared UnlockConfirm modal (doSend above)
+   * — no inline password row lives in this module. */
   /* One barter leg row: asset + human amount (empty asset rows are skipped). */
   function legRow(doc, box) {
     var r = DOM.el(doc, "div", null, "xfer-field");
@@ -170,10 +156,50 @@ var BarterUI = (function () {
     var lockedBar = !isUnlockedNow();
     if (lockedBar) DOM.append(wrap, viewingAsNotice(doc));
     DOM.append(wrap, DOM.el(doc, "p", t("barter.two_sided_atomic_swap_preview_preview_first_t", "Two-sided atomic swap preview. Preview first, then PROPOSE encloses both sides' transfers in one proposal (op %(op)s, fee-payer = Peer A).", { op: 22 }), "muted"));
+    /* Component-wisdom Rec 9: header-only stepper (build → preview →
+     * propose). Position tracks lastPreview/propose below: building → 1,
+     * previewed → 2, proposing → 3. Styling is app.css .ca-steps (shared
+     * stepper look, theme tokens only). */
+    var stepLabels = [t("barter.step_build", "Build"), t("barter.step_preview", "Preview"), t("barter.step_propose", "Propose")];
+    var stepOl = doc.createElement("ol"); stepOl.className = "ca-steps";
+    var stepLis = stepLabels.map(function (label, i) {
+      var li = doc.createElement("li");
+      li.textContent = (i + 1) + ". " + label;
+      stepOl.appendChild(li);
+      return li;
+    });
+    DOM.append(wrap, stepOl);
+    function paintSteps(phase) {
+      stepLis.forEach(function (li, i) {
+        var n = i + 1;
+        if (n < phase) { li.className = "ca-step-done"; try { li.removeAttribute("aria-current"); } catch (e) { /* class stands */ } }
+        else if (n === phase) { li.className = "ca-step-now"; try { li.setAttribute("aria-current", "step"); } catch (e) { /* class stands */ } }
+        else { li.className = ""; try { li.removeAttribute("aria-current"); } catch (e) { /* class stands */ } }
+      });
+    }
+    paintSteps(1);
     var fA = Forms.labeledInput(doc, t("barter.peer_a_account", "Peer A account") + " ", lockedBar
       ? { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0" }
       : { placeholder: t("common.name_or_id_hint", "name or 1.2.N") });
     DOM.append(wrap, fA.row);
+    /* Component-wisdom Rec 2: non-blocking account pre-checks for both
+     * peers (preview still resolves at submit; blur hints surface typos
+     * early with the shared common key). */
+    [fA, fB].forEach(function (f) {
+      var err = doc.createElement("div");
+      err.className = "error"; err.setAttribute("aria-live", "polite"); err.style.display = "none";
+      f.row.appendChild(err);
+      f.input.addEventListener("blur", function () {
+        var v = f.input.value.trim();
+        if (!v) { err.style.display = "none"; err.textContent = ""; return; }
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+        Account.resolve(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== f.input) { err.style.display = "none"; err.textContent = ""; }
+        }).catch(function () {
+          err.textContent = t("common.unknown_account", "Unknown account."); err.style.display = "";
+        });
+      });
+    });
     DOM.append(wrap, DOM.el(doc, "h2", t("barter.a_gives", "A gives")));
     var boxA = DOM.el(doc, "div"); DOM.append(wrap, boxA);
     var legsA = [legRow(doc, boxA)];
@@ -220,6 +246,33 @@ var BarterUI = (function () {
     var fExp = Forms.labeledInput(doc, t("barter.proposal_expiration", "Proposal expiration") + " ", { type: "datetime-local", value: defaultExpiration() });
     var fRev = Forms.labeledInput(doc, t("barter.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("barter.blank_none", "blank = none"), inputmode: "numeric" });
     DOM.append(wrap, fExp.row); DOM.append(wrap, fRev.row);
+    /* Component-wisdom Rec 5: duration preset chips (htlc-ui secsPicker is
+     * the house precedent for seconds presets; these are its absolute-time
+     * sibling for datetime-local). Chips write the inputs above; manual
+     * typing stays as the custom path. Labels are duration symbols
+     * ("+24h"), not language — no new i18n keys (asset-feed range-select
+     * precedent: literal "7d/30d/90d" options). */
+    (function () {
+      function fmt(hours) {
+        var t = new Date(Date.now() + hours * 3600000);
+        function p(n) { return (n < 10 ? "0" : "") + n; }
+        return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + "T" + p(t.getHours()) + ":" + p(t.getMinutes());
+      }
+      var expRow = doc.createElement("div"); expRow.className = "xfer-field";
+      [["+24h", 24], ["+3d", 72], ["+7d", 168]].forEach(function (pr) {
+        var b = touchable(DOM.el(doc, "button", /** @type {string} */ (pr[0]))); b.type = "button"; b.className = "subtle-btn";
+        b.addEventListener("click", function () { fExp.input.value = fmt(pr[1]); });
+        expRow.appendChild(b);
+      });
+      DOM.append(wrap, expRow);
+      var revRow = doc.createElement("div"); revRow.className = "xfer-field";
+      [[t("barter.none", "none"), ""], ["1h", "3600"], ["1d", "86400"]].forEach(function (pr) {
+        var b2 = touchable(DOM.el(doc, "button", /** @type {string} */ (pr[0]))); b2.type = "button"; b2.className = "subtle-btn";
+        b2.addEventListener("click", function () { fRev.input.value = pr[1]; });
+        revRow.appendChild(b2);
+      });
+      DOM.append(wrap, revRow);
+    })();
     var propose = touchable(DOM.el(doc, "button", t("barter.propose_barter_op_22", "Propose barter (op %(op)s)", { op: 22 })));
     propose.type = "button"; propose.disabled = true;
     propose.title = t("barter.preview_the_barter_first_proposing_needs_reso", "Preview the barter first — proposing needs resolved legs.");
@@ -237,16 +290,19 @@ var BarterUI = (function () {
           check.disabled = false;
           if (res && myGen === gen) {
             lastPreview = res; propose.disabled = false;
+            paintSteps(2);
             propose.title = t("barter.propose_encloses_both", "Enclose both sides as transfer ops in one proposal (fee-payer = %(name)s).", { name: res.A.acct.name });
           }
         })
         .catch(function (e) {
           if (myGen !== gen) return; DOM.clear(out);
+          paintSteps(1);
           showError(doc, out, e, t("barter.could_not_preview_the_barter", "Could not preview the barter.")); check.disabled = false;
         });
     });
     propose.addEventListener("click", function () {
       if (myGen !== gen || !lastPreview) return;
+      paintSteps(3);
       proposeBarter(doc, proposeOut, myGen, lastPreview, fExp.input.value.trim(), fRev.input.value.trim(), propose);
     });
   }
@@ -369,16 +425,30 @@ var BarterUI = (function () {
       send.disabled = true; back.disabled = true;
       var status = showStatus(doc, out, t("common.status_signing", "Signing…"));
       var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-      if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+      if (!wif) {
         out.removeChild(status);
-        if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-          var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-          note.className = "muted xfer-sign-note"; DOM.append(out, note);
+        send.disabled = false; back.disabled = false;
+        if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+          showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+          return;
         }
-        unlockInline(doc, out, function () {
-          DOM.append(out, DOM.el(doc, "p", t("barter.unlocked_repreview_note", "Unlocked — preview again so the proposal uses your account, then propose."), "muted"));
+        /* Unlock in the shared modal (same rows + live fee — the full
+         * confirm above stays on the page behind it). After unlock the
+         * proposal is RE-PREVIEWED (same as the old inline row: the legs
+         * were resolved for the viewing-as account — the note says so). */
+        UnlockConfirm.open({
+          title: t("barter.uc_title", "Unlock to sign"),
+          rows: rows,
+          feeHuman: feeHuman,
+          feeTerm: t("common.fee_live", "Fee (live)"),
+          needPassword: true,
+          submitLabel: t("common.sign_send", "Sign & Send"),
+          onUnlocked: function () {
+            DOM.append(out, DOM.el(doc, "p", t("barter.unlocked_repreview_note", "Unlocked — preview again so the proposal uses your account, then propose."), "muted"));
+          },
+          onCancel: function () {}
         });
-        send.disabled = false; back.disabled = false; return; }
+        return; }
       Tx.buildTx([built.pair]).then(function (unsigned) {
         status.textContent = t("common.status_broadcasting", "Broadcasting…");
         return Proposal.sendAndProve(unsigned, wif, async function () {
