@@ -22,7 +22,7 @@
  *
  * Stdlib + playwright-core only. No new dependency.
  */
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -171,6 +171,197 @@ export function routerPaths() {
 export function expandRoutes() {
   return ROUTES.filter(function (r) { return r.group !== "skip"; })
     .map(function (r) { return { hash: r.hash, group: r.group }; });
+}
+
+/* classify: turn measured metrics into a verdict (spec §5). PURE -- no DOM,
+ * no browser, no globals -- so it is unit-testable and cannot drift from the
+ * rule it encodes.
+ * Params: m Metrics (see header); width viewport width in px.
+ *   Metrics = { overflowPx, scrollRegion, widestSelector,
+ *               smallTargets:[{selector,w,h}], contentRatio, contentSelector,
+ *               clippedText:[], viewportMeta, consoleErrors:[] }
+ * Returns: { verdict, fails:[{id,detail,selector}], notes:[string] }.
+ *   verdict is "FAIL" if any assertion failed, else "PASS w/ note" if a
+ *   scroll region absorbed overflow, else "PASS".
+ * Failure: never throws; a malformed metric object yields FAIL, not a crash. */
+export function classify(m, width) {
+  var fails = [], notes = [];
+  m = m || {};
+
+  /* A1 -- sideways page scroll. A declared scroll region on an ancestor is
+   * the sanctioned dense-grid answer (§3.6), so it downgrades to a note. */
+  var overflowPx = Number(m.overflowPx) || 0;
+  if (overflowPx > 1) {
+    if (m.scrollRegion) {
+      notes.push("h-overflow " + overflowPx + "px absorbed by scroll region " + m.scrollRegion);
+    } else {
+      fails.push({ id: "A1-h-overflow", detail: overflowPx + "px", selector: m.widestSelector || "" });
+    }
+  }
+
+  /* A2 -- touch floor: >=44px in AT LEAST ONE dimension (§3.6). The rule is
+   * applied HERE, not trusted from the probe, so a probe bug cannot mint a
+   * false failure and classify stays the single source of the threshold. */
+  var targets = Array.isArray(m.smallTargets) ? m.smallTargets : [];
+  for (var i = 0; i < targets.length; i++) {
+    var t = targets[i] || {};
+    var tw = Number(t.w) || 0, th = Number(t.h) || 0;
+    if (th >= 44 || tw >= 44) continue;
+    fails.push({
+      id: "A2-touch-floor",
+      detail: Math.round(tw) + "x" + Math.round(th),
+      selector: t.selector || "",
+    });
+  }
+
+  /* A3 -- stranded column. Desktop assertion only: a narrow column is the
+   * correct phone layout, so this must never fire at phone width. */
+  var ratio = Number(m.contentRatio);
+  if (width >= 2000 && isFinite(ratio) && ratio < 0.55) {
+    fails.push({
+      id: "A3-stranded-column",
+      detail: Math.round(ratio * 100) + "% of viewport",
+      selector: m.contentSelector || "",
+    });
+  }
+
+  /* A4 -- console errors are failures of the #4 floor as much as #7. */
+  var errs = Array.isArray(m.consoleErrors) ? m.consoleErrors : [];
+  for (var j = 0; j < errs.length; j++) {
+    fails.push({ id: "A4-console", detail: String(errs[j]).slice(0, 200), selector: "" });
+  }
+
+  return {
+    verdict: fails.length ? "FAIL" : (notes.length ? "PASS w/ note" : "PASS"),
+    fails: fails,
+    notes: notes,
+  };
+}
+
+/* shouldShot: which route/viewport pairs get a PNG (spec §5). Every failure
+ * is shot; plain passes are sampled 1-in-5 by a hash-length rule, which is
+ * deterministic and reproducible -- never cherry-picked.
+ * Params: hash route hash; verdict from classify.
+ * Returns: boolean. Pure, never throws. */
+export function shouldShot(hash, verdict) {
+  if (verdict !== "PASS") return true;
+  return String(hash).length % 5 === 0;
+}
+
+/* ensureBrowsers: point Playwright at the vendored browser dir when the env
+ * var is unset. shot.mjs's header documents the same location; without this a
+ * fresh clone fails with "Executable doesn't exist" even though the browsers
+ * are on disk.
+ * Params: none. Returns: the effective PLAYWRIGHT_BROWSERS_PATH (or "").
+ * Failure: never throws -- with no local .browsers dir, the caller's own env
+ * or Playwright default resolution stands. */
+export function ensureBrowsers() {
+  if (!process.env.PLAYWRIGHT_BROWSERS_PATH) {
+    var local = join(HERE, ".browsers");
+    if (existsSync(local)) process.env.PLAYWRIGHT_BROWSERS_PATH = local;
+  }
+  return process.env.PLAYWRIGHT_BROWSERS_PATH || "";
+}
+
+/* measureInPage: the DOM probe. Serialised by Playwright into the page, so it
+ * must be SELF-CONTAINED -- no imports, no closure over module scope, only
+ * browser globals. Returns a Metrics object (see classify).
+ * Params: none. Returns: Metrics.
+ * Failure: never throws. A missing #view yields contentRatio 0 rather than an
+ * exception, and every list field is always an array. */
+export function measureInPage() {
+  var doc = document;
+  var de = doc.documentElement;
+  var out = {
+    overflowPx: 0, scrollRegion: "", widestSelector: "",
+    smallTargets: [], contentRatio: 0, contentSelector: "",
+    clippedText: [], viewportMeta: "", consoleErrors: [],
+  };
+
+  /* A short, readable selector -- enough to grep app.css by, not a full path. */
+  function sel(el) {
+    if (!el) return "";
+    var s = el.tagName.toLowerCase();
+    if (el.id) return s + "#" + el.id;
+    var cls = ((el.getAttribute && el.getAttribute("class")) || "").trim().split(/\s+/).filter(Boolean);
+    if (cls.length) return s + "." + cls.slice(0, 2).join(".");
+    return s;
+  }
+  function shown(el) {
+    var cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    var r = el.getBoundingClientRect();
+    return !(r.width === 0 && r.height === 0);
+  }
+  function scrolls(el) {
+    var cs = getComputedStyle(el);
+    return cs.overflowX === "auto" || cs.overflowX === "scroll";
+  }
+
+  try {
+    var vm = doc.querySelector('meta[name="viewport"]');
+    out.viewportMeta = vm ? String(vm.getAttribute("content") || "") : "";
+  } catch (e) { /* no meta is a finding, not a crash */ }
+
+  try {
+    out.overflowPx = Math.max(0, Math.round(de.scrollWidth - de.clientWidth));
+
+    /* Widest offender + the scroll region absorbing it, if any. */
+    var widest = null, widestRight = -1;
+    var all = doc.querySelectorAll("body *");
+    for (var i = 0; i < all.length; i++) {
+      var r = all[i].getBoundingClientRect();
+      if (r.width > 0 && r.right > widestRight) { widestRight = r.right; widest = all[i]; }
+    }
+    if (widest) {
+      out.widestSelector = sel(widest);
+      for (var p = widest; p && p !== de; p = p.parentElement) {
+        if (scrolls(p)) { out.scrollRegion = sel(p); break; }
+      }
+    }
+
+    /* Touch floor. The probe only collects candidates (capped at 8 for a
+     * readable report); classify applies the >=44px rule itself. */
+    var SEL = "button, a[href], select, input:not([type=hidden]), textarea, [role=button]";
+    var ctrls = doc.querySelectorAll(SEL);
+    for (var c = 0; c < ctrls.length; c++) {
+      var el = ctrls[c];
+      if (out.smallTargets.length >= 8) break;
+      if (!shown(el)) continue;
+      var b = el.getBoundingClientRect();
+      if (b.height < 44 && b.width < 44) {
+        out.smallTargets.push({ selector: sel(el), w: Math.round(b.width), h: Math.round(b.height) });
+      }
+    }
+
+    /* Widest descendant of #view = the real content width. A full-bleed panel
+     * nested inside a narrow wrapper still wins, which is the point. */
+    var view = doc.getElementById("view");
+    if (view) {
+      var best = 0, bestSel = "";
+      var kids = view.querySelectorAll("*");
+      for (var k = 0; k < kids.length; k++) {
+        var kb = kids[k].getBoundingClientRect();
+        if (kb.width > best) { best = kb.width; bestSel = sel(kids[k]); }
+      }
+      out.contentSelector = bestSel;
+      out.contentRatio = de.clientWidth ? Math.round((best / de.clientWidth) * 1000) / 1000 : 0;
+    }
+
+    /* Clipped text -- recorded, never a failure (leading indicator only). */
+    var TX = "#view p, #view span, #view td, #view th, #view label, #view h1, #view h2, #view h3, #view button";
+    var texts = doc.querySelectorAll(TX);
+    for (var t = 0; t < texts.length && out.clippedText.length < 10; t++) {
+      var te = texts[t];
+      if (!shown(te)) continue;
+      if (te.scrollWidth > te.clientWidth + 1 && !scrolls(te.parentElement || te)) {
+        out.clippedText.push(sel(te));
+      }
+    }
+  } catch (e) {
+    out.probeError = String((e && e.message) || e).slice(0, 200);
+  }
+  return out;
 }
 
 export const _internal = { ROOT, HERE, TESTNET_NODE };

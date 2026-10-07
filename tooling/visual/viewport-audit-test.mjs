@@ -135,10 +135,17 @@ eq(c5.fails.length, 3, "all three defects are reported, not just the first");
 /* Shot policy: every FAIL, plus a deterministic 1-in-5 PASS sample. */
 eq(A.shouldShot("#/transfer", "FAIL"), true, "every FAIL is shot");
 eq(A.shouldShot("#/transfer", "PASS w/ note"), true, "every PASS w/ note is shot");
-eq(A.shouldShot("#/transfer", "PASS"), false, "a plain PASS outside the sample is not shot");
+/* The PASS rule IS the length modulus -- assert the contract, not a hash that
+ * happens to fall inside or outside the sample. */
+eq(A.shouldShot("#/transfer", "PASS"), "#/transfer".length % 5 === 0,
+  "a PASS is shot only when the 1-in-5 length rule selects it");
+eq(A.shouldShot("#/accounts", "PASS"), "#/accounts".length % 5 === 0,
+  "the rule holds for a second hash");
 var sample = A.expandRoutes().map(function (r) { return A.shouldShot(r.hash, "PASS"); });
-ok(sample.some(Boolean), "the 1-in-5 PASS sample is non-empty");
-ok(sample.length < A.expandRoutes().length / 3, "the PASS sample stays well under a third of routes");
+var shotCount = sample.filter(Boolean).length;
+ok(shotCount > 0, "the 1-in-5 PASS sample is non-empty (got " + shotCount + ")");
+ok(shotCount < A.expandRoutes().length / 3,
+  "the PASS sample stays well under a third of routes (got " + shotCount + "/" + A.expandRoutes().length + ")");
 eq(A.expandRoutes().map(function (r) { return A.shouldShot(r.hash, "PASS"); }), sample,
   "the PASS sample is deterministic (same input, same shots)");
 
@@ -151,6 +158,7 @@ var hasPw = (function () {
 if (!hasPw) {
   console.log("viewport-audit-test: SKIP task-3 DOM vectors (playwright-core not installed)");
 } else {
+  A.ensureBrowsers();
   var pw = await import("./node_modules/playwright-core/index.js");
   var chromium = pw.chromium || (pw.default && pw.default.chromium);
   var br = await chromium.launch();
