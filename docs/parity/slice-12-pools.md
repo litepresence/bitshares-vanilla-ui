@@ -308,8 +308,10 @@ temp 9.27 re-energize, layout re-spread, zero errors.
 ### Follow-up 2026-10-07 — "buttons do nothing" (user report, root-caused)
 
 Report: flipping Calm→Lively showed no visible change; map stayed calm-like.
-Headless repro (`tooling/visual/probe-poolnet-phys.mjs`: click Lively, sample
-`canvas._netState` + displacement) proved the switch works mechanically
+Headless repro (a `tooling/visual/probe-poolnet-phys.mjs` scratch probe, since
+deleted in `fd40faa` when the Calm/Lively buttons became the On/Off switch:
+click the switch, sample `canvas._netState` + displacement) proved the switch
+works mechanically
 (`S.phys` flips, loop runs, zero console errors) — the lively *dynamics* were
 at fault, in two layers:
 

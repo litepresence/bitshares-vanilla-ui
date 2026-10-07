@@ -1449,7 +1449,7 @@ p.muted[aria-live="polite"],
   background-image: linear-gradient(100deg, var(--panel) 30%, var(--panel-deep) 50%, var(--panel) 70%);
   background-size: 200% 100%;
   animation: candy-shimmer 1.4s linear infinite; }
-.skel-a { flex: 2; } .skel-b { flex: 5; } .skel-c { flex: 3; }
+.sk-a { flex: 2; } .sk-b { flex: 5; } .sk-c { flex: 3; }
 
 /* 2. Live-dot glow + footer block-advance pulse. The explorer dot keeps its
  * existing xplore-pulse (opacity) and gains a static --live halo; the footer
