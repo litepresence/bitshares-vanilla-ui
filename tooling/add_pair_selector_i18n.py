@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """add_pair_selector_i18n.py — selector-ladder copy keys.
 
-Adds the 5 keys the parallel Markets/Pools selector ladder needs
-(nav.markets, market_net.selector_title, pools.selector_title,
+Adds the keys the parallel Markets/Pools selector ladder needs
+(nav.markets, nav.pools, market_net.selector_title, pools.selector_title,
 seo.title_markets, seo.desc_markets) to all 12 vanilla/locales/*.json.
 
 Non-en dicts get the verbatim English value (unverified strings stay
@@ -23,6 +23,7 @@ LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt
 
 NEW_KEYS = {
     "nav.markets": "Markets",
+    "nav.pools": "Pools",
     "market_net.selector_title": "Market Selector",
     "pools.selector_title": "Pool Selector",
     "seo.title_markets": "Markets — BitShares Wallet",

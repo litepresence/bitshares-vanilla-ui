@@ -66,51 +66,18 @@ var App = (function () {
 
   /* ORIGINAL_NAV: the header bar (nav-six 2026-10-05 owner ruling, pools
    *   restore: Dashboard, Exchange, Pools, Credit, Margin, Explore).
-   *   Exchange keeps the pool-context swap (setPoolMarket); Credit Offer
-   *   shortens to Credit; Margin (#/borrow) joins. The two
-   *   vanilla-original labs (API Lab, ES Lab) are reachable from the Labs
-   *   sitemap section only, never the bar (nav-pulldown Task 3 owner
-   *   ruling), so boot rebuilds keep 6 links. */
-  var ORIGINAL_NAV = ["#/", "#/market/BTS_USD", "#/pools", "#/credit-offer",
+   *   2026-10-07 selector ladder: the two trading tabs are CATEGORIES, so
+   *   they land on the selector pages (Markets -> #/markets, Pools ->
+   *   #/pools) and never jump straight to a desk. The pair the user last
+   *   looked at travels in PairContext (session memory), so each selector
+   *   re-seeds itself and the navbar needs no context swap — the
+   *   pool->Exchange one-way swap died with it. Credit Offer shortens to
+   *   Credit; Margin (#/borrow) joins. The two vanilla-original labs
+   *   (API Lab, ES Lab) are reachable from the Labs sitemap section only,
+   *   never the bar (nav-pulldown Task 3 owner ruling), so boot rebuilds
+   *   keep 6 links. */
+  var ORIGINAL_NAV = ["#/", "#/markets", "#/pools", "#/credit-offer",
     "#/borrow", "#/explorer"];
-
-  /* Pool-market context (owner: Exchange tab follows the pool you're
-   * visiting). Pool views publish their pair's QUOTE_BASE market id here;
-   * the header Exchange link swaps to it (falling back to the default).
-   * Transient UI state, never persisted — the router clears it off pool
-   * routes so the tab never goes stale. Never throws. */
-  var poolMarketID = null;
-  /* validPoolMarket: QUOTE_BASE id with real symbols (never 1.2.x-style
-   * object ids — those would misroute the desk). Params: id unknown.
-   * Returns boolean. Pure, unit-tested. */
-  function validPoolMarket(id) {
-    if (typeof id !== "string") return false;
-    var parts = id.toUpperCase().split("_");
-    if (parts.length !== 2) return false;
-    var ok = parts.every(function (p) {
-      return /^[A-Z0-9.]{1,12}$/.test(p) && !/^1\.\d+\.\d+$/.test(p);
-    });
-    return !!ok;
-  }
-  function setPoolMarket(id) {
-    try {
-      poolMarketID = validPoolMarket(id) ? id.toUpperCase() : null;
-    } catch (e) { poolMarketID = null; }
-    refreshExchangeLink();
-  }
-  function poolMarket() { return poolMarketID; }
-  /* refreshExchangeLink: point the header Exchange tab at the pool market
-   * (or back at the default when cleared). Targeted DOM touch — no full
-   * nav rebuild. Never throws (missing nav is a no-op). */
-  function refreshExchangeLink() {
-    try {
-      if (typeof document === "undefined") return;
-      var a = document.querySelector("a[data-nav-exchange]");
-      if (!a) return;
-      a.setAttribute("href", poolMarketID ? "#/market/" + poolMarketID : "#/market/BTS_USD");
-      a.setAttribute("title", poolMarketID ? "#/market/" + poolMarketID : "#/market/BTS_USD");
-    } catch (e) { /* link stands */ }
-  }
 
   /* Nav icons (icon-wiring pass, nav-six 2026-10-05, pools restore): href
    *   -> vendored icon name. Mapping cites #1 MenuDataStructure.js:182-299
@@ -131,7 +98,7 @@ var App = (function () {
    *   text until an icon pass maps them (plain text never breaks). */
   var NAV_ICONS = {
     "#/": "dashboard",
-    "#/market/BTS_USD": "trade",
+    "#/markets": "trade",
     "#/pools": "poolmart",
     "#/credit-offer": "borrow",
     "#/borrow": "borrow",
@@ -147,13 +114,33 @@ var App = (function () {
   function navText(href) {
     switch (href) {
       case "#/": return t("nav.dashboard", "Dashboard");
-      case "#/market/BTS_USD": return t("nav.exchange", "Exchange");
-      case "#/pools": return t("pools.title", "Liquidity Pools");
+      case "#/markets": return t("nav.markets", "Markets");
+      case "#/pools": return t("nav.pools", "Pools");
       case "#/credit-offer": return t("nav.credit", "Credit");
       case "#/borrow": return t("nav.margin", "Margin");
       case "#/explorer": return t("nav.explorer", "Explore");
       default: return href;
     }
+  }
+
+  /* NAV_SECTIONS: tab hrefs that also own a child route, so a tab stays
+   * current one rung down the ladder (the desk belongs to its selector).
+   * Everything else is exact-match only — a tab never lights up for a
+   * sibling. */
+  var NAV_SECTIONS = { "#/markets": ["#/market/"], "#/pools": ["#/pools/"] };
+  /* navIsCurrent: is `href`'s tab the current one for `hash`?
+   * @param {string} hash current location.hash (leading "#")
+   * @param {string} href tab href (leading "#")
+   * @returns {boolean} never throws */
+  function navIsCurrent(hash, href) {
+    try {
+      var h = String(hash || "#/");
+      var a = String(href || "");
+      if (h === a) return true;
+      var kids = NAV_SECTIONS[a] || [];
+      for (var i = 0; i < kids.length; i++) if (h.indexOf(kids[i]) === 0) return true;
+      return false;
+    } catch (e) { return false; }
   }
 
   /* buildNavLink: one <a> for an href (icon + label span when the href is
@@ -162,15 +149,9 @@ var App = (function () {
    *   plain text. */
   function buildNavLink(href, iconOK) {
     var a = document.createElement("a");
-    /* Pool-context swap: the header Exchange tab follows the pool market
-     * (setPoolMarket), falling back to the default pair. */
-    if (href === "#/market/BTS_USD" && poolMarketID) href = "#/market/" + poolMarketID;
     a.setAttribute("href", href);
-    if (href.indexOf("#/market/") === 0) a.setAttribute("data-nav-exchange", "true");
-    try { if (href.indexOf("#/market/") === 0) a.setAttribute("title", href); } catch (e) { /* label stands */ }
     var label = navText(href);
-    if (href.indexOf("#/market/") === 0 && label === href) label = t("nav.exchange", "Exchange");
-    var icon = NAV_ICONS[href] || (href.indexOf("#/market/") === 0 ? "trade" : null);
+    var icon = NAV_ICONS[href] || null;
     try {
       if (icon && iconOK) {
         a.appendChild(Icon.img(icon, "nav-icon", ""));
@@ -182,11 +163,12 @@ var App = (function () {
         a.textContent = label;
       }
     } catch (e) { a.textContent = label; }
-    /* Active-route highlight (command-palette findability): exact hash match
-     * gets aria-current; refreshed on every buildNav (boot, locale, hash). */
+    /* Active-route highlight (command-palette findability): section match,
+     * so a desk one rung below its selector keeps the tab current;
+     * refreshed on every buildNav (boot, locale, hash). */
     try {
       var h = (typeof location !== "undefined" && location.hash) || "#/";
-      if (h === href) a.setAttribute("aria-current", "page");
+      if (navIsCurrent(h, href)) a.setAttribute("aria-current", "page");
     } catch (e) { /* highlight skipped */ }
     return a;
   }
@@ -1319,8 +1301,8 @@ var App = (function () {
   /* Classic script: auto-boot in browsers only; require() under node stays side-effect free. */
   if (typeof document !== "undefined") boot();
 
-  return { boot: boot, localizeShell: localizeShell, setPoolMarket: setPoolMarket,
-    _test: { validPoolMarket: validPoolMarket, parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText, buildDirectory: buildDirectory, closeDirectory: closeDirectory, ORIGINAL_NAV: ORIGINAL_NAV, NAV_ICONS: NAV_ICONS, navText: navText, buildNav: buildNav, buildNavLink: buildNavLink } };
+  return { boot: boot, localizeShell: localizeShell,
+    _test: { parseBuildInfo: parseBuildInfo, parseCompare: parseCompare, compareUrl: compareUrl, relationText: relationText, netHostText: netHostText, currentNetwork: currentNetwork, offbranchText: offbranchText, buildDirectory: buildDirectory, closeDirectory: closeDirectory, ORIGINAL_NAV: ORIGINAL_NAV, NAV_ICONS: NAV_ICONS, NAV_SECTIONS: NAV_SECTIONS, navText: navText, navIsCurrent: navIsCurrent, buildNav: buildNav, buildNavLink: buildNavLink } };
 })();
 
 if (typeof module !== "undefined") { module.exports = App; }

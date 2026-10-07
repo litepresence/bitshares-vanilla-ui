@@ -2382,6 +2382,7 @@
       "nav.explorer",
       "nav.margin",
       "nav.markets",
+      "nav.pools",
       "nav.settings",
       "nav.transfer",
       "nav.voting",
@@ -3786,7 +3787,8 @@
     "settings": "설정",
     "credit": "Credit",
     "margin": "Margin",
-    "markets": "Markets"
+    "markets": "Markets",
+    "pools": "Pools"
   },
   "settings": {
     "title": "설정",

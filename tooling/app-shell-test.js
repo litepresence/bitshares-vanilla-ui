@@ -1,15 +1,19 @@
 /* app-shell-test.js — unit vectors for header shell purity (app.js).
  * Stdlib only: `node tooling/app-shell-test.js` (exit 0 = green). Covers
- * App._test.validPoolMarket (pool->Exchange context validation) + nav-six
- * 6-link bar shape (ORIGINAL_NAV order, NAV_ICONS, navText labels, static
- * fallback anchors, pool-context Exchange tab, buy-panel borrow-link gone).
+ * nav-six 6-link bar shape after the 2026-10-07 selector ladder
+ * (ORIGINAL_NAV order, NAV_ICONS, navText labels, section-aware
+ * navIsCurrent highlight, static fallback anchors, buy-panel borrow-link
+ * gone). The pool->Exchange one-way context validation moved to
+ * tooling/pair-context-test.js (same vectors, same expectations).
  * No DOM, no network, no deps.
  */
 "use strict";
 var assert = require("assert");
 var App = require("../vanilla/js/app.js");
 var T = App._test;
-assert.ok(T && typeof T.validPoolMarket === "function", "_test.validPoolMarket exported");
+assert.ok(T && typeof T.navIsCurrent === "function", "_test.navIsCurrent exported");
+assert.strictEqual(T.setPoolMarket, undefined, "pool->Exchange swap retired (lives in PairContext now)");
+assert.strictEqual(T.validPoolMarket, undefined, "pool->Exchange swap retired (lives in PairContext now)");
 
 var passed = 0;
 function eq(actual, expected, name) {
@@ -17,17 +21,32 @@ function eq(actual, expected, name) {
   passed++;
 }
 
-eq(T.validPoolMarket("BTS_CNY"), true, "canonical pair");
-eq(T.validPoolMarket("bts_cny"), true, "lowercase accepted (uppercased at set)");
-eq(T.validPoolMarket("HONEST.BTC_BTS"), true, "dotted symbols accepted");
-eq(T.validPoolMarket("1.3.113"), false, "bare object id rejected");
-eq(T.validPoolMarket("1.3.113_1.3.0"), false, "object-id pair rejected (would misroute desk)");
-eq(T.validPoolMarket("BTS"), false, "no underscore rejected");
-eq(T.validPoolMarket("A_B_C"), false, "three parts rejected");
-eq(T.validPoolMarket(""), false, "empty rejected");
-eq(T.validPoolMarket(null), false, "null rejected");
-eq(T.validPoolMarket(undefined), false, "undefined rejected");
-eq(T.validPoolMarket("TOOLONGTOKENNAME_X"), false, "overlong leg rejected");
+/* nav-six after the selector ladder: Markets + Pools are CATEGORY tabs that
+ * land on the selector pages, never straight on a desk. 6 links, unchanged
+ * count and order. */
+eq(T.ORIGINAL_NAV.length, 6, "nav-six still 6 links");
+eq(T.ORIGINAL_NAV[0], "#/", "Dashboard first");
+eq(T.ORIGINAL_NAV[1], "#/markets", "second slot is the market selector");
+eq(T.ORIGINAL_NAV[2], "#/pools", "third slot is the pool selector");
+eq(T.NAV_ICONS["#/markets"], "trade", "Markets tab keeps the trade glyph");
+eq(T.NAV_ICONS["#/pools"], "poolmart", "Pools tab keeps the poolmart glyph");
+eq(T.NAV_ICONS["#/market/BTS_USD"], undefined, "no desk href in the icon map any more");
+assert.strictEqual(T.navText("#/markets"), "Markets", "Markets label");
+assert.strictEqual(T.navText("#/pools"), "Pools", "Pools label");
+
+/* Section-aware current-tab highlight: one rung down still belongs to the
+ * tab, a sibling never does. */
+eq(T.navIsCurrent("#/markets", "#/markets"), true, "selector highlights itself");
+eq(T.navIsCurrent("#/market/BTS_USD", "#/markets"), true, "market desk highlights Markets");
+eq(T.navIsCurrent("#/market/ETH_BTS", "#/markets"), true, "any market desk highlights Markets");
+eq(T.navIsCurrent("#/pools", "#/pools"), true, "pools selector highlights itself");
+eq(T.navIsCurrent("#/pools/1.19.0", "#/pools"), true, "pool desk highlights Pools");
+eq(T.navIsCurrent("#/market/BTS_USD", "#/pools"), false, "market desk does not highlight Pools");
+eq(T.navIsCurrent("#/pools/1.19.0", "#/markets"), false, "pool desk does not highlight Markets");
+eq(T.navIsCurrent("#/explorer", "#/explorer"), true, "exact match still highlights");
+eq(T.navIsCurrent("#/explorer/blocks", "#/explorer"), false, "explorer tabs stay exact-match only");
+eq(T.navIsCurrent("#/", "#/"), true, "dashboard highlights itself");
+eq(T.navIsCurrent("#/market/BTS_USD", "#/"), false, "desk does not highlight Dashboard");
 
 console.log("app-shell-test: " + passed + " passed, 0 failed");
 
@@ -148,30 +167,30 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
   console.log("pulldown-shape: 21 passed, 0 failed");
 })();
 
-/* Six-link bar (nav-six 2026-10-05 owner ruling, pools restore): Dashboard,
- * Exchange (pool-context-aware), Pools, Credit, Margin, Explore. Standalone
- * Swap is deleted (pools desk owns swapping now); Credit Offer shortens to
- * Credit. Fake-DOM globals come from the pulldown block above
- * (document/Icon/I18n already stubbed); file-text covers the static
- * fallback + buy-panel removal. Runs after pulldownShape so buildNavLink
- * has a document. */
+/* Six-link bar (nav-six 2026-10-05 owner ruling + 2026-10-07 selector
+ * ladder): Dashboard, Markets (the selector), Pools (the selector), Credit,
+ * Margin, Explore. Standalone Swap is deleted (pools desk owns swapping
+ * now); Credit Offer shortens to Credit. Fake-DOM globals come from the
+ * pulldown block above (document/Icon/I18n already stubbed); file-text
+ * covers the static fallback + buy-panel removal. Runs after pulldownShape
+ * so buildNavLink has a document. */
 (function barSix() {
   var fs = require("fs");
   var path = require("path");
-  var wantNav = ["#/", "#/market/BTS_USD", "#/pools", "#/credit-offer",
+  var wantNav = ["#/", "#/markets", "#/pools", "#/credit-offer",
     "#/borrow", "#/explorer"];
   assert.deepStrictEqual(App._test.ORIGINAL_NAV, wantNav, "bar holds 6 links in owner order");
   assert.deepStrictEqual(App._test.NAV_ICONS, {
     "#/": "dashboard",
-    "#/market/BTS_USD": "trade",
+    "#/markets": "trade",
     "#/pools": "poolmart",
     "#/credit-offer": "borrow",
     "#/borrow": "borrow",
     "#/explorer": "server"
   }, "bar icons wired (pools=poolmart, margin=borrow)");
   assert.strictEqual(App._test.navText("#/"), "Dashboard", "Dashboard label");
-  assert.strictEqual(App._test.navText("#/market/BTS_USD"), "Exchange", "Exchange label");
-  assert.strictEqual(App._test.navText("#/pools"), "Liquidity Pools", "Pools label reuses pools.title");
+  assert.strictEqual(App._test.navText("#/markets"), "Markets", "Markets label (nav.markets)");
+  assert.strictEqual(App._test.navText("#/pools"), "Pools", "Pools label (nav.pools)");
   assert.strictEqual(App._test.navText("#/credit-offer"), "Credit", "Credit label (nav.credit)");
   assert.strictEqual(App._test.navText("#/borrow"), "Margin", "Margin label (nav.margin)");
   assert.strictEqual(App._test.navText("#/explorer"), "Explore", "Explore label");
@@ -195,21 +214,19 @@ console.log("app-shell-test: " + passed + " passed, 0 failed");
     assert.ok(img, href + " renders its icon");
     assert.ok(span && span.textContent, href + " renders its label span");
   });
-  // Pool-context Exchange tab stays: setPoolMarket swaps the desk href/label.
-  App.setPoolMarket("BTS_CNY");
-  var poolA = App._test.buildNavLink("#/market/BTS_USD", true);
-  assert.strictEqual(poolA.attributes.href, "#/market/BTS_CNY", "Exchange tab follows the pool market");
-  assert.ok((poolA.children || []).some(function (c) { return c.tag === "span" && c.textContent === "Exchange"; }),
-    "pool-context tab keeps the Exchange label");
-  App.setPoolMarket(null);
-  var backA = App._test.buildNavLink("#/market/BTS_USD", true);
-  assert.strictEqual(backA.attributes.href, "#/market/BTS_USD", "Exchange tab falls back to the default pair");
+  // Selector tab (2026-10-07): the Markets tab is a static category link —
+  // no pool-context swap survives, so no desk href can reach the bar.
+  var marketsA = App._test.buildNavLink("#/markets", true);
+  assert.strictEqual(marketsA.attributes.href, "#/markets", "Markets tab keeps the selector href");
+  assert.ok((marketsA.children || []).some(function (c) { return c.tag === "span" && c.textContent === "Markets"; }),
+    "Markets tab keeps its label");
+  assert.ok(marketsA.getAttribute("data-nav-exchange") === undefined, "no desk-swap hook on the tab");
   // Buy panel: borrow (margin) entry is gone; Margin lives in the bar now.
   var panels = fs.readFileSync(path.join(__dirname, "..", "vanilla", "js", "views", "trade-panels.js"), "utf8");
   assert.ok(panels.indexOf("trade.borrow_margin_link") === -1, "buy panel drops trade.borrow_margin_link");
   assert.ok(panels.indexOf("trade.borrow_margin_title") === -1, "buy panel drops trade.borrow_margin_title");
   assert.ok(panels.indexOf("#/borrow") === -1, "buy panel holds no #/borrow link");
-  console.log("bar-six: 34 passed, 0 failed");
+  console.log("bar-six: passed, 0 failed");
 })();
 
 /* Phone scroll-row bar + sheet pulldown (nav-pulldown Task 2): under 719px

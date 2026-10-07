@@ -76,7 +76,7 @@ var MenuUI = (function () {
       titleKey: "menu.section_trade", titleDefault: "Trade",
       blurbKey: "menu.blurb_trade", blurbDefault: "Markets, pools, and moving coins in.",
       links: [
-        { href: "#/market/BTS_USD", icon: "trade", titleKey: "menu.p_exchange", titleDefault: "Exchange", blurbKey: "menu.d_exchange", blurbDefault: "Order book, charts, and buy/sell desk." },
+        { href: "#/markets", icon: "trade", titleKey: "menu.p_exchange", titleDefault: "Exchange", blurbKey: "menu.d_exchange", blurbDefault: "Order book, charts, and buy/sell desk." },
         { href: "#/instant-trade", icon: "instant-trade", titleKey: "menu.p_instant", titleDefault: "Instant Trade", blurbKey: "menu.d_instant", blurbDefault: "One-screen buy and sell at market price." },
         { href: "#/pools", icon: "pools", titleKey: "menu.p_pools", titleDefault: "Liquidity Pools", blurbKey: "menu.d_pools", blurbDefault: "Supply pairs and earn swap fees." },
         { href: "#/borrow", icon: "borrow", titleKey: "menu.p_borrow", titleDefault: "Borrow", blurbKey: "menu.d_borrow", blurbDefault: "Borrow smartcoins against BTS collateral." },

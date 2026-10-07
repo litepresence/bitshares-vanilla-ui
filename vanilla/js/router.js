@@ -321,6 +321,7 @@ var Router = (function () {
     "/": { titleKey: "seo.title_dashboard", title: "Dashboard — BitShares Wallet", descKey: "seo.desc_dashboard", description: "BitShares dashboard — balances, markets and chain activity at a glance. Browse freely; keys stay on your device." },
     "/market/BTS_USD": { titleKey: "seo.title_market", title: "BTS/USD Exchange — BitShares Wallet", descKey: "seo.desc_market", description: "Trade BTS for USD on the BitShares order book — live bids, asks and history, signed locally on your device." },
     "/pools": { titleKey: "seo.title_pools", title: "Liquidity Pools — BitShares Wallet", descKey: "seo.desc_pools", description: "Browse BitShares liquidity pools — pairs, balances and activity read live from the chain. No login needed." },
+    "/markets": { titleKey: "seo.title_markets", title: "Markets — BitShares Wallet", descKey: "seo.desc_markets", description: "Browse BitShares order-book markets by 24h volume and open any pair's trading desk. No login needed." },
     "/explorer": { titleKey: "seo.title_explorer", title: "Blockchain Explorer — BitShares Wallet", descKey: "seo.desc_explorer", description: "Explore BitShares blocks, transactions and assets — live chain data, browsable with no login." },
     "/transfer": { titleKey: "seo.title_transfer", title: "Send Funds — BitShares Wallet", descKey: "seo.desc_transfer", description: "Send BitShares assets to any account. Review every field, then sign locally — keys never leave your device." },
     "/account/:name": { titleKey: "seo.title_account", title: "Account %(name)s — BitShares Wallet", descKey: "seo.desc_account", description: "View this BitShares account — balances, orders and history read live from the chain. No login needed." },
@@ -566,17 +567,10 @@ var Router = (function () {
      * paintMeta for node smoke tests. */
     var meta = metaFor(path, params, title);
     paintMeta(meta.title, meta.description);
-    /* Pool-market context hygiene: the header Exchange tab follows pool
-     * pages only. Leaving pools/market clears it (market routes set
-     * their own context implicitly by being the desk). currentPath() yields
-     * "#"-less paths ("/pools/…"). Never throws. */
-    try {
-      if (typeof App !== "undefined" && App && typeof App.setPoolMarket === "function") {
-        if (path.indexOf("/pools") !== 0 && path.indexOf("/market/") !== 0) {
-          App.setPoolMarket(null);
-        }
-      }
-    } catch (e) { /* context stands */ }
+    /* Pair-context hygiene retired 2026-10-07: the navbar's one-way
+     * pool->Exchange swap is gone, and the global pair TRAVELS (a selector
+     * seeds from it, a desk writes it) — so there is nothing to clear per
+     * route. Both desks write on load; nothing here. */
     fn(view, params);
     try { a11ySweep(view); } catch (e) { /* paint stands */ }
     /* Candy-2 view-enter restart (tab-switch micro-fade; CSS owns motion). */
