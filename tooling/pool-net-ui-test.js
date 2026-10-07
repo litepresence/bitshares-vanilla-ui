@@ -277,5 +277,26 @@ var skel = { pools: [
   ok((S.frames || 0) <= 180, "run pauses at/below 180 frames (got " + S.frames + ")");
 })();
 
+/* Task 2 (PoolNetUI nav-opts passthrough): resolveNav composition seam.
+ * Absent opts = pool-default byte-identical; opts.navEdge/navNode override. */
+(function () {
+  function eqNav(got, want, name) {
+    ok(got === want, name + " (got " + JSON.stringify(got) + ", want " + JSON.stringify(want) + ")");
+  }
+  var resolveNav = PoolNetUI.resolveNav;
+  ok(typeof resolveNav === "function", "resolveNav exported (opts composition seam)");
+  if (typeof resolveNav !== "function") return;
+  eqNav(resolveNav({ edgeMid: true, x: 50, y: 50, poolId: "1.19.1" }), "#/pools/1.19.1", "resolveNav pool-default edge -> swap desk");
+  eqNav(resolveNav({ x: 10, y: 10, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "resolveNav pool-default node -> asset page");
+  eqNav(resolveNav(null), null, "resolveNav null hit -> null");
+  eqNav(resolveNav({ x: 1, y: 1, assetId: "1.3.999", sym: "A/B" }), "#/asset/A%2FB", "resolveNav pool-default slash escaped");
+  eqNav(resolveNav({ edgeMid: true, poolId: "1.19.1" }, { navEdge: function () { return "#/market/BTS_USD"; } }), "#/market/BTS_USD", "resolveNav market override edge -> desk");
+  eqNav(resolveNav({ assetId: "1.3.0", sym: "BTS" }, { navNode: function () { return "#/market/BTS_BTS"; } }), "#/market/BTS_BTS", "resolveNav market override node -> desk");
+  eqNav(resolveNav({ edgeMid: true, poolId: "1.19.1" }, { navEdge: function () { throw new Error("boom"); } }), null, "resolveNav throwing edge override -> null");
+  eqNav(resolveNav({ assetId: "1.3.0", sym: "BTS" }, { navNode: function () { throw new Error("boom"); } }), null, "resolveNav throwing node override -> null");
+  eqNav(resolveNav({ edgeMid: true, poolId: "1.19.1" }, { navEdge: function () { return null; } }), null, "resolveNav null-returning edge override -> null");
+  eqNav(resolveNav({ edgeMid: true, poolId: "1.19.1" }, {}), "#/pools/1.19.1", "resolveNav empty opts = pool default");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

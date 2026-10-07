@@ -523,6 +523,31 @@ var PoolNetUI = (function () {
     return "#/asset/" + encodeURIComponent(String(h.sym));
   }
 
+  /* resolveNav: nav-opts composition seam (Task 2 second-master reuse).
+   * Absent opts (or empty/non-function fields) = navForHit pool behavior
+   * byte-identical. opts.navEdge(edgeHit) and opts.navNode(nodeHit) each
+   * return a hash string or null; a throwing override degrades to null (no
+   * navigation), never to the pool default. Pure (no location write).
+   * @param {Object|null} hit Hit record ({edgeMid, poolId} or {sym, assetId}).
+   * @param {Object} [opts] {navEdge, navNode} override fns.
+   * @returns {string|null} Hash target, or null for null hit / null override.
+   * Failure: never throws (override exceptions become null). */
+  function resolveNav(hit, opts) {
+    if (!hit) return null;
+    try {
+      if (hit.edgeMid) {
+        if (opts && typeof opts.navEdge === "function") {
+          try { return opts.navEdge(hit); } catch (e) { return null; }
+        }
+        return navForHit(hit);
+      }
+      if (opts && typeof opts.navNode === "function") {
+        try { return opts.navNode(hit); } catch (e) { return null; }
+      }
+      return navForHit(hit);
+    } catch (e) { return null; }
+  }
+
   /* One-time canvas wiring: tap nav + node drag + pan + pinch + wheel zoom +
    * Enter key (pool-graph.js _wire precedent: touch-action none only mid-gesture
    * so page scroll is untouched otherwise; moved drags suppress the click). */
@@ -579,8 +604,11 @@ var PoolNetUI = (function () {
       if (!p) return;
       var found = bestAt(st, p);
       if (!found) return;
-      if (found.kind === "edge") navigate(navForHit({ edgeMid: true, poolId: found.hit.poolId }));
-      else navigate(navForHit(found.hit));
+      var navOpts = (st && st.navOpts) || null;
+      var dest = null;
+      if (found.kind === "edge") dest = resolveNav({ edgeMid: true, poolId: found.hit.poolId }, navOpts);
+      else dest = resolveNav(found.hit, navOpts);
+      if (typeof dest === "string" && dest) navigate(dest);
     });
 
     var pointers = {};
@@ -754,7 +782,8 @@ var PoolNetUI = (function () {
         tgt = tgt || first;
         if (tgt) {
           if (ev.preventDefault) ev.preventDefault();
-          navigate(/** @type {string} */ (navForHit(tgt)));
+          var dest = resolveNav(tgt, (st && st.navOpts) || null);
+          if (typeof dest === "string" && dest) navigate(/** @type {string} */ (dest));
         }
       } catch (e) { /* navigation best-effort */ }
     });
@@ -765,13 +794,19 @@ var PoolNetUI = (function () {
    * @param {Document} doc Owner document.
    * @param {HTMLElement} wrap Band body element (pool-ui.js #pool-net-body).
    * @param {Function} [getSelection] Live filter getter (PoolUI.getSelection bridge).
+   * @param {Object} [opts] Nav overrides for second-master reuse:
+   *   {navEdge(edgeHit) -> hash|null, navNode(nodeHit) -> hash|null}.
+   *   Absent opts = pool behavior byte-identical (edges -> #/pools/:id,
+   *   nodes -> #/asset/:symbol). Physics, layout, palette, pool visuals
+   *   untouched by opts (nav only).
    * @returns {{redraw: function, destroy: function}} redraw re-reads the
    *   selection (star/union follows the inputs); destroy stops the loop,
    *   observer, and listeners (route-leave cleanup).
    * Failure: never throws (loading note stands); async loads degrade to
    *   skeleton-only, then to an honest offline note + retry.
    */
-  function mount(doc, wrap, getSelection) {
+  function mount(doc, wrap, getSelection, opts) {
+    var navOpts = opts || null;
     var api = { redraw: function () {}, destroy: function () {} };
     try {
       if (!doc || !wrap) return api;
@@ -807,7 +842,8 @@ var PoolNetUI = (function () {
         running: false, settled: true, still: 0, frames: 0,
         temp: (PHYS[phys0] || PHYS.calm).temp0, visible: true,
         dead: false, reduced: reduced, loaded: false, raf: 0, observer: null,
-        drag: null, pinch: null, hover: null, wake: null, onResize: null
+        drag: null, pinch: null, hover: null, wake: null, onResize: null,
+        navOpts: navOpts
       };
 
       var statusEl = mk("p", t("pool_net.loading", "Loading network…"), "muted");
@@ -1167,7 +1203,10 @@ var PoolNetUI = (function () {
         } catch (e) { /* summary stands */ }
         if (!edges.length) return;
         var shown = edges.slice(0, TWIN_CAP);
-        function goPool(pid) { navigate(/** @type {string} */ (navForHit({ edgeMid: true, poolId: pid }))); }
+        function goPool(pid) {
+          var dest = resolveNav({ edgeMid: true, poolId: pid }, navOpts);
+          if (typeof dest === "string" && dest) navigate(/** @type {string} */ (dest));
+        }
         var TR = null;
         try { TR = (typeof TableRenderer !== "undefined" && TableRenderer) ? TableRenderer : null; } catch (e) { TR = null; }
         var built = false;
@@ -1211,7 +1250,10 @@ var PoolNetUI = (function () {
               var tr = doc.createElement("tr");
               var tdP = doc.createElement("td");
               var link = doc.createElement("a");
-              try { link.setAttribute("href", /** @type {string} */ (navForHit({ edgeMid: true, poolId: e.poolId }))); } catch (e2) { /* text stands */ }
+              try {
+                var href = resolveNav({ edgeMid: true, poolId: e.poolId }, navOpts);
+                if (typeof href === "string" && href) link.setAttribute("href", /** @type {string} */ (href));
+              } catch (e2) { /* text stands */ }
               link.textContent = e.poolId;
               tdP.appendChild(link);
               var tdA = doc.createElement("td");
@@ -1411,6 +1453,7 @@ var PoolNetUI = (function () {
   return {
     mount: mount,
     paintGraph: paintGraph,
+    resolveNav: resolveNav,
     _physForTest: _physForTest,
     _defaultPhysForTest: _defaultPhysForTest,
     _navForTest: navForHit,
