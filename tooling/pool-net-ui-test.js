@@ -176,5 +176,36 @@ var skel = { pools: [
   ok(lively > calm * 1.5, "lively out-travels calm 1.5x (got " + (calm > 0 ? (lively / calm).toFixed(2) : "?") + "x)");
 })();
 
+/* wake re-energize regression (user report: flip + drag-release "do nothing"
+ * while the loop spins at floor temp on a parked layout). wake() must reset
+ * temp/still/frames even when the loop is already running — the old
+ * early-return skipped the reset, so nothing ever re-energized. */
+(function () {
+  ok(typeof PoolNetUI._wakeForTest === "function", "_wakeForTest exported");
+  if (typeof PoolNetUI._wakeForTest !== "function") return;
+  var wake = PoolNetUI._wakeForTest;
+  // running loop at floor temp: wake must re-seed energy without restarting
+  var S = {
+    phys: "lively", W: 300, H: 320, temp: 0.5, still: 77, frames: 999,
+    running: true, settled: false, dead: false, reduced: false, visible: true,
+    geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 } },
+    vel: {}, deg: { "1.3.0": 1, "1.3.1": 1 },
+    view: { edges: [{ a: "1.3.0", b: "1.3.1", poolId: "1.19.1" }] }
+  };
+  try { wake(S); } catch (e) { ok(false, "wake on running loop throws: " + e); return; }
+  ok(S.temp === 10 && S.still === 0 && S.frames === 0, "wake re-seeds temp/still/frames on a running loop (temp=" + S.temp + ")");
+  ok(S.running === true, "running loop stays running (no double-start)");
+  // stopped loop: wake restarts and runs to sleep synchronously headless
+  var S2 = {
+    phys: "calm", W: 300, H: 320, temp: 1, still: 25, frames: 900,
+    running: false, settled: true, dead: false, reduced: false, visible: true,
+    geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 }, "1.3.99": { x: 250, y: 260 } },
+    vel: {}, deg: { "1.3.0": 2, "1.3.1": 1 },
+    view: { edges: [{ a: "1.3.0", b: "1.3.1", poolId: "1.19.1" }] }
+  };
+  try { wake(S2); } catch (e) { ok(false, "wake on stopped loop throws: " + e); return; }
+  ok(S2.settled === true && S2.running === false, "stopped loop restarts and settles (temp re-seeded to " + S2.temp + ")");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

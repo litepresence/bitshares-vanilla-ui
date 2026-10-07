@@ -38,7 +38,7 @@ var PoolNetUI = (function () {
    * character: inverse-square degree-mass repulsion, long springs, high
    * carryover for underdamped oscillation, weak center pull, late sleep
    * gate + maxFrames stabilization budget, curved edges).
-   * Lively is deliberately UNDERDAMPED (carry 0.975 + springK 0.025): the
+   * Lively is deliberately UNDERDAMPED (carry 0.99 + springK 0.025): the
    * graph overshoots and oscillates visibly for ~10-15s before the sleep
    * gate catches it — an overdamped lively parks into static equilibrium
    * in ~2s and looks identical to calm (user-reported "does nothing").
@@ -424,18 +424,22 @@ var PoolNetUI = (function () {
   }
 
   /* Wake the settle loop (drag/zoom/filter/resize/phys-flip wake; sleep
-   * cancels it). Re-reads the preset so a Calm/Lively flip re-energizes
-   * from current positions; resets the frame counter for the min-run gate. */
+   * cancels it). ALWAYS re-seeds temp/still/frames — even when the loop is
+   * already running: an early return here starves every later re-energize
+   * (phys-flip, drag-release, filter pages all no-op while the loop spins
+   * at floor temp on a parked layout — user-reported "switch does nothing").
+   * The running loop picks up fresh temp + preset next frame, so no restart
+   * dance is needed; a stopped loop is (re)started below. */
   function wake(S) {
-    if (!S || S.dead || S.settled === false && S.running) return;
+    if (!S || S.dead) return;
     if (S.reduced || S.dead) return;
-    if (S.running) return;
     if (!S.visible) return;
     if (Object.keys(S.geom).length < 2) return;
-    S.running = true;
     S.still = 0;
     S.frames = 0;
     S.temp = (PHYS[S.phys] || PHYS.calm).temp0;
+    if (S.running) return;
+    S.running = true;
     loop(S);
   }
 
@@ -637,6 +641,7 @@ var PoolNetUI = (function () {
           st.scale = ns;
           st.ox = mx - (st.pinch.mx - st.pinch.ox) * (ns / st.pinch.scale);
           st.oy = my - (st.pinch.my - st.pinch.oy) * (ns / st.pinch.scale);
+          try { render(st); } catch (e) { /* loop paints */ }
           if (st.hover) st.hover(p);
         } catch (e) { /* gesture stands */ }
         return;
@@ -646,6 +651,13 @@ var PoolNetUI = (function () {
         try {
           if (st.drag.kind === "node" && st.geom[st.drag.id]) {
             var w = toWorld(st, p);
+            /* Throw tracking: keep the last two world samples + times so
+             * release can fling the node (headless-safe clock fallback). */
+            var nowMs = 0;
+            try { nowMs = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now(); }
+            catch (e) { try { nowMs = Date.now(); } catch (x) { nowMs = 0; } }
+            if (st.drag.px !== undefined) { st.drag.ppx = st.drag.px; st.drag.ppy = st.drag.py; st.drag.pt = st.drag.pt0; }
+            st.drag.px = w.x; st.drag.py = w.y; st.drag.pt0 = nowMs;
             st.geom[st.drag.id].x = w.x;
             st.geom[st.drag.id].y = w.y;
             if (st.vel) st.vel[st.drag.id] = { x: 0, y: 0 };
@@ -653,6 +665,11 @@ var PoolNetUI = (function () {
             st.ox = st.drag.ox + (p.x - st.drag.sx);
             st.oy = st.drag.oy + (p.y - st.drag.sy);
           }
+          /* Direct repaint: the gesture must stay visible even when the
+           * settle loop is asleep or frozen (reduced-motion) — previously
+           * drags only painted via a live loop, so dead-loop drags were
+           * invisible until release. */
+          try { render(st); } catch (e) { /* loop paints */ }
           if (st.hover) st.hover(p);
         } catch (e) { /* position stands */ }
         return;
@@ -669,6 +686,21 @@ var PoolNetUI = (function () {
         if (st) {
           if (st.pinch && pointersCount() < 2) st.pinch = null;
           var moved = !!(st.drag && st.drag.moved);
+          /* Release throw: a flung node keeps its pointer velocity
+           * (clamped to a sane throw) so neighbors visibly react on drop —
+           * previously vel stayed zeroed and the drop landed dead. */
+          try {
+            if (moved && st.drag && st.drag.kind === "node" && st.geom[st.drag.id] &&
+                st.drag.ppx !== undefined && st.drag.pt0 !== undefined && st.drag.pt !== undefined &&
+                st.drag.pt0 > st.drag.pt) {
+              var dt = (st.drag.pt0 - st.drag.pt) / 16.7;
+              if (!(dt > 0)) dt = 1;
+              var tx = (st.drag.px - st.drag.ppx) / dt, ty = (st.drag.py - st.drag.ppy) / dt;
+              var ts = Math.sqrt(tx * tx + ty * ty), TCAP = 12;
+              if (ts > TCAP && ts > 0) { tx = tx / ts * TCAP; ty = ty / ts * TCAP; }
+              if (isFinite(tx) && isFinite(ty) && st.vel) st.vel[st.drag.id] = { x: tx, y: ty };
+            }
+          } catch (e) { /* dead drop stands */ }
           st.drag = null;
           canvas.style.touchAction = "";
           canvas.style.cursor = "pointer";
@@ -692,6 +724,7 @@ var PoolNetUI = (function () {
         st.ox = p.x - (p.x - (st.ox || 0)) * (ns / (st.scale || 1));
         st.oy = p.y - (p.y - (st.oy || 0)) * (ns / (st.scale || 1));
         st.scale = ns;
+        try { render(st); } catch (e) { /* loop paints */ }
         if (st.hover) st.hover(p);
         if (st.wake) st.wake();
       } catch (e) { /* zoom stands down */ }
@@ -794,9 +827,12 @@ var PoolNetUI = (function () {
       var twinSummary = mk("summary", t("pool_net.twin", "Pool rows (%(n)s)", { n: "0" }));
       var twinBox = mk("div", null, "pool-net-twinbox");
       /* Calm/Lively switch (v2): segmented control at the top of the band
-       * body. Flipping persists poolNetPhys and re-energizes the loop from
-       * current positions via wake(S); reduced-motion freeze in wake/loop
-       * covers both presets, so there is no branch here. */
+       * body. Flipping persists poolNetPhys, re-spreads the layout from the
+       * circle seed (a preset flip from a parked equilibrium has ~zero
+       * forces to work with — temp alone cannot move it, so the flip
+       * re-runs the fresh-load spread instead), then re-energizes via
+       * wake(S); reduced-motion freeze in wake/loop covers both presets,
+       * so there is no branch here. Pan/zoom (scale/ox/oy) are untouched. */
       var physBar = mk("div", null, "pool-net-phys");
       var calmBtn = mk("button", t("pool_net.phys_calm", "Calm"));
       var livelyBtn = mk("button", t("pool_net.phys_lively", "Lively"));
@@ -826,6 +862,14 @@ var PoolNetUI = (function () {
           calmBtn.setAttribute("aria-pressed", S.phys === "calm" ? "true" : "false");
           livelyBtn.setAttribute("aria-pressed", S.phys === "lively" ? "true" : "false");
         } catch (e) { /* state stands */ }
+        /* Fresh spread on flip (see header note): temp alone cannot move a
+         * parked equilibrium, so re-seed positions like a fresh load. */
+        try {
+          if (S.view && S.view.nodes && S.view.nodes.length > 1) {
+            S.geom = circleLayout(S.view.nodes, S.W, S.H);
+            S.vel = {};
+          }
+        } catch (e) { /* positions stand */ }
         wake(S);
       }
       try {
@@ -1353,7 +1397,8 @@ var PoolNetUI = (function () {
     _navForTest: navForHit,
     _stepForTest: stepFrame,
     _layoutForTest: circleLayout,
-    _drawForTest: drawScene
+    _drawForTest: drawScene,
+    _wakeForTest: wake
   };
 })();
 
