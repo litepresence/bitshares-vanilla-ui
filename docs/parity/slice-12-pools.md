@@ -213,10 +213,15 @@ no record fixes were needed — resolver + wiring only.
 
 Refine — 3s pause rule (user call: "pause after 3s until next interaction"):
 `maxFrames: 180` both presets, lively `minFrames: 60`. Every wake runs at
-most ~3s then freezes; any interaction (flip, drag-release, wheel, filter)
-re-seeds and runs another 3s. Ends the stuck-jitter class structurally —
+most ~3s then freezes; any node-moving interaction (flip, drag-release,
+filter) re-seeds and runs another 3s. Zoom is camera-only (no wake). Ends the stuck-jitter class structurally —
 tails can't outlive the cap. Browser proof: idle paused @180, flip runs,
-paused @180 again, zero errors. (Unrelated: `check_types.sh` is red on
+paused @180 again, zero errors.
+
+Refine — zoom is camera-only (user call): wheel-zoom no longer wakes the
+loop (verified headless: zoom 1.0 to 1.49 with running false). Only moving
+nodes — drag-release throw, Physics flip re-spread, filter change —
+re-energizes. (Unrelated: `check_types.sh` is red on
 `account-ui.js` myGen/gen from another workstream's uncommitted edit —
 zero errors in pool-net files.)
 

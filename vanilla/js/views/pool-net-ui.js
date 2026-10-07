@@ -735,7 +735,8 @@ var PoolNetUI = (function () {
         st.scale = ns;
         try { render(st); } catch (e) { /* loop paints */ }
         if (st.hover) st.hover(p);
-        if (st.wake) st.wake();
+        /* No wake: zoom is camera-only (owner call) — only moving nodes
+         * (drag-release throw, flip re-spread, filter change) re-energizes. */
       } catch (e) { /* zoom stands down */ }
     }, { passive: false });
 
