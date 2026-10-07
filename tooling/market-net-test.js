@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-/* Market-net vectors: rank (volume-desc BigInt), buildGraph (hub + actives,
- * QUOTE_BASE desk ids per market-picker.js:590), candidates (pool
+/* Market-net vectors: rank (volume-desc BigInt), candidates (pool
  * counterparties + seeds + cache + typed, capped 20), cache (localStorage
  * marketNetSeen, chain merges, stale dropped).
  * Pure (no chain, no DOM). Exit 0 green, 1 red. */
 "use strict";
-const MN = require("/workspace/vanilla/js/api/market-net.js");
+const MN = require("../vanilla/js/api/market-net.js");
 
 let pass = 0, fail = 0;
 function ok(cond, name) {
@@ -17,7 +16,6 @@ function ok(cond, name) {
 (function () {
   ok(typeof MN.candidates === "function", "surface candidates fn");
   ok(typeof MN.rank === "function", "surface rank fn");
-  ok(typeof MN.buildGraph === "function", "surface buildGraph fn");
   ok(typeof MN.readCache === "function", "surface readCache fn");
   ok(typeof MN.writeCache === "function", "surface writeCache fn");
 })();
@@ -47,32 +45,6 @@ function ok(cond, name) {
   ok(ranked[0].symB === "BIG", "rank BigInt huge volume first (no float)");
   ok(ranked[1].symB === "AAA" && ranked[2].symB === "ZZZ", "rank tie-break symB alpha");
   ok(ranked[3].symB === "BAD", "rank malformed volume sorts as zero, kept");
-})();
-
-// 3. Graph hub + actives only (brief verbatim pipeline: rank -> filter -> build).
-(function () {
-  const rows = [
-    { a: "1.3.0", b: "1.3.1", symA: "BTS", symB: "USD", baseVol: "5000", latest: "0.05", change: "1.2" },
-    { a: "1.3.0", b: "1.3.2", symA: "BTS", symB: "BTC", baseVol: "9000", latest: "0.001", change: "-0.4" },
-    { a: "1.3.0", b: "1.3.3", symA: "BTS", symB: "DOGE", baseVol: "0", latest: null, change: null }
-  ];
-  const ranked = MN.rank(rows);
-  const g = MN.buildGraph(ranked.filter((r) => r.baseVol !== "0"));
-  ok(g.nodes.length === 3 && g.edges.length === 2, "graph hub + actives only");
-  ok(g.edges[0].marketId === "BTC_BTS" || g.edges[0].marketId === "BTS_BTC", "desk id present (orientation per market-picker)");
-})();
-
-// 4. Desk-id orientation EXACT: rows carry a=X-as-base, b=counter-as-quote
-// (Market.stats(baseId=X, quoteId=Y) probe), so QUOTE_BASE = symB_symA,
-// mirroring market-picker.js:382 (q + "_" + b) + :590 ("#/market/" + id).
-(function () {
-  const g = MN.buildGraph([
-    { a: "1.3.0", b: "1.3.2", symA: "BTS", symB: "BTC", baseVol: "9000", latest: "0.001", change: "-0.4" }
-  ]);
-  ok(g.edges[0].marketId === "BTC_BTS", "desk id exact QUOTE_BASE (counter first, X base last)");
-  ok(g.edges[0].a === "1.3.0" && g.edges[0].b === "1.3.2", "edge keeps chain asset ids");
-  ok(g.edges[0].stats && g.edges[0].stats.baseVol === "9000", "edge carries volume for node sizing");
-  ok(g.edges[0].stats && g.edges[0].stats.change === "-0.4", "edge carries 24h direction for coloring");
 })();
 
 // 5. Candidates: pool counterparties of X first (Y_X orientation), then

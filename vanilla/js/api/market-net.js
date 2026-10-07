@@ -1,15 +1,14 @@
 /* MarketNet: top-markets discovery data for the #/markets landing.
  * Owns: candidates (pool counterparties of X + curated seeds + cached
  *   markets + user-typed pair, deduped, capped 20), rank (ticker rows
- *   volume-desc on BigInt base_volume, zero-volume kept), buildGraph
- *   (ranked rows -> {nodes, edges} with QUOTE_BASE desk ids), readCache /
+ *   volume-desc on BigInt base_volume, zero-volume kept), readCache /
  *   writeCache / reconcileCache (localStorage cache of discovered market
  *   ids; chain re-validates every load, stale ids dropped — spec §2).
  * Consumes: Market.stats(baseId, quoteId) ticker shape
  *   (market.js:452-462: {raw, latest, highestBid, lowestAsk} with
  *   raw.base_volume in base units) plus row labels {a, b, symA, symB};
  *   PoolNet graph shape {nodes: [{assetId, sym}], edges: [{poolId, a, b}]}
- *   (pool-net.js — market edges use {marketId, a, b, stats}).
+ *   (pool-net.js — table rows carry {a, b} asset ids directly).
  *   No DOM, no signing. Makes no chain calls itself: the view probes
  *   get_ticker per candidate (X-as-base via Market.stats) and passes rows
  *   in — same injection shape as PoolNet.loadAllBatched (chain only at the
@@ -54,27 +53,6 @@ var MarketNet = (function () {
    * @property {string} baseVol Raw base_volume digit string (BigInt-safe).
    * @property {string|null} latest Human latest-price string (or null).
    * @property {string|null} change Human 24h percent_change string (or null).
-   */
-
-  /* Graph node: one asset.
-   * @typedef {Object} MarketNetNode
-   * @property {string} assetId Asset object id ("1.3.x").
-   * @property {string} sym Display symbol (never translated).
-   */
-
-  /* Graph edge: one market linking two assets.
-   * @typedef {Object} MarketNetEdge
-   * @property {string} marketId QUOTE_BASE desk id (symB_symA orientation).
-   * @property {string} a Focus asset id (BASE leg).
-   * @property {string} b Counter asset id (QUOTE leg).
-   * @property {{baseVol: string, latest: (string|null), change: (string|null)}} stats
-   *   Display payload (mapper sizing/coloring; Format renders at paint).
-   */
-
-  /* Discovery graph.
-   * @typedef {Object} MarketNetGraph
-   * @property {MarketNetNode[]} nodes One entry per asset.
-   * @property {MarketNetEdge[]} edges One entry per probed pair.
    */
 
   /* candidates: union of discovery sources for asset X, deduped, capped.
@@ -147,42 +125,6 @@ var MarketNet = (function () {
     });
   }
 
-  /* buildGraph: ranked (caller zero-filtered) rows -> {nodes, edges}.
-   * One node per asset id (first symbol wins — legs agree by construction);
-   * one edge per row with the QUOTE_BASE desk id (symB_symA — see the
-   * desk-id rule above). Maps every row given: the caller owns the >0
-   * policy (spec §2 "nodes = pairs with 24h volume > 0" is applied as
-   * ranked.filter(baseVol !== "0") before this call — rank itself never
-   * drops, so the table can still show zero-volume rows).
-   * @param {MarketTickerRow[]} rows Caller-filtered ticker rows.
-   * @returns {MarketNetGraph} Discovery graph.
-   */
-  function buildGraph(rows) {
-    var nodes = {}, edges = [];
-    (rows || []).forEach(function (r) {
-      if (!r) return;
-      var a = String(r.a), b = String(r.b);
-      var symA = (r.symA !== null && r.symA !== undefined) ? String(r.symA) : a;
-      var symB = (r.symB !== null && r.symB !== undefined) ? String(r.symB) : b;
-      if (!nodes[a]) nodes[a] = { assetId: a, sym: symA };
-      if (!nodes[b]) nodes[b] = { assetId: b, sym: symB };
-      edges.push({
-        marketId: symB + "_" + symA,
-        a: a,
-        b: b,
-        stats: {
-          baseVol: String(r.baseVol || "0"),
-          latest: (r.latest !== null && r.latest !== undefined) ? String(r.latest) : null,
-          change: (r.change !== null && r.change !== undefined) ? String(r.change) : null
-        }
-      });
-    });
-    return {
-      nodes: Object.keys(nodes).map(function (k) { return nodes[k]; }),
-      edges: edges
-    };
-  }
-
   /* readCache: cached discovered market ids, or [] when no cache
    * (first run, private mode, or node test harness without localStorage).
    * Corrupt JSON or non-QUOTE_BASE entries read as dropped, never throws.
@@ -239,7 +181,6 @@ var MarketNet = (function () {
   return {
     candidates: candidates,
     rank: rank,
-    buildGraph: buildGraph,
     readCache: readCache,
     writeCache: writeCache,
     reconcileCache: reconcileCache,

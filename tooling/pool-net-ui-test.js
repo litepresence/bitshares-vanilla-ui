@@ -2,8 +2,8 @@
 /* Pool-net-ui paint vectors: 3-node graph paints arcs + labels on a stub ctx.
  * Headless (no DOM, no chain, no browser). Exit 0 green, 1 red. */
 "use strict";
-globalThis.PoolNet = require("/workspace/vanilla/js/api/pool-net.js");
-var PoolNetUI = require("/workspace/vanilla/js/views/pool-net-ui.js");
+globalThis.PoolNet = require("../vanilla/js/api/pool-net.js");
+var PoolNetUI = require("../vanilla/js/views/pool-net-ui.js");
 
 var pass = 0, fail = 0;
 function ok(cond, name) {

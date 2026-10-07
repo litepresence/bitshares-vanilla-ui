@@ -39,7 +39,11 @@ def main():
             if key in section:
                 del section[key]
         for dotted, default in NEW_KEYS.items():
-            section[dotted.split(".", 1)[1]] = default
+            # Idempotent: never clobber a refined translation with the
+            # English stub on re-runs; only missing keys are added.
+            key = dotted.split(".", 1)[1]
+            if key not in section:
+                section[key] = default
         meta = data.get("_meta")
         if isinstance(meta, dict) and isinstance(meta.get("translated"), list):
             inv = meta["translated"]

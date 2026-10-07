@@ -293,6 +293,7 @@ var PoolNet = (function () {
    * @param {PoolNetGraph} g Loaded graph.
    * @param {{aId?: string|null, bId?: string|null}} [sel] Selection (asset ids).
    * @returns {PoolNetGraph} Subgraph (new object except the full-graph case).
+   *   Callers must not mutate the returned full-graph reference.
    */
   function filterGraph(g, sel) {
     sel = sel || {};

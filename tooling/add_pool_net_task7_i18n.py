@@ -63,7 +63,10 @@ def main():
             shorts[full.split(".", 1)[1]] = v
         rebuilt = {}
         for key, val in section.items():
-            rebuilt[key] = shorts.get(key, val)
+            # Idempotent: never clobber an existing key (refined
+            # non-English translations survive re-runs); only missing
+            # keys are inserted after the anchor below.
+            rebuilt[key] = val
             if key == ANCHOR:
                 for short, v in shorts.items():
                     if short not in section:

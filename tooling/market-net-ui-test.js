@@ -13,7 +13,7 @@ function ok(cond, name) {
 
 var MarketNetUI = null;
 try {
-  MarketNetUI = require("/workspace/vanilla/js/views/market-net-ui.js"); // eslint-disable-line
+  MarketNetUI = require("../vanilla/js/views/market-net-ui.js"); // eslint-disable-line
 } catch (e) {
   MarketNetUI = null;
 }
@@ -25,10 +25,10 @@ if (!MarketNetUI) {
 }
 
 /* Real data-module + chain-math globals (view consumes these live). */
-globalThis.MarketNet = require("/workspace/vanilla/js/api/market-net.js");
-globalThis.Market = require("/workspace/vanilla/js/api/market.js");
-globalThis.Asset = require("/workspace/vanilla/js/api/asset.js");
-globalThis.Format = require("/workspace/vanilla/js/api/format.js");
+globalThis.MarketNet = require("../vanilla/js/api/market-net.js");
+globalThis.Market = require("../vanilla/js/api/market.js");
+globalThis.Asset = require("../vanilla/js/api/asset.js");
+globalThis.Format = require("../vanilla/js/api/format.js");
 
 /* ---- stub Chain: asset catalog + scenario-controlled tickers ---- */
 var ASSETS = {

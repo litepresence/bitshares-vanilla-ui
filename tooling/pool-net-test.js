@@ -2,7 +2,7 @@
 /* Pool-net vectors: skeleton graph, star/union filters, brand groups.
  * Pure (no chain, no DOM). Exit 0 green, 1 red. */
 "use strict";
-const PN = require("/workspace/vanilla/js/api/pool-net.js");
+const PN = require("../vanilla/js/api/pool-net.js");
 
 let pass = 0, fail = 0;
 function ok(cond, name) {
@@ -128,7 +128,7 @@ const skel = { pools: [
     })();
     // 10. Order-free Pool.list params (Task 4, no chain: stub Chain records method+params).
     await (async function () {
-      const Pool = require("/workspace/vanilla/js/api/pool.js");
+      const Pool = require("../vanilla/js/api/pool.js");
       let calls;
       function stub(handler) {
         calls = [];
