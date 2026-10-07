@@ -117,7 +117,12 @@ var PoolNetUI = (function () {
    *   untouched by opts (nav only).
    * @returns {{redraw: function, destroy: function}} redraw re-reads the
    *   selection (star/union follows the inputs); destroy stops the loop,
-   *   observer, and listeners (route-leave cleanup).
+   *   observer, and listeners (route-leave cleanup). Injected-graph market
+ *   mode (desk volume map): opts {mode: "market", graph, meta} skips the
+ *   skeleton fetch + live backfill — S.full/S.meta come from the caller
+ *   (volume-gated markets); physics, gestures, selection, paint run
+ *   unchanged while pool-only chrome (brands, BTS path) branches inside
+ *   NetChrome on S.navOpts.mode.
    * Failure: never throws (loading note stands); async loads degrade to
    *   skeleton-only, then to an honest offline note + retry.
    */
@@ -181,8 +186,15 @@ var PoolNetUI = (function () {
       S.canvas = els.canvas;
       var canvas = els.canvas;
 
-      function getSel() {
-        var sel = { aId: null, bId: null, s: "" };
+      /* marketMode: injected volume graph (desk map) — pool-only stages
+       * (brand filter, BTS path-find) stand down; selection, geometry,
+       * physics and paint run unchanged. */
+      function marketMode() {
+        try { return !!(navOpts && navOpts.mode === "market"); }
+        catch (e) { return false; }
+      }
+
+      function getSel() {        var sel = { aId: null, bId: null, s: "" };
         try {
           if (typeof getSelection === "function") {
             var got = getSelection() || {};
@@ -296,7 +308,10 @@ var PoolNetUI = (function () {
         } catch (e) { /* unweighted repulsion stands */ }
         S.pathSet = {};
         S.pathFull = null;
-        if (sel.aId && sel.bId && String(sel.aId) !== String(sel.bId)) {
+        /* Pool-only route highlight (BTS hops over pool edges): market
+         * graphs carry no pool path data, so the stage stays unlit rather
+         * than drawing a fiction. */
+        if (!marketMode() && sel.aId && sel.bId && String(sel.aId) !== String(sel.bId)) {
           try {
             if (typeof PoolNet !== "undefined" && PoolNet.findPath) {
               S.pathFull = PoolNet.findPath(S.full, sel.aId, sel.bId);
@@ -364,6 +379,33 @@ var PoolNetUI = (function () {
             };
           });
         } catch (e) { /* cards degrade to ids */ }
+      }
+
+      /* Injected market graph (desk volume map): caller-owned {nodes,
+       * edges} + edge meta — no skeleton fetch, no live backfill, no pool
+       * cache touch. Selection, geometry, physics and paint run the same
+       * path below (applySelection reads S.full/S.meta whatever filled
+       * them); pool-only chrome branches on S.navOpts.mode inside
+       * NetChrome. Honest empty stands (a filter with no volume is a
+       * normal state, not an error). */
+      function mountMarketGraph() {
+        if (S.dead) return;
+        var g = { nodes: [], edges: [] };
+        try {
+          var ig = navOpts.graph || {};
+          if (ig && Array.isArray(ig.nodes) && Array.isArray(ig.edges)) g = ig;
+        } catch (e) { /* empty stands */ }
+        try {
+          S.meta = (navOpts.meta && typeof navOpts.meta === "object") ? navOpts.meta : {};
+        } catch (e) { S.meta = {}; }
+        S.full = g;
+        S.loaded = true;
+        applySelection();
+        var nE = (S.full.edges || []).length, nN = (S.full.nodes || []).length;
+        if (!nE) setStatus(t("market_net.map_empty", "No markets with recent volume."));
+        else setStatus(t("market_net.map_ready", "%(markets)s markets · %(assets)s assets", {
+          markets: String(nE), assets: String(nN)
+        }));
       }
 
       function skeletonFirst() {
@@ -524,7 +566,8 @@ var PoolNetUI = (function () {
         } catch (e) { /* down */ }
       };
 
-      skeletonFirst();
+      if (navOpts && navOpts.mode === "market" && navOpts.graph) mountMarketGraph();
+      else skeletonFirst();
       return api;
     } catch (e) {
       return api;

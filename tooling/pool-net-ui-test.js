@@ -431,5 +431,41 @@ var skel = { pools: [
   eqNav(resolveNav({ edgeMid: true, poolId: "1.19.1" }, {}), "#/pools/1.19.1", "resolveNav empty opts = pool default");
 })();
 
+// Market mode: injected volume graph mounts with zero pool loading.
+(function () {
+  var NC = null;
+  try { NC = require("../vanilla/js/views/pool-net-chrome.js"); } catch (e) { NC = null; }
+  if (NC) globalThis.NetChrome = NC;
+  var fetchCalls = 0;
+  var realFetch = globalThis.fetch;
+  try { globalThis.fetch = function () { fetchCalls++; return Promise.reject(new Error("no-net")); }; } catch (e) { /* harness w/o fetch */ }
+  function findClass(root, cls) {
+    var out = null;
+    (function walk(n) {
+      if (out) return;
+      if (n && n.className === cls) { out = n; return; }
+      (n.children || []).forEach(walk);
+    })(root);
+    return out;
+  }
+  var doc = { createElement: function (tag) { return fakeEl(tag); } };
+  var wrap = fakeEl("div");
+  var graph = { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }],
+    edges: [{ id: "USD_BTS", poolId: "USD_BTS", a: "1.3.0", b: "1.3.1" }] };
+  var meta = { USD_BTS: { symA: "BTS", symB: "USD", volBaseRaw: "5000", volBasePrec: 5, volQuoteRaw: "250", volQuotePrec: 4, latest: "0.05", change: "1.2" } };
+  var handle = PoolNetUI.mount(doc, wrap, function () { return { aId: null, bId: null, s: "" }; },
+    { mode: "market", graph: graph, meta: meta, navEdge: function (hit) { return "#/market/USD_BTS"; } });
+  ok(fetchCalls === 0, "market mode issues zero pool fetches (got " + fetchCalls + ")");
+  var status = findClass(wrap, "muted");
+  ok(status && /1 markets/.test(status.textContent), "market status shows markets count (got " + JSON.stringify(status && status.textContent) + ")");
+  var legend = findClass(wrap, "pool-net-legend");
+  ok(!legend || legend.children.length === 0, "market mode builds no brand chips");
+  try { handle.destroy(); } catch (e) { /* headless stands */ }
+  try {
+    if (realFetch === undefined) delete globalThis.fetch;
+    else globalThis.fetch = realFetch;
+  } catch (e) { /* harness stands */ }
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

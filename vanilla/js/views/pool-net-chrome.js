@@ -37,6 +37,14 @@ var NetChrome = (function () {
     return String(raw);
   }
 
+  /* isMarket: injected volume graph (desk map) — pool-only chrome
+   * (brands, BTS hops, pool cards) stands down; market cards/status/twin
+   * take over. Reads the mount opts the composer already stores on state. */
+  function isMarket(S) {
+    try { return !!(S && S.navOpts && S.navOpts.mode === "market"); }
+    catch (e) { return false; }
+  }
+
   function poolCount(S, assetId) {
     var n = 0;
     (S.view.edges || []).forEach(function (e) { if (e.a === assetId || e.b === assetId) n++; });
@@ -66,12 +74,29 @@ var NetChrome = (function () {
   }
 
   function nodeCard(S, t, assetId, sym) {
+    if (isMarket(S)) {
+      return t("market_net.node_card", "%(sym)s (%(id)s) · %(n)s markets", {
+        sym: String(sym), id: String(assetId), n: String(poolCount(S, assetId))
+      });
+    }
     return t("pool_net.node_card", "%(sym)s (%(id)s) · %(n)s pools · %(hops)s", {
       sym: String(sym), id: String(assetId), n: String(poolCount(S, assetId)), hops: hopsText(S, t, assetId)
     });
   }
 
   function edgeCard(S, t, poolId) {
+    if (isMarket(S)) {
+      var m = S.meta[poolId] || {};
+      var vol = humanBal(m.volBaseRaw, m.volBasePrec) + " " + (m.symA || "?") +
+        " + " + humanBal(m.volQuoteRaw, m.volQuotePrec) + " " + (m.symB || "?");
+      var label = t("market_net.edge_card", "%(desk)s · %(a)s–%(b)s · %(vol)s", {
+        desk: String(poolId), a: String(m.symA || "?"), b: String(m.symB || "?"), vol: vol
+      });
+      if (m.latest !== null && m.latest !== undefined && String(m.latest) !== "") {
+        label += " @ " + String(m.latest);
+      }
+      return label;
+    }
     var m = S.meta[poolId] || {};
     var a = m.sym_a || "?", b = m.sym_b || "?";
     if (m.balance_a_raw !== undefined && m.balance_b_raw !== undefined) {
@@ -167,7 +192,9 @@ var NetChrome = (function () {
       canvas.className = "pool-net-canvas";
       canvas.setAttribute("tabindex", "0");
       canvas.setAttribute("role", "img");
-      canvas.setAttribute("aria-label", t("pool_net.canvas_label", "Pool network map. Press Enter to open BTS."));
+      canvas.setAttribute("aria-label", isMarket(S)
+        ? t("market_net.canvas_label", "Market network map. Press Enter to open the market.")
+        : t("pool_net.canvas_label", "Pool network map. Press Enter to open BTS."));
     } catch (e) { /* stub canvas */ }
     els.hoverEl = mk("div", "", "pool-net-hover");
     try { els.hoverEl.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
@@ -236,7 +263,20 @@ var NetChrome = (function () {
   function paintVerdict(S, els, t) {
     var sel = S.sel, text = "";
     var nPools = (S.view.edges || []).length, nAssets = (S.view.nodes || []).length;
-    if (!sel.aId && !sel.bId) {
+    if (isMarket(S)) {
+      /* No route fiction: market graphs carry no pool path data, so a
+       * dual selection reads as full counts, never "no route". */
+      var onlyM = (sel.aId && !sel.bId) || (!sel.aId && sel.bId) ? (sel.aId || sel.bId) : null;
+      if (onlyM) {
+        text = t("market_net.verdict_star", "Markets touching %(s)s: %(n)s", {
+          s: symOf(S, onlyM), n: String(nPools)
+        });
+      } else {
+        text = t("market_net.verdict_full", "%(markets)s markets · %(assets)s assets", {
+          markets: String(nPools), assets: String(nAssets)
+        });
+      }
+    } else if (!sel.aId && !sel.bId) {
       text = t("pool_net.verdict_full", "%(pools)s pools · %(assets)s assets", {
         pools: String(nPools), assets: String(nAssets)
       });
@@ -259,8 +299,10 @@ var NetChrome = (function () {
     }
     try {
       els.verdictEl.textContent = text;
-      S.canvas.setAttribute("aria-label", text + " " +
-        t("pool_net.prompt", "Tap a node for the asset, a line for the pool."));
+      var prompt = isMarket(S)
+        ? t("market_net.prompt", "Tap a node for the asset, a line for the market.")
+        : t("pool_net.prompt", "Tap a node for the asset, a line for the pool.");
+      S.canvas.setAttribute("aria-label", text + " " + prompt);
     } catch (e) { /* text stands */ }
   }
 
@@ -275,6 +317,10 @@ var NetChrome = (function () {
    * @param {Function} [onToggle] (S, group, hidden)->void so the composer can
    *   re-filter and wake the loop. Absent = repaint only (headless). */
   function rebuildLegend(doc, mk, t, S, els, renderFn, onToggle) {
+    /* Market graphs have no brands (pool groupings) — the row stays empty
+     * rather than showing pool filters on market data. rebuildLegend is
+     * the only chip-adder, so an early return keeps it empty. */
+    if (isMarket(S)) return;
     try {
       var D = null;
       try { if (typeof DOM !== "undefined" && DOM) D = DOM; } catch (e) { D = null; }
@@ -346,7 +392,9 @@ var NetChrome = (function () {
       return String(a.poolId) < String(b.poolId) ? -1 : 1;
     });
     try {
-      els.twinSummary.textContent = t("pool_net.twin", "Pool rows (%(n)s)", { n: String(edges.length) });
+      els.twinSummary.textContent = isMarket(S)
+        ? t("market_net.twin", "Market rows (%(n)s)", { n: String(edges.length) })
+        : t("pool_net.twin", "Pool rows (%(n)s)", { n: String(edges.length) });
     } catch (e) { /* summary stands */ }
     if (!edges.length) return;
     var shown = edges.slice(0, TWIN_CAP);
@@ -365,7 +413,7 @@ var NetChrome = (function () {
         });
         var table = TR.render({
           columns: [
-            { key: "pool", title: t("pool_net.col_pool", "Pool") },
+            { key: "pool", title: isMarket(S) ? t("market_net.col_market", "Market") : t("pool_net.col_pool", "Pool") },
             { key: "a", title: t("pool_net.col_a", "Asset 1") },
             { key: "b", title: t("pool_net.col_b", "Asset 2") }
           ],
@@ -383,7 +431,7 @@ var NetChrome = (function () {
         tableF.className = "node-table";
         var thead = doc.createElement("thead");
         var hr = doc.createElement("tr");
-        [t("pool_net.col_pool", "Pool"), t("pool_net.col_a", "Asset 1"), t("pool_net.col_b", "Asset 2")].forEach(function (h) {
+        [isMarket(S) ? t("market_net.col_market", "Market") : t("pool_net.col_pool", "Pool"), t("pool_net.col_a", "Asset 1"), t("pool_net.col_b", "Asset 2")].forEach(function (h) {
           var th = doc.createElement("th");
           th.textContent = h;
           try { th.setAttribute("scope", "col"); } catch (e2) { /* stands */ }
@@ -419,9 +467,13 @@ var NetChrome = (function () {
     if (edges.length > shown.length) {
       try {
         els.twinBox.appendChild(mk("p",
-          t("pool_net.twin_more", "Showing %(shown)s of %(n)s pools — narrow the filter to see fewer.", {
-            shown: String(shown.length), n: String(edges.length)
-          }), "muted"));
+          isMarket(S)
+            ? t("market_net.twin_more", "Showing %(shown)s of %(n)s markets — narrow the filter to see fewer.", {
+              shown: String(shown.length), n: String(edges.length)
+            })
+            : t("pool_net.twin_more", "Showing %(shown)s of %(n)s pools — narrow the filter to see fewer.", {
+              shown: String(shown.length), n: String(edges.length)
+            }), "muted"));
       } catch (e) { /* table stands */ }
     }
   }
