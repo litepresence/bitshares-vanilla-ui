@@ -3414,6 +3414,7 @@
       "transfer.title",
       "transfer.to_label",
       "transfer.to_placeholder",
+      "transfer.uc_title",
       "transfer.unknown_account_name",
       "transfer.unknown_asset",
       "transfer.unknown_asset_prefix",
@@ -5683,7 +5684,8 @@
     "share_needs_to_amount": "A shareable link needs a recipient and an amount.",
     "unlocked_rebuilt_prefix": "已解锁 — 提案已重建，提议人为（",
     "unlocked_rebuilt_suffix": "）。",
-    "view_proposals": "查看提案"
+    "view_proposals": "查看提案",
+    "uc_title": "Unlock to continue"
   },
   "vesting": {
     "title": "归属",

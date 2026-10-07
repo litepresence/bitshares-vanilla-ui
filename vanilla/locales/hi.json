@@ -3414,6 +3414,7 @@
       "transfer.title",
       "transfer.to_label",
       "transfer.to_placeholder",
+      "transfer.uc_title",
       "transfer.unknown_account_name",
       "transfer.unknown_asset",
       "transfer.unknown_asset_prefix",
@@ -5683,7 +5684,8 @@
     "share_needs_to_amount": "A shareable link needs a recipient and an amount.",
     "unlocked_rebuilt_prefix": "अनलॉक हो गया — प्रस्ताव आपके साथ पुनः बनाया गया (",
     "unlocked_rebuilt_suffix": ") प्रस्तावक के रूप में।",
-    "view_proposals": "प्रस्ताव देखें"
+    "view_proposals": "प्रस्ताव देखें",
+    "uc_title": "Unlock to continue"
   },
   "vesting": {
     "title": "वेस्टिंग",

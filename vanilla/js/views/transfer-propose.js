@@ -9,8 +9,8 @@
  * wire shapes. CHAIN TRUTH (#4 wins): op-22 fields <- proposal.hpp:70-82;
  * nested op-0 bytes identical to top-level (barter-ui.js:269-270 path).
  * Consumes: script-tag globals guarded at call time (DOM, ConfirmDialog,
- * touchable, Tx, Account, Wallet, Format, Chain, Asset, Proposal,
- * ViewingAs) + I18n.t via the private t() below; facade-owned DOM helpers
+ * UnlockConfirm, touchable, Tx, Account, Wallet, Format, Chain, Asset,
+ * Proposal, ViewingAs) + I18n.t via the private t() below; facade-owned DOM helpers
  * arrive as the trailing env ({showForm, makeWrap, showError, showStatus} —
  * same function objects as the pre-split file, threaded by the facade and
  * passed through to showProposeConfirm, so this module never reads the
@@ -416,65 +416,83 @@ var TransferPropose = (function () {
       box.appendChild(list);
       box.appendChild(DOM.el(doc, "p",
         t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted"));
-      var pwRow = DOM.el(doc, "div", null, "xfer-field");
-      var pw = doc.createElement("input");
-      pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
-      pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
       var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & review")));
-      ub.type = "button"; pwRow.appendChild(ub);
-      box.appendChild(pwRow);
+      ub.type = "button"; box.appendChild(ub);
       ub.addEventListener("click", function () {
         ub.disabled = true;
-        env.showStatus(doc, box, t("transfer.unlocking", "Unlocking…"));
-        /* H2: wipe the password local + input on either outcome. */
-        var pwStr = pw.value;
-        Promise.resolve().then(function () { return Wallet.unlock(pwStr); })
-          .then(function (r) { try { pw.value = ""; } catch (wipeErr) { /* input gone */ } pwStr = null; return r; })
-          .then(function () { return Account.myAccountId(); })
-          .then(async function (wid) {
-            var proposer = await Account.resolve(wid);
-            var snap2 = {
-              from: vals.from, to: vals.to, asset: vals.asset, amount: vals.amount,
-              memo: vals.memo, encrypted: vals.encrypted, feeAsset: vals.feeAsset,
-              proposer: wid, expiration: vals.expiration, reviewPeriod: vals.reviewPeriod
-            };
-            var leg = await resolveProposeLeg(snap2, false);
-            var pair = Proposal.buildCreate({ feePayerId: wid,
-              expirationIso: normaliseExpiration(snap2.expiration),
-              reviewPeriodSecOrNull: parseReviewPeriod(snap2.reviewPeriod),
-              innerOps: [{ op: [0, leg.opData] }] });
-            var before = (await Proposal.proposalsFor(proposer.name || wid)).length;
-            await Proposal.fee(pair, "1.3.0");
-            var fh = await feeHumanFor(pair[1].fee);
-            var typed = String(vals.proposer || "").trim();
-            var switched = typed !== "" && typed !== wid && typed !== proposer.name;
-            return { proposer: proposer, leg: leg, pair: pair, before: before,
-              snap: snap2, fh: fh, switched: switched };
-          })
-          .then(function (built) {
-            DOM.clear(root);
-            var w2 = env.makeWrap(doc, root);
-            if (built.switched) {
-              w2.appendChild(DOM.el(doc, "p",
-                t("transfer.unlocked_rebuilt_prefix", "Unlocked — proposal rebuilt with you (") + built.proposer.name + t("transfer.unlocked_rebuilt_suffix", ") as proposer."), "muted"));
-            }
-            showProposeConfirm(doc, w2, root, built, built.fh, function () {
-              DOM.clear(root);
-              env.showForm(doc, env.makeWrap(doc, root), root, built.proposer, {
-                from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
-                amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
-                feeAsset: built.snap.feeAsset, mode: "propose",
-                proposer: built.snap.proposer, expiration: built.snap.expiration,
-                reviewPeriod: built.snap.reviewPeriod, error: null
+        if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+          ub.disabled = false;
+          env.showError(doc, box, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+          return;
+        }
+        /* Unlock in the shared modal (summary rows only — the full
+         * human-readable confirm is showProposeConfirm after unlock, which
+         * rebuilds the proposal with the wallet as proposer). The page
+         * preview survives untouched: nothing navigates and the password
+         * never leaves the modal. */
+        var locked = true;
+        try { locked = typeof Wallet.isUnlocked === "function" ? !Wallet.isUnlocked() : !Wallet.keys; }
+        catch (e) { locked = true; }
+        UnlockConfirm.open({
+          title: t("transfer.uc_title", "Unlock to continue"),
+          rows: [
+            [t("transfer.proposer_label", "Proposer"), P.proposer.name + " (" + P.proposer.id + ")"],
+            [t("confirm.to", "To"), P.leg.to.name + " (" + P.leg.to.id + ")"],
+            [t("confirm.amount", "Amount"),
+              Format.formatAmount(P.leg.amountInt, P.leg.asset.precision) + " " + P.leg.asset.symbol, P.leg.amountInt],
+            [t("common.fee_live", "Fee (live)"), P.fh.text, String(P.pair[1].fee.amount)]
+          ],
+          feeHuman: null,
+          needPassword: locked,
+          submitLabel: t("transfer.unlock_sign", "Unlock & review"),
+          onUnlocked: function () {
+            Promise.resolve()
+              .then(function () { return Account.myAccountId(); })
+              .then(async function (wid) {
+                var proposer = await Account.resolve(wid);
+                var snap2 = {
+                  from: vals.from, to: vals.to, asset: vals.asset, amount: vals.amount,
+                  memo: vals.memo, encrypted: vals.encrypted, feeAsset: vals.feeAsset,
+                  proposer: wid, expiration: vals.expiration, reviewPeriod: vals.reviewPeriod
+                };
+                var leg = await resolveProposeLeg(snap2, false);
+                var pair = Proposal.buildCreate({ feePayerId: wid,
+                  expirationIso: normaliseExpiration(snap2.expiration),
+                  reviewPeriodSecOrNull: parseReviewPeriod(snap2.reviewPeriod),
+                  innerOps: [{ op: [0, leg.opData] }] });
+                var before = (await Proposal.proposalsFor(proposer.name || wid)).length;
+                await Proposal.fee(pair, "1.3.0");
+                var fh = await feeHumanFor(pair[1].fee);
+                var typed = String(vals.proposer || "").trim();
+                var switched = typed !== "" && typed !== wid && typed !== proposer.name;
+                return { proposer: proposer, leg: leg, pair: pair, before: before,
+                  snap: snap2, fh: fh, switched: switched };
+              })
+              .then(function (built) {
+                DOM.clear(root);
+                var w2 = env.makeWrap(doc, root);
+                if (built.switched) {
+                  w2.appendChild(DOM.el(doc, "p",
+                    t("transfer.unlocked_rebuilt_prefix", "Unlocked — proposal rebuilt with you (") + built.proposer.name + t("transfer.unlocked_rebuilt_suffix", ") as proposer."), "muted"));
+                }
+                showProposeConfirm(doc, w2, root, built, built.fh, function () {
+                  DOM.clear(root);
+                  env.showForm(doc, env.makeWrap(doc, root), root, built.proposer, {
+                    from: built.snap.from, to: built.snap.to, asset: built.snap.asset,
+                    amount: built.snap.amount, memo: built.snap.memo, encrypted: built.snap.encrypted,
+                    feeAsset: built.snap.feeAsset, mode: "propose",
+                    proposer: built.snap.proposer, expiration: built.snap.expiration,
+                    reviewPeriod: built.snap.reviewPeriod, error: null
+                  });
+                }, env);
+              })
+              .catch(function (e2) {
+                ub.disabled = false;
+                env.showError(doc, box, e2, t("common.unlock_failed", "Unlock failed."));
               });
-            }, env);
-          })
-          .catch(function (e2) {
-            try { pw.value = ""; } catch (wipeErr2) { /* input gone */ }
-            pwStr = null;
-            ub.disabled = false;
-            env.showError(doc, box, e2, t("common.unlock_failed", "Unlock failed."));
-          });
+          },
+          onCancel: function () { ub.disabled = false; }
+        });
       });
       done();
     }).catch(function (e) {

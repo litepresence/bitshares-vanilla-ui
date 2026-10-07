@@ -3414,6 +3414,7 @@
       "transfer.title",
       "transfer.to_label",
       "transfer.to_placeholder",
+      "transfer.uc_title",
       "transfer.unknown_account_name",
       "transfer.unknown_asset",
       "transfer.unknown_asset_prefix",
@@ -5683,7 +5684,8 @@
     "share_needs_to_amount": "A shareable link needs a recipient and an amount.",
     "unlocked_rebuilt_prefix": "잠금이 해제되었습니다 — 제안이 본인(",
     "unlocked_rebuilt_suffix": ")을(를) 제안자로 하여 다시 구성되었습니다.",
-    "view_proposals": "제안 보기"
+    "view_proposals": "제안 보기",
+    "uc_title": "Unlock to continue"
   },
   "vesting": {
     "title": "베스팅",

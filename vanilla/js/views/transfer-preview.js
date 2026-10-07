@@ -7,13 +7,13 @@
  * same node calls, same wire shapes (plain-memo path only).
  * Consumes: script-tag globals guarded at call time (DOM, Forms, touchable,
  * Tx, Account, Wallet, Crypto, Format, Chain, Store, ViewingAs, Offline,
- * TransferConfirm) + I18n.t via the private t() below; facade-owned DOM
+ * TransferConfirm, UnlockConfirm) + I18n.t via the private t() below; facade-owned DOM
  * helpers arrive as the trailing env ({showForm, makeWrap, showError,
  * showStatus} — same function objects as the pre-split file, threaded by
  * the facade so this module never reads the TransferUI global).
  * Globals/side effects: DOM under the given preview box only; global
- * TransferPreview only. No keys leave this module (WIFs pass as JS values
- * into Wallet.unlock only; the password input is wiped on either outcome).
+ * TransferPreview only. No keys leave this module (unlock runs inside the
+ * shared UnlockConfirm modal; no password input lives here).
  * Split from: vanilla/js/views/transfer-ui.js (mechanical move, zero
  * behavior change — called by showForm via the facade).
  * Created by: building-vanilla-slices skill, view-split task.
@@ -169,53 +169,73 @@ var TransferPreview = (function () {
       box.appendChild(list);
       box.appendChild(DOM.el(doc, "p",
         t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted"));
-      var pwRow = DOM.el(doc, "div", null, "xfer-field");
-      var pw = doc.createElement("input");
-      pw.type = "password"; pw.setAttribute("autocomplete", "current-password");
-      pw.setAttribute("aria-label", t("wallet.password", "Password")); touchable(pw); pwRow.appendChild(pw);
       var ub = touchable(DOM.el(doc, "button", t("transfer.unlock_sign", "Unlock & review")));
-      ub.type = "button"; pwRow.appendChild(ub);
-      box.appendChild(pwRow);
+      ub.type = "button"; box.appendChild(ub);
       ub.addEventListener("click", function () {
         ub.disabled = true;
-        env.showStatus(doc, box, t("transfer.unlocking", "Unlocking…"));
-        /* H2: wipe the password local + input on either outcome. */
-        var pwStr = pw.value;
-        Promise.resolve().then(function () { return Wallet.unlock(pwStr); })
-          .then(function (r) { try { pw.value = ""; } catch (wipeErr) { /* input gone */ } pwStr = null; return r; })
-          .then(function () { return Account.myAccountId(); })
-          .then(function (wid) {
-            if (wid !== P.fromAcc.id) {
-              throw new Error("Unlocked as " + wid + " but From is " +
-                P.fromAcc.name + " (" + P.fromAcc.id + ") — switch From or unlock with that account's key.");
-            }
-            return TransferConfirm.review({
-              to: P.to.name, asset: P.asset.symbol,
-              amount: Format.formatAmount(P.amountInt, P.asset.precision),
-              memo: P.memoText, encrypted: !!(P.encrypted && P.memoText),
-              feeAsset: P.feeSym
-            });
-          })
-          .then(function (ctx) {
-            DOM.clear(root);
-            TransferConfirm.showConfirm(doc, env.makeWrap(doc, root), root, P.fromAcc, ctx, function () {
-              DOM.clear(root);
-              env.showForm(doc, env.makeWrap(doc, root), root, P.fromAcc, {
-                from: P.fromAcc.name, to: ctx.to.name, asset: ctx.asset.symbol,
-                amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
-                memo: ctx.memoText, encrypted: ctx.memoKind !== "plain",
-                feeAsset: P.feeSym, mode: (vals.mode || "send"),
-                proposer: vals.proposer, expiration: vals.expiration,
-                reviewPeriod: vals.reviewPeriod, error: null
+        if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+          ub.disabled = false;
+          env.showError(doc, box, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+          return;
+        }
+        /* Unlock in the shared modal (summary rows only — the full
+         * human-readable confirm is TransferConfirm.showConfirm after
+         * unlock). The page preview survives untouched: nothing navigates
+         * and the password never leaves the modal. */
+        var feeText;
+        try {
+          feeText = Format.formatAmount(String(P.fee.amount), P.feePrec) + " " + P.feeSym;
+        } catch (e) { feeText = String(P.fee.amount) + " " + P.feeSym; }
+        var locked = true;
+        try { locked = typeof Wallet.isUnlocked === "function" ? !Wallet.isUnlocked() : !Wallet.keys; }
+        catch (e) { locked = true; }
+        UnlockConfirm.open({
+          title: t("transfer.uc_title", "Unlock to continue"),
+          rows: [
+            [t("confirm.to", "To"), P.to.name + " (" + P.to.id + ")"],
+            [t("confirm.amount", "Amount"),
+              Format.formatAmount(P.amountInt, P.asset.precision) + " " + P.asset.symbol, P.amountInt],
+            [t("confirm.fee", "Fee") + " (" + P.feeSym + ")", feeText, String(P.fee.amount)]
+          ],
+          feeHuman: null,
+          needPassword: locked,
+          submitLabel: t("transfer.unlock_sign", "Unlock & review"),
+          onUnlocked: function () {
+            Promise.resolve()
+              .then(function () { return Account.myAccountId(); })
+              .then(function (wid) {
+                if (wid !== P.fromAcc.id) {
+                  throw new Error("Unlocked as " + wid + " but From is " +
+                    P.fromAcc.name + " (" + P.fromAcc.id + ") — switch From or unlock with that account's key.");
+                }
+                return TransferConfirm.review({
+                  to: P.to.name, asset: P.asset.symbol,
+                  amount: Format.formatAmount(P.amountInt, P.asset.precision),
+                  memo: P.memoText, encrypted: !!(P.encrypted && P.memoText),
+                  feeAsset: P.feeSym
+                });
+              })
+              .then(function (ctx) {
+                DOM.clear(root);
+                TransferConfirm.showConfirm(doc, env.makeWrap(doc, root), root, P.fromAcc, ctx, function () {
+                  DOM.clear(root);
+                  env.showForm(doc, env.makeWrap(doc, root), root, P.fromAcc, {
+                    from: P.fromAcc.name, to: ctx.to.name, asset: ctx.asset.symbol,
+                    amount: Format.formatAmount(ctx.amountInt, ctx.asset.precision),
+                    memo: ctx.memoText, encrypted: ctx.memoKind !== "plain",
+                    feeAsset: P.feeSym, mode: (vals.mode || "send"),
+                    proposer: vals.proposer, expiration: vals.expiration,
+                    reviewPeriod: vals.reviewPeriod, error: null
+                  });
+                });
+              })
+              .catch(function (e2) {
+                ub.disabled = false;
+                env.showError(doc, box, e2, t("common.unlock_failed", "Unlock failed."));
               });
-            });
-          })
-          .catch(function (e2) {
-            try { pw.value = ""; } catch (wipeErr2) { /* input gone */ }
-            pwStr = null;
-            ub.disabled = false;
-            env.showError(doc, box, e2, t("common.unlock_failed", "Unlock failed."));
-          });
+          },
+          onCancel: function () { ub.disabled = false; }
+        });
       });
       done();
     }).catch(function (e) {
