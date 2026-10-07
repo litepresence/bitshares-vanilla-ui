@@ -127,6 +127,20 @@ removed after last-caller migration; verified by grep).
 ## 9. Follow-ups (not this round)
 
 - Browser/theme/viewport + testnet pass (§3, §5) — human.
+- Raw-first addendum (2026-10-07, owner-requested — DONE, same round):
+  #1 shows serialized-tx QR pre-sign (`TransactionConfirm.jsx` view_qr) +
+  JSON inspector post-hoc (`Transaction.jsx` view_json). Ours now shows a
+  `details.raw` drill-down (app.css skin, textContent-only) everywhere the
+  op pair exists pre-sign: shared `ConfirmDialog` (`rawJson`/`rawObj`/
+  `rawLabel`; `rawObj` stringifies centrally, BigInt/circular fail closed),
+  forwarded by `UnlockConfirm`; wired in credit/htlc (pair threaded into
+  `sendConfirm` cfg), borrow ×3, prediction, barter (`built.pair`),
+  instant (`R.unsigned.operations`), pool page `sendConfirm` (`cfg.pair`
+  pre-exists). Label reuses `confirm.op_json_label` everywhere — zero new
+  i18n keys. Honest gaps (op only exists post-unlock — preview bytes would
+  lie): trollbox (placeholder payer), debit (pair built at send). QR for
+  cold-signing explicitly out of scope (needs a QR lib = dependency
+  question). Tests: confirm 39 asserts, unlock-confirm 26 asserts.
 - Focus trap in `Overlay` (Tab can leave the dialog; password autofocus
   mitigates) — shared improvement, all modal callers benefit.
 - `accounts-ui.js` / `account-ui.js` view gates: stay inline by decision §2;

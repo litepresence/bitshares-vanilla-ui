@@ -441,6 +441,8 @@ var BarterUI = (function () {
           rows: rows,
           feeHuman: feeHuman,
           feeTerm: t("common.fee_live", "Fee (live)"),
+          rawObj: built.pair,
+          rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
           needPassword: true,
           submitLabel: t("common.sign_send", "Sign & Send"),
           onUnlocked: function () {

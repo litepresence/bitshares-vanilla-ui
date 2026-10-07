@@ -279,6 +279,25 @@ async function main() {
   }, /no document/, "missing document throws");
   passed += 1;
 
+  // 9. Raw forwarding: rawJson/rawLabel ride into the modal's confirm;
+  // omitted rawJson renders no drill-down.
+  var doc9 = fakeDoc();
+  global.Wallet = { unlock: function () { return Promise.resolve(); } };
+  var h9 = UnlockConfirm.open(baseCfg(doc9, {
+    rawJson: '{"op":[35,{}]}',
+    rawLabel: "Show unsigned operation JSON"
+  }));
+  var pres9 = walk(doc9.body, function (n) { return n.tagName === "PRE"; });
+  assert.strictEqual(pres9.length, 1, "modal forwards the raw drill-down");
+  assert.strictEqual(pres9[0].textContent, '{"op":[35,{}]}', "raw JSON arrives verbatim");
+  passed += 2;
+  h9.close();
+  var doc9b = fakeDoc();
+  var h9b = UnlockConfirm.open(baseCfg(doc9b));
+  assert.strictEqual(walk(doc9b.body, function (n) { return n.tagName === "PRE"; }).length, 0, "omitted rawJson renders no drill-down");
+  passed += 1;
+  h9b.close();
+
   delete global.Wallet;
   console.log("unlock-confirm-test: PASS (" + passed + " asserts)");
 }

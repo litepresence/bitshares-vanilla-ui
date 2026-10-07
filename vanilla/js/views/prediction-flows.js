@@ -403,7 +403,8 @@ var PredictionFlows = (function () {
    * full confirm stays on the page behind it); after unlock the holding is
    * re-reviewed so balances settle under the wallet account, never a stale
    * 1.2.0 (the note says so).
-   * Params: modal {rows, feeHuman?, feeTerm?} for the modal summary. */
+   * Params: modal {rows, feeHuman?, feeTerm?, rawObj?} for the modal
+   * summary (rawObj = the built settle pair for the raw drill-down). */
     function signGateLockedP(out, sendBtn, backBtn, modal) {
       modal = modal || {};
       if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
@@ -416,6 +417,8 @@ var PredictionFlows = (function () {
         rows: modal.rows || [],
         feeHuman: (modal.feeHuman === undefined) ? null : modal.feeHuman,
         feeTerm: modal.feeTerm,
+        rawObj: (modal.rawObj === undefined) ? null : modal.rawObj,
+        rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
         needPassword: true,
         submitLabel: t("common.sign_send", "Sign & Send"),
         onUnlocked: function () {
@@ -742,7 +745,7 @@ var PredictionFlows = (function () {
             sendB.disabled = true; backB.disabled = true;
             var st = showStatus(doc, pfConfirm, t("common.status_broadcasting", "Broadcasting…"));
             var wif = (typeof Wallet !== "undefined" && Wallet.keys && Wallet.keys.active) ? Wallet.keys.active.wif : null;
-            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB, { rows: sRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
+            if (!wif) { pfConfirm.removeChild(st); signGateLockedP(pfConfirm, sendB, backB, { rows: sRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"), rawObj: S.pair }); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {
               return AssetOps.sendAndProve(unsigned, wif, async function () {
                 try {

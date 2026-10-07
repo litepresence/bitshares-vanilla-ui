@@ -94,7 +94,8 @@ var BorrowUI = (function () {
    * full confirm stays on the page behind it); after unlock the caller
    * re-reviews so the rebuilt transaction uses the wallet account, never a
    * stale 1.2.0 (the note says so).
-   * Params: modal {rows, feeHuman?, feeTerm?} for the modal summary. */
+   * Params: modal {rows, feeHuman?, feeTerm?, rawObj?} for the modal
+   * summary (rawObj = the built op pair for the raw drill-down). */
   function signGateLocked(doc, out, sendBtn, backBtn, modal) {
     modal = modal || {};
     if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
@@ -107,6 +108,8 @@ var BorrowUI = (function () {
       rows: modal.rows || [],
       feeHuman: (modal.feeHuman === undefined) ? null : modal.feeHuman,
       feeTerm: modal.feeTerm,
+      rawObj: (modal.rawObj === undefined) ? null : modal.rawObj,
+      rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
       needPassword: true,
       submitLabel: t("common.sign_send", "Sign & Send"),
       onUnlocked: function () {
@@ -524,7 +527,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: adjRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: adjRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"), rawObj: R.pair }); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {
@@ -743,7 +746,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: openRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: openRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"), rawObj: R.pair }); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {
@@ -1094,7 +1097,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: bidRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: bidRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee"), rawObj: S.pair }); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {

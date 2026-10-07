@@ -1,6 +1,7 @@
 /* ui/confirm.js — shared transaction-confirm builder.
  * Owns: div.confirm-dialog (h3 title + dl.confirm named rows + fee line +
- *   div.confirm-actions holding Back (btn-ghost) + Sign & Send buttons;
+ *   opt-in details.raw drill-down + div.confirm-actions holding Back
+ *   (btn-ghost) + Sign & Send buttons;
  *   Esc routes to onBack; returns the container for the caller to mount).
  * Consumes: DOM global (el/append — never reimplemented here; raw
  *   createElement fallback only when DOM is absent, e.g. Node without the
@@ -73,13 +74,18 @@ var ConfirmDialog = (function () {
    *   feeHuman: string (human fee line; skipped when null/undefined),
    *   feeTerm?: string (caller's already-keyed fee dt, e.g.
    *   t("borrow.fee", "Fee"); fallback "Fee" when absent),
-   *   feeRawTitle?: string|null (raw fee integer for the fee dd title,
-   *   principle #6: human terms with raw in title; no title when absent),
-   *   onBack: function, onSend: function,
-   *   doc?: Document (Node-test seam; browsers omit it),
-   *   backLabel?: string (default "Back"), sendLabel?: string
-   *   (default "Sign & Send") — translated labels ride in from the caller
-   *   so this module carries no locale machinery.}
+ *   feeRawTitle?: string|null (raw fee integer for the fee dd title,
+ *   principle #6: human terms with raw in title; no title when absent),
+ *   onBack: function, onSend: function,
+ *   rawJson?: string|null (pre-stringified op JSON for the raw drill-down),
+ *   rawObj?: any (alternative: stringified here in try/catch — rawJson wins;
+ *   unstringifiable values fail closed to no drill-down),
+ *   rawLabel?: string (summary text; fallback the literal "Raw JSON" —
+ *   callers SHOULD pass a keyed label, e.g. confirm.op_json_label),
+ *   doc?: Document (Node-test seam; browsers omit it),
+ *   backLabel?: string (default "Back"), sendLabel?: string
+ *   (default "Sign & Send") — translated labels ride in from the caller
+ *   so this module carries no locale machinery.}
    * @return {HTMLElement} div.confirm-dialog (caller appends it; the
    *   returned node stays usable after Back/Send fire).
    * Failure: throws Error("confirm: no document") with no document;
@@ -127,6 +133,36 @@ var ConfirmDialog = (function () {
     send.type = "button";
     if (D) D.append(actions, back, send);
     else { actions.appendChild(back); actions.appendChild(send); }
+    /* Raw drill-down (opt-in, TransactionConfirm view-qr/JSON concept +
+     * transfer-confirm op-JSON precedent): op JSON behind a <details
+     * class="raw"> (app.css skin, phone-safe) BEFORE the actions so the
+     * order reads review → raw → buttons. textContent only, never secrets
+     * (unsigned ops carry no keys). rawJson (pre-stringified) wins; else
+     * rawObj stringifies here in try/catch — unstringifiable values fail
+     * closed to no drill-down. Skipped when neither yields text. */
+    var rawText = "";
+    if (typeof cfg.rawJson === "string" && cfg.rawJson) {
+      rawText = cfg.rawJson;
+    } else if (cfg.rawObj !== undefined && cfg.rawObj !== null) {
+      try { rawText = JSON.stringify(cfg.rawObj, null, 2) || ""; } catch (e) { rawText = ""; }
+    }
+    if (rawText) {
+      var rawDet = mk(doc, "details", null, "raw");
+      var rawLabel = (cfg.rawLabel === undefined || cfg.rawLabel === null) ? "Raw JSON" : cfg.rawLabel;
+      var rawSum = mk(doc, "summary", rawLabel);
+      try { rawSum.setAttribute("aria-label", rawLabel); } catch (e) { /* text stands */ }
+      if (D) D.append(rawDet, rawSum);
+      else rawDet.appendChild(rawSum);
+      var rawPre = mk(doc, "pre", rawText);
+      if (D) D.append(rawDet, rawPre);
+      else rawDet.appendChild(rawPre);
+      try {
+        if (typeof box.insertBefore === "function") box.insertBefore(rawDet, actions);
+        else box.appendChild(rawDet);
+      } catch (e) {
+        try { box.appendChild(rawDet); } catch (e2) { /* review stands */ }
+      }
+    }
     if (D) D.append(box, actions);
     else box.appendChild(actions);
 

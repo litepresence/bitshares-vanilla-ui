@@ -238,7 +238,7 @@ var CreditUI = (function () {
    * No shared types.js yet (group 1 owns it); local casts only.
    * @param {Document} doc owner document
    * @param {HTMLElement} out output box (cleared + rebuilt)
-   * @param {any} cfg {title, rows, makeUnsigned, prove, okText}
+   * @param {any} cfg {title, rows, pair, makeUnsigned, prove, okText}
    * @param {number} myGen route generation (liveness token)
    * @returns {void} */
   function sendConfirm(doc, out, cfg, myGen) {
@@ -282,6 +282,8 @@ var CreditUI = (function () {
             title: t("credit.uc_title", "Unlock to sign"),
             rows: cfg.rows || [],
             feeHuman: null,
+            rawObj: cfg.pair,
+            rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
             needPassword: true,
             submitLabel: t("common.sign_send", "Sign & Send"),
             onUnlocked: function () { attemptSend(1); },
@@ -326,6 +328,7 @@ var CreditUI = (function () {
       feeText((/** @type {any} */ (built).fee)).then(function (f) {
         if (myGen !== gen) return done();
         sendConfirm(doc, out, { title: cfg.title, rows: cfg.rows(built, f),
+          pair: (/** @type {any} */ (built).pair),
           makeUnsigned: function () { return Tx.buildTx([(/** @type {any} */ (built).pair)]); },
           prove: (/** @type {any} */ (built).prove), okText: cfg.ok(built) }, myGen);
         done();

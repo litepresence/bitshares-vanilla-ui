@@ -32,6 +32,12 @@ function fakeEl(tag) {
   };
   el.removeAttribute = function (k) { delete this[k]; };
   el.appendChild = function (c) { this.children.push(c); return c; };
+  el.insertBefore = function (c, ref) {
+    var i = this.children.indexOf(ref);
+    if (i === -1) this.children.push(c);
+    else this.children.splice(i, 0, c);
+    return c;
+  };
   el.addEventListener = function (t, fn) { this.__handlers[t] = fn; };
   el.removeEventListener = function (t, fn) {
     if (this.__handlers[t] === fn) delete this.__handlers[t];
@@ -200,6 +206,94 @@ var noRawBox = ConfirmDialog.show({
 });
 var noRawDds = findAll(noRawBox, "dd");
 assert.ok(!noRawDds[noRawDds.length - 1].title, "absent feeRawTitle sets no title");
+passed += 1;
+
+// 12. Raw drill-down: rawJson renders details.raw (summary + pre) BEFORE
+// the actions (review -> raw -> buttons order).
+var doc6 = fakeDoc();
+var rawJsonBox = ConfirmDialog.show({
+  doc: doc6,
+  title: "Confirm",
+  rows: [["Amount", "1.0 BTS"]],
+  rawJson: '{"op":[0,{"amount":"100000"}]}',
+  rawLabel: "Show unsigned operation JSON",
+  onBack: function () {},
+  onSend: function () {}
+});
+var dets = findAll(rawJsonBox, "details");
+assert.strictEqual(dets.length, 1, "one raw details renders");
+assert.strictEqual(dets[0].className, "raw", "details carries the raw contract class");
+var sums = findAll(rawJsonBox, "summary");
+assert.strictEqual(sums[0].textContent, "Show unsigned operation JSON", "caller rawLabel renders");
+assert.strictEqual(sums[0]["aria-label"], "Show unsigned operation JSON", "summary mirrors aria-label");
+passed += 3;
+var pres = findAll(rawJsonBox, "pre");
+assert.strictEqual(pres[0].textContent, '{"op":[0,{"amount":"100000"}]}', "pre carries the raw JSON verbatim");
+passed += 1;
+var kidTags = rawJsonBox.children.map(function (c) { return c.tag; });
+assert.deepStrictEqual(kidTags, ["h3", "dl", "details", "div"], "raw sits between list and actions");
+passed += 1;
+
+// 13. Raw label fallback + absence: omitted rawLabel falls back to the
+// literal; omitted/non-string rawJson renders no details.
+var doc7 = fakeDoc();
+var rawFbBox = ConfirmDialog.show({
+  doc: doc7,
+  title: "Confirm",
+  rows: [],
+  rawJson: "{}",
+  onBack: function () {},
+  onSend: function () {}
+});
+assert.strictEqual(findAll(rawFbBox, "summary")[0].textContent, "Raw JSON", "rawLabel falls back to Raw JSON");
+passed += 1;
+var doc8 = fakeDoc();
+var noJsonBox = ConfirmDialog.show({
+  doc: doc8,
+  title: "Confirm",
+  rows: [],
+  onBack: function () {},
+  onSend: function () {}
+});
+assert.strictEqual(findAll(noJsonBox, "details").length, 0, "absent rawJson renders no details");
+passed += 1;
+var doc9 = fakeDoc();
+var badJsonBox = ConfirmDialog.show({
+  doc: doc9,
+  title: "Confirm",
+  rows: [],
+  rawJson: { op: 0 },
+  onBack: function () {},
+  onSend: function () {}
+});
+assert.strictEqual(findAll(badJsonBox, "details").length, 0, "non-string rawJson renders no details");
+passed += 1;
+
+// 14. rawObj: plain objects stringify here; unstringifiable fails closed.
+var doc10 = fakeDoc();
+var rawObjBox = ConfirmDialog.show({
+  doc: doc10,
+  title: "Confirm",
+  rows: [],
+  rawObj: { op: [0, { amount: "100000" }] },
+  rawLabel: "Show unsigned operation JSON",
+  onBack: function () {},
+  onSend: function () {}
+});
+var objPres = findAll(rawObjBox, "pre");
+assert.strictEqual(objPres.length, 1, "rawObj renders the drill-down");
+assert.ok(objPres[0].textContent.indexOf('"amount": "100000"') !== -1, "rawObj stringifies with indent");
+passed += 2;
+var doc11 = fakeDoc();
+var bigBox = ConfirmDialog.show({
+  doc: doc11,
+  title: "Confirm",
+  rows: [],
+  rawObj: { amount: BigInt(100000) },
+  onBack: function () {},
+  onSend: function () {}
+});
+assert.strictEqual(findAll(bigBox, "details").length, 0, "unstringifiable rawObj fails closed");
 passed += 1;
 
 console.log("ConfirmDialog: " + passed + " passed, 0 failed");

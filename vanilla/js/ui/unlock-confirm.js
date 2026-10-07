@@ -1,6 +1,6 @@
 /* ui/unlock-confirm.js — shared confirm + unlock modal (trollbox audit follow-up).
- * Owns: ONE overlay holding ConfirmDialog review rows + fee and (when locked)
- *   a password row; unlock via Wallet.unlock with wipe-on-both-outcomes;
+ * Owns: ONE overlay holding ConfirmDialog review rows + fee + opt-in raw
+ *   drill-down and (when locked) a password row; unlock via Wallet.unlock with wipe-on-both-outcomes;
  *   confirm-only mode when already unlocked. The password NEVER leaves this
  *   module: onUnlocked() carries no password argument — callers only learn
  *   "proceed". Replaces the ~12 hand-rolled inline unlock rows (trollbox-ui,
@@ -90,8 +90,12 @@ var UnlockConfirm = (function () {
 
   /* Open the confirm + unlock modal.
    * @param {object} cfg {title: string, rows: [[term, text, rawTitle?]...],
-   *   feeHuman?: string|null, feeTerm?: string, feeRawTitle?: string|null,
-   *   needPassword: boolean (caller computes via Wallet.isUnlocked()),
+ *   feeHuman?: string|null, feeTerm?: string, feeRawTitle?: string|null,
+ *   rawJson?: string|null, rawObj?: any, rawLabel?: string (forwarded to
+ *   ConfirmDialog's details.raw drill-down — the op the modal reviews,
+ *   when the caller has it built; omitted when the op only exists
+ *   post-unlock),
+ *   needPassword: boolean (caller computes via Wallet.isUnlocked()),
    *   submitLabel?: string, cancelLabel?: string, errorFor?: function(err),
    *   onUnlocked: function (modal closed, password wiped — proceed to publish),
    *   onCancel?: function (any dismiss path, at most once),
@@ -131,6 +135,9 @@ var UnlockConfirm = (function () {
       feeHuman: (cfg.feeHuman === undefined) ? null : cfg.feeHuman,
       feeTerm: cfg.feeTerm,
       feeRawTitle: (cfg.feeRawTitle === undefined) ? null : cfg.feeRawTitle,
+      rawJson: (cfg.rawJson === undefined) ? null : cfg.rawJson,
+      rawObj: (cfg.rawObj === undefined) ? null : cfg.rawObj,
+      rawLabel: cfg.rawLabel,
       backLabel: cancelLabel,
       sendLabel: submitLabel,
       doc: doc,

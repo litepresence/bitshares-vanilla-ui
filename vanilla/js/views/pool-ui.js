@@ -256,6 +256,8 @@ var PoolUI = (function () {
     DOM.clear(out);
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
       backLabel: t("barter.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
+      rawObj: cfg.pair,
+      rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
       onBack: function () { DOM.clear(out); },
       onSend: function () {
         if (myGen !== gen) return;
@@ -451,6 +453,8 @@ var PoolUI = (function () {
           title: t("pool.uc_title", "Unlock to continue"),
           rows: [[t("pool.uc_action", "Action"), cfg.title || ""]],
           feeHuman: null,
+          rawObj: cfg.pair,
+          rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
           needPassword: true,
           submitLabel: t("account.s6", "Unlock"),
           onUnlocked: function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); },

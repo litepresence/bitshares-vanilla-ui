@@ -1109,6 +1109,8 @@ var InstantTradeUI = (function () {
             [t("instant.fee", "Fee"), Format.formatAmount(String(R.feeRaw), R.feeMeta.precision) + " " + R.feeMeta.symbol, R.feeRaw]
           ],
           feeHuman: null,
+          rawObj: (R.unsigned && R.unsigned.operations) ? R.unsigned.operations : null,
+          rawLabel: t("confirm.op_json_label", "Show unsigned operation JSON"),
           needPassword: true,
           submitLabel: t("instant.unlock_sign", "Unlock & sign"),
           onUnlocked: function () {
