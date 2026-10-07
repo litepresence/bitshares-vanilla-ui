@@ -11,9 +11,13 @@ is satisfied by citation, not a new mapping).
 Every signing view hand-rolls its own password row against `Wallet.unlock`.
 The copies drift: trollbox's fails to wipe the password on unlock failure
 (`trollbox-ui.js:380-391`), has no `autocomplete`, no confirm step, and
-reimplements `el/clearRoot` against rule 9. The fix is one shared helper,
-piloted on the trollbox; the other ~11 rows migrate in later rounds (scope
-answer 2026-10-07: pilot only).
+reimplements `el/clearRoot` against rule 9. The fix is one shared helper.
+SCOPE UPDATE (2026-10-07, AFK round, owner-authorized): pilot expanded to
+ALL ~12 signing views in one round — trollbox, transfer-preview/propose,
+trade-panels (single+scaled), instant-trade, credit, borrow, pool,
+debit (via credit's export), htlc, barter, prediction. Page-level view
+gates (#/accounts, #/account/me) and lifecycle surfaces (#/login, #/wallet,
+#/wallet/password, account creation) stay as-is (no tx to review — §7).
 
 ## 2. Solution shape
 

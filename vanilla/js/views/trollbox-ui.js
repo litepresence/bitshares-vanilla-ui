@@ -25,7 +25,6 @@ var TrollboxUI = (function () {
    * time — same contract as the poll timer above). Removed by stopPoll so
    * route leave never leaks a listener. Null when idle. */
   var visFn = null;
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
   /* Drop the poll timer AND the visibility hook. Safe to call when idle;
    * renderTrollbox calls it on every entry, and an orphaned tick calls it
    * on itself after a route leave (ownership-guarded, never killing a newer
@@ -54,14 +53,7 @@ var TrollboxUI = (function () {
     });
     return dflt;
   }
-  /* el: textContent-only element (chain strings never reach HTML). */
-  function el(doc, tag, text, cls) {
-    var n = doc.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined && text !== null) n.textContent = text;
-    return n;
-  }
-  function clearRoot(root) { while (root.firstChild) root.removeChild(root.firstChild); }
+  /* No local el/clearRoot — shared DOM.el / DOM.clear (rule 9). */
 
   /* broadcastPost: send a signed op-35 tx (callback-first, plain fallback —
    * same wire as Tx.broadcast) then prove inclusion by a DIRECT storage
@@ -106,15 +98,15 @@ var TrollboxUI = (function () {
     if (!doc) return;
     var myGen = ++gen;
     stopPoll();
-    clearRoot(root);
+    DOM.clear(root);
     var T = (typeof Trollbox !== "undefined") ? Trollbox : null;
     var wrap = doc.createElement("div"); wrap.className = "wrap trollbox-wrap"; root.appendChild(wrap);
 
     wrap.appendChild(DOM.pageHead(doc, t("trollbox.title", "Trollbox"), "text"));
-    wrap.appendChild(el(doc, "p", t("trollbox.intro", "Messages are posted on-chain from your account and visible to everyone. The sender pays a small network fee per message."), "muted"));
+    wrap.appendChild(        DOM.el(doc, "p", t("trollbox.intro", "Messages are posted on-chain from your account and visible to everyone. The sender pays a small network fee per message."), "muted"));
 
     if (!T) {
-      wrap.appendChild(el(doc, "p", t("trollbox.error_body", "The connected node did not answer the plugin probe. Check your connection and retry."), "muted"));
+      wrap.appendChild(        DOM.el(doc, "p", t("trollbox.error_body", "The connected node did not answer the plugin probe. Check your connection and retry."), "muted"));
       return;
     }
 
@@ -131,7 +123,7 @@ var TrollboxUI = (function () {
     var HIDDEN_SLOW_MS = 60000;
 
     /* Status badge (honest empty states live here). */
-    var badge = el(doc, "p", t("trollbox.status_checking", "Checking node…"), "muted");
+    var badge =         DOM.el(doc, "p", t("trollbox.status_checking", "Checking node…"), "muted");
     badge.setAttribute("aria-live", "polite");
     wrap.appendChild(badge);
 
@@ -139,7 +131,7 @@ var TrollboxUI = (function () {
     var chanBox = doc.createElement("div"); chanBox.className = "trollbox-channels";
     wrap.appendChild(chanBox);
     var tabsRow = doc.createElement("div"); tabsRow.className = "trollbox-tabs"; chanBox.appendChild(tabsRow);
-    var langLabel = el(doc, "label", t("trollbox.language_label", "Language") + " ");
+    var langLabel =         DOM.el(doc, "label", t("trollbox.language_label", "Language") + " ");
     var langSel = doc.createElement("select");
     langSel.classList.add("touchable");
     langSel.setAttribute("aria-label", t("trollbox.language_label", "Language"));
@@ -156,7 +148,7 @@ var TrollboxUI = (function () {
     function paintTabs() {
       while (tabsRow.firstChild) tabsRow.removeChild(tabsRow.firstChild);
       T.CHANNELS.forEach(function (id) {
-        var b = el(doc, "button", "#" + id, "trollbox-tab subtle-btn");
+        var b =         DOM.el(doc, "button", "#" + id, "trollbox-tab subtle-btn");
         b.type = "button";
         b.classList.add("touchable");
         b.setAttribute("aria-pressed", id === S.channel ? "true" : "false");
@@ -178,9 +170,9 @@ var TrollboxUI = (function () {
     });
 
     /* Message list (plain text only). */
-    wrap.appendChild(el(doc, "h2", t("trollbox.channels_title", "Channels") + ": #" + S.channel, "trollbox-chanhead"));
+    wrap.appendChild(        DOM.el(doc, "h2", t("trollbox.channels_title", "Channels") + ": #" + S.channel, "trollbox-chanhead"));
     var chanHead = wrap.lastChild;
-    var listNote = el(doc, "p", "", "muted");
+    var listNote =         DOM.el(doc, "p", "", "muted");
     listNote.setAttribute("aria-live", "polite");
     wrap.appendChild(listNote);
     var list = doc.createElement("ul"); list.className = "trollbox-list"; wrap.appendChild(list);
@@ -203,7 +195,7 @@ var TrollboxUI = (function () {
       }
       if (S.loadError) {
         listNote.textContent = String(S.loadError);
-        var retry = el(doc, "button", t("trollbox.retry", "Retry"));
+        var retry =         DOM.el(doc, "button", t("trollbox.retry", "Retry"));
         retry.type = "button";
         retry.classList.add("touchable");
         retry.addEventListener("click", function () { loadMessages(); });
@@ -219,10 +211,10 @@ var TrollboxUI = (function () {
       shown.forEach(function (m) {
         var li = doc.createElement("li"); li.className = "trollbox-msg";
         var head = doc.createElement("div"); head.className = "trollbox-msghead";
-        head.appendChild(el(doc, "strong", m.displayAuthor || m.account));
-        head.appendChild(el(doc, "span", " " + (m.account || ""), "muted"));
+        head.appendChild(        DOM.el(doc, "strong", m.displayAuthor || m.account));
+        head.appendChild(        DOM.el(doc, "span", " " + (m.account || ""), "muted"));
         li.appendChild(head);
-        li.appendChild(el(doc, "p", m.text || "", "trollbox-msgtext"));
+        li.appendChild(        DOM.el(doc, "p", m.text || "", "trollbox-msgtext"));
         list.appendChild(li);
       });
     }
@@ -246,7 +238,7 @@ var TrollboxUI = (function () {
           : t("trollbox.error_body", "The connected node did not answer the plugin probe. Check your connection and retry.");
         S.loadError = body;
         paintList();
-        var go = el(doc, "a", t("trollbox.change_node", "Go to node settings"), "btn btn-ghost");
+        var go =         DOM.el(doc, "a", t("trollbox.change_node", "Go to node settings"), "btn btn-ghost");
         go.href = "#/settings";
         go.classList.add("touchable");
         wrap.appendChild(go);
@@ -282,7 +274,7 @@ var TrollboxUI = (function () {
     /* Composer: textarea + byte budget + live fee preview. Posting opens the
      * shared review + unlock modal (UnlockConfirm) — no inline password row:
      * the draft, budget and preview survive because nothing navigates. */
-    wrap.appendChild(el(doc, "h2", t("trollbox.composer_title", "Post a message")));
+    wrap.appendChild(        DOM.el(doc, "h2", t("trollbox.composer_title", "Post a message")));
     var area = doc.createElement("textarea");
     area.rows = 3;
     area.maxLength = 1024;
@@ -290,13 +282,13 @@ var TrollboxUI = (function () {
     area.setAttribute("aria-label", t("trollbox.composer_title", "Post a message"));
     area.classList.add("touchable");
     wrap.appendChild(area);
-    var budgetLine = el(doc, "p", "", "muted"); wrap.appendChild(budgetLine);
-    var feeLine = el(doc, "p", "", "muted"); feeLine.setAttribute("aria-live", "polite"); wrap.appendChild(feeLine);
-    var postBtn = el(doc, "button", t("trollbox.post", "Post on-chain"), "btn");
+    var budgetLine =         DOM.el(doc, "p", "", "muted"); wrap.appendChild(budgetLine);
+    var feeLine =         DOM.el(doc, "p", "", "muted"); feeLine.setAttribute("aria-live", "polite"); wrap.appendChild(feeLine);
+    var postBtn =         DOM.el(doc, "button", t("trollbox.post", "Post on-chain"), "btn");
     postBtn.classList.add("touchable");
     postBtn.type = "button";
     wrap.appendChild(postBtn);
-    var note = el(doc, "p", "", "muted"); note.setAttribute("aria-live", "polite"); wrap.appendChild(note);
+    var note =         DOM.el(doc, "p", "", "muted"); note.setAttribute("aria-live", "polite"); wrap.appendChild(note);
 
     /* unlockedNow: keystore state read-only (drives the modal's
      * needPassword + the pre-publish guard; the password itself is only
