@@ -211,6 +211,13 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
 
+Refine — induced swap edges (user call): star/union views now include every
+pool whose BOTH legs are already visible, not just pools touching the
+selected asset(s). Two BTS-linked assets that also pair directly show that
+swap link too. Edges only — both endpoints visible by construction, so no new
+nodes, no extra RPC. Live proof: BTS star renders 89 nodes / 319 edges
+(was ~109 pools). Vectors in `pool-net-test.js` §4b.
+
 Refine 2026-10-07 — "a bit jittery / high tension" (user feel): softened
 lively (`carry: 0.98`, `springK: 0.010`, `cool: 0.999`, `tempMin: 1.2`,
 `temp0: 7`, `repCap: 20`) — same long run, calmer tail creep, sleeps via

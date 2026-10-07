@@ -286,8 +286,10 @@ var PoolNet = (function () {
 
   /* filterGraph: client-side view over one loaded graph (no extra RPC).
    * No selection -> full graph (returned by reference). Single id ->
-   * star(id) = id + pools touching id + counter-assets (1 hop). Both ids ->
-   * union of both stars.
+   * star(id) = id + pools touching id + counter-assets (1 hop), PLUS every
+   * pool whose BOTH legs are already visible (induced edges between
+   * counters, e.g. two BTS-linked assets that also pair directly). Both
+   * ids -> union of both stars, same induced-edge completion.
    * @param {PoolNetGraph} g Loaded graph.
    * @param {{aId?: string|null, bId?: string|null}} [sel] Selection (asset ids).
    * @returns {PoolNetGraph} Subgraph (new object except the full-graph case).
@@ -308,6 +310,12 @@ var PoolNet = (function () {
     }
     if (sel.aId) star(sel.aId);
     if (sel.bId) star(sel.bId);
+    /* Induced completion: any pool between two visible nodes belongs on the
+     * map even when neither leg is the selected asset. Adds edges only —
+     * both endpoints are visible by construction, so no new nodes. */
+    (g.edges || []).forEach(function (e) {
+      if (keepNodes[e.a] && keepNodes[e.b]) keepPools[e.poolId] = 1;
+    });
     return {
       nodes: (g.nodes || []).filter(function (n) { return keepNodes[n.assetId]; }),
       edges: (g.edges || []).filter(function (e) { return keepPools[e.poolId]; })

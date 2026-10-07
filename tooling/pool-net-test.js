@@ -37,6 +37,18 @@ const skel = { pools: [
   ok(union.nodes.length === 3, "union keeps hub + leaves");
 })();
 
+// 4b. Induced edges: a pool between two visible counters joins the star
+// even though neither leg is the selected asset (no new nodes appear).
+(function () {
+  const g2 = PN.fromSkeleton({ pools: skel.pools.concat([
+    { id: "1.19.3", a: "1.3.1", b: "1.3.2", share: "1.3.12", symA: "USD", symB: "BTC", symShare: "LP3", precA: 4, precB: 8, precShare: 4 }
+  ])});
+  const star = PN.filterGraph(g2, { aId: "1.3.0", bId: null });
+  ok(star.nodes.length === 3, "induced star adds no nodes");
+  ok(star.edges.length === 3, "induced star adds the counter-counter pool");
+  ok(star.edges.some(function (e) { return e.poolId === "1.19.3"; }), "induced edge is the 1.19.3 swap");
+})();
+
 // 4. No selection returns the full graph.
 (function () {
   const g = PN.fromSkeleton(skel);
