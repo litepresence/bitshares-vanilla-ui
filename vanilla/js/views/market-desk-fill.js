@@ -630,15 +630,20 @@ MarketDesk._fill = MarketDesk._fill || {};
       try {
         liveOn = typeof PoolGraph.drawLive === "function";
       } catch (e) { liveOn = false; }
+      /* Edge navigation target: this desk trades ORDERS, so a line opens the
+       * order book for the two assets it joins (QUOTE_BASE, desk legs first).
+       * The swap desk opens the pool instead — same line, right destination
+       * per desk (owner 2026-10-07). */
+      var navMode = { mode: "market", quoteAsset: gd.assetA, baseAsset: gd.assetB };
       if (liveOn) {
         PoolGraph.drawLive(doc, state.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit });
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit, nav: navMode });
       } else {
         try {
           if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(state.graphCanvas);
         } catch (e) { /* static paint stands */ }
         PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, nav: navMode });
       }
       var n = (gd.graph.edges || []).length;
       if (!n) state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");

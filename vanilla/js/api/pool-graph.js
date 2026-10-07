@@ -647,7 +647,8 @@ var PoolGraph = (function () {
         try {
           var d = S.drawOpts || {};
           drawGraph(S.doc, S.canvas, S.graph,
-            { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, _pos: S.geom });
+            { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, nav: d.nav,
+              _pos: S.geom, hoverEdge: (S.canvas && S.canvas._graphHoverEdge) || "" });
         } catch (e) { /* next frame */ }
       }
       if (moved < P.stillTol) S.still = (S.still || 0) + 1; else S.still = 0;
@@ -698,7 +699,7 @@ var PoolGraph = (function () {
       react: readReact(), temp: 0, still: 0, frames: 0, running: false, settled: false,
       dead: false, reduced: _reduced(), forced: false,
       canvas: canvas, doc: doc,
-      drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] } };
+      drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [], nav: opts.nav || null } };
     S.temp = _phys().lively.temp0;
     try { canvas._graphLiveS = S; } catch (e) { /* static paint below still stands */ }
     /* Every render paints first (so the frame is never blank), then settles:
@@ -707,7 +708,8 @@ var PoolGraph = (function () {
      * it just painted IS the resting state); only an explicit consent
      * (flipping the switch ON) runs a bounded loop. */
     try {
-      drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] });
+      drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB,
+        highlightPools: opts.highlightPools || [], nav: opts.nav || null, hoverEdge: opts.hoverEdge || "" });
     } catch (e) { /* note below carries it */ }
     if (S.reduced && !opts.explicit) { S.running = false; S.settled = true; return S; }
     wake(S, !!opts.explicit);
@@ -960,7 +962,17 @@ var PoolGraph = (function () {
       pos[id] = o ? { x: base[id].x + o.dx, y: base[id].y + o.dy } : { x: base[id].x, y: base[id].y };
     });
     try { canvas._graphBase = base; } catch (e) {}
-    try { canvas._graphRepaint = { doc: doc, graph: graph, opts: opts }; } catch (e) {}
+    /* The repaint opts carry the live hover + nav mode so a hover repaint
+     * recolors the line (and a click after it navigates the same way). */
+    try {
+      canvas._graphNav = (opts && opts.nav) ? opts.nav : null;
+      canvas._graphRepaint = { doc: doc, graph: graph, opts: (function () {
+        var o = {};
+        for (var k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
+        o.hoverEdge = canvas._graphHoverEdge || "";
+        return o;
+      })() };
+    } catch (e) {}
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
     /* Map text contract: corner verdicts per leg + bottom pair verdict, all from one mapTheme call. */
     var theme = null;
@@ -993,24 +1005,37 @@ var PoolGraph = (function () {
     } catch (e) { /* plain edges stand */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
+    var hoverEdge = (opts && opts.hoverEdge != null) ? String(opts.hoverEdge) : "";
     edges.forEach(function (e) {
       var p = pos[e.a], q = pos[e.b];
       if (!p || !q) return;
-      /* Owner-spec lines: leg↔leg pool + either leg's BTS path, bold
-       * yellow; user highlight glows instead (soft shadowBlur like the
-       * explorer Live dot — static paint, no pulse loop); rest thin grey. */
+      /* THE TRIANGLE (owner 2026-10-07): the pool joining the two desk legs
+       * plus both legs' routes to BTS are ONE visual unit — the pools that
+       * actually matter for this pair — so they all wear the same green.
+       * They used to be bold yellow, which collided with the hover colour
+       * and read as "something special" on every map.
+       * YELLOW NOW MEANS HOVERED, and only that: the pointer is on this
+       * line and a click opens it (pool on the swap desk, market on the
+       * exchange desk). Hover wins over the triangle; everything else stays
+       * thin grey. The user highlight keeps its soft glow. */
+      var st = edgeStyle(e.poolId, hi, pathSet, hoverEdge);
       var hot = !!hi[String(e.poolId)];
-      var path = !hot && !!pathSet[String(e.poolId)];
-      ctx.strokeStyle = hot ? buy : (path ? warn : border);
-      ctx.lineWidth = (hot || path) ? 2.5 : 1.2;
-      if (hot) {
+      ctx.strokeStyle = st.color;
+      ctx.lineWidth = st.width;
+      if (hot && st.color !== "warn") {
         try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (e) { /* glow best-effort */ }
       }
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
       if (hot) {
         try { ctx.restore(); } catch (e) { /* state stands */ }
       }
-      mids.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, poolId: e.poolId });
+      /* Both legs AND their symbols ride along: the swap desk navigates an
+       * edge to the pool, the exchange desk to the ORDER BOOK for those two
+       * legs — and a market id is symbol-based (QUOTE_BASE), not object-id
+       * based, so the hit record has to carry what it needs. */
+      mids.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, poolId: e.poolId,
+        ax: p.x, ay: p.y, bx: q.x, by: q.y,
+        a: e.a, b: e.b, aSym: symById[e.a] || String(e.a), bSym: symById[e.b] || String(e.b) });
     });
     var hits = [];
     var rings = _rings(graph, assetA, assetB), inL2 = {};
@@ -1044,7 +1069,15 @@ var PoolGraph = (function () {
       cornerText({ text: theme.bottom.text, color: theme.bottom.color, bold: theme.bottom.bold, y: g.h - 8 },
         g.w / 2, "center", 12);
     }
-    _wire(canvas, pos, hits.concat(mids.map(function (m) { return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId }; })), doc);
+    /* Edge records keep their SEGMENT (ax..by) and both legs/symbols: the
+     * line is the click target along its whole length, and the exchange desk
+     * resolves the order book from the legs. Only the internal bookkeeping
+     * keys are dropped here. */
+    _wire(canvas, pos, hits.concat(mids.map(function (m) {
+      return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId,
+        ax: m.ax, ay: m.ay, bx: m.bx, by: m.by,
+        a: m.a, b: m.b, aSym: m.aSym, bSym: m.bSym };
+    })), doc);
     try { canvas.setAttribute("tabindex", "0"); } catch (e) {}
     /* A11y 2026-09-30: named canvas (keyboard Enter above). Router sweep
      * skips labeled canvases, so this specific label wins over its generic. */
@@ -1082,14 +1115,122 @@ var PoolGraph = (function () {
    * they replace.
    * @param {Object|null} h Hit record ({sym} or {edgeMid, poolId}).
    * @returns {string|null} Hash target, or null for a null hit. */
-  function navForHit(h) {
+  function navForHit(h, nav) {
     if (!h) return null;
-    if (h.edgeMid) return "#/pools/" + String(h.poolId);
+    if (h.edgeMid) {
+      if (nav && nav.mode === "market") {
+        var m = marketIdForEdge(h, nav);
+        return m ? "#/market/" + m : null;
+      }
+      return "#/pools/" + String(h.poolId);
+    }
     return "#/asset/" + encodeURIComponent(String(h.sym));
   }
 
-  /* One-time wiring: click + Enter navigation (kept), node hover cursor, and direct
-   * node dragging. Pointer events cover mouse + touch; touch-action:none applies ONLY
+  /* marketIdForEdge: the ORDER BOOK for the two assets an edge joins, as a
+   * QUOTE_BASE id (the desk convention — quote is the URL head). Orientation
+   * rule, in order: the desk's BASE leg stays the base when this edge touches
+   * it (so "X per my base" reads the same as the desk you are on); else the
+   * desk's QUOTE leg stays the quote; else the pool's own order. Never
+   * invents a market: an unknown/empty leg yields null and the caller just
+   * does not navigate.
+   * @param {Object} h Edge-mid hit ({a, b, aSym, bSym}).
+   * @param {{quoteAsset?: string, baseAsset?: string}} nav Desk legs (object ids).
+   * @returns {string|null} QUOTE_BASE market id, or null. */
+  function marketIdForEdge(h, nav) {
+    try {
+      var legA = String(h.a), legB = String(h.b);
+      var symA = String(h.aSym), symB = String(h.bSym);
+      var deskQuote = (nav && nav.quoteAsset != null) ? String(nav.quoteAsset) : null;
+      var deskBase = (nav && nav.baseAsset != null) ? String(nav.baseAsset) : null;
+      if (!symA || !symB || symA === symB) return null;
+      var quote = "", base = "";
+      var touchesBase = !!(deskBase && (legA === deskBase || legB === deskBase));
+      var touchesQuote = !!(deskQuote && (legA === deskQuote || legB === deskQuote));
+      if (touchesBase) {
+        /* keep the desk's base leg as the base; the other leg quotes it */
+        base = (legA === deskBase) ? symA : symB;
+        quote = (legA === deskBase) ? symB : symA;
+      } else if (touchesQuote) {
+        /* keep the desk's quote leg as the quote; the other leg is the base */
+        quote = (legA === deskQuote) ? symA : symB;
+        base = (legA === deskQuote) ? symB : symA;
+      } else {
+        /* neither desk leg: the pool's own order, stated honestly */
+        quote = symA; base = symB;
+      }
+      if (!quote || !base || quote === base) return null;
+      return quote + "_" + base;
+    } catch (e) { return null; }
+  }
+
+  /* edgeStyle: the ONE place a line's colour is decided (owner 2026-10-07).
+   * Precedence: HOVERED wins and is YELLOW — yellow means "this line is under
+   * your pointer and a click opens it", nothing else. Then the TRIANGLE (the
+   * pair's own pool + both legs' routes to BTS) is GREEN. Everything else is
+   * the muted border grey. Pure, so the audit vectors pin the contract.
+   * @param {string} poolId Edge pool id.
+   * @param {Object} hi Highlighted pools (user highlight, keeps its glow).
+   * @param {Object} pathSet Triangle pools (leg edge + BTS path).
+   * @param {string} hoverEdge Hovered pool id ("" when none).
+   * @returns {{color: string, width: number}} token name + line width. */
+  function edgeStyle(poolId, hi, pathSet, hoverEdge) {
+    var id = String(poolId);
+    if (hoverEdge && id === String(hoverEdge)) return { color: "warn", width: 3 };
+    if ((hi && hi[id]) || (pathSet && pathSet[id])) return { color: "buy", width: 2.5 };
+    return { color: "border", width: 1.2 };
+  }
+
+  /* EDGE_TOL: how close (CSS px) the pointer must be to a line to mean it.
+   * The line is a hit TARGET across its whole length, not a dot at its
+   * midpoint: people aim at the line they can see, so the whole segment is
+   * clickable (the old midpoint-only test meant most clicks on a line did
+   * nothing, or landed on a nearby node instead). */
+  var EDGE_TOL = 8;
+
+  /* segDist: distance from point (x,y) to segment (ax,ay)-(bx,by).
+   * Pure math, unit-tested headless.
+   * @returns {number} pixels (0 when the point is on the segment). */
+  function segDist(x, y, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    if (!(len2 > 0)) return Math.sqrt((x - ax) * (x - ax) + (y - ay) * (y - ay));
+    var t = ((x - ax) * dx + (y - ay) * dy) / len2;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var px = ax + t * dx, py = ay + t * dy;
+    return Math.sqrt((x - px) * (x - px) + (y - py) * (y - py));
+  }
+
+  /* hitAt: resolve a pointer position to the ONE thing it means — a node
+   * inside its radius, else the nearest edge LINE within EDGE_TOL. Node wins
+   * near a circle so dragging stays reliable (a line ends at its nodes).
+   * Pure over a hit list, so the audit vectors prove it without a DOM.
+   * @param {number} x CSS px. @param {number} y CSS px.
+   * @param {Array<Object>} hits node + edgeMid records.
+   * @param {number} [tol] edge tolerance override.
+   * @returns {Object|null} the hit record, or null. */
+  function hitAt(x, y, hits, tol) {
+    var list = hits || [];
+    var tolE = (typeof tol === "number") ? tol : EDGE_TOL;
+    var best = null, bestD = 1e9, i, h, d;
+    for (i = 0; i < list.length; i++) {
+      h = list[i];
+      if (!h || h.edgeMid) continue;
+      d = Math.sqrt((h.x - x) * (h.x - x) + (h.y - y) * (h.y - y));
+      if (d <= (h.r + 5) && d < bestD) { bestD = d; best = h; }
+    }
+    if (best) return best;
+    for (i = 0; i < list.length; i++) {
+      h = list[i];
+      if (!h || !h.edgeMid || !h.ax || !h.bx) continue;
+      d = segDist(x, y, h.ax, h.ay, h.bx, h.by);
+      if (d <= tolE && d < bestD) { bestD = d; best = h; }
+    }
+    return best;
+  }
+
+  /* One-time wiring: click + Enter navigation (kept), node hover cursor, edge
+   * hover highlight, and direct node dragging. Pointer events cover mouse + touch; touch-action:none applies ONLY
    * while a drag is active so page scroll is untouched otherwise. NO physics — a drag
    * writes a plain {dx,dy} offset into the session Map and repaints via drawGraph. */
   function _wire(canvas, pos, hits, doc) {
@@ -1120,15 +1261,10 @@ var PoolGraph = (function () {
         } catch (e) {}
         var p = ptr(ev);
         if (!p) return;
-        var best = null, bestD = 1e9;
-        (canvas._graphHits || []).forEach(function (h) {
-          var dx = h.x - p.x, dy = h.y - p.y, d = Math.sqrt(dx * dx + dy * dy);
-          var tol = h.edgeMid ? 12 : (h.r + 5);
-          if (d <= tol && d < bestD) { bestD = d; best = h; }
-        });
+        var best = hitAt(p.x, p.y, canvas._graphHits);
         if (!best) return;
         try {
-          var target = navForHit(best);
+          var target = navForHit(best, canvas._graphNav);
           if (target) window.location.hash = target;
         } catch (e) { /* navigation best-effort */ }
       });
@@ -1165,16 +1301,37 @@ var PoolGraph = (function () {
             try { canvas.style.cursor = "grabbing"; } catch (e) {}
           });
         } else {
-          /* Hover cursor (grab over nodes), rAF-throttled — pointermove subsumes mousemove. */
+          /* Hover: grab over a node, and an EDGE turns YELLOW under the
+           * pointer (the selector bands' behavior, brought to the desk maps).
+           * rAF-throttled — pointermove subsumes mousemove, and a repaint per
+           * event would repaint the whole map per mouse sample.
+           * Yellow means exactly one thing here: this line is clickable. */
           try { if (canvas._graphHoverRaf) return; canvas._graphHoverRaf = true; } catch (e) {}
           _raf(function () {
             var q = ptr(ev);
             try {
               canvas._graphHoverRaf = false;
-              if (!canvas._graphDrag) canvas.style.cursor = q && nodeAt(q.x, q.y) ? "grab" : "pointer";
+              if (canvas._graphDrag) return;
+              canvas.style.cursor = q && nodeAt(q.x, q.y) ? "grab" : "pointer";
+              if (!q) return;
+              var h = hitAt(q.x, q.y, canvas._graphHits);
+              var edge = (h && h.edgeMid) ? String(h.poolId) : "";
+              if (String(canvas._graphHoverEdge || "") === edge) return;
+              canvas._graphHoverEdge = edge;
+              _repaint(canvas);
             } catch (e) {}
           });
         }
+      });
+      /* Leaving the canvas clears the hover (a stale yellow line with no
+       * pointer over it reads as a stuck selection). */
+      canvas.addEventListener("pointerleave", function () {
+        try {
+          if (canvas._graphHoverRaf) { canvas._graphHoverRaf = false; }
+          if (!canvas._graphHoverEdge) return;
+          canvas._graphHoverEdge = "";
+          _repaint(canvas);
+        } catch (e) { /* hover stands */ }
       });
       /* Release the drag; a drag that moved suppresses the click that follows it.
        * A moved release re-energizes the lively loop explicitly (band wake
@@ -1222,6 +1379,10 @@ var PoolGraph = (function () {
     _physForTest: _phys, _defaultReactForTest: _defaultReact,
     _runLiveForTest: _runLive, _wakeForTest: wake, _stepForTest: _liveStep,
     _navForTest: navForHit,
+    _hitAtForTest: hitAt,
+    _segDistForTest: segDist,
+    _marketIdForTest: marketIdForEdge,
+    _edgeStyleForTest: edgeStyle,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
       mapTheme: mapTheme } };

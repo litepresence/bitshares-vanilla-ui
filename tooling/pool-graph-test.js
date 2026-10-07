@@ -287,6 +287,80 @@ function ok(cond, name) {
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "A/B" }), "#/asset/A%2FB", "slash in symbol escaped (route-safe)");
   eqNav(nav(null), null, "null hit -> null (no navigation)");
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (core-or-first) resolves to asset page");
+
+  /* EXCHANGE DESK (2026-10-07): the same line opens the ORDER BOOK for the
+   * two assets it joins, not the pool. Orientation rule: the desk's base leg
+   * stays base when the edge touches it, else its quote leg stays quote,
+   * else the pool's own order. Desk legs here: quote=1.3.1 (USD), base=1.3.2
+   * (BTS) — so the desk's own market is USD_BTS. */
+  const NAV = { mode: "market", quoteAsset: "1.3.1", baseAsset: "1.3.2" };
+  function edge(a, b, aSym, bSym) {
+    return { edgeMid: true, x: 50, y: 50, poolId: "1.19.7", a: a, b: b, aSym: aSym, bSym: bSym,
+      ax: 10, ay: 10, bx: 90, by: 90 };
+  }
+  eqNav(nav(edge("1.3.2", "1.3.7", "BTS", "CNY"), NAV), "#/market/CNY_BTS",
+    "edge touching the desk BASE leg -> market with that leg as base");
+  eqNav(nav(edge("1.3.7", "1.3.2", "CNY", "BTS"), NAV), "#/market/CNY_BTS",
+    "same edge, legs reversed -> identical market id (orientation is by desk leg, not pool order)");
+  eqNav(nav(edge("1.3.1", "1.3.7", "USD", "CNY"), NAV), "#/market/USD_CNY",
+    "edge touching the desk QUOTE leg -> that leg stays the quote");
+  eqNav(nav(edge("1.3.5", "1.3.6", "ETH", "XRP"), NAV), "#/market/ETH_XRP",
+    "edge with neither desk leg -> the pool's own order (honest fallback)");
+  eqNav(nav(edge("1.3.2", "1.3.2", "BTS", "BTS"), NAV), null, "self-edge -> no market invented");
+  eqNav(nav({ edgeMid: true, x: 1, y: 1, poolId: "1.19.66" }), "#/pools/1.19.66",
+    "no nav opts -> pool (swap desk default, unchanged)");
+  eqNav(nav({ edgeMid: true, x: 1, y: 1, poolId: "1.19.66" }, { mode: "pool" }), "#/pools/1.19.66",
+    "explicit pool mode -> pool");
+
+  /* LINE COLOUR CONTRACT (2026-10-07): yellow means HOVERED and nothing
+   * else; the triangle (the pair's own pool + both legs' BTS routes) is
+   * green; every other line stays muted grey. */
+  const es = (typeof PG._edgeStyleForTest === "function") ? PG._edgeStyleForTest : null;
+  ok(typeof PG._edgeStyleForTest === "function", "_edgeStyleForTest exported (pure colour decision)");
+  if (es) {
+    const HI = { "1.19.5": 1 }, TRI = { "1.19.5": 1, "1.19.6": 1, "1.19.7": 1 };
+    ok(es("1.19.5", HI, TRI, "1.19.5").color === "warn", "hover beats the triangle -> yellow");
+    ok(es("1.19.5", HI, TRI, "1.19.5").width === 3, "hovered line is the thickest");
+    ok(es("1.19.5", HI, TRI, "").color === "buy", "the pair's own pool is green at rest");
+    ok(es("1.19.6", HI, TRI, "").color === "buy", "a leg->BTS path pool is green (same triangle)");
+    ok(es("1.19.7", {}, TRI, "").color === "buy", "the other leg's BTS path pool is green");
+    ok(es("1.19.8", HI, TRI, "").color === "border", "an unrelated pool stays muted grey");
+    ok(es("1.19.9", {}, {}, "").color === "border", "no highlight at all -> grey");
+    ok(es("1.19.9", {}, {}, "1.19.8").color === "border", "hovering one line does not tint another");
+    ok(es("1.19.5", {}, {}, "").color === "border", "a highlight list alone (no triangle) is grey here");
+    const atRest = es("1.19.6", HI, TRI, "");
+    ok(atRest.color !== "warn", "NOTHING is yellow at rest (was the old leg-line yellow)");
+  }
+
+  /* LINE HIT TEST: the whole line is the target, not a dot at its midpoint —
+   * and a node inside its radius still wins (a line ENDS at its nodes, so
+   * dragging must stay reliable). */
+  const hitAt = (typeof PG._hitAtForTest === "function") ? PG._hitAtForTest : null;
+  ok(typeof PG._hitAtForTest === "function", "_hitAtForTest exported (pure pointer -> hit)");
+  ok(typeof PG._segDistForTest === "function", "_segDistForTest exported (point/segment distance)");
+  if (hitAt && typeof PG._segDistForTest === "function") {
+    eq(PG._segDistForTest(50, 50, 0, 0, 100, 0), 50, "distance to a horizontal line");
+    eq(PG._segDistForTest(50, 10, 0, 0, 100, 0), 10, "distance above a horizontal line");
+    eq(PG._segDistForTest(-5, 0, 0, 0, 100, 0), 5, "distance clamps to the segment start");
+    eq(PG._segDistForTest(105, 0, 0, 0, 100, 0), 5, "distance clamps to the segment end");
+    eq(PG._segDistForTest(3, 4, 3, 4, 3, 4), 0, "degenerate segment (a point)");
+    const HITS = [
+      { x: 20, y: 20, assetId: "1.3.0", sym: "BTS", r: 11 },
+      { x: 200, y: 100, assetId: "1.3.1", sym: "USD", r: 8 },
+      /* Segment (20,20) -> (200,100): its true midpoint is (110,60). */
+      { edgeMid: true, x: 110, y: 60, poolId: "1.19.9", a: "1.3.0", b: "1.3.1",
+        aSym: "BTS", bSym: "USD", ax: 20, ay: 20, bx: 200, by: 100 }
+    ];
+    eq(hitAt(110, 60, HITS).poolId, "1.19.9", "midpoint still hits the edge");
+    eq(hitAt(65, 40, HITS).poolId, "1.19.9", "a quarter ALONG the line hits the edge (was a miss before)");
+    eq(hitAt(182, 92, HITS).poolId, "1.19.9", "near the far end of the line still hits the edge");
+    eq(hitAt(155, 75, HITS).poolId, "1.19.9", "three quarters along, off the midpoint by 50px, still hits");
+    eq(hitAt(110, 100, HITS), null, "~36px off the line -> no hit (tolerance is honest)");
+    eq(hitAt(24, 22, HITS).sym, "BTS", "a node inside its radius wins over the line it ends on");
+    eq(hitAt(198, 101, HITS).sym, "USD", "the far node also wins over its line");
+    eq(hitAt(110, 60, []), null, "empty hit list -> null");
+    eq(hitAt(110, 60, null), null, "null hit list -> null");
+  }
 })();
 // Desk physics (2026-10-07 gesture-reaction model): ONE physics — the same
 // relax math with a temp/cool/sleep schedule and a 180-frame cap — and a

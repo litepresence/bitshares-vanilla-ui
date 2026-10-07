@@ -1702,15 +1702,19 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       try {
         liveOn = typeof PoolGraph.drawLive === "function";
       } catch (e) { liveOn = false; }
+      /* Edge navigation target: this desk stakes/swaps INSIDE a pool, so a
+       * line opens that pool (the engine default). The exchange desk passes
+       * nav.mode "market" instead and gets the order book for the same line. */
+      var navMode = { mode: "pool", quoteAsset: gd.assetA, baseAsset: gd.assetB };
       if (liveOn) {
         PoolGraph.drawLive(doc, P.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit });
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit, nav: navMode });
       } else {
         try {
           if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(P.graphCanvas);
         } catch (e) { /* static paint stands */ }
         PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi });
+          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, nav: navMode });
       }
       var n = (gd.graph.edges || []).length;
       if (!n) P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
