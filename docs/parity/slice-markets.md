@@ -11,8 +11,7 @@ top-markets table by 24h volume → same-canvas network mapper → `#/market/QUO
   `candidates(poolGraph, xId, seeds, cached, typed)` (pool counterparties of X
   first as `Y_X` ids, then curated seeds, cached, typed; dedupe; cap 20),
   `rank(rows)` (BigInt `baseVol` volume-desc, zero-volume kept, symB tie-break),
-  `buildGraph(rows)` (caller-filtered rows → `{nodes, edges}` with
-  `QUOTE_BASE` desk ids), `readCache/writeCache` (`localStorage marketNetSeen`),
+  `readCache/writeCache` (`localStorage marketNetSeen`),
   `reconcileCache(seedIds, liveIds)` (cache := live-minus-seeds, stale dropped).
 - `vanilla/js/views/market-net-ui.js` (751+26) — `#/markets` landing:
   `renderMarkets(root)`; X-only discovery (pool counterparties + curated seeds

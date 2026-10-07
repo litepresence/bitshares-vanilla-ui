@@ -229,4 +229,5 @@ git commit -m "docs(markets): landing parity note"
 
 - Spec §1 (files, reuse, no skeleton) → Tasks 1–3. §2 (calls, caps, orientation rule, offline) → Tasks 1, 3. §3 (search/table/mapper/nav) → Tasks 2–3. §4 (states, engine policies, i18n) → Tasks 3, 6. Desk physics-only add-on (user) → Task 5 (driver + switch only, visuals byte-identical).
 - No placeholders: every step names files, code, commands, expected outputs.
-- Type consistency: `MarketNet.{candidates,rank,buildGraph,readCache,writeCache}`, `mount(doc,wrap,getSelection,opts)` with `opts.{navEdge,navNode}`, `MarketNetUI.renderMarkets(root)`, `market_net.*` keys.
+- Type consistency: `MarketNet.{candidates,rank,readCache,writeCache}`, `mount(doc,wrap,getSelection,opts)` with `opts.{navEdge,navNode}`, `MarketNetUI.renderMarkets(root)`, `market_net.*` keys.
+- Note (2026-10-07): `MarketNet.buildGraph` was deleted as dead code in 9a54967 — the band uses the `poolDeskMap` + `PoolNetUI.mount` nav-override path, not a market graph.

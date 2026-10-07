@@ -8,10 +8,10 @@
  *   "top N of M probed" scope note, collapsible band (marketNetOpen, default
  *   open) mounting PoolNetUI with a navEdge override (pool edge -> market
  *   desk via the pool-leg map; unknown pools -> null, never pool default).
- * Consumes: MarketNet (candidates/rank/buildGraph/cache), Market.stats
+ * Consumes: MarketNet (candidates/rank/cache), Market.stats
  *   (get_ticker, database_api.hpp:618), Asset.describe (ids + precisions),
  *   MarketCandles.candles (top-8 7d sparklines only), Pool.list (pool
- *   counterparties + edge->desk map, optional), PoolNetUI.mount + nav opts
+ *   counterparties + poolDeskMap edge->desk map, optional), PoolNetUI.mount + nav opts
  *   (Task 2 seam), Format (human strings at render only), I18n.t (all
  *   strings), DOM/Forms/touchable shared helpers (raw doc.createElement
  *   fallback when absent, Forms/TableRenderer pattern precedent).
