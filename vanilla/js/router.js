@@ -271,6 +271,10 @@ var Router = (function () {
     { path: "/instant-trade/:marketID", title: "Instant Trade", render: function (root, params) { InstantTradeUI.renderInstant(root, params && params.marketID); } },
     { path: "/pools/:id", title: "Liquidity Pool", render: function (root, params) { PoolDetailUI.renderPoolDetail(root, params && params.id); } },
     { path: "/pools", title: "Liquidity Pools", render: function (root) { PoolUI.renderPools(root); } },
+    { path: "/markets", title: "Markets", render: function (root) {
+      if (typeof MarketNetUI !== "undefined" && MarketNetUI && typeof MarketNetUI.renderMarkets === "function") { MarketNetUI.renderMarkets(root); return; }
+      placeholder("Markets")(root);
+    } },
     { path: "/alerts", title: "Price Alerts", render: function (root) { NotifyUI.render(root); } },
     { path: "/trollbox", title: "Trollbox", render: function (root) { TrollboxUI.renderTrollbox(root); } },
     { path: "/assets", title: "Assets", render: function (root) { AssetUI.renderAssets(root); } },
