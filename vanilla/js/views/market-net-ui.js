@@ -111,8 +111,16 @@ var MarketNetUI = (function () {
   /* hasVol: raw digit string with nonzero value (zero-volume rows render the
    * honest empty scope, never vanish silently — they count as probed).
    * @param {string} v raw base_volume. @returns {boolean}. Never throws. */
+  /* hasVol: nonzero volume (CHAIN TRUTH 2026-10-07: get_ticker volumes
+   * arrive as integer digit strings OR human-scaled decimals — both are
+   * real volume; only zero/garbage counts as empty). Delegates to
+   * MarketNet.volInt when loaded, legacy digit regex otherwise.
+   * @param {string} v raw base_volume. @returns {boolean}. Never throws. */
   function hasVol(v) {
     try {
+      if (typeof MarketNet !== "undefined" && MarketNet && typeof MarketNet.volInt === "function") {
+        return /[1-9]/.test(MarketNet.volInt(v));
+      }
       return typeof v === "string" && /^\d+$/.test(v) && /[1-9]/.test(v);
     } catch (e) { return false; }
   }
@@ -130,22 +138,31 @@ var MarketNetUI = (function () {
     return m[1] === "-" ? "neg" : "pos";
   }
 
-  /* humanVol: raw volumes (X base + counter quote) -> "a X + b CP" via
-   * Format at render; raw integers stay in the title (poolTable precedent).
+  /* humanVol: volumes (X base + counter quote, integer digit strings OR
+   * human decimals per the volInt note above) -> "a X + b CP" via Format at
+   * render; NORMALIZED raw integers stay in the title (poolTable
+   * precedent) so a decimal chain value never double-scales on screen.
    * @param {string} baseRaw X-leg raw. @param {number} basePrec X precision.
    * @param {string} baseSym X symbol. @param {string} qRaw counter raw.
    * @param {number} qPrec counter precision. @param {string} qSym counter sym.
    * @returns {{text: string, raw: string}}. Never throws (raw fallback). */
   function humanVol(baseRaw, basePrec, baseSym, qRaw, qPrec, qSym) {
-    var raw = String(baseRaw) + " / " + String(qRaw);
+    var bInt = baseRaw, qInt = qRaw;
+    try {
+      if (typeof MarketNet !== "undefined" && MarketNet && typeof MarketNet.volInt === "function") {
+        bInt = MarketNet.volInt(baseRaw);
+        qInt = MarketNet.volInt(qRaw);
+      }
+    } catch (e) { /* verbatim below */ }
+    var raw = String(bInt) + " / " + String(qInt);
     try {
       if (typeof Format !== "undefined" && Format && typeof Format.formatAmount === "function" &&
           typeof basePrec === "number" && typeof qPrec === "number") {
-        return { text: Format.formatAmount(String(baseRaw), basePrec) + " " + baseSym +
-          " + " + Format.formatAmount(String(qRaw), qPrec) + " " + qSym, raw: raw };
+        return { text: Format.formatAmount(String(bInt), basePrec) + " " + baseSym +
+          " + " + Format.formatAmount(String(qInt), qPrec) + " " + qSym, raw: raw };
       }
     } catch (e) { /* raw below */ }
-    return { text: String(baseRaw) + " " + baseSym + " + " + String(qRaw) + " " + qSym, raw: raw };
+    return { text: String(bInt) + " " + baseSym + " + " + String(qInt) + " " + qSym, raw: raw };
   }
 
   /* lastText: chain human latest -> 4-sf display (picker ps precedent),

@@ -1,7 +1,9 @@
 /* MarketNet: top-markets discovery data for the #/markets landing.
  * Owns: candidates (pool counterparties of X + curated seeds + cached
  *   markets + user-typed pair, deduped, capped 20), rank (ticker rows
- *   volume-desc on BigInt base_volume, zero-volume kept), graph (ranked
+ *   volume-desc on BigInt base_volume, zero-volume kept), volInt (chain
+ *   volume -> integer digits: integer strings pass, human decimals join
+ *   the point, garbage -> "0"), graph (ranked
  *   rows -> volume-gated {nodes, edges, meta} for the desk band map —
  *   edges appear only for pairs with recent volume, one per unordered
  *   pair with the focus-base orientation winning by page convention),
@@ -109,6 +111,26 @@ var MarketNet = (function () {
     return out.slice(0, CAP);
   }
 
+  /* volInt: chain volume value -> integer digit string (CHAIN TRUTH:
+   * get_ticker base_volume/quote_volume arrive as integer digit strings
+   * OR human-scaled decimal strings ("16.47978" BTS — observed mainnet
+   * 2026-10-07). Decimals normalize by dropping the point (exact raw
+   * reconstruction at the asset's precision; beyond-precision tail is
+   * node rounding). Garbage/null -> "0". Never throws — every downstream
+   * BigInt/regex stays safe.
+   * @param {any} v raw volume value.
+   * @returns {string} integer digit string ("0" when unreadable).
+   */
+  function volInt(v) {
+    try {
+      var s = String(v === undefined || v === null ? "0" : v).trim();
+      if (/^\d+$/.test(s)) return s === "" ? "0" : s;
+      var m = /^(\d+)\.(\d+)$/.exec(s);
+      if (m) return (m[1] + m[2]).replace(/^0+/, "") || "0";
+    } catch (e) { /* "0" below */ }
+    return "0";
+  }
+
   /* rank: ticker rows volume-desc on raw base_volume digit strings.
    * BigInt compare (volumes exceed float-safe range); malformed volumes
    * sort as zero but are KEPT (zero-volume rows render honest empty cells,
@@ -119,8 +141,8 @@ var MarketNet = (function () {
   function rank(rows) {
     return (rows || []).slice().sort(function (x, y) {
       var bx = 0n, by = 0n;
-      try { bx = BigInt(String(x.baseVol || "0")); } catch (e) { bx = 0n; }
-      try { by = BigInt(String(y.baseVol || "0")); } catch (e) { by = 0n; }
+      try { bx = BigInt(volInt(x.baseVol)); } catch (e) { bx = 0n; }
+      try { by = BigInt(volInt(y.baseVol)); } catch (e) { by = 0n; }
       if (bx !== by) return bx > by ? -1 : 1;
       var sx = String(x.symB), sy = String(y.symB);
       if (sx < sy) return -1;
@@ -203,22 +225,29 @@ var MarketNet = (function () {
    */
   function graph(rows, focusId) {
     var nodes = [], edges = [], meta = {}, seenN = {};
-    function liveVol(v) {
-      try { return typeof v === "string" && /^\d+$/.test(v) && /[1-9]/.test(v); }
-      catch (e) { return false; }
+    /* Liveness = normalized nonzero (volInt first: decimal chain values
+     * like "16.47978" are real volume, not malformed). Meta stores the
+     * NORMALIZED integers so digit math + Format downstream never see a
+     * decimal point. */
+    function liveRow(r) {
+      if (!r) return null;
+      var bv = volInt(r.baseVol), qv = volInt(r.quoteVol);
+      if (!/[1-9]/.test(bv)) return null;
+      return { bv: bv, qv: qv };
     }
     function isFocusBase(r) {
       return typeof focusId === "string" && focusId && String(r.a) === String(focusId);
     }
     var kept = {};
     (rows || []).forEach(function (r) {
-      if (!r || !liveVol(r.baseVol)) return;
+      var vols = liveRow(r);
+      if (!vols) return;
       var a = String(r.a), b = String(r.b);
       if (!a || !b || a === b) return;
       if (!r.symA || !r.symB || r.symA === r.symB) return;
       var key = a < b ? a + "|" + b : b + "|" + a;
       if (kept[key] && !(isFocusBase(r) && !isFocusBase(kept[key].r))) return;
-      kept[key] = { r: r, a: a, b: b };
+      kept[key] = { r: r, a: a, b: b, bv: vols.bv, qv: vols.qv };
     });
     Object.keys(kept).forEach(function (key) {
       var k = kept[key], r = k.r, a = k.a, b = k.b;
@@ -226,8 +255,8 @@ var MarketNet = (function () {
       if (!seenN[b]) { seenN[b] = 1; nodes.push({ assetId: b, sym: String(r.symB) }); }
       var id = String(r.symB) + "_" + String(r.symA);
       edges.push({ id: id, poolId: id, a: a, b: b });
-      meta[id] = { symA: String(r.symA), symB: String(r.symB), volBaseRaw: String(r.baseVol),
-        volBasePrec: null, volQuoteRaw: String(r.quoteVol || "0"), volQuotePrec: null,
+      meta[id] = { symA: String(r.symA), symB: String(r.symB), volBaseRaw: k.bv,
+        volBasePrec: null, volQuoteRaw: k.qv, volQuotePrec: null,
         latest: (r.latest === null || r.latest === undefined) ? null : String(r.latest),
         change: (r.change === null || r.change === undefined) ? null : String(r.change) };
     });
@@ -237,6 +266,7 @@ var MarketNet = (function () {
   return {
     candidates: candidates,
     rank: rank,
+    volInt: volInt,
     graph: graph,
     readCache: readCache,
     writeCache: writeCache,

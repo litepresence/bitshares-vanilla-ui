@@ -122,5 +122,26 @@ function ok(cond, name) {
   ok(g2.edges.length === 1 && g2.edges[0].id === "USD_BTS", "focus-base wins regardless of input order");
 })();
 
+// 9. volInt: chain volumes normalize to integer digits (mainnet sends
+// human decimals like "16.47978" alongside integer strings).
+(function () {
+  ok(MN.volInt("5000") === "5000", "integer string passes through");
+  ok(MN.volInt("16.47978") === "1647978", "human decimal joins the point (raw reconstruction)");
+  ok(MN.volInt("0") === "0", "zero stays zero");
+  ok(MN.volInt("0.0") === "0", "decimal zero stays zero");
+  ok(MN.volInt("abc") === "0", "garbage reads zero");
+  ok(MN.volInt(null) === "0" && MN.volInt(undefined) === "0" && MN.volInt("") === "0", "nullish reads zero");
+  const ranked = MN.rank([
+    { a: "1.3.0", b: "1.3.2", symA: "BTS", symB: "BTC", baseVol: "9000", latest: null, change: null },
+    { a: "1.3.0", b: "1.3.1", symA: "BTS", symB: "USD", baseVol: "16.47978", latest: null, change: null }
+  ]);
+  ok(ranked[0].symB === "USD", "decimal volume outranks smaller integer (1647978 > 9000)");
+  const g = MN.graph([
+    { a: "1.3.0", b: "1.3.1", symA: "BTS", symB: "USD", baseVol: "16.47978", quoteVol: "1.05", latest: null, change: null }
+  ], "1.3.0");
+  ok(g.edges.length === 1 && g.meta.USD_BTS.volBaseRaw === "1647978" && g.meta.USD_BTS.volQuoteRaw === "105",
+    "decimal rows admitted with normalized integer meta");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
