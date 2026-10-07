@@ -826,42 +826,44 @@ var PoolNetUI = (function () {
       } catch (e) { twin = null; }
       var twinSummary = mk("summary", t("pool_net.twin", "Pool rows (%(n)s)", { n: "0" }));
       var twinBox = mk("div", null, "pool-net-twinbox");
-      /* Calm/Lively switch (v2): segmented control at the top of the band
-       * body. Flipping persists poolNetPhys, re-spreads the layout from the
-       * circle seed (a preset flip from a parked equilibrium has ~zero
-       * forces to work with — temp alone cannot move it, so the flip
-       * re-runs the fresh-load spread instead), then re-energizes via
-       * wake(S); reduced-motion freeze in wake/loop covers both presets,
-       * so there is no branch here. Pan/zoom (scale/ox/oy) are untouched. */
+      /* Physics switch: ONE labeled on/off control. ON = v2 lively motion,
+       * OFF = v1 calm settle (the shipped default). Flipping persists
+       * poolNetPhys, re-spreads the layout from the circle seed (a preset
+       * flip from a parked equilibrium has ~zero forces to work with — temp
+       * alone cannot move it, so the flip re-runs the fresh-load spread
+       * instead), then re-energizes via wake(S); reduced-motion freeze in
+       * wake/loop covers both presets, so there is no branch here.
+       * Pan/zoom (scale/ox/oy) are untouched. Native <button> gives
+       * Space/Enter keyboard handling; role="switch" + aria-checked exposes
+       * state to assistive tech. */
       var physBar = mk("div", null, "pool-net-phys");
-      var calmBtn = mk("button", t("pool_net.phys_calm", "Calm"));
-      var livelyBtn = mk("button", t("pool_net.phys_lively", "Lively"));
+      var physLabel = mk("span", t("pool_net.phys", "Physics"), "pool-net-physlabel");
+      var physSwitch = mk("button", null, "pool-net-physwitch");
+      var physKnob = mk("span", null, "pool-net-physknob");
+      var physState = mk("span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
+      function paintSwitch() {
+        var on = S.phys === "lively";
+        try {
+          physSwitch.setAttribute("role", "switch");
+          physSwitch.setAttribute("aria-checked", on ? "true" : "false");
+          physSwitch.setAttribute("aria-label", t("pool_net.phys", "Physics"));
+        } catch (e) { /* state stands */ }
+        try {
+          physState.textContent = on ? t("pool_net.phys_on", "On") : t("pool_net.phys_off", "Off");
+        } catch (e) { /* label stands */ }
+      }
       try {
-        calmBtn.type = "button";
-        livelyBtn.type = "button";
-        calmBtn.className = "pool-net-physbtn";
-        livelyBtn.className = "pool-net-physbtn";
-        calmBtn.setAttribute("aria-pressed", S.phys === "calm" ? "true" : "false");
-        livelyBtn.setAttribute("aria-pressed", S.phys === "lively" ? "true" : "false");
-        if (typeof touchable === "function") { touchable(calmBtn); touchable(livelyBtn); }
+        physSwitch.type = "button";
+        physSwitch.appendChild(physKnob);
+        if (typeof touchable === "function") { touchable(physSwitch); }
+        paintSwitch();
       } catch (e) { /* labels stand */ }
-      var D2 = _dom();
-      try {
-        if (D2 && D2.attrs) {
-          D2.attrs(physBar, { role: "group", "aria-label": t("pool_net.phys_label", "Network motion") });
-        } else {
-          physBar.setAttribute("role", "group");
-        }
-      } catch (e) { /* buttons stand unlabeled */ }
       function setPhys(mode) {
         S.phys = (mode === "lively") ? "lively" : "calm";
         try {
           if (typeof localStorage !== "undefined") localStorage.setItem(PHYS_KEY, S.phys);
         } catch (e) { /* memory-only session */ }
-        try {
-          calmBtn.setAttribute("aria-pressed", S.phys === "calm" ? "true" : "false");
-          livelyBtn.setAttribute("aria-pressed", S.phys === "lively" ? "true" : "false");
-        } catch (e) { /* state stands */ }
+        paintSwitch();
         /* Fresh spread on flip (see header note): temp alone cannot move a
          * parked equilibrium, so re-seed positions like a fresh load. */
         try {
@@ -873,12 +875,14 @@ var PoolNetUI = (function () {
         wake(S);
       }
       try {
-        calmBtn.addEventListener("click", function () { setPhys("calm"); });
-        livelyBtn.addEventListener("click", function () { setPhys("lively"); });
+        physSwitch.addEventListener("click", function () {
+          setPhys(S.phys === "lively" ? "calm" : "lively");
+        });
       } catch (e) { /* static preset stands */ }
       try {
-        physBar.appendChild(calmBtn);
-        physBar.appendChild(livelyBtn);
+        physBar.appendChild(physLabel);
+        physBar.appendChild(physSwitch);
+        physBar.appendChild(physState);
         wrap.appendChild(physBar);
         wrap.appendChild(statusEl);
         wrap.appendChild(canvas);

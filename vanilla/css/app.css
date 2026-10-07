@@ -1606,13 +1606,17 @@ p.muted[aria-live="polite"],
 }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }
-.pool-net-phys { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-.pool-net-physbtn { min-height: 44px; padding: 6px 16px; cursor: pointer;
-  background: transparent; color: var(--text);
-  border: 1px solid var(--border); border-radius: 16px; }
-.pool-net-physbtn[aria-pressed="true"] { border-color: var(--accent);
-  border-width: 2px; font-weight: bold; }
-.pool-net-physbtn[aria-pressed="false"] { opacity: 0.55; }
+.pool-net-phys { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+.pool-net-physlabel { font-weight: bold; }
+.pool-net-physwitch { position: relative; width: 60px; height: 44px;
+  min-width: 60px; cursor: pointer; flex: none;
+  background: transparent; border: 2px solid var(--border); border-radius: 22px;
+  padding: 0; }
+.pool-net-physwitch[aria-checked="true"] { border-color: var(--accent); }
+.pool-net-physknob { position: absolute; top: 8px; left: 5px; width: 24px; height: 24px;
+  border-radius: 50%; background: var(--muted); }
+.pool-net-physwitch[aria-checked="true"] .pool-net-physknob { left: 27px; background: var(--accent); }
+.pool-net-physstate { min-width: 2.5em; }
 .pool-net-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin: 8px 0; }
 .pool-net-chip { display: inline-flex; align-items: center; gap: 8px;

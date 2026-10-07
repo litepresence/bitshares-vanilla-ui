@@ -2587,9 +2587,9 @@
       "pool_net.offline_empty",
       "pool_net.orphan",
       "pool_net.partial",
-      "pool_net.phys_calm",
-      "pool_net.phys_label",
-      "pool_net.phys_lively",
+      "pool_net.phys",
+      "pool_net.phys_off",
+      "pool_net.phys_on",
       "pool_net.prompt",
       "pool_net.ready",
       "pool_net.title",
@@ -7584,9 +7584,6 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "loading": "Loading network…",
-    "phys_calm": "Calm",
-    "phys_lively": "Lively",
-    "phys_label": "Network motion",
     "empty": "No pools touch this filter.",
     "canvas_label": "Pool network map. Press Enter to open BTS.",
     "twin": "Pool rows (%(n)s)",
@@ -7609,6 +7606,9 @@
     "ready": "%(pools)s pools · %(assets)s assets",
     "offline": "Network unavailable — showing shipped skeleton. Retry when connected.",
     "offline_empty": "Network unavailable — no skeleton pools cached.",
-    "partial": "Live update incomplete — showing shipped pools."
+    "partial": "Live update incomplete — showing shipped pools.",
+    "phys": "Physics",
+    "phys_on": "On",
+    "phys_off": "Off"
   }
 }

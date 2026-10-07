@@ -211,6 +211,20 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
 
+### Follow-up — Physics on/off switch replaces Calm/Lively buttons (user call)
+
+Owner verdict on the segmented control: buttons felt dead (no pointer
+cursor, no visible pressed state — both gaps real, fixed first), then asked
+for ONE labeled switch instead. Now: `Physics` label + `role="switch"`
+track/knob + `On`/`Off` state text (`pool_net.phys/phys_on/phys_off`;
+stale `phys_calm/phys_lively/phys_label` keys removed from all 12 dicts).
+ON = v2 lively motion, OFF = v1 calm settle (default off); same persist
+(`poolNetPhys`), re-spread, and wake path as the buttons. Native `<button>`
+keeps Space/Enter; 60×44px track meets the touch floor; knob side + accent
+border + state text read in all three themes. Real-mouse probe:
+cursor pointer, click → `aria-checked=true`, `On`, stored `lively`,
+temp 9.27 re-energize, layout re-spread, zero errors.
+
 ### Follow-up 2026-10-07 — "buttons do nothing" (user report, root-caused)
 
 Report: flipping Calm→Lively showed no visible change; map stayed calm-like.
