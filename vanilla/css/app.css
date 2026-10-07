@@ -1598,11 +1598,11 @@ p.muted[aria-live="polite"],
 .pool-net-band { margin: 8px 0 12px; }
 .pool-net-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pool-net-head h2 { margin: 6px 0; font-size: 1rem; flex: 1 1 auto; }
-.pool-net-canvas { width: 100%; height: 320px; display: block;
+.pool-net-canvas { width: 100%; height: 640px; display: block;
   background: var(--plot-bg, var(--panel));
   border: 1px solid var(--border); border-radius: 8px; }
 @media (max-width: 640px) {
-  .pool-net-canvas { height: 240px; }
+  .pool-net-canvas { height: 480px; }
 }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }

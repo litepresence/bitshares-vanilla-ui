@@ -211,6 +211,15 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
 
+Refine — 3s pause rule (user call: "pause after 3s until next interaction"):
+`maxFrames: 180` both presets, lively `minFrames: 60`. Every wake runs at
+most ~3s then freezes; any interaction (flip, drag-release, wheel, filter)
+re-seeds and runs another 3s. Ends the stuck-jitter class structurally —
+tails can't outlive the cap. Browser proof: idle paused @180, flip runs,
+paused @180 again, zero errors. (Unrelated: `check_types.sh` is red on
+`account-ui.js` myGen/gen from another workstream's uncommitted edit —
+zero errors in pool-net files.)
+
 Refine — induced swap edges (user call): star/union views now include every
 pool whose BOTH legs are already visible, not just pools touching the
 selected asset(s). Two BTS-linked assets that also pair directly show that

@@ -83,11 +83,12 @@ var skel = { pools: [
     phys.calm.cool === 0.98 && phys.calm.tempMin === 1 && phys.calm.pull === 0.008 &&
     phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
-  ok(phys.lively.repPow === 2 && phys.lively.minFrames === 400 &&
-    phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.999 && phys.lively.tempMin === 1.2 &&
+  ok(phys.lively.repPow === 2 && phys.lively.minFrames === 60 &&
+    phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.997 && phys.lively.tempMin === 0.2 &&
     phys.lively.temp0 === 7 && phys.lively.repCap === 20 &&
-    phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 1500,
-    "lively softened tune + hub damping (degree-mass + long run + stabilization budget)");
+    phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 180 &&
+    phys.calm.maxFrames === 180,
+    "3s pause rule: both presets cap at 180 frames (lively softened tune + hub damping pinned)");
   function simState(mode) {
     return {
       phys: mode, W: 300, H: 320, temp: 6, still: 0, frames: 0,
@@ -232,6 +233,48 @@ var skel = { pools: [
   try { wake(exp, true); } catch (e) { ok(false, "explicit wake reduced throws: " + e); return; }
   ok(exp.settled === true && exp.running === false, "explicit wake runs bounded and settles under reduced-motion");
   ok(exp.temp < 6 && exp.temp >= 1, "explicit wake re-seeded temp0 then cooled while settling (temp=" + exp.temp + ")");
+})();
+
+/* Unbounded world (user call: no wall binding now that pan/zoom explores):
+ * a node far outside the old rectangle is drawn inward by center pull, never
+ * snapped back inside. */
+(function () {
+  function farState() {
+    return {
+      phys: "lively", W: 800, H: 600, temp: 7, still: 0, frames: 500,
+      geom: { "1.3.0": { x: 400, y: 300 }, "1.3.99": { x: 1400, y: 300 } },
+      vel: {}, deg: { "1.3.0": 1, "1.3.99": 1 },
+      view: { edges: [] }
+    };
+  }
+  var S = farState(), x0 = S.geom["1.3.99"].x, threw = false, moved = -1;
+  try { moved = PoolNetUI._stepForTest(S); } catch (e) { threw = true; }
+  var x1 = S.geom["1.3.99"].x;
+  ok(!threw && isFinite(moved), "unbound step finite");
+  ok(x1 < x0 && x1 > S.W, "far node drawn inward, never clamped (x " + Math.round(x0) + " -> " + Math.round(x1) + ")");
+})();
+
+/* 3s pause rule (owner call): a lively run from a fresh spread terminates
+ * at or before 180 frames via wake+loop headlessly — no endless tail. */
+(function () {
+  if (typeof PoolNetUI._wakeForTest !== "function") { ok(false, "_wakeForTest still exported"); return; }
+  var S = {
+    phys: "lively", W: 800, H: 600, temp: 7, still: 0, frames: 0,
+    running: false, settled: true, dead: false, reduced: false, visible: true,
+    geom: { hub: { x: 400, y: 300 } }, vel: {}, deg: { hub: 0 }, view: { nodes: [], edges: [] }
+  };
+  for (var i = 0; i < 8; i++) {
+    var id = "n" + i, a = (i / 8) * Math.PI * 2;
+    S.geom[id] = { x: 400 + 120 * Math.cos(a), y: 300 + 120 * Math.sin(a) };
+    S.deg[id] = 1;
+    S.view.nodes.push({ assetId: id });
+    S.view.edges.push({ a: "hub", b: id, poolId: "1.19." + i });
+  }
+  S.view.nodes.push({ assetId: "hub" });
+  S.deg.hub = 8;
+  try { PoolNetUI._wakeForTest(S, true); } catch (e) { ok(false, "pause-rule wake throws: " + e); return; }
+  ok(S.settled === true && S.running === false, "lively run terminates headlessly");
+  ok((S.frames || 0) <= 180, "run pauses at/below 180 frames (got " + S.frames + ")");
 })();
 
 console.log(pass + " passed, " + fail + " failed");

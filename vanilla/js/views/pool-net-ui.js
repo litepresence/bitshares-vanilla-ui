@@ -1,7 +1,7 @@
 /* PoolNetUI: full-pool-network canvas band for #/pools.
  * Owns: canvas element + hover/verdict/status lines + brand legend chips +
  *   <details> table twin, live-then-settle rAF physics (repulsion + springs +
- *   gravity + walls, cooling schedule, velocity sleep), transform-only
+ *   gravity on an unbounded canvas, cooling schedule, velocity sleep), transform-only
  *   wheel/pinch zoom, node drag (pointer capture), background pan, tap
  *   navigation (node -> #/asset/:symbol, edge-mid -> #/pools/:id), keyboard
  *   Enter, IntersectionObserver pause, prefers-reduced-motion freeze.
@@ -34,22 +34,20 @@ var PoolNetUI = (function () {
   var BTS_BLUE = "#1E9ED7";
   var PHYS_KEY = "poolNetPhys";
 
-  /* PHYS presets: calm (v1 shipped constants) vs lively (pyvis-barnesHut
-   * character: inverse-square degree-mass repulsion, long springs, high
-   * carryover for underdamped oscillation, weak center pull, late sleep
-   * gate + maxFrames stabilization budget, curved edges).
-   * Lively is deliberately UNDERDAMPED (carry 0.99 + springK 0.025): the
-   * graph overshoots and oscillates visibly for ~10-15s before the sleep
-   * gate catches it — an overdamped lively parks into static equilibrium
-   * in ~2s and looks identical to calm (user-reported "does nothing").
+  /* PHYS presets: calm (v1 shipped constants, plus a 3s pause cap) vs
+   * lively (pyvis-barnesHut character: inverse-square degree-mass
+   * repulsion, long springs, higher carryover, weaker pull). Run rule
+   * (owner call): at most ~3s (180 frames) of motion after load/flip/
+   * filter/drag, then the map pauses until the next interaction — no
+   * endless tail, no stuck jitter. Wake-ups re-seed and run another 3s.
    * stepFrame/drawScene/loop/wake read S.phys; nothing else branches. */
   var PHYS = {
     calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
               springRest: 1.1, springK: 0.015, pull: 0.008, btsPullX: 3,
-              stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 900, curved: false },
-    lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.999, tempMin: 1.2,
+              stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 180, curved: false },
+    lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.997, tempMin: 0.2,
               springRest: 2.2, springK: 0.010, pull: 0.003, btsPullX: 3,
-              stillTol: 0.25, stillFrames: 120, minFrames: 400, maxFrames: 1500, curved: true }
+              stillTol: 0.25, stillFrames: 120, minFrames: 60, maxFrames: 180, curved: true }
   };
 
   /* Headless test seams (no DOM, no chain): preset table + default reader. */
@@ -331,11 +329,13 @@ var PoolNetUI = (function () {
   }
 
   /* One physics step (preset-driven): repulsion + Hooke springs + center
-   * gravity (x3 for BTS prominence) + wall clamp; velocity damping keeps it
-   * overdamped so the sleep gate always terminates the loop. Calm reads the
-   * v1 shipped constants verbatim; lively reads inverse-square degree-mass
-   * repulsion, longer springs, higher carryover, weaker pull. Positions are
-   * world coords; Number() here is pixels only, never money. */
+   * gravity (x3 for BTS prominence); velocity damping keeps it overdamped
+   * so the sleep gate always terminates the loop. The world is UNBOUNDED
+   * (no wall clamp — pan/zoom explores freely; linear center pull grows
+   * with distance so nothing escapes). Calm reads the v1 shipped constants
+   * verbatim; lively reads inverse-square degree-mass repulsion, longer
+   * springs, higher carryover, weaker pull. Positions are world coords;
+   * Number() here is pixels only, never money. */
   function stepFrame(S) {
     var P = PHYS[S.phys] || PHYS.calm;
     var ids = Object.keys(S.geom);
@@ -344,7 +344,7 @@ var PoolNetUI = (function () {
     var k = 0.5 * Math.sqrt((S.W * S.H) / n);
     if (!(k >= 24)) k = 24;
     if (!(k <= 60)) k = 60;
-    var cx = S.W / 2, cy = S.H / 2, PAD = EDGE_PAD;
+    var cx = S.W / 2, cy = S.H / 2;
     var i, j, maxStep = 0;
     var ax = {}, ay = {};
     for (i = 0; i < n; i++) { ax[ids[i]] = 0; ay[ids[i]] = 0; }
@@ -395,17 +395,10 @@ var PoolNetUI = (function () {
       var step = Math.sqrt(v.x * v.x + v.y * v.y);
       if (step > S.temp && step > 0) { v.x = v.x / step * S.temp; v.y = v.y / step * S.temp; }
       S.vel[id2] = v;
-      var nx = S.geom[id2].x + v.x, ny = S.geom[id2].y + v.y;
-      /* Wall clamp kills the inward velocity component (a node pressed
-       * against the wall must not retain full-temp velocity into it —
-       * retained velocity fakes maxStep at the temp cap forever, so the
-       * sleep gate never fires and the loop spins on a frozen map). */
-      if (nx < PAD) { nx = PAD; v.x = 0; }
-      else if (nx > S.W - PAD) { nx = S.W - PAD; v.x = 0; }
-      if (ny < PAD) { ny = PAD; v.y = 0; }
-      else if (ny > S.H - PAD) { ny = S.H - PAD; v.y = 0; }
-      S.geom[id2].x = nx;
-      S.geom[id2].y = ny;
+      /* Unbounded world (no wall clamp — pan/zoom explores freely): the
+       * linear center pull grows with distance, so nothing escapes. */
+      S.geom[id2].x = S.geom[id2].x + v.x;
+      S.geom[id2].y = S.geom[id2].y + v.y;
       step = Math.sqrt(v.x * v.x + v.y * v.y);
       if (step > maxStep) maxStep = step;
     }
@@ -467,9 +460,9 @@ var PoolNetUI = (function () {
     try { render(S); } catch (e) { /* next frame */ }
     if (moved < P.stillTol) S.still++;
     else S.still = 0;
-    /* maxFrames is the pyvis-style stabilization budget: even a perfect
-     * orbit (or a wall-pinned straggler the clamp missed) terminates.
-     * Calm's 900 is pure backstop (it sleeps via the gate long before). */
+    /* maxFrames is the run cap (owner call: ~3s of motion, then pause
+     * until the next interaction). Whatever hasn't settled by 180 frames
+     * freezes in place — the next wake re-seeds and runs again. */
     if ((P.maxFrames && (S.frames || 0) >= P.maxFrames) ||
         (S.still >= P.stillFrames && (S.frames || 0) >= (P.minFrames || 0))) {
       S.running = false;
