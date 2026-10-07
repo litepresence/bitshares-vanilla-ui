@@ -402,6 +402,25 @@ var GatewayUI = (function () {
     /* Forms seam (Task 2.2): single-field row — div.xfer-field > label > input. */
     var acctRow = Forms.fieldRow(doc, t("gateway.your_account", "Your BitShares account "), acct);
     ctx.bodyBox.appendChild(acctRow);
+    /* Component-wisdom Rec 2: non-blocking account pre-check. The deposit
+     * request still validates everything server-side; this blur hint only
+     * surfaces typos early, mapping resolve failures honestly (unknown vs
+     * network) with existing keys. */
+    var acctHint = DOM.el(doc, "div", null, "muted");
+    acctHint.setAttribute("aria-live", "polite");
+    ctx.bodyBox.appendChild(acctHint);
+    acct.addEventListener("blur", function () {
+      var v = (acct.value || "").trim();
+      acctHint.textContent = "";
+      if (!v) return;
+      if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+      Account.resolve(v).then(function () { acctHint.textContent = ""; }).catch(function (e) {
+        var msg = String((e && e.message) || e || "");
+        acctHint.textContent = (/not-connected|not connected|network/i.test(msg))
+          ? t("common.network_unavailable", "Network unavailable. Check Settings → Nodes and retry.")
+          : t("common.unknown_account", "Unknown account.");
+      });
+    });
     var out = DOM.el(doc, "div"); ctx.bodyBox.appendChild(out);
     var go = touchable(DOM.el(doc, "button", t("gateway.get_address", "Get deposit address"))); go.type = "button";
     function doDeposit() {

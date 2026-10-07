@@ -174,6 +174,9 @@ var EsLabUI = (function () {
     var filter = DOM.el(doc, "input", null, null);
     filter.type = "search"; filter.placeholder = t("eslab.filter", "Filter templates…");
     filter.setAttribute("aria-label", t("eslab.filter", "Filter templates…"));
+    /* Component-wisdom Rec 10: touch floor on the search input (file
+     * convention here is the touchable class, as on the select below). */
+    filter.classList.add("touchable");
     var sel = DOM.el(doc, "select", null, null);
     sel.setAttribute("aria-label", t("eslab.template", "Query template"));
     sel.classList.add("touchable");

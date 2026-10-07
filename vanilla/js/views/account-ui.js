@@ -1529,6 +1529,9 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     balLoading.className = "muted";
     balLoading.textContent = t("account.loading_balances", "Loading balances…");
     balSection.appendChild(balLoading);
+    /* Component-wisdom Rec 4: layout-shaped shimmer under the status line
+     * (removed with it on settle, both paths below). */
+    var balSkel = (typeof DOM !== "undefined" && DOM && typeof DOM.skel === "function") ? DOM.skel(balSection, 5) : null;
     wrap.appendChild(balSection);
 
     var ordSection = doc.createElement("section");
@@ -1539,6 +1542,8 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     ordLoading.className = "muted";
     ordLoading.textContent = t("account.loading_orders", "Loading open orders…");
     ordSection.appendChild(ordLoading);
+    /* Component-wisdom Rec 4: same shimmer treatment as balances above. */
+    var ordSkel = (typeof DOM !== "undefined" && DOM && typeof DOM.skel === "function") ? DOM.skel(ordSection, 3) : null;
     wrap.appendChild(ordSection);
 
     var histSection = doc.createElement("section");
@@ -1639,6 +1644,52 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     histSection.appendChild(histFilter);
     var histBody = doc.createElement("div");
     histSection.appendChild(histBody);
+    /* Component-wisdom Rec 3: history pager for the "all" mode — Prev /
+     * Page N / Next over the get_account_history cursor (pool-ui pager
+     * shape; fixed page size 20 = the pre-existing fetch size, so cursor
+     * stacks never invalidate mid-walk). Filtered transfer/fill modes stay
+     * 20-latest: get_account_history_operations has no multi-type merge
+     * cursor to page honestly. */
+    var HIST_SIZE = 20;
+    var histPage = 0, histStarts = [null], histReq = 0, histTail = null, histHasNext = false;
+    var histPager = doc.createElement("div");
+    histPager.className = "pools-pager";
+    var histPrev = doc.createElement("button");
+    histPrev.type = "button"; histPrev.className = "subtle-btn";
+    histPrev.textContent = t("pool.prev_btn", "‹ Prev");
+    try {
+      if (typeof touchable === "function") touchable(histPrev);
+    } catch (e) { /* button stands without the touch floor */ }
+    var histNote = DOM.el(doc, "span", t("common.page_n", "Page %(n)s", { n: 1 }), "muted");
+    var histNext = doc.createElement("button");
+    histNext.type = "button"; histNext.className = "subtle-btn";
+    histNext.textContent = t("pool.next_btn", "Next ›");
+    try {
+      if (typeof touchable === "function") touchable(histNext);
+    } catch (e) { /* button stands without the touch floor */ }
+    histPager.appendChild(histPrev); histPager.appendChild(histNote); histPager.appendChild(histNext);
+    histSection.appendChild(histPager);
+    /* Repaint the pager bar after each history load (all-mode only; hidden
+     * for filtered modes). No params; reads histPage/histHasNext/histTail.
+     * Failure: hides the bar when the account backend is absent. */
+    function paintHistPager(mode) {
+      if (mode !== "all") { histPager.style.display = "none"; return; }
+      histPager.style.display = "";
+      histPrev.disabled = histPage === 0;
+      histNext.disabled = !histHasNext || !histTail;
+      histNote.textContent = t("common.page_n", "Page %(n)s", { n: histPage + 1 });
+    }
+    histPrev.addEventListener("click", function () {
+      if (histPage === 0) return;
+      histPage -= 1;
+      loadHist("all");
+    });
+    histNext.addEventListener("click", function () {
+      if (!histHasNext || !histTail) return;
+      histStarts[histPage + 1] = histTail;
+      histPage += 1;
+      loadHist("all");
+    });
     wrap.appendChild(histSection);
 
     var memSection = doc.createElement("section");
@@ -1730,11 +1781,13 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
 
     Account.balances(acct.id).then(function (list) {
       balSection.removeChild(balLoading);
+      if (balSkel && balSkel.parentNode) balSkel.parentNode.removeChild(balSkel);
       enrichPortfolio(acct.id, list, sharedReads).then(function (enrich) {
         renderPortfolio(doc, balSection, acct, list, enrich);
       });
     }).catch(function (e) {
       balSection.removeChild(balLoading);
+      if (balSkel && balSkel.parentNode) balSkel.parentNode.removeChild(balSkel);
       showError(doc, balSection, e, t("account.load_balances_failed", "Could not load balances."));
     });
 
@@ -1773,13 +1826,36 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
           p = Promise.reject(new Error("history-unavailable"));
         }
       } else {
-        p = Account.history(acct.id, 20);
+        /* Paged "all" mode (Rec 3): over-fetch one row for hasNext; the
+         * start cursor is inclusive on most nodes, so a leading duplicate
+         * of the previous page's tail is dropped. histReq discards stale
+         * page turns that resolve out of order. */
+        p = (function () {
+          var myReq = ++histReq;
+          var start = histStarts[histPage];
+          return Account.history(acct.id, HIST_SIZE + 1, (start === null || start === undefined) ? undefined : start).then(function (raw) {
+            if (myReq !== histReq) return null;
+            var rows = Array.isArray(raw) ? raw.slice() : [];
+            if (histPage > 0 && rows.length && start) {
+              var firstId = (typeof Account.histRowId === "function") ? Account.histRowId(rows[0]) : null;
+              if (firstId !== null && firstId === start) rows.shift();
+            }
+            var hasNext = rows.length > HIST_SIZE;
+            if (hasNext) rows = rows.slice(0, HIST_SIZE);
+            return { rows: rows, hasNext: hasNext };
+          });
+        })();
       }
-      Promise.resolve(p).then(function (rows) {
+      Promise.resolve(p).then(function (res) {
+        if (!res) return;
+        var rows = (mode === "all" && res && !Array.isArray(res) && Array.isArray(res.rows)) ? res.rows : res;
+        var hasNext = !!(mode === "all" && res && !Array.isArray(res) && res.hasNext);
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
         /* Slice-16 (F1b): pulled history watcher on the existing fetch.
-         * First-entry diff per plan; a notify fault never breaks history. */
-        if (mode === "all") {
+         * First-entry diff per plan; a notify fault never breaks history.
+         * Page-0 only (Rec 3): deeper pages re-baseline firstId and would
+         * toast fills/transfers for old history as "fresh". */
+        if (mode === "all" && histPage === 0) {
           try {
             if (typeof NotifyHost !== "undefined" && NotifyHost &&
                 typeof NotifyHost.mountToasts === "function") {
@@ -1807,6 +1883,14 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
         }).then(function (r3) {
           histRowsCache = Array.isArray(r3) ? r3 : [];
           AccountUI._history.renderHistory(doc, histBody, r3);
+          /* Pager tail: cursor for the Next turn (null when the row shape
+           * is unrecognized — Next stays disabled rather than guessing). */
+          histTail = null;
+          histHasNext = hasNext;
+          if (mode === "all" && histRowsCache.length && typeof Account.histRowId === "function") {
+            try { histTail = Account.histRowId(histRowsCache[histRowsCache.length - 1]); } catch (e) { histTail = null; }
+          }
+          paintHistPager(mode);
         });
       }).catch(function (e) {
         if (fetching.parentNode === histBody) histBody.removeChild(fetching);
@@ -1814,6 +1898,7 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
       });
     }
     histFilter.addEventListener("change", function () {
+      histPage = 0; histStarts = [null]; histTail = null; histHasNext = false;
       loadHist(histFilter.value);
       try { syncAcctUrl(activeTabKey, histFilter.value); } catch (e) { /* URL stays */ }
     });
@@ -1826,9 +1911,11 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
      * Shared with the Balances enrichment (perf: one fetch per render). */
     sharedOrders().then(function (orders) {
       ordSection.removeChild(ordLoading);
+      if (ordSkel && ordSkel.parentNode) ordSkel.parentNode.removeChild(ordSkel);
       AccountUI._history.renderOpenOrders(doc, ordSection, orders);
     }).catch(function (e) {
       ordSection.removeChild(ordLoading);
+      if (ordSkel && ordSkel.parentNode) ordSkel.parentNode.removeChild(ordSkel);
       showError(doc, ordSection, e, t("account.load_orders_failed", "Could not load open orders."));
     });
   }

@@ -138,6 +138,9 @@ var FavouritesUI = (function () {
     var input = doc.createElement("input");
     input.id = inputId; input.type = "text";
     input.setAttribute("placeholder", placeholder);
+    /* Component-wisdom Rec 10: placeholder is not a name — mirror it as the
+     * accessible name (same hint text SR users hear as sighted users see). */
+    input.setAttribute("aria-label", placeholder);
     input.setAttribute("autocomplete", "off");
     input.setAttribute("autocapitalize", "characters");
     input.setAttribute("spellcheck", "false");

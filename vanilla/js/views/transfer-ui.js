@@ -484,11 +484,14 @@ var TransferUI = (function () {
       }
     } catch (e) { /* free text stands */ }
 
-    /* Asset field (punchlist HIGH). assetF.input is SWAPPABLE: unlocked it
-     * becomes a <select> restricted to the sender's non-zero balances once
-     * they load (free-text fallback when locked or when the load fails, so
-     * the form never blocks). Every reader below uses assetF.input at event
-     * time, never a cached node. */
+    /* Asset field (component-wisdom Rec 1): a stable INPUT with a
+     * datalist combobox of the sender's non-zero balance symbols once they
+     * load (free-text fallback when locked or when the load fails, so the
+     * form never blocks). WHY never a swapped <select>: replacing the
+     * control type under the user breaks focus, native keyboards, and the
+     * already-bound events; the To field above (:467-485) is the precedent.
+     * Every reader below uses assetF.input at event time, never a cached
+     * node. */
     var assetF = Forms.labeledInput(doc, t("transfer.asset_label", "Asset ") + " ", {
       id: "xfer-asset", value: state.asset, placeholder: coreSymbol(), autocomplete: "off"
     });
@@ -733,7 +736,7 @@ var TransferUI = (function () {
     var balWho = null;
     var balsState = locked ? "locked" : "loading"; /* loading|ready|failed|locked */
 
-    /* Live asset value across the input/select swap (never cached). */
+    /* Live asset value, read at event time (never cached). */
     function assetVal() {
       return String((assetF.input && assetF.input.value) || "").trim();
     }
@@ -931,7 +934,8 @@ var TransferUI = (function () {
       reviewBtn.disabled = reasons.length > 0;
     }
 
-    /* Asset input events, rebound after the input/select swap. */
+    /* Asset input events, bound once: the input element is stable for the
+     * life of the form (datalist suggestions only, never a control swap). */
     function bindAssetEvents() {
       assetF.input.addEventListener("input", function () {
         refreshFeeOpts(); refreshAvail(); updateGate();
@@ -941,36 +945,38 @@ var TransferUI = (function () {
       });
     }
 
-    /* Unlocked asset dropdown: resolve the sender, load non-zero balances,
-     * swap the text input for a restricted <select> (the current/prefill
-     * value survives via union). Any failure keeps the free-text input —
-     * the form never blocks, and the unknown-asset review catch still
-     * guards every path. */
-    function swapAssetToSelect() {
+    /* Unlocked asset combobox: resolve the sender, load non-zero balances,
+     * and offer their symbols as datalist suggestions on the stable text
+     * input (current/prefill value survives: it is never replaced, and the
+     * union appends it when absent from balances). Any failure keeps the
+     * plain free-text input — the form never blocks, and the unknown-asset
+     * review catch still guards every path. */
+    function refreshAssetList() {
       if (!assetF.input || assetF.input.tagName !== "INPUT") return;
       var cur = assetVal().toUpperCase();
       var seen = {};
       var opts = [];
-      var i, k;
+      var i;
       for (i = 0; i < bals.length; i++) {
         seen[String(bals[i].symbol).toUpperCase()] = 1;
         opts.push(bals[i].symbol);
       }
       if (cur && !seen[cur]) opts.push(cur);
       if (!opts.length) return;
-      var sel = doc.createElement("select");
-      sel.id = "xfer-asset";
-      touchable(sel);
-      for (k = 0; k < opts.length; k++) {
-        var o = doc.createElement("option");
-        o.value = opts[k];
-        o.textContent = opts[k];
-        if (opts[k].toUpperCase() === cur) o.selected = true;
-        sel.appendChild(o);
+      var dl = doc.getElementById("xfer-asset-list");
+      if (!dl) {
+        dl = doc.createElement("datalist");
+        dl.id = "xfer-asset-list";
+        assetF.row.appendChild(dl);
+        assetF.input.setAttribute("list", "xfer-asset-list");
+      } else {
+        while (dl.firstChild) dl.removeChild(dl.firstChild);
       }
-      assetF.input.parentNode.replaceChild(sel, assetF.input);
-      assetF.input = sel;
-      bindAssetEvents();
+      for (i = 0; i < opts.length; i++) {
+        var o = doc.createElement("option");
+        o.value = opts[i];
+        dl.appendChild(o);
+      }
     }
 
     /* loadBalancesForSender: reload sender balances + fee options on sender change.
@@ -999,7 +1005,7 @@ var TransferUI = (function () {
           feeSym = assetVal().toUpperCase() || feeSym;
           feeTouched = false;
         }
-        swapAssetToSelect();
+        refreshAssetList();
         refreshFeeOpts();
         refreshAvail();
         updateGate();

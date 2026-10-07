@@ -108,6 +108,40 @@ var DOM = (function () {
     return p;
   }
 
+  /* skel: shimmer placeholder rows for known-layout loads (component-wisdom
+   * Rec 4: balances, order book, pool rows). Decorative (aria-hidden) — the
+   * caller keeps its DOM.status text line for screen readers; sighted users
+   * get layout-shaped shimmer instead of a bare spinner. Styling lives in
+   * app.css (.skel*, tokens only, static under prefers-reduced-motion).
+   * Params: wrap (appended into, like status/error), rows (row count,
+   * default 3, clamped 1-8). Returns the wrapper div. */
+  function skel(wrap, rows) {
+    var doc = getDoc(wrap);
+    var n = (typeof rows === "number" && isFinite(rows)) ? Math.floor(rows) : 3;
+    if (n < 1) n = 1;
+    if (n > 8) n = 8;
+    var box = doc ? createElementWithMethods(doc, "div") : makeElement("div");
+    box.className = "skel-wrap";
+    box.setAttribute("aria-hidden", "true");
+    var i, r, a, b, c;
+    for (i = 0; i < n; i++) {
+      r = doc ? createElementWithMethods(doc, "div") : makeElement("div");
+      r.className = "skel-row";
+      a = doc ? createElementWithMethods(doc, "span") : makeElement("span");
+      a.className = "skel sk-a";
+      b = doc ? createElementWithMethods(doc, "span") : makeElement("span");
+      b.className = "skel sk-b";
+      c = doc ? createElementWithMethods(doc, "span") : makeElement("span");
+      c.className = "skel sk-c";
+      r.appendChild(a); r.appendChild(b); r.appendChild(c);
+      box.appendChild(r);
+    }
+    if (wrap && wrap.appendChild) {
+      wrap.appendChild(box);
+    }
+    return box;
+  }
+
   function append(wrap) {
     if (!wrap) return wrap;
     for (var i = 1; i < arguments.length; i++) {
@@ -153,6 +187,7 @@ var DOM = (function () {
     attrs: attrs,
     status: status,
     error: error,
+    skel: skel,
     append: append,
     pageHead: pageHead
   };

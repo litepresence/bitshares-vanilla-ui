@@ -413,8 +413,10 @@ var DashboardUI = (function () {
     acctSection.appendChild(DOM.el(doc, "p", t("transfer.loading", "Loading…"), "muted"));
     balSection.appendChild(DOM.el(doc, "h2", t("account.s7", "Balances")));
     balSection.appendChild(DOM.el(doc, "p", t("account.loading_balances", "Loading balances…"), "muted"));
+    if (DOM.skel) DOM.skel(balSection, 4);
     histSection.appendChild(DOM.el(doc, "h2", t("account.history_title", "History")));
     histSection.appendChild(DOM.el(doc, "p", t("account.loading_history", "Loading history…"), "muted"));
+    if (DOM.skel) DOM.skel(histSection, 4);
 
     resolveWatched(unlocked).then(function (found) {
       if (myGen !== gen) return;

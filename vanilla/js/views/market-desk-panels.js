@@ -482,6 +482,7 @@ MarketDesk._panels = MarketDesk._panels || {};
       }
       DOM.clear(myBody);
       myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+      if (DOM.skel) DOM.skel(myBody, 4);
       Promise.resolve().then(function () {
         if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
           throw new Error("account backend missing");
@@ -514,6 +515,7 @@ MarketDesk._panels = MarketDesk._panels || {};
       }
     } catch (e) { /* auto-load below stands */ }
     myBody.appendChild(DOM.el(doc, "p", t("market.loading_my_trades", "Loading your fills…"), "muted"));
+    if (DOM.skel) DOM.skel(myBody, 4);
     Account.myAccountId().then(function (myId) {
       return Account.history(myId, 100).then(function (rows) {
         return { myId: myId, rows: rows || [] };

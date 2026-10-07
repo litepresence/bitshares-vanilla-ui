@@ -160,6 +160,16 @@ var ReferralsUI = (function () {
      * input stays hand-built; only the row shell comes from Forms. */
     var row = Forms.fieldRow(doc, t("referrals.account", "Account "), input);
     wrap.appendChild(row);
+    /* Component-wisdom Rec 2: non-blocking blur pre-check reusing the
+     * fail() mapping below (unknown-account vs network vs locked). The
+     * Look-up button still decides; this only surfaces typos early and
+     * writes on failure, never clearing (lookup results own the div). */
+    input.addEventListener("blur", function () {
+      var v = input.value.trim().toLowerCase();
+      if (!v) return;
+      if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+      Account.resolve(v).then(function () { /* exists — submit owns success */ }).catch(function (e) { fail(e || { message: "unknown-account" }); });
+    });
     var go = touchable(DOM.el(doc, "button", t("referrals.look_up", "Look up")));
     go.id = "ref-go"; go.type = "button"; wrap.appendChild(go);
     var mine = touchable(DOM.el(doc, "button", t("referrals.use_my_account", "Use my account")));

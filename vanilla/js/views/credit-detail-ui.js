@@ -258,6 +258,38 @@ var CreditDetailUI = (function () {
     var fRate = ui.field(doc, t("credit.max_fee_rate_2", "Max fee rate %"), { value: Credit.rateUnitsToHuman(o.rate_units), inputmode: "decimal" });
     var fDur = ui.field(doc, t("credit.min_duration", "Min duration"), { value: "1 day", placeholder: t("credit.e_g_3_days", "e.g. 3 days") });
     [fBor, fAmt, fCollA, fColl, fRate, fDur].forEach(function (f) { box.appendChild(f.row); });
+    /* Component-wisdom Rec 2: non-blocking registry pre-checks. The review
+     * build still resolves both via Account.resolve/Asset.describe at
+     * submit; these blur hints only surface typos early. */
+    (function () {
+      function inlineErr(field) {
+        var err = doc.createElement("div");
+        err.className = "error"; err.setAttribute("aria-live", "polite"); err.style.display = "none";
+        field.row.appendChild(err);
+        return err;
+      }
+      var borErr = inlineErr(fBor), collErr = inlineErr(fCollA);
+      fBor.input.addEventListener("blur", function () {
+        var v = fBor.input.value.trim();
+        if (!v) { borErr.style.display = "none"; borErr.textContent = ""; return; }
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+        Account.resolve(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== fBor.input) { borErr.style.display = "none"; borErr.textContent = ""; }
+        }).catch(function () {
+          borErr.textContent = t("common.unknown_account", "Unknown account."); borErr.style.display = "";
+        });
+      });
+      fCollA.input.addEventListener("blur", function () {
+        var v = fCollA.input.value.trim();
+        if (!v) { collErr.style.display = "none"; collErr.textContent = ""; return; }
+        if (typeof Asset === "undefined" || !Asset || typeof Asset.describe !== "function") return;
+        Asset.describe(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== fCollA.input) { collErr.style.display = "none"; collErr.textContent = ""; }
+        }).catch(function () {
+          collErr.textContent = t("common.unknown_asset", "Unknown asset."); collErr.style.display = "";
+        });
+      });
+    })();
     var arRow = ui.el(doc, "div", null, "xfer-field");
     arRow.appendChild(ui.el(doc, "span", t("credit.auto_repay_2", "Auto-repay: ")));
     var arNames = [["", t("credit.omit_chain_default", "omit (chain default)")], ["0", t("credit.0_none", "0 — none")], ["1", t("credit.1_full_only", "1 — full only")], ["2", t("credit.2_partial_ok", "2 — partial ok")]];

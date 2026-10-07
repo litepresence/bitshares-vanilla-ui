@@ -611,8 +611,29 @@ var ProposalUI = (function () {
         ctx.wrap.appendChild(DOM.el(doc, "p", t("proposal.viewing_as", "Viewing as %(name)s (%(id)s) — unlock to act as yourself.", { name: _v.name, id: _v.id }), "muted"));
       }
     } catch (e) { /* notice is display-only */ }
+    /* Component-wisdom Rec 2: non-blocking account pre-check for the
+     * registry-object inputs below. Submit-time Account.resolve still
+     * decides; this blur hint only surfaces typos early.
+     * @param {{row: HTMLElement, input: HTMLInputElement}} field Forms row pair.
+     * Failure: silent when the account backend is absent (never blocks). */
+    function blurAccount(field) {
+      var err = doc.createElement("div");
+      err.className = "error"; err.setAttribute("aria-live", "polite"); err.style.display = "none";
+      field.row.appendChild(err);
+      field.input.addEventListener("blur", function () {
+        var v = field.input.value.trim();
+        if (!v) { err.style.display = "none"; err.textContent = ""; return; }
+        if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+        Account.resolve(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== field.input) { err.style.display = "none"; err.textContent = ""; }
+        }).catch(function () {
+          err.textContent = t("common.unknown_account", "Unknown account."); err.style.display = "";
+        });
+      });
+    }
     var fA = Forms.labeledInput(doc, t("proposal.account_for_approvals", "Account for approvals") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
     ctx.wrap.appendChild(fA.row);
+    blurAccount(fA);
     var go = touchable(DOM.el(doc, "button", t("proposal.list_proposals", "List proposals"))); go.type = "button"; ctx.wrap.appendChild(go);
     var listBox = DOM.el(doc, "div"); ctx.wrap.appendChild(listBox);
     ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.create_proposal", "Create proposal")));
@@ -620,6 +641,32 @@ var ProposalUI = (function () {
     var fE = Forms.labeledInput(doc, t("proposal.expiration", "Expiration") + " ", { type: "datetime-local" });
     var fR = Forms.labeledInput(doc, t("proposal.review_period_seconds_optional", "Review period seconds (optional)") + " ", { placeholder: t("proposal.blank_none", "blank = none"), inputmode: "numeric" });
     ctx.wrap.appendChild(fP.row); ctx.wrap.appendChild(fE.row); ctx.wrap.appendChild(fR.row);
+    blurAccount(fP);
+    /* Component-wisdom Rec 5: duration preset chips (barter-ui expiration /
+     * review chips are the sibling; htlc-ui secsPicker the seconds
+     * precedent). Chips write fE/fR above; manual typing stays custom.
+     * Labels are duration symbols, not language — no new i18n keys. */
+    (function () {
+      function fmt(hours) {
+        var t = new Date(Date.now() + hours * 3600000);
+        function p(n) { return (n < 10 ? "0" : "") + n; }
+        return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate()) + "T" + p(t.getHours()) + ":" + p(t.getMinutes());
+      }
+      var expRow = doc.createElement("div"); expRow.className = "xfer-field";
+      [["+24h", 24], ["+3d", 72], ["+7d", 168]].forEach(function (pr) {
+        var b = touchable(DOM.el(doc, "button", /** @type {string} */ (pr[0]))); b.type = "button"; b.className = "subtle-btn";
+        b.addEventListener("click", function () { fE.input.value = fmt(pr[1]); });
+        expRow.appendChild(b);
+      });
+      ctx.wrap.appendChild(expRow);
+      var revRow = doc.createElement("div"); revRow.className = "xfer-field";
+      [[t("proposal.none", "none"), ""], ["1h", "3600"], ["1d", "86400"]].forEach(function (pr) {
+        var b2 = touchable(DOM.el(doc, "button", /** @type {string} */ (pr[0]))); b2.type = "button"; b2.className = "subtle-btn";
+        b2.addEventListener("click", function () { fR.input.value = pr[1]; });
+        revRow.appendChild(b2);
+      });
+      ctx.wrap.appendChild(revRow);
+    })();
     var kindSel = doc.createElement("select"); touchable(kindSel);
     /* A11y delta 2026-10-01: unnamed <select> announced only "combobox" —
      * plain aria-label (no new t() key, so check_i18n stays green; a later
@@ -805,9 +852,29 @@ var ProposalUI = (function () {
         });
       }).catch(function (e) { if (myGen === gen) showError(doc, ctx.wrap, e, t("proposal.could_not_join_asset_symbols", "Could not join asset symbols.")); });
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.approve_reject", "Approve / reject")));
+      /* Component-wisdom Rec 2 (detail scope): same non-blocking account
+       * pre-check as the list scope above — submit-time resolve still decides.
+       * @param {{row: HTMLElement, input: HTMLInputElement}} field Forms row pair.
+       * Failure: silent when the account backend is absent (never blocks). */
+      function blurAccount2(field) {
+        var err2 = doc.createElement("div");
+        err2.className = "error"; err2.setAttribute("aria-live", "polite"); err2.style.display = "none";
+        field.row.appendChild(err2);
+        field.input.addEventListener("blur", function () {
+          var v = field.input.value.trim();
+          if (!v) { err2.style.display = "none"; err2.textContent = ""; return; }
+          if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") return;
+          Account.resolve(v).then(function () {
+            if (typeof document === "undefined" || document.activeElement !== field.input) { err2.style.display = "none"; err2.textContent = ""; }
+          }).catch(function () {
+            err2.textContent = t("common.unknown_account", "Unknown account."); err2.style.display = "";
+          });
+        });
+      }
       var fW = Forms.labeledInput(doc, t("proposal.approver_account", "Approver account") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       var fP2 = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fW.row); ctx.wrap.appendChild(fP2.row);
+      blurAccount2(fW); blurAccount2(fP2);
       var ow = doc.createElement("select"); touchable(ow);
       try { ow.setAttribute("aria-label", t("misc.authority", "Authority")); } catch (e) { /* options stand */ }
       ["active", "owner"].forEach(function (k) { var o = doc.createElement("option"); o.value = k; o.textContent = k + " authority"; ow.appendChild(o); });
@@ -838,6 +905,7 @@ var ProposalUI = (function () {
       ctx.wrap.appendChild(DOM.el(doc, "h2", t("proposal.delete_proposal_op_24", "Delete proposal (op %(op)s)", { op: 24 })));
       var fD = Forms.labeledInput(doc, t("proposal.fee_payer", "Fee payer") + " ", { placeholder: t("common.name_or_id_hint", "name or 1.2.N"), value: "1.2.0" });
       ctx.wrap.appendChild(fD.row);
+      blurAccount2(fD);
       var chk = doc.createElement("input"); chk.type = "checkbox"; touchable(chk);
       var chkRow = Forms.fieldRow(doc, t("proposal.use_owner_authority_veto_path", "Use owner authority (veto path) "), chk);
       ctx.wrap.appendChild(chkRow);

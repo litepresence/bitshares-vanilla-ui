@@ -126,11 +126,17 @@ var Account = (function () {
   }
 
   /* Fetch raw operation history for an account id (newest first, opaque rows).
-   * Params: id account id string; limit positive int (default 20).
+   * Params: id account id string; limit positive int (default 20);
+   *   start "1.11.x" cursor, INCLUSIVE (default FIRST_HISTORY_OP = chain tip,
+   *   i.e. the newest page). Callers paging backwards pass the previous
+   *   page's tail id and drop the leading duplicate themselves.
    * Returns: Promise of the raw get_account_history array.
-   * Fails: "history-unavailable" when the history plugin/api is missing. */
-  async function history(id, limit) {
+   * Fails: "history-unavailable" when the history plugin/api is missing;
+   *   "bad-args" on a malformed start cursor. */
+  async function history(id, limit, start) {
     if (limit === undefined) limit = 20;
+    var st = (start === undefined || start === null) ? FIRST_HISTORY_OP : start;
+    if (typeof st !== "string" || !HIST_ID_RE.test(st)) throw new Error("bad-args");
     var histId;
     try {
       histId = await _histId();
@@ -139,7 +145,7 @@ var Account = (function () {
     }
     var rows;
     try {
-      rows = await Chain.call(histId, "get_account_history", [id, FIRST_HISTORY_OP, limit, FIRST_HISTORY_OP]);
+      rows = await Chain.call(histId, "get_account_history", [id, FIRST_HISTORY_OP, limit, st]);
     } catch (e) {
       throw new Error("history-unavailable");
     }
@@ -195,6 +201,19 @@ var Account = (function () {
       throw new Error("history-unavailable");
     }
     return rows || [];
+  }
+
+  /* History-row cursor id ("1.11.N") from either get_account_history row
+   * shape (object with .id, or [seq, object] pair tolerated) — the same
+   * tolerant read the API itself uses when walking (historyPaged).
+   * Component-wisdom Rec 3 seam: views page backwards with it.
+   * Pure: no network, no globals.
+   * @param {any} r raw history row.
+   * @returns {string|null} the "1.11.N" cursor, or null when the row shape
+   * is unrecognized (caller stops paging — never guesses).
+   * Failure: returns null on anything unrecognized (never throws). */
+  function histRowId(r) {
+    return _histRowId(r, _unwrapHist(r));
   }
 
   /* Paged history walk (dex-ux plot proposal 4 source — docs/parity/
@@ -577,6 +596,7 @@ var Account = (function () {
     balances: balances,
     history: history,
     historyPaged: historyPaged,
+    histRowId: histRowId,
     opsFiltered: opsFiltered,
     _opsArgs: _opsArgs,
     replayEquity: replayEquity,

@@ -93,7 +93,7 @@ var CreateAccountUI = (function () {
       return;
     }
     if (typeof Chain !== "undefined" && Chain && Chain.status().state !== "open") {
-      wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
+    wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
       wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
       var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
       var off = Store.subscribe("connection", function (st) {
@@ -155,6 +155,28 @@ var CreateAccountUI = (function () {
     DOM.clear(root);
     var wrap = makeWrap(doc, root), testnet = networkName() === "testnet";
     wrap.appendChild(DOM.pageHead(doc, t("createaccount.create_account", "Create Account"), "create_account"));
+    /* Component-wisdom Rec 9: header-only stepper (name → brainkey →
+     * register). Position derives from P below: unchecked name → 1,
+     * checked-free → 2, registering → 3. Styling is app.css .ca-steps
+     * (theme tokens only). */
+    var stepLabels = [t("createaccount.step_name", "Name"), t("createaccount.step_brainkey", "Brainkey"), t("createaccount.step_register", "Register")];
+    var stepOl = doc.createElement("ol"); stepOl.className = "ca-steps";
+    var stepLis = stepLabels.map(function (label, i) {
+      var li = doc.createElement("li");
+      li.textContent = (i + 1) + ". " + label;
+      stepOl.appendChild(li);
+      return li;
+    });
+    wrap.appendChild(stepOl);
+    function paintSteps(phase) {
+      stepLis.forEach(function (li, i) {
+        var n = i + 1;
+        if (n < phase) { li.className = "ca-step-done"; try { li.removeAttribute("aria-current"); } catch (e) { /* class stands */ } }
+        else if (n === phase) { li.className = "ca-step-now"; try { li.setAttribute("aria-current", "step"); } catch (e) { /* class stands */ } }
+        else { li.className = ""; try { li.removeAttribute("aria-current"); } catch (e) { /* class stands */ } }
+      });
+    }
+    paintSteps(1);
     wrap.appendChild(DOM.el(doc, "p", testnet
       ? "Register a new testnet account through the faucet (testnet network)."
       : "Registration uses the testnet faucet — switch to testnet in Settings to register. Name checks work on either network.", "muted"));
@@ -217,6 +239,7 @@ var CreateAccountUI = (function () {
     nameF.input.addEventListener("input", function () {
       P.name = nameF.input.value.trim().toLowerCase(); P.checked = null; P.takenId = null;
       avail.textContent = availabilityText(P);
+      paintSteps(1);
     });
     regenBtn.addEventListener("click", function () {
       DOM.clear(out); bkArea.placeholder = t("createaccount.generating_brainkey", "Generating brainkey…"); bkArea.value = ""; P.brainkey = "";
@@ -233,6 +256,7 @@ var CreateAccountUI = (function () {
         if (myGen !== gen) return;
         P.checked = r.free ? "free" : "taken"; P.takenId = r.id || null;
         avail.textContent = availabilityText(P);
+        paintSteps(r.free ? 2 : 1);
         out.removeChild(status); checkBtn.disabled = false;
       }).catch(function (e) {
         if (myGen !== gen) return;
@@ -247,6 +271,7 @@ var CreateAccountUI = (function () {
       if (bad) { setFieldError(nameF, bad); return; }
       if (!P.brainkey) { showError(doc, out, new Error(t("createaccount.err_brainkey_wait", "Wait for the brainkey to generate first.")), null); return; }
       checkBtn.disabled = true; regBtn.disabled = true;
+      paintSteps(3);
       var status = showStatus(doc, out, t("createaccount.checking_name", "Checking name…"));
       /* Re-check right before registering: names are first-come, so a stale
        * "free" must never send a doomed POST. */
@@ -264,6 +289,7 @@ var CreateAccountUI = (function () {
           if (myGen !== gen) return;
           try { out.removeChild(status); } catch (err) { /* already replaced */ }
           checkBtn.disabled = false; regBtn.disabled = false;
+          paintSteps(2);
           showError(doc, out, e, t("createaccount.registration_failed", "Registration failed."));
         });
     });

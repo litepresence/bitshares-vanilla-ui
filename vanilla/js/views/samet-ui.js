@@ -361,6 +361,24 @@ var SametUI = (function () {
     var fBal = Forms.labeledInput(doc, t("samet.balance", "Balance") + " ", { placeholder: "0.0", inputmode: "decimal" });
     var fRate = Forms.labeledInput(doc, t("samet.fee_rate_2", "Fee rate %") + " ", { placeholder: "0.1", inputmode: "decimal" });
     [fAsset, fBal, fRate].forEach(function (f) { box.appendChild(f.row); });
+    /* Component-wisdom Rec 2: non-blocking asset pre-check. The create
+     * review still validates via Asset.describe at submit; this blur hint
+     * only surfaces typos early. */
+    (function () {
+      var err = doc.createElement("div");
+      err.className = "error"; err.setAttribute("aria-live", "polite"); err.style.display = "none";
+      fAsset.row.appendChild(err);
+      fAsset.input.addEventListener("blur", function () {
+        var v = fAsset.input.value.trim();
+        if (!v) { err.style.display = "none"; err.textContent = ""; return; }
+        if (typeof Asset === "undefined" || !Asset || typeof Asset.describe !== "function") return;
+        Asset.describe(v).then(function () {
+          if (typeof document === "undefined" || document.activeElement !== fAsset.input) { err.style.display = "none"; err.textContent = ""; }
+        }).catch(function () {
+          err.textContent = t("common.unknown_asset", "Unknown asset."); err.style.display = "";
+        });
+      });
+    })();
     ui.reviewSection(doc, box, uiGen, t("samet.review_create", "Review create"), {
       build: async function () {
         var me = await Account.resolve(await Account.myAccountId().catch(function () { return (typeof ViewingAs !== "undefined" && ViewingAs && typeof ViewingAs.id === "function") ? ViewingAs.id() : "1.2.0"; }));
