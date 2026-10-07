@@ -745,6 +745,7 @@
       "borrow.target_ratio_blank_unchanged",
       "borrow.the_chain_would_reject_raise_collateral_or_lo",
       "borrow.title",
+      "borrow.uc_title",
       "borrow.under_maintenance",
       "borrow.unexpected_asset_data_from_the_node_stopped_i",
       "borrow.unlock",
@@ -1005,7 +1006,6 @@
       "credit.owner",
       "credit.owner_account",
       "credit.owner_update_delete",
-      "credit.password",
       "credit.ph_base_amt",
       "credit.ph_base_asset",
       "credit.ph_borrower_account",
@@ -1031,13 +1031,13 @@
       "credit.total",
       "credit.total_balance",
       "credit.total_prefix",
+      "credit.uc_title",
       "credit.unchanged",
       "credit.unknown_asset",
       "credit.unknown_credit_deal",
       "credit.unknown_credit_offer",
       "credit.unknown_offer",
       "credit.unknown_same_t_fund",
-      "credit.unlock",
       "credit.unlocked_rereview_note",
       "credit.update_delta_tpl",
       "credit.viewing_as",
@@ -1123,6 +1123,8 @@
       "debit.tile_prediction_desc",
       "debit.title",
       "debit.total_field",
+      "debit.uc_order",
+      "debit.uc_title",
       "debit.unlocked_note",
       "debit.used_col",
       "debit.verify_fills_suffix",
@@ -2584,8 +2586,9 @@
       "pool.taker_row",
       "pool.time_col",
       "pool.touch_hint",
+      "pool.uc_action",
+      "pool.uc_title",
       "pool.unknown_pool",
-      "pool.unlock_notice",
       "pool.unstake_failed",
       "pool.unstaked",
       "pool.updated",
@@ -4409,7 +4412,8 @@
     "adjust": "Adjust",
     "repay_full": "Repay in full",
     "close_position": "Close position",
-    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire."
+    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire.",
+    "uc_title": "Unlock to sign"
   },
   "credit_detail": {
     "title": "信用报价"
@@ -4547,11 +4551,9 @@
     "unknown_credit_offer": "未知信用报价。",
     "unknown_offer": "未知报价。",
     "unknown_same_t_fund": "未知 Same-T 资金池。",
-    "unlock": "解锁",
     "update_delta_tpl": "差值金额 (%(sym)s，有符号)",
     "wallet_is_locked_enter_your_password_to_conti": "钱包已锁定。请输入密码以继续。",
     "yes": "是",
-    "password": "密码",
     "unlocked_rereview_note": "已解锁——请返回并重新运行核对，以便交易使用您的账户。",
     "viewing_as": "正以 committee-account (1.2.0) 身份查看——解锁后以您的账户操作。",
     "retry_load": "重试加载。",
@@ -4565,7 +4567,8 @@
     "offers_hint": " 有人创建报价后会出现——请在此操作台的创建报价表单中起草您的报价。",
     "owned_hint": " 请在下方创建报价表单中创建一个——拥有的报价将列在这里。",
     "my_deals_borrower": "My deals (borrower)",
-    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer."
+    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer.",
+    "uc_title": "Unlock to sign"
   },
   "debit": {
     "title": "直接扣款",
@@ -4641,7 +4644,9 @@
     "placed_prefix": "已下单（头区块 #",
     "verify_fills_suffix": "；请在 #/market 验证成交）。",
     "failed_prefix": "失败： ",
-    "retry_suffix": " — 重试前请先检查状态。"
+    "retry_suffix": " — 重试前请先检查状态。",
+    "uc_title": "Unlock to sign",
+    "uc_order": "Order"
   },
   "explorer_assets": {
     "title": "资产",
@@ -7108,7 +7113,6 @@
     "taker_row": "吃单手续费",
     "time_col": "时间（UTC）",
     "unknown_pool": "未知资金池。",
-    "unlock_notice": "解锁后操作——签名需要您的钱包密码。",
     "unstake_failed": "无法准备解押。",
     "warning_row": "警告",
     "withdrawal_row": "提取手续费",
@@ -7167,7 +7171,9 @@
     "swap_mkt_row": "Market fee",
     "delete_not_empty": "Not empty — %(legs)s must read 0 before delete.",
     "no_filter_match": "No swaps match these filters.",
-    "swap_desk": "Swap Desk"
+    "swap_desk": "Swap Desk",
+    "uc_title": "Unlock to continue",
+    "uc_action": "Action"
   },
   "market_ind": {
     "vwap": "日内成交量加权均价 + 价差",

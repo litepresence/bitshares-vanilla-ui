@@ -745,6 +745,7 @@
       "borrow.target_ratio_blank_unchanged",
       "borrow.the_chain_would_reject_raise_collateral_or_lo",
       "borrow.title",
+      "borrow.uc_title",
       "borrow.under_maintenance",
       "borrow.unexpected_asset_data_from_the_node_stopped_i",
       "borrow.unlock",
@@ -1005,7 +1006,6 @@
       "credit.owner",
       "credit.owner_account",
       "credit.owner_update_delete",
-      "credit.password",
       "credit.ph_base_amt",
       "credit.ph_base_asset",
       "credit.ph_borrower_account",
@@ -1031,13 +1031,13 @@
       "credit.total",
       "credit.total_balance",
       "credit.total_prefix",
+      "credit.uc_title",
       "credit.unchanged",
       "credit.unknown_asset",
       "credit.unknown_credit_deal",
       "credit.unknown_credit_offer",
       "credit.unknown_offer",
       "credit.unknown_same_t_fund",
-      "credit.unlock",
       "credit.unlocked_rereview_note",
       "credit.update_delta_tpl",
       "credit.viewing_as",
@@ -1123,6 +1123,8 @@
       "debit.tile_prediction_desc",
       "debit.title",
       "debit.total_field",
+      "debit.uc_order",
+      "debit.uc_title",
       "debit.unlocked_note",
       "debit.used_col",
       "debit.verify_fills_suffix",
@@ -2584,8 +2586,9 @@
       "pool.taker_row",
       "pool.time_col",
       "pool.touch_hint",
+      "pool.uc_action",
+      "pool.uc_title",
       "pool.unknown_pool",
-      "pool.unlock_notice",
       "pool.unstake_failed",
       "pool.unstaked",
       "pool.updated",
@@ -4409,7 +4412,8 @@
     "adjust": "Adjust",
     "repay_full": "Repay in full",
     "close_position": "Close position",
-    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire."
+    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire.",
+    "uc_title": "Unlock to sign"
   },
   "credit_detail": {
     "title": "Offerta di credito"
@@ -4547,11 +4551,9 @@
     "unknown_credit_offer": "Offerta di credito sconosciuta.",
     "unknown_offer": "Offerta sconosciuta.",
     "unknown_same_t_fund": "Fondo Same-T sconosciuto.",
-    "unlock": "Sblocchi",
     "update_delta_tpl": "Importo delta (%(sym)s, con segno)",
     "wallet_is_locked_enter_your_password_to_conti": "Il wallet è bloccato. Inserisca la password per continuare.",
     "yes": "sì",
-    "password": "password",
     "unlocked_rereview_note": "Sbloccato — prema Indietro e riesegua Verifica così la transazione usa il Suo account.",
     "viewing_as": "Visualizzazione come committee-account (1.2.0) — sblocchi per agire come Suo account.",
     "retry_load": "Riprovi il caricamento.",
@@ -4565,7 +4567,8 @@
     "offers_hint": " Le offerte compaiono dopo che qualcuno ne crea una — rediga la Sua nel modulo Crei offerta di questa sezione.",
     "owned_hint": " Ne crei una nel modulo Crei offerta qui sotto — le offerte possedute sono elencate qui.",
     "my_deals_borrower": "My deals (borrower)",
-    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer."
+    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer.",
+    "uc_title": "Unlock to sign"
   },
   "debit": {
     "title": "Addebito diretto",
@@ -4641,7 +4644,9 @@
     "placed_prefix": "piazzato (testa #",
     "verify_fills_suffix": "; verifichi le esecuzioni su #/market).",
     "failed_prefix": "non riuscito: ",
-    "retry_suffix": " — verifichi lo stato prima di riprovare."
+    "retry_suffix": " — verifichi lo stato prima di riprovare.",
+    "uc_title": "Unlock to sign",
+    "uc_order": "Order"
   },
   "explorer_assets": {
     "title": "Asset",
@@ -7108,7 +7113,6 @@
     "taker_row": "Commissione taker",
     "time_col": "Ora (UTC)",
     "unknown_pool": "Pool sconosciuta.",
-    "unlock_notice": "Sblocchi per operare — la firma richiede la password del wallet.",
     "unstake_failed": "Impossibile preparare l'unstake.",
     "warning_row": "Avviso",
     "withdrawal_row": "Commissione di prelievo",
@@ -7167,7 +7171,9 @@
     "swap_mkt_row": "Market fee",
     "delete_not_empty": "Not empty — %(legs)s must read 0 before delete.",
     "no_filter_match": "No swaps match these filters.",
-    "swap_desk": "Swap Desk"
+    "swap_desk": "Swap Desk",
+    "uc_title": "Unlock to continue",
+    "uc_action": "Action"
   },
   "market_ind": {
     "vwap": "VWAP di sessione + spread",

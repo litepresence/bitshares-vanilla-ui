@@ -87,32 +87,32 @@ var BorrowUI = (function () {
   function signNotice(doc) {
     return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
-  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
-    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-    var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-    inp.setAttribute("placeholder", t("borrow.password", "password")); inp.setAttribute("aria-label", t("borrow.password", "password"));
-    touchable(inp); row.appendChild(inp);
-    var b = touchable(DOM.el(doc, "button", t("borrow.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
-    parent.appendChild(row);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
-  /* Sign-time gate for the bespoke confirms below: locked clicks get a notice
-   * + inline unlock instead of a bare error; success asks for a re-review so
-   * the rebuilt transaction uses the wallet account, never a stale 1.2.0. */
-  function signGateLocked(doc, out, sendBtn, backBtn) {
-    if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-      var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-      note.className = "muted xfer-sign-note"; out.appendChild(note);
+  /* Unlocking runs in the shared UnlockConfirm modal (signGateLocked above)
+   * — no inline password row lives in this module. */
+  /* Sign-time gate for the bespoke confirms below: locked clicks detour
+   * through the shared review + unlock modal (the confirm's own rows — the
+   * full confirm stays on the page behind it); after unlock the caller
+   * re-reviews so the rebuilt transaction uses the wallet account, never a
+   * stale 1.2.0 (the note says so).
+   * Params: modal {rows, feeHuman?, feeTerm?} for the modal summary. */
+  function signGateLocked(doc, out, sendBtn, backBtn, modal) {
+    modal = modal || {};
+    if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+      showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+      sendBtn.disabled = false; backBtn.disabled = false;
+      return;
     }
-    unlockInline(doc, out, function () {
-      out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+    UnlockConfirm.open({
+      title: t("borrow.uc_title", "Unlock to sign"),
+      rows: modal.rows || [],
+      feeHuman: (modal.feeHuman === undefined) ? null : modal.feeHuman,
+      feeTerm: modal.feeTerm,
+      needPassword: true,
+      submitLabel: t("common.sign_send", "Sign & Send"),
+      onUnlocked: function () {
+        out.appendChild(DOM.el(doc, "p", t("borrow.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+      },
+      onCancel: function () {}
     });
     sendBtn.disabled = false; backBtn.disabled = false;
   }
@@ -524,7 +524,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: adjRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {
@@ -743,7 +743,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: openRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
             Tx.buildTx([R.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {
@@ -1094,7 +1094,7 @@ var BorrowUI = (function () {
             send.disabled = true; back.disabled = true;
             var status = showStatus(doc, out, t("common.status_broadcasting", "Broadcasting…"));
             var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back); return; }
+            if (!wif) { out.removeChild(status); signGateLocked(doc, out, send, back, { rows: bidRows, feeHuman: feeHuman, feeTerm: t("borrow.fee", "Fee") }); return; }
             Tx.buildTx([S.pair]).then(function (unsigned) {
               return Credit.sendAndProve(unsigned, wif, async function () {
                 try {

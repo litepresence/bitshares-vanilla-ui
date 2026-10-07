@@ -114,22 +114,8 @@ var CreditUI = (function () {
   function signNotice(doc) {
     return DOM.el(doc, "p", t("common.locked_preview", "Wallet locked — preview only. Password is asked at Sign & Send, never to view."), "muted");
   }
-  function unlockInline(doc, parent, onUnlock) { /* in-place password row (no route re-render, so previews survive) */
-    if (parent.querySelector && parent.querySelector(".xfer-unlock-row")) return;
-    var row = DOM.el(doc, "div", null, "xfer-field xfer-unlock-row");
-    var inp = doc.createElement("input");
-    inp.type = "password"; inp.setAttribute("autocomplete", "current-password");
-    inp.setAttribute("placeholder", t("credit.password", "password")); inp.setAttribute("aria-label", t("credit.password", "password"));
-    touchable(inp); row.appendChild(inp);
-    var b = touchable(DOM.el(doc, "button", t("credit.unlock", "Unlock"))); b.type = "button"; row.appendChild(b);
-    parent.appendChild(row);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; if (onUnlock) onUnlock(); })
-        .catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, parent, e, t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
+  /* Unlocking runs in the shared UnlockConfirm modal (sendConfirm above +
+   * debit-ui.js ladder) — no inline password row lives in this module. */
   function dropSubs() { subs.forEach(function (off) { try { off(); } catch (e) {} }); subs = []; }
   /* Gate a route: backend globals + online (offline -> panel+Retry).
    * PUBLIC-FIRST: no wallet gate here — lists/details/previews render locked. */
@@ -260,23 +246,49 @@ var CreditUI = (function () {
     var dlg = ConfirmDialog.show({ title: cfg.title, rows: cfg.rows || [],
       backLabel: t("credit.back", "Back"), sendLabel: t("common.sign_send", "Sign & Send"),
       onBack: function () { DOM.clear(out); },
-      onSend: function () {
+      onSend: function () { attemptSend(0); } });
+    /* attemptSend: sign-time gate (password asked only here — preview stays
+     * visible). Locked wallets detour through the shared review + unlock
+     * modal (same rows — the full confirm above stays on the page behind
+     * it); after unlock the transaction is RE-REVIEWED (same as the old
+     * inline row: the built pair may name the viewing-as account, so
+     * auto-sending it under the wallet key is refused — the note says so).
+     * Params: depth (0 first try; re-entry after unlock shows the note). */
+    function attemptSend(depth) {
+      if (depth > 0) {
         if (myGen !== gen) return;
+        out.appendChild(DOM.el(doc, "p", t("credit.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+        var btnsR = dlg.getElementsByTagName("button");
+        btnsR[0].disabled = false; btnsR[1].disabled = false;
+        return;
+      }
+      if (myGen !== gen) return;
+      /* First-try send body, scope-isolated (same shape as the pre-modal
+       * code — disable, status, wif gate, publish chain). */
+      (function () {
         var btns = dlg.getElementsByTagName("button");
         var backB = btns[0], sendB = btns[1];
         sendB.disabled = true; backB.disabled = true;
         var status = showStatus(doc, out, t("common.status_signing", "Signing…"));
         var wif = Wallet.keys && Wallet.keys.active ? Wallet.keys.active.wif : null;
-        if (!wif) { /* SIGN-TIME GATE: password asked only here — preview stays visible */
+        if (!wif) {
           out.removeChild(status);
-          if (!out.querySelector || !out.querySelector(".xfer-sign-note")) {
-            var note = DOM.el(doc, "p", t("common.locked_sign", "Wallet is locked — unlock to sign. The preview above stays visible; password is asked only here, at signing."), "muted");
-            note.className = "muted xfer-sign-note"; out.appendChild(note);
+          sendB.disabled = false; backB.disabled = false;
+          if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+            showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
+            return;
           }
-          unlockInline(doc, out, function () {
-            out.appendChild(DOM.el(doc, "p", t("credit.unlocked_rereview_note", "Unlocked — press Back and re-run Review so the transaction uses your account."), "muted"));
+          UnlockConfirm.open({
+            title: t("credit.uc_title", "Unlock to sign"),
+            rows: cfg.rows || [],
+            feeHuman: null,
+            needPassword: true,
+            submitLabel: t("common.sign_send", "Sign & Send"),
+            onUnlocked: function () { attemptSend(1); },
+            onCancel: function () {}
           });
-          sendB.disabled = false; backB.disabled = false; return; }
+          return;
+        }
         Promise.resolve().then(cfg.makeUnsigned).then(function (unsigned) {
           status.textContent = t("common.status_broadcasting", "Broadcasting…");
           return Credit.sendAndProve(unsigned, wif, cfg.prove);
@@ -289,7 +301,8 @@ var CreditUI = (function () {
           showError(doc, out, e, t("common.failed_check_state", "Failed. Check state before retrying (do NOT blindly rebroadcast)."));
           sendB.disabled = false; backB.disabled = false;
         });
-      } });
+      })();
+    }
     /* Principle #6 (raw in title): rows carry r[2] raw titles rendered
      * natively by ConfirmDialog (ui/confirm.js + tooling/confirm-test.js
      * §9 — the Batch B post-show restore loop deleted as redundant, same
@@ -808,7 +821,7 @@ var CreditUI = (function () {
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection,
       routeReady: routeReady,
       isUnlockedNow: isUnlockedNow, viewingAsNotice: viewingAsNotice, signNotice: signNotice,
-      unlockInline: unlockInline, viewingAsId: VIEWING_AS_ID,
+      viewingAsId: VIEWING_AS_ID,
       live: function (g) { return g === gen; } } };
 })();
 

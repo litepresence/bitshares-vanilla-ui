@@ -745,6 +745,7 @@
       "borrow.target_ratio_blank_unchanged",
       "borrow.the_chain_would_reject_raise_collateral_or_lo",
       "borrow.title",
+      "borrow.uc_title",
       "borrow.under_maintenance",
       "borrow.unexpected_asset_data_from_the_node_stopped_i",
       "borrow.unlock",
@@ -1005,7 +1006,6 @@
       "credit.owner",
       "credit.owner_account",
       "credit.owner_update_delete",
-      "credit.password",
       "credit.ph_base_amt",
       "credit.ph_base_asset",
       "credit.ph_borrower_account",
@@ -1031,13 +1031,13 @@
       "credit.total",
       "credit.total_balance",
       "credit.total_prefix",
+      "credit.uc_title",
       "credit.unchanged",
       "credit.unknown_asset",
       "credit.unknown_credit_deal",
       "credit.unknown_credit_offer",
       "credit.unknown_offer",
       "credit.unknown_same_t_fund",
-      "credit.unlock",
       "credit.unlocked_rereview_note",
       "credit.update_delta_tpl",
       "credit.viewing_as",
@@ -1123,6 +1123,8 @@
       "debit.tile_prediction_desc",
       "debit.title",
       "debit.total_field",
+      "debit.uc_order",
+      "debit.uc_title",
       "debit.unlocked_note",
       "debit.used_col",
       "debit.verify_fills_suffix",
@@ -2584,8 +2586,9 @@
       "pool.taker_row",
       "pool.time_col",
       "pool.touch_hint",
+      "pool.uc_action",
+      "pool.uc_title",
       "pool.unknown_pool",
-      "pool.unlock_notice",
       "pool.unstake_failed",
       "pool.unstaked",
       "pool.updated",
@@ -4409,7 +4412,8 @@
     "adjust": "Adjust",
     "repay_full": "Repay in full",
     "close_position": "Close position",
-    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire."
+    "bids_no_cancel": "Bids cannot be cancelled once placed — they execute or expire.",
+    "uc_title": "Unlock to sign"
   },
   "credit_detail": {
     "title": "신용 제안"
@@ -4547,11 +4551,9 @@
     "unknown_credit_offer": "알 수 없는 신용 제안입니다.",
     "unknown_offer": "알 수 없는 제안입니다.",
     "unknown_same_t_fund": "알 수 없는 Same-T 자금입니다.",
-    "unlock": "잠금 해제",
     "update_delta_tpl": "변동분(%(sym)s, 부호 포함)",
     "wallet_is_locked_enter_your_password_to_conti": "지갑이 잠겨 있습니다. 계속하려면 비밀번호를 입력하십시오.",
     "yes": "예",
-    "password": "비밀번호",
     "unlocked_rereview_note": "잠금 해제됨 — 트랜잭션이 본인 계정을 사용하도록 뒤로 돌아간 뒤 검토를 다시 실행하십시오.",
     "viewing_as": "committee-account(1.2.0)로 보는 중 — 본인 계정으로 활동하려면 잠금을 해제하십시오.",
     "retry_load": "다시 불러오기.",
@@ -4565,7 +4567,8 @@
     "offers_hint": " 누군가 생성하면 제안이 표시됩니다 — 이 데스크의 제안 만들기 양식에서 본인 제안을 작성하십시오.",
     "owned_hint": " 아래 제안 만들기 양식에서 만드십시오 — 보유 제안이 여기에 표시됩니다.",
     "my_deals_borrower": "My deals (borrower)",
-    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer."
+    "no_borrower_deals": "No borrower deals yet — deals appear after you borrow against an offer.",
+    "uc_title": "Unlock to sign"
   },
   "debit": {
     "title": "직접 출금",
@@ -4641,7 +4644,9 @@
     "placed_prefix": "주문됨 (헤드 #",
     "verify_fills_suffix": "; #/market에서 체결을 확인하십시오).",
     "failed_prefix": "실패: ",
-    "retry_suffix": " — 다시 시도하기 전에 상태를 확인하십시오."
+    "retry_suffix": " — 다시 시도하기 전에 상태를 확인하십시오.",
+    "uc_title": "Unlock to sign",
+    "uc_order": "Order"
   },
   "explorer_assets": {
     "title": "자산",
@@ -7108,7 +7113,6 @@
     "taker_row": "테이커 수수료",
     "time_col": "시간(UTC)",
     "unknown_pool": "알 수 없는 풀입니다.",
-    "unlock_notice": "실행하려면 잠금을 해제하십시오 — 서명에는 지갑 비밀번호가 필요합니다.",
     "unstake_failed": "언스테이크를 준비하지 못했습니다.",
     "warning_row": "경고",
     "withdrawal_row": "출금 수수료",
@@ -7167,7 +7171,9 @@
     "swap_mkt_row": "Market fee",
     "delete_not_empty": "Not empty — %(legs)s must read 0 before delete.",
     "no_filter_match": "No swaps match these filters.",
-    "swap_desk": "Swap Desk"
+    "swap_desk": "Swap Desk",
+    "uc_title": "Unlock to continue",
+    "uc_action": "Action"
   },
   "market_ind": {
     "vwap": "세션 VWAP + 스프레드",

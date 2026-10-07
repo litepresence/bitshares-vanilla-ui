@@ -9,7 +9,8 @@
  *   locked account reads default to committee-account 1.2.0 with a notice.
  * Consumes: Pool (list/mine/buildCreate/fee/sendAndProve/percent helpers),
  *   Tx.buildTx, Format (human strings only), Account (resolve/myAccountId),
- *   Asset.describe (symbols + precisions), Wallet (unlock + memory WIF),
+ *   Asset.describe (symbols + precisions), Wallet (isUnlocked check + memory
+ *   WIF; unlock lives in the shared UnlockConfirm modal),
  *   Chain/Store (status). Created by: building-vanilla-slices skill,
  *   slice-12-pools plan Task 3 (split: detail desk lives in pool-detail-ui.js
  *   so every file stays <=400 lines).
@@ -142,16 +143,8 @@ var PoolUI = (function () {
     }
     row.appendChild(settingsLink);
   }
-  function unlockBox(doc, wrap, retry) {
-    wrap.appendChild(DOM.el(doc, "p", t("barter.wallet_is_locked_enter_your_password_to_conti", "Wallet is locked. Enter your password to continue."), "muted"));
-    var inp = doc.createElement("input"); inp.type = "password"; touchable(inp); wrap.appendChild(inp);
-    var b = touchable(DOM.el(doc, "button", t("account.s6", "Unlock"))); b.type = "button"; wrap.appendChild(b);
-    b.addEventListener("click", function () { b.disabled = true;
-      /* H2: wipe the password local + input on either outcome. */
-      var pw = inp.value;
-      Wallet.unlock(pw).then(function () { inp.value = ""; pw = null; retry(); }).catch(function (e) { inp.value = ""; pw = null; b.disabled = false; showError(doc, wrap,e,t("common.unlock_failed", "Unlock failed.")); });
-    });
-  }
+  /* Unlocking runs in the shared UnlockConfirm modal (reviewSection above)
+   * — no inline password row lives in this module. */
   /* Default viewing account while locked: committee-account 1.2.0 (a public
    * chain object on testnet+mainnet). Reads stay public under it; writes gate
    * at review click (reviewSection). Never throws — locked render is normal. */
@@ -443,14 +436,26 @@ var PoolUI = (function () {
       });
     }
     /* SIGN-TIME GATE: password asked only here, never at render. A locked
-     * click shows an honest notice + inline unlock; success flows into review
-     * (read-only until the user presses Sign & Send). */
+     * click detours through the shared review + unlock modal (the action
+     * title rides along — the full review renders after unlock, read-only
+     * until the user presses Sign & Send). */
     btn.addEventListener("click", function () {
       if (myGen !== gen) return;
       if (!isUnlockedNow()) {
-        DOM.clear(out);
-        out.appendChild(DOM.el(doc, "p", t("pool.unlock_notice", "Unlock to act — signing needs your wallet password."), "muted"));
-        unlockBox(doc, out, function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); });
+        if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+          DOM.clear(out);
+          showError(doc, out, "review backend missing: js/ui/unlock-confirm.js failed to load.", t("common.unlock_failed", "Unlock failed."));
+          return;
+        }
+        UnlockConfirm.open({
+          title: t("pool.uc_title", "Unlock to continue"),
+          rows: [[t("pool.uc_action", "Action"), cfg.title || ""]],
+          feeHuman: null,
+          needPassword: true,
+          submitLabel: t("account.s6", "Unlock"),
+          onUnlocked: function () { if (myGen === gen) reviewPaid(doc, out, myGen, cfg); },
+          onCancel: function () {}
+        });
         return;
       }
       reviewPaid(doc, out, myGen, cfg);
@@ -787,6 +792,7 @@ var PoolUI = (function () {
     function loadPage() {
       if (myGen !== gen) return; go.disabled = true; DOM.clear(listBox);
       showStatus(doc, listBox,t("pool.loading", "Loading pools…"));
+      if (DOM.skel) DOM.skel(listBox, 5);
       Promise.resolve().then(async function () {
         /* Direct pool-id lookup: a 1.19.x in Share asset fetches the pool
          * itself (Pool.get returns joined rows like list) — no asset
@@ -966,7 +972,7 @@ var PoolUI = (function () {
   }
   return { renderPools: renderPools, getSelection: getSelection,
     _ui: { el: DOM.el, touchable: touchable, clearBox: DOM.clear, showError: showError, showStatus: showStatus,
-      offlineBox: offlineBox, unlockBox: unlockBox, field: field, tableHead: tableHead,
+      offlineBox: offlineBox, field: field, tableHead: tableHead,
       feeText: feeText, headBlock: headBlock, amtText: amtText, pctText: pctText, networkName: networkName,
       sendConfirm: sendConfirm, reviewPaid: reviewPaid, reviewSection: reviewSection, deleteCheck: deleteCheck,
       routeReady: routeReady, routeFail: routeFail, autoRetry: autoRetry, dropSubs: dropSubs,

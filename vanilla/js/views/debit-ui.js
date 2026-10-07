@@ -330,8 +330,29 @@ var DebitUI = (function () {
             if (!wif) {
               stCell.textContent = t("debit.locked_sign_note", "Wallet is locked — unlock to sign (preview stays visible).");
               stCell.className = "error";
-              u.unlockInline(doc, out, function () {
-                out.appendChild(u.el(doc, "p", t("debit.unlocked_note", "Unlocked — press Preview again so the orders use your account, then sign."), "muted"));
+              if (typeof UnlockConfirm === "undefined" || !UnlockConfirm || typeof UnlockConfirm.open !== "function") {
+                stCell.textContent = "review backend missing: js/ui/unlock-confirm.js failed to load.";
+                btn.disabled = false; return;
+              }
+              /* Unlock in the shared modal (this order's rows — the table
+               * above stays visible behind it). After unlock the ladder is
+               * RE-PREVIEWED (R was built for the viewing-as account while
+               * locked — the note says so). */
+              UnlockConfirm.open({
+                title: t("debit.uc_title", "Unlock to sign"),
+                rows: [
+                  [t("debit.uc_order", "Order"), "#" + (i + 1) + " of " + R.orders.length],
+                  [t("account.sell_th", "Sell"), Format.formatAmount(o.sellRaw, R.sell.precision) + " " + R.sell.symbol, o.sellRaw],
+                  [t("debit.min_recv_col", "Min receive"), Format.formatAmount(o.recvRaw, R.recv.precision) + " " + R.recv.symbol, o.recvRaw]
+                ],
+                feeHuman: null,
+                needPassword: true,
+                submitLabel: t("common.sign_send", "Sign & Send"),
+                onUnlocked: function () {
+                  if (myGen !== gen) return;
+                  out.appendChild(u.el(doc, "p", t("debit.unlocked_note", "Unlocked — press Preview again so the orders use your account, then sign."), "muted"));
+                },
+                onCancel: function () {}
               });
               btn.disabled = false; return; }
             var pair = [Tx.OP.limit_order_create, { fee: { amount: 0, asset_id: "1.3.0" }, seller: R.me.id,
