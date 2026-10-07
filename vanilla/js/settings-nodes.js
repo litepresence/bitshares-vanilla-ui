@@ -155,12 +155,20 @@ var SettingsNodes = (function () {
       tr.setAttribute("data-url", url);
 
       var tdSel = doc.createElement("td");
+      /* The native box stays 18px (app.css:240 — #1 uses small boxes) and the
+       * wrapping label carries the 44px touch target, matching the
+       * .xfer-field label:has(input[type=radio]) rule. Bare in a <td> the box
+       * WAS the whole tap target at 18x18 — found by the two-ended viewport
+       * audit (A2-touch-floor, input[type=radio][name=node] x8 on #/settings). */
+      var selLabel = doc.createElement("label");
+      selLabel.className = "node-pick";
       var sel = doc.createElement("input");
       sel.type = "radio";
       sel.name = "node";
       sel.value = url;
       if (settings.activeNode === url) sel.checked = true;
-      tdSel.appendChild(sel);
+      selLabel.appendChild(sel);
+      tdSel.appendChild(selLabel);
       tr.appendChild(tdSel);
 
       var tdUrl = doc.createElement("td");

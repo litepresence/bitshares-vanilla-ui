@@ -275,7 +275,7 @@ export function measureInPage() {
   var out = {
     overflowPx: 0, scrollRegion: "", widestSelector: "",
     smallTargets: [], contentRatio: 0, contentSelector: "",
-    clippedText: [], viewportMeta: "", consoleErrors: [],
+    clippedText: [], inlineLinks: [], viewportMeta: "", consoleErrors: [],
   };
 
   /* A short, readable selector -- enough to grep app.css by, not a full path.
@@ -345,7 +345,17 @@ export function measureInPage() {
     }
 
     /* Touch floor. The probe only collects candidates (capped at 8 for a
-     * readable report); classify applies the >=44px rule itself. */
+     * readable report); classify applies the >=44px rule itself.
+     *
+     * INLINE ANCHORS ARE NOT CONTROLS. Every real control in this app is
+     * styled inline-flex / inline-block / block (a.btn:112, .subtle-btn,
+     * #appfoot .appfoot-actions a:1054) -- all >=44px by construction. An
+     * anchor left `display:inline` is part of a text run (help TOC <li>,
+     * the footer's "Master" inside .appfoot-left), and inflating it to 44px
+     * would break the line it sits in. Those go to `inlineLinks` --
+     * recorded, never failing -- so the report stays honest without
+     * drowning real findings in prose. Observed: without this rule 100% of
+     * routes FAILed on the same footer link. */
     var SEL = "button, a[href], select, input:not([type=hidden]), textarea, [role=button]";
     var ctrls = doc.querySelectorAll(SEL);
     for (var c = 0; c < ctrls.length; c++) {
@@ -353,17 +363,26 @@ export function measureInPage() {
       if (out.smallTargets.length >= 8) break;
       if (!shown(el)) continue;
       var b2 = targetBox(el);
-      if (b2.h < 44 && b2.w < 44) {
-        out.smallTargets.push({
-          selector: sel(el),
-          w: Math.round(b2.w), h: Math.round(b2.h),
-          /* A short text/attr hint so the punchlist row is actionable -- a row
-           * reading "a 38x13" tells the fixer nothing. */
-          hint: (el.tagName === "A"
-            ? (el.textContent || "").trim().slice(0, 40) || (el.getAttribute("href") || "")
-            : (el.placeholder || el.getAttribute("aria-label") || "").trim().slice(0, 40)),
-        });
+      if (!(b2.h < 44 && b2.w < 44)) continue;
+      if (el.tagName === "A" && getComputedStyle(el).display === "inline") {
+        if (out.inlineLinks.length < 10) {
+          out.inlineLinks.push({
+            selector: sel(el),
+            text: (el.textContent || "").trim().slice(0, 30),
+            w: Math.round(b2.w), h: Math.round(b2.h),
+          });
+        }
+        continue;
       }
+      out.smallTargets.push({
+        selector: sel(el),
+        w: Math.round(b2.w), h: Math.round(b2.h),
+        /* A short text/attr hint so the punchlist row is actionable -- a row
+         * reading "a 38x13" tells the fixer nothing. */
+        hint: (el.tagName === "A"
+          ? (el.textContent || "").trim().slice(0, 40) || (el.getAttribute("href") || "")
+          : (el.placeholder || el.getAttribute("aria-label") || "").trim().slice(0, 40)),
+      });
     }
 
     /* Widest descendant of #view that FITS the viewport = the real content

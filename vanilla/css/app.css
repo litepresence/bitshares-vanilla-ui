@@ -213,6 +213,11 @@ a.btn { display: inline-flex; align-items: center; justify-content: center;
 .node-table [data-h="good"], .node-card [data-h="good"] { color: var(--live); font-weight: 700; }
 .node-table [data-h="warn"], .node-card [data-h="warn"] { color: var(--warn-text); font-weight: 700; }
 .node-table [data-h="bad"], .node-card [data-h="bad"] { color: var(--danger); font-weight: 700; }
+/* Node-select radio: the native box stays 18px (rule above), this label is
+ * the 44px touch target — same pattern as .xfer-field label:has(...).
+ * Two-ended viewport audit: bare in a <td> the box WAS the whole target. */
+.node-pick { display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; cursor: pointer; }
 .node-table th:first-child, .node-table td:first-child { position: sticky; left: 0;
   background: var(--panel); }
 .node-cards { display: none; }

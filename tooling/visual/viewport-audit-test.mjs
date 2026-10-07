@@ -229,8 +229,33 @@ if (!hasPw) {
   m = await page.evaluate(A.measureInPage);
   eq(m.smallTargets.length, 1, "an unlabelled 18x18 radio IS flagged");
 
+  /* Prose vs control: an anchor left display:inline is part of a text run
+   * (help TOC <li>, footer "Master") and must NOT fail the floor -- every real
+   * control in the app is inline-flex/block. Without this rule 100% of routes
+   * failed on the same footer link. */
+  await page.setContent("<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    + "<span class='left'>v1.0.0 <a href='#'>Master</a></span>"
+    + "<ul><li><a href='#'>Help</a></li></ul>");
+  m = await page.evaluate(A.measureInPage);
+  eq(m.smallTargets.length, 0, "inline prose links are not touch-floor failures");
+  eq(m.inlineLinks.length, 1, "the narrow inline link is recorded instead");
+  ok(m.inlineLinks[0].text === "Help", "the recorded link carries its text (got " + m.inlineLinks[0].text + ")");
+
+  /* A genuinely small BUTTON is still a failure -- the rule is display-based,
+   * not a blanket exemption for anchors. */
+  await page.setContent("<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    + "<button style='width:20px;height:20px'>x</button>");
+  m = await page.evaluate(A.measureInPage);
+  eq(m.smallTargets.length, 1, "a 20x20 button is still flagged");
+
+  /* A small anchor styled as a real control (inline-flex) IS a failure. */
+  await page.setContent("<meta name='viewport' content='width=device-width, initial-scale=1'>"
+    + "<a class='btn' href='#' style='display:inline-flex;width:24px;height:24px'>go</a>");
+  m = await page.evaluate(A.measureInPage);
+  eq(m.smallTargets.length, 1, "a 24x24 inline-flex control-anchor IS flagged");
+
   await br.close();
-  passed += 14;
+  passed += 18;
 }
 
 console.log("viewport-audit-test: " + passed + " assertions PASS");
