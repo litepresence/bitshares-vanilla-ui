@@ -212,9 +212,12 @@ Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
 
 Refine 2026-10-07 — "a bit jittery / high tension" (user feel): softened
-lively (`carry: 0.985`, `springK: 0.014`, `cool: 0.999`, `tempMin: 1.2`) —
-same ~11s run, 3× calmer tail creep, sleeps via gate; energy vector still
-13× calm. Tale of the tape in `pool-net-ui-test.js` energy block.
+lively (`carry: 0.98`, `springK: 0.010`, `cool: 0.999`, `tempMin: 1.2`,
+`temp0: 7`, `repCap: 20`) — same long run, calmer tail creep, sleeps via
+gate; then "center wobble lasts too long": the BTS hub (tugged by every
+leaf) now carries less velocity (`hubCarry: 0.90`, lively-only, calm
+untouched) — hub tail motion 3× down, rim drift intact. Energy vector
+still 7.6× calm. Tale of the tape in `pool-net-ui-test.js` energy block.
 
 ### Follow-up — reduced-motion: explicit flips/releases run bounded (user env)
 

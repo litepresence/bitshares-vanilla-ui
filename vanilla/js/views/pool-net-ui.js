@@ -47,8 +47,8 @@ var PoolNetUI = (function () {
     calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
               springRest: 1.1, springK: 0.015, pull: 0.008, btsPullX: 3,
               stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 900, curved: false },
-    lively: { repPow: 2, repK: 2.6, repCap: 40, carry: 0.985, temp0: 10, cool: 0.999, tempMin: 1.2,
-              springRest: 2.2, springK: 0.014, pull: 0.003, btsPullX: 3,
+    lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.999, tempMin: 1.2,
+              springRest: 2.2, springK: 0.010, pull: 0.003, btsPullX: 3,
               stillTol: 0.25, stillFrames: 120, minFrames: 400, maxFrames: 1500, curved: true }
   };
 
@@ -385,8 +385,13 @@ var PoolNetUI = (function () {
     for (i = 0; i < n; i++) {
       var id2 = ids[i];
       var v = S.vel[id2] || { x: 0, y: 0 };
-      v.x = (v.x + ax[id2]) * P.carry;
-      v.y = (v.y + ay[id2]) * P.carry;
+      /* Hub damping: the BTS center wobbles longest (every leaf tugs it),
+       * so it carries less velocity than leaves — the middle settles in
+       * ~1s while the rim keeps drifting. Calm sets no hubCarry and is
+       * unaffected. */
+      var carr = (id2 === CORE_ID && P.hubCarry) ? P.hubCarry : P.carry;
+      v.x = (v.x + ax[id2]) * carr;
+      v.y = (v.y + ay[id2]) * carr;
       var step = Math.sqrt(v.x * v.x + v.y * v.y);
       if (step > S.temp && step > 0) { v.x = v.x / step * S.temp; v.y = v.y / step * S.temp; }
       S.vel[id2] = v;

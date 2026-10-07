@@ -84,9 +84,10 @@ var skel = { pools: [
     phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
   ok(phys.lively.repPow === 2 && phys.lively.minFrames === 400 &&
-    phys.lively.carry === 0.985 && phys.lively.cool === 0.999 && phys.lively.tempMin === 1.2 &&
-    phys.lively.springK === 0.014 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 1500,
-    "lively softened tune (degree-mass + long run + stabilization budget)");
+    phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.999 && phys.lively.tempMin === 1.2 &&
+    phys.lively.temp0 === 7 && phys.lively.repCap === 20 &&
+    phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 1500,
+    "lively softened tune + hub damping (degree-mass + long run + stabilization budget)");
   function simState(mode) {
     return {
       phys: mode, W: 300, H: 320, temp: 6, still: 0, frames: 0,
@@ -193,7 +194,8 @@ var skel = { pools: [
     view: { edges: [{ a: "1.3.0", b: "1.3.1", poolId: "1.19.1" }] }
   };
   try { wake(S); } catch (e) { ok(false, "wake on running loop throws: " + e); return; }
-  ok(S.temp === 10 && S.still === 0 && S.frames === 0, "wake re-seeds temp/still/frames on a running loop (temp=" + S.temp + ")");
+  var livelyT0 = PoolNetUI._physForTest().lively.temp0;
+  ok(S.temp === livelyT0 && S.still === 0 && S.frames === 0, "wake re-seeds temp/still/frames on a running loop (temp=" + S.temp + ")");
   ok(S.running === true, "running loop stays running (no double-start)");
   // stopped loop: wake restarts and runs to sleep synchronously headless
   var S2 = {
