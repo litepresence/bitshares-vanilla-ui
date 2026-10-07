@@ -236,3 +236,16 @@ through from rows that carry them.
 - `python3 tooling/check_i18n.py` → OK (7 new `market.discrete_tip_*` keys).
 - Headless both desks: axes render, hover card full, wheel zoom narrows the
   window, keyboard arrows + Escape work, zero console errors.
+
+## 11. Delta — one root cause behind three complaints (user call)
+
+Zoom jumps, oversized/stretched labels, phantom hovers: all three traced to
+ONE bug — `fitHost` measured `hostEl.clientWidth` AFTER `DOM.clear(hostEl)`,
+and the app CSS hides empty hosts (`.mkt-price-host:empty { display: none }`,
+`app.css`), so every paint read width 0, baked the 300px fallback, and CSS
+stretched it ~2.75× (fat text; hover/zoom math aimed at the wrong domain).
+Fix: measure before clearing; plus `skipWhenHidden` (display:none OR zero
+width → dirty flag for the IO half), `ResizeObserver` (size changes) and an
+`IntersectionObserver` (show/hide cycles are net-zero to RO) so any fallback
+paint self-heals. Browser proof post-fix: live 826 vs painted 764 (exact
+gutter math), zoom 3× compounds to 0.512 anchored, hover exact/miss correct.

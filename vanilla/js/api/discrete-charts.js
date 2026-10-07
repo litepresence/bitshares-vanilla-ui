@@ -43,19 +43,100 @@ var DiscreteCharts = (function () {
     };
   }
 
+  /* Resize repaint (the actual layout-race fix): a paint that ran while
+   * the host had no size bakes a fallback-width canvas that CSS then
+   * stretches (fat text, mis-aimed hover/zoom). One ResizeObserver per host
+   * repaints on real size changes, so any fallback paint self-heals the
+   * moment layout lands — plus sidebar/font shifts later. No-op when size
+   * is unchanged (last-size guard); initial observe seeds without repainting.
+   * Params: hostEl, repaintFn. Never throws. */
+  function watchHostSize(hostEl, repaintFn) {
+    try {
+      if (typeof ResizeObserver === "undefined" || !hostEl || typeof repaintFn !== "function") return;
+      /* Fresh closure every paint (data changes re-invoke the painters);
+       * the observer below always calls the LATEST one. */
+      try { hostEl._dROpaint = repaintFn; } catch (e) { return; }
+      if (hostEl._dRO) return;
+      try {
+        hostEl._dROSize = { w: hostEl.clientWidth || 0, h: hostEl.clientHeight || 0 };
+      } catch (e) { /* guard stands cleared below */ }
+      var ro = new ResizeObserver(function () {
+        var w = 0, h = 0, last = null, fn = null;
+        try { w = hostEl.clientWidth || 0; h = hostEl.clientHeight || 0; } catch (e) { w = 0; }
+        try { last = hostEl._dROSize || null; } catch (e) { last = null; }
+        try { hostEl._dROSize = { w: w, h: h }; } catch (e) {}
+        if (last && last.w === w && last.h === h) return;
+        if (w > 0) {
+          try { fn = hostEl._dROpaint || null; } catch (e) { fn = null; }
+          if (fn) { try { fn(); } catch (e) { /* paint stands */ } }
+        }
+      });
+      hostEl._dRO = ro;
+      try { ro.observe(hostEl); } catch (e) { try { hostEl._dRO = null; } catch (x) {} }
+      /* IntersectionObserver: repaint when a dirty (hidden-painted) host
+       * becomes visible. display:none toggles inside one frame are net-zero
+       * to RO, so RO alone never sees them — IO fires on the visibility
+       * transition itself. */
+      if (typeof IntersectionObserver !== "undefined" && !hostEl._dIO) {
+        var io = new IntersectionObserver(function (entries) {
+          var vis = false;
+          try { vis = !!(entries && entries[0] && entries[0].isIntersecting); } catch (e) {}
+          if (!vis) return;
+          var dirty = false;
+          try { dirty = !!hostEl._dDirty; } catch (e) {}
+          if (!dirty) return;
+          try { hostEl._dDirty = false; } catch (e) {}
+          var fn2 = null;
+          try { fn2 = hostEl._dROpaint || null; } catch (e) { fn2 = null; }
+          if (fn2) { try { fn2(); } catch (e) { /* paint stands */ } }
+        });
+        hostEl._dIO = io;
+        try { io.observe(hostEl); } catch (e) { try { hostEl._dIO = null; } catch (x) {} }
+      }
+    } catch (e) { /* static size stands */ }
+  }
+
+  /* Hidden-host skip (companion to watchHostSize): painting into a
+   * display:none OR zero-width host bakes a fallback canvas that CSS then
+   * stretches (fat text, mis-aimed hover/zoom). A flex/grid host can read
+   * clientWidth 0 while fully rendered (offsetParent non-null), so width
+   * is checked too — not just display. Mark dirty and let the IO half
+   * repaint on show (or the RO half on growth) instead. Returns true when
+   * the caller should return without painting. Never throws. */
+  function skipWhenHidden(hostEl) {
+    try {
+      if (!hostEl) return false;
+      var vis = true, w = 0;
+      try { vis = !!hostEl.offsetParent; } catch (e) { vis = true; }
+      try { w = hostEl.clientWidth || 0; } catch (e) { w = 0; }
+      if (vis && w > 0) {
+        try { hostEl._dDirty = false; } catch (e) {}
+        return false;
+      }
+      try { hostEl._dDirty = true; } catch (e) {}
+      return true;
+    } catch (e) { return false; }
+  }
+
   /* DPR-aware canvas under a host (clears the host first when DOM.clear is
    * present). Params: doc, hostEl, cssH (CSS pixel height). Returns
    * {ctx, w, h} in CSS pixels, or null when unusable. Never throws. */
   function fitHost(doc, hostEl, cssH) {
     try {
       if (!doc || !hostEl || typeof doc.createElement !== "function") return null;
+      /* Measure FIRST: DOM.clear below empties the host, and the app CSS
+       * hides empty hosts (.mkt-price-host:empty { display: none }) — so a
+       * read after clearing sees width 0 and bakes the 300px fallback,
+       * which CSS then stretches (fat text, mis-aimed hover/zoom). */
+      var wEarly = 0;
+      try { wEarly = hostEl.clientWidth || 0; } catch (e) { wEarly = 0; }
       try {
         if (typeof DOM !== "undefined" && DOM && typeof DOM.clear === "function") DOM.clear(hostEl);
       } catch (e) { /* paint over whatever stands */ }
       var canvas = doc.createElement("canvas");
       if (!canvas || typeof canvas.getContext !== "function") return null;
       canvas.className = "mkt-canvas";
-      var w = hostEl.clientWidth || 300;
+      var w = wEarly || 300;
       var dpr = 1;
       try {
         if (typeof window !== "undefined" && window.devicePixelRatio) dpr = window.devicePixelRatio;
@@ -152,6 +233,30 @@ var DiscreteCharts = (function () {
     return out;
   }
 
+  /* Compact axis label (pure). Scale labels only: up to 6 significant
+   * digits in plain notation (~8 chars max), exponential fallback for
+   * extremes. Keeps labels inside the gutter instead of overflowing it.
+   * Never throws (bad input -> ""). */
+  function sigLabel(num) {
+    try {
+      var v = Number(num);
+      if (!isFinite(v)) return "";
+      if (v === 0) return "0";
+      var s = v.toPrecision(6);
+      if (s.indexOf("e") !== -1 || s.indexOf("E") !== -1) {
+        var m = /^(-?\d(?:\.\d+)?)[eE]([+-]?\d+)$/.exec(s);
+        if (!m) return String(v).slice(0, 9);
+        var mant = m[1].replace(/\.?0+$/, "");
+        if (mant === "-0") mant = "0";
+        return (mant + "e" + m[2]).slice(0, 9);
+      }
+      if (s.indexOf(".") !== -1) s = s.replace(/\.?0+$/, "");
+      if (s.length > 9) s = v.toPrecision(4);
+      if (s.indexOf("e") === -1 && s.indexOf("E") === -1 && s.length > 9) s = s.slice(0, 9);
+      return s;
+    } catch (e) { return ""; }
+  }
+
   /* i18n helper (pool-file t() shape): I18n.t when loaded, verbatim
    * English default otherwise (file:// where dict fetch fails). */
   function t(key, dflt) {
@@ -206,22 +311,34 @@ var DiscreteCharts = (function () {
   }
 
   /* Shared time-window zoom math (pure, testable). view {t0,t1} ms (nulls =
-   * full range); zoomView returns the clamped window after factor f (>1 zooms
-   * in) around centerMs within bounds {lo, hi}; panView shifts by deltaMs;
-   * fullView resets. Never throws (bad input -> bounds). */
+   * full range); zoomView narrows the CURRENT window by factor f (>1 zooms
+   * in) around centerMs (clamped inside the current window), floored at the
+   * full bounds {lo, hi}; panView shifts by deltaMs; fullView resets.
+   * Repeated zooms compound (each builds on the last window). Never throws
+   * (bad input -> bounds). */
   function zoomView(view, centerMs, f, bounds) {
     try {
       var lo = bounds.lo, hi = bounds.hi;
       if (!(hi > lo) || !(f > 0)) return { t0: lo, t1: hi };
+      var c0 = (view && isFinite(Number(view.t0))) ? Number(view.t0) : lo;
+      var c1 = (view && isFinite(Number(view.t1))) ? Number(view.t1) : hi;
+      if (!(c1 > c0)) { c0 = lo; c1 = hi; }
       var c = Number(centerMs);
-      if (!isFinite(c)) c = (lo + hi) / 2;
-      var span = (hi - lo) / f;
-      if (!(span > 0)) span = hi - lo;
+      if (!isFinite(c)) c = (c0 + c1) / 2;
+      if (c < c0) c = c0;
+      if (c > c1) c = c1;
+      var span = (c1 - c0) / f;
+      if (!(span > 0)) span = c1 - c0;
+      /* Epsilon on the bounds checks: float dust at an exact edge must not
+       * pin the window open (or leave it microscopically outside the data,
+       * painting dots off-plot). */
+      var eps = (hi - lo) * 1e-9;
       var n0 = c - span / 2, n1 = c + span / 2;
       if (n1 - n0 >= hi - lo) return { t0: lo, t1: hi };
-      if (n0 < lo) { n1 += lo - n0; n0 = lo; }
-      if (n1 > hi) { n0 -= n1 - hi; n1 = hi; }
+      if (n0 < lo - eps) { n1 += lo - n0; n0 = lo; }
+      if (n1 > hi + eps) { n0 -= n1 - hi; n1 = hi; }
       if (n0 < lo) n0 = lo;
+      if (n1 > hi) n1 = hi;
       return { t0: n0, t1: n1 };
     } catch (e) { return { t0: bounds.lo, t1: bounds.hi }; }
   }
@@ -317,6 +434,33 @@ var DiscreteCharts = (function () {
         if (tip) tip.style.display = "none";
       } catch (e) { /* stands */ }
     }
+    /* Selection key, namespaced per pane (price/volume share one view
+     * object — a shared "sel" would ring the wrong dot in the twin pane). */
+    function selKey() {
+      try {
+        if (opts && typeof opts.selKey === "string" && opts.selKey) return opts.selKey;
+      } catch (e) { /* "sel" stands */ }
+      return "sel";
+    }
+    function getSel(r) {
+      try {
+        var k = selKey();
+        if (r && r.view && typeof r.view[k] === "number") return r.view[k];
+      } catch (e) { /* -1 stands */ }
+      return -1;
+    }
+    function setSel(r, idx) {
+      try { if (r && r.view) r.view[selKey()] = idx; } catch (e) { /* stands */ }
+    }
+    function clearSel(r) {
+      try {
+        if (r && r.view) {
+          try { delete r.view.sel; } catch (e) {}
+          try { delete r.view.selPrice; } catch (e) {}
+          try { delete r.view.selVol; } catch (e) {}
+        }
+      } catch (e) { /* stands */ }
+    }
     function ptr(ev) {
       try {
         var box = canvas.getBoundingClientRect();
@@ -340,21 +484,52 @@ var DiscreteCharts = (function () {
     }
     try {
       if (typeof canvas.addEventListener !== "function") return;
+      var lastHover = -2;
       canvas.addEventListener("mousemove", function (ev) {
         var r = cur(), p = ptr(ev);
         if (!p) return;
-        var idx = nearestIdx(r.xs.map(function (x, i) { return { x: x, y: r.ys[i] }; }), p.x, p.y, 14);
-        if (idx < 0) { hideTip(); return; }
-        paintTip(r, idx);
+        var idx = nearestIdx(r.xs.map(function (x, i) { return { x: x, y: r.ys[i] }; }), p.x, p.y, 10);
+        if (idx < 0) {
+          hideTip();
+          if (lastHover !== -2) {
+            lastHover = -2;
+            try { if (r.repaint) r.repaint(); } catch (e) { /* ring stands down */ }
+          }
+          return;
+        }
+        /* Hover ring anchors the card to its dot (dense blobs make a bare
+         * tooltip feel random). repaint() wipes the host (fitHost clears
+         * children, tooltip included), so repaint FIRST, then paint the tip
+         * and ring on the fresh canvas — never the reverse. Skips entirely
+         * when this dot is already anchored. */
+        if (idx === lastHover && tipShowing()) return;
+        lastHover = idx;
+        try { if (r.repaint) r.repaint(); } catch (e) {}
+        var rFresh = cur();
+        paintTip(rFresh, idx);
+        drawSelRing(rFresh, idx);
       });
-      canvas.addEventListener("mouseleave", hideTip);
+      function tipShowing() {
+        try {
+          var tip = hostEl && hostEl.querySelector ? hostEl.querySelector("[data-discrete-tip]") : null;
+          return !!(tip && tip.style.display && tip.style.display !== "none");
+        } catch (e) { return false; }
+      }
+      canvas.addEventListener("mouseleave", function () {
+        hideTip();
+        lastHover = -2;
+      });
       /* Touch tap = tooltip (click without drag). Desktop click on empty space clears. */
       canvas.addEventListener("click", function (ev) {
         var r = cur(), p = ptr(ev);
         if (!p) return;
-        var idx = nearestIdx(r.xs.map(function (x, i) { return { x: x, y: r.ys[i] }; }), p.x, p.y, 16);
+        var idx = nearestIdx(r.xs.map(function (x, i) { return { x: x, y: r.ys[i] }; }), p.x, p.y, 12);
         if (idx < 0) { hideTip(); return; }
-        paintTip(r, idx);
+        /* Repaint first (wipes host incl. any stale tip), then paint + ring. */
+        try { if (r.repaint) r.repaint(); } catch (e) {}
+        var rTap = cur();
+        paintTip(rTap, idx);
+        drawSelRing(rTap, idx);
       });
       /* Wheel zooms the shared time window at the cursor; drag pans time;
        * double-click resets. Price refits the visible window on repaint. */
@@ -363,9 +538,14 @@ var DiscreteCharts = (function () {
         if (!p || !r.view) return;
         try { if (ev.preventDefault) ev.preventDefault(); } catch (e) {}
         try {
-          var span = (r.hi - r.lo) || 1;
+          /* Window domain (not full bounds): screen x maps into the
+           * CURRENT window, so repeated zooms stay anchored at the cursor
+           * instead of jumping back to full-range mapping. */
+          var wlo = isFinite(Number(r.wlo)) ? Number(r.wlo) : r.lo;
+          var whi = isFinite(Number(r.whi)) ? Number(r.whi) : r.hi;
+          var span = (whi - wlo) || 1;
           var msPerPx = span / Math.max(1, ((r.plotW) || span));
-          var center = r.lo + (p.x - (r.padL || 0)) * msPerPx;
+          var center = wlo + (p.x - (r.padL || 0)) * msPerPx;
           var f = (ev.deltaY || 0) > 0 ? 1 / 1.25 : 1.25;
           var w = zoomView(r.view, center, f, { lo: r.lo, hi: r.hi });
           r.view.t0 = w.t0; r.view.t1 = w.t1;
@@ -386,7 +566,9 @@ var DiscreteCharts = (function () {
         if (Math.abs(p.x - dragSt.sx) > 4) dragSt.moved = true;
         if (!dragSt.moved) return;
         try {
-          var span = (r.hi - r.lo) || 1;
+          var wlo2 = isFinite(Number(r.wlo)) ? Number(r.wlo) : r.lo;
+          var whi2 = isFinite(Number(r.whi)) ? Number(r.whi) : r.hi;
+          var span = (whi2 - wlo2) || 1;
           var msPerPx = span / Math.max(1, (r.plotW || span));
           var w = panView(r.view, (dragSt.sx - p.x) * msPerPx, { lo: r.lo, hi: r.hi });
           dragSt.sx = p.x;
@@ -403,7 +585,7 @@ var DiscreteCharts = (function () {
       canvas.addEventListener("dblclick", function () {
         var r = cur();
         if (!r.view) return;
-        try { r.view.t0 = null; r.view.t1 = null; if (r.view) delete r.view.sel; } catch (e) {}
+        try { r.view.t0 = null; r.view.t1 = null; clearSel(r); } catch (e) {}
         viewChanged();
       });
       /* Keyboard inspection: arrows step the selection, Escape clears. */
@@ -417,7 +599,7 @@ var DiscreteCharts = (function () {
         if (!r.pts || !r.pts.length) return;
         try {
           if (key === "Escape" || ev.keyCode === 27) {
-            if (r.view) delete r.view.sel;
+            clearSel(r);
             hideTip();
             if (r.repaint) r.repaint();
             ev.preventDefault();
@@ -425,9 +607,10 @@ var DiscreteCharts = (function () {
           }
           var d = (key === "ArrowLeft" || ev.keyCode === 37) ? -1 : 1;
           var n = r.pts.length;
-          var curSel = (r.view && typeof r.view.sel === "number") ? r.view.sel : (d > 0 ? -1 : n);
+          var curSel = getSel(r);
+          if (curSel < 0) curSel = (d > 0 ? -1 : n);
           var nx = Math.min(n - 1, Math.max(0, curSel + d));
-          if (r.view) r.view.sel = nx;
+          setSel(r, nx);
           if (r.repaint) r.repaint();
           var r2 = cur();
           paintTip(r2, nx);
@@ -490,6 +673,8 @@ var DiscreteCharts = (function () {
       emptyNote(doc, hostEl, opts.emptyText);
       return { kind: "discrete", n: 0 };
     }
+    watchHostSize(hostEl, function () { drawDiscretePrice(doc, hostEl, points, opts); });
+    if (skipWhenHidden(hostEl)) return { kind: "discrete", n: list.length };
     var g = fitHost(doc, hostEl, 260);
     if (!g) return { kind: "discrete", n: list.length };
     /* Rows keep their source point (hover card identity survives filtering). */
@@ -565,7 +750,8 @@ var DiscreteCharts = (function () {
         ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + plotW, yy); ctx.stroke();
         ctx.globalAlpha = 1;
         ctx.textAlign = "right";
-        ctx.fillText(String(yTicks[ti].label).slice(0, 12), padL - 4, yy + 3);
+        var yLab = /^1e[+-]?\d+$/.test(yTicks[ti].label) ? yTicks[ti].label : sigLabel(yTicks[ti].y);
+        ctx.fillText(yLab, padL - 4, yy + 3);
       }
       ctx.textAlign = "center";
       for (ti = 0; ti < xTicks.length; ti++) {
@@ -596,11 +782,12 @@ var DiscreteCharts = (function () {
       var cvs = null;
       if (hostEl && hostEl.querySelector) cvs = hostEl.querySelector("canvas.mkt-canvas");
       if (cvs) {
-        var rec = { pts: ksrc, xs: kxs, ys: kys, lo: lo, hi: hi, view: view,
+        var rec = { pts: ksrc, xs: kxs, ys: kys, lo: lo, hi: hi, wlo: wlo, whi: whi, view: view,
           plotW: plotW, padL: padL,
           repaint: function () { drawDiscretePrice(doc, hostEl, points, opts); } };
         wireDiscrete(doc, hostEl, cvs, rec, opts);
-        var sel = view && typeof view.sel === "number" ? view.sel : -1;
+        var SELK = (opts && typeof opts.selKey === "string" && opts.selKey) ? opts.selKey : "sel";
+        var sel = (view && typeof view[SELK] === "number") ? view[SELK] : -1;
         if (sel >= 0 && sel < kxs.length) {
           ctx.save();
           try { ctx.strokeStyle = C.accent; } catch (e) {}
@@ -632,6 +819,8 @@ var DiscreteCharts = (function () {
       emptyNote(doc, hostEl, opts.emptyText);
       return { kind: "discrete", n: 0 };
     }
+    watchHostSize(hostEl, function () { drawDiscreteVolume(doc, hostEl, points, opts); });
+    if (skipWhenHidden(hostEl)) return { kind: "discrete", n: list.length };
     var g = fitHost(doc, hostEl, 120);
     if (!g) return { kind: "discrete", n: list.length };
     var i, rows = [];
@@ -729,11 +918,12 @@ var DiscreteCharts = (function () {
       var cvs = null;
       if (hostEl && hostEl.querySelector) cvs = hostEl.querySelector("canvas.mkt-canvas");
       if (cvs) {
-        var rec = { pts: ksrc, xs: kxs, ys: kys, lo: lo, hi: hi, view: view,
+        var rec = { pts: ksrc, xs: kxs, ys: kys, lo: lo, hi: hi, wlo: wlo, whi: whi, view: view,
           plotW: plotW, padL: padL,
           repaint: function () { drawDiscreteVolume(doc, hostEl, points, opts); } };
         wireDiscrete(doc, hostEl, cvs, rec, opts);
-        var sel = view && typeof view.sel === "number" ? view.sel : -1;
+        var SELK = (opts && typeof opts.selKey === "string" && opts.selKey) ? opts.selKey : "sel";
+        var sel = (view && typeof view[SELK] === "number") ? view[SELK] : -1;
         if (sel >= 0 && sel < kxs.length) {
           ctx.save();
           try { ctx.strokeStyle = C.accent; } catch (e) {}

@@ -740,6 +740,8 @@ MarketInd._panes = MarketInd._panes || {};
           state.discreteSig = dsig;
           dview.t0 = null; dview.t1 = null;
           try { delete dview.sel; } catch (e) {}
+          try { delete dview.selPrice; } catch (e) {}
+          try { delete dview.selVol; } catch (e) {}
         }
       } catch (e) { /* window stands */ }
       function repaintDiscrete() {
@@ -802,11 +804,11 @@ MarketInd._panes = MarketInd._panes || {};
         if (typeof DiscreteCharts !== "undefined" && DiscreteCharts) {
           DiscreteCharts.drawDiscretePrice(sdoc, state.priceHost, pts, {
             log: !!state.logScale, colors: frame, emptyText: emptyText,
-            view: dview, onViewChange: repaintDiscrete
+            view: dview, selKey: "selPrice", onViewChange: repaintDiscrete
           });
           DiscreteCharts.drawDiscreteVolume(sdoc, dvBody, pts, {
             colors: frame, emptyText: emptyText,
-            view: dview, onViewChange: repaintDiscrete
+            view: dview, selKey: "selVol", onViewChange: repaintDiscrete
           });
         }
       } catch (e) { /* panes stand on honest empties */ }

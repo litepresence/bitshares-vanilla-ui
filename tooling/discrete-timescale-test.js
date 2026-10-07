@@ -162,7 +162,7 @@ try {
   }
   function stubHost() {
     var kids = [];
-    return { clientWidth: 300, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
+    return { clientWidth: 300, offsetParent: {}, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
   }
   var pts = [
     { timeMs: 1000, price: "1.0", volume: "A(10:5)", volumeBaseRaw: "10", volumeQuoteRaw: "5" },
@@ -282,7 +282,7 @@ try {
   }
   function recHost() {
     var kids = [];
-    return { clientWidth: 300, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
+    return { clientWidth: 300, offsetParent: {}, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
   }
   var pts = [
     { timeMs: 1000, price: "1.0", volume: "10", volumeBaseRaw: "10", volumeQuoteRaw: "5" },
@@ -298,7 +298,23 @@ try {
   eq(c2.texts.indexOf("0") !== -1, true, "volume pane emits zero label");
 })();
 
-/* Hover + zoom math vectors (pure helpers behind the tooltip/gestures). */
+/* Hidden-host skip vectors: painting into display:none marks dirty for the
+ * IO half instead of baking a stretched fallback canvas. */
+(function () {
+  var DC = require("../vanilla/js/api/discrete-charts.js");
+  function hidHost() {
+    var kids = [];
+    return { clientWidth: 0, offsetParent: null, appendChild: function (k) { kids.push(k); }, removeChild: function () {}, get children() { return kids; } };
+  }
+  function hidDoc() {
+    return { createElement: function () { return { className: "", style: {}, clientWidth: 0, width: 0, height: 0, getContext: function () { return null; }, setAttribute: function () {}, appendChild: function () {} }; } };
+  }
+  var pts = [{ timeMs: 1000, price: "1.0", volume: "10", volumeBaseRaw: "10", volumeQuoteRaw: "5" }];
+  var hh = hidHost();
+  var r = DC.drawDiscretePrice(hidDoc(), hh, pts, { log: false, colors: {} });
+  eq(r.n, 1, "hidden host skips paint but counts honestly");
+  eq(hh._dDirty, true, "hidden paint marks dirty for the IO half");
+})();
 (function () {
   var DC = require("../vanilla/js/api/discrete-charts.js");
   var T = DC._ticksForTest;
@@ -316,6 +332,8 @@ try {
   eq(T.nearest([], 0, 0, 14), -1, "empty hits miss");
   var zw = T.zoom({ t0: null, t1: null }, 500, 2, { lo: 0, hi: 1000 });
   eq(zw.t0 === 250 && zw.t1 === 750, true, "zoom halves around cursor (" + zw.t0 + "," + zw.t1 + ")");
+  var zwAgain = T.zoom(zw, 500, 2, { lo: 0, hi: 1000 });
+  eq(zwAgain.t0 === 375 && zwAgain.t1 === 625, true, "repeated zooms compound on the current window");
   var zw2 = T.zoom({ t0: 250, t1: 750 }, 0, 0.1, { lo: 0, hi: 1000 });
   eq(zw2.t0 === 0 && zw2.t1 === 1000, true, "zoom out past full restores bounds");
   var pw = T.pan({ t0: 200, t1: 400 }, 100, { lo: 0, hi: 1000 });
