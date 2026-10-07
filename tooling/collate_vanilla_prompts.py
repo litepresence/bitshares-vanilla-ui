@@ -18,6 +18,7 @@ Rerun is idempotent (rewrites both docs).
 
 import datetime
 import json
+import re
 import sqlite3
 
 DB = "file:/root/.local/share/opencode/opencode.db?mode=ro"
@@ -42,6 +43,33 @@ VANILLA_SESSIONS = [
     "ses_efe53b1eaffeOKVmFjl2e8URXO",  # API lab and ES lab template review
     "ses_efe4e7202ffeOoAP0jtAZ6k4um",  # Price plot pool mapper default setup
     "ses_efe1fdb60ffeai253BNzFFV1qN",  # Implementing Bitshares vanilla UI issue #1
+    # --- 2026-10-04 onward. The list above was frozen at 2026-10-03 13:07
+    # and every later human session was silently missing; these were
+    # recovered from opencode.db and each one's first prompt sampled to
+    # confirm it is vanilla-UI work, not the sibling protocol project.
+    "ses_efb5efca7ffelQao3h903edKwo",  # Block-corner latency updates on node calls
+    "ses_ef82b9fe4ffe71b2jk9v3iwSNt",  # Footer showing commits ahead/behind Master
+    "ses_ef39087bbffesKb1fXOWODPh1x",  # Deployed footer version mismatch investigation
+    "ses_ef6e5ec4dffe2xov1oJDCdsfIa",  # Tester first impression transcript review
+    "ses_ef600f406ffenIZb1VkaYbfu9Q",  # Skill files standards compliance update
+    "ses_ef1176125ffeODsjCN7R2FUjvd",  # Project status check (incl. marketing-auditor request)
+    "ses_ef1174264ffeE53P0yZG1dSCXm",  # Project status check
+    "ses_eee070a8dffedDhuX0KO7nY4HX",  # Multisig UX audit skill and repairs
+    "ses_eee04e210ffeKQrQRR2NA6sXOZ",  # Audit skill for pending/stubs/incomplete items
+    "ses_eedebd798ffedwA4wo1lR4xDCA",  # Fixing missing price chart pool map
+    "ses_eedea8907ffeAQUcXDhcy52Lcv",  # Exchange inverted price plot bug
+    "ses_eed88b122ffezXykSPGt1kLOkx",  # Pool map in bitshares-networks repo
+    "ses_eed5b7b00ffe47YNBjR7HaLobC",  # Price feed page feature review
+    "ses_eed58aaf6ffeM8588GKvm6MS7a",  # Discrete timescale for exchange price plots
+    "ses_eecc492afffecoEl1V5kb4i57x",  # Reviewing completed audit documents
+    "ses_eec1cd0d5ffeMQ4A46L8n37uBF",  # UI guideline skill creation and app audit
+    "ses_ee971b2d2ffeKj0AYPNpDOSh1R",  # Workspace skills and git history audit
+    "ses_ee9706a50ffeykokx26H7gV0aA",  # Workspace skills and git audit review
+    "ses_ee940b1f0ffeXd178bdY3jIZSJ",  # Skills and git history audit review
+    "ses_ee85e735dffeNk8tywY8837dnX",  # Trollbox and duplicate login audit
+    "ses_ee7d1a00fffeFkT6QFhv3u2vjp",  # Swap desk bid ask books full width expansion
+    "ses_ee7bef696ffegCVE3FmJkRMxwj",  # Correcting 4th gateway typo to btwty
+    "ses_ee778581cffeTjuj1Ru6iFTBtq",  # Git history race condition cleanup
 ]
 
 # Individual user prompts reviewed and excluded: off-topic core-protocol
@@ -71,6 +99,19 @@ EXCLUDED = [
     ("ses_f03976c92ffeosPwSaQJAF0Dd6", "comprehensive audit of 3 protocols"),
     ("ses_f039572f8ffeqUQIkb3KlHjM0C", "auditing 3 protocols for repair agent"),
     ("ses_efe17ef3cffeAqyWUZnPX3Tmyy", "this collation session itself (meta)"),
+    # --- 2026-10-03 onward: reviewed and excluded. The user confirmed
+    # protocol-level work is a separate concern from the UI, so every
+    # protocol/G1/clsag session stays out of the origin story.
+    ("ses_efbe72b85ffe5wus5RXlGahkJS", "auditor concerns for the 2 protocols (protocol work)"),
+    ("ses_eeeb2298affeD5lE0YN4kPkH94", "clsag-bp-auditor skill review (protocol work)"),
+    ("ses_eee9626a8ffeg7pwe8GLXu5H5H", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_eee8b1ef6ffejOj0oOwzYfnR32", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_eee89c38dffeBTKT4i53mNZb1D", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_eee88b30effeUTsXWPx0rkvJjw", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_eee876d93ffeujTa2rOBYbqPEY", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_eee792039ffezqbmDlVeKTT6nH", "G1 audit via clsag-bp-plus-auditor (protocol work)"),
+    ("ses_ee803a339ffe1igwCIjzJblt4T", "book-photo PDF/OCR sizing (not UI)"),
+    ("ses_f12ebe6a5ffePDyVlYC9nEQJa8", "project status check — sampled: BSIP/three-upgrades protocol work"),
 ]
 
 
@@ -119,11 +160,33 @@ def main() -> None:
     )
     worker_count = cur.fetchone()[0]
     frozen_at = utc(int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp() * 1000))
-    scope_sentence = (
-        "Scope: verbatim user prompts from the 14 vanilla-UI creation sessions "
-        "(two share a title), excluding 6 protocol-off-topic messages and "
-        f"{worker_count} @general subagent worker sessions."
-    )
+
+    # Gap guard. VANILLA_SESSIONS is a hand-maintained list, so it drifts:
+    # the list froze on 2026-10-03 and 22 later vanilla-UI sessions were
+    # silently absent until this check existed. Every human session in the
+    # DB must now be either classified as vanilla-UI (in the list) or
+    # explicitly excluded with a reason (in EXCLUDED). An unclassified
+    # session is a silent truncation, so it prints loudly and the run
+    # still completes — the reader decides, the script never guesses.
+    classified = set(sessions) | {sid for sid, _ in EXCLUDED}
+    cur.execute("SELECT id, title, time_created FROM session ORDER BY time_created")
+    unclassified: list[tuple[str, str, str]] = []
+    for sid, title, tcreated in cur.fetchall():
+        if sid in classified:
+            continue
+        # Agent worker sessions are not user prompts — never in scope.
+        if re.search(r"@(general|explore)\b|worker", title or "", re.I):
+            continue
+        unclassified.append((sid, title or sid, utc(tcreated)))
+    if unclassified:
+        print("WARNING: %d human session(s) in opencode.db are neither in "
+              "VANILLA_SESSIONS nor in EXCLUDED — the origin story is "
+              "truncated. Classify each one:" % len(unclassified))
+        for sid, title, when in unclassified:
+            print("  %s  %s  %s" % (when, sid, title[:80]))
+        print()
+
+
 
     prompts: list[tuple[int, str, str, str, str]] = []  # (time, sid, mid, user, reply)
     for sid in sessions:
@@ -165,13 +228,16 @@ def main() -> None:
     prompts.sort(key=lambda p: p[0])
     prompt_count = len(prompts)
 
-    # Shared header block
+    # Shared header block. Counts are derived, never hardcoded: an earlier
+    # version froze "14 sessions" in prose while the list had grown, which
+    # is how the 2026-10-03 truncation stayed invisible.
     header_block = (
         f"Generated {frozen_at} from opencode.db: "
         f"{prompt_count} prompts across {session_count} sessions "
-        f"({title_count} distinct titles — two sessions share one title). "
-        f"{worker_count} `@general subagent` worker sessions excluded "
-        "(agent-generated, not user prompts)."
+        f"({title_count} distinct titles). Excluded: "
+        f"{len(EXCLUDE_MESSAGE_IDS)} protocol-off-topic messages, "
+        f"{len(EXCLUDED)} reviewed non-vanilla sessions (listed below), and "
+        f"{worker_count} subagent worker sessions (agent-generated)."
     )
 
     lines = []
@@ -193,8 +259,6 @@ def main() -> None:
     lines.append("")
     for sid, why in EXCLUDED:
         lines.append(f"- {why} (`{sid}`)")
-    lines.append("- Project status check (`ses_f12ebe6a5ffePDyVlYC9nEQJa8`) — "
-                 "sampled: BSIP/three-upgrades protocol work, not vanilla UI")
     lines.append("")
     lines.append("---")
     lines.append("")

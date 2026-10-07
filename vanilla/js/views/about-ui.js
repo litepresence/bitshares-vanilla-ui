@@ -40,22 +40,22 @@ var AboutUI = (function () {
     return a;
   }
 
+  /* buildDialogTotal: live exchange count when the asset script loaded,
+   * else DIALOG_FALLBACK_TOTAL. The archive grows every time
+   * tooling/collate_vanilla_prompts.py runs, so this constant is only the
+   * pre-load bound — every visible count reads buildDialogTotal() instead
+   * of a literal, which is what let "413 / 14 sessions" rot into all 12
+   * locale dicts. Params: none. Returns integer. */
+  var DIALOG_FALLBACK_TOTAL = 739;
+
   /* dialogNumber: parse Router.query() into a 1-based exchange number.
    * Params: q (object, possibly {}). Returns integer or null. Bounds come
-   * from window.BuildDialog when loaded, else fall back to 413 (committed
-   * count — stale only until first expansion loads the real length). */
+   * from window.BuildDialog when loaded, else DIALOG_FALLBACK_TOTAL. */
   function dialogNumber(q) {
     var raw = q && q.dialog;
     var n = parseInt(raw, 10);
     if (isNaN(n) || n < 1) return null;
-    var total = 413;
-    try {
-      if (typeof window !== "undefined" && window) {
-        var live = /** @type {any} */ (window).BuildDialog;
-        if (live && live.length) total = live.length;
-      }
-    } catch (e) { /* fallback stands */ }
-    if (n > total) return null;
+    if (n > buildDialogTotal()) return null;
     return n;
   }
 
@@ -68,8 +68,6 @@ var AboutUI = (function () {
     return hay.toLowerCase().indexOf(String(needle).toLowerCase()) !== -1;
   }
 
-  /* buildDialogTotal: live exchange count when the asset script loaded,
-   * else the committed 413 fallback. Params: none. Returns integer. */
   function buildDialogTotal() {
     try {
       if (typeof window !== "undefined" && window) {
@@ -77,7 +75,7 @@ var AboutUI = (function () {
         if (live && live.length) return live.length;
       }
     } catch (e) { /* fallback below */ }
-    return 413;
+    return DIALOG_FALLBACK_TOTAL;
   }
 
   /* Build-dialog lazy loader (index.html frozen — dynamic script like the
@@ -210,7 +208,7 @@ var AboutUI = (function () {
     DOM.append(wrap,
       DOM.el(doc, "h2", t("about.making_title", "Making of this wallet")),
       DOM.el(doc, "p",
-        t("about.making_body", "What follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited. It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated. 413 exchanges across 14 sessions. Read it as history: this is how the wallet got built.")));
+        t("about.making_body", "What follows is the original build story: every prompt that created this wallet, from \"acquire bitshares-ui\" on 26 September 2026 to the issue-1 fix on 3 October, with the builders' replies — preserved unedited. It records the decisions this wallet stands on: walking away from another React uplift after issue #3583 and its thousand-hour trap, so this wallet depends on nothing with a release cycle; signing every transaction locally like the old wallet instead of outsourcing it; three themes with the classic look as default; numbers in human terms, never raw chain integers; phone-first layouts from the first slice; and fees read from the live chain, never estimated. Read it as history: this is how the wallet got built.")));
     /* Collapsed build-dialog archive. First expansion injects the asset
      * script once (data-bd flag on the box); load error writes the
      * unavailable line. Deep-link ?dialog=N expands + scrolls on render. */
@@ -247,7 +245,7 @@ var AboutUI = (function () {
     var target = dialogNumber(query);
     /* R12: bad-link feedback — query.dialog present but out of range / non-numeric */
     if (query && query.dialog && target === null) {
-      try { status.textContent = t("about.dlg_bad_link", "Invalid exchange number. Valid range: 1–413."); } catch (e) { /* status stands */ }
+      try { status.textContent = t("about.dlg_bad_link", "Invalid exchange number. Valid range: 1–%(total)s.", { total: buildDialogTotal() }); } catch (e) { /* status stands */ }
     }
     /* fillArchive: build day groups + wire filter + honour deep link.
      * Params: ok (asset usable), deep (exchange number or null).
@@ -356,7 +354,7 @@ var AboutUI = (function () {
     }
   }
 
-  return { renderAbout: renderAbout, _test: { dialogNumber: dialogNumber, matchExchange: matchExchange } };
+  return { renderAbout: renderAbout, _test: { dialogNumber: dialogNumber, matchExchange: matchExchange, buildDialogTotal: buildDialogTotal } };
 })();
 
 if (typeof module !== "undefined") { module.exports = AboutUI; }
