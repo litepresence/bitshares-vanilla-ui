@@ -615,6 +615,25 @@ var MarketNetUI = (function () {
    * @returns {Promise<void>} resolves when the table + sparkline settle
    *   lands (band mounts right after the table, before spark settle;
    *   headless tests await this). */
+  /* pairSeed: the Asset 1 / Asset 2 starting values, in the spec's
+   * precedence — a shared ?a=/?b= deep link wins (it is a URL someone
+   * deliberately shared), then the global pair the last desk/pool visit
+   * wrote (PairContext, session memory), then the BTS default. Never
+   * throws; the fields simply keep their defaults. */
+  function pairSeed() {
+    var q = readQuery();
+    if (String(q.a || "").trim() || String(q.b || "").trim()) {
+      return { a: String(q.a || "").trim(), b: String(q.b || "").trim() };
+    }
+    var legs = [];
+    try {
+      if (typeof PairContext !== "undefined" && PairContext && typeof PairContext.get === "function") {
+        legs = PairContext.get() || [];
+      }
+    } catch (e) { legs = []; }
+    return { a: String(legs[0] || "BTS"), b: String(legs[1] || "") };
+  }
+
   function renderMarkets(root) {
     if (!root) return Promise.resolve();
     var myGen = ++gen;
@@ -633,14 +652,14 @@ var MarketNetUI = (function () {
     root.appendChild(wrap);
     var D = _dom();
     if (D && typeof D.pageHead === "function") {
-      try { wrap.appendChild(D.pageHead(doc, t("market_net.title", "Markets"))); } catch (e) {
-        wrap.appendChild(mk(doc, "h1", t("market_net.title", "Markets")));
+      try { wrap.appendChild(D.pageHead(doc, t("market_net.selector_title", "Market Selector"))); } catch (e) {
+        wrap.appendChild(mk(doc, "h1", t("market_net.selector_title", "Market Selector")));
       }
     } else {
-      wrap.appendChild(mk(doc, "h1", t("market_net.title", "Markets")));
+      wrap.appendChild(mk(doc, "h1", t("market_net.selector_title", "Market Selector")));
     }
     if (miss) {
-      wrap.appendChild(mk(doc, "p", t("market_net.title", "Markets") + " backend missing: " + miss + " failed to load.", "error"));
+      wrap.appendChild(mk(doc, "p", t("market_net.selector_title", "Market Selector") + " backend missing: " + miss + " failed to load.", "error"));
       return Promise.resolve();
     }
     try {
@@ -678,7 +697,6 @@ var MarketNetUI = (function () {
       }
     } catch (e) { /* connected path below */ }
     wrap.appendChild(mk(doc, "p", t("market_net.subtitle", "Top order-book markets by 24h volume. Pick a row to open the desk."), "muted"));
-    var q = readQuery();
     var filters = mk(doc, "div", null, "pools-filters");
     var fA, fB;
     try {
@@ -720,8 +738,9 @@ var MarketNetUI = (function () {
     filters.appendChild(clearBtn);
     wrap.appendChild(filters);
     try {
-      if (fA.input) fA.input.value = (q.a || "BTS").slice(0, 64);
-      if (fB.input) fB.input.value = (q.b || "").slice(0, 64);
+      var seed = pairSeed();
+      if (fA.input) fA.input.value = seed.a.slice(0, 64);
+      if (fB.input) fB.input.value = seed.b.slice(0, 64);
     } catch (e) { /* defaults stand */ }
     function currentLoad() {
       if (myGen !== gen) return Promise.resolve();

@@ -76,6 +76,7 @@ declare var MarketNetUI: any;
 declare var MarketOrders: any;
 declare var MarketPicker: any;
 declare var MarketUI: any;
+declare var PairContext: any;
 declare var MenuUI: any;
 declare var MiscUI: any;
 declare var NetChrome: any;

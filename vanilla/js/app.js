@@ -134,8 +134,15 @@ var App = (function () {
    * @returns {boolean} never throws */
   function navIsCurrent(hash, href) {
     try {
-      var h = String(hash || "#/");
+      /* Query lives INSIDE the hash on picker routes (#/markets?a=BTS&b=ETH,
+       * written by their writeQuery), so compare the path half only —
+       * otherwise a filtered selector un-highlights its own tab. */
+      var raw = String(hash || "#/");
+      var q = raw.indexOf("?");
+      var h = q === -1 ? raw : raw.slice(0, q);
       var a = String(href || "");
+      var aq = a.indexOf("?");
+      if (aq !== -1) a = a.slice(0, aq);
       if (h === a) return true;
       var kids = NAV_SECTIONS[a] || [];
       for (var i = 0; i < kids.length; i++) if (h.indexOf(kids[i]) === 0) return true;

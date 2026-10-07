@@ -635,7 +635,7 @@ var PoolUI = (function () {
    * @param {HTMLElement} root router mount element */
   function renderPools(root) {
     if (!root) return;
-    var ctx = routeReady(root, t("pools.title", "Liquidity Pools"), function () { renderPools(root); });
+    var ctx = routeReady(root, t("pools.selector_title", "Pool Selector"), function () { renderPools(root); });
     if (!ctx) return;
     var doc = ctx.doc, myGen = ctx.myGen;
     /* Wide (viewport-gaps fix 2026-09-28): the 10-col dense table
@@ -859,9 +859,21 @@ var PoolUI = (function () {
        * explicit ?a= (even empty — the Clear path) wins so Back/clear
        * round-trips stay honest. Clearable: empty inputs omit ?a=/?b= in
        * writeQuery and resolve to null (unfiltered) in loadPage. */
+      /* Seed precedence (spec §2.2): a shared ?a=/?b= deep link wins, then
+       * the global pair the last desk visit wrote (PairContext, session
+       * memory), then the BTS default. An EXPLICIT ?a=/?b= (even empty —
+       * the Clear path) still wins so Back/clear round-trips stay honest. */
+      var hasDeep = Object.prototype.hasOwnProperty.call(q, "a") || Object.prototype.hasOwnProperty.call(q, "b");
+      var legs = [];
+      if (!hasDeep) {
+        try {
+          if (typeof PairContext !== "undefined" && PairContext && typeof PairContext.get === "function") legs = PairContext.get() || [];
+        } catch (e) { legs = []; }
+      }
       if (Object.prototype.hasOwnProperty.call(q, "a")) fA.input.value = String(q.a || "").slice(0, 64);
-      else fA.input.value = "BTS";
+      else fA.input.value = String(legs[0] || "BTS").slice(0, 64);
       if (Object.prototype.hasOwnProperty.call(q, "b")) fB.input.value = String(q.b || "").slice(0, 64);
+      else if (legs[1]) fB.input.value = String(legs[1]).slice(0, 64);
       if (Object.prototype.hasOwnProperty.call(q, "s")) fS.input.value = String(q.s || "").slice(0, 64);
       var n = parseInt(q.size, 10);
       if (n === 25 || n === 50) {

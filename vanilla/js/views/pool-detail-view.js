@@ -416,14 +416,17 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       inverted: !!(orient && orient.inverted),
       _tapeSource: (tape && tape.source) || null
     };
-    /* Pool->Exchange context (owner): the header Exchange tab follows this
-     * pool's pair (QUOTE_BASE orientation like the desk). Guarded: symbol
-     * fallbacks may be object ids, which validPoolMarket rejects. */
+    /* Global pair context (selector ladder 2026-10-07): a pool visit writes
+     * the pool's own (base, quote) legs, so BOTH selectors come back seeded
+     * and the one-way pool->Exchange navbar swap is gone. fromPool keeps the
+     * pool's leg order, which is exactly what marketId() needs to rebuild the
+     * same "QUOTE_BASE" id the old swap produced — so a pool visit and a
+     * market visit still agree on one pair. */
     try {
-      if (typeof App !== "undefined" && App && typeof App.setPoolMarket === "function") {
-        App.setPoolMarket(P.assets.quote.symbol + "_" + P.assets.base.symbol);
+      if (typeof PairContext !== "undefined" && PairContext && typeof PairContext.set === "function") {
+        PairContext.set(PairContext.fromPool(P.assets));
       }
-    } catch (e) { /* default market stands */ }
+    } catch (e) { /* selectors keep their last pair */ }
     try { MarketInd.renderIndMenu(doc, menuHost, P); } catch (e) { /* chart works without the menu */ }
     /* Orientation helpers (invert wiring): normal legs quote B-per-A (desk
      * header SYMA/SYMB orientation); inverted legs quote A-per-B. Enriching

@@ -47,6 +47,9 @@ eq(T.navIsCurrent("#/explorer", "#/explorer"), true, "exact match still highligh
 eq(T.navIsCurrent("#/explorer/blocks", "#/explorer"), false, "explorer tabs stay exact-match only");
 eq(T.navIsCurrent("#/", "#/"), true, "dashboard highlights itself");
 eq(T.navIsCurrent("#/market/BTS_USD", "#/"), false, "desk does not highlight Dashboard");
+eq(T.navIsCurrent("#/markets?a=DOGE&b=USD", "#/markets"), true, "query-in-hash selector still highlights");
+eq(T.navIsCurrent("#/pools?a=BTS&b=ETH&size=25", "#/pools"), true, "pools query-in-hash still highlights");
+eq(T.navIsCurrent("#/market/ETH_BTS?tf=discrete", "#/markets"), true, "query on a desk still highlights its selector");
 
 console.log("app-shell-test: " + passed + " passed, 0 failed");
 

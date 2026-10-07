@@ -174,6 +174,15 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
     }
     var id = (pair.quote + "_" + pair.base).toUpperCase();
     MarketDesk._query.saveLast(id);
+    /* Global pair context (selector ladder 2026-10-07): a desk visit IS a
+     * pair visit — the selector you come back to seeds with this pair.
+     * fromMarketId undoes the QUOTE_BASE id so the pair is stored in human
+     * [base, quote] order, the same order the pools side writes. */
+    try {
+      if (typeof PairContext !== "undefined" && PairContext && typeof PairContext.set === "function") {
+        PairContext.set(PairContext.fromMarketId(id));
+      }
+    } catch (e) { /* selectors keep their last pair */ }
 
     var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
