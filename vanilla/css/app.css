@@ -1606,6 +1606,13 @@ p.muted[aria-live="polite"],
 }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }
+.pool-net-phys { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.pool-net-physbtn { min-height: 44px; padding: 6px 16px; cursor: pointer;
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border); border-radius: 16px; }
+.pool-net-physbtn[aria-pressed="true"] { border-color: var(--accent);
+  border-width: 2px; font-weight: bold; }
+.pool-net-physbtn[aria-pressed="false"] { opacity: 0.55; }
 .pool-net-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin: 8px 0; }
 .pool-net-chip { display: inline-flex; align-items: center; gap: 8px;
