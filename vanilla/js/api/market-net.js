@@ -1,9 +1,13 @@
 /* MarketNet: top-markets discovery data for the #/markets landing.
  * Owns: candidates (pool counterparties of X + curated seeds + cached
  *   markets + user-typed pair, deduped, capped 20), rank (ticker rows
- *   volume-desc on BigInt base_volume, zero-volume kept), readCache /
- *   writeCache / reconcileCache (localStorage cache of discovered market
- *   ids; chain re-validates every load, stale ids dropped — spec §2).
+ *   volume-desc on BigInt base_volume, zero-volume kept), graph (ranked
+ *   rows -> volume-gated {nodes, edges, meta} for the desk band map —
+ *   edges appear only for pairs with recent volume, one per unordered
+ *   pair with the focus-base orientation winning by page convention),
+ *   readCache / writeCache / reconcileCache (localStorage cache of
+ *   discovered market ids; chain re-validates every load, stale ids
+ *   dropped — spec §2).
  * Consumes: Market.stats(baseId, quoteId) ticker shape
  *   (market.js:452-462: {raw, latest, highestBid, lowestAsk} with
  *   raw.base_volume in base units) plus row labels {a, b, symA, symB};
@@ -178,9 +182,60 @@ var MarketNet = (function () {
     return { added: added, dropped: dropped, extra: extra };
   }
 
+  /* graph: ranked ticker rows -> volume-gated band graph (desk map
+   * mirrors the market selector: an edge appears only for a pair with
+   * recent volume). One edge per unordered asset pair; the focus-base
+   * orientation wins by page convention (volumes in different base units
+   * are incomparable, so size never decides — determinism does).
+   * Malformed/zero volumes count as no-volume (hidden from the map, kept
+   * in the table by rank). Pure: input untouched, never throws (bad rows
+   * skipped). Precisions ship null here — the caller fills them from its
+   * precs map before mounting (it owns the Asset.describe results).
+   * @param {MarketTickerRow[]} rows Probed ticker rows (ranked or not).
+   * @param {string} [focusId] Focus asset id ("1.3.x", X-as-base convention).
+   * @returns {{nodes: Array<{assetId: string, sym: string}>,
+   *   edges: Array<{id: string, a: string, b: string}>,
+   *   meta: Object<string, {symA, symB, volBaseRaw, volBasePrec,
+   *   volQuoteRaw, volQuotePrec, latest, change}>}} Edge id is the QUOTE_BASE
+   *   desk id (nav needs no lookup table).
+   */
+  function graph(rows, focusId) {
+    var nodes = [], edges = [], meta = {}, seenN = {};
+    function liveVol(v) {
+      try { return typeof v === "string" && /^\d+$/.test(v) && /[1-9]/.test(v); }
+      catch (e) { return false; }
+    }
+    function isFocusBase(r) {
+      return typeof focusId === "string" && focusId && String(r.a) === String(focusId);
+    }
+    var kept = {};
+    (rows || []).forEach(function (r) {
+      if (!r || !liveVol(r.baseVol)) return;
+      var a = String(r.a), b = String(r.b);
+      if (!a || !b || a === b) return;
+      if (!r.symA || !r.symB || r.symA === r.symB) return;
+      var key = a < b ? a + "|" + b : b + "|" + a;
+      if (kept[key] && !(isFocusBase(r) && !isFocusBase(kept[key].r))) return;
+      kept[key] = { r: r, a: a, b: b };
+    });
+    Object.keys(kept).forEach(function (key) {
+      var k = kept[key], r = k.r, a = k.a, b = k.b;
+      if (!seenN[a]) { seenN[a] = 1; nodes.push({ assetId: a, sym: String(r.symA) }); }
+      if (!seenN[b]) { seenN[b] = 1; nodes.push({ assetId: b, sym: String(r.symB) }); }
+      var id = String(r.symB) + "_" + String(r.symA);
+      edges.push({ id: id, a: a, b: b });
+      meta[id] = { symA: String(r.symA), symB: String(r.symB), volBaseRaw: String(r.baseVol),
+        volBasePrec: null, volQuoteRaw: String(r.quoteVol || "0"), volQuotePrec: null,
+        latest: (r.latest === null || r.latest === undefined) ? null : String(r.latest),
+        change: (r.change === null || r.change === undefined) ? null : String(r.change) };
+    });
+    return { nodes: nodes, edges: edges, meta: meta };
+  }
+
   return {
     candidates: candidates,
     rank: rank,
+    graph: graph,
     readCache: readCache,
     writeCache: writeCache,
     reconcileCache: reconcileCache,

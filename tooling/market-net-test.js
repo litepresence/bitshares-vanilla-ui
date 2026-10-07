@@ -103,5 +103,23 @@ function ok(cond, name) {
   delete globalThis.localStorage;
 })();
 
+// 8. Graph: volume-gated edges, desk-id edge ids, orientation dedupe.
+(function () {
+  const rows = [
+    { a: "1.3.0", b: "1.3.1", symA: "BTS", symB: "USD", baseVol: "5000", quoteVol: "250", latest: "0.05", change: "1.2" },
+    { a: "1.3.1", b: "1.3.0", symA: "USD", symB: "BTS", baseVol: "999999", quoteVol: "1", latest: "20.0", change: "0.1" },
+    { a: "1.3.0", b: "1.3.2", symA: "BTS", symB: "BTC", baseVol: "0", latest: null, change: null },
+    { a: "1.3.0", b: "1.3.3", symA: "BTS", symB: "BAD", baseVol: "not-a-number", latest: null, change: null }
+  ];
+  const g = MN.graph(rows, "1.3.0");
+  ok(g.edges.length === 1, "only the nonzero-volume pair survives");
+  ok(g.edges[0].id === "USD_BTS", "focus-base orientation wins (QUOTE_BASE desk id)");
+  ok(g.nodes.length === 2, "nodes are the kept edge's assets");
+  ok(g.meta["USD_BTS"].volBaseRaw === "5000", "meta carries raw volume + labels");
+  ok(rows.length === 4, "input untouched");
+  const g2 = MN.graph([rows[1], rows[0], rows[2], rows[3]], "1.3.0");
+  ok(g2.edges.length === 1 && g2.edges[0].id === "USD_BTS", "focus-base wins regardless of input order");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
