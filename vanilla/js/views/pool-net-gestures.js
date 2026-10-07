@@ -76,6 +76,18 @@ var NetGestures = (function () {
     } catch (e) { return null; }
   }
 
+  /* segDist: distance from a point to a segment, in CSS px. Pure math so the
+   * line hit test is unit-testable without a canvas. */
+  function segDist(x, y, ax, ay, bx, by) {
+    var dx = bx - ax, dy = by - ay;
+    var len2 = dx * dx + dy * dy;
+    if (!(len2 > 0)) return Math.sqrt((x - ax) * (x - ax) + (y - ay) * (y - ay));
+    var t = ((x - ax) * dx + (y - ay) * dy) / len2;
+    if (t < 0) t = 0; else if (t > 1) t = 1;
+    var px = ax + t * dx, py = ay + t * dy;
+    return Math.sqrt((x - px) * (x - px) + (y - py) * (y - py));
+  }
+
   /* Injected repaint: the state's S.paint(S), guarded (a painter-less
    * state — e.g. the paintGraph one-shot stub — simply skips mid-gesture
    * repaints; the loop still paints live states). */
@@ -124,9 +136,18 @@ var NetGestures = (function () {
         var tolh = Math.max(h.r + 5, tolN);
         if (d <= tolh && d < bestD) { bestD = d; best = { kind: "node", hit: h }; }
       }
+      /* Edges: the whole LINE is the target (distance to the segment), not a
+       * dot at its midpoint — people aim at the line they can see. Node wins
+       * above because a line ends at its nodes and dragging starts there.
+       * Records without a segment (older/headless shapes) still fall back to
+       * midpoint distance, so nothing that used to hit stops hitting. */
       for (i = 0; i < mids.length; i++) {
         var m = mids[i];
-        dx = m.x - p.x; dy = m.y - p.y; d = Math.sqrt(dx * dx + dy * dy);
+        if (m && (m.ax !== undefined || m.bx !== undefined)) {
+          d = segDist(p.x, p.y, m.ax, m.ay, m.bx, m.by);
+        } else {
+          dx = m.x - p.x; dy = m.y - p.y; d = Math.sqrt(dx * dx + dy * dy);
+        }
         if (d <= tolE && d < bestD) { bestD = d; best = { kind: "edge", hit: m }; }
       }
       return best;
@@ -143,7 +164,10 @@ var NetGestures = (function () {
       if (!found) return;
       var navOpts = (st && st.navOpts) || null;
       var dest = null;
-      if (found.kind === "edge") dest = resolveNav({ edgeMid: true, poolId: found.hit.poolId }, navOpts);
+      /* Pass the WHOLE edge record, not a {poolId}-only copy: a nav override
+       * derives the market from the line's two legs, and stripping them made
+       * every edge fall back to the pool desk (or to nothing). */
+      if (found.kind === "edge") dest = resolveNav(found.hit, navOpts);
       else dest = resolveNav(found.hit, navOpts);
       if (typeof dest === "string" && dest) navigate(dest);
     });
@@ -337,6 +361,7 @@ var NetGestures = (function () {
     navigate: navigate,
     navForHit: navForHit,
     resolveNav: resolveNav,
+    segDist: segDist,
     HIT_TOL: HIT_TOL,
     TAP_SLOP: TAP_SLOP
   };

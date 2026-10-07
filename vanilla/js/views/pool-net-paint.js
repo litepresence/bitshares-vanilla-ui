@@ -232,7 +232,14 @@ var NetPaint = (function () {
           if (hot) { try { ctx.restore(); } catch (x) { /* state stands */ } }
           ctx.globalAlpha = 1;
         } catch (e2) { try { ctx.globalAlpha = 1; } catch (x) { /* next edge */ } }
-        mids.push({ x: (SX(p.x) + SX(q.x)) / 2, y: (SY(p.y) + SY(q.y)) / 2, poolId: e.poolId });
+        /* An edge record carries its SEGMENT and both legs (id + symbol):
+         * the whole line is the click target, and the market selector derives
+         * the desk id for the pair from those symbols — a midpoint-only record
+         * with no legs could only ever be a dot you had to guess the position
+         * of, and could not name the market it opens. */
+        mids.push({ edgeMid: true, x: (SX(p.x) + SX(q.x)) / 2, y: (SY(p.y) + SY(q.y)) / 2, poolId: e.poolId,
+          ax: SX(p.x), ay: SY(p.y), bx: SX(q.x), by: SY(q.y),
+          a: e.a, b: e.b, aSym: symById[e.a] || String(e.a), bSym: symById[e.b] || String(e.b) });
       });
       nodes.forEach(function (n) {
         var g = geom[n.assetId];

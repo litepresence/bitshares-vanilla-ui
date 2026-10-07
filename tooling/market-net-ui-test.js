@@ -196,8 +196,38 @@ async function scenarioVolumes() {
   ok(bandMounts[0] && bandMounts[0].opts && typeof bandMounts[0].opts.navEdge === "function",
     "band passes navEdge override (Task 2 seam)");
   if (bandMounts[0] && bandMounts[0].opts && typeof bandMounts[0].opts.navEdge === "function") {
-    ok(bandMounts[0].opts.navEdge({ edgeMid: true, poolId: "1.19.9" }) === null,
-      "unknown pool edge -> null (no navigation, never pool default)");
+    var navEdge = bandMounts[0].opts.navEdge;
+    /* 2026-10-07: an edge on THIS map opens the order book for the pair it
+     * joins, derived from the line's own symbols. The old Pool.list lookup
+     * covered only the focus asset's pools with a known counterparty, which
+     * left 219 of 319 live lines dead — the symptom was "clicking an edge
+     * does nothing". So: known symbols -> market desk; unknown symbols ->
+     * the POOL desk (honest, still clickable); nothing to open -> null. */
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.0", b: "1.3.7", aSym: "BTS", bSym: "CNY" }) === "#/market/CNY_BTS",
+      "edge touching the focus asset -> counter_FOCUS desk (focus is the base)");
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.7", b: "1.3.0", aSym: "CNY", bSym: "BTS" }) === "#/market/CNY_BTS",
+      "same pair, legs reversed -> identical desk id (focus leg decides, not pool order)");
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.6", aSym: "ETH", bSym: "XRP" }) === "#/market/ETH_XRP",
+      "edge touching neither leg -> the graph's own order");
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.6" }) === "#/pools/1.19.9",
+      "no usable symbols -> the pool desk (never a dead line)");
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.5", aSym: "ETH", bSym: "ETH" }) === "#/pools/1.19.9",
+      "self-pair (no market exists) -> the pool desk");
+    ok(navEdge({ edgeMid: true }) === null, "no pool id at all -> null (nothing honest to open)");
+    ok(navEdge(null) === null, "null hit -> null");
+    /* The seam itself, headless: object ids must never become a desk id. */
+    var de = MarketNetUI._deskIdForEdgeForTest;
+    ok(typeof de === "function", "_deskIdForEdgeForTest exported");
+    if (typeof de === "function") {
+      ok(de({ a: "1.3.0", b: "1.3.7", aSym: "BTS", bSym: "CNY" }, "1.3.0", "BTS") === "CNY_BTS", "focus leg -> counter_FOCUS");
+      ok(de({ a: "1.3.7", b: "1.3.0", aSym: "CNY", bSym: "BTS" }, "1.3.0", "BTS") === "CNY_BTS", "leg order irrelevant");
+      ok(de({ a: "1.3.5", b: "1.3.6", aSym: "1.3.5", bSym: "1.3.6" }, "1.3.0", "BTS") === null,
+        "object ids are not symbols -> null (a '1.3.7_1.3.0' desk would 404)");
+      ok(de({ a: "1.3.5", b: "1.3.5", aSym: "ETH", bSym: "ETH" }, "1.3.0", "BTS") === null, "self-pair -> null");
+      ok(de(null, "1.3.0", "BTS") === null, "null edge -> null");
+      ok(de({ a: "1.3.5", b: "1.3.6", aSym: "ETH", bSym: "XRP" }, "1.3.0", "") === "ETH_XRP",
+        "no focus symbol -> the graph's own order");
+    }
   }
   ok(textOf(root).indexOf("Collapse") !== -1, "band collapsible (Collapse label, open default)");
 }

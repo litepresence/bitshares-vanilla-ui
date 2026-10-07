@@ -263,6 +263,34 @@ var skel = { pools: [
   delete global.localStorage;
 })();
 
+/* LINE HIT TEST (2026-10-07): on the selector bands an edge is a VISIBLE
+ * LINE, so the whole line must be clickable — the old test only ever compared
+ * the pointer to each edge's midpoint, which is why clicking a line "did
+ * nothing" unless you guessed the dot. Node still wins inside its radius (a
+ * line ends at its nodes and dragging starts there), and a record without a
+ * segment still falls back to midpoint distance, so nothing that used to hit
+ * can stop hitting. */
+(function () {
+  var G = (typeof NetGestures !== "undefined") ? NetGestures : require("../vanilla/js/views/pool-net-gestures.js");
+  ok(G && typeof G.segDist === "function", "segDist exported (pure point/segment distance)");
+  if (!G || typeof G.segDist !== "function") return;
+  ok(G.segDist(50, 10, 0, 0, 100, 0) === 10, "distance above a horizontal line");
+  ok(G.segDist(-5, 0, 0, 0, 100, 0) === 5, "clamps to the segment start");
+  ok(G.segDist(105, 0, 0, 0, 100, 0) === 5, "clamps to the segment end");
+  ok(G.segDist(3, 4, 3, 4, 3, 4) === 0, "degenerate segment (a point)");
+  ok(G.segDist(50, 0, 0, 0, 100, 0) === 0, "a point ON the line is zero away");
+
+  /* The painter must hand the gesture layer a segment + both legs: without
+   * them the band can only hit midpoints and cannot name a market. */
+  var paintSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-paint.js"), "utf8");
+  ok(/mids\.push\(\{[^}]*ax:/.test(paintSrc), "edge records carry ax/ay (segment start)");
+  ok(/mids\.push\(\{[^}]*bx:/.test(paintSrc), "edge records carry bx/by (segment end)");
+  ok(/mids\.push\(\{[^}]*aSym:/.test(paintSrc), "edge records carry both leg symbols");
+  var gestSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-gestures.js"), "utf8");
+  ok(/segDist\(p\.x, p\.y, m\.ax/.test(gestSrc), "the click path measures the SEGMENT, not the midpoint");
+  ok(/m\.x - p\.x/.test(gestSrc), "midpoint distance remains as the fallback for segment-less records");
+})();
+
 /* The switch's DOM contract (2026-10-07): the button is the 44x44 HIT AREA
  * and the visible pill is a child track, so the control can read half-size
  * without dropping below the platform touch floor (principle #7). No tooltip

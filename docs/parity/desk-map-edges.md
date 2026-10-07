@@ -130,6 +130,59 @@ assertion rather than a comment:
    own `{errors}` sentinel as a third measurement). It now parks the layout
    before aiming and asserts the flag from its owners.
 
+## The same bug on the market selector's band (reported next)
+
+"Clicking an edge in the market selector network map does not nav to that
+exchange desk for that pair" turned out to be **three** defects, and the first
+two were invisible to the existing suite:
+
+1. **69% of lines were dead.** `poolDeskMap` derived market ids from
+   `Pool.list` rows for the focus asset, and only when the counterparty symbol
+   was present. Measured on the live map: **100 of 319 edges** resolved to
+   anything. Now every edge derives its id from the line's **own two symbols**
+   (`deskIdForEdge`, pure, headless-tested) — 319/319 resolve, 0 dead. Unknown
+   symbols fall back to the pool desk (honest, still clickable) rather than a
+   line that does nothing.
+2. **The click stripped the payload.** The handler built a fresh
+   `{ edgeMid: true, poolId }` object and handed *that* to the nav override, so
+   the legs and symbols were gone before the override could read them. It now
+   passes the whole record.
+3. **The record was missing its own marker.** Band edge records never carried
+   `edgeMid`, so `resolveNav` read them as **nodes** — with the payload fix
+   that meant clicking an edge opened `#/asset/undefined`. Records now carry
+   `edgeMid` plus the segment (`ax..by`) and both legs, the same shape the
+   desk engine uses.
+
+Alongside that, the band's hit test moved from **midpoint-only** to
+**segment distance** (the same fix as the desk maps), so the whole visible
+line is clickable.
+
+Orientation on this map: the focus asset is the **base** (X is probed as base,
+so a pair touching it reads `counter_FOCUS`, matching the rows and
+`poolDeskMap`); an edge touching neither leg uses the graph's own order; an
+object id is never accepted as a symbol (a `1.3.7_1.3.0` desk would 404).
+
+### Evidence
+- `tooling/market-net-ui-test.js` → **36 passed** (was 23): the `navEdge`
+  override contract (market desk / pool fallback / null), plus
+  `deskIdForEdge` vectors including leg-order independence and the
+  object-id-is-not-a-symbol rejection.
+- `tooling/pool-net-ui-test.js` → **87 passed** (was 76): `segDist` maths and
+  the painter/gesture contract (records carry a segment + both legs; the click
+  path measures the segment and keeps midpoint distance as the fallback).
+- `tooling/visual/probe-market-band-edges.mjs` → **MARKET-BAND-EDGES OK**,
+  zero page errors. Census on the live map: **319 edges, 319 to a market desk,
+  0 dead**. A click 25% along a line (not the midpoint) opens an order book.
+- Unchanged and green: `pool-graph-test` 190 · `pool-net-test` 39 ·
+  `market-net-test` 22 · `node-network-test` 30; rot/i18n/types all pass.
+
+### Honest limits
+This graph is dense (319 edges over 89 nodes), so lines cross and a few sit
+almost on top of each other. Nearest-line-wins is the rule, and where two
+lines are within a pixel of each other, *which* one you get is a tie-break,
+not a promise — the promise is that a click opens **an** order book for a pair
+on the map.
+
 ## Note
 
 The exchange desk's fallback (an edge touching neither of the desk's legs)
