@@ -13,13 +13,26 @@ enough to accept color-only encoding).
    change covers both), metric: pool balance digits (no ticker data in
    hand; probing per edge refused — decoration must not cost chain calls).
 
-## 2. Ramp spec (locked)
+## 2. Ramp spec (locked, calibrated 2026-10-07 live)
 
-- `t = min(strippedDigitLength / 14, 1)` — the same 14 as the old width
-  formula, so a given blue means the same thing on every map/filter/page.
+- `t = clamp((digits - LO) / (HI - LO), 0, 1)` per data kind — ABSOLUTE
+  windows (stable across filters/pages), calibrated that day:
+  pool legs (bands + mini-maps) LO=4/HI=22 — histogram probe
+  (`tooling/visual/probe-ramp-hist.mjs`) over 515 live pools, bulk 8–22;
+  market volumes LO=5/HI=11 — live `#/markets` table, 7–11 digits.
+  Pool size and 24h volume are different quantities sharing one visual
+  language, deliberately NOT one scale (cross-unit sameness would be a
+  fiction; the earlier /14 sketch saturated 67% of pools to full blue —
+  caught by screenshot audit, fixed same round).
 - Low = `--muted` token, high = `--accent` token; fallbacks `#758696` /
   `#1E9ED7` (values both painters already use). Non-hex token values fail
   closed to fallbacks.
+- Volumes normalize first (`MarketNet.volInt`): `get_ticker`
+  base/quote volumes arrive as integer digit strings OR human-scaled
+  decimals ("16.47978" BTS, observed mainnet) — decimals join the point
+  (exact raw reconstruction), garbage reads "0". Without this the table
+  hid real volume ("Top 0 of 20") and the map gated everything out.
+  Found by live audit, same round.
 - Lerp in RGB, output `rgb(r,g,b)` string. Pure, vector-tested, exposed as
   `_rampForTest` in both modules (verbatim-duplicated per doctrine, with
   provenance comment — same as the width math it replaces).

@@ -2125,6 +2125,7 @@
       "market_net.offline",
       "market_net.open_desk",
       "market_net.prompt",
+      "market_net.ramp",
       "market_net.selector_title",
       "market_net.spark_label",
       "market_net.subtitle",
@@ -2638,6 +2639,7 @@
       "pool_net.partial",
       "pool_net.phys",
       "pool_net.prompt",
+      "pool_net.ramp",
       "pool_net.ready",
       "pool_net.title",
       "pool_net.twin",
@@ -7707,7 +7709,8 @@
     "offline": "Network unavailable — showing shipped skeleton. Retry when connected.",
     "offline_empty": "Network unavailable — no skeleton pools cached.",
     "partial": "Live update incomplete — showing shipped pools.",
-    "phys": "Physics"
+    "phys": "Physics",
+    "ramp": "Pool size: small → large"
   },
   "market_net": {
     "title": "Markets",
@@ -7740,7 +7743,8 @@
     "twin": "Market rows (%(n)s)",
     "twin_more": "Showing %(shown)s of %(n)s markets — narrow the filter to see fewer.",
     "canvas_label": "Market network map. Press Enter to open the market.",
-    "prompt": "Tap a node for the asset, a line for the market."
+    "prompt": "Tap a node for the asset, a line for the market.",
+    "ramp": "24h volume: low → high"
   },
   "unlockconfirm": {
     "password": "Password",

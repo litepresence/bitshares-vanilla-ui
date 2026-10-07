@@ -71,9 +71,9 @@ var NetPaint = (function () {
   }
 
   /* Volume ramp: t in [0,1] -> grey-to-blue ink (owner 2026-10-07: color
-   * replaces the old digit-length thickness — same t metric, same /14
-   * scale, so a given blue means the same thing on every map/filter.
-   * Pure: parse failures fail closed to grey. Verbatim twin lives in
+   * replaces the old digit-length thickness. t windows are caller-owned
+   * per data kind (see edgeT) — absolute, so colors stay put across
+   * filters. Pure: parse failures fail closed to grey. Verbatim twin lives in
    * pool-graph.js — doctrine prefers the duplication over a shared import
    * for two files. */
   function _ramp(t, greyHex, blueHex) {
@@ -105,27 +105,36 @@ var NetPaint = (function () {
     return BRAND_FILLS[group] || BRAND_FILLS.other;
   }
 
-  /* edgeT: volume/size parameter for the ramp — stripped digit length
-   * over 14 (the old width formula's scale, kept so a given blue means the
-   * same thing on every map). Pool meta reads both balance legs, market
-   * meta reads volBaseRaw; missing/malformed data reads 0 (thin grey).
-   * Counts only, never values — no floats on money.
+  /* edgeT: volume/size parameter for the ramp — calibrated digit window
+   * over 18 (pool legs: live probe 2026-10-07, 515 pools, bulk 8–22 digits;
+   * market volumes: live table 2026-10-07, 7–11 digits). Pool meta reads
+   * both balance legs (window 4–22), market meta reads volBaseRaw (window
+   * 5–11). Windows are ABSOLUTE (stable across filters/pages) and
+   * deliberately overlapping-free per data kind — pool size and 24h volume
+   * are different quantities sharing one visual language, not one scale.
+   * Missing/malformed data reads 0 (thin grey). Counts only, never
+   * values — no floats on money.
    * @param {Object|null} meta edge meta map. @param {string} id edge id.
    * @returns {number} t in [0,1]. Never throws. */
   function edgeT(meta, id) {
+    var POOL_LO = 4, POOL_HI = 22, MKT_LO = 5, MKT_HI = 11;
     try {
       var m = meta ? meta[id] : null;
-      var digits = 0;
+      var digits = 0, lo = POOL_LO, hi = POOL_HI;
       if (m) {
         var a = m.balance_a_raw, b = m.balance_b_raw;
         if (typeof a === "string" && /^\d+$/.test(a) && typeof b === "string" && /^\d+$/.test(b)) {
           digits = a.replace(/^0+/, "").length + b.replace(/^0+/, "").length;
         } else if (typeof m.volBaseRaw === "string" && /^\d+$/.test(m.volBaseRaw)) {
           digits = m.volBaseRaw.replace(/^0+/, "").length;
+          lo = MKT_LO; hi = MKT_HI;
         }
       }
       if (!(digits > 0)) return 0;
-      return Math.min(digits / 14, 1);
+      var t = (digits - lo) / (hi - lo);
+      if (!(t > 0)) return 0;
+      if (t > 1) return 1;
+      return t;
     } catch (e) { return 0; }
   }
 

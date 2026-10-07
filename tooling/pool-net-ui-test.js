@@ -516,21 +516,23 @@ var skel = { pools: [
     var mm = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(String(((m || [])[i]) || ""));
     return mm ? [Number(mm[1]), Number(mm[2]), Number(mm[3])] : null;
   }
-  var view = { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" }],
-    edges: [{ poolId: "1.19.1", a: "1.3.0", b: "1.3.1" }, { poolId: "1.19.2", a: "1.3.0", b: "1.3.2" }] };
-  var geom = { "1.3.0": { x: 10, y: 10 }, "1.3.1": { x: 100, y: 10 }, "1.3.2": { x: 10, y: 100 } };
-  var meta = { "1.19.1": { balance_a_raw: "5000000", balance_b_raw: "250000" }, "1.19.2": { balance_a_raw: "5", balance_b_raw: "7" } };
+  var view = { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" }, { assetId: "1.3.113", sym: "CNY" }],
+    edges: [{ poolId: "1.19.1", a: "1.3.0", b: "1.3.1" }, { poolId: "1.19.2", a: "1.3.0", b: "1.3.2" }, { poolId: "CNY_BTS", a: "1.3.0", b: "1.3.113" }] };
+  var geom = { "1.3.0": { x: 10, y: 10 }, "1.3.1": { x: 100, y: 10 }, "1.3.2": { x: 10, y: 100 }, "1.3.113": { x: 100, y: 100 } };
+  var meta = { "1.19.1": { balance_a_raw: "5000000", balance_b_raw: "250000" }, "1.19.2": { balance_a_raw: "5", balance_b_raw: "7" },
+    "CNY_BTS": { symA: "BTS", symB: "CNY", volBaseRaw: "1647978" } };
   var cap = capCtx();
   NP.drawScene(cap.ctx, 300, 320, view, geom, { scale: 1, ox: 0, oy: 0, pathSet: {}, selPool: null,
     meta: meta, hoverNode: null, hoverEdge: null, phys: "lively" });
   var inks = cap.strokes.map(function (s) { return s.color; });
   var widths = cap.strokes.map(function (s) { return s.width; });
-  var big = num(inks, 0), small = num(inks, 1);
-  ok(!!big && !!small, "both edges stroke rgb ink (got " + JSON.stringify(inks.slice(0, 2)) + ")");
-  if (big && small) {
-    ok((big[2] - big[0]) > (small[2] - small[0]), "big edge bluer than small edge (blueness " + (big[2] - big[0]) + " vs " + (small[2] - small[0]) + ")");
+  var big = num(inks, 0), small = num(inks, 1), mkt = num(inks, 2);
+  ok(!!big && !!small && !!mkt, "all three edges stroke rgb ink (got " + JSON.stringify(inks.slice(0, 3)) + ")");
+  if (big && small && mkt) {
+    ok((big[2] - big[0]) > (mkt[2] - mkt[0]) && (mkt[2] - mkt[0]) > (small[2] - small[0]),
+      "blueness orders big-pool > market-mid > small-pool");
   }
-  ok(widths[0] === 1.25 && widths[1] === 1.25, "base edges share one constant width (got " + JSON.stringify(widths.slice(0, 2)) + ")");
+  ok(widths[0] === 1.25 && widths[1] === 1.25 && widths[2] === 1.25, "base edges share one constant width (got " + JSON.stringify(widths.slice(0, 3)) + ")");
 })();
 
 console.log(pass + " passed, " + fail + " failed");

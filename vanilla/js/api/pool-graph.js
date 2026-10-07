@@ -347,8 +347,8 @@ var PoolGraph = (function () {
     return 0.5 + digits / 18;
   }
   /* Volume ramp: t in [0,1] -> grey-to-blue ink (owner 2026-10-07: color
-   * replaces the old digit-length thickness — same t metric, so a given
-   * blue means the same thing on every map. Pure: parse failures fail
+   * replaces the old flat border grey. t windows live at the call site
+   * (pool window 4–22, shared with the bands). Pure: parse failures fail
    * closed to grey. Verbatim twin lives in pool-net-paint.js — doctrine
    * prefers the duplication over a shared import for two files. */
   function _ramp(t, greyHex, blueHex) {
@@ -1054,12 +1054,17 @@ var PoolGraph = (function () {
        * thin grey. The user highlight keeps its soft glow. */
       var st = edgeStyle(e.poolId, hi, pathSet, hoverEdge);
       /* Base ink is the size ramp (owner 2026-10-07 — color replaced the
-       * flat border grey; interaction tokens keep overriding). sizeRaw is
-       * the BigInt-sum digit string, so digit length is the whole metric. */
+       * flat border grey; interaction tokens keep overriding). Window
+       * 4–22 digits: live probe 2026-10-07 over 515 pools (bulk 8–22),
+       * same window as the bands' pool mode so one blue means one size
+       * everywhere. sizeRaw is the BigInt-sum digit string. */
       var baseT = 0;
       try {
-        var raw = String(e.sizeRaw == null ? "" : e.sizeRaw).replace(/^0+/, "");
-        baseT = (/^\d+$/.test(String(e.sizeRaw == null ? "" : e.sizeRaw)) && raw) ? Math.min(raw.length / 14, 1) : 0;
+        var rawS = String(e.sizeRaw == null ? "" : e.sizeRaw);
+        if (/^\d+$/.test(rawS)) {
+          var dd = rawS.replace(/^0+/, "").length;
+          baseT = dd <= 4 ? 0 : Math.min((dd - 4) / 18, 1);
+        }
       } catch (e2) { baseT = 0; }
       var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : _ramp(baseT, muted, accent));
       ctx.strokeStyle = col;
