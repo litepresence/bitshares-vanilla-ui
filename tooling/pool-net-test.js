@@ -191,7 +191,78 @@ const skel = { pools: [
       ok(threw, "bad startId still rejected");
       delete globalThis.Chain;
     })();
-    console.log(pass + " passed, " + fail + " failed");
+    /* BRAND TOGGLES FILTER, NOT DIM (owner 2026-10-07). Turning a brand off used
+ * to paint it at 15% opacity: the nodes stayed in the plot, in the hit list,
+ * in the table twin and — worst — in the simulation, so the map kept
+ * breathing around things the user had switched off. Now the group is removed
+ * from the graph, and turning it back on seeds the returning nodes so the
+ * physics springs them into the mesh. */
+(function () {
+  var G = {
+    nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" },
+            { assetId: "1.3.2", sym: "HONEST.BTC" }, { assetId: "1.3.3", sym: "GDEX.USDT" }],
+    edges: [{ poolId: "1.19.1", a: "1.3.0", b: "1.3.1" }, { poolId: "1.19.2", a: "1.3.1", b: "1.3.2" },
+            { poolId: "1.19.3", a: "1.3.0", b: "1.3.3" }]
+  };
+  function ids(g) { return (g.nodes || []).map(function (n) { return n.assetId; }).join(","); }
+  function pools(g) { return (g.edges || []).map(function (e) { return e.poolId; }).join(","); }
+
+  ok(G === PoolNet.filterBrands(G, null), "no hidden groups -> the same graph (no copy)");
+  ok(G === PoolNet.filterBrands(G, {}), "empty hidden set -> the same graph");
+  var btcBrand = PoolNet.brandOf("HONEST.BTC");
+  var out = PoolNet.filterBrands(G, (function () { var h = {}; h[btcBrand] = 1; return h; })());
+  ok(ids(out) === "1.3.0,1.3.1,1.3.3", "the hidden brand's node is gone (" + ids(out) + ")");
+  ok(pools(out) === "1.19.1,1.19.3", "edges touching it are gone too (" + pools(out) + ")");
+  ok(ids(G) === "1.3.0,1.3.1,1.3.2,1.3.3", "the input graph is untouched");
+  var bts = PoolNet.brandOf("BTS");
+  var out2 = PoolNet.filterBrands(G, (function () { var h = {}; h[bts] = 1; return h; })());
+  ok(pools(out2) === "", "hiding BTS removes every pool touching it");
+  var all = {};
+  all[bts] = 1; all[btcBrand] = 1; all[PoolNet.brandOf("GDEX.USDT")] = 1;
+  var out3 = PoolNet.filterBrands(G, all);
+  ok(ids(out3) === "" && (out3.edges || []).length === 0, "hiding everything yields an empty graph (honest, not a crash)");
+  ok(PoolNet.filterBrands(null, all) && PoolNet.filterBrands(null, all).nodes.length === 0, "null graph -> empty, never throws");
+  ok(PoolNet.filterBrands({ nodes: [{ assetId: "1.3.0", sym: "BTS" }], edges: [] }, all).nodes.length === 0,
+    "a lone node of a hidden brand is dropped");
+
+  /* reseedGeom: survivors hold still, newcomers get seeded positions. */
+  var prev = { "1.3.0": { x: 11, y: 12 }, "1.3.1": { x: 13, y: 14 } };
+  var r1 = PoolNet.reseedGeom(prev, [{ assetId: "1.3.0" }, { assetId: "1.3.1" }, { assetId: "1.3.2" }], 800, 600);
+  ok(r1.geom["1.3.0"].x === 11 && r1.geom["1.3.0"].y === 12, "a survivor keeps its exact position");
+  ok(r1.geom["1.3.1"].x === 13 && r1.geom["1.3.1"].y === 14, "a second survivor keeps its position too");
+  ok(!!r1.geom["1.3.2"], "a returning node is seeded with a position");
+  ok(r1.fresh.join(",") === "1.3.2", "the returning node is reported as freshly seeded");
+  ok(isFinite(r1.geom["1.3.2"].x) && isFinite(r1.geom["1.3.2"].y), "the seed is finite (never NaN)");
+  ok(Object.keys(r1.geom).length === 3, "the geom holds exactly the current node set");
+  var r2 = PoolNet.reseedGeom(prev, [{ assetId: "1.3.1" }], 800, 600);
+  ok(Object.keys(r2.geom).join(",") === "1.3.1", "a node that left is dropped from the geom");
+  var r3 = PoolNet.reseedGeom(null, [{ assetId: "1.3.0" }, { assetId: "1.3.1" }], 800, 600);
+  ok(r3.fresh.length === 2, "with no previous layout every node is fresh");
+  ok(Object.keys(r3.geom).length === 2, "and every node still gets a position");
+  var r4 = PoolNet.reseedGeom(prev, [{ assetId: "1.3.0" }, { assetId: "1.3.1" }], 0, 0);
+  ok(isFinite(r4.geom["1.3.0"].x), "zero-size canvas still yields finite coordinates");
+  var r5 = PoolNet.reseedGeom(prev, null, 800, 600);
+  ok(Object.keys(r5.geom).length === 0, "null node list -> empty geom, never throws");
+  ok(Object.keys(prev).length === 2, "reseedGeom never mutates the previous layout");
+
+  /* Two newcomers must not start stacked (a spring needs something to pull). */
+  var r6 = PoolNet.reseedGeom({}, [{ assetId: "a" }, { assetId: "b" }], 800, 600);
+  var same = r6.geom.a.x === r6.geom.b.x && r6.geom.a.y === r6.geom.b.y;
+  ok(!same, "two newcomers start at different points (no visual pop)");
+
+  /* The painter must not reintroduce a dim path: hidden brands are filtered
+   * out upstream, so a 15%-opacity branch would be dead code that suggests
+   * "off" is still drawn. */
+  var paintSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-paint.js"), "utf8");
+  ok(paintSrc.indexOf("paint.dim") === -1, "the painter has no dim branch");
+  ok(/0\.15/.test(paintSrc) === false, "no 15% opacity branch left behind");
+  var uiSrc = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-ui.js"), "utf8");
+  ok(uiSrc.indexOf("filterBrands") !== -1, "the composer applies the brand filter");
+  ok(uiSrc.indexOf("onBrandToggle") !== -1, "the composer handles the chip toggle");
+  ok(/hide: \{\}/.test(uiSrc), "state carries a hidden-brand set");
+})();
+
+console.log(pass + " passed, " + fail + " failed");
     process.exit(fail ? 1 : 0);
   }
 })();

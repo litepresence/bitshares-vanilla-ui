@@ -30,7 +30,7 @@ var NetPaint = (function () {
   /* Brand fills (spec §4 groups): BTS + committee smartcoins always
    * BitShares blue — read from --accent (BitShares blue in all three themes)
    * so the core tracks the theme instead of a frozen hex; the remaining
-   * groups are fixed data hues (no theme tokens exist for them), dimmed by
+   * groups are fixed data hues (no theme tokens exist for them), drawn by
    * legend toggle (display only, never chain). */
   var BRAND_FILLS = {
     honest: "#2E9E5B", gdex: "#14A8A8", xbtsx: "#8E5BD6", btwty: "#E5639E",
@@ -162,7 +162,7 @@ var NetPaint = (function () {
    * @param {number} W CSS-pixel width. @param {number} H CSS-pixel height.
    * @param {{nodes: Array, edges: Array}} view Filtered graph.
    * @param {Object} geom assetId -> {x, y} world coords.
-   * @param {Object} paint {scale, ox, oy, pathSet, selPool, dim, meta,
+   * @param {Object} paint {scale, ox, oy, pathSet, selPool, hoverNode,
    *   hoverNode, hoverEdge, phys} display-only state (the legacy `phys`
    *   hint is ignored now that one physics exists; positions are
    *   preset-independent).
@@ -202,18 +202,15 @@ var NetPaint = (function () {
         symById[n.assetId] = n.sym || n.assetId;
         brandById[n.assetId] = brandOf(n.sym);
       });
-      function dimmed(id) { return !!(paint.dim && paint.dim[brandById[id]]); }
       edges.forEach(function (e, ei) {
         var p = geom[e.a], q = geom[e.b];
         if (!p || !q) return;
         var hot = paint.selPool && String(e.poolId) === String(paint.selPool);
         var onPath = paint.pathSet && paint.pathSet[e.poolId];
         var hov = paint.hoverEdge && String(e.poolId) === String(paint.hoverEdge);
-        var faint = dimmed(e.a) || dimmed(e.b);
         try {
           ctx.strokeStyle = hot ? buy : ((onPath || hov) ? PATH_WARM : border);
           ctx.lineWidth = (hot || onPath || hov) ? 2.5 : _edgeWidth(paint.meta, e.poolId);
-          ctx.globalAlpha = faint ? 0.12 : 1;
           if (hot) {
             try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (x) { /* glow best-effort */ }
           }
@@ -230,8 +227,7 @@ var NetPaint = (function () {
           }
           ctx.stroke();
           if (hot) { try { ctx.restore(); } catch (x) { /* state stands */ } }
-          ctx.globalAlpha = 1;
-        } catch (e2) { try { ctx.globalAlpha = 1; } catch (x) { /* next edge */ } }
+        } catch (e2) { /* next edge */ }
         /* An edge record carries its SEGMENT and both legs (id + symbol):
          * the whole line is the click target, and the market selector derives
          * the desk id for the pair from those symbols — a midpoint-only record
@@ -248,7 +244,6 @@ var NetPaint = (function () {
         var brand = brandById[n.assetId] || "other";
         var hovN = paint.hoverNode && String(n.assetId) === String(paint.hoverNode);
         try {
-          ctx.globalAlpha = (paint.dim && paint.dim[brand]) ? 0.15 : 1;
           ctx.fillStyle = brandFill(brand);
           ctx.beginPath();
           ctx.arc(SX(g.x), SY(g.y), r, 0, 2 * Math.PI);
@@ -279,7 +274,8 @@ var NetPaint = (function () {
    * One-shot paint seam (headless-testable): fit + circle layout + draw.
    * @param {HTMLCanvasElement} canvas Target canvas.
    * @param {{nodes: Array, edges: Array}} graph Graph to paint.
-   * @param {Object} [opts] {pathPools, selPool, dim, meta} display-only.
+   * @param {Object} [opts] {pathPools, selPool, meta} display-only (no dim:
+   *   hidden brands are filtered out of the graph upstream).
    * @returns {{empty: boolean, nodes: number, edges: number}|null}
    * Failure: null when the canvas has no 2d context.
    */

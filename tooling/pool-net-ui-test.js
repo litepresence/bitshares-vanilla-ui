@@ -263,6 +263,22 @@ var skel = { pools: [
   delete global.localStorage;
 })();
 
+/* Legend chips must come from the FULL graph (2026-10-07): a chip built from
+ * the FILTERED view disappears when its brand is hidden, taking the only
+ * control that could turn it back on with it. */
+(function () {
+  var src = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-chrome.js"), "utf8");
+  ok(/S\.full && S\.full\.nodes && S\.full\.nodes\.length/.test(src),
+    "legend reads the brand set from the full graph");
+  ok(/\(S\.view && S\.view\.nodes\) \|\| \[\]/.test(src),
+    "with a full-graph fallback to the view (headless states)");
+  ok(src.indexOf("delete S.hide[group]") !== -1, "a second click unhides the group");
+  ok(src.indexOf("onToggle(S, group, off)") !== -1, "the chip reports the toggle to the composer");
+  var ui = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-ui.js"), "utf8");
+  ok(/function onBrandToggle/.test(ui), "composer owns the toggle handler");
+  ok(/_wakeForTest\(S\)/.test(ui), "the handler wakes the loop so the mesh springs");
+})();
+
 /* LINE HIT TEST (2026-10-07): on the selector bands an edge is a VISIBLE
  * LINE, so the whole line must be clickable — the old test only ever compared
  * the pointer to each edge's midpoint, which is why clicking a line "did

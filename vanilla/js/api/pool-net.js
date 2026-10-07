@@ -323,8 +323,73 @@ var PoolNet = (function () {
     };
   }
 
+  /* filterBrands: the graph with every HIDDEN brand group removed —
+   * nodes AND the edges that touch them (an edge cannot exist without both
+   * ends). Pure, so the legend contract is testable headlessly.
+   * Brand toggles used to paint the group at 15% opacity instead, which left
+   * every hidden node in the plot, in the hit list and in the simulation —
+   * "turned off" that still moves and still catches clicks.
+   * @param {{nodes: Array, edges: Array}} g Graph (fromSkeleton/mergeLive).
+   * @param {Object} hide brand group -> truthy = hidden. Null/empty = full graph.
+   * @returns {{nodes: Array, edges: Array}} a NEW graph; the input is untouched. */
+  function filterBrands(g, hide) {
+    var keep = {};
+    var has = false;
+    for (var k in hide) if (Object.prototype.hasOwnProperty.call(hide, k) && hide[k]) { has = true; break; }
+    if (!has) return g;
+    var src = g || {};
+    var nodes = [], ids = {};
+    (src.nodes || []).forEach(function (n) {
+      if (!n || !n.assetId) return;
+      var grp = brandOf(n.sym);
+      if (hide[grp]) return;
+      keep[String(n.assetId)] = 1;
+      nodes.push(n);
+    });
+    var edges = [];
+    (src.edges || []).forEach(function (e) {
+      if (!e || !keep[String(e.a)] || !keep[String(e.b)]) return;
+      edges.push(e);
+    });
+    return { nodes: nodes, edges: edges };
+  }
+
+  /* reseedGeom: geometry for a CHANGING node set, so a brand toggle springs
+   * instead of popping. Nodes that survived keep their position; nodes that
+   * just came back are seeded on a fresh circle around the centre (so the
+   * loop has something to pull them from); nodes that left are dropped
+   * along with their velocity. Pure — the caller mutates nothing.
+   * @param {Object} prevGeom assetId -> {x,y} from the previous layout.
+   * @param {Array} nodes Current node list.
+   * @param {number} w CSS width. @param {number} h CSS height.
+   * @returns {{geom: Object, fresh: string[]}} fresh = ids newly seeded. */
+  function reseedGeom(prevGeom, nodes, w, h) {
+    var geom = {}, fresh = [];
+    var list = nodes || [];
+    var W = (w > 0 ? w : 300), H = (h > 0 ? h : 320);
+    var cx = W / 2, cy = H / 2;
+    var r = Math.max(24, Math.min(W, H) * 0.36);
+    for (var i = 0; i < list.length; i++) {
+      var id = list[i] && list[i].assetId;
+      if (!id) continue;
+      var prev = prevGeom ? prevGeom[id] : null;
+      if (prev && isFinite(prev.x) && isFinite(prev.y)) {
+        geom[id] = { x: prev.x, y: prev.y };
+      } else {
+        /* Golden-angle ring: no two newcomers start on top of each other, so
+         * the first spring frames read as motion, not a flash. */
+        var a = i * 2.399963;
+        geom[id] = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+        fresh.push(String(id));
+      }
+    }
+    return { geom: geom, fresh: fresh };
+  }
+
   return {
     brandOf: brandOf,
+    filterBrands: filterBrands,
+    reseedGeom: reseedGeom,
     fromSkeleton: fromSkeleton,
     mergeLive: mergeLive,
     findPath: findPath,

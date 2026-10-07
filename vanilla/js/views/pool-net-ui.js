@@ -90,7 +90,7 @@ var PoolNetUI = (function () {
     S.H = g.H;
     var out = NP.drawScene(g.ctx, g.W, g.H, S.view, S.geom, {
       scale: S.scale, ox: S.ox, oy: S.oy, pathSet: S.pathSet,
-      selPool: S.selPool, dim: S.dim, meta: S.meta,
+      selPool: S.selPool, meta: S.meta,
       hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: "lively"
     });
     S.hits = out.hits;
@@ -160,7 +160,7 @@ var PoolNetUI = (function () {
       var S = {
         canvas: null, doc: doc, W: 300, H: 320,
         full: { nodes: [], edges: [] }, view: { nodes: [], edges: [] },
-        geom: {}, vel: {}, deg: {}, meta: {}, dim: {}, pathSet: {}, pathFull: null,
+        geom: {}, vel: {}, deg: {}, meta: {}, hide: {}, pathSet: {}, pathFull: null,
         sel: { aId: null, bId: null, s: "" }, selPool: null, sig: "",
         scale: 1, ox: 0, oy: 0, hits: [], mids: [],
         hoverNode: null, hoverEdge: null, react: react0,
@@ -243,10 +243,25 @@ var PoolNetUI = (function () {
         } catch (e) { /* loop stands */ }
       };
 
+      /* onBrandToggle: a legend chip was switched. Re-run the whole filter
+       * (selection + hidden brands) so the survivors keep their positions and
+       * the returning nodes are seeded to spring in, then wake the loop — the
+       * mesh re-settles instead of popping. The verdict and the table twin are
+       * rebuilt too, so "off" means off everywhere, not just on the canvas. */
+      function onBrandToggle() {
+        try {
+          if (S.dead) return;
+          applySelection();
+          var st = paint();
+          if (st && typeof st.nodeRadius === "function") { /* painter loaded */ }
+          try { var PP = phys(); if (PP && typeof PP._wakeForTest === "function") PP._wakeForTest(S); } catch (eW) { /* loop stands */ }
+        } catch (e) { /* legend stands */ }
+      }
+
       /* Re-filter from the live selection: full/star/union (PoolNet owns the
        * set math) + full-graph BFS highlight (visible pools glow; the verdict
-       * tells the truth even when the route leaves the union). Fresh circle
-       * seed per filter change, transform kept, loop woken. */
+       * tells the truth even when the route leaves the union). Geometry is
+       * spring-preserving (see reseedGeom); the loop is woken after. */
       function applySelection() {
         var sel = getSel();
         S.sel = sel;
@@ -257,6 +272,16 @@ var PoolNetUI = (function () {
             g = PoolNet.filterGraph(S.full, { aId: sel.aId, bId: sel.bId }) || S.full;
           }
         } catch (e) { g = S.full; }
+        /* Brand toggles FILTER, they do not dim: a hidden group's nodes and
+         * every edge touching them leave the plot entirely (a dimmed node was
+         * still in the physics, in the hit list and in the twin). */
+        var hiding = false;
+        try { for (var hk in S.hide) if (Object.prototype.hasOwnProperty.call(S.hide, hk) && S.hide[hk]) { hiding = true; break; } } catch (eH) { hiding = false; }
+        if (hiding) {
+          try {
+            if (typeof PoolNet !== "undefined" && PoolNet.filterBrands) g = PoolNet.filterBrands(g, S.hide) || g;
+          } catch (eB) { /* full graph stands */ }
+        }
         S.view = g;
         /* Degree map for lively repulsion mass: {assetId: edgeCount},
          * rebuilt wherever geometry is rebuilt (here — the only such
@@ -286,14 +311,24 @@ var PoolNetUI = (function () {
           }
         }
         S.selPool = (sel.s && POOL_RE.test(sel.s)) ? sel.s : null;
+        /* Geometry: survivors keep their position and newcomers are seeded on
+         * a ring, so a brand toggle SPRINGS (the loop then pulls them into the
+         * mesh) instead of the whole map jumping to a fresh circle. */
         var NP = paint();
-        S.geom = NP ? NP.circleLayout(S.view.nodes, S.W, S.H) : {};
+        var seeded = null;
+        try {
+          if (typeof PoolNet !== "undefined" && PoolNet.reseedGeom) {
+            seeded = PoolNet.reseedGeom(S.geom, S.view.nodes, S.W, S.H);
+          }
+        } catch (eR) { seeded = null; }
+        if (seeded && seeded.geom) S.geom = seeded.geom;
+        else S.geom = NP ? NP.circleLayout(S.view.nodes, S.W, S.H) : {};
         S.vel = {};
         S.hoverNode = null;
         S.hoverEdge = null;
         try { els.hoverEl.textContent = ""; } catch (e) { /* stands */ }
         NC.verdict(S, els, t);
-        NC.legend(doc, mk, t, S, els, render);
+        NC.legend(doc, mk, t, S, els, render, onBrandToggle);
         NC.twin(doc, mk, t, S, els, navOpts);
         try { render(S); } catch (e) { /* loop paints */ }
         try {

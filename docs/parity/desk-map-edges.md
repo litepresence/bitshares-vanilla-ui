@@ -176,7 +176,48 @@ object id is never accepted as a symbol (a `1.3.7_1.3.0` desk would 404).
 - Unchanged and green: `pool-graph-test` 190 · `pool-net-test` 39 ·
   `market-net-test` 22 · `node-network-test` 30; rot/i18n/types all pass.
 
-### Honest limits
+### Brand chips are filters, not dimmers (2026-10-07)
+
+The legend chips used to set `S.dim[brand] = 1`, and the painter drew that
+group at **15% opacity**. So a brand you had switched off was still in the
+plot, still in the hit list (still clickable), still in the table twin — and
+still in the simulation, which is why the map kept breathing around things
+that looked switched off.
+
+Now a chip **filters the graph**:
+
+- **Off** → the group's nodes leave the plot, and so does every edge touching
+  them (an edge cannot exist without both ends). They leave the geometry, the
+  velocity map, the degree map, the hit list, the physics and the twin.
+- **On** → they come back **and spring**: survivors keep their exact position,
+  returning nodes are seeded on a golden-angle ring around the centre (so the
+  first spring frames read as motion, not a flash), velocities are cleared, and
+  the loop is woken so the mesh re-settles.
+- The chips themselves are listed from the **full** graph, not the filtered
+  view. That detail was a bug caught in the first live run: building chips from
+  `S.view` made a hidden brand's chip **vanish**, taking the only control that
+  could switch it back on.
+- Still session-only (a reload shows every brand), still display-only: no
+  chain call, nothing resolved, nothing signed.
+
+### Evidence
+- `tooling/pool-net-test.js` → **66 passed** (was 39). New: `filterBrands`
+  (hidden node gone, touching edges gone, input graph untouched, hiding
+  everything → an honest empty graph, null graph safe) and `reseedGeom`
+  (survivors keep exact coordinates, newcomers seeded and reported as fresh,
+  departed nodes dropped, no two newcomers stacked, zero-size canvas finite,
+  previous layout never mutated).
+- `tooling/pool-net-ui-test.js` → **93 passed** (was 87): the legend reads the
+  full graph, the chip reports the toggle, the composer wakes the loop, and the
+  painter carries **no** dim branch (a 15%-opacity path would be dead code that
+  implies "off" is still drawn).
+- `tooling/visual/probe-brand-toggle.mjs` → **BRAND-TOGGLE OK**, zero page
+  errors. Measured on the live map: hiding the `grey` brand took nodes
+  89 → 88, edges 319 → 318, geometry and hit list to 88; the chip stayed put
+  (`aria-pressed=false`, dimmed); switching it back on restored 89/319, reset
+  the frame counter (a fresh run) and left the loop running — the spring.
+
+## Honest limits
 This graph is dense (319 edges over 89 nodes), so lines cross and a few sit
 almost on top of each other. Nearest-line-wins is the rule, and where two
 lines are within a pixel of each other, *which* one you get is a tie-break,

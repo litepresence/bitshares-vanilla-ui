@@ -264,17 +264,29 @@ var NetChrome = (function () {
     } catch (e) { /* text stands */ }
   }
 
-  /* Brand legend chips (toggle dims the group — display only, never chain).
-   * @param {Function} renderFn (S)->void repaint (composer-owned render). */
-  function rebuildLegend(doc, mk, t, S, els, renderFn) {
+  /* Brand legend chips: ON/OFF FILTERS the graph (owner 2026-10-07). Turning a
+   * brand off removes its nodes and every edge touching them from the plot,
+   * the physics and the twin, and turning it back on springs those nodes into
+   * the mesh. Previously the chip only dimmed the group to 15% opacity, so
+   * "off" nodes still moved, still caught clicks and still sat in the table.
+   * Display-only in the sense that matters: no chain call, nothing is
+   * resolved, and the state is session-only (a reload shows every brand).
+   * @param {Function} renderFn (S)->void repaint (composer-owned render).
+   * @param {Function} [onToggle] (S, group, hidden)->void so the composer can
+   *   re-filter and wake the loop. Absent = repaint only (headless). */
+  function rebuildLegend(doc, mk, t, S, els, renderFn, onToggle) {
     try {
       var D = null;
       try { if (typeof DOM !== "undefined" && DOM) D = DOM; } catch (e) { D = null; }
       if (D) D.clear(els.legendEl);
       else { while (els.legendEl.firstChild) els.legendEl.removeChild(els.legendEl.firstChild); }
     } catch (e) { return; }
+    /* Chips come from the FULL graph, never the filtered view: a hidden brand
+     * must keep its chip, or turning it off would delete the only control that
+     * could turn it back on (measured — the chip disappeared with the nodes). */
     var seen = {};
-    (S.view.nodes || []).forEach(function (n) { seen[NetPaint.brandOf(n.sym)] = 1; });
+    var src = (S.full && S.full.nodes && S.full.nodes.length) ? S.full.nodes : ((S.view && S.view.nodes) || []);
+    src.forEach(function (n) { if (n) seen[NetPaint.brandOf(n.sym)] = 1; });
     var groups = Object.keys(seen).sort();
     if (!groups.length) return;
     try { els.legendEl.appendChild(mk("span", t("pool_net.legend", "Brands") + " ", "muted")); } catch (e) { /* chips stand */ }
@@ -283,8 +295,9 @@ var NetChrome = (function () {
       try {
         chip = doc.createElement("button");
         chip.type = "button";
-        chip.className = "pool-net-chip" + (S.dim[gr] ? " pool-net-dim" : "");
-        chip.setAttribute("aria-pressed", S.dim[gr] ? "false" : "true");
+        var hidden = !!S.hide[gr];
+        chip.className = "pool-net-chip" + (hidden ? " pool-net-dim" : "");
+        chip.setAttribute("aria-pressed", hidden ? "false" : "true");
         var sw = doc.createElement("span");
         sw.className = "pool-net-sw";
         sw.style.background = NetPaint.brandFill(gr);
@@ -295,14 +308,21 @@ var NetChrome = (function () {
       (function (group, el) {
         el.addEventListener("click", function () {
           try {
-            if (S.dim[group]) delete S.dim[group];
-            else S.dim[group] = 1;
-            el.setAttribute("aria-pressed", S.dim[group] ? "false" : "true");
+            if (S.hide[group]) delete S.hide[group];
+            else S.hide[group] = 1;
+            var off = !!S.hide[group];
+            el.setAttribute("aria-pressed", off ? "false" : "true");
             try {
               if (el.className !== undefined) {
-                el.className = "pool-net-chip" + (S.dim[group] ? " pool-net-dim" : "");
+                el.className = "pool-net-chip" + (off ? " pool-net-dim" : "");
               }
             } catch (e2) { /* state stands */ }
+            /* The composer re-filters the graph, re-seeds the newcomers and
+             * wakes the loop — a bare repaint would only redraw the same
+             * graph, which is exactly the "does nothing" this replaces. */
+            if (typeof onToggle === "function") {
+              try { onToggle(S, group, off); return; } catch (e3) { /* fall back */ }
+            }
             renderFn(S);
           } catch (e2) { /* legend stands */ }
         });
