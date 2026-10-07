@@ -334,3 +334,22 @@ Anti-rot (§4.5): (a) yes — preset table + pure resolver, platform APIs only
 (Canvas/rAF/localStorage/matchMedia), no new import; (b) nothing new depended
 on; (c) smallest deletable: lively preset (calm band + audit stand).
 `check_rot.py` PASS.
+
+## Delta 2026-10-07 — desk physics-only upgrade (market-net Task 5; pool desk half, visuals byte-identical)
+
+The pool desk (`#/pools/:id`) pool-map keeps its exact look, colors, verdicts,
+hit-testing, and layout — ONLY the physics driver changed, plus the shared
+Physics switch in the map pane header. `pool-graph.js`: preset-driven live loop
+(calm = shipped `relax()` settle-once; lively = same relax math per-frame,
+temp/cool/sleep + 180-frame cap; presets from `PoolNetUI._physForTest` with
+built-in calm-equivalent fallback so the module stays standalone). One
+deliberate seam (`drawGraph opts._pos`, lively loop only — all pre-existing
+vectors green = default path unchanged). `pool-detail-view.js`: ONLY the
+Physics switch in `chartPane`'s `graphHead` (shared `poolNetPhys` key, default
+calm/off, `role="switch"`, 44px, helpers duplicated per doctrine) + the same
+`redrawPoolMap` lively branch as the market desk. Vectors: `pool-graph-test.js`
+123/123 (calm≡relax positions; lively 3-node demo runs the full 180 cap —
+bounded, terminating, same pause-rule semantics as the band). Headless
+`#/pools/1.19.1`: map loads, switch present, zero app console errors. Full
+note: `docs/parity/slice-markets.md` (desk physics-only section) + Task-5
+report `.superpowers/sdd/task-5-report.md`.

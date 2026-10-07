@@ -648,6 +648,32 @@ var MarketNetUI = (function () {
         var cachedBox = mk(doc, "div");
         wrap.appendChild(cachedBox);
         offlineBox(doc, cachedBox, function () { if (myGen === gen) renderMarkets(root); });
+        /* Cold-load race (pool-ui autoRetry / asset-feed-ui cold precedent):
+         * the route often paints before the handshake lands — without this
+         * the offline panel survives after connect. Re-render once on the
+         * first "open" event while this render is still current and the
+         * hash hasn't moved on; plus one automated handshake attempt. */
+        (function () {
+          var hashAtEntry = (typeof location !== "undefined" && location.hash) || "";
+          var settled = false, off = function () {};
+          function rerun() {
+            if (settled) return;
+            settled = true;
+            try { off(); } catch (e) { /* gone */ }
+            if (myGen === gen && (typeof location === "undefined" || location.hash === hashAtEntry)) renderMarkets(root);
+          }
+          try {
+            if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
+              off = Store.subscribe("connection", function (st) {
+                if (settled || myGen !== gen) { settled = true; try { off(); } catch (e) { /* gone */ } return; }
+                if (st && st.state === "open") rerun();
+              });
+            }
+          } catch (e) { /* manual Retry remains */ }
+          try {
+            if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure();
+          } catch (e) { /* subscription above still covers */ }
+        })();
         return Promise.resolve();
       }
     } catch (e) { /* connected path below */ }
