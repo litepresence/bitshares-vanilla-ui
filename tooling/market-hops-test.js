@@ -75,9 +75,16 @@ var rEdges = [
 var route = MarketHops.routeToCore(rEdges, ["1.3.10"], "1.3.0");
 assert(route !== null, "route: found");
 assert(route.hops === 2, "route: 2 hops");
-assert(route.deskIds.length === 2, "route: 2 desks on the path");
-assert(route.deskIds.indexOf("SY") !== -1 && route.deskIds.indexOf("YC") !== -1, "route: widest bottleneck SY-CORE chosen");
-assert(route.deskIds.indexOf("XC") === -1, "route: thin route rejected");
+assert(route.assetPath.join(",") === "1.3.10,1.3.12,1.3.0", "route: widest bottleneck path S-Y-CORE chosen");
+assert(route.assetPath.indexOf("1.3.11") === -1, "route: thin route rejected");
+/* deskIdsFor maps that asset path onto RENDERED edges (which carry desk ids) */
+var routeIds = MarketHops.deskIdsFor(route, rEdges);
+assert(routeIds.length === 2, "deskIdsFor: 2 edges on the path");
+assert(routeIds.indexOf("SY") !== -1 && routeIds.indexOf("YC") !== -1, "deskIdsFor: SY + YC");
+assert(routeIds.indexOf("XC") === -1, "deskIdsFor: thin edge not highlighted");
+assert(MarketHops.deskIdsFor(route, [{ poolId: "SY", a: "1.3.10", b: "1.3.12" }]).length === 1, "deskIdsFor: partial graph keeps the reachable prefix");
+assert(MarketHops.deskIdsFor(null, rEdges).length === 0, "deskIdsFor: null route = no highlight");
+assert(MarketHops.deskIdsFor(route, []).length === 0, "deskIdsFor: no edges = no highlight");
 var noRoute = MarketHops.routeToCore([{ poolId: "AB", a: "1.3.20", b: "1.3.21", fills: 3 }], ["1.3.20"], "1.3.0");
 assert(noRoute === null, "route: null when core unreachable (never fabricated)");
 var seedIsCore = MarketHops.routeToCore([], ["1.3.0"], "1.3.0");

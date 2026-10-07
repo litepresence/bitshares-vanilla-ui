@@ -682,6 +682,7 @@ var PoolGraph = (function () {
           var d = S.drawOpts || {};
           drawGraph(S.doc, S.canvas, S.graph,
             { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, nav: d.nav,
+              kind: d.kind, meta: d.meta, routeDeskIds: d.routeDeskIds,
               _pos: S.geom });
         } catch (e) { /* next frame */ }
       }
@@ -733,7 +734,9 @@ var PoolGraph = (function () {
       react: readReact(), temp: 0, still: 0, frames: 0, running: false, settled: false,
       dead: false, reduced: _reduced(), forced: false,
       canvas: canvas, doc: doc,
-      drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [], nav: opts.nav || null } };
+      drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [],
+        nav: opts.nav || null, kind: (opts.kind === "market") ? "market" : "pool",
+        meta: opts.meta || null, routeDeskIds: opts.routeDeskIds || [] } };
     S.temp = _phys().lively.temp0;
     try { canvas._graphLiveS = S; } catch (e) { /* static paint below still stands */ }
     /* Every render paints first (so the frame is never blank), then settles:
@@ -743,7 +746,9 @@ var PoolGraph = (function () {
      * (flipping the switch ON) runs a bounded loop. */
     try {
       drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB,
-        highlightPools: opts.highlightPools || [], nav: opts.nav || null, hoverEdge: opts.hoverEdge || "" });
+        highlightPools: opts.highlightPools || [], nav: opts.nav || null, hoverEdge: opts.hoverEdge || "",
+        kind: (opts.kind === "market") ? "market" : "pool", meta: opts.meta || null,
+        routeDeskIds: opts.routeDeskIds || [] });
     } catch (e) { /* note below carries it */ }
     if (S.reduced && !opts.explicit) { S.running = false; S.settled = true; return S; }
     wake(S, !!opts.explicit);
@@ -962,6 +967,12 @@ var PoolGraph = (function () {
       danger = _cssTok("--danger", "#f74745"), live = _cssTok("--live", "#7bd500");
     var ctx = g.ctx, nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
     var assetA = opts.assetA, assetB = opts.assetB;
+    /* kind: "pool" (default) paints the pool provenance map with its BTS
+     * trust verdict; "market" paints a 24h FILLED-market web, which has no
+     * orphan concept (a thin market web is normal, never a scam warning) and
+     * gets a fills ramp + an explicit BTS route instead. Same painter, one
+     * branch — the clean split is backend-side, the style stays shared. */
+    var isMarket = (opts && opts.kind === "market");
     var hi = {};
     (opts.highlightPools || []).forEach(function (id) { hi[String(id)] = 1; });
     /* emptyLine: centered canvas message (no-data states). */
@@ -970,6 +981,16 @@ var PoolGraph = (function () {
       ctx.fillText(s, g.w / 2, g.h / 2); ctx.textAlign = "left";
     }
     if (!edges.length) {
+      /* Markets: an honest empty, NEVER the red takeover banner. "No market
+       * filled in 24h around these legs" is ordinary illiquidity; painting
+       * it as a pool-orphan warning on a market desk would cry wolf. */
+      if (isMarket) {
+        try {
+          ctx.fillStyle = muted; ctx.font = "12px system-ui, sans-serif"; ctx.textAlign = "center";
+          ctx.fillText(t("market.map_hops_empty", "No market filled in the past 24 hours around these legs."), g.w / 2, g.h / 2);
+          ctx.textAlign = "left";
+        } catch (eME) { /* honest empty stands */ }
+      } else {
       /* Takeover: truly empty legs — red, bold, 1.5x, centered both ways. */
       try {
         ctx.fillStyle = danger; ctx.font = "bold 18px system-ui, sans-serif"; ctx.textAlign = "center";
@@ -980,6 +1001,7 @@ var PoolGraph = (function () {
         ctx.fillText(t("pool.map_takeover", "WARNING: These assets are orphaned from the liquidity pool network!"), g.w / 2, g.h / 2);
         ctx.textAlign = "left";
       } catch (e) { emptyLine("No pools touch these assets."); }
+      }
       _wire(canvas, {}, [], doc);
       /* A11y: empty map is not interactive (no tabindex trap) but stays
        * named so the canvas text is exposed. */
@@ -1011,7 +1033,10 @@ var PoolGraph = (function () {
     var symById = {}; nodes.forEach(function (n) { symById[n.assetId] = n.sym || n.assetId; });
     /* Map text contract: corner verdicts per leg + bottom pair verdict, all from one mapTheme call. */
     var theme = null;
-    try { theme = mapTheme(graph, assetA, assetB); } catch (e) { theme = null; }
+    /* Markets carry no BTS-trust verdict: an "orphan" market pair is just an
+     * illiquid pair, and painting it red would cry wolf. theme stays null,
+     * which also silences the corner/bottom verdict text + takeover banner. */
+    if (!isMarket) { try { theme = mapTheme(graph, assetA, assetB); } catch (e) { theme = null; } }
     /* Corner + bottom text painter (haloed like node labels; bold reds). */
     function cornerText(item, x, align, size) {
       if (!item || !item.text) return;
@@ -1035,8 +1060,16 @@ var PoolGraph = (function () {
     var hits = [];
     var pathSet = {};
     try {
-      ((theme && theme.pathPools) || []).forEach(function (pid) { pathSet[String(pid)] = 1; });
-      if (theme && theme.legEdge) pathSet[String(theme.legEdge)] = 1;
+      if (isMarket) {
+        /* The "most-filled route to BTS" (MarketHops.routeToCore) is the
+         * market counterpart of the pool map's own-line + BTS-route glow:
+         * the structure you are here to read, so it is the only thing that
+         * glows. No route -> no highlight, which is honest, not a warning. */
+        (opts.routeDeskIds || []).forEach(function (id) { if (id) pathSet[String(id)] = 1; });
+      } else {
+        ((theme && theme.pathPools) || []).forEach(function (pid) { pathSet[String(pid)] = 1; });
+        if (theme && theme.legEdge) pathSet[String(theme.legEdge)] = 1;
+      }
     } catch (e) { /* plain edges stand */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
@@ -1067,10 +1100,23 @@ var PoolGraph = (function () {
        * everywhere. sizeRaw is the BigInt-sum digit string. */
       var baseT = 0;
       try {
-        var rawS = String(e.sizeRaw == null ? "" : e.sizeRaw);
-        if (/^\d+$/.test(rawS)) {
-          var dd = rawS.replace(/^0+/, "").length;
-          baseT = dd <= 4 ? 0 : Math.min((dd - 4) / 18, 1);
+        /* Pool: BigInt-sum digit length over 18 (window 4-22, the live probe
+         * 2026-10-07 over 515 pools). Market: the 24h FILL COUNT digit length
+         * over a short window (fills run 1 -> hundreds of thousands, so 3
+         * decades span the real range). Counts only, never money — the same
+         * grey-to-accent ramp, a window calibrated to its own quantity. */
+        if (isMarket) {
+          var fc = Number(e.fills);
+          if (isFinite(fc) && fc > 0) {
+            var fd = String(Math.floor(fc)).replace(/^0+/, "").length;
+            baseT = fd <= 1 ? 0 : Math.min((fd - 1) / 3, 1);
+          }
+        } else {
+          var rawS = String(e.sizeRaw == null ? "" : e.sizeRaw);
+          if (/^\d+$/.test(rawS)) {
+            var dd = rawS.replace(/^0+/, "").length;
+            baseT = dd <= 4 ? 0 : Math.min((dd - 4) / 18, 1);
+          }
         }
       } catch (e2) { baseT = 0; }
       var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : _ramp(baseT, muted, accent));
@@ -1093,7 +1139,10 @@ var PoolGraph = (function () {
        * based, so the hit record has to carry what it needs. */
       mids.push({ x: (p.x + q.x) / 2, y: (p.y + q.y) / 2, poolId: e.poolId,
         ax: p.x, ay: p.y, bx: q.x, by: q.y,
-        a: e.a, b: e.b, aSym: symById[e.a] || String(e.a), bSym: symById[e.b] || String(e.b) });
+        a: e.a, b: e.b, aSym: symById[e.a] || String(e.a), bSym: symById[e.b] || String(e.b),
+        /* fills ride the hit so the desk can show the 24h activity behind
+         * the line (price provenance, spec §2 G3). Undefined for pools. */
+        fills: (e.fills === undefined) ? null : e.fills });
     });
     var hits = [];
     var rings = _rings(graph, assetA, assetB), inL2 = {};
@@ -1127,6 +1176,39 @@ var PoolGraph = (function () {
       cornerText({ text: theme.bottom.text, color: theme.bottom.color, bold: theme.bottom.bold, y: g.h - 8 },
         g.w / 2, "center", 12);
     }
+    /* Market hover caption: the PRICE PROVENANCE line (spec G3). The pools
+     * map has no caption — its story is the corner verdicts — but a market
+     * line's meaning is "this pair actually traded", so the hovered line
+     * states the evidence: 24h fill count + the chain's own last price.
+     * Reads nothing from ES beyond the count; price/volume arrive in
+     * opts.meta keyed by desk id (the view's own chain ticker probe), and a
+     * miss omits the price rather than inventing one. Never throws. */
+    if (isMarket) {
+      try {
+        var hovMid = null;
+        for (var mi = 0; mi < mids.length; mi++) {
+          if (hoverEdge && String(mids[mi].poolId) === String(hoverEdge)) { hovMid = mids[mi]; break; }
+        }
+        if (hovMid) {
+          var hm = (opts.meta && opts.meta[hovMid.poolId]) || null;
+          var fillsTxt = (hm && hm.fills !== undefined && hm.fills !== null) ? String(hm.fills) : "?";
+          var cap = t("market.map_edge_fills", "%(desk)s \u00b7 %(a)s\u2013%(b)s \u00b7 %(fills)s fills/24h", {
+            desk: String(hovMid.poolId), a: String(hovMid.aSym || "?"), b: String(hovMid.bSym || "?"), fills: fillsTxt });
+          if (hm && hm.latest !== undefined && hm.latest !== null && String(hm.latest) !== "") {
+            var volTxt = null;
+            try {
+              if (typeof Format !== "undefined" && Format && typeof Format.formatAmount === "function" &&
+                  hm.volBasePrec !== undefined && hm.volBasePrec !== null && hm.volBaseRaw !== undefined) {
+                volTxt = Format.formatAmount(String(hm.volBaseRaw || "0"), hm.volBasePrec) + " " + String(hm.symA || "");
+              }
+            } catch (eV) { volTxt = null; }
+            cap += " " + t("market.map_edge_price", "@ %(price)s \u00b7 %(vol)s",
+              { price: String(hm.latest), vol: volTxt || "\u2014" });
+          }
+          cornerText({ text: cap, color: "live", bold: false, y: g.h - 8 }, g.w / 2, "center", 12);
+        }
+      } catch (eC) { /* caption is best-effort */ }
+    }
     /* Edge records keep their SEGMENT (ax..by) and both legs/symbols: the
      * line is the click target along its whole length, and the exchange desk
      * resolves the order book from the legs. Only the internal bookkeeping
@@ -1134,7 +1216,7 @@ var PoolGraph = (function () {
     _wire(canvas, pos, hits.concat(mids.map(function (m) {
       return { edgeMid: true, x: m.x, y: m.y, poolId: m.poolId,
         ax: m.ax, ay: m.ay, bx: m.bx, by: m.by,
-        a: m.a, b: m.b, aSym: m.aSym, bSym: m.bSym };
+        a: m.a, b: m.b, aSym: m.aSym, bSym: m.bSym, fills: m.fills };
     })), doc);
     try { canvas.setAttribute("tabindex", "0"); } catch (e) {}
     /* A11y 2026-09-30: named canvas (keyboard Enter above). Router sweep
@@ -1142,7 +1224,9 @@ var PoolGraph = (function () {
     try {
       if (!canvas.getAttribute("aria-label")) {
         canvas.setAttribute("role", "img");
-        canvas.setAttribute("aria-label", t("pool.map_core_aria", "Pool map. Press Enter to open the core asset."));
+        canvas.setAttribute("aria-label", isMarket
+          ? t("market.map_aria", "Market network. Lines are markets that filled in the past 24 hours.")
+          : t("pool.map_core_aria", "Pool map. Press Enter to open the core asset."));
       }
     } catch (e) {}
     /* Screen-reader twin for the corner verdicts (canvas text is invisible

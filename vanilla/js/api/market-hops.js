@@ -184,12 +184,15 @@ var MarketHops = (function () {
    * PoolGraph.findCorePath's widest-min-edge tiebreak. Returns null when BTS
    * is unreachable: a thin market web is NORMAL, not an orphan warning, so
    * nothing is ever fabricated. A seed that IS BTS yields 0 hops.
+   * Runs over HOP edges (a/b/fills), which carry NO desk id yet — a desk id
+   * needs symbols, and symbols arrive after this call — so the result is the
+   * ASSET path; `deskIdsFor` maps it onto the rendered edges afterwards.
    * Pure (unit-tested, no DOM).
-   * @param {Array<Object>} edges hops edges (needs a/b/poolId/fills).
+   * @param {Array<Object>} edges hops edges (needs a/b, uses fills).
    * @param {Array<string>} seeds starting assets.
    * @param {string} [coreId] defaults to the 1.3.0 literal.
-   * @returns {{deskIds: Array<string>, hops: number}|null} deskIds are the
-   *   edge ids along the path, in travel order.
+   * @returns {{assetPath: Array<string>, hops: number}|null} assetPath runs
+   *   seed -> ... -> BTS inclusive.
    */
   function routeToCore(edges, seeds, coreId) {
     var core = String(coreId || CORE_ID);
@@ -199,13 +202,12 @@ var MarketHops = (function () {
       if (!e || !ASSET_RE.test(String(e.a)) || !ASSET_RE.test(String(e.b))) continue;
       var f = Number(e.fills);
       if (!isFinite(f)) f = 0;
-      var id = String(e.poolId || e.id || "");
-      (adj[e.a] = adj[e.a] || []).push({ to: e.b, via: id, fills: f });
-      (adj[e.b] = adj[e.b] || []).push({ to: e.a, via: id, fills: f });
+      (adj[e.a] = adj[e.a] || []).push({ to: e.b, fills: f });
+      (adj[e.b] = adj[e.b] || []).push({ to: e.a, fills: f });
     }
     var seedList = (seeds || []).filter(function (s) { return ASSET_RE.test(String(s)); }).map(String);
     if (!seedList.length) return null;
-    if (seedList.indexOf(core) !== -1) return { deskIds: [], hops: 0 };
+    if (seedList.indexOf(core) !== -1) return { assetPath: [core], hops: 0 };
     var best = {}, queue = [];
     seedList.forEach(function (s) {
       best[s] = { hops: 0, bottle: -1, prev: null, via: null };
@@ -221,22 +223,54 @@ var MarketHops = (function () {
         var have = best[l.to];
         var better = !have || cur.hops + 1 < have.hops || (cur.hops + 1 === have.hops && nb > have.bottle);
         if (!better) continue;
-        best[l.to] = { hops: cur.hops + 1, bottle: nb, prev: cur.id, via: l.via };
+        best[l.to] = { hops: cur.hops + 1, bottle: nb, prev: cur.id };
         queue.push({ id: l.to, hops: cur.hops + 1, bottle: nb });
       }
     }
     var hit = best[core];
     if (!hit || hit.hops === undefined || hit.hops === 0) return null;
-    var deskIds = [], at = core, g = 0;
+    var path = [core], at = core, g = 0;
     while (at && g++ < 200) {
       var b = best[at];
       if (!b) return null;
-      if (b.via) deskIds.unshift(b.via);
       if (!b.prev) break;
       at = b.prev;
+      path.unshift(at);
     }
-    if (deskIds.length !== hit.hops) return null;
-    return { deskIds: deskIds, hops: hit.hops };
+    if (path.length !== hit.hops + 1) return null;
+    return { assetPath: path, hops: hit.hops };
+  }
+
+  /* deskIdsFor: map a routeToCore ASSET path onto the rendered edges, so the
+   * painter can glow exactly those lines. Walks consecutive path legs and
+   * keeps the edge joining them; a leg whose edge is absent from the painted
+   * graph stops the highlight there (better a partial honest route than a
+   * glow on a line the user cannot see). Pure.
+   * @param {{assetPath: Array<string>}|null} route routeToCore result.
+   * @param {Array<Object>} edges RENDERED edges (id/poolId + a/b).
+   * @returns {Array<string>} desk/edge ids in travel order (may be empty).
+   */
+  function deskIdsFor(route, edges) {
+    var out = [];
+    try {
+      if (!route || !Array.isArray(route.assetPath) || route.assetPath.length < 2) return out;
+      var byPair = {};
+      (edges || []).forEach(function (e) {
+        if (!e || !e.a || !e.b) return;
+        var id = String(e.id || e.poolId || "");
+        if (!id) return;
+        var k = String(e.a) + "|" + String(e.b);
+        var rk = String(e.b) + "|" + String(e.a);
+        if (!byPair[k]) byPair[k] = id;
+        if (!byPair[rk]) byPair[rk] = id;
+      });
+      for (var i = 0; i < route.assetPath.length - 1; i++) {
+        var id2 = byPair[route.assetPath[i] + "|" + route.assetPath[i + 1]];
+        if (!id2) break;
+        out.push(id2);
+      }
+    } catch (e) { /* no highlight over a broken path */ }
+    return out;
   }
 
   /* ---- ES fetch ---- */
@@ -456,6 +490,7 @@ var MarketHops = (function () {
     mergePairs: mergePairs,
     hopsFrom: hopsFrom,
     routeToCore: routeToCore,
+    deskIdsFor: deskIdsFor,
     toGraph: toGraph,
     deskId: deskId,
     clearCache: clearCache,
