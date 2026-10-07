@@ -726,6 +726,25 @@ MarketInd._panes = MarketInd._panes || {};
       var frame = { paneBg: C.paneBg, grid: C.grid, text: C.text, accent: C.accent, muted: C.muted };
       var emptyText = state.discreteEmptyText ||
         t("market.discrete_no_fills", "No fills yet — place an order or try another pair.");
+      /* Shared zoom window (one object for price + volume panes so wheel /
+       * drag / dblclick on either moves both; a filter/pair change resets
+       * it by replacing the object — stale windows never follow new data). */
+      if (!state.discreteView || typeof state.discreteView !== "object") state.discreteView = { t0: null, t1: null };
+      var dview = state.discreteView;
+      /* Stale-window guard: a new dataset (pair/filter/count change) resets
+       * the zoom — a persisted window must never follow new data. Fingerprint
+       * is length + endpoints (cheap, collision-harmless: worst case a reset). */
+      try {
+        var dsig = pts.length + ":" + (pts.length ? (pts[0].timeMs + "-" + pts[pts.length - 1].timeMs) : "");
+        if (state.discreteSig !== dsig) {
+          state.discreteSig = dsig;
+          dview.t0 = null; dview.t1 = null;
+          try { delete dview.sel; } catch (e) {}
+        }
+      } catch (e) { /* window stands */ }
+      function repaintDiscrete() {
+        try { drawDiscrete(state); } catch (e) { /* panes stand */ }
+      }
       /* Release LWC handles (stale canvases/listeners retire via removePane). */
       try {
         if (!state.panes) state.panes = {};
@@ -782,10 +801,12 @@ MarketInd._panes = MarketInd._panes || {};
       try {
         if (typeof DiscreteCharts !== "undefined" && DiscreteCharts) {
           DiscreteCharts.drawDiscretePrice(sdoc, state.priceHost, pts, {
-            log: !!state.logScale, colors: frame, emptyText: emptyText
+            log: !!state.logScale, colors: frame, emptyText: emptyText,
+            view: dview, onViewChange: repaintDiscrete
           });
           DiscreteCharts.drawDiscreteVolume(sdoc, dvBody, pts, {
-            colors: frame, emptyText: emptyText
+            colors: frame, emptyText: emptyText,
+            view: dview, onViewChange: repaintDiscrete
           });
         }
       } catch (e) { /* panes stand on honest empties */ }

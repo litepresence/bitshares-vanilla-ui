@@ -146,6 +146,9 @@ var MarketFills = (function () {
       var bd = s.block_data || {};
       return {
         time: bd.block_time || null,
+        block: (bd.block_num !== undefined && bd.block_num !== null) ? bd.block_num : null,
+        account: (obj.account_id !== undefined && obj.account_id !== null) ? String(obj.account_id)
+          : ((obj.account !== undefined && obj.account !== null) ? String(obj.account) : null),
         paid: { amount: pAmt, asset: pA },
         received: { amount: rAmt, asset: rA }
       };
@@ -257,6 +260,8 @@ var MarketFills = (function () {
       if (!((pA === b || pA === q) && (rA === b || rA === q) && pA !== rA)) return null;
       return {
         time: row.time || row.block_time || null,
+        account: (op.account_id !== undefined && op.account_id !== null) ? String(op.account_id) : null,
+        order: (op.order_id !== undefined && op.order_id !== null) ? String(op.order_id) : null,
         paid: { amount: pAmt, asset: pA },
         received: { amount: rAmt, asset: rA }
       };
@@ -433,7 +438,9 @@ var MarketFills = (function () {
    *   precB/precQ numeric precisions, quoteId, cap (1..5000 integer, the
    *   shared candle-count input — the newest cap entries survive, painted
    *   oldest-first). Returns oldest-first [{timeMs, price, volume (base-leg
-   *   human), volumeBaseRaw, volumeQuoteRaw}]. Empty fills are VALID ([]).
+   *   human), volumeBaseRaw, volumeQuoteRaw, volumeQuote (quote-leg human),
+   *   accountId (filler 1.2.x or null), orderId (1.7.x or null), blockNum
+   *   (ES rows only, else null)}]. Empty fills are VALID ([]).
    * Malformed fills (bad time, unmappable legs, zero quote) are skipped,
    * never reject. Throws "bad-count" on a non-integer cap < 1.
    * Pure except Format (BigInt money math only); Number() never touches money. */
@@ -466,9 +473,14 @@ var MarketFills = (function () {
         if (!_isIntStr(String(bRaw)) || !_isIntStr(String(qRaw))) { bRaw = null; qRaw = null; }
       } catch (e) { bRaw = null; qRaw = null; }
       if (bRaw === null || qRaw === null) return;
-      var vol = "0";
+      var vol = "0", volQ = "0";
       try { vol = Format.formatAmount(bRaw, precB); } catch (e) { vol = "0"; }
-      newest.push({ timeMs: unix * 1000, price: price, volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: qRaw });
+      try { volQ = Format.formatAmount(qRaw, precQ); } catch (e) { volQ = "0"; }
+      newest.push({ timeMs: unix * 1000, price: price, volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: qRaw,
+        volumeQuote: volQ,
+        accountId: (f && f.account !== undefined && f.account !== null) ? String(f.account) : null,
+        orderId: (f && f.order !== undefined && f.order !== null) ? String(f.order) : null,
+        blockNum: (f && f.block !== undefined && f.block !== null) ? f.block : null });
     });
     newest.reverse();
     return newest;

@@ -199,3 +199,40 @@ insertions, no restructures, no shadow copies. Shared seams reused: `DOM`,
 - `node --check` on all 9 touched/created JS files → clean.
 - Headless renders with `consoleErrors: []` on every run (exchange dark +
   light + phone, pool mainnet, testnet empty states).
+
+## 9. Delta — axes, per-tx hover, zoom (user call, dex-ux advanced parity)
+
+dex-ux's discrete ("advanced") was Plotly scatter: free axes + per-point
+hover text over `[unix, price, volume]`. Canvas had neither — dots/stems
+with no scales and no inspection. Now: price y-ticks (nice linear, decades
+in log) + UTC time x-ticks (seconds→years adaptive) + theme gridlines on
+both panes; volume y shows the exact max human label + 0 (fractional
+humans refused); hover tooltip per dot/stem (UTC time, price, base + quote
+human volumes, filler account, order id, block — rows render when carried,
+never guessed); mouse + touch tap; arrow-key stepping with selection ring
+and Escape; wheel-zoom time at cursor, drag-pan time (`touch-action: pan-y`
+so page scroll survives), double-click reset, shared price+volume window
+object with stale-window reset on dataset change. Ours beats dex-ux: swap
+tooltips show account + block, fills show account/order where rows carry
+them (chain `fill_order_operation` carries both per `market.hpp`).
+
+Root causes fixed along the way (all silent, all vector-locked):
+`yTicks` read `.y` off `niceTicks` `{v,label}` rows (NaN → every label and
+gridline skipped); `timeTicks` topped at 7d steps (multi-month spans capped
+into an overlapping mush) and floored at 1m (sub-minute spans tickless);
+empty-string ids rendered hollow rows. Point identity: `fillsToPoints` /
+`swapsToPoints` pass `accountId`/`orderId`/`blockNum` (+ quote-leg human)
+through from rows that carry them.
+
+## 10. Gate evidence (delta run)
+
+- `node tooling/discrete-timescale-test.js` → 84 passed (ticks, emission,
+  passthrough, zoom math).
+- `node tooling/market-fills-test.js` → 29 passed, 0 failed.
+- `node tooling/pool-history-test.js` → 46 pass, 0 fail.
+- `bash tooling/check_types.sh` → PASS on discrete files (repo-wide red is
+  pre-existing `account-ui.js` from another workstream).
+- `python3 tooling/check_rot.py` → PASSED.
+- `python3 tooling/check_i18n.py` → OK (7 new `market.discrete_tip_*` keys).
+- Headless both desks: axes render, hover card full, wheel zoom narrows the
+  window, keyboard arrows + Escape work, zero console errors.

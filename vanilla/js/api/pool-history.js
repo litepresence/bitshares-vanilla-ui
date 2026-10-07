@@ -373,9 +373,9 @@ var PoolHistory = (function () {
    * every priced swap is one point (dex-ux discrete parity — raw tape,
    * never aggregated). Params: swaps (newest-first tape), assetB id,
    * precB numeric B precision, cap 1..5000 integer (shared candle-count
-   * input — newest cap entries survive, painted oldest-first). Returns
-   * oldest-first [{timeMs, price, volume (B-leg human), volumeBaseRaw,
-   * volumeQuoteRaw}]. Swaps with null price, bad time, or non-digit legs
+   *   input — newest cap entries survive, painted oldest-first). Returns
+   *   oldest-first [{timeMs, price, volume (B-leg human), volumeBaseRaw,
+   *   volumeQuoteRaw, accountId (swapper or null), blockNum (or null)}]. Swaps with null price, bad time, or non-digit legs
    * are skipped, never reject. Empty swaps are VALID ([]).
    * Throws "bad-count" on cap < 1, "bad precision" on bad precB.
    * Pure except Format.formatAmount (BigInt money math only). */
@@ -401,7 +401,9 @@ var PoolHistory = (function () {
       if (bRaw === null || aRaw === null) return;
       var vol = "0";
       try { vol = Format.formatAmount(bRaw, precB); } catch (e) { vol = "0"; }
-      newest.push({ timeMs: unix * 1000, price: String(sw.price), volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: aRaw });
+      newest.push({ timeMs: unix * 1000, price: String(sw.price), volume: vol, volumeBaseRaw: bRaw, volumeQuoteRaw: aRaw,
+        accountId: (sw && sw.account !== undefined && sw.account !== null) ? String(sw.account) : null,
+        blockNum: (sw && sw.block !== undefined && sw.block !== null) ? sw.block : null });
     });
     newest.reverse();
     return newest;
