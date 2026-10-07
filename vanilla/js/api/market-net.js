@@ -194,10 +194,12 @@ var MarketNet = (function () {
    * @param {MarketTickerRow[]} rows Probed ticker rows (ranked or not).
    * @param {string} [focusId] Focus asset id ("1.3.x", X-as-base convention).
    * @returns {{nodes: Array<{assetId: string, sym: string}>,
-   *   edges: Array<{id: string, a: string, b: string}>,
+   *   edges: Array<{id: string, poolId: string, a: string, b: string}>,
    *   meta: Object<string, {symA, symB, volBaseRaw, volBasePrec,
    *   volQuoteRaw, volQuotePrec, latest, change}>}} Edge id is the QUOTE_BASE
-   *   desk id (nav needs no lookup table).
+   *   desk id (nav needs no lookup table); poolId repeats it because the
+   *   shared canvas pipeline (paint hits, hover, twin sort) keys edges by
+   *   poolId — one identity, two names, never two values.
    */
   function graph(rows, focusId) {
     var nodes = [], edges = [], meta = {}, seenN = {};
@@ -223,7 +225,7 @@ var MarketNet = (function () {
       if (!seenN[a]) { seenN[a] = 1; nodes.push({ assetId: a, sym: String(r.symA) }); }
       if (!seenN[b]) { seenN[b] = 1; nodes.push({ assetId: b, sym: String(r.symB) }); }
       var id = String(r.symB) + "_" + String(r.symA);
-      edges.push({ id: id, a: a, b: b });
+      edges.push({ id: id, poolId: id, a: a, b: b });
       meta[id] = { symA: String(r.symA), symB: String(r.symB), volBaseRaw: String(r.baseVol),
         volBasePrec: null, volQuoteRaw: String(r.quoteVol || "0"), volQuotePrec: null,
         latest: (r.latest === null || r.latest === undefined) ? null : String(r.latest),

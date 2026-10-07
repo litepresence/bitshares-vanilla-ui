@@ -150,19 +150,11 @@ function textOf(root) {
   return parts.join(" ");
 }
 
-/* ---- pure seams: desk-id orientation (Task 1 rule) + pool->desk map ---- */
+/* ---- band: volume graph + direct desk nav (no pool lookups) ---- */
 ok(typeof MarketNetUI._deskForTest === "function", "_deskForTest seam exported");
 if (typeof MarketNetUI._deskForTest === "function") {
   ok(MarketNetUI._deskForTest("BTS", "BTC") === "BTC_BTS",
     "_deskForTest X-as-base BTS/BTC yields BTC_BTS (Task 1 orientation rule)");
-}
-ok(typeof MarketNetUI._poolDeskMapForTest === "function", "_poolDeskMapForTest seam exported");
-if (typeof MarketNetUI._poolDeskMapForTest === "function") {
-  var pmap = MarketNetUI._poolDeskMapForTest(
-    [{ id: "1.19.1", asset_a_id: "1.3.0", asset_b_id: "1.3.1", sym_a: "BTS", sym_b: "USD" }],
-    "1.3.0", "BTS");
-  ok(pmap["1.19.1"] === "#/market/USD_BTS",
-    "pool edge 1.19.1 (BTS/USD) maps to #/market/USD_BTS (got " + JSON.stringify(pmap["1.19.1"]) + ")");
 }
 
 async function scenarioVolumes() {
@@ -193,41 +185,30 @@ async function scenarioVolumes() {
   ok(textOf(root).indexOf("-0.4%") !== -1, "24h change -0.4% shown");
   ok(textOf(root).indexOf("No markets found") === -1, "no empty note when rows exist");
   ok(bandMounts.length === 1, "band mounts PoolNetUI once");
+  ok(bandMounts[0] && bandMounts[0].opts && bandMounts[0].opts.mode === "market",
+    "band mounts in market mode (volume graph, not pools)");
+  var bgraph = bandMounts[0] && bandMounts[0].opts && bandMounts[0].opts.graph;
+  ok(bgraph && bgraph.edges.length === 2, "band graph holds the 2 volume markets (got " + JSON.stringify(bgraph && bgraph.edges.map(function (e) { return e.id; })) + ")");
+  var bmeta = bandMounts[0] && bandMounts[0].opts && bandMounts[0].opts.meta;
+  ok(bmeta && bmeta.BTC_BTS && bmeta.BTC_BTS.volBaseRaw === "9000" && bmeta.BTC_BTS.volBasePrec === 5 && bmeta.BTC_BTS.volQuotePrec === 8,
+    "band meta carries raw volume + joined precisions (base BTS/5, quote BTC/8)");
   ok(bandMounts[0] && bandMounts[0].opts && typeof bandMounts[0].opts.navEdge === "function",
-    "band passes navEdge override (Task 2 seam)");
+    "band passes navEdge override");
   if (bandMounts[0] && bandMounts[0].opts && typeof bandMounts[0].opts.navEdge === "function") {
     var navEdge = bandMounts[0].opts.navEdge;
-    /* 2026-10-07: an edge on THIS map opens the order book for the pair it
-     * joins, derived from the line's own symbols. The old Pool.list lookup
-     * covered only the focus asset's pools with a known counterparty, which
-     * left 219 of 319 live lines dead — the symptom was "clicking an edge
-     * does nothing". So: known symbols -> market desk; unknown symbols ->
-     * the POOL desk (honest, still clickable); nothing to open -> null. */
-    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.0", b: "1.3.7", aSym: "BTS", bSym: "CNY" }) === "#/market/CNY_BTS",
-      "edge touching the focus asset -> counter_FOCUS desk (focus is the base)");
-    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.7", b: "1.3.0", aSym: "CNY", bSym: "BTS" }) === "#/market/CNY_BTS",
-      "same pair, legs reversed -> identical desk id (focus leg decides, not pool order)");
-    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.6", aSym: "ETH", bSym: "XRP" }) === "#/market/ETH_XRP",
-      "edge touching neither leg -> the graph's own order");
-    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.6" }) === "#/pools/1.19.9",
-      "no usable symbols -> the pool desk (never a dead line)");
-    ok(navEdge({ edgeMid: true, poolId: "1.19.9", a: "1.3.5", b: "1.3.5", aSym: "ETH", bSym: "ETH" }) === "#/pools/1.19.9",
-      "self-pair (no market exists) -> the pool desk");
-    ok(navEdge({ edgeMid: true }) === null, "no pool id at all -> null (nothing honest to open)");
+    /* Volume edges carry their desk id — navigation is direct, no pool
+     * lookup, no symbol derivation, no dead lines. Pool-shaped ids stay
+     * pool desks (defensive); object-id pairs (would 404) go nowhere. */
+    ok(navEdge({ edgeMid: true, poolId: "USD_BTS", a: "1.3.0", b: "1.3.1" }) === "#/market/USD_BTS",
+      "volume edge by poolId key -> its desk");
+    ok(navEdge({ edgeMid: true, id: "BTC_BTS", a: "1.3.0", b: "1.3.2" }) === "#/market/BTC_BTS",
+      "volume edge by id key -> its desk");
+    ok(navEdge({ edgeMid: true, poolId: "1.19.9" }) === "#/pools/1.19.9",
+      "pool-shaped id -> the pool desk (defensive)");
+    ok(navEdge({ edgeMid: true, poolId: "1.3.5_1.3.6" }) === null,
+      "object ids are not symbols -> null (a '1.3.5_1.3.6' desk would 404)");
+    ok(navEdge({ edgeMid: true }) === null, "no edge id at all -> null (nothing honest to open)");
     ok(navEdge(null) === null, "null hit -> null");
-    /* The seam itself, headless: object ids must never become a desk id. */
-    var de = MarketNetUI._deskIdForEdgeForTest;
-    ok(typeof de === "function", "_deskIdForEdgeForTest exported");
-    if (typeof de === "function") {
-      ok(de({ a: "1.3.0", b: "1.3.7", aSym: "BTS", bSym: "CNY" }, "1.3.0", "BTS") === "CNY_BTS", "focus leg -> counter_FOCUS");
-      ok(de({ a: "1.3.7", b: "1.3.0", aSym: "CNY", bSym: "BTS" }, "1.3.0", "BTS") === "CNY_BTS", "leg order irrelevant");
-      ok(de({ a: "1.3.5", b: "1.3.6", aSym: "1.3.5", bSym: "1.3.6" }, "1.3.0", "BTS") === null,
-        "object ids are not symbols -> null (a '1.3.7_1.3.0' desk would 404)");
-      ok(de({ a: "1.3.5", b: "1.3.5", aSym: "ETH", bSym: "ETH" }, "1.3.0", "BTS") === null, "self-pair -> null");
-      ok(de(null, "1.3.0", "BTS") === null, "null edge -> null");
-      ok(de({ a: "1.3.5", b: "1.3.6", aSym: "ETH", bSym: "XRP" }, "1.3.0", "") === "ETH_XRP",
-        "no focus symbol -> the graph's own order");
-    }
   }
   ok(textOf(root).indexOf("Collapse") !== -1, "band collapsible (Collapse label, open default)");
 }

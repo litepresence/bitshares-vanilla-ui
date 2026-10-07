@@ -108,51 +108,6 @@ var MarketNetUI = (function () {
     return String(quoteSym) + "_" + String(baseSym);
   }
 
-  /* poolDeskMap: pool edge -> market desk hash for the band nav override.
-   * Pure (headless-tested): pool legs touching X map to the counter_X desk.
-   * @param {Array<any>} poolRows joined pool rows (asset_a_id/asset_b_id +
-   *   sym_a/sym_b, Pool.list shape; raw asset_a/asset_b tolerated).
-   * @param {string} xId focus asset id. @param {string} xSym focus symbol.
-   * @returns {Object} poolId -> "#/market/QUOTE_BASE" (unknown legs omitted). */
-  function poolDeskMap(poolRows, xId, xSym) {
-    var map = {};
-    (poolRows || []).forEach(function (r) {
-      if (!r || !r.id) return;
-      var a = r.asset_a_id || r.asset_a, b = r.asset_b_id || r.asset_b;
-      var symA = r.sym_a || r.symA, symB = r.sym_b || r.symB;
-      if (String(a) === String(xId) && symB && symB !== xSym) {
-        map[String(r.id)] = "#/market/" + String(symB) + "_" + xSym;
-      } else if (String(b) === String(xId) && symA && symA !== xSym) {
-        map[String(r.id)] = "#/market/" + String(symA) + "_" + xSym;
-      }
-    });
-    return map;
-  }
-
-  /* deskIdForEdge: the market desk id (QUOTE_BASE — quote is the URL head) for
-   * the pair an edge joins, derived from the edge's OWN two symbols. The focus
-   * asset is the base, matching this page's rows (X is probed as base, so
-   * "counter_X" is the desk) and poolDeskMap above; an edge that touches
-   * neither leg uses the graph's own order.
-   * Pure (headless-tested) — a wrong market id is a wrong desk.
-   * @param {Object} h Edge-mid hit ({a, b, aSym, bSym}).
-   * @param {string} focusId focus asset id. @param {string} focusSym focus symbol.
-   * @returns {string|null} market id, or null when a leg has no usable symbol. */
-  function deskIdForEdge(h, focusId, focusSym) {
-    try {
-      if (!h) return null;
-      var symA = String(h.aSym || ""), symB = String(h.bSym || "");
-      var legA = String(h.a == null ? "" : h.a), legB = String(h.b == null ? "" : h.b);
-      if (!symA || !symB || symA === symB) return null;
-      /* Object ids are not symbols: a desk id built from "1.3.7" would 404. */
-      if (/^\d+\.\d+\.\d+$/.test(symA) || /^\d+\.\d+\.\d+$/.test(symB)) return null;
-      var fSym = String(focusSym || "");
-      if (fSym && legA === String(focusId)) return symB + "_" + fSym;
-      if (fSym && legB === String(focusId)) return symA + "_" + fSym;
-      return symA + "_" + symB;
-    } catch (e) { return null; }
-  }
-
   /* hasVol: raw digit string with nonzero value (zero-volume rows render the
    * honest empty scope, never vanish silently — they count as probed).
    * @param {string} v raw base_volume. @returns {boolean}. Never throws. */
@@ -402,20 +357,16 @@ var MarketNetUI = (function () {
     return shown;
   }
 
-  /* mountBand: collapsible PoolNetUI band retargeted to market desks
-   * (pool-ui band precedent: open-default, marketNetOpen persistence,
-   * aria-expanded/controls, touchable toggle). navNode stays pool default
-   * (nodes -> #/asset/:symbol); navEdge maps known pool edges to desks and
-   * returns null for unknown pools (no navigation, never pool default).
-   * Replaces any previous band node + stops its loop (one band per page).
+  /* mountBand: volume-driven PoolNetUI band (desk map mirrors the market
+   * selector — edges exist only for pairs with recent volume).
    * @param {Document} doc owner document. @param {any} wrap page container.
    * @param {Function} getSelection live {a,b,s,aId,bId} getter.
-   * @param {Object} deskByPool poolId -> market hash. @param {number} myGen.
-   * @param {{id: string, symbol: string}} [focus] the page's Asset 1, so an
-   *   edge can name the market it opens (see deskIdForEdge). */
-  function mountBand(doc, wrap, getSelection, deskByPool, myGen, focus) {
-    var focusId = focus && focus.id != null ? String(focus.id) : "";
-    var focusSym = focus && focus.symbol ? String(focus.symbol) : "";
+   * @param {any} vg volume graph {graph: {nodes, edges}, meta} from
+   *   MarketNet.graph + precisions (null/empty = honest empty via market
+   *   mode — the band still mounts so the note has a home).
+   * @param {number} myGen liveness token.
+   * Replaces any previous band node + stops its loop (one band per page). */
+  function mountBand(doc, wrap, getSelection, vg, myGen) {
     var PUI = (typeof PoolNetUI !== "undefined" && PoolNetUI) ? PoolNetUI : null;
     if (!PUI || typeof PUI.mount !== "function") return;
     destroyBands();
@@ -461,28 +412,23 @@ var MarketNetUI = (function () {
     try { wrap._bandEl = band; } catch (e) { /* headless stands */ }
     var handle = null;
     try {
+      var vgGraph = (vg && vg.graph) || { nodes: [], edges: [] };
+      var vgMeta = (vg && vg.meta) || {};
       handle = PUI.mount(doc, body, getSelection, {
-        /* Edge -> the ORDER BOOK for the pair this line joins. Built from the
-         * line's own two symbols (the graph knows them), because the old
-         * Pool.list lookup only covered the pools the focus asset touches
-         * AND that carried a counterparty symbol: 219 of 319 lines on this
-         * map resolved to nothing, so they were dead clicks.
-         * Orientation follows the desk rule (QUOTE_BASE, quote = URL head)
-         * and this page's convention: the focus asset is the BASE, so a pair
-         * touching it reads "counter_FOCUS". A line that touches neither leg
-         * uses the graph's own order. Unknown symbols fall back to the POOL
-         * desk — honest and clickable, rather than a line that does nothing. */
+        /* Volume edges carry their desk id (QUOTE_BASE), so navigation is
+         * direct — no pool lookup table, no symbol derivation, no dead
+         * lines. Pool-shaped ids (defensive: foreign graphs) stay pool
+         * desks; object-id pairs (would 404) resolve to nothing. */
+        mode: "market",
+        graph: vgGraph,
+        meta: vgMeta,
         navEdge: function (hit) {
           try {
-            var id = hit && hit.poolId ? String(hit.poolId) : "";
-            if (id && deskByPool && deskByPool[id]) return deskByPool[id];
-            var desk = deskIdForEdge(hit, focusId, focusSym);
-            if (desk) return "#/market/" + desk;
-          } catch (e) { /* pool fallback below */ }
-          try {
-            var pid = hit && hit.poolId ? String(hit.poolId) : "";
-            if (pid) return "#/pools/" + pid;
-          } catch (e2) { /* nothing honest to open */ }
+            var id = hit && (hit.id || hit.poolId) ? String(hit.id || hit.poolId) : "";
+            if (!id) return null;
+            if (/^1\.19\.\d+$/.test(id)) return "#/pools/" + id;
+            if (/^[A-Za-z0-9.]+_[A-Za-z0-9.]+$/.test(id) && id.indexOf("1.3.") === -1) return "#/market/" + id;
+          } catch (e) { /* null below */ }
           return null;
         }
       });
@@ -603,14 +549,27 @@ var MarketNetUI = (function () {
       } catch (e) { /* cache is a speedup, never load-bearing */ }
       /* Band mounts right after the table (parallel with sparklines):
        * the mapper starts while the 8 history calls fly; spark canvases
-       * fill in when ready. Spark logic itself unchanged. */
-      var deskByPool = {};
-      try { deskByPool = poolDeskMap(poolRows, xDesc.id, xDesc.symbol); } catch (e) { deskByPool = {}; }
+       * fill in when ready. Spark logic itself unchanged. The graph comes
+       * from the table's own ranked rows (volume-gated markets — the band
+       * mirrors the selector); precisions join from the map above so the
+       * hover cards format at render. */
+      var vg = null;
+      try {
+        var built = MN.graph(ranked, xDesc.id);
+        (built.edges || []).forEach(function (e) {
+          var m = built.meta[e.id];
+          if (m) {
+            if (typeof precs[e.a] === "number") m.volBasePrec = precs[e.a];
+            if (typeof precs[e.b] === "number") m.volQuotePrec = precs[e.b];
+          }
+        });
+        vg = { graph: { nodes: built.nodes, edges: built.edges }, meta: built.meta };
+      } catch (e) { vg = null; }
       (function () {
         var rawA = aName, rawB = bName;
         mountBand(doc, wrap, function () {
           return { a: rawA, b: rawB, s: "", aId: xDesc ? xDesc.id : null, bId: yDesc ? yDesc.id : null };
-        }, deskByPool, myGen, { id: xDesc ? xDesc.id : null, symbol: xDesc ? xDesc.symbol : "" });
+        }, vg, myGen);
       })();
       /* Lazy top-8 sparklines (spec §2: 1 get_market_history each, after the
        * table — the table stays interactive before the mapper finishes). */
@@ -831,9 +790,7 @@ var MarketNetUI = (function () {
 
   return {
     renderMarkets: renderMarkets,
-    _deskForTest: deskForProbe,
-    _poolDeskMapForTest: poolDeskMap,
-    _deskIdForEdgeForTest: deskIdForEdge
+    _deskForTest: deskForProbe
   };
 })();
 

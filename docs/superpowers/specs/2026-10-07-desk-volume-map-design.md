@@ -20,7 +20,10 @@ calls — the data is free (one `get_ticker` per candidate already paid).
 // MarketNet.graph(rows) -> { nodes, edges, meta }
 // rows: probeOne ticker rows {a, b, symA, symB, baseVol, quoteVol, latest, change}
 nodes: [{ assetId: "1.3.x", sym: "SYM" }]          // distinct assets of kept edges
-edges: [{ id: "QUOTE_BASE", a: "1.3.x", b: "1.3.x" }]  // id IS the desk id
+edges: [{ id: "QUOTE_BASE", poolId: "QUOTE_BASE", a: "1.3.x", b: "1.3.x" }]
+  // id IS the desk id; poolId repeats it — the shared canvas pipeline
+  // (paint hits, hover, twin sort) keys edges by poolId: one identity,
+  // two names, never two values.
 meta:  { "<deskId>": { symA, symB,
          volBaseRaw, volBasePrec, volQuoteRaw, volQuotePrec,
          latest, change } }

@@ -114,6 +114,7 @@ function ok(cond, name) {
   const g = MN.graph(rows, "1.3.0");
   ok(g.edges.length === 1, "only the nonzero-volume pair survives");
   ok(g.edges[0].id === "USD_BTS", "focus-base orientation wins (QUOTE_BASE desk id)");
+  ok(g.edges[0].poolId === "USD_BTS", "poolId repeats the desk id (shared pipeline key)");
   ok(g.nodes.length === 2, "nodes are the kept edge's assets");
   ok(g.meta["USD_BTS"].volBaseRaw === "5000", "meta carries raw volume + labels");
   ok(rows.length === 4, "input untouched");
