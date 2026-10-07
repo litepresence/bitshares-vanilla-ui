@@ -218,6 +218,11 @@ filter) re-seeds and runs another 3s. Zoom is camera-only (no wake). Ends the st
 tails can't outlive the cap. Browser proof: idle paused @180, flip runs,
 paused @180 again, zero errors.
 
+Refine — switch overlays canvas lower-left (user call): `Physics`
+control moved into a relative `.pool-net-stage` wrapper, absolutely
+positioned over the art (panel pill, readable in all themes) instead of
+sitting above the band. Verified in-position + clickable headlessly.
+
 Refine — wind-down arc (user Q: would lower gravity/tension cut jitter?):
 measured no — halving either leaves the tail byte-identical (tails are
 temp-cap-quantized, not force-set; softer springs only sprawl wider).

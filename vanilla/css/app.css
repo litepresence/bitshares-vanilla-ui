@@ -750,6 +750,14 @@ dl.xfer-confirm dd { margin: 0; overflow-wrap: break-word; word-break: break-wor
  * ~720px; 2-col grid (label | input) above. Width guard excludes
  * checkboxes/radios (they must keep their native box, not stretch). */
 .xfer-field { margin: 8px 0; min-width: 0; }
+/* Stepper (component-wisdom Rec 9, .ca-steps): header-only ordered stages
+ * for multi-step builders (create-account, barter). Theme tokens only;
+ * wraps on phones, no hover dependence. */
+.ca-steps { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin: 8px 0; padding: 0; }
+.ca-steps li { padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); }
+.ca-steps li.ca-step-now { color: var(--text); border-color: var(--accent); font-weight: 700; }
+.ca-steps li.ca-step-done { color: var(--muted); }
+.ca-steps li.ca-step-done::before { content: "✓ "; }
 .xfer-field label { display: grid; gap: 4px 12px;
   grid-template-columns: minmax(0, 1fr); align-items: center; min-width: 0; }
 .xfer-field input:not([type="checkbox"]):not([type="radio"]),
@@ -1324,8 +1332,8 @@ button:focus-visible, a:focus-visible, summary:focus-visible,
   tr.book-row, .book-row-card,
   #nav a, .menu-card, .mkt-picker-list a,
   .trade-tabs button, .mkt-tabs button,
-  .node-card, .dashboard-gate, .alert-row,
-  .mkt-statstrip, .mkt-chart-empty,
+   .node-card, .dashboard-gate, .alert-row,
+   .mkt-statstrip, .mkt-chart-empty, .skel,
   .mkt-quotes button, .mkt-scalerow button, .mkt-indmenu-btn,
   .pools-pager button, .mkt-star, .mkt-bell,
   .mkt-indmenu-item, .mkt-tf, .mkt-ind, .mkt-kind,
@@ -1425,6 +1433,18 @@ p.muted[aria-live="polite"],
   animation: candy-shimmer 1.4s linear infinite;
 }
 @keyframes candy-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* 1b. Layout-shaped skeleton rows (component-wisdom Rec 4, DOM.skel): three
+ * placeholder bars per row for known-layout loads (balances, book, pool
+ * rows). Reuses candy-shimmer above (no new keyframes); static panel-deep
+ * under reduced motion (added to the §8 list). */
+.skel-wrap { margin: 8px 0; }
+.skel-row { display: flex; gap: 8px; align-items: center; padding: 6px 0; }
+.skel { display: block; height: 1em; border-radius: 4px;
+  background-image: linear-gradient(100deg, var(--panel) 30%, var(--panel-deep) 50%, var(--panel) 70%);
+  background-size: 200% 100%;
+  animation: candy-shimmer 1.4s linear infinite; }
+.skel-a { flex: 2; } .skel-b { flex: 5; } .skel-c { flex: 3; }
 
 /* 2. Live-dot glow + footer block-advance pulse. The explorer dot keeps its
  * existing xplore-pulse (opacity) and gains a static --live halo; the footer
@@ -1604,6 +1624,11 @@ p.muted[aria-live="polite"],
 @media (max-width: 640px) {
   .pool-net-canvas { height: 480px; }
 }
+.pool-net-stage { position: relative; }
+.pool-net-stage > .pool-net-canvas { display: block; }
+.pool-net-stage > .pool-net-phys { position: absolute; left: 12px; bottom: 12px;
+  margin: 0; padding: 6px 10px; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--border); }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }
 .pool-net-phys { display: flex; gap: 10px; align-items: center; margin: 8px 0; }

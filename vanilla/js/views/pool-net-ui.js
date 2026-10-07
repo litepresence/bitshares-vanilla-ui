@@ -893,9 +893,14 @@ var PoolNetUI = (function () {
         physBar.appendChild(physLabel);
         physBar.appendChild(physSwitch);
         physBar.appendChild(physState);
-        wrap.appendChild(physBar);
+        /* Stage: relative-positioned wrapper so the Physics switch overlays
+         * the canvas lower-left (owner call) instead of sitting above the
+         * band. Canvas keeps its in-flow size; the switch floats over art. */
+        var stage = mk("div", null, "pool-net-stage");
+        stage.appendChild(canvas);
+        stage.appendChild(physBar);
         wrap.appendChild(statusEl);
-        wrap.appendChild(canvas);
+        wrap.appendChild(stage);
         wrap.appendChild(hoverEl);
         wrap.appendChild(verdictEl);
         wrap.appendChild(legendEl);
