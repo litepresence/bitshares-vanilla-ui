@@ -192,6 +192,8 @@ deep(T.normalize(["  bts  ", "", "  ", null, undefined]), ["BTS"], "blanks/nulls
 deep(T.normalize([]), ["BTS"], "empty array resets to default");
 deep(T.normalize(["   "]), ["BTS"], "whitespace-only resets to default");
 deep(T.normalize(null), ["BTS"], "null resets to default");
+deep(T.normalize("bts"), ["BTS"], "a string is ONE leg (id -> pair is fromMarketId's job)");
+deep(T.normalize("ETH_BTS"), ["ETH_BTS"], "normalize never splits a string on the separator");
 deep(T.normalize("TOOLONGSYMBOLNAME"), ["BTS"], "over-12-char symbol dropped");
 deep(T.normalize(["BTS", "ABCDEFGHIJKL"]), ["BTS", "ABCDEFGHIJKL"], "exactly-12-char symbol kept");
 deep(T.DEFAULT, ["BTS"], "DEFAULT is [BTS]");
@@ -210,7 +212,7 @@ deep(T.fromMarketId("BTS"), ["BTS"], "bare id -> single-leg pair");
 deep(T.fromMarketId("1.3.113"), ["BTS"], "object id -> default");
 deep(T.fromMarketId(""), ["BTS"], "empty id -> default");
 deep(T.fromMarketId(null), ["BTS"], "null id -> default");
-deep(T.fromMarketId("A_B_C"), ["A", "B"], "three-part id -> first two legs");
+deep(T.fromMarketId("A_B_C"), ["BTS"], "three-part id rejected (validPoolMarket rule) -> default");
 
 /* --- pool -> pair -> desk id: reproduces today's pool string --- */
 deep(PairContext.fromPool({ base: { symbol: "BTS" }, quote: { symbol: "USDT" } }), ["BTS", "USDT"],
@@ -309,7 +311,7 @@ var PairContext = (function () {
     var legs = [];
     try {
       if (Array.isArray(input)) legs = input.slice();
-      else if (typeof input === "string") legs = input.split(/[-_]/);
+      else if (typeof input === "string") legs = [input];
       else if (input && typeof input.length === "number") legs = Array.prototype.slice.call(input);
     } catch (e) { legs = []; }
     var out = [];
@@ -379,7 +381,11 @@ var PairContext = (function () {
    * @param {string[]|string} next
    * @returns {string[]} the stored pair */
   function set(next) {
-    var normalized = normalize(next);
+    var input = next;
+    try {
+      if (typeof input === "string" && /^[^_-]+[-_][^_-]+$/.test(input.trim())) input = fromMarketId(input);
+    } catch (e) { /* normalize below handles it */ }
+    var normalized = normalize(input);
     try {
       var same = normalized.length === pair.length;
       if (same) for (var i = 0; i < normalized.length; i++) if (normalized[i] !== pair[i]) { same = false; break; }
@@ -995,4 +1001,4 @@ git commit -m "feat(pair-context): desks write the global pair; pool swap retire
 - **Spec coverage:** §1 module → Task 2 (every call in the table exists); §2 four seams → Tasks 3–6; §2.1 read/write split → Task 2 header + Tasks 4/5/6; §2.2 precedence → Tasks 4 and 5; §2.3 section highlight → Task 3 (`navIsCurrent`); §3 naming + SEO + i18n → Tasks 1, 3, 4, 5; §5 testing → Task 2 (unit), Task 3 (nav vectors), Tasks 4–6 (probe) plus the gate list.
 - **Placeholder scan:** no TBD/TODO; every step names exact files, code, commands, and expected output.
 - **Type consistency:** `get/set/on/reset/marketId/fromMarketId/fromPool/_t.normalize/_t.marketId/_t.fromMarketId/_t.DEFAULT` are defined once in Task 2 and used verbatim in Tasks 3–6; `navIsCurrent(hash, href)` argument order is identical in the test (Task 3) and the implementation (Task 3).
-- **Divergences from the spec, both deliberate and documented in the spec text itself:** pickers do not write (§2.1); `nav.markets` is a new key rather than a rename of `nav.exchange` (Global Constraints).
+- **Divergences from the spec, all deliberate and documented in the spec text itself:** pickers do not write (§2.1); `nav.markets` is a new key rather than a rename of `nav.exchange` (Global Constraints); a malformed multi-part desk id (`A_B_C`) is REJECTED to the default pair rather than truncated — the ported `validPoolMarket` rule said three parts are not a valid market, and silently opening a different market from a typo is worse than falling back (found while running Task 2's test). `normalize` also treats a STRING as one leg and never splits it — `set` is the only door that accepts a `QUOTE_BASE` string, routing it through `fromMarketId`, so the two input shapes can never mean different things in different callers.
