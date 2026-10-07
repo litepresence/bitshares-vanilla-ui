@@ -2121,6 +2121,7 @@
       "market_net.loading",
       "market_net.offline",
       "market_net.open_desk",
+      "market_net.selector_title",
       "market_net.spark_label",
       "market_net.subtitle",
       "market_net.title",
@@ -2380,6 +2381,7 @@
       "nav.exchange",
       "nav.explorer",
       "nav.margin",
+      "nav.markets",
       "nav.settings",
       "nav.transfer",
       "nav.voting",
@@ -2636,6 +2638,7 @@
       "pool_net.verdict_orphan",
       "pool_net.verdict_path",
       "pool_net.verdict_star",
+      "pools.selector_title",
       "pools.title",
       "prediction.action",
       "prediction.active",
@@ -3024,6 +3027,7 @@
       "seo.desc_help",
       "seo.desc_login",
       "seo.desc_market",
+      "seo.desc_markets",
       "seo.desc_pools",
       "seo.desc_transfer",
       "seo.desc_voting",
@@ -3034,6 +3038,7 @@
       "seo.title_help",
       "seo.title_login",
       "seo.title_market",
+      "seo.title_markets",
       "seo.title_pools",
       "seo.title_transfer",
       "seo.title_voting",
@@ -3780,7 +3785,8 @@
     "voting": "Голосование",
     "settings": "Настройки",
     "credit": "Credit",
-    "margin": "Margin"
+    "margin": "Margin",
+    "markets": "Markets"
   },
   "settings": {
     "title": "Настройки",
@@ -5434,7 +5440,8 @@
     "title": "Своп"
   },
   "pools": {
-    "title": "Пулы ликвидности"
+    "title": "Пулы ликвидности",
+    "selector_title": "Pool Selector"
   },
   "proposals_misc": {
     "title": "Предложение"
@@ -7631,7 +7638,9 @@
     "title_help": "Help — BitShares Wallet",
     "desc_help": "BitShares wallet help — guides for accounts, trading, voting and recovery. Start here when stuck.",
     "title_login": "Log In — BitShares Wallet",
-    "desc_login": "Unlock your local BitShares wallet — password, brainkey or imported keys. Keys never leave this device."
+    "desc_login": "Unlock your local BitShares wallet — password, brainkey or imported keys. Keys never leave this device.",
+    "title_markets": "Markets — BitShares Wallet",
+    "desc_markets": "Browse BitShares order-book markets by 24h volume and open any pair's trading desk. No login needed."
   },
   "pool_net": {
     "title": "Pool network",
@@ -7685,6 +7694,7 @@
     "collapse": "Collapse",
     "expand": "Expand",
     "open_desk": "Open %(id)s",
-    "spark_label": "7-day trend for %(id)s"
+    "spark_label": "7-day trend for %(id)s",
+    "selector_title": "Market Selector"
   }
 }
