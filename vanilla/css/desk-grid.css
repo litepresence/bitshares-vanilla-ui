@@ -9,8 +9,9 @@
  *   :2089/sellForm, marketHistory :2551, myMarketHistory :2583,
  *   myOpenOrders :2618, settlementOrders :2656, myMarkets :2428; toggle
  *   group-1 default panelTabs :362-371) — while the POOL desk
- *   (.mkt.mkt-pool) keeps the legacy book|trades areas, with its .mkt-book
- *   cell holding the same split bids|asks cells side-by-side on desktop. Plus every desk scroll region
+ *   (.mkt.mkt-pool) spans its .mkt-book cell across two thirds (book book
+ *   trades), with its .mkt-book cell holding the same split bids|asks cells
+ *   side-by-side on desktop (a full third each). Plus every desk scroll region
  *   (.book-scroll/.trades-scroll/.orders-scroll/.picker-scroll plus the
  *   phone-card lists), sticky table headers inside those regions,
  *   .mkt-tabs toggle styling, and .depth-bar geometry + colors. All colors
@@ -67,9 +68,10 @@
  * the main area (price + volume + depth slice + oscillators inside
  * mkt-charts). Below it the EXCHANGE desk (.mkt-exchange) runs the retro
  * equal 2x3: row 1 buy | sell | trades-toggle, row 2 bids | asks | orders;
- * the picker rail (side) spans all rows full-height. The POOL desk
- * (.mkt.mkt-pool) keeps the legacy book | trades areas; its book cell holds
- * the split bids | asks cells (side-by-side ≥1200px, stacked below).
+ *   the picker rail (side) spans all rows full-height. The POOL desk
+ *   (.mkt.mkt-pool) spans book across two thirds (book book trades); its
+ *   book cell holds the split bids | asks cells (side-by-side ≥1200px,
+ *   a full third each, stacked below).
  * Phones (<1200px) stack every cell single-column; the rail drops last. */
 .mkt {
   grid-template-areas: "head" "charts" "book" "trades" "orders" "trade" "stats" "side";
@@ -199,10 +201,17 @@
 
 /* Pool split book (pool-detail-ui.js depthPane mirrors market-desk.js
  * bids/asks cells): phones stack single-column for free (no rule here);
- * desktop ≥1200px places Buy | Sell side-by-side inside the .mkt-book cell
- * while the h2, curve canvas, and muted notes span full width. Reuses the
+ * desktop ≥1200px the book cell spans two thirds (book book trades) so its
+ * inner Buy | Sell split lands at a full third each, and the recent-swaps
+ * trades cell shifts to the final third — no blank orders third. The h2,
+ * curve canvas, and muted notes span the full book width. Reuses the
  * shared .mkt-bids/.mkt-asks cells — no pool-only book classes. */
 @media (min-width: 1200px) {
+  .mkt.mkt-pool {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 320px;
+    grid-template-areas: "head head head side" "charts charts charts side" "book book trades side";
+    align-items: start;
+  }
   .mkt-pool .mkt-book {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

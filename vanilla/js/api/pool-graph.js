@@ -91,6 +91,10 @@ var PoolGraph = (function () {
   }
   /* L1 selection: biggest-first, cap N (pure, tested). */
   function _selectL1(rows, cap) { return _sortBiggest(rows || []).slice(0, cap); }
+  /* Funded-only edge rule (desk-map connects semantics: a line means a live
+   * venue — an empty pool has no side to trade against, so it never becomes
+   * an edge. Pure, tested via _test._funded). */
+  function _funded(p) { try { return _poolSize(p) > 0n; } catch (e) { return false; } }
   /* L2 counter-asset pick: distinct ids touching L1 pools except A/B, in biggest-pool order, cap N (pure, tested). */
   function _pickL2Assets(l1pools, assetA, assetB, max) {
     var out = [], seen = {};
@@ -141,7 +145,8 @@ var PoolGraph = (function () {
 
   /* 2-layer graph from two asset ids. Returns {nodes:[{assetId,sym}], edges:[{poolId,a,b,sizeRaw}]}.
    * L0=A,B; L1=one_asset each cap 8 biggest-first; L2=up to 6 counters limit 3; nodes cap 25
-   * (smallest L2 pools dropped first). Partial on leg failures; throws not-connected only
+   * (smallest L2 pools dropped first). Funded pools only (zero-size pools are
+   * never edges — desk-map connects semantics). Partial on leg failures; throws not-connected only
    * when every pool fetch is offline. Never guesses symbols (bare ids stand).
    * Discovery is concurrent (same calls, timing only): L1 pair via one Promise.all,
    * L2 counters via one Promise.all (<=6 legs, <=8 total — no pool needed). Each leg
@@ -164,7 +169,9 @@ var PoolGraph = (function () {
     var offline = (l1res[0].offline ? 1 : 0) + (l1res[1].offline ? 1 : 0);
     if (offline === 2) throw new Error("not-connected");
     var l1a = _selectL1(l1res[0].rows, L1_CAP), l1b = _selectL1(l1res[1].rows, L1_CAP);
-    var l1 = l1a.concat(l1b);
+    /* Funded-only (connects rule above): empty pools never enter the edge
+     * set, so L2 counters derive from funded L1 only. */
+    var l1 = l1a.concat(l1b).filter(_funded);
     var seenPool = {}, pools = [];
     l1.forEach(function (p) { if (!seenPool[p.id]) { seenPool[p.id] = 1; pools.push(p); } });
     var counters = _pickL2Assets(pools, assetA, assetB, L2_ASSETS);
@@ -177,7 +184,7 @@ var PoolGraph = (function () {
     }
     var l2rows = await Promise.all(counters.map(function (id) { return _safeL2(id); }));
     for (var i = 0; i < l2rows.length; i++) {
-      var l2sel = _selectL1(l2rows[i] || [], L2_LIMIT);
+      var l2sel = _selectL1(l2rows[i] || [], L2_LIMIT).filter(_funded);
       l2sel.forEach(function (p) { if (!seenPool[p.id]) { seenPool[p.id] = 1; pools.push(p); } });
     }
     /* Node-cap trim: drop smallest L2 pools (never L1) until nodes fit. */
@@ -1474,6 +1481,7 @@ var PoolGraph = (function () {
     _rampForTest: _ramp,
     _withAlphaForTest: withAlpha,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,
+      funded: _funded,
       nodeRadius: _nodeRadius, ringRadii: _ringRadii, relax: relax, edgeWeight: _edgeWeight,
       mapTheme: mapTheme } };
 })();

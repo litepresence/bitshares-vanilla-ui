@@ -66,6 +66,15 @@ function ok(cond, name) {
   ok(PG._test.pickL2(l1, "1.3.1", "1.3.2", 6).length <= 6, "L2 pick cap 6");
 })();
 
+// 4b. Funded-only edge rule (desk-map connects semantics): empty pools never
+// become edges; one-sided reserves still count as funded.
+(function () {
+  ok(PG._test.funded({ balance_a_raw: "10", balance_b_raw: "10" }) === true, "funded both legs");
+  ok(PG._test.funded({ balance_a_raw: "10", balance_b_raw: "0" }) === true, "funded one-sided");
+  ok(PG._test.funded({ balance_a_raw: "0", balance_b_raw: "0" }) === false, "empty pool unfunded");
+  ok(PG._test.funded(null) === false, "null row unfunded");
+})();
+
 // 5. Layout deterministic: same input -> byte-identical positions (no physics/random).
 (function () {
   const g = {

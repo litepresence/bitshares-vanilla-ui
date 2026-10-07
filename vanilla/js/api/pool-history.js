@@ -289,6 +289,83 @@ var PoolHistory = (function () {
     }).catch(chain);
   }
 
+  /* ES 24h-activity probe query (desk-map connects gating): ONE search over
+   * many pools — op-63 docs in the past-24h window mentioning ANY listed
+   * pool id (multi_match best_fields, lenient — same recall shape as the
+   * per-pool esQuery; strict per-hit pool validation happens in
+   * poolsActive24h via esSwap, so tokenization looseness never invents
+   * activity). Range on block_data.block_time (the field esQuery already
+   * sorts on, so it is mapped). Single page, no search_after: a full page
+   * means the window may hold more than one page and the probe reports
+   * partial:true (caller falls back to unfiltered edges + fallback note)
+   * rather than pretending exhaustive. Params: poolIds (non-empty string
+   * array), sinceIso ("YYYY-MM-DDTHH:mm:ss" UTC). Returns the query body. */
+  function esActiveQuery(poolIds, sinceIso) {
+    return {
+      track_total_hits: false,
+      sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
+      size: ES_SIZE,
+      _source: ["account_history", "operation_history", "operation_type", "block_data"],
+      query: {
+        bool: {
+          filter: [
+            { match: { operation_type: "63" } },
+            { range: { "block_data.block_time": { gte: sinceIso } } },
+            { multi_match: { type: "best_fields", query: poolIds.join(" "), lenient: true } }
+          ]
+        }
+      }
+    };
+  }
+
+  /* poolsActive24h: which pools from the set swapped in the past 24h (ONE
+   * ES search, mainnet community index). Resolves {active: {poolId: true},
+   * partial: boolean} — partial true when the window filled the whole page
+   * (activity beyond it unobserved; caller treats as inconclusive and falls
+   * back). Rejects "es-unavailable"/"es-disabled" (or any transport error)
+   * when ES cannot answer — the caller keeps its chain pools and shows the
+   * fallback connects definition. Never resolves invented activity: a pool
+   * lands in active only on a strict esSwap match (exact pool id + executed
+   * paid/received), with a lexicographic recency double-check when the hit
+   * carries a time string (the ES range is the authority; unparseable times
+   * ride it). Testnet callers must not call this (index is mainnet-only and
+   * pool ids collide across chains) — the fills gate on network first.
+   * Params: poolIds (string array, validated + deduped, cap 100 — desk maps
+   *   stay under 25 edges). */
+  function poolsActive24h(poolIds) {
+    var ids = [], seen = {};
+    (poolIds || []).forEach(function (id) {
+      try {
+        assertPoolId(id);
+        if (!seen[id]) { seen[id] = true; ids.push(id); }
+      } catch (e) { /* malformed id never probes */ }
+    });
+    if (ids.length > 100) ids = ids.slice(0, 100);
+    if (!ids.length) return Promise.resolve({ active: {}, partial: false });
+    var HC = _historyCap();
+    if (!HC) return Promise.reject(new Error("es-unavailable"));
+    if (!_esOn()) return Promise.reject(new Error("es-disabled"));
+    var since = "";
+    try { since = new Date(Date.now() - 86400000).toISOString().slice(0, 19); } catch (e) { since = ""; }
+    if (!since) return Promise.reject(new Error("es-unavailable"));
+    return HC.esSearch("bitshares-*", esActiveQuery(ids, since), { timeoutMs: ES_TIMEOUT_MS }).then(function (data) {
+      var hits = (data && data.hits && data.hits.hits) || [];
+      var active = {};
+      hits.forEach(function (hit) {
+        for (var i = 0; i < ids.length; i++) {
+          var sw = null;
+          try { sw = esSwap(hit, ids[i]); } catch (e) { sw = null; }
+          if (!sw) continue;
+          try {
+            if (sw.time && String(sw.time).slice(0, 19) < since) continue;
+          } catch (e) { /* range authority stands */ }
+          active[ids[i]] = true;
+          break;
+        }
+      });
+      return { active: active, partial: hits.length >= ES_SIZE };
+    });
+  }
   /* Price orientation (#5 parse_price_history rule): price is always BUY-leg
    * per SELL-leg in pool-leg terms — legs sort by asset id (a<b consensus),
    * so paid=A&recv=B -> recv/paid, paid=B&recv=A -> paid/recv. Exact BigInt
@@ -523,11 +600,12 @@ var PoolHistory = (function () {
 
   return {
     swapsForPool: swapsForPool, chainSwaps: chainSwaps, esSwaps: esSwaps,
+    poolsActive24h: poolsActive24h,
     enrich: enrich, priceHuman: priceHuman, swapsToCandles: swapsToCandles, swapsToPoints: swapsToPoints,
     filterLegs: filterLegs,
     synthBook: synthBook, ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     ES_SIZE: ES_SIZE, ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
-    _test: { esSwap: esSwap, esQuery: esQuery, filterLegs: filterLegs, SLICES: SLICES }
+    _test: { esSwap: esSwap, esQuery: esQuery, esActiveQuery: esActiveQuery, filterLegs: filterLegs, SLICES: SLICES }
   };
 })();
 

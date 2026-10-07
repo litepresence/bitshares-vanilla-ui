@@ -487,21 +487,23 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         P.depthCanvas = depthCanvas;
       }
     } catch (e) { /* desk stands without the depth slice */ }
-    /* Pool-map provenance slice: .mkt-osc-pane titled "Pool map" in oscHost.
-     * drawCharts pins graphWrap right after depthWrap (index 2-ish). Lazy
-     * async fetch for this pool's legs; never blocks the desk. */
+    /* Network-map slice: untitled canvas + connects note in oscHost (no pane
+     * heading by owner decision — the note below the canvas defines what a
+     * line means). DrawCharts pins graphWrap right after depthWrap. Lazy
+     * async fetch never blocks the desk. The Physics switch lives overlaid
+     * on the canvas lower-left inside the stage wrapper (band parity),
+     * so no header element is needed. */
     try {
       var graphWrap = doc.createElement("div");
       graphWrap.className = "mkt-osc-pane";
-      var graphHead = doc.createElement("div");
-      graphHead.className = "mkt-osc-head";
-      var graphTitle = doc.createElement("span");
-      graphTitle.className = "mkt-osc-title";
-      graphTitle.textContent = t("pool_detail.pool_map", "Pool map");
-      graphHead.appendChild(graphTitle);
+      var graphStage = doc.createElement("div");
+      graphStage.className = "pool-net-stage";
+      var graphCanvas = doc.createElement("canvas");
+      graphCanvas.className = "mkt-canvas";
+      graphStage.appendChild(graphCanvas);
       /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition
        * to this pane): ONE labeled on/off control, overlaid on the canvas
-       * lower-left via the stage wrapper below (band parity, owner call).
+       * lower-left via the stage wrapper above (band parity, owner call).
        * 2026-10-07: the switch is a GESTURE-REACTION flag, shared through
        * the poolNetReact key with the selector bands — ON = a drag release
        * re-energizes the map so neighbours react; OFF = gestures never wake
@@ -544,23 +546,12 @@ PoolDetailUI._view = PoolDetailUI._view || {};
             try { redrawPoolMap(doc, P, myGen, uiGen, true); } catch (eSw) { /* map stands */ }
           });
         })(physBox);
-        graphHead.appendChild(physBox);
+        /* On-canvas overlay (owner call, band parity): the switch floats over
+         * the map lower-left inside the relative stage wrapper above. */
+        graphStage.appendChild(physBox);
       } catch (eSw) { /* desk stands without the switch */ }
-      graphWrap.appendChild(graphHead);
-      var graphCanvas = doc.createElement("canvas");
-      graphCanvas.className = "mkt-canvas";
-      /* On-canvas switch overlay (owner call, band parity): the Physics box
-       * built above floats over the map lower-left inside a relative stage
-       * wrapper instead of sitting in the pane header. */
-      var graphStage = doc.createElement("div");
-      graphStage.className = "pool-net-stage";
-      graphStage.appendChild(graphCanvas);
-      try {
-        var movedBox = graphHead.querySelector ? graphHead.querySelector("[data-phys-switch]") : null;
-        if (movedBox) graphStage.appendChild(movedBox);
-      } catch (eSw) { /* switch stays in header */ }
       graphWrap.appendChild(graphStage);
-      var graphNote = u.el(doc, "p", "Loading pool map…", "muted");
+      var graphNote = u.el(doc, "p", t("market.loading_pool_map", "Loading map…"), "muted");
       graphNote.setAttribute("aria-live", "polite");
       graphWrap.appendChild(graphNote);
       oscHost.appendChild(graphWrap);
@@ -1658,6 +1649,8 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       if (!live(myGen, uiGen)) return;
       if (!ok) { try { P.graphNote.textContent = t("pool_detail.pool_map_unavailable_script", "Pool map unavailable (script load failed)."); } catch (e) {} return; }
       var pA = r.asset_a_id, pB = r.asset_b_id;
+      P._activity = null;
+      try { P.graphNote.textContent = t("market.loading_pool_map", "Loading map…"); } catch (e) {}
       try {
         PoolGraph.buildGraph(pA, pB, { depth: 2, cap: 25 }).then(function (g) {
           if (!live(myGen, uiGen)) return;
@@ -1667,6 +1660,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           P.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
           redrawPoolMap(doc, P, myGen, uiGen);
           try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
+          gateByActivity(doc, P, myGen, uiGen);
         }).catch(function (e) {
           if (!live(myGen, uiGen)) return;
           var m = String((e && e.message) || e || "");
@@ -1677,6 +1671,96 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         });
       } catch (e) { /* map best-effort */ }
     });
+  }
+
+  /* Mainnet read (market-desk-fill deepenPool precedent: community ES is
+   * mainnet-only, and pool ids collide across chains — testnet never
+   * probes, it takes the fallback definition). Verbatim duplicate by
+   * doctrine (no shared map abstraction). @returns {boolean} Never throws. */
+  function isMainnet() {
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+        var st = Store.loadSettings();
+        if (st && (st.network === "testnet" || st.network === "mainnet")) return st.network === "mainnet";
+      }
+    } catch (e) { /* mainnet default below */ }
+    return true;
+  }
+
+  /* Prune a desk graph to 24h-active pools (pure shape, no chain calls).
+   * Nodes shrink to edge endpoints + the desk legs; BTS paths recompute on
+   * the pruned graph (a route through a dropped pool must not glow).
+   * Verbatim duplicate of the market-desk-fill helper by doctrine.
+   * @returns {{graph: {nodes: Array, edges: Array}, pathA: Object|null,
+   *   pathB: Object|null, kept: number}} Never throws. */
+  function gateEdges(gd, active) {
+    var kept = 0;
+    try {
+      var g = (gd && gd.graph) || { nodes: [], edges: [] };
+      var aA = gd.assetA, aB = gd.assetB;
+      var edges = ((g.edges) || []).filter(function (e) {
+        return e && e.poolId && active[String(e.poolId)];
+      });
+      kept = edges.length;
+      var keepN = {};
+      try { keepN[String(aA)] = 1; keepN[String(aB)] = 1; } catch (e) { /* legs stand */ }
+      edges.forEach(function (e) {
+        try { keepN[String(e.a)] = 1; keepN[String(e.b)] = 1; } catch (x) { /* edge stands */ }
+      });
+      var nodes = ((g.nodes) || []).filter(function (n) {
+        return n && keepN[String(n.assetId)];
+      });
+      var pruned = { nodes: nodes, edges: edges };
+      var pa = null, pb = null;
+      try {
+        if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.findCorePath === "function") {
+          pa = PoolGraph.findCorePath(pruned, aA);
+          pb = PoolGraph.findCorePath(pruned, aB);
+        }
+      } catch (e) { pa = null; pb = null; }
+      return { graph: pruned, pathA: pa, pathB: pb, kept: kept };
+    } catch (e) { return { graph: { nodes: [], edges: [] }, pathA: null, pathB: null, kept: 0 }; }
+  }
+
+  /* 24h-activity gating pass (once per desk, after the chain-first paint —
+   * the desk never waits on it). Probe success prunes to active pools
+   * (strict-definition activity); anything else keeps the funded chain
+   * pools with fallback activity. Stale-route guarded; never throws. */
+  function gateByActivity(doc, P, myGen, uiGen) {
+    try {
+      if (!P.graphData || !P.graphData.graph) return;
+      var total = ((P.graphData.graph.edges) || []).length;
+      if (!total) return;
+      if (typeof PoolHistory === "undefined" || !PoolHistory ||
+          typeof PoolHistory.poolsActive24h !== "function" || !isMainnet()) {
+        P._activity = { gated: false, count: total, total: total };
+        try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* chain paint stands */ }
+        return;
+      }
+      var ids = [];
+      try {
+        P.graphData.graph.edges.forEach(function (e) {
+          if (e && e.poolId) ids.push(String(e.poolId));
+        });
+      } catch (e) { ids = []; }
+      PoolHistory.poolsActive24h(ids).then(function (res) {
+        if (!live(myGen, uiGen)) return;
+        if (!res || res.partial) {
+          P._activity = { gated: false, count: total, total: total };
+        } else {
+          var out = gateEdges(P.graphData, res.active || {});
+          P.graphData = { graph: out.graph, assetA: P.graphData.assetA,
+            assetB: P.graphData.assetB, pathA: out.pathA, pathB: out.pathB };
+          P._activity = { gated: true, count: out.kept, total: total };
+        }
+        try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* chain paint stands */ }
+        try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
+      }).catch(function () {
+        if (!live(myGen, uiGen)) return;
+        P._activity = { gated: false, count: total, total: total };
+        try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* chain paint stands */ }
+      });
+    } catch (e) { /* chain paint stands */ }
   }
 
   /* Repaint the pool-map canvas from cached graphData (theme/resize path). Never throws outward. */
@@ -1716,15 +1800,24 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         PoolGraph.drawGraph(doc, P.graphCanvas, gd.graph,
           { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, nav: navMode });
       }
+      /* Below-map note (owner wording): the connects definition, never a
+       * title. Strict when the 24h probe gated this render (with the honest
+       * active/total count, number-style — no new words); fallback wording
+       * while the probe is pending or when ES could not answer (the funded
+       * chain pools stand, and the note says activity is unconfirmed).
+       * Truly pool-less pairs keep the honest empty sentence. */
+      var act = P._activity || null;
       var n = (gd.graph.edges || []).length;
-      if (!n) P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-      else if (!gd.pathA && !gd.pathB) P.graphNote.textContent = t("pool_detail.no_bts_path_unverified", "No BTS path — treat pair as unverified.");
-      else {
-        var bits = [];
-        if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
-        if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        P.graphNote.textContent = t("pool_detail.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ". " +
-          t("pool_net.ramp", "Pool size: small → large");
+      if (!n && !(act && act.gated && act.total > 0)) {
+        P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
+      } else if (act && act.gated) {
+        P.graphNote.textContent = t("pool_detail.map_connects", "A line connects two assets when a funded pool exists and there has been a trade in the past 24 hours.") +
+          " " + String(act.count) + "/" + String(act.total);
+      } else if (!act) {
+        P.graphNote.textContent = t("market.loading_pool_map", "Loading map…");
+      } else {
+        P.graphNote.textContent = t("pool_detail.map_connects_fallback", "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools.") +
+          " N=" + String(act.total);
       }
     } catch (e) { /* canvas best-effort */ }
   }

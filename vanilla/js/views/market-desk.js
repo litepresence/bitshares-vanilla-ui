@@ -760,19 +760,18 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
     depthWrap.appendChild(depthCanvas);
     oscHost.appendChild(depthWrap);
     state.depthWrap = depthWrap;
-    /* Pool-map provenance slice: .mkt-osc-pane titled "Pool map" in oscHost.
-     * Own canvas + loading note; drawCharts pins graphWrap right after
-     * depthWrap (index 2-ish). Lazy async fetch never blocks the desk. */
+    /* Network-map slice: untitled canvas + connects note in oscHost (no pane
+     * heading by owner decision — the note below the canvas defines what a
+     * line means). DrawCharts pins graphWrap right after depthWrap
+     * (index 2-ish). Lazy async fetch never blocks the desk. The Physics
+     * switch (market-desk-fill.js ensurePhysSwitch) overlays the canvas, so
+     * no header element is needed. */
     var graphWrap = doc.createElement("div");
     graphWrap.className = "mkt-osc-pane";
-    var graphHead = doc.createElement("div");
-    graphHead.className = "mkt-osc-head";
-    graphHead.appendChild(DOM.el(doc, "span", "Pool map", "mkt-osc-title"));
-    graphWrap.appendChild(graphHead);
     var graphCanvas = doc.createElement("canvas");
     graphCanvas.className = "mkt-canvas";
     graphWrap.appendChild(graphCanvas);
-    var graphNote = DOM.el(doc, "p", "Loading pool map…", "muted");
+    var graphNote = DOM.el(doc, "p", t("market.loading_pool_map", "Loading map…"), "muted");
     graphNote.setAttribute("aria-live", "polite");
     graphWrap.appendChild(graphNote);
     oscHost.appendChild(graphWrap);

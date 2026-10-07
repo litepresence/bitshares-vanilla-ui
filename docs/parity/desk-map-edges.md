@@ -230,3 +230,37 @@ The exchange desk's fallback (an edge touching neither of the desk's legs)
 navigates to the pool's own `A_B` order. That market may be thin or absent; the
 desk shows an honest empty state rather than a fake one, which is the intended
 behaviour for a market that has no order book.
+
+## Delta — untitled panes + connects definitions (owner wording)
+
+The `Pool map` pane headings are gone from both desks (exchange
+`#/market/…`, swap `#/pools/:id`); the Physics switch overlays the canvas so
+no header element remains. The textbox below each map is now the connects
+definition, and it changes with the data state:
+
+- strict (24h probe gated this render): pool desk —
+  "A line connects two assets when a funded pool exists and there has been a
+  trade in the past 24 hours." (+ `active/total` count); exchange desk —
+  "A line connects two assets when there has been a market trade in the past
+  24 hours." (+ `active/total`).
+- fallback (probe pending, ES down/disabled, partial window, or off-mainnet):
+  "A line connects two assets when a funded pool exists. 24h trade activity
+  is unconfirmed (history unavailable) — showing funded pools." (+ `N=total`).
+
+Mechanics: `PoolHistory.poolsActive24h` (one ES search over the edge pool
+set, 24h range on `block_data.block_time`, strict per-hit pool match; partial
+on a full page, rejects when ES cannot answer) gates the funded-only
+`PoolGraph` edges (`_funded`: zero-size pools are never edges); paths
+recompute on the pruned graph so dropped pools never glow. Chain-first paint
+stands — the probe only ever removes edges, and every failure mode keeps the
+funded chain pools with the fallback wording. Loading/offline/script-fail/
+pool-less notes are unchanged (the failure messages and fallbacks). The old
+"BTS provenance / pool→BTS hops / size ramp" note text is retired; the route
+glow, hover cards, and canvas aria labels still carry path info. Selector
+bands (`#/markets`, `#/pools`) are untouched.
+
+Evidence: `pool-graph-test` 204 · `pool-history-test` 57 (new `_funded` +
+probe vectors: strict match, stale exclusion, partial-on-full-page,
+reject-on-ES-down, empty-set-no-fire) · market/historical suites unchanged ·
+`check_i18n` OK (4 new `map_connects*` keys, 5 retired keys dropped) ·
+`check_types` PASS · `check_rot` PASS.

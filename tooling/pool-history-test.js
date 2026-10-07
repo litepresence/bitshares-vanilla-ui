@@ -253,6 +253,69 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     eq(new Set(tb.bids.map((l) => l.price)).size, tb.bids.length, "tiny book bids distinct");
   })();
 
+  // 9. poolsActive24h probe (desk-map connects gating): one ES call over
+  // many pools; strict per-hit pool match; stale hits excluded; full page ->
+  // partial (inconclusive, caller falls back); ES down -> rejects (caller
+  // falls back); empty set resolves without firing.
+  try {
+    const _f3 = globalThis.fetch;
+    const nowIso = new Date().toISOString().slice(0, 19);
+    function actHit(pool, time) {
+      return {
+        _source: {
+          operation_type: 63,
+          block_data: { block_num: 2000, block_time: time },
+          operation_history: {
+            op_object: { account: "1.2.7", pool: pool },
+            operation_result_object: { which: 4, data_object: {
+              paid: [{ amount: 5, asset_id: "1.3.0" }],
+              received: [{ amount: 9, asset_id: "1.3.1" }] } }
+          }
+        },
+        sort: [pool + "-" + time]
+      };
+    }
+    let seenBody = null, calls3 = 0;
+    globalThis.fetch = function (url, opts) {
+      calls3++;
+      try { seenBody = JSON.parse(opts && opts.body ? String(opts.body) : "{}"); } catch (e) { seenBody = null; }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: [
+        actHit("1.19.7", nowIso),
+        actHit("1.19.9", "2020-01-01T00:00:00"),
+        actHit("1.19.999", nowIso)
+      ] } }) });
+    };
+    const rAct = await PH.poolsActive24h(["1.19.7", "1.19.9", "bad-id"]);
+    eq(rAct.active["1.19.7"], true, "active pool confirmed by recent hit");
+    eq(rAct.active["1.19.9"], undefined, "stale hit does not confirm activity");
+    eq(rAct.active["1.19.999"], undefined, "unlisted pool never leaks into the set");
+    eq(rAct.partial, false, "short page is conclusive");
+    const filters = (seenBody && seenBody.query && seenBody.query.bool && seenBody.query.bool.filter) || [];
+    eq(filters.some((f) => f && f.range && f.range["block_data.block_time"] && typeof f.range["block_data.block_time"].gte === "string"), true, "probe carries a 24h range");
+    eq(filters.some((f) => f && f.multi_match && String(f.multi_match.query || "").indexOf("1.19.7") !== -1), true, "probe carries the pool set");
+    // full page -> partial (window may hold more; caller falls back).
+    const big = [];
+    for (let i = 0; i < 500; i++) big.push(actHit("1.19.7", nowIso));
+    globalThis.fetch = function () {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: big } }) });
+    };
+    const rPart = await PH.poolsActive24h(["1.19.7"]);
+    eq(rPart.partial, true, "full page reports partial");
+    // ES down -> rejects (caller keeps chain pools + fallback note).
+    globalThis.fetch = function () { return Promise.reject(new Error("down")); };
+    let rejected = false;
+    try { await PH.poolsActive24h(["1.19.7"]); } catch (e) { rejected = true; }
+    eq(rejected, true, "ES failure rejects to the fallback path");
+    // empty set resolves without firing.
+    calls3 = 0;
+    globalThis.fetch = function () { calls3++; return Promise.reject(new Error("must not fire")); };
+    const rEmpty = await PH.poolsActive24h([]);
+    eq(rEmpty.partial, false, "empty set conclusive");
+    eq(Object.keys(rEmpty.active).length, 0, "empty set confirms nothing");
+    eq(calls3, 0, "empty set fires no call");
+    if (_f3 !== undefined) globalThis.fetch = _f3; else delete globalThis.fetch;
+  } catch (e) { fail++; console.log("FAIL poolsActive24h probe\n " + (e && e.stack || e)); }
+
   console.log("Pool-history vectors: " + pass + " pass, " + fail + " fail");
   process.exit(fail ? 1 : 0);
 })();

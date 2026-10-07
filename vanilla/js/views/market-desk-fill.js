@@ -300,13 +300,22 @@ MarketDesk._fill = MarketDesk._fill || {};
   }
 
   /* Fetch 2-layer pool graph for quote/base ids (lazy async, <=9 RPCs).
-   * Loading note -> render. Failures -> honest partial/empty note. */
+   * Loading note -> render. Failures -> honest partial/empty note.
+   * 24h-activity gating (desk-map connects semantics): after the chain-first
+   * paint, a best-effort ONE-call ES probe (PoolHistory.poolsActive24h,
+   * mainnet only — the community index is mainnet-only and pool ids collide
+   * across chains) keeps only pools that swapped in the past 24h. Probe
+   * success -> strict connects definition; probe failure/partial/off-mainnet
+   * -> funded chain pools stand with the fallback definition (the note says
+   * so). The map is a safety feature, not mission-critical navigation: it
+   * degrades to funded-pools + fallback wording, never to invented data. */
   function fetchPoolMap(doc, state) {
     if (!state.graphWrap || !state.graphCanvas || !state.graphNote) return;
     ensurePhysSwitch(doc, state);
     if (!state.assets) return;
     var q = state.assets.quote, b = state.assets.base, myId = state.id;
-    try { state.graphNote.textContent = t("market.loading_pool_map", "Loading pool map…"); } catch (e) {}
+    state.graphActivity = null;
+    try { state.graphNote.textContent = t("market.loading_pool_map", "Loading map…"); } catch (e) {}
     ensurePoolGraph(function (ok) {
       if (!deskAlive(state) || state.id !== myId) return;
       if (!ok) {
@@ -327,6 +336,7 @@ MarketDesk._fill = MarketDesk._fill || {};
           state.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
           redrawPoolMap(doc, state);
           try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+          gateByActivity(doc, state, myId);
         }).catch(function (e) {
           if (!deskAlive(state) || state.id !== myId) return;
           var m = String((e && e.message) || e || "");
@@ -337,6 +347,96 @@ MarketDesk._fill = MarketDesk._fill || {};
         });
       } catch (e) { /* graph best-effort */ }
     });
+  }
+
+  /* Mainnet read (deepenPool precedent: community ES is mainnet-only).
+   * @returns {boolean} true on mainnet. Never throws. */
+  function isMainnet() {
+    try {
+      if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
+        var st = Store.loadSettings();
+        if (st && (st.network === "testnet" || st.network === "mainnet")) return st.network === "mainnet";
+      }
+    } catch (e) { /* mainnet default below */ }
+    return true;
+  }
+
+  /* Prune a desk graph to 24h-active pools (pure shape, no chain calls).
+   * Nodes shrink to edge endpoints + the desk legs; BTS paths recompute on
+   * the pruned graph (a route through a dropped pool must not glow).
+   * Params: gd (graphData with graph/assetA/assetB), active ({poolId:true}).
+   * @returns {{graph: {nodes: Array, edges: Array}, pathA: Object|null,
+   *   pathB: Object|null, kept: number}} Never throws (bad input -> empty). */
+  function gateEdges(gd, active) {
+    var kept = 0;
+    try {
+      var g = (gd && gd.graph) || { nodes: [], edges: [] };
+      var aA = gd.assetA, aB = gd.assetB;
+      var edges = ((g.edges) || []).filter(function (e) {
+        return e && e.poolId && active[String(e.poolId)];
+      });
+      kept = edges.length;
+      var keepN = {};
+      try { keepN[String(aA)] = 1; keepN[String(aB)] = 1; } catch (e) { /* legs stand */ }
+      edges.forEach(function (e) {
+        try { keepN[String(e.a)] = 1; keepN[String(e.b)] = 1; } catch (x) { /* edge stands */ }
+      });
+      var nodes = ((g.nodes) || []).filter(function (n) {
+        return n && keepN[String(n.assetId)];
+      });
+      var pruned = { nodes: nodes, edges: edges };
+      var pa = null, pb = null;
+      try {
+        if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.findCorePath === "function") {
+          pa = PoolGraph.findCorePath(pruned, aA);
+          pb = PoolGraph.findCorePath(pruned, aB);
+        }
+      } catch (e) { pa = null; pb = null; }
+      return { graph: pruned, pathA: pa, pathB: pb, kept: kept };
+    } catch (e) { return { graph: { nodes: [], edges: [] }, pathA: null, pathB: null, kept: 0 }; }
+  }
+
+  /* 24h-activity gating pass (runs once per desk after the chain-first
+   * paint above — the desk never waits on it). Probe success with a
+   * conclusive (non-partial) answer prunes to active pools and records the
+   * strict-definition activity; anything else (ES down/disabled, partial
+   * window, off-mainnet) records the fallback activity and the funded chain
+   * pools stand. Stale-route guarded; never throws outward. */
+  function gateByActivity(doc, state, myId) {
+    try {
+      if (!state.graphData || !state.graphData.graph) return;
+      var total = ((state.graphData.graph.edges) || []).length;
+      if (!total) return;
+      if (typeof PoolHistory === "undefined" || !PoolHistory ||
+          typeof PoolHistory.poolsActive24h !== "function" || !isMainnet()) {
+        state.graphActivity = { gated: false, count: total, total: total };
+        try { redrawPoolMap(doc, state); } catch (e) { /* chain paint stands */ }
+        return;
+      }
+      var ids = [];
+      try {
+        state.graphData.graph.edges.forEach(function (e) {
+          if (e && e.poolId) ids.push(String(e.poolId));
+        });
+      } catch (e) { ids = []; }
+      PoolHistory.poolsActive24h(ids).then(function (res) {
+        if (!deskAlive(state) || state.id !== myId) return;
+        if (!res || res.partial) {
+          state.graphActivity = { gated: false, count: total, total: total };
+        } else {
+          var out = gateEdges(state.graphData, res.active || {});
+          state.graphData = { graph: out.graph, assetA: state.graphData.assetA,
+            assetB: state.graphData.assetB, pathA: out.pathA, pathB: out.pathB };
+          state.graphActivity = { gated: true, count: out.kept, total: total };
+        }
+        try { redrawPoolMap(doc, state); } catch (e) { /* chain paint stands */ }
+        try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+      }).catch(function () {
+        if (!deskAlive(state) || state.id !== myId) return;
+        state.graphActivity = { gated: false, count: total, total: total };
+        try { redrawPoolMap(doc, state); } catch (e) { /* chain paint stands */ }
+      });
+    } catch (e) { /* chain paint stands */ }
   }
 
   /* Repaint the pool-map canvas from cached graphData (theme/resize path).
@@ -539,8 +639,7 @@ MarketDesk._fill = MarketDesk._fill || {};
   function ensurePhysSwitch(doc, state) {
     try {
       if (!doc || !state.graphWrap) return;
-      var head = state.graphWrap.firstChild;
-      if (!head || typeof doc.createElement !== "function") return;
+      if (typeof doc.createElement !== "function") return;
       var existing = null;
       try { existing = state.graphWrap.querySelector ? state.graphWrap.querySelector("[data-phys-switch]") : null; } catch (e) { existing = null; }
       if (!existing) {
@@ -603,7 +702,7 @@ MarketDesk._fill = MarketDesk._fill || {};
           placed = true;
         }
       } catch (e) { /* header fallback below */ }
-      if (!placed) head.appendChild(box);
+      if (!placed) state.graphWrap.appendChild(box);
     } catch (e) { /* desk stands without the switch */ }
   }
 
@@ -645,15 +744,24 @@ MarketDesk._fill = MarketDesk._fill || {};
         PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
           { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, nav: navMode });
       }
+      /* Below-map note (owner wording): the connects definition, never a
+       * title. Strict when the 24h probe gated this render (with the honest
+       * active/total count, tapeCount number-style — no new words); fallback
+       * wording while the probe is pending or when ES could not answer (the
+       * funded chain pools stand, and the note says activity is unconfirmed).
+       * Truly pool-less pairs keep the honest empty sentence. */
+      var act = state.graphActivity || null;
       var n = (gd.graph.edges || []).length;
-      if (!n) state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
-      else if (!gd.pathA && !gd.pathB) state.graphNote.textContent = t("market.no_bts_path", "No BTS path — treat pair as unverified.");
-      else {
-        var bits = [];
-        if (gd.pathA) bits.push("pool→BTS " + gd.pathA.hops.length + " hops");
-        if (gd.pathB) bits.push("pool→BTS " + gd.pathB.hops.length + " hops");
-        state.graphNote.textContent = t("market.bts_provenance_prefix", "BTS provenance: ") + bits.join(" · ") + ". " +
-          t("pool_net.ramp", "Pool size: small → large");
+      if (!n && !(act && act.gated && act.total > 0)) {
+        state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
+      } else if (act && act.gated) {
+        state.graphNote.textContent = t("market.map_connects", "A line connects two assets when there has been a market trade in the past 24 hours.") +
+          " " + String(act.count) + "/" + String(act.total);
+      } else if (!act) {
+        state.graphNote.textContent = t("market.loading_pool_map", "Loading map…");
+      } else {
+        state.graphNote.textContent = t("market.map_connects_fallback", "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools.") +
+          " N=" + String(act.total);
       }
     } catch (e) { /* canvas best-effort */ }
   }
