@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""add_pool_net_switch_i18n.py — Physics on/off switch key swap (user call).
+"""add_pool_net_switch_i18n.py — Physics switch keys (gesture-reaction toggle).
 
 Removes the segmented-control keys (pool_net.phys_calm/phys_lively/phys_label,
 no longer referenced after the single-switch rebuild) and adds the switch keys
-(pool_net.phys/phys_on/phys_off) with verbatim English defaults matching
-vanilla/js/views/pool-net-ui.js I18n.t calls, in all 12 vanilla/locales/*.json.
+(pool_net.phys/phys_on/phys_off) with verbatim English defaults
+matching vanilla/js/views/pool-net-chrome.js I18n.t calls, in all 12
+vanilla/locales/*.json. (A phys_hint key shipped briefly with the
+2026-10-07 gesture-reaction rework and was removed again the same day — the
+owner asked for no hint line on the switch; the On/Off word beside it is the
+whole label.)
 Non-en dicts are fully-translated (untranslated=false), so new keys land
 allowlisted with honest English values. en.json _meta.translated inventory
 kept sorted, as check_i18n expects.

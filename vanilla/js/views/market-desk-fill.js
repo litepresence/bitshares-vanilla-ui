@@ -485,26 +485,37 @@ MarketDesk._fill = MarketDesk._fill || {};
   /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition to
    * this pane): ONE labeled on/off control, overlaid on the canvas
    * lower-left via a stage wrapper (band parity, owner call). Reads and
-   * writes the shared poolNetPhys key (PoolGraph.readPhys/setPhys when loaded,
-   * guarded localStorage otherwise — same key the pool desk and the pools
-   * band use, default calm/off). Labels reuse the pool_net.phys dict keys
+   * writes the shared poolNetReact key (PoolGraph.readReact/setReact when
+   * loaded, guarded localStorage otherwise — the same key the pool desk and
+   * both selector bands use, default ON). It is a GESTURE-REACTION flag, not
+   * a fidelity dial (2026-10-07): ON = a drag release re-energizes the map,
+   * OFF = gestures never do and the map stays where you dropped it. Labels
+   * reuse the pool_net.phys dict keys
    * (already translated — no new strings). A flip repaints through
    * redrawPoolMap with explicit=true (bounded run even under reduced-motion);
    * auto repaints stay frozen under reduced-motion (PoolGraph.drawLive
    * policy). Idempotent: refetches repaint the existing switch. Never throws. */
   function readPhysMode() {
     try {
-      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readPhys === "function") {
-        return PoolGraph.readPhys();
+      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readReact === "function") {
+        return PoolGraph.readReact();
       }
     } catch (e) { /* storage below */ }
     try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetPhys") === "lively") return "lively";
-    } catch (e) { /* calm stands */ }
-    return "calm";
+      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetReact") === "0") return false;
+    } catch (e) { /* ON stands */ }
+    return true;
   }
-  function persistPhys(m) {
-    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetPhys", m); } catch (e) { /* memory-only */ }
+  function persistPhys(on) {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetReact", on ? "1" : "0"); } catch (e) { /* memory-only */ }
+  }
+  /* stopLiveMap: park the desk map loop on this pane's canvas so the OFF
+   * promise holds after the tap (no drift on the next settle). Never throws. */
+  function stopLiveMap(st) {
+    try {
+      var c = (st && st.graphCanvas) ? st.graphCanvas : null;
+      if (c && typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(c);
+    } catch (e) { /* parked anyway */ }
   }
   function paintPhysSwitch(box, mode) {
     try {
@@ -517,7 +528,7 @@ MarketDesk._fill = MarketDesk._fill || {};
           if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
         }
       }
-      var on = mode === "lively";
+      var on = (mode === false) ? false : true;
       if (btn) {
         btn.setAttribute("role", "switch");
         btn.setAttribute("aria-checked", on ? "true" : "false");
@@ -548,7 +559,12 @@ MarketDesk._fill = MarketDesk._fill || {};
       var btn = DOM.el(doc, "button", null, "pool-net-physwitch");
       btn.type = "button";
       try { btn.setAttribute("data-phys-btn", "1"); } catch (e) { /* paint stands */ }
-      btn.appendChild(DOM.el(doc, "span", null, "pool-net-physknob"));
+      /* The button is the 44x44 HIT AREA; the visible pill is the track
+       * inside it, so the control reads small without shrinking the touch
+       * target below the platform floor (principle #7). */
+      var track = DOM.el(doc, "span", null, "pool-net-phystrack");
+      track.appendChild(DOM.el(doc, "span", null, "pool-net-physknob"));
+      btn.appendChild(track);
       try { if (typeof touchable === "function") touchable(btn); } catch (e) { /* click still works */ }
       var st = DOM.el(doc, "span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
       try { st.setAttribute("data-phys-state", "1"); } catch (e) { /* paint stands */ }
@@ -556,13 +572,17 @@ MarketDesk._fill = MarketDesk._fill || {};
       box.appendChild(st);
       paintPhysSwitch(box, readPhysMode());
       btn.addEventListener("click", function () {
-        var next = (readPhysMode() === "lively") ? "calm" : "lively";
+        /* Flip ON = consent to motion (repaint explicit=true, bounded run
+         * even under reduced-motion). Flip OFF only stops: no repaint, no
+         * re-energize, so the map does not drift after the tap. */
+        var next = !readPhysMode();
         try {
-          if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setPhys === "function") {
-            PoolGraph.setPhys(next);
+          if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setReact === "function") {
+            PoolGraph.setReact(next);
           } else persistPhys(next);
         } catch (e) { persistPhys(next); }
         paintPhysSwitch(box, next);
+        if (!next) { try { stopLiveMap(state); } catch (eStop) { /* parked anyway */ } return; }
         try { redrawPoolMap(doc, state, true); } catch (e) { /* map stands */ }
       });
       /* On-canvas overlay (owner call, band parity): the switch floats over
@@ -601,15 +621,18 @@ MarketDesk._fill = MarketDesk._fill || {};
       [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
         (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
       });
-      /* Task 5 physics branch: lively animates through PoolGraph.drawLive
-       * (same painter via the _pos seam — look/verdicts/hit-test unchanged);
-       * calm (default) keeps the settle-once drawGraph path byte-identical.
-       * explicit=true only from the Physics flip (bounded run under
+      /* Physics branch (2026-10-07 gesture-reaction model): ONE physics, so
+       * every map render animates through PoolGraph.drawLive (same painter via
+       * the _pos seam — look/verdicts/hit-test unchanged) and the settle runs
+       * whether or not gestures react; the OFF flag is enforced inside
+       * PoolGraph.wake, which refuses EXPLICIT (gesture) wakes. The old
+       * "calm keeps the settle-once drawGraph path" split is gone — it was
+       * why Off froze the desks but not the selector bands.
+       * explicit=true only from flipping the switch ON (bounded run under
        * reduced-motion); auto repaints stay frozen there. */
       var liveOn = false;
       try {
-        liveOn = readPhysMode() === "lively" &&
-          typeof PoolGraph.drawLive === "function";
+        liveOn = typeof PoolGraph.drawLive === "function";
       } catch (e) { liveOn = false; }
       if (liveOn) {
         PoolGraph.drawLive(doc, state.graphCanvas, gd.graph,

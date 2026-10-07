@@ -502,11 +502,13 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       /* Pool-map Physics switch (Task 5, physics ONLY — the sole DOM addition
        * to this pane): ONE labeled on/off control, overlaid on the canvas
        * lower-left via the stage wrapper below (band parity, owner call).
-       * Shared poolNetPhys key with the exchange desk + pools band (default
-       * calm/off); labels reuse pool_net.phys keys (already translated — no
-       * new strings). Flip persists via PoolGraph.setPhys and repaints with
-       * explicit=true (bounded run even under reduced-motion); auto repaints
-       * stay frozen there. Never throws. */
+       * 2026-10-07: the switch is a GESTURE-REACTION flag, shared through
+       * the poolNetReact key with the selector bands — ON = a drag release
+       * re-energizes the map so neighbours react; OFF = gestures never wake
+       * it, you can drag nodes and the map stays exactly where you dropped
+       * them. Every render still settles (mount/pair change/resize) either
+       * way. Labels reuse pool_net.phys keys (already translated — no new
+       * strings). Never throws. */
       try {
         var physBox = u.el(doc, "span", null, "pool-net-phys");
         try { physBox.setAttribute("data-phys-switch", "1"); } catch (eSw) { /* paint stands */ }
@@ -514,7 +516,11 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         var physBtn = u.el(doc, "button", null, "pool-net-physwitch");
         try { physBtn.type = "button"; } catch (eSw) { /* click still works */ }
         try { physBtn.setAttribute("data-phys-btn", "1"); } catch (eSw) { /* paint stands */ }
-        physBtn.appendChild(u.el(doc, "span", null, "pool-net-physknob"));
+        /* Button = 44x44 hit area; the visible pill is the track inside it, so
+         * the control reads small without dropping below the touch floor. */
+        var physTrack = u.el(doc, "span", null, "pool-net-phystrack");
+        physTrack.appendChild(u.el(doc, "span", null, "pool-net-physknob"));
+        physBtn.appendChild(physTrack);
         try {
           if (typeof u.touchable === "function") u.touchable(physBtn);
           else if (typeof touchable === "function") touchable(physBtn);
@@ -523,16 +529,21 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         try { physState.setAttribute("data-phys-state", "1"); } catch (eSw) { /* paint stands */ }
         physBox.appendChild(physBtn);
         physBox.appendChild(physState);
-        try { paintPoolPhysSwitch(physBox, readPoolPhysMode()); } catch (eSw) { /* default stands */ }
+        try { paintPoolPhysSwitch(physBox, readPoolReact()); } catch (eSw) { /* default stands */ }
         (function (box) {
           physBtn.addEventListener("click", function () {
-            var next = (readPoolPhysMode() === "lively") ? "calm" : "lively";
+            /* Flip ON = consent to motion, so it repaints with explicit=true
+             * (a bounded run even under reduced-motion). Flip OFF only stops:
+             * no repaint, and the running loop is parked with its residual
+             * velocity dropped, so the map does not drift afterwards. */
+            var next = !readPoolReact();
             try {
-              if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setPhys === "function") {
-                PoolGraph.setPhys(next);
-              } else persistPoolPhys(next);
-            } catch (eSw) { persistPoolPhys(next); }
+              if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.setReact === "function") {
+                PoolGraph.setReact(next);
+              } else persistPoolReact(next);
+            } catch (eSw) { persistPoolReact(next); }
             try { paintPoolPhysSwitch(box, next); } catch (eSw) { /* map stands */ }
+            if (!next) { try { stopPoolLive(P); } catch (eStop) { /* already parked */ } return; }
             try { redrawPoolMap(doc, P, myGen, uiGen, true); } catch (eSw) { /* map stands */ }
           });
         })(physBox);
@@ -1591,24 +1602,38 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     try { cb(false); } catch (e) {}
   }
 
-  /* Pool-map Physics pref (Task 5): shared poolNetPhys key with the exchange
-   * desk + pools band, default calm/off. PoolGraph.readPhys wins when the
-   * lazy script loaded, else guarded localStorage. Never throws. */
-  function readPoolPhysMode() {
+  /* Pool-map gesture-reaction pref: shared poolNetReact key with the
+   * selector bands, default ON. PoolGraph.readReact wins when the lazy
+   * script loaded, else guarded localStorage. The retired poolNetPhys preset
+   * key is never consulted. Never throws. */
+  function readPoolReact() {
     try {
-      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readPhys === "function") {
-        return PoolGraph.readPhys();
+      if (typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.readReact === "function") {
+        return PoolGraph.readReact();
       }
     } catch (e) { /* storage below */ }
     try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetPhys") === "lively") return "lively";
-    } catch (e) { /* calm stands */ }
-    return "calm";
+      if (typeof localStorage !== "undefined" && localStorage.getItem("poolNetReact") === "0") return false;
+    } catch (e) { /* ON stands */ }
+    return true;
   }
-  function persistPoolPhys(m) {
-    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetPhys", m); } catch (e) { /* memory-only */ }
+  function persistPoolReact(on) {
+    try { if (typeof localStorage !== "undefined") localStorage.setItem("poolNetReact", on ? "1" : "0"); } catch (e) { /* memory-only */ }
   }
-  function paintPoolPhysSwitch(box, mode) {
+  /* stopPoolLive: park a running desk map loop and drop its residual
+   * velocity — the OFF promise is "nothing moves after this", including on
+   * the next automatic settle. Delegates to PoolGraph.stopLive (which owns
+   * the canvas -> live-state link) and takes the canvas from the current
+   * render context. Never throws. */
+  function stopPoolLive(P) {
+    try {
+      var c = (P && P.graphCanvas) ? P.graphCanvas : null;
+      if (c && typeof PoolGraph !== "undefined" && PoolGraph && typeof PoolGraph.stopLive === "function") {
+        PoolGraph.stopLive(c);
+      }
+    } catch (e) { /* parked anyway */ }
+  }
+  function paintPoolPhysSwitch(box, on) {
     try {
       var btn = box.querySelector ? box.querySelector("[data-phys-btn]") : null;
       var st = box.querySelector ? box.querySelector("[data-phys-state]") : null;
@@ -1619,7 +1644,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           if (kids[i] && kids[i].getAttribute && kids[i].getAttribute("data-phys-state")) st = kids[i];
         }
       }
-      var on = mode === "lively";
+      on = (on === false) ? false : true;
       if (btn) {
         btn.setAttribute("role", "switch");
         btn.setAttribute("aria-checked", on ? "true" : "false");
@@ -1669,14 +1694,17 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
         (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
       });
-      /* Task 5 physics branch (exchange-desk parity): lively animates through
-       * PoolGraph.drawLive (same painter — look/verdicts/hit-test unchanged);
-       * calm keeps the settle-once drawGraph path. explicit=true only from
-       * the Physics flip. */
+      /* Physics branch (desk parity, 2026-07-07 gesture-reaction model): ONE
+       * physics, so every map render animates through PoolGraph.drawLive
+       * (same painter — look/verdicts/hit-test unchanged) and the settle
+       * runs whether or not gestures react; the OFF flag is enforced inside
+       * PoolGraph.wake, which refuses EXPLICIT (gesture) wakes. The old
+       * "calm keeps the settle-once drawGraph path" split is gone — it was
+       * why Off froze this desk but not the selector bands.
+       * explicit=true only from flipping the switch ON. */
       var liveOn = false;
       try {
-        liveOn = readPoolPhysMode() === "lively" &&
-          typeof PoolGraph.drawLive === "function";
+        liveOn = typeof PoolGraph.drawLive === "function";
       } catch (e) { liveOn = false; }
       if (liveOn) {
         PoolGraph.drawLive(doc, P.graphCanvas, gd.graph,

@@ -85,7 +85,7 @@ var NetChrome = (function () {
   }
 
   function paintSwitch(S, els, t) {
-    var on = S.phys === "lively";
+    var on = S.react !== false;
     try {
       els.physSwitch.setAttribute("role", "switch");
       els.physSwitch.setAttribute("aria-checked", on ? "true" : "false");
@@ -96,30 +96,49 @@ var NetChrome = (function () {
     } catch (e) { /* label stands */ }
   }
 
-  function setPhys(S, els, t, mode) {
-    S.phys = (mode === "lively") ? "lively" : "calm";
+  /* setReact: the band switch. ON = gestures wake the simulation again
+   * (re-spread + a bounded settle — the flip IS consent to motion, and a
+   * parked equilibrium has no forces to work with, so the flip re-runs the
+   * fresh-load spread instead of nudging). OFF = gestures never wake it:
+   * the running loop is stopped and residual velocity is dropped so
+   * nothing drifts later, and the current layout is KEPT (no re-spread —
+   * flipping off must not teleport the mesh the user was reading).
+   * @param {PoolNetState} S Band state.
+   * @param {Object} els Chrome bundle (repainted here).
+   * @param {Function} t I18n wrapper.
+   * @param {boolean} on true = gestures react. Never throws. */
+  function setReact(S, els, t, on) {
+    var next = (on === false) ? false : true;
+    S.react = next;
     try {
-      var key = "poolNetPhys";
-      try {
-        if (typeof PoolNetPhys !== "undefined" && PoolNetPhys && PoolNetPhys.PHYS_KEY) key = PoolNetPhys.PHYS_KEY;
-      } catch (e) { /* literal stands */ }
-      if (typeof localStorage !== "undefined") localStorage.setItem(key, S.phys);
+      var PP = (typeof PoolNetPhys !== "undefined") ? PoolNetPhys : null;
+      if (PP && typeof PP.writeReact === "function") PP.writeReact(next);
+      else if (typeof localStorage !== "undefined") localStorage.setItem("poolNetReact", next ? "1" : "0");
     } catch (e) { /* memory-only session */ }
     paintSwitch(S, els, t);
-    /* Fresh spread on flip (see header note): temp alone cannot move a
-     * parked equilibrium, so re-seed positions like a fresh load. */
-    try {
-      if (S.view && S.view.nodes && S.view.nodes.length > 1) {
-        S.geom = NetPaint.circleLayout(S.view.nodes, S.W, S.H);
-        S.vel = {};
-      }
-    } catch (e) { /* positions stand */ }
-    try {
-      if (typeof PoolNetPhys !== "undefined" && PoolNetPhys && typeof PoolNetPhys._wakeForTest === "function") {
-        PoolNetPhys._wakeForTest(S, true);
-      }
-    } catch (e) { /* loop stands */ }
+    if (next) {
+      try {
+        if (S.view && S.view.nodes && S.view.nodes.length > 1) {
+          S.geom = NetPaint.circleLayout(S.view.nodes, S.W, S.H);
+          S.vel = {};
+        }
+      } catch (e) { /* positions stand */ }
+      try {
+        if (typeof PoolNetPhys !== "undefined" && PoolNetPhys && typeof PoolNetPhys._wakeForTest === "function") {
+          PoolNetPhys._wakeForTest(S, true);
+        }
+      } catch (e) { /* loop stands */ }
+    } else {
+      /* Stop now, drop leftover velocity: a mesh that has just been parked
+       * must not drift on the next automatic wake. */
+      try { S.running = false; S.forced = false; } catch (e) { /* stopped anyway */ }
+      try { if (typeof PoolNetPhys !== "undefined" && PoolNetPhys && typeof PoolNetPhys.cancel === "function") PoolNetPhys.cancel(S.raf); } catch (e) { /* stopped anyway */ }
+      try { S.raf = 0; S.vel = {}; } catch (e) { /* velocity stands */ }
+      try { if (typeof S.paint === "function") S.paint(S); } catch (e) { /* paint stands */ }
+    }
+    return S.react;
   }
+
 
   /* Build the band furniture into wrap; returns the els bundle (or null
    * when the stage cannot be assembled — the composer returns its idle api).
@@ -131,7 +150,8 @@ var NetChrome = (function () {
     var els = {
       statusEl: null, canvas: null, hoverEl: null, verdictEl: null, legendEl: null,
       twin: null, twinSummary: null, twinBox: null,
-      physBar: null, physLabel: null, physSwitch: null, physKnob: null, physState: null,
+      physBar: null, physLabel: null, physSwitch: null, physTrack: null,
+      physKnob: null, physState: null,
       stage: null
     };
     els.statusEl = mk("p", t("pool_net.loading", "Loading network…"), "muted");
@@ -159,32 +179,41 @@ var NetChrome = (function () {
     } catch (e) { els.twin = null; }
     els.twinSummary = mk("summary", t("pool_net.twin", "Pool rows (%(n)s)", { n: "0" }));
     els.twinBox = mk("div", null, "pool-net-twinbox");
-    /* Physics switch: ONE labeled on/off control. ON = v2 lively motion,
-     * OFF = v1 calm settle (the shipped default). Flipping persists
-     * poolNetPhys, re-spreads the layout from the circle seed (a preset
-     * flip from a parked equilibrium has ~zero forces to work with — temp
-     * alone cannot move it, so the flip re-runs the fresh-load spread
-     * instead), then re-energizes via wake(S, true) — an explicit flip is
-     * consent to motion, so it runs bounded even under reduced-motion
-     * (ambient auto-runs stay frozen). Pan/zoom (scale/ox/oy) are untouched. Native <button> gives
-     * Space/Enter keyboard handling; role="switch" + aria-checked exposes
-     * state to assistive tech. */
+    /* Physics switch: ONE labeled on/off control, and it is about GESTURES,
+     * not fidelity (owner 2026-10-07 — there is only one physics). ON = a
+     * touch re-wakes it: flipping re-spreads from the circle seed (a parked
+     * equilibrium has ~zero forces, so the flip re-runs the fresh-load
+     * spread) and settles, and every later drag release re-energizes it.
+     * OFF = gestures never wake it — you can drag nodes and the mesh stays
+     * exactly where you put it (no settle, no spring reaction, no throw);
+     * the flip stops the running loop and drops residual velocity.
+     * Automatic wakes (load/filter/resize) settle either way, so OFF never
+     * leaves the map unarranged for a new filter. Flipping persists
+     * poolNetReact. Pan/zoom (scale/ox/oy) are untouched. Native <button>
+     * gives Space/Enter keyboard handling; role="switch" + aria-checked
+     * exposes state to assistive tech. No tooltip and no hint line: the
+     * On/Off word beside the switch says which half you are in. */
     els.physBar = mk("div", null, "pool-net-phys");
     els.physLabel = mk("span", t("pool_net.phys", "Physics"), "pool-net-physlabel");
     els.physSwitch = mk("button", null, "pool-net-physwitch");
-    els.physKnob = mk("span", null, "pool-net-physknob");
     els.physState = mk("span", t("pool_net.phys_off", "Off"), "pool-net-physstate");
     try {
       els.physSwitch.type = "button";
-      els.physSwitch.appendChild(els.physKnob);
+      /* The button is the 44x44 HIT AREA (touchable enforces that floor);
+       * the visible pill is the track inside it, so the control reads small
+       * without shrinking the touch target below the platform minimum. */
+      els.physTrack = mk("span", null, "pool-net-phystrack");
+      els.physKnob = mk("span", null, "pool-net-physknob");
+      els.physTrack.appendChild(els.physKnob);
+      els.physSwitch.appendChild(els.physTrack);
       if (typeof touchFn === "function") { touchFn(els.physSwitch); }
       paintSwitch(S, els, t);
     } catch (e) { /* labels stand */ }
     try {
       els.physSwitch.addEventListener("click", function () {
-        setPhys(S, els, t, S.phys === "lively" ? "calm" : "lively");
+        setReact(S, els, t, S.react === false);
       });
-    } catch (e) { /* static preset stands */ }
+    } catch (e) { /* flag stands */ }
     try {
       els.physBar.appendChild(els.physLabel);
       els.physBar.appendChild(els.physSwitch);
@@ -386,7 +415,7 @@ var NetChrome = (function () {
     status: setStatus,
     nodeCard: nodeCard,
     edgeCard: edgeCard,
-    setPhys: setPhys,
+    setReact: setReact,
     paintSwitch: paintSwitch
   };
 })();

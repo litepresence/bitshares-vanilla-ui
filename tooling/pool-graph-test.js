@@ -288,27 +288,33 @@ function ok(cond, name) {
   eqNav(nav(null), null, "null hit -> null (no navigation)");
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (core-or-first) resolves to asset page");
 })();
-// Task 5 (desk physics-only upgrade): preset-driven live loop (calm =
-// settle-once, lively = same relax math with temp/cool/sleep + 180-frame
-// cap; presets from PoolNetUI._physForTest when loaded, else a built-in
-// calm-equivalent fallback so the module stays standalone for tests).
-// RED first: no loop entrypoint exists yet (setPhys/readPhys/_phys etc.).
+// Desk physics (2026-10-07 gesture-reaction model): ONE physics — the same
+// relax math with a temp/cool/sleep schedule and a 180-frame cap — and a
+// shared poolNetReact GESTURE flag. The retired "calm" preset (which ran
+// ZERO live frames) is why "Off" froze these desk maps while still animating
+// on the selector bands: same On/Off label, two different meanings.
 (function () {
-  ok(typeof PG.setPhys === "function", "setPhys exported (pane switches share poolNetPhys)");
-  ok(typeof PG.readPhys === "function", "readPhys exported (shared poolNetPhys key)");
+  ok(typeof PG.setReact === "function", "setReact exported (pane switches share poolNetReact)");
+  ok(typeof PG.readReact === "function", "readReact exported (shared poolNetReact key)");
+  ok(typeof PG.PHYS_KEY === "string" && PG.PHYS_KEY === "poolNetReact", "the shared key is poolNetReact");
+  ok(typeof PG.setPhys === "undefined" && typeof PG.readPhys === "undefined",
+    "the preset reader/writer seams are gone with the preset");
   ok(typeof PG._physForTest === "function", "_physForTest exported (preset table)");
-  ok(typeof PG._defaultPhysForTest === "function" && PG._defaultPhysForTest() === "calm", "preset default calm");
+  ok(typeof PG._defaultReactForTest === "function" && PG._defaultReactForTest() === true,
+    "default gesture reaction is ON");
   if (typeof PG._physForTest !== "function") return;
   var phys = PG._physForTest();
-  ok(!!(phys && phys.calm && phys.lively), "fallback presets: calm + lively present standalone (no PoolNetUI loaded)");
-  ok(phys.calm.maxFrames === 180 && phys.lively.maxFrames === 180, "180-frame cap on both presets");
+  ok(!!(phys && phys.lively), "the one preset is present standalone (no PoolNetUI loaded)");
+  ok(!phys.calm, "the calm preset is GONE (one physics only)");
+  ok(Object.keys(phys).length === 1, "exactly one preset in the table");
+  ok(phys.lively.maxFrames === 180, "180-frame cap on the one preset");
   // Guarded read-through: a loaded PoolNetUI table wins over the fallback.
   var hadPNUI = Object.prototype.hasOwnProperty.call(globalThis, "PoolNetUI");
   var savedPNUI = globalThis.PoolNetUI;
   try {
-    globalThis.PoolNetUI = { _physForTest: function () { return { calm: { maxFrames: 11 }, lively: { maxFrames: 12 } }; } };
+    globalThis.PoolNetUI = { _physForTest: function () { return { lively: { maxFrames: 12 } }; } };
     var thru = PG._physForTest();
-    ok(thru && thru.calm.maxFrames === 11 && thru.lively.maxFrames === 12, "presets read from PoolNetUI._physForTest when loaded");
+    ok(thru && thru.lively.maxFrames === 12, "preset read from PoolNetUI._physForTest when loaded");
   } catch (e) { ok(false, "preset read-through throws: " + e); }
   try { if (hadPNUI) globalThis.PoolNetUI = savedPNUI; else delete globalThis.PoolNetUI; } catch (e) {}
   function demo3() {
@@ -325,21 +331,21 @@ function ok(cond, name) {
   else {
     var g3 = demo3();
     var seed3 = PG.layout(g3, "1.3.1", "1.3.2", 300, 180);
-    var lv = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "lively");
+    var lv = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3);
     ok(lv && typeof lv.frames === "number" && lv.frames >= 1 && lv.frames <= 180,
-      "lively loop on 3-node graph terminates 1..180 frames (got " + (lv && lv.frames) + ")");
+      "loop on 3-node graph terminates 1..180 frames (got " + (lv && lv.frames) + ")");
     var ids3 = Object.keys((lv && lv.pos) || {}).sort();
-    eq(ids3, ["1.3.0", "1.3.1", "1.3.2"], "lively loop places all 3 nodes");
+    eq(ids3, ["1.3.0", "1.3.1", "1.3.2"], "loop places all 3 nodes");
     ids3.forEach(function (id) {
-      ok(isFinite(lv.pos[id].x) && isFinite(lv.pos[id].y), "lively finite coords " + id);
+      ok(isFinite(lv.pos[id].x) && isFinite(lv.pos[id].y), "finite coords " + id);
       ok(lv.pos[id].x >= 30 && lv.pos[id].x <= 270 && lv.pos[id].y >= 30 && lv.pos[id].y <= 150,
-        "lively contained " + id);
+        "contained " + id);
     });
-    var lv2 = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "lively");
-    eq(lv2, lv, "lively loop deterministic (same seed twice)");
-    var calm = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "calm");
-    eq(calm.pos, PG._test.relax(g3, seed3, 300, 180, OPTS3), "calm path = settle-once relax, unchanged");
-    eq(calm.frames, 0, "calm path runs zero live frames");
+    var lv2 = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3);
+    eq(lv2, lv, "loop deterministic (same seed twice)");
+    /* The retired mode argument must change nothing: a render always settles. */
+    var lvStale = PG._runLiveForTest(g3, seed3, 300, 180, OPTS3, "calm");
+    eq(lvStale, lv, "a stale mode argument is ignored (no zero-frame calm path)");
   }
   if (typeof PG._wakeForTest !== "function") { ok(false, "_wakeForTest exported (re-seed seam)"); }
   else {
@@ -347,7 +353,7 @@ function ok(cond, name) {
     var Sg = demo3();
     var seedW = PG.layout(Sg, "1.3.1", "1.3.2", W, H);
     var S = { graph: Sg, geom: JSON.parse(JSON.stringify(seedW)), w: W, h: H, opts: OPTS3,
-      phys: "lively", temp: 0.5, still: 77, frames: 999,
+      react: true, temp: 0.5, still: 77, frames: 999,
       running: true, settled: false, dead: false, reduced: false };
     try { PG._wakeForTest(S); } catch (e) { ok(false, "wake on running loop throws: " + e); S = null; }
     if (S) {
@@ -355,6 +361,46 @@ function ok(cond, name) {
       ok(S.temp === t0 && S.still === 0 && S.frames === 0, "wake re-seeds temp/still/frames on a running loop (temp=" + S.temp + ")");
       ok(S.running === true, "running loop stays running (no double-start)");
     }
+    /* THE flag gates GESTURES only: OFF refuses a release wake outright
+     * (the map stays exactly where you dropped it), while an automatic wake
+     * still settles so a pair change or resize re-arranges the map. */
+    function flagState(react) {
+      return { graph: Sg, geom: JSON.parse(JSON.stringify(seedW)), w: W, h: H, opts: OPTS3,
+        react: react, temp: 1, still: 25, frames: 900,
+        running: false, settled: true, dead: false, reduced: false };
+    }
+    var offGesture = flagState(false);
+    var geomBefore = JSON.stringify(offGesture.geom);
+    try { PG._wakeForTest(offGesture, true); } catch (e) { ok(false, "gesture wake with react off throws: " + e); }
+    ok(offGesture.running === false, "react OFF: a gesture wake starts nothing");
+    ok(offGesture.temp === 1, "react OFF: no energy seeded (temp=" + offGesture.temp + ")");
+    ok(JSON.stringify(offGesture.geom) === geomBefore, "react OFF: geometry untouched by the release");
+    var offAuto = flagState(false);
+    try { PG._wakeForTest(offAuto); } catch (e) { ok(false, "auto wake with react off throws: " + e); }
+    ok(offAuto.frames > 0 || offAuto.settled === true, "react OFF: an AUTOMATIC wake still settles");
+    var onGesture = flagState(true);
+    try { PG._wakeForTest(onGesture, true); } catch (e) { ok(false, "gesture wake with react on throws: " + e); }
+    ok(onGesture.frames > 0 || onGesture.settled === true, "react ON: a gesture wake re-runs the settle");
+  }
+  /* Persistence: OFF survives a reload, and the retired preset key is inert. */
+  if (typeof PG.readReact === "function" && typeof PG.setReact === "function") {
+    var mem = {};
+    global.localStorage = {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+      setItem: function (k, v) { mem[k] = String(v); }
+    };
+    ok(PG.readReact() === true, "no stored value reads ON");
+    PG.setReact(false);
+    ok(mem[PG.PHYS_KEY] === "0", "setReact(false) stores \"0\" under poolNetReact");
+    ok(PG.readReact() === false, "a stored OFF reads back OFF (survives reload)");
+    PG.setReact(true);
+    ok(PG.readReact() === true, "setReact(true) flips it back ON");
+    mem.poolNetPhys = "calm";
+    delete mem[PG.PHYS_KEY];
+    ok(PG.readReact() === true, "the retired poolNetPhys key is ignored");
+    delete global.localStorage;
+  } else {
+    ok(false, "readReact/setReact exported for the persistence vectors");
   }
 })();
 (async function () {

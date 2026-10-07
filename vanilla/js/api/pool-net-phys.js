@@ -1,8 +1,15 @@
 /* PoolNetPhys: live-then-settle rAF physics for the pool-network band.
- * Owns: PHYS preset table (calm = v1 shipped constants, lively =
- *   pyvis-barnesHut character), persisted preset reader (readPhys),
- *   one-step integrator (stepFrame), headless-safe rAF helpers
- *   (_raf/_cancel), wake + loop with the ~3s (180-frame) run cap.
+ * Owns: the ONE PHYS preset (pyvis-barnesHut character), the persisted
+ *   gesture-reaction flag (readReact), one-step integrator (stepFrame),
+ *   headless-safe rAF helpers (_raf/_cancel), wake + loop with the ~3s
+ *   (180-frame) run cap.
+ * TOGGLE SEMANTICS (owner 2026-10-07): the band switch is NOT a fidelity
+ *   dial — there is one physics. ON = a gesture (drag release, flip) wakes
+ *   it again, so neighbours react and it re-settles. OFF = gestures never
+ *   wake it: you can still drag nodes around and the mesh simply STAYS
+ *   where you put it (no settle, no spring reaction, no throw). Automatic
+ *   wakes (load, filter change, resize, scroll-back into view) always run
+ *   the settle — those are not gestures, so "off" does not freeze the map.
  * Consumes: nothing (pure math + timers only). loop(S) paints via the
  *   S.paint hook the composer (PoolNetUI.mount) injects — guarded, so
  *   headless states without a painter still step + sleep + terminate.
@@ -16,7 +23,8 @@
  * @property {number} W World width. @property {number} H World height.
  * @property {number} temp Current temperature (velocity cap).
  * @property {number} still Consecutive sub-tol frames. @property {number} frames Frames this run.
- * @property {string} phys "calm"|"lively" preset key.
+ * @property {boolean} [react] Gesture reaction ON (default). OFF = gestures
+ *   never wake the loop; automatic wakes still settle.
  * @property {boolean} [running] Loop live. @property {boolean} [settled] Parked.
  * @property {boolean} [forced] Explicit-gesture run (reduced-motion consent).
  * @property {boolean} [reduced] prefers-reduced-motion. @property {boolean} [visible] On-screen.
@@ -24,8 +32,9 @@
  * @property {Function} [paint] Injected painter (S)->void (ui render).
  *   Absent/null headless (loop skips paint, physics still runs).
  * No signing, no storage beyond the phys preset key, no display strings.
- * Created by: pool-net-ui split (mechanical move from pool-net-ui.js,
- *   zero behavior change; calm constants byte-identical to v1 shipped).
+ * Created by: pool-net-ui split (mechanical move from pool-net-ui.js),
+ *   then the 2026-10-07 toggle rework (one preset; the switch became a
+ *   gesture-reaction flag).
  * CHAIN TRUTH: none here (pixels only). MONEY DISCIPLINE: Number() is
  *   canvas pixels (positions/velocities), never money.
  * Exposes global PoolNetPhys.
@@ -37,47 +46,59 @@ var PoolNetPhys = (function () {
    * the hub gets extra gravity + hub damping. Mirrored in paint/gestures
    * (circle seed, Enter target); same literal, never a lookup. */
   var CORE_ID = "1.3.0";
-  var PHYS_KEY = "poolNetPhys";
+  /* PHYS_KEY retired 2026-10-07: it stored a PRESET ("calm"/"lively"), and
+   * the old "calm" default is meaningless now that there is one physics.
+   * REACT_KEY stores the gesture-reaction flag instead. A stale poolNetPhys
+   * value is deliberately ignored, never migrated — it cannot resurrect the
+   * preset that no longer exists. */
+  var REACT_KEY = "poolNetReact";
 
-  /* PHYS presets: calm (v1 shipped constants, plus a 3s pause cap) vs
-   * lively (pyvis-barnesHut character: inverse-square degree-mass
-   * repulsion, long springs, higher carryover, weaker pull). Run rule
+  /* PHYS: ONE preset (the pyvis-barnesHut character that used to be
+   * "lively": inverse-square degree-mass repulsion, long springs, high
+   * carryover, weaker pull, curved edges). The former "calm" preset is
+   * GONE — two fidelities behind an On/Off label is what made "Off" look
+   * like "a different lively physics" instead of "stopped". Run rule
    * (owner call): at most ~3s (180 frames) of motion after load/flip/
    * filter/drag, then the map pauses until the next interaction — no
    * endless tail, no stuck jitter. Wake-ups re-seed and run another 3s.
-   * stepFrame/drawScene/loop/wake read S.phys; nothing else branches. */
+   * The key stays "lively" so the preset table seam (and any stored value)
+   * stays readable; nothing selects between presets any more. */
   var PHYS = {
-    calm:   { repPow: 1, repK: 1.0, repCap: 5, carry: 0.8, temp0: 6, cool: 0.98, tempMin: 1,
-              springRest: 1.1, springK: 0.015, pull: 0.008, btsPullX: 3,
-              stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 180, curved: false },
     lively: { repPow: 2, repK: 2.6, repCap: 20, carry: 0.98, hubCarry: 0.90, temp0: 7, cool: 0.984, tempMin: 0.2,
               springRest: 2.2, springK: 0.010, pull: 0.003, btsPullX: 3,
               stillTol: 0.25, stillFrames: 120, minFrames: 60, maxFrames: 180, curved: true }
   };
 
-  /* Headless test seams (no DOM, no chain): preset table + default reader. */
+  /* Headless test seams (no DOM, no chain): preset table + default flag. */
   function _physForTest() { return PHYS; }
-  function _defaultPhysForTest() { return "calm"; }
+  function _defaultReactForTest() { return true; }
 
-  /* Persisted preset reader: "lively" -> lively, anything else (or no
-   * storage at all) -> calm. Default is calm, storage failure keeps calm. */
-  function readPhys() {
+  /* readReact: is gesture reaction ON? "0" is the only OFF value, so a
+   * missing key, a corrupt value, or no storage at all all read as ON
+   * (the shipped default: a touch reacts). Never throws. */
+  function readReact() {
     try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem(PHYS_KEY) === "lively") return "lively";
-    } catch (e) { /* calm stands */ }
-    return "calm";
+      if (typeof localStorage !== "undefined" && localStorage.getItem(REACT_KEY) === "0") return false;
+    } catch (e) { /* ON stands */ }
+    return true;
+  }
+
+  /* writeReact: persist the flag ("1"/"0"). Session-memory only when
+   * storage is unavailable — never throws, never blocks the flip. */
+  function writeReact(on) {
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(REACT_KEY, on ? "1" : "0");
+    } catch (e) { /* memory-only session */ }
   }
 
   /* One physics step (preset-driven): repulsion + Hooke springs + center
    * gravity (x3 for BTS prominence); velocity damping keeps it overdamped
    * so the sleep gate always terminates the loop. The world is UNBOUNDED
    * (no wall clamp — pan/zoom explores freely; linear center pull grows
-   * with distance so nothing escapes). Calm reads the v1 shipped constants
-   * verbatim; lively reads inverse-square degree-mass repulsion, longer
-   * springs, higher carryover, weaker pull. Positions are world coords;
+   * with distance so nothing escapes). Positions are world coords;
    * Number() here is pixels only, never money. */
   function stepFrame(S) {
-    var P = PHYS[S.phys] || PHYS.calm;
+    var P = PHYS.lively;
     var ids = Object.keys(S.geom);
     var n = ids.length;
     if (n < 2) return 0;
@@ -97,7 +118,7 @@ var PoolNetPhys = (function () {
         else { var ang = ((i * 7 + j) * 2.399963); ux = Math.cos(ang); uy = Math.sin(ang); d = 0.01; }
         /* Lively weights repulsion by endpoint degree mass (hubs push
          * harder, pyvis-barnesHut character: inverse-square with a 400px^2
-         * softening so close-range stays finite); calm keeps the v1 formula.
+         * softening so close-range stays finite).
          * Missing deg entries count 0 (isolated nodes) — never NaN. */
         var da = (S.deg && S.deg[a]) || 0, db = (S.deg && S.deg[b]) || 0;
         var deg = 1 + da + db;
@@ -185,11 +206,16 @@ var PoolNetPhys = (function () {
   function wake(S, explicit) {
     if (!S || S.dead) return;
     if ((S.reduced && !explicit) || S.dead) return;
+    /* Gesture reaction OFF: a touch must not move anything. The node still
+     * follows the pointer (that is the drag handler, not physics) — this
+     * gate only refuses to START a simulation. Automatic wakes (load,
+     * filter, resize) pass through and still settle. */
+    if (explicit && S.react === false) return;
     if (!S.visible) return;
     if (Object.keys(S.geom).length < 2) return;
     S.still = 0;
     S.frames = 0;
-    S.temp = (PHYS[S.phys] || PHYS.calm).temp0;
+    S.temp = PHYS.lively.temp0;
     if (explicit) S.forced = true;
     if (S.running) return;
     S.running = true;
@@ -201,7 +227,7 @@ var PoolNetPhys = (function () {
       if (S) { S.running = false; S.forced = false; }
       return;
     }
-    var P = PHYS[S.phys] || PHYS.calm;
+    var P = PHYS.lively;
     S.frames = (S.frames || 0) + 1;
     var moved = 0;
     try { moved = stepFrame(S); } catch (e) { moved = 0; }
@@ -228,12 +254,13 @@ var PoolNetPhys = (function () {
   }
 
   return {
-    readPhys: readPhys,
+    readReact: readReact,
+    writeReact: writeReact,
     loop: loop,
     cancel: _cancel,
-    PHYS_KEY: PHYS_KEY,
+    REACT_KEY: REACT_KEY,
     _physForTest: _physForTest,
-    _defaultPhysForTest: _defaultPhysForTest,
+    _defaultReactForTest: _defaultReactForTest,
     _stepForTest: stepFrame,
     _wakeForTest: wake
   };

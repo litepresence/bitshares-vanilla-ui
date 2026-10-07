@@ -436,57 +436,67 @@ var PoolGraph = (function () {
       } catch (x) { return {}; }
     }
   }
-  /* Desk physics driver (market-net Task 5 — physics ONLY.
-   * Calm (default) paints the settle-once relax() equilibrium exactly as
-   * before; lively animates the SAME per-iteration math frame-by-frame
-   * (_liveStep below is one relax iteration verbatim, temp-capped) with a
-   * temp/cool/sleep schedule and a 180-frame cap, then rests. Presets come
-   * from PoolNetUI._physForTest() when the band module is loaded (one shared
-   * preset shape), else the built-in FALLBACK so this module stays standalone
-   * for headless tests. Force constants stay relax's shipped values (k clamp
-   * 24..60, gravity, walls) — presets carry RUN-CONTROL ONLY (temp0/cool/
-   * tempMin/stillTol/stillFrames/minFrames/maxFrames), which is why the rest
-   * layout is unchanged. Reduced-motion: auto runs stay frozen, an explicit
-   * flip runs bounded (band wake policy verbatim, minus the band's visibility
-   * observer — desk canvases paint while mounted). Per-frame paints reuse
-   * drawGraph via the opts._pos seam (same painter, colors, verdicts,
-   * hit-testing — no painter swap). Never throws outward. */
-  var PHYS_KEY = "poolNetPhys";
+  /* Desk physics driver (market-net Task 5 — physics ONLY; reworked
+   * 2026-10-07 to the band's gesture-reaction model).
+   * There is ONE physics here now: every render settles (the same
+   * per-iteration math animates frame-by-frame via _liveStep — one relax
+   * iteration verbatim, temp-capped — with a temp/cool/sleep schedule and a
+   * 180-frame cap, then rests). The former "calm" preset, which painted the
+   * settle-once equilibrium and ran ZERO live frames, is gone: two fidelities
+   * behind one On/Off label is exactly why "Off" meant one thing on this
+   * desk and another on the selector bands.
+   * THE FLAG (S.react / readReact) is about GESTURES, shared with the band
+   * through the same poolNetReact key: ON = a drag release re-energizes the
+   * loop so neighbours react; OFF = gestures never wake it — you can still
+   * drag nodes and the map stays exactly where you dropped it. Automatic
+   * settles (mount, filter/pair change, resize) always run, so OFF never
+   * leaves the desk map unarranged.
+   * Presets come from PoolNetUI._physForTest() when the band module is
+   * loaded (one shared preset shape), else the built-in FALLBACK so this
+   * module stays standalone for headless tests. Force constants stay relax's
+   * shipped values (k clamp 24..60, gravity, walls) — presets carry
+   * RUN-CONTROL ONLY. Reduced-motion: auto runs stay frozen, an explicit
+   * consent (the flip to ON) runs bounded (band wake policy verbatim, minus
+   * the band's visibility observer — desk canvases paint while mounted).
+   * Per-frame paints reuse drawGraph via the opts._pos seam (same painter,
+   * colors, verdicts, hit-testing — no painter swap). Never throws outward. */
+  var PHYS_KEY = "poolNetReact";
   var PHYS_FALLBACK = {
-    calm:   { temp0: 6, cool: 0.98, tempMin: 1, stillTol: 0.35, stillFrames: 25, minFrames: 0, maxFrames: 180 },
     lively: { temp0: 7, cool: 0.984, tempMin: 0.2, stillTol: 0.25, stillFrames: 120, minFrames: 60, maxFrames: 180 }
   };
-  /* Session override from setPhys (readPhys prefers it over storage). */
-  var _physMode = null;
+  /* Session override from setReact (readReact prefers it over storage). */
+  var _react = null;
   /* Preset table: band's live values when loaded, else the fallback.
    * Runtime lookup (never cached) so band load order never matters. */
   function _phys() {
     try {
       if (typeof PoolNetUI !== "undefined" && PoolNetUI && typeof PoolNetUI._physForTest === "function") {
         var p = PoolNetUI._physForTest();
-        if (p && p.calm && p.lively) return p;
+        if (p && p.lively) return p;
       }
     } catch (e) { /* fallback stands */ }
     return PHYS_FALLBACK;
   }
-  /* Default preset name (storage decides via readPhys; the NAME default is calm). */
-  function _defaultPhys() { return "calm"; }
-  /* Shared-key reader: in-memory setPhys wins, then localStorage poolNetPhys,
-   * else calm. Default calm, storage failure keeps calm. Never throws. */
-  function readPhys() {
-    if (_physMode === "lively" || _physMode === "calm") return _physMode;
+  /* Default gesture reaction (storage decides via readReact; the shipped
+   * default is ON, matching the band). */
+  function _defaultReact() { return true; }
+  /* Shared-key reader: in-memory setReact wins, then localStorage
+   * poolNetReact ("0" = off), else ON. Storage failure keeps ON. The
+   * RETIRED poolNetPhys preset key is never consulted. Never throws. */
+  function readReact() {
+    if (_react === true || _react === false) return _react;
     try {
-      if (typeof localStorage !== "undefined" && localStorage.getItem(PHYS_KEY) === "lively") return "lively";
-    } catch (e) { /* calm stands */ }
-    return "calm";
+      if (typeof localStorage !== "undefined" && localStorage.getItem(PHYS_KEY) === "0") return false;
+    } catch (e) { /* ON stands */ }
+    return true;
   }
   /* Shared-key writer for the pane switches (both desks call this).
-   * Normalizes anything-not-lively to calm. Returns the stored mode. */
-  function setPhys(mode) {
-    var m = (mode === "lively") ? "lively" : "calm";
-    _physMode = m;
-    try { if (typeof localStorage !== "undefined") localStorage.setItem(PHYS_KEY, m); } catch (e) { /* memory-only */ }
-    return m;
+   * Anything-not-false normalizes to ON. Returns the stored flag. */
+  function setReact(on) {
+    var v = (on === false) ? false : true;
+    _react = v;
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(PHYS_KEY, v ? "1" : "0"); } catch (e) { /* memory-only */ }
+    return v;
   }
   /* Reduced-motion probe (band precedent: guarded matchMedia, false headless). */
   function _reduced() {
@@ -571,16 +581,13 @@ var PoolGraph = (function () {
       return maxStep;
     } catch (e) { return 0; }
   }
-  /* Synchronous headless loop (tests + wake settle): calm delegates to
-   * relax() (settle-once, zero live frames); lively iterates _liveStep with
-   * the preset schedule until the sleep gate or the 180-frame cap.
-   * Returns {pos, frames} (pos is a NEW map; seed untouched). Never throws. */
-  function _runLive(graph, seed, w, h, opts, mode) {
-    if (mode !== "lively") {
-      var still = null;
-      try { still = relax(graph, seed, w, h, opts); } catch (e) { still = {}; }
-      return { pos: still, frames: 0 };
-    }
+  /* Synchronous headless loop (tests + wake settle): iterates _liveStep with
+   * the one preset's schedule until the sleep gate or the 180-frame cap. The
+   * former `mode !== "lively"` short-circuit (which delegated to relax() and
+   * ran ZERO live frames for the retired "calm" preset) is gone: a render
+   * always settles. Returns {pos, frames} (pos is a NEW map; seed untouched).
+   * Never throws. */
+  function _runLive(graph, seed, w, h, opts) {
     var P = _phys().lively || PHYS_FALLBACK.lively;
     var geom = {};
     try {
@@ -609,8 +616,12 @@ var PoolGraph = (function () {
    * settled, reduced, dead?, forced?, canvas?, doc?, drawOpts?}. */
   function wake(S, explicit) {
     if (!S || S.dead) return;
-    var P = _phys()[S.phys] || _phys().calm;
+    var P = _phys().lively;
     if (S.reduced && !explicit) return;
+    /* Gesture reaction OFF: a drop must not move anything (the node already
+     * followed the pointer — that is the drag handler, not physics). This
+     * gate only refuses to START a loop; automatic settles pass through. */
+    if (explicit && S.react === false) return;
     if (!S.geom || Object.keys(S.geom).length < 2) return;
     S.still = 0; S.frames = 0; S.temp = P.temp0;
     if (explicit) S.forced = true;
@@ -627,7 +638,7 @@ var PoolGraph = (function () {
       try {
         if (S.canvas && S.canvas._graphLiveS && S.canvas._graphLiveS !== S) { S.running = false; return; }
       } catch (e) { /* ownership stands */ }
-      var P = _phys()[S.phys] || _phys().calm;
+      var P = _phys().lively;
       S.frames = (S.frames || 0) + 1;
       var moved = 0;
       try { moved = _liveStep(S.graph, S.geom, S.w, S.h, S.opts, S.temp); } catch (e) { moved = 0; }
@@ -660,11 +671,12 @@ var PoolGraph = (function () {
       if (canvas) { try { canvas._graphLiveS = null; } catch (e) {} }
     } catch (e) { /* stopped anyway */ }
   }
-  /* Lively entrypoint for the desk panes (redrawPoolMap's lively branch).
-   * opts {assetA, assetB, highlightPools, explicit}: explicit true only for a
-   * direct user flip (runs bounded even under reduced-motion). Calm mode or a
-   * reduced-motion AUTO call paints once statically (current behavior) and
-   * never starts a loop. Stops any prior loop on the canvas first. */
+  /* The desk panes' entrypoint (redrawPoolMap). Every call paints once, then
+   * settles with the one physics; under reduced-motion an AUTO call stops at
+   * that painted (already relaxed) equilibrium and only an EXPLICIT consent —
+   * flipping the switch ON — runs a bounded loop. The gesture flag gates
+   * explicit wakes only, so an OFF desk map still re-arranges on a pair
+   * change or resize. Stops any prior loop on the canvas first. */
   function drawLive(doc, canvas, graph, opts) {
     opts = opts || {};
     if (!canvas || !graph) return null;
@@ -683,20 +695,21 @@ var PoolGraph = (function () {
       Object.keys(seed).forEach(function (id) { geom[id] = { x: seed[id].x, y: seed[id].y }; });
     } catch (e) { geom = {}; }
     var S = { graph: graph, geom: geom, w: w, h: h, opts: { assetA: assetA, assetB: assetB },
-      phys: readPhys(), temp: 0, still: 0, frames: 0, running: false, settled: false,
+      react: readReact(), temp: 0, still: 0, frames: 0, running: false, settled: false,
       dead: false, reduced: _reduced(), forced: false,
       canvas: canvas, doc: doc,
       drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] } };
-    var P = _phys()[S.phys] || _phys().calm;
-    S.temp = P.temp0;
+    S.temp = _phys().lively.temp0;
     try { canvas._graphLiveS = S; } catch (e) { /* static paint below still stands */ }
-    if (S.phys !== "lively" || (S.reduced && !opts.explicit)) {
-      try {
-        drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] });
-      } catch (e) { /* note below carries it */ }
-      S.running = false; S.settled = true;
-      return S;
-    }
+    /* Every render paints first (so the frame is never blank), then settles:
+     * the old "calm painted once and never animated" branch is gone. Under
+     * reduced-motion an automatic render stays frozen (the relax equilibrium
+     * it just painted IS the resting state); only an explicit consent
+     * (flipping the switch ON) runs a bounded loop. */
+    try {
+      drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [] });
+    } catch (e) { /* note below carries it */ }
+    if (S.reduced && !opts.explicit) { S.running = false; S.settled = true; return S; }
     wake(S, !!opts.explicit);
     return S;
   }
@@ -1177,7 +1190,10 @@ var PoolGraph = (function () {
           if (moved) {
             var liveS = null;
             try { liveS = canvas._graphLiveS; } catch (e) { liveS = null; }
-            if (liveS) wake(liveS, true);
+            /* OFF = the mesh stays where it was dropped (wake() refuses an
+             * explicit gesture anyway; stating it here keeps the promise
+             * readable at the call site). */
+            if (liveS && liveS.react !== false) wake(liveS, true);
           }
         } catch (e) {}
       }
@@ -1201,8 +1217,9 @@ var PoolGraph = (function () {
 
   return { poolsForAsset: poolsForAsset, buildGraph: buildGraph, findCorePath: findCorePath,
     layout: layout, drawGraph: drawGraph, CORE_ID: CORE_ID,
-    setPhys: setPhys, readPhys: readPhys, drawLive: drawLive, stopLive: stopLive,
-    _physForTest: _phys, _defaultPhysForTest: _defaultPhys,
+    setReact: setReact, readReact: readReact, drawLive: drawLive, stopLive: stopLive,
+    PHYS_KEY: PHYS_KEY,
+    _physForTest: _phys, _defaultReactForTest: _defaultReact,
     _runLiveForTest: _runLive, _wakeForTest: wake, _stepForTest: _liveStep,
     _navForTest: navForHit,
     _test: { selectL1: _selectL1, pickL2: _pickL2Assets, poolSize: _poolSize, sortBiggest: _sortBiggest,

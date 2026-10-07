@@ -262,9 +262,14 @@ var NetGestures = (function () {
           var moved = !!(st.drag && st.drag.moved);
           /* Release throw: a flung node keeps its pointer velocity
            * (clamped to a sane throw) so neighbors visibly react on drop —
-           * previously vel stayed zeroed and the drop landed dead. */
+           * previously vel stayed zeroed and the drop landed dead.
+           * WITH PHYSICS OFF the mesh must stay where it was dropped, so no
+           * throw is stored: leftover velocity would drift the graph on the
+           * next automatic wake (filter change, resize), which is exactly
+           * the "something happens after release" the switch promises not
+           * to do. */
           try {
-            if (moved && st.drag && st.drag.kind === "node" && st.geom[st.drag.id] &&
+            if (moved && st.react !== false && st.drag && st.drag.kind === "node" && st.geom[st.drag.id] &&
                 st.drag.ppx !== undefined && st.drag.pt0 !== undefined && st.drag.pt !== undefined &&
                 st.drag.pt0 > st.drag.pt) {
               var dt = (st.drag.pt0 - st.drag.pt) / 16.7;

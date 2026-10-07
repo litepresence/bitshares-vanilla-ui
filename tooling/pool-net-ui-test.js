@@ -68,27 +68,24 @@ var skel = { pools: [
   catch (e) { ok(false, "destroy runs headless"); }
 })();
 
-/* Task 1 (pool-net v2: lively preset + Calm/Lively switch) — preset table,
- * calm default, material lively/calm deltas, curves only on lively,
- * byte-identical calm constants, headless step/draw smoke on both presets. */
+/* The one physics (2026-10-07 toggle rework): the former "calm" preset is
+ * GONE — an On/Off label over two fidelities is what made "Off" look like
+ * "a different lively physics" instead of "stopped". The switch is now a
+ * gesture-reaction FLAG (default ON), and gestures are what it gates. */
 (function () {
   var phys = (typeof PoolNetUI._physForTest === "function") ? PoolNetUI._physForTest() : null;
-  ok(phys && phys.calm && phys.lively, "phys presets: calm + lively exist");
-  ok(typeof PoolNetUI._defaultPhysForTest === "function" && PoolNetUI._defaultPhysForTest() === "calm", "default phys is calm");
-  if (!phys || !phys.calm || !phys.lively) return;
-  ok(phys.lively.carry > phys.calm.carry, "lively carryover higher");
-  ok(phys.lively.stillFrames > phys.calm.stillFrames, "lively sleeps later");
-  ok(phys.lively.curved === true && phys.calm.curved !== true, "curves only lively");
-  ok(phys.calm.carry === 0.8 && phys.calm.stillFrames === 25 && phys.calm.temp0 === 6 &&
-    phys.calm.cool === 0.98 && phys.calm.tempMin === 1 && phys.calm.pull === 0.008 &&
-    phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
-    "calm constants byte-identical to v1 shipped behavior");
+  ok(!!phys && !!phys.lively, "phys preset: lively exists");
+  ok(!!phys && !phys.calm, "phys preset: calm is GONE (one physics only)");
+  ok(Object.keys(phys || {}).length === 1, "exactly one preset in the table");
+  ok(typeof PoolNetUI._defaultReactForTest === "function" && PoolNetUI._defaultReactForTest() === true,
+    "default gesture reaction is ON");
+  if (!phys || !phys.lively) return;
+  ok(phys.lively.curved === true, "edges are curved (the one preset)");
   ok(phys.lively.repPow === 2 && phys.lively.minFrames === 60 &&
     phys.lively.carry === 0.98 && phys.lively.hubCarry === 0.90 && phys.lively.cool === 0.984 && phys.lively.tempMin === 0.2 &&
     phys.lively.temp0 === 7 && phys.lively.repCap === 20 &&
-    phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 180 &&
-    phys.calm.maxFrames === 180,
-    "3s pause rule: both presets cap at 180 frames (lively softened tune + hub damping pinned)");
+    phys.lively.springK === 0.010 && phys.lively.springRest === 2.2 && phys.lively.maxFrames === 180,
+    "lively constants pinned + 3s pause cap at 180 frames");
   function simState(mode) {
     return {
       phys: mode, W: 300, H: 320, temp: 6, still: 0, frames: 0,
@@ -98,11 +95,9 @@ var skel = { pools: [
     };
   }
   if (typeof PoolNetUI._stepForTest === "function") {
-    ["calm", "lively"].forEach(function (mode) {
-      var S = simState(mode), moved = -1, threw = false;
-      try { moved = PoolNetUI._stepForTest(S); } catch (e) { threw = true; }
-      ok(!threw && isFinite(moved), mode + " stepFrame finite (isolated node, no NaN deg)");
-    });
+    var S0 = simState("lively"), moved0 = -1, threw0 = false;
+    try { moved0 = PoolNetUI._stepForTest(S0); } catch (e) { threw0 = true; }
+    ok(!threw0 && isFinite(moved0), "stepFrame finite (isolated node, no NaN deg)");
   } else {
     ok(false, "_stepForTest exported for headless physics smoke");
   }
@@ -110,16 +105,14 @@ var skel = { pools: [
   var graph = globalThis.PoolNet.fromSkeleton(skel);
   var laid = PoolNetUI._layoutForTest ? PoolNetUI._layoutForTest(graph.nodes, 300, 320) : null;
   if (laid) {
-    ["calm", "lively"].forEach(function (mode) {
-      var threw = false, out = null;
-      try {
-        out = PoolNetUI._drawForTest(stub.ctx, 300, 320, graph, laid, {
-          scale: 1, ox: 0, oy: 0, pathSet: {}, selPool: null, dim: {}, meta: {},
-          hoverNode: null, hoverEdge: null, phys: mode
-        });
-      } catch (e) { threw = true; }
-      ok(!threw && out && out.mids.length === 2, mode + " drawScene paints 2 edges headless (curves need no quadraticCurveTo)");
-    });
+    var threw1 = false, out1 = null;
+    try {
+      out1 = PoolNetUI._drawForTest(stub.ctx, 300, 320, graph, laid, {
+        scale: 1, ox: 0, oy: 0, pathSet: {}, selPool: null, dim: {}, meta: {},
+        hoverNode: null, hoverEdge: null, phys: "lively"
+      });
+    } catch (e) { threw1 = true; }
+    ok(!threw1 && out1 && out1.mids.length === 2, "drawScene paints 2 edges headless (curves need no quadraticCurveTo)");
   } else {
     ok(false, "_layoutForTest/_drawForTest exported for headless draw smoke");
   }
@@ -144,12 +137,13 @@ var skel = { pools: [
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (BTS-or-first) resolves to asset page");
 })();
 
-/* v2 lively-frozen regression (user report: switch "does nothing"): from an
- * identical spread start, 300 lively steps must travel FARTHER than 300 calm
- * steps (overshoot + longer run). A 1/d^3 repulsion typo once made lively
- * weaker than calm at all working distances (frozen map) — this locks it. */
+/* Physics-alive regression (user report: the switch "does nothing" / a
+ * frozen map): from a spread start, 300 steps must travel a real distance.
+ * The old version compared lively against calm (two presets); there is ONE
+ * physics now, so the guard is "the simulation actually moves and then
+ * parks" — a 1/d^3 repulsion typo would freeze it and fail here. */
 (function () {
-  function ringState(mode) {
+  function ringState() {
     var geom = { hub: { x: 400, y: 300 } }, deg = { hub: 8 }, edges = [];
     for (var i = 0; i < 8; i++) {
       var id = "n" + i, a = (i / 8) * Math.PI * 2;
@@ -157,12 +151,12 @@ var skel = { pools: [
       deg[id] = 1; edges.push({ a: "hub", b: id, poolId: "1.19." + i });
     }
     var nodes = [{ assetId: "hub" }].concat(Object.keys(geom).filter(function (k) { return k !== "hub"; }).map(function (k) { return { assetId: k }; }));
-    var P = PoolNetUI._physForTest()[mode] || PoolNetUI._physForTest().calm;
-    return { phys: mode, W: 800, H: 600, temp: P.temp0, still: 0, frames: 0,
+    var P = PoolNetUI._physForTest().lively;
+    return { W: 800, H: 600, temp: P.temp0, still: 0, frames: 0,
       geom: geom, vel: {}, deg: deg, view: { nodes: nodes, edges: edges } };
   }
-  function pathFor(mode, steps) {
-    var S = ringState(mode), path = 0, i, id, px = {}, first = true;
+  function pathFor(steps) {
+    var S = ringState(), path = 0, i, id, px = {}, first = true;
     for (var s = 0; s < steps; s++) {
       if (!first) {
         for (id in S.geom) path += Math.hypot(S.geom[id].x - px[id][0], S.geom[id].y - px[id][1]);
@@ -173,9 +167,11 @@ var skel = { pools: [
     }
     return path;
   }
-  var calm = pathFor("calm", 300), lively = pathFor("lively", 300);
-  ok(calm > 0 && lively > 0, "both presets travel (calm=" + Math.round(calm) + " lively=" + Math.round(lively) + ")");
-  ok(lively > calm * 1.5, "lively out-travels calm 1.5x (got " + (calm > 0 ? (lively / calm).toFixed(2) : "?") + "x)");
+  var travel = pathFor(300);
+  var late = pathFor(60);
+  ok(travel > 0, "the one physics travels from a spread (300 steps: " + Math.round(travel) + "px)");
+  ok(late < travel, "and settles — the last 60 steps cover less ground than the first 300 (" +
+    Math.round(late) + " vs " + Math.round(travel) + ")");
 })();
 
 /* wake re-energize regression (user report: flip + drag-release "do nothing"
@@ -188,7 +184,7 @@ var skel = { pools: [
   var wake = PoolNetUI._wakeForTest;
   // running loop at floor temp: wake must re-seed energy without restarting
   var S = {
-    phys: "lively", W: 300, H: 320, temp: 0.5, still: 77, frames: 999,
+    W: 300, H: 320, temp: 0.5, still: 77, frames: 999,
     running: true, settled: false, dead: false, reduced: false, visible: true,
     geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 } },
     vel: {}, deg: { "1.3.0": 1, "1.3.1": 1 },
@@ -200,7 +196,7 @@ var skel = { pools: [
   ok(S.running === true, "running loop stays running (no double-start)");
   // stopped loop: wake restarts and runs to sleep synchronously headless
   var S2 = {
-    phys: "calm", W: 300, H: 320, temp: 1, still: 25, frames: 900,
+    W: 300, H: 320, temp: 1, still: 25, frames: 900,
     running: false, settled: true, dead: false, reduced: false, visible: true,
     geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 }, "1.3.99": { x: 250, y: 260 } },
     vel: {}, deg: { "1.3.0": 2, "1.3.1": 1 },
@@ -218,7 +214,7 @@ var skel = { pools: [
   var wake = PoolNetUI._wakeForTest;
   function rmState(explicit) {
     return {
-      phys: "calm", W: 300, H: 320, temp: 1, still: 25, frames: 900,
+      W: 300, H: 320, temp: 1, still: 25, frames: 900,
       running: false, settled: true, dead: false, reduced: true, visible: true,
       geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 }, "1.3.99": { x: 250, y: 260 } },
       vel: {}, deg: { "1.3.0": 2, "1.3.1": 1 },
@@ -232,7 +228,94 @@ var skel = { pools: [
   var exp = rmState(true);
   try { wake(exp, true); } catch (e) { ok(false, "explicit wake reduced throws: " + e); return; }
   ok(exp.settled === true && exp.running === false, "explicit wake runs bounded and settles under reduced-motion");
-  ok(exp.temp < 6 && exp.temp >= 1, "explicit wake re-seeded temp0 then cooled while settling (temp=" + exp.temp + ")");
+  /* Floor is the ONE preset's tempMin (0.2 for lively — the retired calm
+   * preset had 1), so this bounds against the table, never a literal. */
+  var floorT = PoolNetUI._physForTest().lively.tempMin;
+  ok(exp.temp < 7 && exp.temp >= floorT, "explicit wake re-seeded temp0 then cooled to the preset floor (temp=" + exp.temp + ")");
+})();
+
+/* Persistence contract for the switch: OFF must survive a reload, and the
+ * RETIRED preset key (poolNetPhys) must never resurrect anything — it is
+ * read by nothing, so a stale "calm" in someone's storage is inert. */
+(function () {
+  var P = (typeof PoolNetPhys !== "undefined") ? PoolNetPhys : null;
+  if (!P || typeof P.readReact !== "function" || typeof P.writeReact !== "function") {
+    ok(false, "readReact/writeReact exported"); return;
+  }
+  var mem = {};
+  global.localStorage = {
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+    setItem: function (k, v) { mem[k] = String(v); }
+  };
+  ok(P._defaultReactForTest() === true, "shipped default is ON (a touch reacts)");
+  ok(P.readReact() === true, "no stored value reads ON");
+  P.writeReact(false);
+  ok(mem[P.REACT_KEY] === "0", "writeReact(false) stores \"0\" under poolNetReact");
+  ok(P.readReact() === false, "a stored OFF reads back OFF (survives reload)");
+  P.writeReact(true);
+  ok(P.readReact() === true, "writeReact(true) flips it back ON");
+  mem[P.REACT_KEY] = "nonsense";
+  ok(P.readReact() === true, "a corrupt stored value reads ON, never OFF");
+  mem.poolNetPhys = "calm";
+  delete mem[P.REACT_KEY];
+  ok(P.readReact() === true, "the retired poolNetPhys key is ignored (no preset resurrection)");
+  ok(P.PHYS_KEY === undefined, "the old PHYS_KEY seam is gone with the preset");
+  delete global.localStorage;
+})();
+
+/* The switch's DOM contract (2026-10-07): the button is the 44x44 HIT AREA
+ * and the visible pill is a child track, so the control can read half-size
+ * without dropping below the platform touch floor (principle #7). No tooltip
+ * element and no hint line — the On/Off word beside it is the whole label. */
+(function () {
+  var css = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "css", "app.css"), "utf8");
+  ok(/\.pool-net-physwitch\s*\{[^}]*min-height:\s*44px/.test(css), "switch button keeps a 44px touch floor");
+  ok(/\.pool-net-physwitch\s*\{[^}]*min-width:\s*44px/.test(css), "switch button keeps a 44px touch width");
+  ok(/\.pool-net-phystrack\s*\{[^}]*width:\s*30px/.test(css), "the visible track is the half-size pill (30px)");
+  ok(/\.pool-net-phystrack\s*\{[^}]*height:\s*16px/.test(css), "track height 16px (half of the old 44px pill)");
+  ok(/\.pool-net-physhint/.test(css) === false, "no hint line styled");
+  ok(/\.pool-net-physwitch[^}]*title:/.test(css) === false, "no tooltip styling on the switch");
+  var src = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", "pool-net-chrome.js"), "utf8");
+  ok(src.indexOf("pool-net-physhint") === -1, "chrome builds no hint element");
+  ok(src.indexOf("phys_hint") === -1, "chrome references no hint key");
+  ok(src.indexOf("physTrack") !== -1, "chrome builds the track child");
+  ["market-desk-fill.js", "pool-detail-view.js"].forEach(function (f) {
+    var t = require("fs").readFileSync(require("path").join(__dirname, "..", "vanilla", "js", "views", f), "utf8");
+    ok(t.indexOf("physhint") === -1 && t.indexOf("phys_hint") === -1, f + ": no hint element or key");
+    ok(t.indexOf("pool-net-phystrack") !== -1, f + ": builds the track child");
+  });
+})();
+
+/* THE switch semantics (2026-10-07): the flag gates GESTURES only.
+ * OFF = a drag release must not start a simulation (the mesh stays exactly
+ * where it was dropped) while an automatic wake (load/filter/resize) still
+ * settles, so the map is never left unarranged for a new filter. */
+(function () {
+  if (typeof PoolNetUI._wakeForTest !== "function") { ok(false, "_wakeForTest still exported"); return; }
+  var wake = PoolNetUI._wakeForTest;
+  function state(react) {
+    return {
+      react: react, W: 300, H: 320, temp: 1, still: 25, frames: 900,
+      running: false, settled: true, dead: false, reduced: false, visible: true,
+      geom: { "1.3.0": { x: 150, y: 160 }, "1.3.1": { x: 60, y: 60 }, "1.3.99": { x: 250, y: 260 } },
+      vel: {}, deg: { "1.3.0": 2, "1.3.1": 1 },
+      view: { edges: [{ a: "1.3.0", b: "1.3.1", poolId: "1.19.1" }] }
+    };
+  }
+  var offGesture = state(false);
+  var before = JSON.stringify(offGesture.geom);
+  try { wake(offGesture, true); } catch (e) { ok(false, "explicit wake with react off throws: " + e); return; }
+  ok(offGesture.running === false && offGesture.settled === true,
+    "react OFF: a gesture wake starts nothing (running=" + offGesture.running + ")");
+  ok(offGesture.temp === 1, "react OFF: no energy seeded at all (temp=" + offGesture.temp + ")");
+  ok(JSON.stringify(offGesture.geom) === before, "react OFF: geometry untouched by the release");
+  var offAuto = state(false);
+  try { wake(offAuto); } catch (e) { ok(false, "auto wake with react off throws: " + e); return; }
+  ok(offAuto.settled === true && offAuto.running === false && offAuto.frames > 0,
+    "react OFF: an AUTOMATIC wake still settles (frames=" + offAuto.frames + ")");
+  var onGesture = state(true);
+  try { wake(onGesture, true); } catch (e) { ok(false, "explicit wake with react on throws: " + e); return; }
+  ok(onGesture.frames > 0, "react ON: a gesture wake re-runs the settle (frames=" + onGesture.frames + ")");
 })();
 
 /* Unbounded world (user call: no wall binding now that pan/zoom explores):
@@ -241,7 +324,7 @@ var skel = { pools: [
 (function () {
   function farState() {
     return {
-      phys: "lively", W: 800, H: 600, temp: 7, still: 0, frames: 500,
+      W: 800, H: 600, temp: 7, still: 0, frames: 500,
       geom: { "1.3.0": { x: 400, y: 300 }, "1.3.99": { x: 1400, y: 300 } },
       vel: {}, deg: { "1.3.0": 1, "1.3.99": 1 },
       view: { edges: [] }
@@ -259,7 +342,7 @@ var skel = { pools: [
 (function () {
   if (typeof PoolNetUI._wakeForTest !== "function") { ok(false, "_wakeForTest still exported"); return; }
   var S = {
-    phys: "lively", W: 800, H: 600, temp: 7, still: 0, frames: 0,
+    W: 800, H: 600, temp: 7, still: 0, frames: 0,
     running: false, settled: true, dead: false, reduced: false, visible: true,
     geom: { hub: { x: 400, y: 300 } }, vel: {}, deg: { hub: 0 }, view: { nodes: [], edges: [] }
   };

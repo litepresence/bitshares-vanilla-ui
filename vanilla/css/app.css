@@ -1627,21 +1627,30 @@ p.muted[aria-live="polite"],
 .pool-net-stage { position: relative; }
 .pool-net-stage > .pool-net-canvas { display: block; }
 .pool-net-stage > .pool-net-phys { position: absolute; left: 12px; bottom: 12px;
-  margin: 0; padding: 6px 10px; border-radius: 14px;
+  margin: 0; padding: 4px 8px; border-radius: 14px;
   background: var(--panel); border: 1px solid var(--border); }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }
-.pool-net-phys { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+/* Physics switch (2026-10-07): the BUTTON is the 44x44 touch target and the
+ * visible pill is a child track, so the control can read small on the canvas
+ * without dropping below the platform touch floor (principle #7). Half-size
+ * visuals, full-size target; no tooltip, no hint line. */
+.pool-net-phys { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
 .pool-net-physlabel { font-weight: bold; }
-.pool-net-physwitch { position: relative; width: 60px; height: 44px;
-  min-width: 60px; cursor: pointer; flex: none;
-  background: transparent; border: 2px solid var(--border); border-radius: 22px;
-  padding: 0; }
-.pool-net-physwitch[aria-checked="true"] { border-color: var(--accent); }
-.pool-net-physknob { position: absolute; top: 8px; left: 5px; width: 24px; height: 24px;
+.pool-net-physwitch { position: relative; width: 44px; height: 44px;
+  min-width: 44px; min-height: 44px; cursor: pointer; flex: none;
+  background: transparent; border: 0; padding: 0; }
+.pool-net-phystrack { position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px; height: 16px; box-sizing: border-box;
+  border: 2px solid var(--border); border-radius: 8px; background: transparent; }
+.pool-net-physwitch[aria-checked="true"] .pool-net-phystrack { border-color: var(--accent); }
+.pool-net-physknob { position: absolute; top: 2px; left: 2px; width: 8px; height: 8px;
   border-radius: 50%; background: var(--muted); }
-.pool-net-physwitch[aria-checked="true"] .pool-net-physknob { left: 27px; background: var(--accent); }
+.pool-net-physwitch[aria-checked="true"] .pool-net-physknob { left: 16px; background: var(--accent); }
 .pool-net-physstate { min-width: 2.5em; }
+.pool-net-phys:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px;
+  border-radius: 6px; }
 .pool-net-legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin: 8px 0; }
 .pool-net-chip { display: inline-flex; align-items: center; gap: 8px;

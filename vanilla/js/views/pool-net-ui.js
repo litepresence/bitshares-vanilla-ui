@@ -91,7 +91,7 @@ var PoolNetUI = (function () {
     var out = NP.drawScene(g.ctx, g.W, g.H, S.view, S.geom, {
       scale: S.scale, ox: S.ox, oy: S.oy, pathSet: S.pathSet,
       selPool: S.selPool, dim: S.dim, meta: S.meta,
-      hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: S.phys
+      hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: "lively"
     });
     S.hits = out.hits;
     S.mids = out.mids;
@@ -148,19 +148,22 @@ var PoolNetUI = (function () {
       } catch (e) { reduced = false; }
 
       var PP = phys();
-      var phys0 = "calm";
-      try { if (PP && typeof PP.readPhys === "function") phys0 = PP.readPhys(); } catch (e) { /* calm stands */ }
-      var temp0 = 6;
+      /* react = does a GESTURE wake the physics? (owner 2026-07-07 rework:
+       * one physics, so this is a flag, not a preset — readReact owns the
+       * persisted value and defaults to ON.) */
+      var react0 = true;
+      try { if (PP && typeof PP.readReact === "function") react0 = PP.readReact(); } catch (e) { /* ON stands */ }
+      var temp0 = 7;
       try {
-        if (PP && typeof PP._physForTest === "function") temp0 = (PP._physForTest()[phys0] || PP._physForTest().calm).temp0;
-      } catch (e) { /* v1 default stands */ }
+        if (PP && typeof PP._physForTest === "function") temp0 = (PP._physForTest().lively || {}).temp0 || temp0;
+      } catch (e) { /* shipped default stands */ }
       var S = {
         canvas: null, doc: doc, W: 300, H: 320,
         full: { nodes: [], edges: [] }, view: { nodes: [], edges: [] },
         geom: {}, vel: {}, deg: {}, meta: {}, dim: {}, pathSet: {}, pathFull: null,
         sel: { aId: null, bId: null, s: "" }, selPool: null, sig: "",
         scale: 1, ox: 0, oy: 0, hits: [], mids: [],
-        hoverNode: null, hoverEdge: null, phys: phys0,
+        hoverNode: null, hoverEdge: null, react: react0,
         running: false, settled: true, still: 0, frames: 0,
         temp: temp0, visible: true,
         dead: false, reduced: reduced, loaded: false, raf: 0, observer: null,
@@ -518,9 +521,9 @@ var PoolNetUI = (function () {
     return null;
   }
 
-  function _defaultPhysForTest() {
+  function _defaultReactForTest() {
     var P = phys();
-    if (P && typeof P._defaultPhysForTest === "function") return P._defaultPhysForTest();
+    if (P && typeof P._defaultReactForTest === "function") return P._defaultReactForTest();
     return "calm";
   }
 
@@ -559,7 +562,7 @@ var PoolNetUI = (function () {
     paintGraph: paintGraph,
     resolveNav: resolveNav,
     _physForTest: _physForTest,
-    _defaultPhysForTest: _defaultPhysForTest,
+    _defaultReactForTest: _defaultReactForTest,
     _navForTest: _navForTest,
     _stepForTest: _stepForTest,
     _layoutForTest: _layoutForTest,

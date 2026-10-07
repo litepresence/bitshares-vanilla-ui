@@ -102,16 +102,16 @@ var NetPaint = (function () {
   }
 
   /* Live PHYS table (single source of truth in PoolNetPhys); guarded
-   * fallback carries the curvature flags only (drawScene needs nothing
-   * else from a preset). */
+   * fallback carries the curvature flag only (drawScene needs nothing
+   * else from a preset, and there is only ONE preset since 2026-10-07). */
   function physTable() {
     try {
       if (typeof PoolNetPhys !== "undefined" && PoolNetPhys && typeof PoolNetPhys._physForTest === "function") {
         var p = PoolNetPhys._physForTest();
-        if (p && p.calm && p.lively) return p;
+        if (p && p.lively) return p;
       }
     } catch (e) { /* fallback below */ }
-    return { calm: { curved: false }, lively: { curved: true } };
+    return { lively: { curved: true } };
   }
 
   /* Deterministic circle seed: sorted ids around the ring, BTS centered when
@@ -163,16 +163,19 @@ var NetPaint = (function () {
    * @param {{nodes: Array, edges: Array}} view Filtered graph.
    * @param {Object} geom assetId -> {x, y} world coords.
    * @param {Object} paint {scale, ox, oy, pathSet, selPool, dim, meta,
-   *   hoverNode, hoverEdge, phys} display-only state (phys selects the
-   *   PHYS preset for edge curvature; positions are preset-independent).
+   *   hoverNode, hoverEdge, phys} display-only state (the legacy `phys`
+   *   hint is ignored now that one physics exists; positions are
+   *   preset-independent).
    * @returns {{hits: Array, mids: Array}} Screen-space hit lists.
    * Failure: never throws (a broken frame must not kill the loop).
    */
   function drawScene(ctx, W, H, view, geom, paint) {
     var hits = [], mids = [];
     try {
-      var PHYS = physTable();
-      var P = PHYS[(paint && paint.phys) || "calm"] || PHYS.calm;
+      /* One physics since the 2026-10-07 toggle rework: the curved-edge
+       * character is THE preset, so there is nothing to select. A legacy
+       * `paint.phys` hint is accepted and ignored. */
+      var P = physTable().lively;
       var border = _cssTok("--border", "#5a5a5a"), text = _cssTok("--text", "#c5cbce"),
         muted = _cssTok("--muted", "#758696"),
         buy = _cssTok("--buy", "#26de81");
@@ -282,7 +285,7 @@ var NetPaint = (function () {
     var out = drawScene(g.ctx, g.W, g.H, graph, circleLayout((graph && graph.nodes) || [], g.W, g.H), {
       scale: 1, ox: 0, oy: 0, pathSet: pathSet,
       selPool: opts.selPool || null, dim: opts.dimBrands || {},
-      meta: opts.meta || {}, hoverNode: null, hoverEdge: null, phys: opts.phys || "calm"
+      meta: opts.meta || {}, hoverNode: null, hoverEdge: null, phys: "lively"
     });
     try {
       canvas.setAttribute("tabindex", "0");
