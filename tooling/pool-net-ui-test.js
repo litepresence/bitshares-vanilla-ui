@@ -83,7 +83,10 @@ var skel = { pools: [
     phys.calm.cool === 0.98 && phys.calm.tempMin === 1 && phys.calm.pull === 0.008 &&
     phys.calm.springRest === 1.1 && phys.calm.springK === 0.015 && phys.calm.repCap === 5,
     "calm constants byte-identical to v1 shipped behavior");
-  ok(phys.lively.repPow === 2 && phys.lively.minFrames === 180, "lively degree-mass repulsion + min-run gate");
+  ok(phys.lively.repPow === 2 && phys.lively.minFrames === 400 &&
+    phys.lively.carry === 0.99 && phys.lively.cool === 0.9995 && phys.lively.tempMin === 1.5 &&
+    phys.lively.springK === 0.025 && phys.lively.maxFrames === 1500,
+    "lively underdamped tune (degree-mass + long run + stabilization budget)");
   function simState(mode) {
     return {
       phys: mode, W: 300, H: 320, temp: 6, still: 0, frames: 0,
@@ -137,6 +140,40 @@ var skel = { pools: [
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.999", sym: "A/B" }), "#/asset/A%2FB", "slash in symbol escaped (route-safe)");
   eqNav(nav(null), null, "null hit -> null (no navigation)");
   eqNav(nav({ x: 1, y: 1, assetId: "1.3.0", sym: "BTS" }), "#/asset/BTS", "keyboard Enter target (BTS-or-first) resolves to asset page");
+})();
+
+/* v2 lively-frozen regression (user report: switch "does nothing"): from an
+ * identical spread start, 300 lively steps must travel FARTHER than 300 calm
+ * steps (overshoot + longer run). A 1/d^3 repulsion typo once made lively
+ * weaker than calm at all working distances (frozen map) — this locks it. */
+(function () {
+  function ringState(mode) {
+    var geom = { hub: { x: 400, y: 300 } }, deg = { hub: 8 }, edges = [];
+    for (var i = 0; i < 8; i++) {
+      var id = "n" + i, a = (i / 8) * Math.PI * 2;
+      geom[id] = { x: 400 + 120 * Math.cos(a), y: 300 + 120 * Math.sin(a) };
+      deg[id] = 1; edges.push({ a: "hub", b: id, poolId: "1.19." + i });
+    }
+    var nodes = [{ assetId: "hub" }].concat(Object.keys(geom).filter(function (k) { return k !== "hub"; }).map(function (k) { return { assetId: k }; }));
+    var P = PoolNetUI._physForTest()[mode] || PoolNetUI._physForTest().calm;
+    return { phys: mode, W: 800, H: 600, temp: P.temp0, still: 0, frames: 0,
+      geom: geom, vel: {}, deg: deg, view: { nodes: nodes, edges: edges } };
+  }
+  function pathFor(mode, steps) {
+    var S = ringState(mode), path = 0, i, id, px = {}, first = true;
+    for (var s = 0; s < steps; s++) {
+      if (!first) {
+        for (id in S.geom) path += Math.hypot(S.geom[id].x - px[id][0], S.geom[id].y - px[id][1]);
+      }
+      for (id in S.geom) px[id] = [S.geom[id].x, S.geom[id].y];
+      first = false;
+      try { PoolNetUI._stepForTest(S); } catch (e) { return -1; }
+    }
+    return path;
+  }
+  var calm = pathFor("calm", 300), lively = pathFor("lively", 300);
+  ok(calm > 0 && lively > 0, "both presets travel (calm=" + Math.round(calm) + " lively=" + Math.round(lively) + ")");
+  ok(lively > calm * 1.5, "lively out-travels calm 1.5x (got " + (calm > 0 ? (lively / calm).toFixed(2) : "?") + "x)");
 })();
 
 console.log(pass + " passed, " + fail + " failed");

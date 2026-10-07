@@ -157,13 +157,19 @@ asset page. Commits `8de4dc9` (preset + switch), `f9ac027` (calm `springK`
 
 | pyvis character | Calm (v1, unchanged) | Lively |
 |---|---|---|
-| Repulsion law | `repPow: 1` (linear-ish, `min((k*k)/(d*d+1)*2, 5)`) | `repPow: 2` inverse-square degree-mass: `min(2.6·k²·deg/(d³+1), 40)`, `deg = 1+deg_a+deg_b` |
-| Springs | `springRest: 1.1`, `springK: 0.015` | long + weak: `springRest: 2.4`, `springK: 0.006` |
-| Carryover/damping | `carry: 0.8` | `carry: 0.92` (high — keeps the tumble alive) |
+| Repulsion law | `repPow: 1` (linear-ish, `min((k*k)/(d*d+1)*2, 5)`) | `repPow: 2` inverse-square degree-mass: `min(2.6·k²·deg/(d²+400), 40)`, `deg = 1+deg_a+deg_b`, 400px² softening keeps close-range finite |
+| Springs | `springRest: 1.1`, `springK: 0.015` | long + strong (underdamped overshoot): `springRest: 2.0`, `springK: 0.025` |
+| Carryover/damping | `carry: 0.8` | `carry: 0.99` (underdamped — oscillation decays over ~14s, not ~2s) |
 | Center pull | `pull: 0.008` | weak: `pull: 0.003` (`btsPullX: 3` both) |
-| Energy | `temp0: 6`, `cool: 0.98`, `tempMin: 1` | hotter + slower cool: `temp0: 10`, `cool: 0.995`, `tempMin: 0.5` |
-| Sleep gate | `stillTol: 0.35`, `stillFrames: 25`, `minFrames: 0` | late + min-run: `stillTol: 0.2`, `stillFrames: 90`, `minFrames: 180` |
+| Energy | `temp0: 6`, `cool: 0.98`, `tempMin: 1` | hotter + slow cool: `temp0: 10`, `cool: 0.9995`, `tempMin: 1.5` |
+| Sleep gate | `stillTol: 0.35`, `stillFrames: 25`, `minFrames: 0` | late + min-run + budget: `stillTol: 0.25`, `stillFrames: 120`, `minFrames: 400`, `maxFrames: 1500` (calm `maxFrames: 900` pure backstop) |
 | Edges | straight (`curved: false`) | quadratic midpoint offset `((edgeIndex % 5) − 2) · 6px` (`curved: true`) |
+
+Wall-clamp kills inward velocity (both presets): a node pressed against the
+wall previously retained full-temp velocity into it, so `maxStep` parked at
+the temp cap forever — the sleep gate never fired and the loop spun on a
+frozen map. `maxStep` is now measured post-clamp; calm equilibrium (never at
+walls) is unaffected.
 
 `stepFrame`/`drawScene`/`loop`/`wake` read `S.phys` (`PHYS[S.phys] ||
 PHYS.calm`); nothing else branches. `loop` counts `S.frames`, `wake` resets
@@ -204,6 +210,32 @@ existing handler wired through it (click/tap/keydown/twin/`goPool`/twin
 
 Audit found no missing/wrong record (`sym`/`poolId` construction intact), so
 no record fixes were needed — resolver + wiring only.
+
+### Follow-up 2026-10-07 — "buttons do nothing" (user report, root-caused)
+
+Report: flipping Calm→Lively showed no visible change; map stayed calm-like.
+Headless repro (`tooling/visual/probe-poolnet-phys.mjs`: click Lively, sample
+`canvas._netState` + displacement) proved the switch works mechanically
+(`S.phys` flips, loop runs, zero console errors) — the lively *dynamics* were
+at fault, in two layers:
+
+1. **Wrong falloff (shipped `d³+1`, should be `d²+soft`).** The v2 plan prose
+   said "inverse-square" but the dictated formula divided by `d³+1`: at working
+   distances (30–150px) lively repulsion ran ~7–18× *weaker* than calm, so the
+   map parked into static equilibrium in ~2s. Energy regression vector added
+   (`pool-net-ui-test.js`: identical ring start, 300 steps, lively path >
+   1.5× calm — failed 1.39× pre-fix, 3.51× post-fix).
+2. **Overdamped lively + wall-pin spin.** The first retune still parked 85/89
+   nodes (per-node browser trace: 4 movers >1px/s) while the loop spun forever:
+   wall-clamped nodes retained full-temp inward velocity, faking `maxStep` at
+   the cap so the sleep gate never fired. Fix: clamp zeroes inward velocity +
+   `maxStep` measured post-clamp; lively retuned underdamped (`carry: 0.99`,
+   `springK: 0.025`, `cool: 0.9995`, `tempMin: 1.5`) for ~14s visible oscillation
+   (asymmetric + ring harnesses both sleep via gate, ~825–850 frames);
+   `maxFrames` (lively 1500 / calm 900) is the pyvis-style stabilization
+   budget backstop. Browser proof: fresh-mount lively out-moves calm, T+12s
+   spread 146 vs 95, `/tmp/phys-lively-t12.png` vs `/tmp/phys-calm-t12.png`
+   (tight ball vs wide curved-edge starburst), zero console errors.
 
 ### Gate evidence (Task 3 run, 2026-10-06)
 
