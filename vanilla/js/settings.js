@@ -116,6 +116,13 @@ var SettingsPage = (function () {
     wrap.appendChild(hist.wrap);
     var esBox = hist.checkbox;
 
+    /* Outbound version-compare switch: persists versionCompare. The footer
+     * reads it live via readVersionCompare(), so turning it on needs no
+     * reload and turning it off stops the next attempt immediately. */
+    var vc = SettingsPrefs.buildVersionCompare(doc, settings, t);
+    wrap.appendChild(vc.wrap);
+    var vcBox = vc.checkbox;
+
     var themeHead = doc.createElement("h2");
     themeHead.textContent = t("settings.theme_title", "Theme");
     wrap.appendChild(themeHead);
@@ -346,6 +353,13 @@ var SettingsPage = (function () {
     // live on next history call, so no reconnect or re-render is needed).
     esBox.addEventListener("change", function () {
       try { Store.saveSettings({esEnabled: esBox.checked === true}); }
+      catch (e) { /* pref write failed — box keeps user pick, next load reseeds */ }
+    });
+
+    // Events: version-compare opt-in. Same contract as esEnabled — persist
+    // only; readVersionCompare() consults the store live.
+    vcBox.addEventListener("change", function () {
+      try { Store.saveSettings({versionCompare: vcBox.checked === true}); }
       catch (e) { /* pref write failed — box keeps user pick, next load reseeds */ }
     });
 

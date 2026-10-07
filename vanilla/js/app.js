@@ -748,6 +748,18 @@ var App = (function () {
     return "https://api.github.com/repos/" + repo + "/compare/" + branch + "..." + commit;
   }
 
+  /** Current `versionCompare` opt-in, read live so the Settings toggle takes
+   *  effect without a reload. Params: none. Returns: boolean.
+   *  Failure: false (opt-OUT) when the store is absent or unreadable — an
+   *  unreadable preference must never authorize an outbound request. */
+  function readVersionCompare() {
+    try {
+      if (typeof Store === "undefined" || !Store || typeof Store.loadSettings !== "function") return false;
+      var s = Store.loadSettings();
+      return !!(s && s.versionCompare === true);
+    } catch (e) { return false; }
+  }
+
   /**
    * Relation fragment for footer-left (Master link appended by caller).
    * @param {{ahead: number, behind: number}} cmp counts
@@ -866,10 +878,20 @@ var App = (function () {
   }
 
   /** Kick one guarded compare fetch; completion repaints. Never throws.
+   *  OPT-IN ONLY (anti-rot §4.5 rule b): the compare is the ONE outbound
+   *  request the wallet makes, and a hosted service is a dependency the
+   *  doctrine says to refuse by default. So it runs only when the operator
+   *  switched it on in Settings (store.js `versionCompare`, default false).
+   *  Found by the two-ended viewport audit: an always-on call to a
+   *  not-yet-public repo 404'd on every page load of every route, leaking
+   *  the visitor's IP to GitHub and failing the console-error assertion
+   *  app-wide. The local same-origin version stamp needs no network and is
+   *  unaffected.
    * @returns {void} */
   function maybeRefreshCmp() {
     if (!buildInfo || buildFetching) return;
     if (typeof fetch === "undefined") return;
+    if (readVersionCompare() !== true) return;
     if (buildCmp && (Date.now() - buildCmpAt) <= COMPARE_TTL_MS) return;
     var cached = readCmpCache(buildInfo.commit);
     if (cached) { buildCmp = cached; buildCmpAt = Date.now(); return; }

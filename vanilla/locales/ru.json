@@ -3136,6 +3136,8 @@
       "settings.theme_title",
       "settings.theme_vanilla_light",
       "settings.title",
+      "settings.vc_note",
+      "settings.vc_toggle",
       "shell.acting_default",
       "shell.acting_loading",
       "shell.acting_unlocked",
@@ -3897,7 +3899,9 @@
     "sign_sites_empty": "No sites approved yet — approvals appear here with per-site revoke.",
     "sign_revoke": "Revoke",
     "sign_badge": "Extension signing active — details in Login",
-    "sign_badge_local": "In-page signing — details in Login"
+    "sign_badge_local": "In-page signing — details in Login",
+    "vc_note": "Отправляет один запрос в GitHub из вашего браузера. По умолчанию выключено; локальная отметка версии ниже всегда отображается без сетевых запросов.",
+    "vc_toggle": "Проверить GitHub на наличие новой версии"
   },
   "shell": {
     "brand": "BitShares",

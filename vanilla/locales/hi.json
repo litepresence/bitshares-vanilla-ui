@@ -3136,6 +3136,8 @@
       "settings.theme_title",
       "settings.theme_vanilla_light",
       "settings.title",
+      "settings.vc_note",
+      "settings.vc_toggle",
       "shell.acting_default",
       "shell.acting_loading",
       "shell.acting_unlocked",
@@ -3897,7 +3899,9 @@
     "sign_sites_empty": "No sites approved yet — approvals appear here with per-site revoke.",
     "sign_revoke": "Revoke",
     "sign_badge": "Extension signing active — details in Login",
-    "sign_badge_local": "In-page signing — details in Login"
+    "sign_badge_local": "In-page signing — details in Login",
+    "vc_note": "आपके ब्राउज़र से GitHub पर एक अनुरोध भेजता है। डिफ़ॉल्ट रूप से बंद; नीचे स्थानीय संस्करण मुहर हमेशा बिना किसी नेटवर्क कॉल के दिखती है।",
+    "vc_toggle": "GitHub पर नया संस्करण देखें"
   },
   "shell": {
     "brand": "BitShares",

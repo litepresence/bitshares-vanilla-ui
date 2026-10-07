@@ -3136,6 +3136,8 @@
       "settings.theme_title",
       "settings.theme_vanilla_light",
       "settings.title",
+      "settings.vc_note",
+      "settings.vc_toggle",
       "shell.acting_default",
       "shell.acting_loading",
       "shell.acting_unlocked",
@@ -3897,7 +3899,9 @@
     "sign_sites_empty": "No sites approved yet — approvals appear here with per-site revoke.",
     "sign_revoke": "Revoke",
     "sign_badge": "Extension signing active — details in Login",
-    "sign_badge_local": "In-page signing — details in Login"
+    "sign_badge_local": "In-page signing — details in Login",
+    "vc_note": "从你的浏览器向 GitHub 发送一次请求。默认关闭；下方的本地版本标记无需任何网络请求即可始终显示。",
+    "vc_toggle": "在 GitHub 上检查是否有更新版本"
   },
   "shell": {
     "brand": "BitShares",

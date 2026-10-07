@@ -423,6 +423,38 @@ async function settle(page, waitMs) {
   await page.waitForTimeout(waitMs);
 }
 
+/* launchBrowser: a fresh browser with the vendored browsers path applied.
+ * Params: none. Returns: Promise<Browser>.
+ * Failure: throws -- the caller decides whether to retry or record. */
+async function launchBrowser() {
+  ensureBrowsers();
+  var pw = await import("./node_modules/playwright-core/index.js");
+  var chromium = pw.chromium || (pw.default && pw.default.chromium);
+  return chromium.launch();
+}
+
+/* makeContext: one context per route, carrying the testnet bootstrap.
+ * A fresh context per route is what keeps a long sweep alive: pages leak
+ * inside a long-lived context and the browser eventually dies mid-run
+ * (observed: crash at route 21 of the first full sweep).
+ * Params: browser; vp viewport {id,width,height}. Returns: Promise<Context>. */
+async function makeContext(browser, vp) {
+  var context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+  /* Same bootstrap shot.mjs uses (shot.mjs:47-66): pin testnet, dismiss the
+   * tour so it never covers the page under test. */
+  await context.addInitScript(function ({ node, flag }) {
+    try {
+      var raw = localStorage.getItem("bts-vanilla-settings-v1");
+      var s = raw ? JSON.parse(raw) : {};
+      s.network = "testnet";
+      s.activeNode = node;
+      localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
+      localStorage.setItem("bts-vanilla-tour-dismissed-v1", flag);
+    } catch (e) { /* app defaults stand */ }
+  }, { node: TESTNET_NODE, flag: "1" });
+  return context;
+}
+
 /* sweep: measure every route at every viewport against live testnet.
  * Params: opts { port, viewportId?, routeFilter?, waitMs?, shotsDir?, reportPath? }.
  *   Defaults: port 8081, waitMs 6000, shotsDir docs/parity/viewport-shots,
@@ -430,8 +462,9 @@ async function settle(page, waitMs) {
  * Returns: Promise<Report>. Report = { ranAt, network, node, viewports,
  *   routesSwept, results, skips }. Skipped routes come back in Report.skips
  *   with their recorded reason -- never counted as passes.
- * Failure: a route that throws mid-measure records metrics.overflowPx = -1 and
- *   an A4-console entry naming the error; the run never aborts. */
+ * Failure: a route that cannot be measured records overflowPx -1 plus an
+ *   A4-console entry naming the crash, and is retried once on a relaunched
+ *   browser. The run itself never aborts. */
 export async function sweep(opts) {
   opts = opts || {};
   var port = opts.port || 8081;
@@ -444,82 +477,72 @@ export async function sweep(opts) {
   });
 
   mkdirSync(shotsDir, { recursive: true });
-  ensureBrowsers();
-
-  /* Dev-only dep, imported lazily so the pure exports stay importable without
-   * it. playwright-core is CJS, so `chromium` may sit on .default. */
-  var pw = await import("./node_modules/playwright-core/index.js");
-  var chromium = pw.chromium || (pw.default && pw.default.chromium);
-  var browser = await chromium.launch();
-  var results = [];
 
   /* Skips are reported whether or not the route filter narrows the sweep. */
   var skips = ROUTES.filter(function (r) { return r.group === "skip"; })
     .map(function (r) { return { hash: r.hash, reason: r.note || "no reason recorded" }; });
 
-  try {
-    for (var vi = 0; vi < viewports.length; vi++) {
-      var vp = viewports[vi];
-      var context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } });
+  var browser = await launchBrowser();
+  var results = [];
 
-      /* Same bootstrap shot.mjs uses (shot.mjs:47-66): pin testnet, dismiss the
-       * tour so it never covers the page under test. */
-      await context.addInitScript(function ({ node, flag }) {
+  for (var vi = 0; vi < viewports.length; vi++) {
+    var vp = viewports[vi];
+
+    for (var ri = 0; ri < routes.length; ri++) {
+      var r = routes[ri];
+      var attempt = 0, metrics = null, errors = [], shot = null, verdict = null;
+
+      /* One retry: a dead browser is relaunched and the route re-measured. */
+      while (attempt < 2) {
+        attempt++;
+        var context = null, page = null;
+        errors = [];
         try {
-          var raw = localStorage.getItem("bts-vanilla-settings-v1");
-          var s = raw ? JSON.parse(raw) : {};
-          s.network = "testnet";
-          s.activeNode = node;
-          localStorage.setItem("bts-vanilla-settings-v1", JSON.stringify(s));
-          localStorage.setItem("bts-vanilla-tour-dismissed-v1", flag);
-        } catch (e) { /* app defaults stand */ }
-      }, { node: TESTNET_NODE, flag: "1" });
+          context = await makeContext(browser, vp);
+          page = await context.newPage();
+          page.on("console", function (m) { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
+          page.on("pageerror", function (e) { errors.push("pageerror: " + String(e).slice(0, 300)); });
+          try {
+            page.on("unhandledrejection", function (reason) { errors.push("unhandled: " + String(reason).slice(0, 300)); });
+          } catch (e) { /* older playwright-core: pageerror coverage stands */ }
 
-      for (var ri = 0; ri < routes.length; ri++) {
-        var r = routes[ri];
-        var page = await context.newPage();
-        var errors = [];
-        page.on("console", function (m) { if (m.type() === "error") errors.push(m.text().slice(0, 300)); });
-        page.on("pageerror", function (e) { errors.push("pageerror: " + String(e).slice(0, 300)); });
-        try {
-          page.on("unhandledrejection", function (reason) { errors.push("unhandled: " + String(reason).slice(0, 300)); });
-        } catch (e) { /* older playwright-core: pageerror coverage stands */ }
-
-        var metrics = { overflowPx: -1, scrollRegion: "", widestSelector: "", smallTargets: [],
-          contentRatio: 0, contentSelector: "", clippedText: [], viewportMeta: "", consoleErrors: errors };
-
-        try {
           await page.goto("http://localhost:" + port + "/" + r.hash,
             { waitUntil: "domcontentloaded", timeout: 30000 });
           await settle(page, waitMs);
           metrics = await page.evaluate(measureInPage);
           metrics.consoleErrors = errors;
+
+          verdict = classify(metrics, vp.width);
+          if (shouldShot(r.hash, verdict.verdict)) {
+            shot = join(shotsDir, slugFor(r.hash) + "-" + vp.id + ".png");
+            try { await page.screenshot({ path: shot }); } catch (e) { shot = null; }
+          }
         } catch (e) {
-          errors.push("sweep: " + String((e && e.message) || e).slice(0, 200));
-          metrics.consoleErrors = errors;
+          metrics = { overflowPx: -1, scrollRegion: "", widestSelector: "", smallTargets: [],
+            contentRatio: 0, contentSelector: "", clippedText: [], viewportMeta: "",
+            consoleErrors: ["sweep-crash: " + String((e && e.message) || e).slice(0, 200)] };
+          verdict = classify(metrics, vp.width);
+          /* The browser is the likely casualty -- relaunch before retrying. */
+          try { await browser.close(); } catch (e2) { /* already gone */ }
+          browser = await launchBrowser();
+        } finally {
+          try { if (page) await page.close(); } catch (e) { /* page already gone */ }
+          try { if (context) await context.close(); } catch (e) { /* context already gone */ }
         }
-
-        var verdict = classify(metrics, vp.width);
-        var shot = null;
-        if (shouldShot(r.hash, verdict.verdict)) {
-          shot = join(shotsDir, slugFor(r.hash) + "-" + vp.id + ".png");
-          try { await page.screenshot({ path: shot }); } catch (e) { shot = null; }
-        }
-
-        results.push({
-          hash: r.hash, group: r.group, viewport: vp.id, width: vp.width,
-          verdict: verdict.verdict, fails: verdict.fails, notes: verdict.notes,
-          metrics: metrics, shot: shot,
-        });
-        process.stderr.write("[" + (ri + 1) + "/" + routes.length + " " + vp.id + "] "
-          + r.hash + " -> " + verdict.verdict + "\n");
-        await page.close();
+        if (!metrics || metrics.overflowPx >= 0 || attempt >= 2) break;
       }
-      await context.close();
+
+      results.push({
+        hash: r.hash, group: r.group, viewport: vp.id, width: vp.width,
+        verdict: verdict.verdict, fails: verdict.fails, notes: verdict.notes,
+        metrics: metrics, shot: shot,
+      });
+      process.stderr.write("[" + (vi * routes.length + ri + 1) + "/" + (viewports.length * routes.length)
+        + " " + vp.id + "] " + r.hash + " -> " + verdict.verdict + "\n");
     }
-  } finally {
-    await browser.close();
   }
+
+  try { await browser.close(); } catch (e) { /* already closed */ }
 
   var report = {
     ranAt: new Date().toISOString(),

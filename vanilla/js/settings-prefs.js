@@ -120,6 +120,32 @@ var SettingsPrefs = (function () {
     return { wrap: wrap, checkbox: box };
   }
 
+  /* Outbound version-compare switch. Mirrors buildHistory above: a visible
+   * toggle for the ONE request the wallet makes to a third party, off by
+   * default (anti-rot §4.5 rule b). The local build stamp is same-origin and
+   * always shown; only the "ahead of master" enrichment needs this.
+   * Params: doc, settings (for the checked seed), t. Returns
+   *   {wrap, checkbox}. Never throws. */
+  function buildVersionCompare(doc, settings, t) {
+    var wrap = doc.createElement("div");
+    wrap.id = "vc-block";
+    var label = doc.createElement("label");
+    var box = doc.createElement("input");
+    box.type = "checkbox";
+    box.id = "vc-toggle";
+    try { box.checked = !!(settings && settings.versionCompare === true); }
+    catch (e) { box.checked = false; }
+    try { box.style.minHeight = "44px"; } catch (e) { /* label taps anyway */ }
+    label.appendChild(box);
+    label.appendChild(doc.createTextNode(" " + t("settings.vc_toggle", "Check GitHub for a newer version")));
+    wrap.appendChild(label);
+    var note = doc.createElement("p");
+    note.className = "muted";
+    note.textContent = t("settings.vc_note", "Sends one request to GitHub from your browser. Off by default; the local version stamp below always shows without any network call.");
+    wrap.appendChild(note);
+    return { wrap: wrap, checkbox: box };
+  }
+
   /* Signing section (Tier 2): route display + override + warning + sites.
    * Builds DOM only — radio/revoke wiring lives in auth-ui.js login view
    * (it owns the login re-mount; Settings no longer mounts this section).
@@ -257,6 +283,7 @@ var SettingsPrefs = (function () {
     buildTheme: buildTheme,
     buildLocale: buildLocale,
     buildHistory: buildHistory,
+    buildVersionCompare: buildVersionCompare,
     buildSigning: buildSigning
   };
 })();

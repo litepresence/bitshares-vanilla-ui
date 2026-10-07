@@ -110,6 +110,7 @@ var Store = (function () {
       theme: "ref-ui-theme",
       locale: "en",
       esEnabled: true,
+      versionCompare: false,
       signing: "auto"
     };
   }
@@ -163,12 +164,19 @@ var Store = (function () {
      * 2026-10-02: community ES is a main feature). Only an explicit false
      * opts out, so old wallets gain history illumination, never lose it. */
     var esEnabled = (stored.esEnabled === false) ? false : true;
+    /* versionCompare: outbound GitHub compare for the footer build stamp.
+     * DEFAULT OFF (anti-rot §4.5 rule b: an external hosted service is a new
+     * dependency, and the default answer is no). Only an explicit true opts
+     * in; a pre-existing envelope without the key therefore makes ZERO
+     * outbound calls, which is what the viewport audit requires. The
+     * same-origin version stamp is unaffected — it needs no network. */
+    var versionCompare = (stored.versionCompare === true) ? true : false;
     /* signing: Tier 2 route pin ("auto"|"extension"|"browser", default auto
      * — extension route when a channel is detected). Unknown values read as
      * auto (fail toward the default, never toward a forced route). */
     var signing = (stored.signing === "extension" || stored.signing === "browser" ||
       stored.signing === "auto") ? stored.signing : base.signing;
-    return { network: network, activeNode: activeNode, customNodes: customNodes, hiddenNodes: hiddenNodes, theme: theme, locale: locale, esEnabled: esEnabled, signing: signing };
+    return { network: network, activeNode: activeNode, customNodes: customNodes, hiddenNodes: hiddenNodes, theme: theme, locale: locale, esEnabled: esEnabled, versionCompare: versionCompare, signing: signing };
   }
 
   /* saveSettings: merges a patch onto current settings, persists + emits.
@@ -186,6 +194,7 @@ var Store = (function () {
       theme: current.theme,
       locale: current.locale,
       esEnabled: current.esEnabled,
+      versionCompare: current.versionCompare,
       signing: current.signing
     };
     if (patch && typeof patch === "object") {
@@ -196,6 +205,7 @@ var Store = (function () {
       if (typeof patch.theme === "string") next.theme = patch.theme;
       if (typeof patch.locale === "string") next.locale = patch.locale;
       if (typeof patch.esEnabled === "boolean") next.esEnabled = patch.esEnabled;
+      if (typeof patch.versionCompare === "boolean") next.versionCompare = patch.versionCompare;
       if (patch.signing === "auto" || patch.signing === "extension" || patch.signing === "browser") {
         next.signing = patch.signing;
       }
