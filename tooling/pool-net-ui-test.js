@@ -467,5 +467,20 @@ var skel = { pools: [
   } catch (e) { /* harness stands */ }
 })();
 
+// Edge width vectors: balance digits (pool) and volume digits (market)
+// size identically; absent data renders thin.
+(function () {
+  var NP = null;
+  try { NP = require("../vanilla/js/views/pool-net-paint.js"); } catch (e) { NP = null; }
+  if (!NP || typeof NP._edgeWidthForTest !== "function") { ok(false, "paint exposes _edgeWidthForTest"); return; }
+  var w = NP._edgeWidthForTest;
+  var bal = w({ P: { balance_a_raw: "5000000", balance_b_raw: "250000" } }, "P");
+  var vol = w({ X: { volBaseRaw: "5000000250000" } }, "X");
+  ok(bal > 1.0 && vol === bal, "volume digits size identically to balance digits (got " + vol + " vs " + bal + ")");
+  ok(w({ Y: { volBaseRaw: "5000000" } }, "Y") === 0.8 + 7 / 14, "width follows the digit-length formula");
+  ok(w({}, "Z") === 1.0, "absent data renders thin");
+  ok(w({ X: { volBaseRaw: "not-a-number" } }, "X") === 1.0, "malformed volume renders thin");
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

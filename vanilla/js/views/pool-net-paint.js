@@ -87,8 +87,9 @@ var NetPaint = (function () {
   }
 
   /* Edge width, pixels only: log-weight from raw-digit balance lengths
-   * (big pools pull thicker lines); skeleton-only edges (no balances yet)
-   * render thin. Never Number(balance) — lengths only. */
+   * (big pools pull thicker lines) or volume digits (desk volume map —
+   * same formula, same look: big markets pull thicker lines); edges with
+   * neither render thin. Never Number(balance/volume) — lengths only. */
   function _edgeWidth(meta, poolId) {
     try {
       var m = meta ? meta[poolId] : null;
@@ -96,6 +97,11 @@ var NetPaint = (function () {
       if (typeof a === "string" && /^\d+$/.test(a) && typeof b === "string" && /^\d+$/.test(b)) {
         var digits = a.replace(/^0+/, "").length + b.replace(/^0+/, "").length;
         return 0.8 + Math.min(digits / 14, 1.6);
+      }
+      var v = m && m.volBaseRaw;
+      if (typeof v === "string" && /^\d+$/.test(v)) {
+        var vd = v.replace(/^0+/, "").length;
+        return 0.8 + Math.min(vd / 14, 1.6);
       }
     } catch (e) { /* thin below */ }
     return 1.0;
@@ -313,7 +319,8 @@ var NetPaint = (function () {
     circleLayout: circleLayout,
     fitCanvas: fitCanvas,
     brandOf: brandOf,
-    brandFill: brandFill
+    brandFill: brandFill,
+    _edgeWidthForTest: _edgeWidth
   };
 })();
 
