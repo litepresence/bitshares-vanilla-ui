@@ -69,7 +69,7 @@ export const ROUTES = [
   { src: "/deposit-withdraw/:gateway", hash: "#/deposit-withdraw/XBTSX", group: "expanded" },
   { src: "/deposit-withdraw/:gateway", hash: "#/deposit-withdraw/IOB", group: "expanded" },
   { src: "/deposit-withdraw/:gateway", hash: "#/deposit-withdraw/GDEX", group: "expanded" },
-  { src: "/deposit-withdraw/:gateway", hash: "#/deposit-withdraw/BIT20", group: "expanded" },
+  { src: "/deposit-withdraw/:gateway", hash: "#/deposit-withdraw/BTWTY", group: "expanded" },
   { src: "/deposit-withdraw", hash: "#/deposit-withdraw", group: "static" },
   { src: "/create-account", hash: "#/create-account", group: "static" },
   { src: "/login", hash: "#/login", group: "static" },

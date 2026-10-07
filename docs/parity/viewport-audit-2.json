@@ -1,0 +1,6604 @@
+{
+  "ranAt": "2026-10-07T21:24:56.661Z",
+  "network": "testnet",
+  "node": "wss://testnet.xbts.io/ws",
+  "viewports": [
+    {
+      "id": "phone",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "id": "desk",
+      "width": 2560,
+      "height": 1080
+    }
+  ],
+  "routesSwept": 99,
+  "results": [
+    {
+      "hash": "#/",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a.subtle-btn",
+            "text": "Login",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a.subtle-btn",
+            "text": "Pools",
+            "w": 41,
+            "h": 19
+          },
+          {
+            "selector": "a.subtle-btn",
+            "text": "HTLC",
+            "w": 42,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/account/lite-test-1",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "TEST",
+            "w": 40,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/accounts",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a.subtle-btn",
+            "text": "Login",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/accounts-phone.png"
+    },
+    {
+      "hash": "#/market/USD_TEST",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.mkt-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/market/BTS_HONEST.BTC",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.mkt-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/credit-offer/1.21.43",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/deal/1.22.70",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/credit-offer",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/samet",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/settings/nodes",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/settings",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/settings-phone.png"
+    },
+    {
+      "hash": "#/invoice",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/proposals/1.10.1488",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/proposals",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/tickets",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/vesting",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/authorities",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/lists",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/airdrop",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/deposit-withdraw/XBTSX",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-XBTSX-phone.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/IOB",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-IOB-phone.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/GDEX",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-GDEX-phone.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/BIT20",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-BIT20-phone.png"
+    },
+    {
+      "hash": "#/deposit-withdraw",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-phone.png"
+    },
+    {
+      "hash": "#/create-account",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/login",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/registration",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/registration/local",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/registration-local-phone.png"
+    },
+    {
+      "hash": "#/registration/cloud",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/registration-cloud-phone.png"
+    },
+    {
+      "hash": "#/news",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/voting",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-phone.png"
+    },
+    {
+      "hash": "#/explorer/blocks",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/assets",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/pools",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/accounts",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/witnesses",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-witnesses-phone.png"
+    },
+    {
+      "hash": "#/explorer/committee",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-committee-phone.png"
+    },
+    {
+      "hash": "#/explorer/markets",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/fees",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-fees-phone.png"
+    },
+    {
+      "hash": "#/explorer/feeds",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/asset/HONEST.BTC",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/asset/BTS",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/block/100916767",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/block/100916767/0",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/borrow",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.borrow-prose",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/barter",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/direct-debit",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/spotlight",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/transfer/lite-test-1",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/transfer",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/transfer-phone.png"
+    },
+    {
+      "hash": "#/wallet/password",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/wallet",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/create-wallet-brainkey",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/existing-account",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/create-worker",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/create-worker-phone.png"
+    },
+    {
+      "hash": "#/about",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Help",
+            "w": 36,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/community",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Help",
+            "w": 36,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "News",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/disclaimer",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/wallets",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/dex-trading",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/assets-mpa",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/pools",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/proposals",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/charts",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/help/glossary",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-glossary-phone.png"
+    },
+    {
+      "hash": "#/htlc/1.16.621",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/htlc-1-16-621-phone.png"
+    },
+    {
+      "hash": "#/htlc",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/prediction",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/instant-trade",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/instant-trade-phone.png"
+    },
+    {
+      "hash": "#/instant-trade/USD_TEST",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/pools/1.19.66",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/pools-1-19-66-phone.png"
+    },
+    {
+      "hash": "#/pools",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/markets",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/alerts",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "pageerror: TypeError: touchable is not a function",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.alerts-view",
+        "clippedText": [],
+        "inlineLinks": [],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "pageerror: TypeError: touchable is not a function"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/alerts-phone.png"
+    },
+    {
+      "hash": "#/trollbox",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.trollbox-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/trollbox-phone.png"
+    },
+    {
+      "hash": "#/assets",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/assets/create",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-create-phone.png"
+    },
+    {
+      "hash": "#/assets/update/HONEST.BTC",
+      "group": "live-id",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/assets/issue",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/assets/feed",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/fees",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.fees-view",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/referrals",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/favourites",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/top-ops",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/ops",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/ops-phone.png"
+    },
+    {
+      "hash": "#/txbuilder",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/api-lab",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.card",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/es-lab",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/wallet",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/trade",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/earn",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/govern",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/explore",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/labs",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu/personal",
+      "group": "expanded",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-personal-phone.png"
+    },
+    {
+      "hash": "#/this-route-does-not-exist",
+      "group": "static",
+      "viewport": "phone",
+      "width": 390,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "nav#nav",
+        "widestSelector": "span.nav-label",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 38,
+            "h": 13
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a.subtle-btn",
+            "text": "Login",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a.subtle-btn",
+            "text": "Pools",
+            "w": 41,
+            "h": 19
+          },
+          {
+            "selector": "a.subtle-btn",
+            "text": "HTLC",
+            "w": 42,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/root-desk.png"
+    },
+    {
+      "hash": "#/account/lite-test-1",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "TEST",
+            "w": 36,
+            "h": 16
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/accounts",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "h1",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a.subtle-btn",
+            "text": "Login",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/accounts-desk.png"
+    },
+    {
+      "hash": "#/market/USD_TEST",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.98,
+        "contentSelector": "div.wrap.mkt-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/market/BTS_HONEST.BTC",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.98,
+        "contentSelector": "div.wrap.mkt-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/credit-offer/1.21.43",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/credit-offer-1-21-43-desk.png"
+    },
+    {
+      "hash": "#/deal/1.22.70",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deal-1-22-70-desk.png"
+    },
+    {
+      "hash": "#/credit-offer",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "53% of viewport",
+          "selector": "table.node-table.offers-table"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.526,
+        "contentSelector": "table.node-table.offers-table",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Open",
+            "w": 43,
+            "h": 19
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/credit-offer-desk.png"
+    },
+    {
+      "hash": "#/samet",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/samet-desk.png"
+    },
+    {
+      "hash": "#/settings/nodes",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/settings",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/settings-desk.png"
+    },
+    {
+      "hash": "#/invoice",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/invoice-desk.png"
+    },
+    {
+      "hash": "#/proposals/1.10.1488",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/proposals-1-10-1488-desk.png"
+    },
+    {
+      "hash": "#/proposals",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/proposals-desk.png"
+    },
+    {
+      "hash": "#/tickets",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/tickets-desk.png"
+    },
+    {
+      "hash": "#/vesting",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/vesting-desk.png"
+    },
+    {
+      "hash": "#/authorities",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/authorities-desk.png"
+    },
+    {
+      "hash": "#/lists",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/lists-desk.png"
+    },
+    {
+      "hash": "#/airdrop",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/airdrop-desk.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/XBTSX",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        },
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-XBTSX-desk.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/IOB",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        },
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-IOB-desk.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/GDEX",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        },
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-GDEX-desk.png"
+    },
+    {
+      "hash": "#/deposit-withdraw/BIT20",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        },
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-BIT20-desk.png"
+    },
+    {
+      "hash": "#/deposit-withdraw",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        },
+        {
+          "id": "A4-console",
+          "detail": "Failed to load resource: net::ERR_NAME_NOT_RESOLVED",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "Failed to load resource: net::ERR_NAME_NOT_RESOLVED"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/deposit-withdraw-desk.png"
+    },
+    {
+      "hash": "#/create-account",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/create-account-desk.png"
+    },
+    {
+      "hash": "#/login",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/login-desk.png"
+    },
+    {
+      "hash": "#/registration",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/registration-desk.png"
+    },
+    {
+      "hash": "#/registration/local",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/registration-local-desk.png"
+    },
+    {
+      "hash": "#/registration/cloud",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/registration-cloud-desk.png"
+    },
+    {
+      "hash": "#/news",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/news-desk.png"
+    },
+    {
+      "hash": "#/voting",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-desk.png"
+    },
+    {
+      "hash": "#/explorer/blocks",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/assets",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/pools",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/accounts",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/witnesses",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-witnesses-desk.png"
+    },
+    {
+      "hash": "#/explorer/committee",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-committee-desk.png"
+    },
+    {
+      "hash": "#/explorer/markets",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/explorer/fees",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/explorer-fees-desk.png"
+    },
+    {
+      "hash": "#/explorer/feeds",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [
+          "h1.xplore-sr"
+        ],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/asset/HONEST.BTC",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/asset/BTS",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/block/100916767",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/block/100916767/0",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/borrow",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.borrow-prose"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.borrow-prose",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/borrow-desk.png"
+    },
+    {
+      "hash": "#/barter",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "h1",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/direct-debit",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/direct-debit-desk.png"
+    },
+    {
+      "hash": "#/spotlight",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/spotlight-desk.png"
+    },
+    {
+      "hash": "#/transfer/lite-test-1",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/transfer",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/transfer-desk.png"
+    },
+    {
+      "hash": "#/wallet/password",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/wallet-password-desk.png"
+    },
+    {
+      "hash": "#/wallet",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/wallet-desk.png"
+    },
+    {
+      "hash": "#/create-wallet-brainkey",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/create-wallet-brainkey-desk.png"
+    },
+    {
+      "hash": "#/existing-account",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/existing-account-desk.png"
+    },
+    {
+      "hash": "#/create-worker",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/create-worker-desk.png"
+    },
+    {
+      "hash": "#/about",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Help",
+            "w": 36,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/about-desk.png"
+    },
+    {
+      "hash": "#/community",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Help",
+            "w": 36,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/community-desk.png"
+    },
+    {
+      "hash": "#/help",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "News",
+            "w": 43,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-desk.png"
+    },
+    {
+      "hash": "#/help/disclaimer",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-disclaimer-desk.png"
+    },
+    {
+      "hash": "#/help/wallets",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-wallets-desk.png"
+    },
+    {
+      "hash": "#/help/dex-trading",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-dex-trading-desk.png"
+    },
+    {
+      "hash": "#/help/assets-mpa",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-assets-mpa-desk.png"
+    },
+    {
+      "hash": "#/help/pools",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-pools-desk.png"
+    },
+    {
+      "hash": "#/help/proposals",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-proposals-desk.png"
+    },
+    {
+      "hash": "#/help/charts",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-charts-desk.png"
+    },
+    {
+      "hash": "#/help/glossary",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.help-article"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.help-article",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/help-glossary-desk.png"
+    },
+    {
+      "hash": "#/htlc/1.16.621",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/htlc-1-16-621-desk.png"
+    },
+    {
+      "hash": "#/htlc",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/htlc-desk.png"
+    },
+    {
+      "hash": "#/prediction",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/prediction-desk.png"
+    },
+    {
+      "hash": "#/instant-trade",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/instant-trade-desk.png"
+    },
+    {
+      "hash": "#/instant-trade/USD_TEST",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/instant-trade-USD-TEST-desk.png"
+    },
+    {
+      "hash": "#/pools/1.19.66",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/pools-1-19-66-desk.png"
+    },
+    {
+      "hash": "#/pools",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A4-console",
+          "detail": "pageerror: SyntaxError: Unexpected token '*'",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "pageerror: SyntaxError: Unexpected token '*'"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/pools-desk.png"
+    },
+    {
+      "hash": "#/markets",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/alerts",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.alerts-view"
+        },
+        {
+          "id": "A4-console",
+          "detail": "pageerror: TypeError: touchable is not a function",
+          "selector": ""
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.alerts-view",
+        "clippedText": [],
+        "inlineLinks": [],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": [
+          "pageerror: TypeError: touchable is not a function"
+        ]
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/alerts-desk.png"
+    },
+    {
+      "hash": "#/trollbox",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.trollbox-wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.trollbox-wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/trollbox-desk.png"
+    },
+    {
+      "hash": "#/assets",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-desk.png"
+    },
+    {
+      "hash": "#/assets/create",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-create-desk.png"
+    },
+    {
+      "hash": "#/assets/update/HONEST.BTC",
+      "group": "live-id",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-update-HONEST-BTC-desk.png"
+    },
+    {
+      "hash": "#/assets/issue",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-issue-desk.png"
+    },
+    {
+      "hash": "#/assets/feed",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/assets-feed-desk.png"
+    },
+    {
+      "hash": "#/fees",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap.fees-view"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap.fees-view",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/fees-desk.png"
+    },
+    {
+      "hash": "#/referrals",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/referrals-desk.png"
+    },
+    {
+      "hash": "#/favourites",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/favourites-desk.png"
+    },
+    {
+      "hash": "#/top-ops",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/top-ops-desk.png"
+    },
+    {
+      "hash": "#/ops",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/ops-desk.png"
+    },
+    {
+      "hash": "#/txbuilder",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/api-lab",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.card",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/es-lab",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "PASS",
+      "fails": [],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 1,
+        "contentSelector": "div.wrap.wide",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": null
+    },
+    {
+      "hash": "#/menu",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-desk.png"
+    },
+    {
+      "hash": "#/menu/wallet",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-wallet-desk.png"
+    },
+    {
+      "hash": "#/menu/trade",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-trade-desk.png"
+    },
+    {
+      "hash": "#/menu/earn",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-earn-desk.png"
+    },
+    {
+      "hash": "#/menu/govern",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-govern-desk.png"
+    },
+    {
+      "hash": "#/menu/explore",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-explore-desk.png"
+    },
+    {
+      "hash": "#/menu/labs",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-labs-desk.png"
+    },
+    {
+      "hash": "#/menu/personal",
+      "group": "expanded",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Menu",
+            "w": 44,
+            "h": 19
+          },
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/menu-personal-desk.png"
+    },
+    {
+      "hash": "#/this-route-does-not-exist",
+      "group": "static",
+      "viewport": "desk",
+      "width": 2560,
+      "verdict": "FAIL",
+      "fails": [
+        {
+          "id": "A3-stranded-column",
+          "detail": "42% of viewport",
+          "selector": "div.wrap"
+        }
+      ],
+      "notes": [],
+      "metrics": {
+        "overflowPx": 0,
+        "scrollRegion": "",
+        "widestSelector": "div#warn-banner",
+        "smallTargets": [],
+        "contentRatio": 0.422,
+        "contentSelector": "div.wrap",
+        "clippedText": [],
+        "inlineLinks": [
+          {
+            "selector": "a",
+            "text": "Master",
+            "w": 44,
+            "h": 15
+          }
+        ],
+        "viewportMeta": "width=device-width, initial-scale=1",
+        "consoleErrors": []
+      },
+      "shot": "/workspace/docs/parity/viewport-shots/this-route-does-not-exist-desk.png"
+    }
+  ],
+  "skips": [
+    {
+      "hash": "#/invoice/:data",
+      "reason": "invoice payload is per-recipient base64; no recorded fixture and fabricating one proves nothing"
+    },
+    {
+      "hash": "#/prediction/:market",
+      "reason": "no prediction market id recorded on testnet; the list route covers the renderer"
+    }
+  ]
+}
