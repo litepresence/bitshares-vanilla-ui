@@ -2534,6 +2534,7 @@
       "pool.map_a_ok",
       "pool.map_a_orphan",
       "pool.map_core_aria",
+      "pool.map_core_self",
       "pool.map_pair_ok",
       "pool.map_pair_orphan",
       "pool.map_pair_reach",
@@ -7199,7 +7200,8 @@
     "no_filter_match": "No swaps match these filters.",
     "swap_desk": "Swap Desk",
     "uc_title": "Unlock to continue",
-    "uc_action": "Action"
+    "uc_action": "Action",
+    "map_core_self": "BTS is BitShares core token"
   },
   "market_ind": {
     "vwap": "セッションVWAP＋スプレッド",

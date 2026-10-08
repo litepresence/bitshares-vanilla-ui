@@ -27,6 +27,7 @@ NEW_KEYS = {
     "market_net.map_fallback": "%(pairs)s pairs · %(assets)s assets · 24h fills unconfirmed",
     "market_net.edge_card_fills": "%(desk)s · %(a)s–%(b)s · %(fills)s fills/24h",
     "market_net.edge_card_price": "@ %(price)s",
+    "pool.map_core_self": "BTS is BitShares core token",
     "market_net.verdict_web": "Markets reachable from %(s)s: %(n)s",
     "market_net.verdict_path": "%(a)s reaches %(b)s in %(n)s filled markets",
     "market_net.verdict_no_path": "No filled-market route between %(a)s and %(b)s",

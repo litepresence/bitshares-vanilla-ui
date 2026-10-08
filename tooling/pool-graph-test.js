@@ -243,6 +243,11 @@ function ok(cond, name) {
   var d = MT(demo(), "1.3.1", "1.3.0");
   eq(d.b, { level: "direct", hops: 0, via: [] }, "BTS leg direct 0");
   eq(d.nodeColors["1.3.0"], "bts", "BTS node blue even as a leg");
+  // The core is the anchor, not a finding: identity in core blue, never
+  // "BTS connects to BTS" in green (owner 2026-10-08).
+  eq(d.right, { text: "BTS is BitShares core token", color: "bts", bold: false }, "BTS leg corner is the core identity, blue");
+  var d2 = MT(demo(), "1.3.0", "1.3.1");
+  eq(d2.left, { text: "BTS is BitShares core token", color: "bts", bold: false }, "BTS as first leg, same identity line");
   // Green corner: leg paired straight with BTS.
   var g = MT(demo(), "1.3.9", "1.3.7");
   eq(g.left, { text: "X connects to BTS", color: "live", bold: false }, "upper-left green direct");

@@ -849,6 +849,12 @@ var PoolGraph = (function () {
     });
     function legText(id, st) {
       var s = S(id);
+      /* The core is not "connected to" anything — it IS the anchor. Calling
+       * it "BTS connects to BTS" in green reads as a finding; the honest line
+       * is an identity statement in core blue (owner 2026-10-08). */
+      if (String(id) === CORE_ID) {
+        return { text: t("pool.map_core_self", "BTS is BitShares core token"), color: "bts", bold: false };
+      }
       if (st.level === "direct") {
         return { text: t("pool.map_a_ok", "{s} connects to BTS").split("{s}").join(s), color: "live", bold: false };
       }
@@ -1041,7 +1047,9 @@ var PoolGraph = (function () {
     function cornerText(item, x, align, size) {
       if (!item || !item.text) return;
       try {
-        var colormap = { live: live, warn: warn, danger: danger };
+        /* "bts" is the core-identity ink (theme accent, BitShares blue in all
+         * three themes) — the only non-verdict color on the corners. */
+        var colormap = { live: live, warn: warn, danger: danger, bts: accent };
         ctx.font = (item.bold ? "bold " : "") + (size || 12) + "px system-ui, sans-serif";
         ctx.textAlign = align;
         try {
