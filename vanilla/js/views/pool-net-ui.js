@@ -279,9 +279,23 @@ var PoolNetUI = (function () {
         S.sel = sel;
         S.sig = String(sel.aId || "") + "|" + String(sel.bId || "") + "|" + String(sel.s || "");
         var g = S.full;
+        /* Fill-web exception (market selector, owner 2026-10-07): the graph
+         * is ALREADY grown from the typed asset(s) — 3 hops, no caps — so a
+         * band-side star filter would amputate hops 2-3 and the "3-hop web"
+         * would paint as a 1-hop star. With 0-1 legs selected the full web
+         * stands (the status line already reports full counts, so view and
+         * status agree); with BOTH legs the pair union still focuses the
+         * comparison. The ticker fallback (no route channel) keeps the old
+         * star behavior — it is a 1-hop graph and the star is all it has. */
+        var fillWeb = false;
+        try {
+          fillWeb = marketMode() && !!(navOpts && navOpts.route && navOpts.route.assetPath);
+        } catch (eF) { fillWeb = false; }
+        var oneLeg = !(sel.aId && sel.bId && String(sel.aId) !== String(sel.bId));
         try {
           if (typeof PoolNet !== "undefined" && PoolNet.filterGraph) {
-            g = PoolNet.filterGraph(S.full, { aId: sel.aId, bId: sel.bId }) || S.full;
+            if (fillWeb && oneLeg) g = S.full;
+            else g = PoolNet.filterGraph(S.full, { aId: sel.aId, bId: sel.bId }) || S.full;
           }
         } catch (e) { g = S.full; }
         /* Brand toggles FILTER, they do not dim: a hidden group's nodes and

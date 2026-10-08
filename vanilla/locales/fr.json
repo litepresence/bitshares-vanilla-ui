@@ -2148,6 +2148,7 @@
       "market_net.verdict_no_path",
       "market_net.verdict_path",
       "market_net.verdict_star",
+      "market_net.verdict_web",
       "market_orders.tape",
       "market_orders.tape_empty",
       "market_orders.tape_hint",
@@ -7768,7 +7769,8 @@
     "edge_card_price": "@ %(price)s",
     "verdict_path": "%(a)s reaches %(b)s in %(n)s filled markets",
     "verdict_no_path": "No filled-market route between %(a)s and %(b)s",
-    "ramp_fills": "24h fills: low → high"
+    "ramp_fills": "24h fills: low → high",
+    "verdict_web": "Markets reachable from %(s)s: %(n)s"
   },
   "unlockconfirm": {
     "password": "Password",

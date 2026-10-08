@@ -293,9 +293,17 @@ var NetChrome = (function () {
        * dual selection reads as full counts, never "no route". */
       var onlyM = (sel.aId && !sel.bId) || (!sel.aId && sel.bId) ? (sel.aId || sel.bId) : null;
       if (onlyM) {
-        text = t("market_net.verdict_star", "Markets touching %(s)s: %(n)s", {
-          s: symOf(S, onlyM), n: String(nPools)
-        });
+        /* The 1-hop ticker fallback genuinely touches; the 3-hop fill web
+         * reaches two hops further, and "touching" would understate it. */
+        if (fillsWeb(S)) {
+          text = t("market_net.verdict_web", "Markets reachable from %(s)s: %(n)s", {
+            s: symOf(S, onlyM), n: String(nPools)
+          });
+        } else {
+          text = t("market_net.verdict_star", "Markets touching %(s)s: %(n)s", {
+            s: symOf(S, onlyM), n: String(nPools)
+          });
+        }
       } else {
         text = t("market_net.verdict_full", "%(markets)s markets · %(assets)s assets", {
           markets: String(nPools), assets: String(nAssets)
@@ -359,7 +367,16 @@ var NetChrome = (function () {
    * (.pool-net-sw.ramp-lo/hi track --muted/--accent), never resolved hex —
    * the key cannot disagree with the canvas ink. One label per mode.
    * @returns {void}. Never throws. */
-  function appendRamp(doc, mk, t, els, market) {
+  /* fillsWeb: true when the market graph on screen is the ES 24h-fill
+   * web (its ink is fill counts, not 24h volume). Detected from the mount
+   * opts the composer stored (the route channel only exists on that path),
+   * so the legend can never claim volume for a fills map. */
+  function fillsWeb(S) {
+    try {
+      return isMarket(S) && !!(S && S.navOpts && S.navOpts.route && S.navOpts.route.assetPath);
+    } catch (e) { return false; }
+  }
+  function appendRamp(doc, mk, t, els, market, S) {
     try {
       var row = mk("span", null, "pool-net-ramp");
       var lo = doc.createElement("span");
@@ -369,7 +386,9 @@ var NetChrome = (function () {
       row.appendChild(lo);
       row.appendChild(hi);
       var lab = market
-        ? t("market_net.ramp", "24h volume: low → high")
+        ? (fillsWeb(S)
+          ? t("market_net.ramp_fills", "24h fills: low → high")
+          : t("market_net.ramp", "24h volume: low → high"))
         : t("pool_net.ramp", "Pool size: small → large");
       row.appendChild(mk("span", lab, null));
       try { row.setAttribute("aria-label", lab); } catch (e) { /* text stands */ }
@@ -380,7 +399,7 @@ var NetChrome = (function () {
   function rebuildLegend(doc, mk, t, S, els, renderFn, onToggle) {
     /* Market graphs have no brands (pool groupings) — the row skips chips
      * but keeps the ramp key (volume meaning needs its legend too). */
-    if (isMarket(S)) { appendRamp(doc, mk, t, els, true); return; }
+    if (isMarket(S)) { appendRamp(doc, mk, t, els, true, S); return; }
     try {
       var D = null;
       try { if (typeof DOM !== "undefined" && DOM) D = DOM; } catch (e) { D = null; }
@@ -435,7 +454,7 @@ var NetChrome = (function () {
       })(gr, chip);
       try { els.legendEl.appendChild(chip); } catch (e) { /* next chip */ }
     });
-    appendRamp(doc, mk, t, els, isMarket(S));
+    appendRamp(doc, mk, t, els, isMarket(S), S);
   }
 
   /* Screen-reader table twin (spec §6): the same pool rows as the canvas

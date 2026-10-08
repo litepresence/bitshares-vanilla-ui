@@ -371,16 +371,27 @@ MarketDesk._fill = MarketDesk._fill || {};
     }
     function poolsPath() {
       if (MH && typeof MH.fetchActivePairs === "function") {
-        /* Markets first; the pool graph only when markets cannot answer. */
-        marketPath().then(function (ok) {
+        /* Markets first; the pool graph only when markets cannot answer.
+         * The PAINTER loads first either way: PoolGraph is lazy (dynamic
+         * <script>, not an index.html tag), and the market path paints
+         * through it too — without this the canvas stays blank and the
+         * note stays "Loading map…" with no error anywhere. */
+        ensurePoolGraph(function (okPainter) {
           if (state.id !== myId || !deskAlive(state)) return;
-          if (ok) {
-            state.graphActivity = { gated: false, count: 0, total: 0 };
-            redrawPoolMap(doc, state);
-            try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+          if (!okPainter) {
+            try { state.graphNote.textContent = t("market.pool_map_unavailable_script", "Pool map unavailable (script load failed)."); } catch (e) {}
             return;
           }
-          loadPoolGraph();
+          marketPath().then(function (ok) {
+            if (state.id !== myId || !deskAlive(state)) return;
+            if (ok) {
+              state.graphActivity = { gated: false, count: 0, total: 0 };
+              redrawPoolMap(doc, state);
+              try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+              return;
+            }
+            loadPoolGraph();
+          });
         });
         return;
       }
