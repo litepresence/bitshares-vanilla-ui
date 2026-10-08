@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "खाता नाम उपसर्ग…",
     "accounts_search_aria": "नाम उपसर्ग से खाते खोजें",
     "search_suggestions_aria": "खोज सुझाव",
-    "search_empty_hint": "ब्लॉक संख्या, ऑब्जेक्ट id, खाता, या एसेट प्रतीक लिखें।"
+    "search_empty_hint": "ब्लॉक संख्या, ऑब्जेक्ट id, खाता, या एसेट प्रतीक लिखें।",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "जमा / निकासी",

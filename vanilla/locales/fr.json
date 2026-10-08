@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Préfixe du nom de compte…",
     "accounts_search_aria": "Rechercher des comptes par préfixe de nom",
     "search_suggestions_aria": "Suggestions de recherche",
-    "search_empty_hint": "Saisissez un numéro de bloc, un id d’objet, un compte ou un symbole d’actif."
+    "search_empty_hint": "Saisissez un numéro de bloc, un id d’objet, un compte ou un symbole d’actif.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Dépôt / Retrait",

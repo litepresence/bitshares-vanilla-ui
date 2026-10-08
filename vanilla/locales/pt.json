@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Prefixo do nome da conta…",
     "accounts_search_aria": "Buscar contas por prefixo do nome",
     "search_suggestions_aria": "Sugestões de busca",
-    "search_empty_hint": "Digite um número de bloco, id de objeto, conta ou símbolo de ativo."
+    "search_empty_hint": "Digite um número de bloco, id de objeto, conta ou símbolo de ativo.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Depósito / Saque",

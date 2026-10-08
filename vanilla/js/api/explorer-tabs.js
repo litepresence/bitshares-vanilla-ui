@@ -110,6 +110,23 @@ var ExplorerTabs = (function () {
     });
   }
 
+  /* accountLinkTarget: one lookup_accounts row -> link target, or null.
+   * WHY: the node answers [name, id] PAIRS (#4 database_api.hpp:357;
+   * live-proven), so stringifying the row leaks ",1.2.x" into the href
+   * (#/account/committee%2C1.2.599999 -> 404) and the label. The name wins
+   * in every shape; garbage rows yield null so the caller skips them.
+   * Pure (unit-tested). @param {any} nm row. @returns {{href,label}|null}. */
+  function accountLinkTarget(nm) {
+    try {
+      var name = null;
+      if (typeof nm === "string") name = nm;
+      else if (Array.isArray(nm) && typeof nm[0] === "string") name = nm[0];
+      else if (nm && typeof nm === "object" && typeof nm.name === "string") name = nm.name;
+      if (!name) return null;
+      return { href: "#/account/" + encodeURIComponent(name), label: name };
+    } catch (e) { return null; }
+  }
+
   /* accountsTab: prefix search via lookup_accounts -> name links. */
   function accountsTab(doc, body, live) {
     var form = doc.createElement("form");
@@ -143,10 +160,16 @@ var ExplorerTabs = (function () {
         }
         var ul = doc.createElement("ul");
         names.forEach(function (nm) {
+          var tgt = accountLinkTarget(nm);
+          if (!tgt) return;
           var li = doc.createElement("li");
-          li.appendChild(link(doc, "#/account/" + encodeURIComponent(nm), nm));
+          li.appendChild(link(doc, tgt.href, tgt.label));
           ul.appendChild(li);
         });
+        if (!ul.firstChild) {
+          out.appendChild(el(doc, "p", t("explorer.no_accounts_found", "No accounts found — check the name prefix, or register a new name at Create Account (#/create-account)."), "muted"));
+          return;
+        }
         out.appendChild(ul);
       }).catch(function (e) {
         if (!live()) return;
@@ -475,7 +498,7 @@ var ExplorerTabs = (function () {
     poolsTab: poolsTab, accountsTab: accountsTab,
     witnessesTab: witnessesTab, committeeTab: committeeTab,
     marketsTab: marketsTab, feesTab: feesTab,
-    _test: { filterMarkets: filterMarkets, sortMarkets: sortMarkets, cmpDec: cmpDec }
+    _test: { filterMarkets: filterMarkets, sortMarkets: sortMarkets, cmpDec: cmpDec, accountLinkTarget: accountLinkTarget }
   };
 })();
 

@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Account name prefix…",
     "accounts_search_aria": "Search accounts by name prefix",
     "search_suggestions_aria": "Search suggestions",
-    "search_empty_hint": "Type a block number, object id, account, or asset symbol."
+    "search_empty_hint": "Type a block number, object id, account, or asset symbol.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Deposit / Withdraw",

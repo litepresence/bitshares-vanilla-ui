@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Prefijo del nombre de cuenta…",
     "accounts_search_aria": "Buscar cuentas por prefijo de nombre",
     "search_suggestions_aria": "Sugerencias de búsqueda",
-    "search_empty_hint": "Escriba un número de bloque, id de objeto, cuenta o símbolo de activo."
+    "search_empty_hint": "Escriba un número de bloque, id de objeto, cuenta o símbolo de activo.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Depósito / Retiro",

@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "アカウント名の接頭辞…",
     "accounts_search_aria": "名前の接頭辞でアカウントを検索",
     "search_suggestions_aria": "検索候補",
-    "search_empty_hint": "ブロック番号、オブジェクトID、アカウント、またはアセットシンボルを入力してください。"
+    "search_empty_hint": "ブロック番号、オブジェクトID、アカウント、またはアセットシンボルを入力してください。",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "入金 / 出金",

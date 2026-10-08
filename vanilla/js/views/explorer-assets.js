@@ -94,6 +94,20 @@ var ExplorerAssets = (function () {
     return "market";
   }
 
+  /* searchLowerBound: live query -> chain prefix bound for list_assets.
+   * WHY: the symbol filter used to run client-side over the single loaded
+   * page, so any symbol past page 1 never matched. Symbols are UPPERCASE on
+   * chain, so a lowercase query would sort past them (ASCII) — uppercase
+   * here (suggestAssets in explorer.js documents the same rule). Blank
+   * means browse (caller falls back to its page lower bound).
+   * Pure (unit-tested). @param {any} q raw query. @returns {string} bound. */
+  function searchLowerBound(q) {
+    try {
+      var s = String(q === undefined || q === null ? "" : q).trim().toUpperCase();
+      return s;
+    } catch (e) { return ""; }
+  }
+
   /* assetModeLabel: keyed display name for a (possibly unclamped) mode.
    * WHY helper: the radios + the honest Showing line share one source so
    *   they can never drift apart; display-only, never throws.
@@ -488,9 +502,22 @@ var ExplorerAssets = (function () {
     var allRows = null; /* enriched rows for client-side filter/sort */
     var lastRows = []; /* raw page rows for Next paging */
     showStatus(doc, tableWrap, t("explorer.loading_assets", "Loading assets…"));
+    var fetchTimer = null;
     search.addEventListener("input", function () {
       assetState.q = search.value || "";
       paintCached();
+      /* Chain search (debounced): keystrokes repaint the loaded rows
+       * instantly, then settle into a chain prefix fetch so symbols past
+       * the loaded page match too. The bar is never rebuilt here, so typing
+       * keeps focus; the gen guard drops stale flights after route leave. */
+      try { if (fetchTimer) clearTimeout(fetchTimer); } catch (e) { /* refetch stands */ }
+      try {
+        fetchTimer = setTimeout(function () {
+          fetchTimer = null;
+          if (!isCurrent(myGen)) return;
+          fetchRows();
+        }, 350);
+      } catch (e) { /* local filter stands */ }
     });
     function enrichAndStore(rows) {
       lastRows = rows || [];
@@ -618,7 +645,12 @@ var ExplorerAssets = (function () {
       var view = filteredSorted();
       paintCount(view);
       if (view.length === 0) {
-        tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
+        /* Search mode names the query (the chain was asked and answered);
+         * browse mode keeps the page hint (more pages may hold matches). */
+        var searching = !!searchLowerBound(assetState.q);
+        tableWrap.appendChild(DOM.el(doc, "p", searching
+          ? t("explorer.no_assets_match", "No assets match \"%(q)s\".", { q: String(assetState.q || "").trim() })
+          : t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
       } else {
         var scroller = DOM.el(doc, "div", null, "xplore-scroll");
         scroller.style.overflowX = "auto";
@@ -687,7 +719,11 @@ var ExplorerAssets = (function () {
         scroller.appendChild(table);
         tableWrap.appendChild(scroller);
       }
-      if ((stack || []).length > 0) {
+      /* Search mode shows ONE honest prefix page (accounts-tab precedent):
+       * continuing Next from a search page would walk into unrelated
+       * alphabet past the prefix, so browse paging stays browse-only. */
+      var searching = !!searchLowerBound(assetState.q);
+      if (!searching && (stack || []).length > 0) {
         var prev = touchable(DOM.el(doc, "button", t("explorer.prev", "← Prev")));
         prev.type = "button";
         prev.addEventListener("click", function () {
@@ -697,7 +733,7 @@ var ExplorerAssets = (function () {
         });
         navWrap.appendChild(prev);
       }
-      if (lastRows.length >= assetState.perPage && lastRows.length > 0) {
+      if (!searching && lastRows.length >= assetState.perPage && lastRows.length > 0) {
         var next = touchable(DOM.el(doc, "button", t("explorer.next", "Next →")));
         next.type = "button";
         next.addEventListener("click", function () {
@@ -706,28 +742,40 @@ var ExplorerAssets = (function () {
         navWrap.appendChild(next);
       }
     }
-    Explorer.assetsPage(lower, assetState.perPage).then(function (rows) {
-      if (!isCurrent(myGen)) return;
-      rows = rows || [];
-      if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
+    /* fetchRows: one chain page into the cache (browse lower, or the live
+     * query's prefix bound when searching). Called on entry and (debounced)
+     * on every query change — never rebuilds the filter bar, so typing keeps
+     * focus. No params, no return; gen-guarded like every other flight. */
+    function fetchRows() {
+      /* Chain prefix search (not page-scoped): a live query fetches from its
+       * own uppercased bound, so symbols anywhere in the alphabet match —
+       * fetching from the browse `lower` only ever searched page 1. */
+      var fetchLower = searchLowerBound(assetState.q) || lower;
+      Explorer.assetsPage(fetchLower, assetState.perPage).then(function (rows) {
+        if (!isCurrent(myGen)) return;
+        rows = rows || [];
+        if (rows.length === 0 && (stack || []).length === 0 && !assetState.q) {
+          DOM.clear(tableWrap);
+          allRows = [];
+          paintCount([]);
+          tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
+          return;
+        }
+        enrichAndStore(rows);
+      }).catch(function (e) {
+        if (!isCurrent(myGen)) return;
         DOM.clear(tableWrap);
-        allRows = [];
-        paintCount([]);
-        tableWrap.appendChild(DOM.el(doc, "p", t("explorer.no_assets", "No assets on this page.") + t("explorer.clear_filter_hint", " Clear the search filter to see the full page."), "muted"));
-        return;
-      }
-      enrichAndStore(rows);
-    }).catch(function (e) {
-      if (!isCurrent(myGen)) return;
-      DOM.clear(tableWrap);
-      showError(doc, tableWrap, e, t("explorer.assets_failed", "Could not load assets."));
-      var retry = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
-      retry.type = "button";
-      retry.addEventListener("click", function () {
-        assetsTab(doc, body, root, myGen, lower, stack);
+        showError(doc, tableWrap, e, t("explorer.assets_failed", "Could not load assets."));
+        var retry = touchable(DOM.el(doc, "button", t("explorer.retry", "Retry")));
+        retry.type = "button";
+        retry.addEventListener("click", function () {
+          if (!isCurrent(myGen)) return;
+          fetchRows();
+        });
+        tableWrap.appendChild(retry);
       });
-      tableWrap.appendChild(retry);
-    });
+    }
+    fetchRows();
   }
 
   /** #/asset/:symbol: header + MARKET button (preferred market) +

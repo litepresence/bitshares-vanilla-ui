@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "계정 이름 앞부분…",
     "accounts_search_aria": "이름 앞부분으로 계정 검색",
     "search_suggestions_aria": "검색 제안",
-    "search_empty_hint": "블록 번호, 객체 id, 계정 또는 자산 심볼을 입력하십시오."
+    "search_empty_hint": "블록 번호, 객체 id, 계정 또는 자산 심볼을 입력하십시오.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "입금 / 출금",

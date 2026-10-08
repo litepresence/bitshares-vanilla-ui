@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Prefisso del nome account…",
     "accounts_search_aria": "Ricerca account per prefisso del nome",
     "search_suggestions_aria": "Suggerimenti di ricerca",
-    "search_empty_hint": "Digiti un numero di blocco, un id oggetto, un account o un simbolo asset."
+    "search_empty_hint": "Digiti un numero di blocco, un id oggetto, un account o un simbolo asset.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Deposito / Prelievo",

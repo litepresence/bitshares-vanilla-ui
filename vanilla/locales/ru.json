@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Префикс имени аккаунта…",
     "accounts_search_aria": "Поиск аккаунтов по префиксу имени",
     "search_suggestions_aria": "Подсказки поиска",
-    "search_empty_hint": "Введите номер блока, id объекта, аккаунт или символ актива."
+    "search_empty_hint": "Введите номер блока, id объекта, аккаунт или символ актива.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Депозит / Вывод",

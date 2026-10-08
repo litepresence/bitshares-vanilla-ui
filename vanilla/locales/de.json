@@ -1294,6 +1294,7 @@
       "explorer.no_accounts_found",
       "explorer.no_activity",
       "explorer.no_assets",
+      "explorer.no_assets_match",
       "explorer.no_blocks",
       "explorer.no_feeds",
       "explorer.no_fields",
@@ -4934,7 +4935,8 @@
     "accounts_prefix_ph": "Kontonamen-Präfix…",
     "accounts_search_aria": "Konten nach Namenspräfix suchen",
     "search_suggestions_aria": "Suchvorschläge",
-    "search_empty_hint": "Geben Sie eine Blocknummer, Objekt-ID, ein Konto oder ein Asset-Symbol ein."
+    "search_empty_hint": "Geben Sie eine Blocknummer, Objekt-ID, ein Konto oder ein Asset-Symbol ein.",
+    "no_assets_match": "No assets match \"%(q)s\"."
   },
   "gateway": {
     "title": "Einzahlen / Auszahlen",
