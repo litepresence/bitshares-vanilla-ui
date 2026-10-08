@@ -223,8 +223,14 @@ var skel = { pools: [
     };
   }
   var auto = rmState(false);
+  var beforeX = auto.geom["1.3.1"].x, beforeY = auto.geom["1.3.1"].y, paints = 0;
+  auto.paint = function () { paints++; };
   try { wake(auto); } catch (e) { ok(false, "auto wake reduced throws: " + e); return; }
-  ok(auto.running === false, "auto wake stays frozen under reduced-motion");
+  ok(auto.running === false, "auto wake runs zero animation frames under reduced-motion");
+  ok(auto.settled === true, "auto wake marks settled under reduced-motion");
+  ok(auto.geom["1.3.1"].x !== beforeX || auto.geom["1.3.1"].y !== beforeY,
+    "auto wake settles geometry synchronously under reduced-motion (no frozen circle)");
+  ok(paints === 1, "settle-instant paints exactly once (got " + paints + ")");
   var exp = rmState(true);
   try { wake(exp, true); } catch (e) { ok(false, "explicit wake reduced throws: " + e); return; }
   ok(exp.settled === true && exp.running === false, "explicit wake runs bounded and settles under reduced-motion");

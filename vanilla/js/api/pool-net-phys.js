@@ -190,22 +190,60 @@ var PoolNetPhys = (function () {
     } catch (e) { /* next frame */ }
   }
 
+  /* Settle synchronously with zero animation frames (owner 2026-10-08):
+   * the exact step sequence the rAF loop would run (same temp schedule,
+   * same still-gate, same cap), executed back-to-back and painted once.
+   * The settled geometry is IDENTICAL to the animated loop's resting
+   * state — frame counting, not wall time, drives the math — so
+   * reduced-motion users see the same final map, minus the motion.
+   * @param {Object} S band state (see PoolNetState above). Never throws. */
+  function settleNow(S) {
+    if (!S || S.dead) return;
+    var ids = [];
+    try { ids = Object.keys(S.geom || {}); } catch (e) { ids = []; }
+    var P = PHYS.lively;
+    S.still = 0;
+    S.frames = 0;
+    try { S.temp = P.temp0; } catch (e) { /* stepFrame reads its own preset */ }
+    if (ids.length >= 2) {
+      var maxFrames = (P.maxFrames && P.maxFrames > 0) ? P.maxFrames : 180;
+      while (S.frames < maxFrames) {
+        var moved = 0;
+        try { moved = stepFrame(S); } catch (e) { moved = 0; }
+        S.frames++;
+        if (moved < P.stillTol) S.still++;
+        else S.still = 0;
+        if (S.still >= P.stillFrames && S.frames >= (P.minFrames || 0)) break;
+      }
+    }
+    S.running = false;
+    S.settled = true;
+    paintHook(S);
+  }
+
   /* Wake the settle loop. ALWAYS re-seeds temp/still/frames — even when the
-   * loop is already running: an early return here starves every later
+   * loop is already running: an early return here would starve every later
    * re-energize (phys-flip, drag-release, filter pages all no-op while the
    * loop spins at floor temp on a parked layout — user-reported "switch
    * does nothing"). The running loop picks up fresh temp + preset next
    * frame, so no restart dance is needed; a stopped loop is (re)started.
-   * Reduced-motion: AUTO wakes (load/filter/scroll/resize) stay frozen, but
-   * an EXPLICIT user gesture (Physics flip, drag-release throw) runs a
-   * bounded settle anyway — flipping the switch on IS informed consent to
-   * motion, and every run self-terminates via the sleep gate + maxFrames.
+   * Reduced-motion: AUTO wakes (load/filter/scroll/resize) settle instantly
+   * via settleNow (same resting geometry, zero frames) instead of staying
+   * frozen on the circle seed; an EXPLICIT user gesture (Physics flip,
+   * drag-release throw) still runs the bounded animated settle — the
+   * gesture itself is consent to motion. Every run self-terminates via the
+   * sleep gate + maxFrames.
    * @param {Object} S band state (see PoolNetState above).
    * @param {boolean} [explicit] true when the wake comes straight from a
    *   user gesture (flip/release), never from timers/observers/loads. */
   function wake(S, explicit) {
     if (!S || S.dead) return;
-    if ((S.reduced && !explicit) || S.dead) return;
+    if (S.reduced && !explicit) {
+      if (S.visible === false) return;
+      settleNow(S);
+      return;
+    }
+    if (S.dead) return;
     /* Gesture reaction OFF: a touch must not move anything. The node still
      * follows the pointer (that is the drag handler, not physics) — this
      * gate only refuses to START a simulation. Automatic wakes (load,
@@ -262,7 +300,8 @@ var PoolNetPhys = (function () {
     _physForTest: _physForTest,
     _defaultReactForTest: _defaultReactForTest,
     _stepForTest: stepFrame,
-    _wakeForTest: wake
+    _wakeForTest: wake,
+    settleNow: settleNow
   };
 })();
 
