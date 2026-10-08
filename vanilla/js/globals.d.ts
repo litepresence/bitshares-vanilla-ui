@@ -71,6 +71,7 @@ declare var MarketCharts: any;
 declare var MarketDesk: any;
 declare var MarketFills: any;
 declare var MarketInd: any;
+declare var MarketHops: any;
 declare var MarketNet: any;
 declare var MarketNetUI: any;
 declare var MarketOrders: any;

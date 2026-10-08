@@ -378,12 +378,16 @@ var MarketNetUI = (function () {
    * selector — edges exist only for pairs with recent volume).
    * @param {Document} doc owner document. @param {any} wrap page container.
    * @param {Function} getSelection live {a,b,s,aId,bId} getter.
-   * @param {any} vg volume graph {graph: {nodes, edges}, meta} from
-   *   MarketNet.graph + precisions (null/empty = honest empty via market
-   *   mode — the band still mounts so the note has a home).
+   * @param {any} vg band graph {graph: {nodes, edges}, meta} + optional
+   *   {route} from MarketHops (24h fill web, 3 hops) or MarketNet.graph
+   *   (1-hop ticker fallback). Null/empty = honest empty via market mode —
+   *   the band still mounts so the note has a home.
    * @param {number} myGen liveness token.
+   * @param {boolean} [fallback] true when the graph came from the ticker
+   *   fallback (index unavailable): the status + note then say so, so a
+   *   weaker map never claims to be the full 24h web.
    * Replaces any previous band node + stops its loop (one band per page). */
-  function mountBand(doc, wrap, getSelection, vg, myGen) {
+  function mountBand(doc, wrap, getSelection, vg, myGen, fallback) {
     var PUI = (typeof PoolNetUI !== "undefined" && PoolNetUI) ? PoolNetUI : null;
     if (!PUI || typeof PUI.mount !== "function") return;
     destroyBands();
@@ -439,6 +443,8 @@ var MarketNetUI = (function () {
         mode: "market",
         graph: vgGraph,
         meta: vgMeta,
+        fallback: !!fallback,
+        route: (vg && vg.route) || null,
         navEdge: function (hit) {
           try {
             var id = hit && (hit.id || hit.poolId) ? String(hit.id || hit.poolId) : "";
@@ -564,30 +570,100 @@ var MarketNetUI = (function () {
         var liveIds = shown.map(function (r) { return deskForProbe(r.symA, r.symB); });
         MN.reconcileCache(CURATED[network()] || CURATED.mainnet, liveIds);
       } catch (e) { /* cache is a speedup, never load-bearing */ }
-      /* Band mounts right after the table (parallel with sparklines):
-       * the mapper starts while the 8 history calls fly; spark canvases
-       * fill in when ready. Spark logic itself unchanged. The graph comes
-       * from the table's own ranked rows (volume-gated markets — the band
-       * mirrors the selector); precisions join from the map above so the
-       * hover cards format at render. */
-      var vg = null;
-      try {
-        var built = MN.graph(ranked, xDesc.id);
-        (built.edges || []).forEach(function (e) {
-          var m = built.meta[e.id];
-          if (m) {
-            if (typeof precs[e.a] === "number") m.volBasePrec = precs[e.a];
-            if (typeof precs[e.b] === "number") m.volQuotePrec = precs[e.b];
-          }
+      /* Band mounts right after the table (parallel with sparklines).
+       *
+       * BAND GRAPH (clean split, owner 2026-10-07): this is a MARKET chart,
+       * so it draws markets. First ask the community index for the 24h FILL
+       * web — every pair that actually traded in the last 24h, grown to 3
+       * hops from the selected asset, no display caps — which is the answer
+       * a selector is for ("what can I actually reach?"). When the index
+       * cannot answer (pref off, testnet, unreachable, partial page) fall
+       * back to the table's own 1-hop ticker rows, so the band never empties
+       * and the note says which world is on screen.
+       *
+       * The TABLE is untouched either way: chain-owned price/volume stays the
+       * truth; the map adds reachability, and each line carries the fills +
+       * the probed price as its provenance. */
+      var xId = xDesc ? xDesc.id : null;
+      function selGetter() {
+        return { a: aName, b: bName, s: "", aId: xId, bId: yDesc ? yDesc.id : null };
+      }
+      /* provenance per desk id from the rows we ALREADY probed (no extra
+       * RPCs): last price + both 24h volume raws + both precisions. */
+      function provenanceFrom(rows) {
+        var out = {};
+        (rows || []).forEach(function (r) {
+          if (!r || !r.symA || !r.symB) return;
+          var id = deskForProbe(r.symA, r.symB);
+          out[id] = { latest: (r.latest === undefined ? null : r.latest),
+            volBaseRaw: r.baseVol, volQuoteRaw: r.quoteVol,
+            volBasePrec: precs[r.a], volQuotePrec: precs[r.b] };
         });
-        vg = { graph: { nodes: built.nodes, edges: built.edges }, meta: built.meta };
-      } catch (e) { vg = null; }
-      (function () {
-        var rawA = aName, rawB = bName;
-        mountBand(doc, wrap, function () {
-          return { a: rawA, b: rawB, s: "", aId: xDesc ? xDesc.id : null, bId: yDesc ? yDesc.id : null };
-        }, vg, myGen);
-      })();
+        return out;
+      }
+      /* tickerGraph: the pre-existing 1-hop volume-gated graph (fallback). */
+      function tickerGraph() {
+        try {
+          var built = MN.graph(ranked, xId);
+          (built.edges || []).forEach(function (e) {
+            var m = built.meta[e.id];
+            if (m) {
+              if (typeof precs[e.a] === "number") m.volBasePrec = precs[e.a];
+              if (typeof precs[e.b] === "number") m.volQuotePrec = precs[e.b];
+            }
+          });
+          return { graph: { nodes: built.nodes, edges: built.edges }, meta: built.meta };
+        } catch (e) { return { graph: { nodes: [], edges: [] }, meta: {} }; }
+      }
+      function mountWith(vgIn, fallbackFlag) {
+        if (!live()) return;
+        mountBand(doc, wrap, selGetter, vgIn, myGen, fallbackFlag);
+      }
+      var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+      if (MH && typeof MH.fetchActivePairs === "function" && xId) {
+        MH.fetchActivePairs({ days: 1 }).then(function (res) {
+          if (!live()) return;
+          /* partial => more of the window than we read; show the honest
+           * 1-hop fallback rather than a web that looks complete. */
+          if (!res || res.partial || !(res.pairs || []).length) {
+            mountWith(tickerGraph(), true);
+            return;
+          }
+          var hops = MH.hopsFrom(res.pairs, [xId], 3);
+          var ids = hops.nodes.map(function (n) { return n.assetId; });
+          return MH.lookupSyms(ids).then(function (symMap) {
+            if (!live()) return;
+            var built = MH.toGraph(hops, {
+              syms: symMap,
+              provenance: provenanceFrom(ranked),
+              quoteAsset: yDesc ? yDesc.id : xId,
+              baseAsset: xId
+            });
+            if (!(built.graph.edges || []).length) { mountWith(tickerGraph(), true); return; }
+            /* precisions for any leg the probe cache knows (the desk card
+             * formats the volume at render; a miss just omits it). */
+            (built.graph.edges || []).forEach(function (e) {
+              var m = built.meta[e.id];
+              if (!m) return;
+              if (typeof precs[e.a] === "number" && m.volBasePrec === undefined) m.volBasePrec = precs[e.a];
+              if (typeof precs[e.b] === "number" && m.volQuotePrec === undefined) m.volQuotePrec = precs[e.b];
+            });
+            /* The explicit BTS route: fewest hops, most-filled bottleneck —
+             * the band pathSet is the same channel the pool band uses. */
+            var route = MH.routeToCore(hops.edges, [xId], MH.CORE_ID);
+            /* Two assets typed = a PAIR: the band's verdict line should speak
+             * about the pair, and both legs route to BTS independently. */
+            var routePair = yDesc ? MH.routeToCore(hops.edges, [xId, yDesc.id], MH.CORE_ID) : null;
+            mountWith({ graph: built.graph, meta: built.meta,
+              route: routePair ? routePair : route, routeBts: route }, false);
+          });
+        }).catch(function () {
+          if (!live()) return;
+          mountWith(tickerGraph(), true);
+        });
+      } else {
+        mountWith(tickerGraph(), true);
+      }
       /* Lazy top-8 sparklines (spec §2: 1 get_market_history each, after the
        * table — the table stays interactive before the mapper finishes). */
       var jobs = shown.slice(0, SPARK_N).map(function (r) {

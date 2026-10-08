@@ -457,7 +457,18 @@ var skel = { pools: [
     { mode: "market", graph: graph, meta: meta, navEdge: function (hit) { return "#/market/USD_BTS"; } });
   ok(fetchCalls === 0, "market mode issues zero pool fetches (got " + fetchCalls + ")");
   var status = findClass(wrap, "muted");
-  ok(status && /1 markets/.test(status.textContent), "market status shows markets count (got " + JSON.stringify(status && status.textContent) + ")");
+  /* Market-mode status states the WORLD: the 24h fill web (default) or the
+   * honest 1-hop ticker fallback when navOpts.fallback is set. Both must
+   * carry the pair count so the scope is never vague. */
+  ok(status && /1 pairs/.test(status.textContent) && /24h fills/.test(status.textContent),
+    "market status shows the 24h fill web count (got " + JSON.stringify(status && status.textContent) + ")");
+  var wrapFallback = fakeEl("div");
+  var hFallback = PoolNetUI.mount(doc, wrapFallback, function () { return { aId: null, bId: null, s: "" }; },
+    { mode: "market", graph: graph, meta: meta, fallback: true, navEdge: function () { return null; } });
+  var statusFb = findClass(wrapFallback, "muted");
+  ok(statusFb && /1 pairs/.test(statusFb.textContent) && /unconfirmed/.test(statusFb.textContent),
+    "fallback status says 24h fills are unconfirmed (got " + JSON.stringify(statusFb && statusFb.textContent) + ")");
+  try { if (hFallback && hFallback.destroy) hFallback.destroy(); } catch (eFb) { /* headless */ }
   var legend = findClass(wrap, "pool-net-legend");
   function walkTags(root, tag, out) {
     out = out || [];

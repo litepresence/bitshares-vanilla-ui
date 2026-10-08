@@ -24,10 +24,22 @@ MarketDesk._fill = MarketDesk._fill || {};
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
    * the default when i18n.js failed to load: never blank, never throws. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") {
+        if (vars && typeof vars === "object") return I18n.t(key, dflt, vars);
+        return I18n.t(key, dflt);
+      }
     } catch (e) { /* default below */ }
+    /* vars fill %(name)s placeholders when I18n is absent (pool-net-ui.js
+     * precedent — file:// renders identically instead of showing raw %). */
+    if (vars && typeof dflt === "string") {
+      try {
+        return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+        });
+      } catch (e2) { /* default below */ }
+    }
     return dflt;
   }
 
@@ -316,6 +328,65 @@ MarketDesk._fill = MarketDesk._fill || {};
     var q = state.assets.quote, b = state.assets.base, myId = state.id;
     state.graphActivity = null;
     try { state.graphNote.textContent = t("market.loading_pool_map", "Loading map…"); } catch (e) {}
+    /* BACKEND SWITCH (clean split, owner 2026-10-07): a market desk draws
+     * MARKETS. Ask the community index first for the 24h fill web (2 hops
+     * around BOTH desk legs, no display caps); when it cannot answer (pref
+     * off, testnet, unreachable, partial page) fall back to the pool graph
+     * this desk has always shown. Same canvas, same Physics switch, same
+     * pmap flag — `kind` tells the painter and the note which world is on
+     * screen, so a fallback map never wears a market definition. */
+    var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+    poolsPath();
+    function marketPath() {
+      if (!MH || typeof MH.fetchActivePairs !== "function") return Promise.resolve(false);
+      var pA = q.id, pB = b.id;
+      return MH.fetchActivePairs({ days: 1 }).then(function (res) {
+        /* partial => the window holds more than we read. A truncated web
+         * presented as complete would be the silent lie this project never
+         * ships, so a partial page takes the honest pool fallback. */
+        if (!res || res.partial || !(res.pairs || []).length) return false;
+        var hops = MH.hopsFrom(res.pairs, [pA, pB], 2);
+        if (!(hops.edges || []).length) return false;
+        var ids = hops.nodes.map(function (n) { return n.assetId; });
+        return MH.lookupSyms(ids).then(function (symMap) {
+          if (!deskAlive(state) || state.id !== myId) return false;
+          var built = MH.toGraph(hops, { syms: symMap, quoteAsset: pA, baseAsset: pB });
+          if (!(built.graph.edges || []).length) return false;
+          /* Price provenance (spec G3): this desk's own ticker already told
+           * us last + 24h volume, so the desk's OWN line carries them and a
+           * hover states them; neighbours carry the fill count alone. */
+          fillDeskProvenance(state, built);
+          /* Explicit route to BTS through the most-filled markets
+           * (routeToCore) — the market counterpart of the pool map's own-line
+           * glow. Null (unreachable) is a normal outcome, not a warning. */
+          state.graphData = {
+            graph: built.graph, meta: built.meta, kind: "market",
+            assetA: pA, assetB: pB,
+            routeA: MH.routeToCore(hops.edges, [pA], MH.CORE_ID),
+            routeB: MH.routeToCore(hops.edges, [pB], MH.CORE_ID)
+          };
+          return true;
+        });
+      }).catch(function () { return false; });
+    }
+    function poolsPath() {
+      if (MH && typeof MH.fetchActivePairs === "function") {
+        /* Markets first; the pool graph only when markets cannot answer. */
+        marketPath().then(function (ok) {
+          if (state.id !== myId || !deskAlive(state)) return;
+          if (ok) {
+            state.graphActivity = { gated: false, count: 0, total: 0 };
+            redrawPoolMap(doc, state);
+            try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
+            return;
+          }
+          loadPoolGraph();
+        });
+        return;
+      }
+      loadPoolGraph();
+    }
+    function loadPoolGraph() {
     ensurePoolGraph(function (ok) {
       if (!deskAlive(state) || state.id !== myId) return;
       if (!ok) {
@@ -333,7 +404,9 @@ MarketDesk._fill = MarketDesk._fill || {};
           var pa = null, pb = null;
           try { pa = PoolGraph.findCorePath(g, pA); } catch (e) { pa = null; }
           try { pb = PoolGraph.findCorePath(g, pB); } catch (e) { pb = null; }
-          state.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
+          /* kind "pool" marks the fallback world: the pool trust verdict and
+           * the pool connects definition come back with it. */
+          state.graphData = { graph: g, meta: null, kind: "pool", assetA: pA, assetB: pB, pathA: pa, pathB: pb };
           redrawPoolMap(doc, state);
           try { MarketInd.drawCharts(state); } catch (e) { /* pin best-effort */ }
           gateByActivity(doc, state, myId);
@@ -347,6 +420,39 @@ MarketDesk._fill = MarketDesk._fill || {};
         });
       } catch (e) { /* graph best-effort */ }
     });
+    }
+  }
+
+  /* fillDeskProvenance: attach the desk's own chain ticker facts (last price
+   * + 24h volume raws + BOTH precisions) to whichever built edge joins the two
+   * desk legs. Chain owns price; ES supplied only the fill count, so this is
+   * the whole "price provenance" story on the desk's own line. Best-effort: a
+   * missing ticker leaves the fill count alone. Never throws.
+   * @param {Object} state desk state (assets + ticker).
+   * @param {Object} built MarketHops.toGraph output (meta mutated in place).
+   * @returns {boolean} true when a desk edge was enriched. */
+  function fillDeskProvenance(state, built) {
+    try {
+      var tk = state.ticker;
+      var qa = state.assets && state.assets.quote, ba = state.assets && state.assets.base;
+      if (!tk || !qa || !ba || !built || !built.meta) return false;
+      var raw = tk.raw || {};
+      var latest = (tk.latest !== undefined && tk.latest !== null) ? String(tk.latest) : null;
+      if (!latest) return false;
+      var hits = 0;
+      (built.graph.edges || []).forEach(function (e) {
+        if (!e || !built.meta[e.id]) return;
+        if ((e.a === qa.id && e.b === ba.id) || (e.a === ba.id && e.b === qa.id)) {
+          built.meta[e.id].latest = latest;
+          if (raw.base_volume !== undefined && raw.base_volume !== null) built.meta[e.id].volBaseRaw = String(raw.base_volume);
+          if (raw.quote_volume !== undefined && raw.quote_volume !== null) built.meta[e.id].volQuoteRaw = String(raw.quote_volume);
+          if (typeof ba.precision === "number") built.meta[e.id].volBasePrec = ba.precision;
+          if (typeof qa.precision === "number") built.meta[e.id].volQuotePrec = qa.precision;
+          hits++;
+        }
+      });
+      return hits > 0;
+    } catch (e) { return false; }
   }
 
   /* Mainnet read (deepenPool precedent: community ES is mainnet-only).
@@ -713,9 +819,31 @@ MarketDesk._fill = MarketDesk._fill || {};
     try {
       if (typeof PoolGraph === "undefined" || !PoolGraph) return;
       var gd = state.graphData, hi = [], seen = {};
-      [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
-        (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
-      });
+      /* kind: which world is on screen (clean split). "market" = the 24h fill
+       * web, painted with the fills ramp + the BTS route and NO pool trust
+       * verdict; anything else = the pool provenance map, byte-identical to
+       * before this work. */
+      var isMarket = (gd.kind === "market");
+      if (isMarket) {
+        /* The route to BTS through the most-filled markets: both desk legs'
+         * routes unioned, mapped onto rendered edge ids (deskIdsFor). This is
+         * the ONLY glowing set, exactly as the pool map glows its own line +
+         * BTS route. An unreachable BTS highlights nothing (honest, calm). */
+        var MHr = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+        if (MHr && typeof MHr.deskIdsFor === "function") {
+          [gd.routeA, gd.routeB].forEach(function (rt) {
+            MHr.deskIdsFor(rt, gd.graph.edges || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
+          });
+        }
+      }
+      /* Pool worlds take their glow from findCorePath's `via` pool ids; a
+       * market world already filled `hi` from the fills-weighted route above
+       * (its pathA/pathB are ASSET paths, not pool ids). */
+      if (!isMarket) {
+        [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
+          (list || []).forEach(function (id) { if (!seen[id]) { seen[id] = 1; hi.push(id); } });
+        });
+      }
       /* Physics branch (2026-10-07 gesture-reaction model): ONE physics, so
        * every map render animates through PoolGraph.drawLive (same painter via
        * the _pos seam — look/verdicts/hit-test unchanged) and the settle runs
@@ -734,15 +862,19 @@ MarketDesk._fill = MarketDesk._fill || {};
        * The swap desk opens the pool instead — same line, right destination
        * per desk (owner 2026-10-07). */
       var navMode = { mode: "market", quoteAsset: gd.assetA, baseAsset: gd.assetB };
+      /* kind + meta + routeDeskIds travel with every frame: drawLive replays
+       * them through the same painter, so the live loop cannot drift back to
+       * pool semantics mid-settle. */
+      var paintOpts = { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit,
+        nav: navMode, kind: isMarket ? "market" : "pool",
+        meta: (isMarket ? (gd.meta || null) : null), routeDeskIds: hi };
       if (liveOn) {
-        PoolGraph.drawLive(doc, state.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit, nav: navMode });
+        PoolGraph.drawLive(doc, state.graphCanvas, gd.graph, paintOpts);
       } else {
         try {
           if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(state.graphCanvas);
         } catch (e) { /* static paint stands */ }
-        PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph,
-          { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, nav: navMode });
+        PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph, paintOpts);
       }
       /* Below-map note (owner wording): the connects definition, never a
        * title. Strict when the 24h probe gated this render (with the honest
@@ -752,6 +884,24 @@ MarketDesk._fill = MarketDesk._fill || {};
        * Truly pool-less pairs keep the honest empty sentence. */
       var act = state.graphActivity || null;
       var n = (gd.graph.edges || []).length;
+      /* MARKETS: the definition states 24h FILLS (what the line now means),
+       * plus the pair count and, when the web cannot reach BTS at all, a
+       * calm "no route" note. Never a warning — an unreachable BTS through
+       * markets is ordinary, not a scam signal. */
+      if (isMarket) {
+        var noteTxt = t("market.map_hops_note", "A line is a market that filled in the past 24 hours. %(pairs)s pairs shown.", { pairs: String(n) });
+        var hasRoute = false;
+        try {
+          hasRoute = hi.length > 0;
+        } catch (eR) { hasRoute = false; }
+        if (!hasRoute) {
+          noteTxt += " " + t("market.map_hops_no_route", "No route to BTS through filled markets.");
+        }
+        state.graphNote.textContent = noteTxt;
+        return;
+      }
+      /* POOLS (the fallback world): the four honest pool sentences, verbatim
+       * from before this work — a fallback map must never claim markets. */
       if (!n && !(act && act.gated && act.total > 0)) {
         state.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
       } else if (act && act.gated) {

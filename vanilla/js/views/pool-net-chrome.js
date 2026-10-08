@@ -75,6 +75,9 @@ var NetChrome = (function () {
 
   function nodeCard(S, t, assetId, sym) {
     if (isMarket(S)) {
+      /* Markets count MARKETS (lines), pools count POOLS — the same number
+       * word, but never interchangeable: a market selector answering "how
+       * many pools touch this" would answer a different question. */
       return t("market_net.node_card", "%(sym)s (%(id)s) · %(n)s markets", {
         sym: String(sym), id: String(assetId), n: String(poolCount(S, assetId))
       });
@@ -84,16 +87,38 @@ var NetChrome = (function () {
     });
   }
 
+  /* volText: the 24h volume line for a market edge, "SYM 1.234 + SYM 56.78".
+   * Chain-owned raw volume scaled by Format at RENDER (never a float on the
+   * raw value); a missing leg reads an em dash rather than a raw integer, so
+   * a chain integer can never reach the screen. */
+  function volText(m) {
+    var a = humanBal(m.volBaseRaw, m.volBasePrec), b = humanBal(m.volQuoteRaw, m.volQuotePrec);
+    var dash = "\u2014";
+    return (a === "\u2014" && b === "\u2014") ? dash : (a + " " + (m.symA || "?") + " + " + b + " " + (m.symB || "?"));
+  }
+
   function edgeCard(S, t, poolId) {
     if (isMarket(S)) {
       var m = S.meta[poolId] || {};
-      var vol = humanBal(m.volBaseRaw, m.volBasePrec) + " " + (m.symA || "?") +
-        " + " + humanBal(m.volQuoteRaw, m.volQuotePrec) + " " + (m.symB || "?");
-      var label = t("market_net.edge_card", "%(desk)s · %(a)s–%(b)s · %(vol)s", {
-        desk: String(poolId), a: String(m.symA || "?"), b: String(m.symB || "?"), vol: vol
-      });
-      if (m.latest !== null && m.latest !== undefined && String(m.latest) !== "") {
-        label += " @ " + String(m.latest);
+      /* PRICE PROVENANCE (spec G3): what makes this line trustworthy is
+       * stated on the line itself — the 24h FILL COUNT (why it exists) and
+       * the chain's own last price + 24h volume (why you would use it).
+       * Either part is omitted when unknown; neither is ever invented. */
+      var label;
+      if (m.fills !== undefined && m.fills !== null && String(m.fills) !== "") {
+        label = t("market_net.edge_card_fills", "%(desk)s · %(a)s–%(b)s · %(fills)s fills/24h", {
+          desk: String(poolId), a: String(m.symA || "?"), b: String(m.symB || "?"), fills: String(m.fills)
+        });
+      } else {
+        label = t("market_net.edge_card", "%(desk)s · %(a)s–%(b)s · %(vol)s", {
+          desk: String(poolId), a: String(m.symA || "?"), b: String(m.symB || "?"), vol: volText(m)
+        });
+      }
+      var tail = [];
+      if (m.latest !== undefined && m.latest !== null && String(m.latest) !== "") tail.push(String(m.latest));
+      if (m.volBaseRaw !== undefined && m.volBaseRaw !== null && String(m.volBaseRaw) !== "") tail.push(volText(m));
+      if (tail.length) {
+        label += " " + t("market_net.edge_card_price", "@ %(price)s", { price: tail.join(" · ") });
       }
       return label;
     }
@@ -283,8 +308,21 @@ var NetChrome = (function () {
     } else if (sel.aId && sel.bId && String(sel.aId) !== String(sel.bId)) {
       if (S.pathFull && S.pathFull.hops) {
         var hops = S.pathFull.hops.length - 1;
+        if (isMarket(S)) {
+          /* A pair's market route is the fills-weighted one the band glows
+           * (pathSet), which lives on the selection path — read it so the
+           * verdict line and the glow can never disagree. */
+          text = t("market_net.verdict_path", "%(a)s reaches %(b)s in %(n)s filled markets", {
+            a: symOf(S, sel.aId), b: symOf(S, sel.bId), n: String(hops)
+          });
+        } else {
         text = t("pool_net.verdict_path", "%(a)s reaches %(b)s in %(n)s hops", {
           a: symOf(S, sel.aId), b: symOf(S, sel.bId), n: String(hops)
+        });
+        }
+      } else if (isMarket(S)) {
+        text = t("market_net.verdict_no_path", "No filled-market route between %(a)s and %(b)s", {
+          a: symOf(S, sel.aId), b: symOf(S, sel.bId)
         });
       } else {
         text = t("pool_net.verdict_orphan", "No route between %(a)s and %(b)s", {

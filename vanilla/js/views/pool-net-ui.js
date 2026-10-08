@@ -398,13 +398,42 @@ var PoolNetUI = (function () {
         try {
           S.meta = (navOpts.meta && typeof navOpts.meta === "object") ? navOpts.meta : {};
         } catch (e) { S.meta = {}; }
+        /* BTS route from the caller's fills-weighted route (MarketHops). The
+         * band pathSet is exactly the pool band\'s own-line+BTS-route glow,
+         * so the market world gets the same affordance for the same reason:
+         * it is the structure the user came to read. Absent/failed route =
+         * nothing glows, which is honest (a thin web is normal). */
+        S.pathSet = {};
+        try {
+          var rt = (navOpts.route && Array.isArray(navOpts.route.assetPath)) ? navOpts.route.assetPath : null;
+          var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+          if (rt && MH && typeof MH.deskIdsFor === "function") {
+            MH.deskIdsFor({ assetPath: rt }, (S.full.edges || [])).forEach(function (id) { S.pathSet[String(id)] = 1; });
+          }
+        } catch (eRt) { /* no route highlight */ }
         S.full = g;
         S.loaded = true;
+        /* applySelection recomputes pathSet from the pool-only BTS path stage,
+         * which does not apply to a market graph, so restore ours after. */
         applySelection();
+        try {
+          var rt2 = (navOpts.route && Array.isArray(navOpts.route.assetPath)) ? navOpts.route.assetPath : null;
+          var MH2 = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+          if (rt2 && MH2 && typeof MH2.deskIdsFor === "function") {
+            S.pathSet = {};
+            MH2.deskIdsFor({ assetPath: rt2 }, (S.full.edges || [])).forEach(function (id) { S.pathSet[String(id)] = 1; });
+          }
+        } catch (eRt2) { /* no route highlight */ }
+        try { render(S); } catch (eRr) { /* loop paints */ }
         var nE = (S.full.edges || []).length, nN = (S.full.nodes || []).length;
+        /* Status states which world is on screen: the full 24h fill web, or
+         * the 1-hop ticker fallback (index unavailable). Never both claims. */
         if (!nE) setStatus(t("market_net.map_empty", "No markets with recent volume."));
-        else setStatus(t("market_net.map_ready", "%(markets)s markets · %(assets)s assets", {
-          markets: String(nE), assets: String(nN)
+        else if (navOpts.fallback) setStatus(t("market_net.map_fallback", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills unconfirmed", {
+          pairs: String(nE), assets: String(nN)
+        }));
+        else setStatus(t("market_net.map_hops_ready", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills", {
+          pairs: String(nE), assets: String(nN)
         }));
       }
 
