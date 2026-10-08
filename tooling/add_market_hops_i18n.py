@@ -45,6 +45,8 @@ NEW_KEYS = {
     "market.map_leg_orphan": "WARNING: {s} has no filled-market route!",
     "pool.min_swaps": "Min swaps",
     "pool_detail.map_min_swaps": "(min %(min)s swaps)",
+    "pool_detail.candle_count": "%(swaps)s swaps \u00b7 %(count)s \u00d7 %(bucket)s candles",
+    "pool_detail.candle_count_partial": "%(swaps)s swaps \u00b7 %(actual)s of %(requested)s \u00d7 %(bucket)s candles",
 }
 
 

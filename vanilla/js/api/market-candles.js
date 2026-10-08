@@ -279,9 +279,13 @@ var MarketCandles = (function () {
         bySlot[slot] = r;
       }
     }
-    if (Object.keys(bySlot).length === 0) {
-      return { bucket: bucket, start: startISO, end: endISO, buckets: [], closes: [], deep: false, places: PRICE_PLACES };
-    }
+    /* Chain-silent windows still consult the ES backfill below instead of
+     * returning empty here: a pruned/gapped history node must not blank a
+     * chart the community index can fill (audit 2026-10-08 — the desk
+     * showed "No price history" while ES held the fills). The merge stays
+     * chain-wins, so a silent chain plus an empty cache still resolves the
+     * same honest empty as before. */
+    var chainSilent = Object.keys(bySlot).length === 0;
     _needPriceMath();
     var precs = await _precisions([baseId, quoteId]);
     /* Satoshi-scale (4 sig figs): probe the fetched set at SIGFIG_MAX

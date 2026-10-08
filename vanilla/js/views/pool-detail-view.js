@@ -629,12 +629,20 @@ PoolDetailUI._view = PoolDetailUI._view || {};
        * a timeframe switch resets the cache, so stale-bucket merges are
        * impossible. MarketFills missing -> chain buckets stand. */
       var vv = orientVol();
+      /* Live candle window for the merge + slice below (shared input, read
+       * fresh every rebucket — a count edit re-windows without refetch). */
+      var pnMerge = 2000;
+      try {
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) pnMerge = MarketInd.CANDLE_COUNT;
+      } catch (e) { /* default stands */ }
       var chainBuckets = PoolHistory.swapsToCandles(P.swaps, P.bucket, vv.asset, vv.prec);
       var buckets = chainBuckets;
       try {
         if (P.esBuckets && P.esBuckets.length && P._deepBucket === P.bucket &&
             typeof MarketFills !== "undefined" && MarketFills && typeof MarketFills.mergeDeep === "function") {
-          buckets = MarketFills.mergeDeep(chainBuckets, P.esBuckets, 2000);
+          /* Cap is the LIVE count, never a literal: a hardcoded 2000 would
+           * truncate a 5000-wide request to 2000 merged buckets. */
+          buckets = MarketFills.mergeDeep(chainBuckets, P.esBuckets, pnMerge);
         }
       } catch (e) { buckets = chainBuckets; }
       /* Candle window (shared input): pools build from the swap tape, so
@@ -648,7 +656,26 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {
         var liveSuffix = (typeof poolLive !== "undefined" && poolLive && poolLive.live) ? " · live" : "";
-        P.countNote.textContent = P.swaps.length + " swaps · " + P.bucket + "s candles" + liveSuffix;
+        /* Plotted-bucket honesty (exchange-desk precedent): the tape is
+         * bounded (500 chain / 1000 ES swaps), so wide windows legitimately
+         * hold fewer buckets than requested — the note states plotted AND
+         * requested, never the request alone. */
+        var plottedN = Array.isArray(buckets) ? buckets.length : 0;
+        var bucketName = null;
+        try {
+          bucketName = (typeof MarketInd !== "undefined" && MarketInd && typeof MarketInd.bucketLabel === "function")
+            ? MarketInd.bucketLabel(P.bucket) : null;
+        } catch (e) { bucketName = null; }
+        if (!bucketName) bucketName = String(P.bucket) + "s";
+        if (plottedN < pn) {
+          P.countNote.textContent = t("pool_detail.candle_count_partial",
+            "%(swaps)s swaps · %(actual)s of %(requested)s × %(bucket)s candles",
+            { swaps: String(P.swaps.length), actual: String(plottedN), requested: String(pn), bucket: bucketName }) + liveSuffix;
+        } else {
+          P.countNote.textContent = t("pool_detail.candle_count",
+            "%(swaps)s swaps · %(count)s × %(bucket)s candles",
+            { swaps: String(P.swaps.length), count: String(pn), bucket: bucketName }) + liveSuffix;
+        }
       } catch (e) { /* count stands */ }
     }
     var swaps = (tape && tape.swaps) || [];

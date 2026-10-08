@@ -2629,6 +2629,8 @@
       "pool.withdrawal_row",
       "pool.withdrawal_zero_note",
       "pool.zero_supply_hint",
+      "pool_detail.candle_count",
+      "pool_detail.candle_count_partial",
       "pool_detail.invert",
       "pool_detail.invert_label",
       "pool_detail.map_connects",
@@ -5498,7 +5500,9 @@
     "pool_map_unavailable_offline": "Pool map unavailable (offline).",
     "map_connects": "A line connects two assets when a funded pool exists and there has been a trade in the past 24 hours.",
     "map_connects_fallback": "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools.",
-    "map_min_swaps": "(min %(min)s swaps)"
+    "map_min_swaps": "(min %(min)s swaps)",
+    "candle_count": "%(swaps)s swaps · %(count)s × %(bucket)s candles",
+    "candle_count_partial": "%(swaps)s swaps · %(actual)s of %(requested)s × %(bucket)s candles"
   },
   "swap": {
     "title": "Swap"
