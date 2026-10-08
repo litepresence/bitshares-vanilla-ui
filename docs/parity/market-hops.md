@@ -148,7 +148,7 @@ grew a "Min fills" noise floor instead of a cap:
   Zero survivors yields the fully empty graph so the painter's honest empty
   sentence paints instead of two lonely dots. Input untouched, never mutated.
 - Floor lives in `state.minFills`, persisted per profile
-  (`bts-vanilla-min-fills-v1`, candle-count precedent), shipped default 5.
+  (`bts-vanilla-min-fills-v1`, candle-count precedent), shipped default 10.
   The number input sits ahead of the map note (market worlds only — pool
   worlds never prune, so they never offer it); invalid entries revert.
 - The connects definition names the filter: "Showing 54 of 85 pairs (min 5

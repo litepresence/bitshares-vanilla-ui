@@ -224,5 +224,40 @@ PoolGraph.drawGraph(null, cvNoLegs, deskBuilt.graph, {
 assert(textsOf(cvNoLegs).indexOf("connects to BTS") === -1 && textsOf(cvNoLegs).indexOf("WARNING") === -1,
   "market: no leg data -> no verdict text (never a guess)");
 
+/* ---- market bottom pair verdict: green connects / yellow reach / red orphan ---- */
+function bottomOf(cv) {
+  /* bottom-center text is the last centered 12px paint; find canvas texts
+   * mentioning the pair verdict shapes. */
+  return cv._calls.text.join(" | ");
+}
+/* deskBuilt legs 1.3.1/USD + 1.3.2/BTC share no direct edge in the fixture:
+ * deterministic check needs a controlled graph. */
+var pairGraph = { nodes: [{ assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" },
+    { assetId: "1.3.0", sym: "BTS" }],
+  edges: [{ id: "BTC_USD", poolId: "BTC_USD", a: "1.3.1", b: "1.3.2", fills: 60, sizeRaw: "60" }] };
+var cvPair = stubCanvas();
+PoolGraph.drawGraph(null, cvPair, pairGraph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: [],
+  marketLegs: { aOk: true, bOk: true }
+});
+assert(bottomOf(cvPair).indexOf("USD connects to BTC") !== -1, "market bottom: own filled pair reads green connects");
+var hopGraph = { nodes: [{ assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" },
+    { assetId: "1.3.0", sym: "BTS" }],
+  edges: [{ id: "USD_BTS", poolId: "USD_BTS", a: "1.3.1", b: "1.3.0", fills: 60, sizeRaw: "60" },
+    { id: "BTC_BTS", poolId: "BTC_BTS", a: "1.3.2", b: "1.3.0", fills: 5, sizeRaw: "5" }] };
+var cvReach = stubCanvas();
+PoolGraph.drawGraph(null, cvReach, hopGraph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: [],
+  marketLegs: { aOk: true, bOk: true }
+});
+assert(bottomOf(cvReach).indexOf("USD reaches BTC in 2 hops") !== -1, "market bottom: routed pair reads yellow reach");
+var loneGraph = { nodes: [{ assetId: "1.3.1", sym: "USD" }, { assetId: "1.3.2", sym: "BTC" }], edges: [] };
+var cvLone = stubCanvas();
+PoolGraph.drawGraph(null, cvLone, loneGraph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: [],
+  marketLegs: { aOk: false, bOk: false }
+});
+assert(bottomOf(cvLone).indexOf("No market filled") !== -1, "market bottom: empty graph keeps the honest empty, not a pair verdict");
+
 console.log("market-desk-map: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

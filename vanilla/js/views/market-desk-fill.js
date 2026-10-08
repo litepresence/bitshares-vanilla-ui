@@ -775,7 +775,12 @@ MarketDesk._fill = MarketDesk._fill || {};
         return MarketHops.readMinFills();
       }
     } catch (e) { /* default below */ }
-    return 5;
+    try {
+      if (typeof MarketHops !== "undefined" && MarketHops && MarketHops.DEFAULT_MIN_FILLS) {
+        return MarketHops.DEFAULT_MIN_FILLS;
+      }
+    } catch (e2) { /* literal below */ }
+    return 10;
   }
 
   /* ensureMinFillsInput: the "Min fills" number input as a bottom-right
@@ -795,7 +800,7 @@ MarketDesk._fill = MarketDesk._fill || {};
       var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
       if (!MH || typeof MH.writeMinFills !== "function") return;
       if (typeof state.minFills !== "number") {
-        try { state.minFills = minFillsNow(state); } catch (e) { state.minFills = 5; }
+        try { state.minFills = minFillsNow(state); } catch (e) { state.minFills = 10; }
       }
       var row = doc.createElement("div");
       row.className = "pool-net-minfilter";

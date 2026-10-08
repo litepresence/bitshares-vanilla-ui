@@ -159,7 +159,7 @@ var prNone = MarketHops.pruneGraph(pg, 1000, [], ["1.3.0", "1.3.3"]);
 assert(prNone.edges.length === 0 && prNone.nodes.length === 0, "prune: nothing passes -> honest empty, not lonely dots");
 assert(pg.edges.length === 3, "prune: input untouched (no mutation)");
 assert(MarketHops.pruneGraph(null, 5, [], []).edges.length === 0, "prune: null graph is an honest empty");
-assert(MarketHops.readMinFills() === 5, "readMinFills: shipped default is 5");
+assert(MarketHops.readMinFills() === 10, "readMinFills: shipped default is 10");
 
 console.log("market-hops: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

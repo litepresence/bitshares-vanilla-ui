@@ -1228,11 +1228,44 @@ var PoolGraph = (function () {
      * Reads nothing from ES beyond the count; price/volume arrive in
      * opts.meta keyed by desk id (the view's own chain ticker probe), and a
      * miss omits the price rather than inventing one. Never throws. */
+    /* Market bottom pair verdict (owner catch 2026-10-08: the corners
+     * painted but the bottom-center pair line never did — theme is pool-only
+     * so markets had no bottom text at all). Pool-parallel semantics over
+     * filled markets: own pair filled = green connects, reachable through
+     * other filled markets = yellow reach, neither = red orphaned. Shares
+     * the bottom-center slot with the hover caption: a hovered line reads
+     * its provenance instead, the pair verdict returns after. */
+    var marketBottom = null;
     if (isMarket) {
       try {
         var hovMid = null;
         for (var mi = 0; mi < mids.length; mi++) {
           if (hoverEdge && String(mids[mi].poolId) === String(hoverEdge)) { hovMid = mids[mi]; break; }
+        }
+        /* No pair verdict on an empty graph: the honest-empty sentence above
+         * already spoke, and a red orphan line under it would cry wolf twice. */
+        if (!hovMid && (edges || []).length && assetA && assetB && String(assetA) !== String(assetB)) {
+          var sA = symById[assetA] || String(assetA), sB = symById[assetB] || String(assetB);
+          var ownLine = null;
+          (edges || []).forEach(function (e) {
+            if (!e) return;
+            if ((String(e.a) === String(assetA) && String(e.b) === String(assetB)) ||
+                (String(e.a) === String(assetB) && String(e.b) === String(assetA))) {
+              ownLine = e;
+            }
+          });
+          if (ownLine) {
+            marketBottom = { text: t("pool.map_pair_ok", "{a} connects to {b}").split("{a}").join(sA).split("{b}").join(sB), color: "live", bold: false };
+          } else {
+            var mDist = null;
+            try { mDist = legDistance(graph, assetA, assetB); } catch (eD) { mDist = null; }
+            if (mDist !== null && mDist !== undefined) {
+              marketBottom = { text: t("pool.map_pair_reach", "{a} reaches {b} in {n} hops").split("{a}").join(sA).split("{b}").join(sB).split("{n}").join(String(mDist)), color: "warn", bold: false };
+            } else {
+              marketBottom = { text: t("pool.map_pair_orphan", "WARNING: assets are orphaned!"), color: "danger", bold: true };
+            }
+          }
+          if (marketBottom) cornerText({ text: marketBottom.text, color: marketBottom.color, bold: marketBottom.bold, y: g.h - 8 }, g.w / 2, "center", 12);
         }
         if (hovMid) {
           var hm = (opts.meta && opts.meta[hovMid.poolId]) || null;
@@ -1288,7 +1321,9 @@ var PoolGraph = (function () {
         }
       } else if (isMarket && marketVerdicts && marketVerdicts.length) {
         canvas.setAttribute("role", "img");
-        canvas.setAttribute("aria-label", marketVerdicts.join(" "));
+        var mBits = marketVerdicts.slice();
+        try { if (marketBottom && marketBottom.text) mBits.push(marketBottom.text); } catch (eB) { /* corners stand */ }
+        canvas.setAttribute("aria-label", mBits.join(" "));
       }
     } catch (e) { /* generic label stands */ }
     try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}

@@ -482,7 +482,7 @@ var MarketHops = (function () {
    * 2026-10-08). Pairs below this hide; the BTS route and the desk legs
    * never hide. 1 means show everything. Persisted per profile like the
    * candle count; the input owns the value after load. */
-  var DEFAULT_MIN_FILLS = 5;
+  var DEFAULT_MIN_FILLS = 10;
   var MIN_FILLS_KEY = "bts-vanilla-min-fills-v1";
 
   /* readMinFills: persisted threshold, or the default. Missing/corrupt
