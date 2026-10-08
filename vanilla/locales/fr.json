@@ -1176,6 +1176,7 @@
       "explorer.asset_type_filter",
       "explorer.assets_failed",
       "explorer.assets_missing",
+      "explorer.assets_mode_all",
       "explorer.assets_mode_market",
       "explorer.assets_mode_prediction",
       "explorer.assets_mode_user",
@@ -4936,7 +4937,8 @@
     "accounts_search_aria": "Rechercher des comptes par préfixe de nom",
     "search_suggestions_aria": "Suggestions de recherche",
     "search_empty_hint": "Saisissez un numéro de bloc, un id d’objet, un compte ou un symbole d’actif.",
-    "no_assets_match": "No assets match \"%(q)s\"."
+    "no_assets_match": "No assets match \"%(q)s\".",
+    "assets_mode_all": "All"
   },
   "gateway": {
     "title": "Dépôt / Retrait",

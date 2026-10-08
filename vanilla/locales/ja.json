@@ -1176,6 +1176,7 @@
       "explorer.asset_type_filter",
       "explorer.assets_failed",
       "explorer.assets_missing",
+      "explorer.assets_mode_all",
       "explorer.assets_mode_market",
       "explorer.assets_mode_prediction",
       "explorer.assets_mode_user",
@@ -4936,7 +4937,8 @@
     "accounts_search_aria": "名前の接頭辞でアカウントを検索",
     "search_suggestions_aria": "検索候補",
     "search_empty_hint": "ブロック番号、オブジェクトID、アカウント、またはアセットシンボルを入力してください。",
-    "no_assets_match": "No assets match \"%(q)s\"."
+    "no_assets_match": "No assets match \"%(q)s\".",
+    "assets_mode_all": "All"
   },
   "gateway": {
     "title": "入金 / 出金",

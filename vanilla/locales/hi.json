@@ -1176,6 +1176,7 @@
       "explorer.asset_type_filter",
       "explorer.assets_failed",
       "explorer.assets_missing",
+      "explorer.assets_mode_all",
       "explorer.assets_mode_market",
       "explorer.assets_mode_prediction",
       "explorer.assets_mode_user",
@@ -4936,7 +4937,8 @@
     "accounts_search_aria": "नाम उपसर्ग से खाते खोजें",
     "search_suggestions_aria": "खोज सुझाव",
     "search_empty_hint": "ब्लॉक संख्या, ऑब्जेक्ट id, खाता, या एसेट प्रतीक लिखें।",
-    "no_assets_match": "No assets match \"%(q)s\"."
+    "no_assets_match": "No assets match \"%(q)s\".",
+    "assets_mode_all": "All"
   },
   "gateway": {
     "title": "जमा / निकासी",

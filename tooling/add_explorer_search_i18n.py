@@ -19,6 +19,7 @@ LOCALES = ["en", "de", "es", "fr", "it", "ja", "ko", "ru", "tr", "zh", "hi", "pt
 # (check_i18n.py enforces byte-equality).
 NEW_KEYS = {
     "explorer.no_assets_match": "No assets match \"%(q)s\".",
+    "explorer.assets_mode_all": "All",
 }
 
 

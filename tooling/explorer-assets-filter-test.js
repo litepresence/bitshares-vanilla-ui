@@ -28,9 +28,9 @@ function ok(cond, name) {
 var SRC = fs.readFileSync(
   path.join(__dirname, "..", "vanilla", "js", "views", "explorer-assets.js"), "utf8");
 
-/* 1. First paint defaults to market (today's behavior — keep). */
-ok(SRC.indexOf('var assetState = { mode: "market"') !== -1,
-  "assetState defaults to market on first paint");
+/* 1. First paint defaults to all (non-selective — owner 2026-10-08). */
+ok(SRC.indexOf('var assetState = { mode: "all"') !== -1,
+  "assetState defaults to all on first paint");
 
 /* 2. Session-memory: module-level, never localStorage (view state, not settings). */
 ok(SRC.indexOf("var assetState") !== -1, "assetState is module-level (session memory)");
@@ -44,10 +44,11 @@ ok(SRC.indexOf("localStorage.getItem") === -1 &&
 ok(SRC.indexOf("assetState.mode = m[0]") !== -1 ||
    SRC.indexOf("assetState.mode = normalizeAssetMode") !== -1,
   "radio change writes assetState.mode (persists across re-renders)");
-ok(SRC.indexOf('assetState.mode = "market"') === -1,
-  "no reset-to-market on entry (mode survives page turns)");
+ok(SRC.indexOf('assetState.mode = "market"') === -1 &&
+   SRC.indexOf('assetState.mode = "all"') === -1,
+  "no reset-to-a-mode on entry (mode survives page turns)");
 
-/* 4. Unknown stored values clamp to market (pure helper, extracted like _parseHolders). */
+/* 4. Unknown stored values clamp to all (pure helper, extracted like _parseHolders). */
 var MARKER = "function normalizeAssetMode(m) {";
 var start = SRC.indexOf(MARKER);
 ok(start !== -1, "source contains normalizeAssetMode (clamps unknown modes)");
@@ -69,17 +70,20 @@ ok(typeof normalizeAssetMode === "function", "extracted normalizeAssetMode is a 
 eq(normalizeAssetMode("market"), "market", "market stays market");
 eq(normalizeAssetMode("user"), "user", "user stays user");
 eq(normalizeAssetMode("prediction"), "prediction", "prediction stays prediction");
-eq(normalizeAssetMode("bogus"), "market", "unknown string clamps to market");
-eq(normalizeAssetMode(undefined), "market", "undefined clamps to market");
-eq(normalizeAssetMode(null), "market", "null clamps to market");
-eq(normalizeAssetMode(""), "market", "empty clamps to market");
-eq(normalizeAssetMode("MARKET"), "market", "wrong-case clamps to market");
+eq(normalizeAssetMode("all"), "all", "all stays all");
+eq(normalizeAssetMode("bogus"), "all", "unknown string clamps to all");
+eq(normalizeAssetMode(undefined), "all", "undefined clamps to all");
+eq(normalizeAssetMode(null), "all", "null clamps to all");
+eq(normalizeAssetMode(""), "all", "empty clamps to all");
+eq(normalizeAssetMode("MARKET"), "all", "wrong-case clamps to all");
 
 /* 5. Honest Showing line above the table (keyed, never raw integers on screen). */
 ok(SRC.indexOf('t("explorer.assets_showing", "Showing")') !== -1,
   "showing line uses explorer.assets_showing");
 ok(SRC.indexOf('t("explorer.assets_of", "of")') !== -1,
   "showing line uses explorer.assets_of");
+ok(SRC.indexOf('t("explorer.assets_mode_all", "All")') !== -1,
+  "all mode label keyed");
 ok(SRC.indexOf('t("explorer.assets_mode_market", "SmartCoins")') !== -1,
   "market mode label keyed");
 ok(SRC.indexOf('t("explorer.assets_mode_user", "User-Issued")') !== -1,
@@ -92,6 +96,7 @@ ok(SRC.indexOf("aria-live") !== -1, "showing line is aria-live");
 var NEW_KEYS = {
   assets_showing: "Showing",
   assets_of: "of",
+  assets_mode_all: "All",
   assets_mode_market: "SmartCoins",
   assets_mode_user: "User-Issued",
   assets_mode_prediction: "Prediction",

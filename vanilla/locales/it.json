@@ -1176,6 +1176,7 @@
       "explorer.asset_type_filter",
       "explorer.assets_failed",
       "explorer.assets_missing",
+      "explorer.assets_mode_all",
       "explorer.assets_mode_market",
       "explorer.assets_mode_prediction",
       "explorer.assets_mode_user",
@@ -4936,7 +4937,8 @@
     "accounts_search_aria": "Ricerca account per prefisso del nome",
     "search_suggestions_aria": "Suggerimenti di ricerca",
     "search_empty_hint": "Digiti un numero di blocco, un id oggetto, un account o un simbolo asset.",
-    "no_assets_match": "No assets match \"%(q)s\"."
+    "no_assets_match": "No assets match \"%(q)s\".",
+    "assets_mode_all": "All"
   },
   "gateway": {
     "title": "Deposito / Prelievo",

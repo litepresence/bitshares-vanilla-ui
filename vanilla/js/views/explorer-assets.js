@@ -80,18 +80,19 @@ var ExplorerAssets = (function () {
    * assetsTab with new lower/stack but same state) — session memory, never
    * localStorage (view state, not settings; polish Task 7). Mode labels +
    * the Showing line are keyed explorer.assets_* (12 locales). */
-  var assetState = { mode: "market", q: "", perPage: 25, sortKey: "symbol", sortDir: 1 };
+  var assetState = { mode: "all", q: "", perPage: 25, sortKey: "symbol", sortDir: 1 };
   var ROW_OPTIONS = [10, 25, 50, 100];
 
-  /* normalizeAssetMode: clamp any stored mode to the three known filters.
+  /* normalizeAssetMode: clamp any stored mode to the four known filters
+   * ("all" is deliberately non-selective: every asset type passes).
    * WHY: session memory persists the last mode; unknown values (future
-   *   modes, corrupt state) fall back to market — today's first-paint
-   *   default — instead of matching everything (the old unclamped path).
+   *   modes, corrupt state) fall back to all — today's first-paint
+   *   default — instead of matching nothing (the old unclamped path).
    * @param {any} m candidate mode
-   * @returns {string} "market"|"user"|"prediction" */
+   * @returns {string} "all"|"market"|"user"|"prediction" */
   function normalizeAssetMode(m) {
-    if (m === "market" || m === "user" || m === "prediction") return m;
-    return "market";
+    if (m === "market" || m === "user" || m === "prediction" || m === "all") return m;
+    return "all";
   }
 
   /* searchLowerBound: live query -> chain prefix bound for list_assets.
@@ -112,9 +113,10 @@ var ExplorerAssets = (function () {
    * WHY helper: the radios + the honest Showing line share one source so
    *   they can never drift apart; display-only, never throws.
    * @param {any} mode candidate mode (clamped inside)
-   * @returns {string} keyed SmartCoins/User-Issued/Prediction label */
+   * @returns {string} keyed All/SmartCoins/User-Issued/Prediction label */
   function assetModeLabel(mode) {
     var m = normalizeAssetMode(mode);
+    if (m === "all") return t("explorer.assets_mode_all", "All");
     if (m === "user") return t("explorer.assets_mode_user", "User-Issued");
     if (m === "prediction") return t("explorer.assets_mode_prediction", "Prediction");
     return t("explorer.assets_mode_market", "SmartCoins");
@@ -446,7 +448,7 @@ var ExplorerAssets = (function () {
     touchable(search);
     search.style.minWidth = "180px";
     bar.appendChild(search);
-    var modes = [["market", assetModeLabel("market")], ["user", assetModeLabel("user")], ["prediction", assetModeLabel("prediction")]];
+    var modes = [["all", assetModeLabel("all")], ["market", assetModeLabel("market")], ["user", assetModeLabel("user")], ["prediction", assetModeLabel("prediction")]];
     var radioWrap = DOM.el(doc, "span", null, "xplore-radios");
     radioWrap.setAttribute("role", "radiogroup");
     radioWrap.setAttribute("aria-label", t("explorer.asset_type_filter", "Asset type filter"));
@@ -585,9 +587,10 @@ var ExplorerAssets = (function () {
       var mode = normalizeAssetMode(assetState.mode);
       var out = (allRows || []).filter(function (r) {
         if (!r || !r.a) return false;
-        if (mode === "market" && !(r.isSmart && !r.isPrediction)) return false;
-        if (mode === "user" && r.isSmart) return false;
-        if (mode === "prediction" && !(r.isSmart && r.isPrediction)) return false;
+        if (mode === "all") { /* non-selective: query substring only */ }
+        else if (mode === "market" && !(r.isSmart && !r.isPrediction)) return false;
+        else if (mode === "user" && r.isSmart) return false;
+        else if (mode === "prediction" && !(r.isSmart && r.isPrediction)) return false;
         if (q && String(r.a.symbol || "").toUpperCase().indexOf(q) === -1) return false;
         return true;
       });
