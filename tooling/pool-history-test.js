@@ -102,6 +102,31 @@ eq(PH._test.esSwap({ _source: { operation_type: 63, block_data: {},
     paid: [{ amount: 1, asset_id: "1.3.0" }], received: [{ amount: 2, asset_id: "1.3.1" }] } } } } }, "1.19.133"),
   null, "esSwap missing pool id rejects (mainnet-only index guard)");
 
+// 4b. countSwaps: strict per-pool 24h magnitudes for the min-swaps floor.
+function swapHit(pool, time) {
+  return { _source: {
+    operation_type: 63,
+    block_data: { block_num: 1, block_time: time || "2026-10-08T10:00:00" },
+    operation_history: {
+      op_object: { account: "1.2.1", pool: pool },
+      operation_result_object: { which: 4, data_object: {
+        paid: [{ amount: 10, asset_id: "1.3.0" }],
+        received: [{ amount: 20, asset_id: "1.3.1" }] } } } } };
+}
+eq(PH._test.countSwaps(
+  [swapHit("1.19.1"), swapHit("1.19.1"), swapHit("1.19.2")],
+  ["1.19.1", "1.19.2"], "2026-10-08T00:00:00"),
+  { "1.19.1": 2, "1.19.2": 1 }, "countSwaps tallies per pool");
+eq(PH._test.countSwaps(
+  [swapHit("1.19.9"), swapHit("1.19.1", "2026-10-01T00:00:00")],
+  ["1.19.1"], "2026-10-08T00:00:00"),
+  {}, "countSwaps drops foreign pools and stale hits");
+eq(PH._test.countSwaps([], ["1.19.1"], ""), {}, "countSwaps empty page, empty since");
+eq(PH._test.countSwaps(null, null, null), {}, "countSwaps garbage in, {} out");
+eq(PH.readMinSwaps(), 1, "readMinSwaps default is 1 (strict-gate parity)");
+eq(PH.writeMinSwaps(0), false, "writeMinSwaps rejects zero");
+eq(PH.writeMinSwaps("abc"), false, "writeMinSwaps rejects garbage");
+
 // 5. ES capped search_after pagination (offline, fetch stubbed).
 // 500/page, max 2 pages = 1000 events, 15s total budget (lazy-deep audit
 // 2026-10-01: 762KB/page measured — the 4-page/2000 cap cost ~3MB per fill

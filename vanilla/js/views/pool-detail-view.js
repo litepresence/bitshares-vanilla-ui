@@ -40,10 +40,22 @@ PoolDetailUI._view = PoolDetailUI._view || {};
    * their code structure (batch-2b precedent): only complete static literals and
    * word-bearing segments are wrapped, values and punctuation glue stay raw, so
    * every default below is byte-verbatim in the HEAD blob. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") {
+        if (vars && typeof vars === "object") return I18n.t(key, dflt, vars);
+        return I18n.t(key, dflt);
+      }
     } catch (e) { /* default below */ }
+    /* vars fill %(name)s placeholders when I18n is absent (pool-net-ui.js
+     * precedent — file:// renders identically instead of showing raw %). */
+    if (vars && typeof dflt === "string") {
+      try {
+        return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+        });
+      } catch (e2) { /* default below */ }
+    }
     return dflt;
   }
 
@@ -1658,6 +1670,15 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           try { pa = PoolGraph.findCorePath(g, pA); } catch (e) { pa = null; }
           try { pb = PoolGraph.findCorePath(g, pB); } catch (e) { pb = null; }
           P.graphData = { graph: g, assetA: pA, assetB: pB, pathA: pa, pathB: pb };
+          /* Full-graph snapshot + triangle for the min-swaps reprunes (the
+           * input re-filters locally — no refetch, the counts arrive below).
+           * Stable for this chain snapshot; a refetch rebuilds all three. */
+          try {
+            P._fullGraph = g;
+            P._triIds = triangleIds(P.graphData);
+            P._swapCounts = null;
+            P.minSwaps = minSwapsNow(P);
+          } catch (eS) { /* prune degrades to unfiltered */ }
           redrawPoolMap(doc, P, myGen, uiGen);
           try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
           gateByActivity(doc, P, myGen, uiGen);
@@ -1687,21 +1708,34 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     return true;
   }
 
-  /* Prune a desk graph to 24h-active pools (pure shape, no chain calls).
-   * Nodes shrink to edge endpoints + the desk legs; BTS paths recompute on
-   * the pruned graph (a route through a dropped pool must not glow).
-   * Verbatim duplicate of the market-desk-fill helper by doctrine.
+  /* Prune a desk graph by 24h swap counts (pure shape, no chain calls).
+   * Pools below minSwaps drop, except the triangle (the desk's own pool +
+   * both legs' BTS paths) which always paints: the triangle is the map's
+   * reason to exist, never noise. Nodes shrink to kept-edge endpoints +
+   * the desk legs; BTS paths recompute on the pruned graph (a route
+   * through a dropped pool must not glow). DIVERGED from the
+   * market-desk-fill boolean copy on purpose: the swap desk filters by
+   * magnitudes now, the exchange fallback still filters by presence.
+   * @param {Object} gd graphData (graph/assetA/assetB). @param {Object}
+   * counts poolId -> 24h swap count. @param {number} minSwaps floor (>= 1).
+   * @param {Object} exempt poolId -> true for the triangle.
    * @returns {{graph: {nodes: Array, edges: Array}, pathA: Object|null,
    *   pathB: Object|null, kept: number}} Never throws. */
-  function gateEdges(gd, active) {
+  function gateEdges(gd, counts, minSwaps, exempt) {
     var kept = 0;
     try {
       var g = (gd && gd.graph) || { nodes: [], edges: [] };
       var aA = gd.assetA, aB = gd.assetB;
+      var min = Math.floor(Number(minSwaps));
+      if (!isFinite(min) || min < 1) min = 1;
       var edges = ((g.edges) || []).filter(function (e) {
-        return e && e.poolId && active[String(e.poolId)];
+        if (!e || !e.poolId) return false;
+        var id = String(e.poolId);
+        if (exempt && exempt[id]) return true;
+        return (Number((counts || {})[id]) || 0) >= min;
       });
       kept = edges.length;
+      if (!kept) return { graph: { nodes: [], edges: [] }, pathA: null, pathB: null, kept: 0 };
       var keepN = {};
       try { keepN[String(aA)] = 1; keepN[String(aB)] = 1; } catch (e) { /* legs stand */ }
       edges.forEach(function (e) {
@@ -1722,17 +1756,146 @@ PoolDetailUI._view = PoolDetailUI._view || {};
     } catch (e) { return { graph: { nodes: [], edges: [] }, pathA: null, pathB: null, kept: 0 }; }
   }
 
+  /* minSwapsNow: the live floor for the swap map. The desk state carries it
+   * once the input exists; otherwise the persisted profile value (or the
+   * shipped 1) answers. Never throws. @returns {number} >= 1. */
+  function minSwapsNow(P) {
+    try {
+      if (P && typeof P.minSwaps === "number" && isFinite(P.minSwaps) && P.minSwaps >= 1) {
+        return Math.floor(P.minSwaps);
+      }
+      if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.readMinSwaps === "function") {
+        return PoolHistory.readMinSwaps();
+      }
+    } catch (e) { /* default below */ }
+    return 1;
+  }
+
+  /* triangleIds: the desk's own pool + both legs' BTS paths over the FULL
+   * graph (stable for the chain snapshot — computed once at fetch, reused
+   * by every reprune so the triangle never depends on a pruned view).
+   * Pure shape, never throws. @returns {Object} poolId -> true. */
+  function triangleIds(gd) {
+    var out = {};
+    try {
+      var g = (gd && gd.graph) || { nodes: [], edges: [] };
+      var aA = gd.assetA, aB = gd.assetB;
+      (g.edges || []).forEach(function (e) {
+        if (!e) return;
+        if ((String(e.a) === String(aA) && String(e.b) === String(aB)) ||
+            (String(e.a) === String(aB) && String(e.b) === String(aA))) {
+          if (e.poolId) out[String(e.poolId)] = 1;
+        }
+      });
+      [(gd.pathA && gd.pathA.via) || [], (gd.pathB && gd.pathB.via) || []].forEach(function (list) {
+        (list || []).forEach(function (id) { if (id) out[String(id)] = 1; });
+      });
+    } catch (e) { /* partial triangle stands */ }
+    return out;
+  }
+
+  /* repruneBySwaps: re-filter the FULL graph by the live floor (input
+   * changes re-prune locally — no refetch, the counts are already in).
+   * Stale-route guarded; unknown counts leave the painted world alone.
+   * Never throws outward. */
+  function repruneBySwaps(doc, P, myGen, uiGen) {
+    try {
+      if (!live(myGen, uiGen)) return;
+      if (!P._fullGraph || !P._swapCounts) return;
+      var out = gateEdges({ graph: P._fullGraph, assetA: P.graphData.assetA, assetB: P.graphData.assetB },
+        P._swapCounts, minSwapsNow(P), P._triIds || {});
+      P.graphData = { graph: out.graph, assetA: P.graphData.assetA, assetB: P.graphData.assetB,
+        pathA: out.pathA, pathB: out.pathB };
+      P._activity = { gated: true, count: out.kept, total: (P._fullGraph.edges || []).length };
+      try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* map stands */ }
+      try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
+    } catch (e) { /* painted world stands */ }
+  }
+
+  /* ensureMinSwapsInput: the "Min swaps" number input as a bottom-right
+   * canvas overlay pill — the same overlay treatment as the physics pill
+   * (panel/border/radius, opposite corner) and the exchange desk's min
+   * fills input, so all three map controls read as one family. Offered only
+   * once swap counts are known (strict world); fallback worlds never offer
+   * a control that cannot filter. Built once per desk; valid changes
+   * persist per profile and reprune locally, invalid ones revert.
+   * Never throws. */
+  function ensureMinSwapsInput(doc, P, myGen, uiGen) {
+    try {
+      if (!doc || !P.graphWrap) return;
+      if (P.minSwapsBox && P.minSwapsBox.parentNode) return;
+      if (typeof doc.createElement !== "function") return;
+      if (typeof PoolHistory === "undefined" || !PoolHistory ||
+          typeof PoolHistory.writeMinSwaps !== "function") return;
+      if (typeof P.minSwaps !== "number") {
+        try { P.minSwaps = minSwapsNow(P); } catch (e) { P.minSwaps = 1; }
+      }
+      var u = null;
+      try { u = U(); } catch (eU) { u = null; }
+      function mkEl(tag, text, cls) {
+        if (u && u.el) return u.el(doc, tag, text, cls);
+        var el = doc.createElement(tag);
+        if (text !== undefined && text !== null) el.textContent = text;
+        if (cls) el.className = cls;
+        return el;
+      }
+      var row = doc.createElement("div");
+      row.className = "pool-net-minfilter";
+      try { row.setAttribute("data-minfilter", "swaps"); } catch (e) { /* class stands */ }
+      var lab = doc.createElement("label");
+      lab.textContent = t("pool.min_swaps", "Min swaps") + " ";
+      var inp = doc.createElement("input");
+      inp.type = "number";
+      inp.min = "1";
+      inp.value = String(minSwapsNow(P));
+      try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* value stands */ }
+      try { inp.setAttribute("aria-label", t("pool.min_swaps", "Min swaps")); } catch (e) { /* label stands */ }
+      try {
+        if (u && typeof u.touchable === "function") u.touchable(inp);
+        else if (typeof touchable === "function") touchable(inp);
+      } catch (e) { /* click still works */ }
+      lab.appendChild(inp);
+      row.appendChild(lab);
+      var placed = false;
+      try {
+        var cv = P.graphCanvas;
+        if (cv && cv.parentNode) {
+          var stage = cv.parentNode;
+          if (stage && stage.className && String(stage.className).indexOf("pool-net-stage") !== -1) {
+            stage.appendChild(row);
+            placed = true;
+          }
+        }
+      } catch (e) { /* fallback below */ }
+      if (!placed) P.graphWrap.appendChild(row);
+      P.minSwapsBox = row;
+      inp.addEventListener("change", function () {
+        var v = parseInt(inp.value, 10);
+        var okW = false;
+        try { okW = PoolHistory.writeMinSwaps(v); } catch (e) { okW = false; }
+        if (!okW) {
+          try { inp.value = String(minSwapsNow(P)); } catch (e) { /* stands */ }
+          return;
+        }
+        try { P.minSwaps = PoolHistory.readMinSwaps(); } catch (e) { P.minSwaps = v; }
+        try { repruneBySwaps(doc, P, myGen, uiGen); } catch (e) { /* map stands */ }
+      });
+    } catch (e) { /* map stands without the filter */ }
+  }
+
   /* 24h-activity gating pass (once per desk, after the chain-first paint —
-   * the desk never waits on it). Probe success prunes to active pools
-   * (strict-definition activity); anything else keeps the funded chain
-   * pools with fallback activity. Stale-route guarded; never throws. */
+   * the desk never waits on it). Probe success prunes by swap COUNTS under
+   * the live min-swaps floor (the triangle always paints) and offers the
+   * Min swaps input; anything else keeps the funded chain pools with
+   * fallback activity and no input (a control that cannot filter is worse
+   * than none). Stale-route guarded; never throws. */
   function gateByActivity(doc, P, myGen, uiGen) {
     try {
       if (!P.graphData || !P.graphData.graph) return;
       var total = ((P.graphData.graph.edges) || []).length;
       if (!total) return;
       if (typeof PoolHistory === "undefined" || !PoolHistory ||
-          typeof PoolHistory.poolsActive24h !== "function" || !isMainnet()) {
+          typeof PoolHistory.poolSwapCounts !== "function" || !isMainnet()) {
         P._activity = { gated: false, count: total, total: total };
         try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* chain paint stands */ }
         return;
@@ -1743,15 +1906,17 @@ PoolDetailUI._view = PoolDetailUI._view || {};
           if (e && e.poolId) ids.push(String(e.poolId));
         });
       } catch (e) { ids = []; }
-      PoolHistory.poolsActive24h(ids).then(function (res) {
+      PoolHistory.poolSwapCounts(ids).then(function (res) {
         if (!live(myGen, uiGen)) return;
         if (!res || res.partial) {
           P._activity = { gated: false, count: total, total: total };
         } else {
-          var out = gateEdges(P.graphData, res.active || {});
+          P._swapCounts = res.counts || {};
+          var out = gateEdges(P.graphData, P._swapCounts, minSwapsNow(P), P._triIds || {});
           P.graphData = { graph: out.graph, assetA: P.graphData.assetA,
             assetB: P.graphData.assetB, pathA: out.pathA, pathB: out.pathB };
           P._activity = { gated: true, count: out.kept, total: total };
+          try { ensureMinSwapsInput(doc, P, myGen, uiGen); } catch (eI) { /* note still states the floor */ }
         }
         try { redrawPoolMap(doc, P, myGen, uiGen); } catch (e) { /* chain paint stands */ }
         try { MarketInd.drawCharts(P); } catch (e) { /* pin best-effort */ }
@@ -1811,8 +1976,18 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       if (!n && !(act && act.gated && act.total > 0)) {
         P.graphNote.textContent = t("pool.touch_hint", "No pools touch these assets — pick a pair with a pool, or create one at #/pools.");
       } else if (act && act.gated) {
+        /* The connects definition names the floor when one is set (owner
+         * 2026-10-08): a filtered map says "12/17 (min 5 swaps)" while the
+         * default floor-1 map keeps the plain count, byte-identical. */
+        var floorTxt = "";
+        try {
+          var floorNow = minSwapsNow(P);
+          if (floorNow > 1) {
+            floorTxt = " " + t("pool_detail.map_min_swaps", "(min %(min)s swaps)", { min: String(floorNow) });
+          }
+        } catch (eF) { /* plain count stands */ }
         P.graphNote.textContent = t("pool_detail.map_connects", "A line connects two assets when a funded pool exists and there has been a trade in the past 24 hours.") +
-          " " + String(act.count) + "/" + String(act.total);
+          " " + String(act.count) + "/" + String(act.total) + floorTxt;
       } else if (!act) {
         P.graphNote.textContent = t("market.loading_pool_map", "Loading map…");
       } else {

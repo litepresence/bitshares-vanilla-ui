@@ -682,7 +682,7 @@ var PoolGraph = (function () {
           var d = S.drawOpts || {};
           drawGraph(S.doc, S.canvas, S.graph,
             { assetA: d.assetA, assetB: d.assetB, highlightPools: d.highlightPools, nav: d.nav,
-              kind: d.kind, meta: d.meta, routeDeskIds: d.routeDeskIds,
+              kind: d.kind, meta: d.meta, routeDeskIds: d.routeDeskIds, marketLegs: d.marketLegs,
               _pos: S.geom });
         } catch (e) { /* next frame */ }
       }
@@ -736,7 +736,8 @@ var PoolGraph = (function () {
       canvas: canvas, doc: doc,
       drawOpts: { assetA: assetA, assetB: assetB, highlightPools: opts.highlightPools || [],
         nav: opts.nav || null, kind: (opts.kind === "market") ? "market" : "pool",
-        meta: opts.meta || null, routeDeskIds: opts.routeDeskIds || [] } };
+        meta: opts.meta || null, routeDeskIds: opts.routeDeskIds || [],
+        marketLegs: (opts.marketLegs && typeof opts.marketLegs === "object") ? opts.marketLegs : null } };
     S.temp = _phys().lively.temp0;
     try { canvas._graphLiveS = S; } catch (e) { /* static paint below still stands */ }
     /* Every render paints first (so the frame is never blank), then settles:
@@ -748,7 +749,8 @@ var PoolGraph = (function () {
       drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB,
         highlightPools: opts.highlightPools || [], nav: opts.nav || null, hoverEdge: opts.hoverEdge || "",
         kind: (opts.kind === "market") ? "market" : "pool", meta: opts.meta || null,
-        routeDeskIds: opts.routeDeskIds || [] });
+        routeDeskIds: opts.routeDeskIds || [],
+        marketLegs: (opts.marketLegs && typeof opts.marketLegs === "object") ? opts.marketLegs : null });
     } catch (e) { /* note below carries it */ }
     if (S.reduced && !opts.explicit) { S.running = false; S.settled = true; return S; }
     wake(S, !!opts.explicit);
@@ -1065,6 +1067,32 @@ var PoolGraph = (function () {
       cornerText({ text: theme.left.text, color: theme.left.color, bold: theme.left.bold, y: 14 }, 8, "left");
       cornerText({ text: theme.right.text, color: theme.right.color, bold: theme.right.bold, y: 14 }, g.w - 8, "right");
     }
+    /* Market leg verdicts (owner 2026-10-08): each desk leg states its own
+     * filled-market standing — core blue identity for BTS itself, green for
+     * a leg that reaches BTS through filled markets, red for one that does
+     * not. Reachability arrives precomputed as opts.marketLegs ({aOk, bOk},
+     * from the view's own routeToCore results); absent legs object = no
+     * text rather than a guessed verdict. Pool verdicts above are untouched. */
+    function marketLegText(id, ok) {
+      var s = symById[id] || String(id === undefined || id === null ? "?" : id);
+      if (String(id) === CORE_ID) {
+        return { text: t("pool.map_core_self", "BTS is BitShares core token"), color: "bts", bold: false };
+      }
+      if (ok) {
+        return { text: t("market.map_leg_ok", "{s} connects to BTS").split("{s}").join(s), color: "live", bold: false };
+      }
+      return { text: t("market.map_leg_orphan", "WARNING: {s} has no filled-market route!").split("{s}").join(s), color: "danger", bold: true };
+    }
+    var marketVerdicts = null;
+    if (isMarket && opts && opts.marketLegs) {
+      try {
+        var mlA = marketLegText(assetA, !!(opts.marketLegs && opts.marketLegs.aOk));
+        var mlB = marketLegText(assetB, !!(opts.marketLegs && opts.marketLegs.bOk));
+        cornerText({ text: mlA.text, color: mlA.color, bold: mlA.bold, y: 14 }, 8, "left");
+        cornerText({ text: mlB.text, color: mlB.color, bold: mlB.bold, y: 14 }, g.w - 8, "right");
+        marketVerdicts = [mlA.text, mlB.text];
+      } catch (eM) { /* corners stand empty, never half-painted */ }
+    }
     var hits = [];
     var pathSet = {};
     try {
@@ -1258,6 +1286,9 @@ var PoolGraph = (function () {
           canvas.setAttribute("role", "img");
           canvas.setAttribute("aria-label", ariaBits.join(" "));
         }
+      } else if (isMarket && marketVerdicts && marketVerdicts.length) {
+        canvas.setAttribute("role", "img");
+        canvas.setAttribute("aria-label", marketVerdicts.join(" "));
       }
     } catch (e) { /* generic label stands */ }
     try { if (!canvas._graphDrag) canvas.style.cursor = "pointer"; } catch (e) {}

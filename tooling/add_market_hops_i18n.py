@@ -41,6 +41,10 @@ NEW_KEYS = {
     "market.map_edge_price": "@ %(price)s · %(vol)s",
     "market.map_hops_filtered": "A line is a market that filled in the past 24 hours. Showing %(shown)s of %(total)s pairs (min %(min)s fills/24h).",
     "market.min_fills": "Min fills",
+    "market.map_leg_ok": "{s} connects to BTS",
+    "market.map_leg_orphan": "WARNING: {s} has no filled-market route!",
+    "pool.min_swaps": "Min swaps",
+    "pool_detail.map_min_swaps": "(min %(min)s swaps)",
 }
 
 

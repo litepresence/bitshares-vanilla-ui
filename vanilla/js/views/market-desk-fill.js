@@ -778,16 +778,19 @@ MarketDesk._fill = MarketDesk._fill || {};
     return 5;
   }
 
-  /* ensureMinFillsInput: the "Min fills" number input ahead of the map note
-   * (market worlds only — pool worlds never prune, so they never offer it).
+  /* ensureMinFillsInput: the "Min fills" number input as a bottom-right
+   * canvas overlay pill (market worlds only — pool worlds never prune, so
+   * they never offer it). Same overlay treatment as the physics pill
+   * (panel/border/radius, opposite corner) so the two map controls read as
+   * one family; falls back beside the note when no canvas stage exists.
    * Built once per desk (guarded on state); a valid change persists per
    * profile and repaints the map, an invalid one reverts. Never throws.
    * @param {Document} doc owner document. @param {Object} state desk state.
    * @returns {void}. */
   function ensureMinFillsInput(doc, state) {
     try {
-      if (!doc || !state.graphWrap || !state.graphNote) return;
-      if (state.minFillsBox && state.minFillsBox.parentNode === state.graphWrap) return;
+      if (!doc || !state.graphWrap) return;
+      if (state.minFillsBox && state.minFillsBox.parentNode) return;
       if (typeof doc.createElement !== "function") return;
       var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
       if (!MH || typeof MH.writeMinFills !== "function") return;
@@ -795,20 +798,31 @@ MarketDesk._fill = MarketDesk._fill || {};
         try { state.minFills = minFillsNow(state); } catch (e) { state.minFills = 5; }
       }
       var row = doc.createElement("div");
-      row.className = "mkt-mapfilter";
+      row.className = "pool-net-minfilter";
+      try { row.setAttribute("data-minfilter", "fills"); } catch (e) { /* class stands */ }
       var lab = doc.createElement("label");
       lab.textContent = t("market.min_fills", "Min fills") + " ";
       var inp = doc.createElement("input");
       inp.type = "number";
       inp.min = "1";
       inp.value = String(minFillsNow(state));
-      try { inp.style.maxWidth = "90px"; } catch (e) { /* stylesheet stands */ }
       try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* value stands */ }
       try { inp.setAttribute("aria-label", t("market.min_fills", "Min fills")); } catch (e) { /* label stands */ }
       touchable(inp);
       lab.appendChild(inp);
       row.appendChild(lab);
-      try { state.graphWrap.insertBefore(row, state.graphNote); } catch (e) { state.graphWrap.appendChild(row); }
+      var placed = false;
+      try {
+        var cv = state.graphCanvas;
+        if (cv && cv.parentNode) {
+          var stage = cv.parentNode;
+          if (stage && stage.className && String(stage.className).indexOf("pool-net-stage") !== -1) {
+            stage.appendChild(row);
+            placed = true;
+          }
+        }
+      } catch (e) { /* fallback below */ }
+      if (!placed) state.graphWrap.appendChild(row);
       state.minFillsBox = row;
       inp.addEventListener("change", function () {
         var v = parseInt(inp.value, 10);
@@ -962,9 +976,18 @@ MarketDesk._fill = MarketDesk._fill || {};
         ensureMinFillsInput(doc, state);
       }
       var shownN = (shownGraph.edges || []).length;
+      /* Per-leg standing for the corner verdicts (green/red/blue): present
+       * only when the view actually computed routes — a verdict without
+       * data would be a guess, and the painter must never guess. */
+      var marketLegs = null;
+      if (isMarket && gd && ("routeA" in gd) && ("routeB" in gd)) {
+        try {
+          marketLegs = { aOk: !!(gd.routeA && gd.routeA.assetPath), bOk: !!(gd.routeB && gd.routeB.assetPath) };
+        } catch (eL) { marketLegs = null; }
+      }
       var paintOpts = { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit,
         nav: navMode, kind: isMarket ? "market" : "pool",
-        meta: (isMarket ? (gd.meta || null) : null), routeDeskIds: hi };
+        meta: (isMarket ? (gd.meta || null) : null), routeDeskIds: hi, marketLegs: marketLegs };
       if (liveOn) {
         PoolGraph.drawLive(doc, state.graphCanvas, shownGraph, paintOpts);
       } else {

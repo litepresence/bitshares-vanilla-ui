@@ -1997,6 +1997,8 @@
       "market.map_hops_filtered",
       "market.map_hops_no_route",
       "market.map_hops_note",
+      "market.map_leg_ok",
+      "market.map_leg_orphan",
       "market.min_fills",
       "market.my_orders",
       "market.my_trades_hint",
@@ -2548,6 +2550,7 @@
       "pool.map_touch_aria",
       "pool.market_col",
       "pool.min_recv_row",
+      "pool.min_swaps",
       "pool.mine_title",
       "pool.my_hist_hint",
       "pool.my_history_failed",
@@ -2630,6 +2633,7 @@
       "pool_detail.invert_label",
       "pool_detail.map_connects",
       "pool_detail.map_connects_fallback",
+      "pool_detail.map_min_swaps",
       "pool_detail.pool_curve",
       "pool_detail.pool_curve_plot",
       "pool_detail.pool_map_unavailable_offline",
@@ -5313,7 +5317,9 @@
     "map_edge_fills": "%(desk)s · %(a)s–%(b)s · %(fills)s fills/24h",
     "map_edge_price": "@ %(price)s · %(vol)s",
     "map_hops_filtered": "A line is a market that filled in the past 24 hours. Showing %(shown)s of %(total)s pairs (min %(min)s fills/24h).",
-    "min_fills": "Min fills"
+    "min_fills": "Min fills",
+    "map_leg_ok": "{s} connects to BTS",
+    "map_leg_orphan": "WARNING: {s} has no filled-market route!"
   },
   "misc": {
     "title": "Invoice",
@@ -5491,7 +5497,8 @@
     "pool_map_unavailable_script": "Pool map unavailable (script load failed).",
     "pool_map_unavailable_offline": "Pool map unavailable (offline).",
     "map_connects": "A line connects two assets when a funded pool exists and there has been a trade in the past 24 hours.",
-    "map_connects_fallback": "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools."
+    "map_connects_fallback": "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools.",
+    "map_min_swaps": "(min %(min)s swaps)"
   },
   "swap": {
     "title": "Swap"
@@ -7211,7 +7218,8 @@
     "swap_desk": "Swap Desk",
     "uc_title": "Unlock to continue",
     "uc_action": "Action",
-    "map_core_self": "BTS is BitShares core token"
+    "map_core_self": "BTS is BitShares core token",
+    "min_swaps": "Min swaps"
   },
   "market_ind": {
     "vwap": "Session VWAP + spread",

@@ -193,5 +193,36 @@ PoolGraph.drawGraph(null, cvPoolHov, { nodes: [{ assetId: "1.3.0", sym: "BTS" },
 });
 assert(cvPoolHov._calls.stroke.indexOf("#fbbc06") !== -1, "pool: hovered line still yellow");
 
+/* ---- market corner verdicts: green connected / red orphaned / blue core ---- */
+function textsOf(cv) { return cv._calls.text.join(" | "); }
+var cvLegs = stubCanvas();
+PoolGraph.drawGraph(null, cvLegs, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds,
+  marketLegs: { aOk: true, bOk: true }
+});
+var legText = textsOf(cvLegs);
+assert(legText.indexOf("USD connects to BTS") !== -1, "market: connected leg reads green connects-to-BTS");
+assert(legText.indexOf("WARNING") === -1, "market: no red when both legs reach BTS");
+var cvOrphan = stubCanvas();
+PoolGraph.drawGraph(null, cvOrphan, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.9", kind: "market", routeDeskIds: [],
+  marketLegs: { aOk: true, bOk: false }
+});
+var orphText = textsOf(cvOrphan);
+assert(orphText.indexOf("WARNING") !== -1, "market: unreachable leg reads red");
+assert(orphText.indexOf("filled-market route") !== -1, "market: red names the filled-market route");
+var cvCore = stubCanvas();
+PoolGraph.drawGraph(null, cvCore, built.graph, {
+  assetA: "1.3.0", assetB: "1.3.1", kind: "market", routeDeskIds: [],
+  marketLegs: { aOk: true, bOk: true }
+});
+assert(textsOf(cvCore).indexOf("BTS is BitShares core token") !== -1, "market: BTS leg reads the blue core identity");
+var cvNoLegs = stubCanvas();
+PoolGraph.drawGraph(null, cvNoLegs, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds
+});
+assert(textsOf(cvNoLegs).indexOf("connects to BTS") === -1 && textsOf(cvNoLegs).indexOf("WARNING") === -1,
+  "market: no leg data -> no verdict text (never a guess)");
+
 console.log("market-desk-map: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

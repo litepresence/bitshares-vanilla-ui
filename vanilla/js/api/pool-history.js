@@ -318,21 +318,17 @@ var PoolHistory = (function () {
     };
   }
 
-  /* poolsActive24h: which pools from the set swapped in the past 24h (ONE
-   * ES search, mainnet community index). Resolves {active: {poolId: true},
-   * partial: boolean} — partial true when the window filled the whole page
-   * (activity beyond it unobserved; caller treats as inconclusive and falls
-   * back). Rejects "es-unavailable"/"es-disabled" (or any transport error)
-   * when ES cannot answer — the caller keeps its chain pools and shows the
-   * fallback connects definition. Never resolves invented activity: a pool
-   * lands in active only on a strict esSwap match (exact pool id + executed
-   * paid/received), with a lexicographic recency double-check when the hit
-   * carries a time string (the ES range is the authority; unparseable times
-   * ride it). Testnet callers must not call this (index is mainnet-only and
-   * pool ids collide across chains) — the fills gate on network first.
-   * Params: poolIds (string array, validated + deduped, cap 100 — desk maps
-   *   stay under 25 edges). */
-  function poolsActive24h(poolIds) {
+  /* _fetchActiveHits: validate + probe the 24h op-63 window for a pool set
+   * (ONE ES search, mainnet community index). Shared by poolsActive24h
+   * (boolean presence) and poolSwapCounts (per-pool counts) so the query,
+   * the caps and the honesty rule exist exactly once. Resolves
+   * {hits, partial, ids, since} — partial true when the window filled the
+   * whole page (activity beyond it unobserved; callers treat as
+   * inconclusive and fall back). Rejects "es-unavailable"/"es-disabled".
+   * Testnet callers must not call this (index is mainnet-only and pool ids
+   * collide across chains). Params: poolIds (validated + deduped, cap 100).
+   * Never throws outward (validation failures reject as es-unavailable). */
+  function _fetchActiveHits(poolIds) {
     var ids = [], seen = {};
     (poolIds || []).forEach(function (id) {
       try {
@@ -341,7 +337,7 @@ var PoolHistory = (function () {
       } catch (e) { /* malformed id never probes */ }
     });
     if (ids.length > 100) ids = ids.slice(0, 100);
-    if (!ids.length) return Promise.resolve({ active: {}, partial: false });
+    if (!ids.length) return Promise.resolve({ hits: [], partial: false, ids: [], since: "" });
     var HC = _historyCap();
     if (!HC) return Promise.reject(new Error("es-unavailable"));
     if (!_esOn()) return Promise.reject(new Error("es-disabled"));
@@ -350,21 +346,103 @@ var PoolHistory = (function () {
     if (!since) return Promise.reject(new Error("es-unavailable"));
     return HC.esSearch("bitshares-*", esActiveQuery(ids, since), { timeoutMs: ES_TIMEOUT_MS }).then(function (data) {
       var hits = (data && data.hits && data.hits.hits) || [];
+      return { hits: hits, partial: hits.length >= ES_SIZE, ids: ids, since: since };
+    });
+  }
+
+  /* poolsActive24h: which pools from the set swapped in the past 24h.
+   * Resolves {active: {poolId: true}, partial: boolean} — see
+   * _fetchActiveHits for transport. Never resolves invented activity: a
+   * pool lands in active only on a strict esSwap match (exact pool id +
+   * executed paid/received), with a lexicographic recency double-check
+   * when the hit carries a time string (the ES range is the authority;
+   * unparseable times ride it). Params: poolIds (string array). */
+  function poolsActive24h(poolIds) {
+    return _fetchActiveHits(poolIds).then(function (res) {
       var active = {};
-      hits.forEach(function (hit) {
-        for (var i = 0; i < ids.length; i++) {
+      (res.hits || []).forEach(function (hit) {
+        for (var i = 0; i < res.ids.length; i++) {
+          var sw = null;
+          try { sw = esSwap(hit, res.ids[i]); } catch (e) { sw = null; }
+          if (!sw) continue;
+          try {
+            if (sw.time && String(sw.time).slice(0, 19) < res.since) continue;
+          } catch (e) { /* range authority stands */ }
+          active[res.ids[i]] = true;
+          break;
+        }
+      });
+      return { active: active, partial: res.partial };
+    });
+  }
+
+  /* countSwaps: strict per-pool 24h swap counts over one probe page (pure).
+   * Same match rule as poolsActive24h (exact pool id + executed legs +
+   * recency double-check), but every matching hit COUNTS instead of just
+   * marking presence — the min-swaps floor needs magnitudes, not booleans.
+   * A hit matching no listed pool counts nowhere (never invented). Pure
+   * (unit-tested). @param {Array} hits raw ES hits. @param {Array<string>}
+   * ids validated pool ids. @param {string} since "YYYY-MM-DDTHH:mm:ss" UTC
+   * floor ("", the empty probe, disables the recency check). @returns
+   * {Object} poolId -> integer count (only pools with >= 1 hit). */
+  function countSwaps(hits, ids, since) {
+    var counts = {};
+    try {
+      (hits || []).forEach(function (hit) {
+        for (var i = 0; i < (ids || []).length; i++) {
           var sw = null;
           try { sw = esSwap(hit, ids[i]); } catch (e) { sw = null; }
           if (!sw) continue;
           try {
-            if (sw.time && String(sw.time).slice(0, 19) < since) continue;
+            if (since && sw.time && String(sw.time).slice(0, 19) < since) continue;
           } catch (e) { /* range authority stands */ }
-          active[ids[i]] = true;
+          counts[ids[i]] = (counts[ids[i]] || 0) + 1;
           break;
         }
       });
-      return { active: active, partial: hits.length >= ES_SIZE };
+    } catch (e) { /* partial counts stand */ }
+    return counts;
+  }
+
+  /* poolSwapCounts: per-pool 24h swap counts for a pool set (ONE ES search).
+   * Resolves {counts: {poolId: n}, partial: boolean} — partial follows the
+   * same rule as poolsActive24h (a full page may hide activity, so callers
+   * fall back rather than filter on truncated counts). Rejects
+   * "es-unavailable"/"es-disabled" like poolsActive24h. Params: poolIds. */
+  function poolSwapCounts(poolIds) {
+    return _fetchActiveHits(poolIds).then(function (res) {
+      return { counts: countSwaps(res.hits, res.ids, res.since), partial: res.partial };
     });
+  }
+
+  /* DEFAULT_MIN_SWAPS: the swap desk's out-of-the-box noise floor (owner
+   * 2026-10-08). 1 means "swapped at least once in 24h" — identical to the
+   * pre-existing strict gate, so first paint is byte-identical to before.
+   * Persisted per profile like the candle count. */
+  var DEFAULT_MIN_SWAPS = 1;
+  var MIN_SWAPS_KEY = "bts-vanilla-min-swaps-v1";
+
+  /* readMinSwaps: persisted floor, or 1. Anything-not-a-positive-int reads
+   * as 1. Never throws. @returns {number} >= 1. */
+  function readMinSwaps() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        var v = parseInt(localStorage.getItem(MIN_SWAPS_KEY), 10);
+        if (isFinite(v) && v >= 1) return Math.floor(v);
+      }
+    } catch (e) { /* default stands */ }
+    return DEFAULT_MIN_SWAPS;
+  }
+
+  /* writeMinSwaps: persist a validated floor. Anything-not-a-positive-int
+   * is ignored (the input reverts). Never throws. @returns {boolean}. */
+  function writeMinSwaps(v) {
+    try {
+      var n = Math.floor(Number(v));
+      if (!isFinite(n) || n < 1) return false;
+      if (typeof localStorage !== "undefined") localStorage.setItem(MIN_SWAPS_KEY, String(n));
+      return true;
+    } catch (e) { return false; }
   }
   /* Price orientation (#5 parse_price_history rule): price is always BUY-leg
    * per SELL-leg in pool-leg terms — legs sort by asset id (a<b consensus),
@@ -601,11 +679,14 @@ var PoolHistory = (function () {
   return {
     swapsForPool: swapsForPool, chainSwaps: chainSwaps, esSwaps: esSwaps,
     poolsActive24h: poolsActive24h,
+    poolSwapCounts: poolSwapCounts,
+    readMinSwaps: readMinSwaps, writeMinSwaps: writeMinSwaps,
+    DEFAULT_MIN_SWAPS: DEFAULT_MIN_SWAPS,
     enrich: enrich, priceHuman: priceHuman, swapsToCandles: swapsToCandles, swapsToPoints: swapsToPoints,
     filterLegs: filterLegs,
     synthBook: synthBook, ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     ES_SIZE: ES_SIZE, ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
-    _test: { esSwap: esSwap, esQuery: esQuery, esActiveQuery: esActiveQuery, filterLegs: filterLegs, SLICES: SLICES }
+    _test: { esSwap: esSwap, esQuery: esQuery, esActiveQuery: esActiveQuery, filterLegs: filterLegs, SLICES: SLICES, countSwaps: countSwaps }
   };
 })();
 

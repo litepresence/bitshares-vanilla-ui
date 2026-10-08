@@ -163,7 +163,33 @@ grew a "Min fills" noise floor instead of a cap:
   persisted, readable 22-node map (`desk-min25-filter.png`). Zero console
   errors throughout.
 
-## 9. Gates
+## 9. Second declutter pass (owner 2026-10-08 — same session)
+
+Three follow-ups, one commit:
+
+- **Min-fills pill to the canvas bottom-right** (was: ahead of the note),
+  same overlay treatment as the physics pill (panel/border/radius, opposite
+  corner — new `.pool-net-minfilter` rules beside the phys rules), so the
+  two map controls read as one family. Pool worlds still never offer it.
+- **Min-swaps on the swap desk** (same manner, preset 1): `PoolHistory`
+  grew `poolSwapCounts` (per-pool 24h magnitudes over the SAME one-search
+  probe — `poolsActive24h` was refactored onto a shared `_fetchActiveHits`
+  with identical behavior, 64 vectors green) plus `read/writeMinSwaps`
+  persistence. The desk prunes below the floor but the triangle (own pool
+  + both BTS paths) always paints; input changes reprune locally from the
+  stored counts (no refetch); the strict note appends "(min 5 swaps)" only
+  above floor 1, so first paint is byte-identical to before. Live: 7/25 →
+  2/25 at min 5, persisted, zero errors (`swap-minswaps.png`).
+- **Leg verdicts on the exchange map** (green/red/blue): each desk leg now
+  states its filled-market standing in the corners — core-blue identity for
+  BTS, green "X connects to BTS", red "WARNING: X has no filled-market
+  route!" — computed in the view from its own routeToCore results and
+  threaded through every live frame (a verdict without data paints nothing,
+  never a guess). Pool corners untouched. Live on BTS/CNY: blue identity +
+  green CNY (`desk-leg-verdicts.png`); headless pins all three states plus
+  the no-data silence.
+
+## 10. Gates
 
 - `node tooling/market-hops-test.js` → 55 passed, 0 failed (merge, unbounded
   BFS incl. 120-edge no-cap proof, route fewest-hops + widest-bottleneck +

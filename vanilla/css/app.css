@@ -1634,6 +1634,16 @@ p.muted[aria-live="polite"],
 .pool-net-stage > .pool-net-phys { position: absolute; left: 12px; bottom: 12px;
   margin: 0; padding: 4px 8px; border-radius: 14px;
   background: var(--panel); border: 1px solid var(--border); }
+/* Min-fills / min-swaps pill (2026-10-08): the same overlay treatment as the
+ * physics pill (panel, border, radius, 12px insets) on the opposite corner,
+ * so the two map controls read as one family. The number input keeps a
+ * 44px touch height like every other control (principle #7). */
+.pool-net-stage > .pool-net-minfilter { position: absolute; right: 12px; bottom: 12px;
+  margin: 0; padding: 4px 8px; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--border); }
+.pool-net-minfilter { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.pool-net-minfilter label { display: flex; gap: 8px; align-items: center; font-weight: bold; }
+.pool-net-minfilter input { max-width: 64px; min-height: 44px; }
 .pool-net-hover { min-height: 1.4em; margin: 4px 0 0; overflow-wrap: anywhere; }
 .pool-net-verdict { margin: 4px 0 0; }
 /* Physics switch (2026-10-07): the BUTTON is the 44x44 touch target and the
