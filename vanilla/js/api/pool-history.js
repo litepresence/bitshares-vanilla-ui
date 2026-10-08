@@ -422,24 +422,24 @@ var PoolHistory = (function () {
   var DEFAULT_MIN_SWAPS = 1;
   var MIN_SWAPS_KEY = "bts-vanilla-min-swaps-v1";
 
-  /* readMinSwaps: persisted floor, or 1. Anything-not-a-positive-int reads
-   * as 1. Never throws. @returns {number} >= 1. */
+  /* readMinSwaps: persisted floor, or 1. Anything-not-a-non-negative-int reads
+   * as 1 (0 shows every funded pool). Never throws. @returns {number} >= 0. */
   function readMinSwaps() {
     try {
       if (typeof localStorage !== "undefined") {
         var v = parseInt(localStorage.getItem(MIN_SWAPS_KEY), 10);
-        if (isFinite(v) && v >= 1) return Math.floor(v);
+        if (isFinite(v) && v >= 0) return Math.floor(v);
       }
     } catch (e) { /* default stands */ }
     return DEFAULT_MIN_SWAPS;
   }
 
-  /* writeMinSwaps: persist a validated floor. Anything-not-a-positive-int
+  /* writeMinSwaps: persist a validated floor. Anything-not-a-non-negative-int
    * is ignored (the input reverts). Never throws. @returns {boolean}. */
   function writeMinSwaps(v) {
     try {
       var n = Math.floor(Number(v));
-      if (!isFinite(n) || n < 1) return false;
+      if (!isFinite(n) || n < 0) return false;
       if (typeof localStorage !== "undefined") localStorage.setItem(MIN_SWAPS_KEY, String(n));
       return true;
     } catch (e) { return false; }

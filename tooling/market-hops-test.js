@@ -160,6 +160,29 @@ assert(prNone.edges.length === 0 && prNone.nodes.length === 0, "prune: nothing p
 assert(pg.edges.length === 3, "prune: input untouched (no mutation)");
 assert(MarketHops.pruneGraph(null, 5, [], []).edges.length === 0, "prune: null graph is an honest empty");
 assert(MarketHops.readMinFills() === 10, "readMinFills: shipped default is 10");
+assert(MarketHops.writeMinFills(0) === true, "writeMinFills accepts zero (show everything)");
+assert(MarketHops.writeMinFills(-1) === false, "writeMinFills rejects negatives");
+/* Zero round-trips through a stub store (node has no localStorage). */
+(function () {
+  var had = (typeof global.localStorage !== "undefined") ? global.localStorage : undefined;
+  try {
+    var box = {};
+    global.localStorage = { getItem: function (k) { return (k in box) ? box[k] : null; },
+      setItem: function (k, v) { box[k] = String(v); } };
+    assert(MarketHops.writeMinFills(0) === true, "writeMinFills persists zero");
+    assert(MarketHops.readMinFills() === 0, "readMinFills returns the persisted zero");
+    assert(MarketHops.writeMinFills(7) === true, "writeMinFills persists seven");
+    assert(MarketHops.readMinFills() === 7, "readMinFills returns seven");
+  } finally {
+    if (had === undefined) { try { delete global.localStorage; } catch (e) {} }
+    else { global.localStorage = had; }
+  }
+})();
+var pz = MarketHops.pruneGraph({
+  nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }],
+  edges: [{ id: "USD_BTS", poolId: "USD_BTS", a: "1.3.0", b: "1.3.1", fills: 2, sizeRaw: "2" }]
+}, 0, [], ["1.3.0", "1.3.1"]);
+assert(pz.edges.length === 1, "prune: min 0 keeps thin pairs too");
 
 console.log("market-hops: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

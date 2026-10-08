@@ -480,19 +480,19 @@ var MarketHops = (function () {
 
   /* DEFAULT_MIN_FILLS: the desk map's out-of-the-box noise floor (owner
    * 2026-10-08). Pairs below this hide; the BTS route and the desk legs
-   * never hide. 1 means show everything. Persisted per profile like the
+   * never hide. 0 means show everything, even with no fills today. Persisted per profile like the
    * candle count; the input owns the value after load. */
   var DEFAULT_MIN_FILLS = 10;
   var MIN_FILLS_KEY = "bts-vanilla-min-fills-v1";
 
   /* readMinFills: persisted threshold, or the default. Missing/corrupt
-   * storage reads as default; anything-not-a-positive-int reads as default.
-   * Never throws. @returns {number} >= 1. */
+   * storage reads as default; anything-not-a-non-negative-int reads as default (0 shows everything).
+   * Never throws. @returns {number} >= 0. */
   function readMinFills() {
     try {
       if (typeof localStorage !== "undefined") {
         var v = parseInt(localStorage.getItem(MIN_FILLS_KEY), 10);
-        if (isFinite(v) && v >= 1) return Math.floor(v);
+        if (isFinite(v) && v >= 0) return Math.floor(v);
       }
     } catch (e) { /* default stands */ }
     return DEFAULT_MIN_FILLS;
@@ -503,7 +503,7 @@ var MarketHops = (function () {
   function writeMinFills(v) {
     try {
       var n = Math.floor(Number(v));
-      if (!isFinite(n) || n < 1) return false;
+      if (!isFinite(n) || n < 0) return false;
       if (typeof localStorage !== "undefined") localStorage.setItem(MIN_FILLS_KEY, String(n));
       return true;
     } catch (e) { return false; }
@@ -525,7 +525,7 @@ var MarketHops = (function () {
   function pruneGraph(graph, minFills, keepIds, legIds) {
     var nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
     var min = Math.floor(Number(minFills));
-    if (!isFinite(min) || min < 1) min = 1;
+    if (!isFinite(min) || min < 0) min = 0;
     var keep = {};
     (keepIds || []).forEach(function (id) { if (id) keep[String(id)] = 1; });
     var legs = {};

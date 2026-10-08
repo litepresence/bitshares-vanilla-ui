@@ -765,10 +765,10 @@ MarketDesk._fill = MarketDesk._fill || {};
    * carries it once the input exists; otherwise the persisted profile value
    * (or the shipped default) answers. Anything unreadable reads as "show
    * everything". Never throws.
-   * @param {Object} state desk state. @returns {number} >= 1. */
+   * @param {Object} state desk state. @returns {number} >= 0. */
   function minFillsNow(state) {
     try {
-      if (state && typeof state.minFills === "number" && isFinite(state.minFills) && state.minFills >= 1) {
+      if (state && typeof state.minFills === "number" && isFinite(state.minFills) && state.minFills >= 0) {
         return Math.floor(state.minFills);
       }
       if (typeof MarketHops !== "undefined" && MarketHops && typeof MarketHops.readMinFills === "function") {
@@ -809,7 +809,7 @@ MarketDesk._fill = MarketDesk._fill || {};
       lab.textContent = t("market.min_fills", "Min fills") + " ";
       var inp = doc.createElement("input");
       inp.type = "number";
-      inp.min = "1";
+      inp.min = "0";
       inp.value = String(minFillsNow(state));
       try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* value stands */ }
       try { inp.setAttribute("aria-label", t("market.min_fills", "Min fills")); } catch (e) { /* label stands */ }

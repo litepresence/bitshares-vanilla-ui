@@ -1717,7 +1717,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
    * market-desk-fill boolean copy on purpose: the swap desk filters by
    * magnitudes now, the exchange fallback still filters by presence.
    * @param {Object} gd graphData (graph/assetA/assetB). @param {Object}
-   * counts poolId -> 24h swap count. @param {number} minSwaps floor (>= 1).
+   * counts poolId -> 24h swap count. @param {number} minSwaps floor (>= 0; 0 keeps every funded pool).
    * @param {Object} exempt poolId -> true for the triangle.
    * @returns {{graph: {nodes: Array, edges: Array}, pathA: Object|null,
    *   pathB: Object|null, kept: number}} Never throws. */
@@ -1727,7 +1727,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       var g = (gd && gd.graph) || { nodes: [], edges: [] };
       var aA = gd.assetA, aB = gd.assetB;
       var min = Math.floor(Number(minSwaps));
-      if (!isFinite(min) || min < 1) min = 1;
+      if (!isFinite(min) || min < 0) min = 0;
       var edges = ((g.edges) || []).filter(function (e) {
         if (!e || !e.poolId) return false;
         var id = String(e.poolId);
@@ -1758,10 +1758,10 @@ PoolDetailUI._view = PoolDetailUI._view || {};
 
   /* minSwapsNow: the live floor for the swap map. The desk state carries it
    * once the input exists; otherwise the persisted profile value (or the
-   * shipped 1) answers. Never throws. @returns {number} >= 1. */
+   * shipped 1) answers. Never throws. @returns {number} >= 0. */
   function minSwapsNow(P) {
     try {
-      if (P && typeof P.minSwaps === "number" && isFinite(P.minSwaps) && P.minSwaps >= 1) {
+      if (P && typeof P.minSwaps === "number" && isFinite(P.minSwaps) && P.minSwaps >= 0) {
         return Math.floor(P.minSwaps);
       }
       if (typeof PoolHistory !== "undefined" && PoolHistory && typeof PoolHistory.readMinSwaps === "function") {
@@ -1846,7 +1846,7 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       lab.textContent = t("pool.min_swaps", "Min swaps") + " ";
       var inp = doc.createElement("input");
       inp.type = "number";
-      inp.min = "1";
+      inp.min = "0";
       inp.value = String(minSwapsNow(P));
       try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* value stands */ }
       try { inp.setAttribute("aria-label", t("pool.min_swaps", "Min swaps")); } catch (e) { /* label stands */ }

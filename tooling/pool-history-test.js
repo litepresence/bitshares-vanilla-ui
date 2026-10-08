@@ -124,7 +124,8 @@ eq(PH._test.countSwaps(
 eq(PH._test.countSwaps([], ["1.19.1"], ""), {}, "countSwaps empty page, empty since");
 eq(PH._test.countSwaps(null, null, null), {}, "countSwaps garbage in, {} out");
 eq(PH.readMinSwaps(), 1, "readMinSwaps default is 1 (strict-gate parity)");
-eq(PH.writeMinSwaps(0), false, "writeMinSwaps rejects zero");
+eq(PH.writeMinSwaps(0), true, "writeMinSwaps accepts zero (show every funded pool)");
+eq(PH.writeMinSwaps(-1), false, "writeMinSwaps rejects negatives");
 eq(PH.writeMinSwaps("abc"), false, "writeMinSwaps rejects garbage");
 
 // 5. ES capped search_after pagination (offline, fetch stubbed).
