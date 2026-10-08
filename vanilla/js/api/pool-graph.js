@@ -747,7 +747,11 @@ var PoolGraph = (function () {
      * (flipping the switch ON) runs a bounded loop. */
     try {
       drawGraph(doc, canvas, graph, { assetA: assetA, assetB: assetB,
-        highlightPools: opts.highlightPools || [], nav: opts.nav || null, hoverEdge: opts.hoverEdge || "",
+        highlightPools: opts.highlightPools || [], nav: opts.nav || null,
+        /* No `|| ""` laundering here: an absent hoverEdge stays absent so
+         * the live canvas state decides (see the read above). Storing ""
+         * would re-poison _graphRepaint for every frameless render. */
+        hoverEdge: (opts && opts.hoverEdge) ? opts.hoverEdge : undefined,
         kind: (opts.kind === "market") ? "market" : "pool", meta: opts.meta || null,
         routeDeskIds: opts.routeDeskIds || [],
         marketLegs: (opts.marketLegs && typeof opts.marketLegs === "object") ? opts.marketLegs : null });
@@ -1109,11 +1113,16 @@ var PoolGraph = (function () {
     } catch (e) { /* plain edges stand */ }
     var deg = {}; edges.forEach(function (e) { deg[e.a] = (deg[e.a] || 0) + 1; deg[e.b] = (deg[e.b] || 0) + 1; });
     var mids = [];
-    /* Live hover from the canvas (single source of truth); an explicit
-     * opts.hoverEdge still wins so a caller can paint a state directly. */
+    /* Live hover from the canvas (single source of truth); a non-empty
+     * opts.hoverEdge still wins so a caller can paint a state directly.
+     * An EMPTY opts.hoverEdge must fall through, never override: "" means
+     * "no opinion", and letting it win silently kills hover highlights on
+     * every repaint whose stored opts carried the default (reduced-motion
+     * frozen maps never ran a loop frame to overwrite it — yellow stayed
+     * dead until a drag's explicit wake, 2026-10-08). */
     var hoverEdge = "";
     try {
-      if (opts && opts.hoverEdge != null) hoverEdge = String(opts.hoverEdge);
+      if (opts && opts.hoverEdge) hoverEdge = String(opts.hoverEdge);
       else if (canvas && canvas._graphHoverEdge) hoverEdge = String(canvas._graphHoverEdge);
     } catch (e) { hoverEdge = ""; }
     edges.forEach(function (e) {

@@ -259,5 +259,29 @@ PoolGraph.drawGraph(null, cvLone, loneGraph, {
 });
 assert(bottomOf(cvLone).indexOf("No market filled") !== -1, "market bottom: empty graph keeps the honest empty, not a pair verdict");
 
+/* ---- hover poison (2026-10-08): an EMPTY opts.hoverEdge must never
+ * override the live canvas hover. Frameless renders (reduced-motion frozen
+ * maps) stored hoverEdge:"" in _graphRepaint, and every hover repaint then
+ * forced hoverEdge="" — yellow stayed dead until a drag's explicit wake
+ * ran loop frames. This paints with the poisoned opts and demands yellow. */
+var cvPoison = stubCanvas();
+PoolGraph.drawGraph(null, cvPoison, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds, hoverEdge: ""
+});
+try { cvPoison._graphHoverEdge = deskBuilt.graph.edges[0].poolId; } catch (eP) { /* harness stands */ }
+PoolGraph.drawGraph(null, cvPoison, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds, hoverEdge: ""
+});
+assert(cvPoison._calls.stroke.indexOf("#fbbc06") !== -1,
+  "hover: empty opts.hoverEdge falls through to live canvas hover (yellow paints)");
+/* Explicit hover still wins outright (direct-state painting preserved). */
+var cvDirect = stubCanvas();
+PoolGraph.drawGraph(null, cvDirect, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: [],
+  hoverEdge: deskBuilt.graph.edges[1].poolId
+});
+assert(cvDirect._calls.stroke.indexOf("#fbbc06") !== -1,
+  "hover: explicit non-empty opts.hoverEdge still paints yellow directly");
+
 console.log("market-desk-map: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);
