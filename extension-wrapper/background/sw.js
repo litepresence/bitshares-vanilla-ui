@@ -28,6 +28,7 @@ try {
   if (typeof importScripts === "function") {
     importScripts(
       "../js/sdk/vendor/noble-classic.js",
+      "../js/sdk/vendor/scrypt.js",
       "../js/sdk/crypto.js",
       "../js/api/format.js",
       "../js/api/tx.js",

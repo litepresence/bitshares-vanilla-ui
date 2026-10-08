@@ -10,6 +10,7 @@ const fs = require("fs");
 const vm = require("vm");
 
 vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/sdk/vendor/noble-classic.js", "utf8"), { filename: "noble-classic.js" });
+vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/sdk/vendor/scrypt.js", "utf8"), { filename: "scrypt.js" });
 vm.runInThisContext(fs.readFileSync("/workspace/vanilla/js/sdk/data/brainkey-dict.js", "utf8"), { filename: "brainkey-dict.js" });
 const Crypto = require("/workspace/vanilla/js/sdk/crypto.js");
 globalThis.Crypto = Crypto;

@@ -57,8 +57,9 @@ Chain explorer — live blocks, object search, per-tab deep links:
 
 ## Features
 
-- **Wallet:** brainkey create/import (classic derivation), PBKDF2-600k +
-  AES-GCM keystore, memory-only unlock, auto-lock, rate-limited unlock,
+- **Wallet:** brainkey create/import (classic derivation), scrypt (N=2^15,
+  r=8, p=1) + HKDF-SHA-256 + AES-256-GCM keystore (v1 PBKDF2 wallets read
+  + auto-upgraded on unlock), memory-only unlock, auto-lock, rate-limited unlock,
   backup + password change. Single-slot by design (`.bin`/cloud honestly
   noted, never half-ported).
 - **Accounts:** balances, open orders, history, margin positions with
@@ -104,7 +105,9 @@ status + retry instead.
 
 ## Security model
 
-- AES-256-GCM envelope, PBKDF2-HMAC-SHA-256/600k + per-wallet salt;
+- AES-256-GCM envelope, scrypt memory-hard KDF (N=2^15, r=8, p=1) +
+  HKDF-SHA-256 key separation + timing-safe HMAC verifier, per-wallet salt;
+  legacy v1 (PBKDF2-600k) envelopes still unlock and are upgraded in place;
   unlock lives in memory only; 5-minute + tab-hide auto-lock; unlock
   rate-limit persisted across restarts.
 - Page-origin scripts can never be fully trusted (the ceiling of any web
