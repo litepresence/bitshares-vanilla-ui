@@ -2101,6 +2101,8 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_note",
+      "market_ind.count_partial",
       "market_ind.count_range",
       "market_ind.vwap",
       "market_ind.vwap_label",
@@ -7212,7 +7214,9 @@
     "vwap_skipped": "खाली स्लॉट छोड़े गए",
     "vwap_unavailable": "VWAP उपलब्ध नहीं (बकेट गणित या एसेट परिशुद्धता गायब)।",
     "candle_count": "कैंडल",
-    "count_range": "1–5000 कैंडल डालें।"
+    "count_range": "1–5000 कैंडल डालें।",
+    "count_note": "%(count)s × %(bucket)s candles",
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
   },
   "txbuilder": {
     "title": "लेनदेन निर्माता",

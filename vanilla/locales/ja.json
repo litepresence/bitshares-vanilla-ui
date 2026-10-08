@@ -2101,6 +2101,8 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_note",
+      "market_ind.count_partial",
       "market_ind.count_range",
       "market_ind.vwap",
       "market_ind.vwap_label",
@@ -7212,7 +7214,9 @@
     "vwap_skipped": "空スロットはスキップ",
     "vwap_unavailable": "VWAPを利用できません（バケット計算またはアセット精度が不足）。",
     "candle_count": "ローソク足",
-    "count_range": "1～5000本のローソク足を入力してください。"
+    "count_range": "1～5000本のローソク足を入力してください。",
+    "count_note": "%(count)s × %(bucket)s candles",
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
   },
   "txbuilder": {
     "title": "トランザクションビルダー",

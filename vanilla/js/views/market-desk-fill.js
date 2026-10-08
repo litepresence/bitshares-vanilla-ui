@@ -284,10 +284,17 @@ MarketDesk._fill = MarketDesk._fill || {};
       return;
     }
 
-    Market.candles(b.id, q.id, state.bucket, MarketInd.CANDLE_COUNT).then(function (c) {
+    /* The candleKey proves the set below belongs to THESE params, so the
+     * count note can state actual delivery ("1610 of 2000") instead of
+     * echoing the request. Captured at call: a mid-flight count edit
+     * mismatches on arrival and the note falls back to the request. */
+    var reqCount = 2000;
+    try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) reqCount = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
+    Market.candles(b.id, q.id, state.bucket, reqCount).then(function (c) {
       /* Newest paint wins: invalidate older in-flight tips before painting. */
       try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
       state.candles = c;
+      try { state.candleKey = state.bucket + "|" + reqCount; } catch (e) { /* note falls back to requested */ }
       try { state.deep = !!(c && c.deep); } catch (e) { state.deep = false; }
       MarketInd.maybeDraw(state);
       /* Re-paint the deep/live suffix fill() itself reset above: the note
@@ -296,6 +303,7 @@ MarketDesk._fill = MarketDesk._fill || {};
       MarketDesk._panels.deepenOnce(state, b, q);
     }).catch(function () {
       state.candles = { buckets: [], closes: [] };
+      try { state.candleKey = state.bucket + "|" + reqCount; } catch (e) { /* note falls back to requested */ }
       try { state.deep = false; } catch (e) { /* flag best-effort */ }
       MarketInd.maybeDraw(state);
       try { if (typeof state.paintNote === "function") state.paintNote(); } catch (e) { /* note best-effort */ }

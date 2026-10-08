@@ -109,10 +109,22 @@ MarketInd._panes = MarketInd._panes || {};
    * the pre-conversion literal kept verbatim as enDefault (English-identical
    * on any transport, incl. file:// where dict fetch fails). Falls back to
    * the default when i18n.js failed to load: never blank, never throws. */
-  function t(key, dflt) {
+  function t(key, dflt, vars) {
     try {
-      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") return I18n.t(key, dflt);
+      if (typeof I18n !== "undefined" && I18n && typeof I18n.t === "function") {
+        if (vars && typeof vars === "object") return I18n.t(key, dflt, vars);
+        return I18n.t(key, dflt);
+      }
     } catch (e) { /* default below */ }
+    /* vars fill %(name)s placeholders when I18n is absent (pool-net-ui.js
+     * precedent — file:// renders identically instead of showing raw %). */
+    if (vars && typeof dflt === "string") {
+      try {
+        return dflt.replace(/%\(([^)]+)\)s/g, function (m, name) {
+          return (vars && Object.prototype.hasOwnProperty.call(vars, name)) ? String(vars[name]) : m;
+        });
+      } catch (e2) { /* default below */ }
+    }
     return dflt;
   }
 
@@ -505,9 +517,15 @@ MarketInd._panes = MarketInd._panes || {};
     }
   }
 
-  /* Refresh the "N × timeframe candles" note under the timeframe radios.
-   * Discrete mode instead names the ACTUAL plotted point count ("N fills" —
-   * the tape may hold fewer than the requested count on thin markets). */
+  /* Refresh the candle-count note under the timeframe radios. Bucket mode
+   * names the ACTUAL plotted bucket count ("1610 of 2000 × 1h candles") —
+   * the fetch drops leading empty slots (no prevClose to carry), so a
+   * wide window on a thin market paints fewer buckets than requested and
+   * the old request-echoing note ("2000 × 1h") read as a lie. The candleKey
+   * stamped at each full-window assign proves the set on state belongs to
+   * THESE bucket+count params; anything else (pre-fill, params moved on
+   * mid-flight) shows the request, exactly as before. Discrete mode is
+   * unchanged (actual fill count, as before). */
   function paintCountNote(state) {
     if (state.countNote) {
       if (state.discrete) {
@@ -519,8 +537,23 @@ MarketInd._panes = MarketInd._panes || {};
         state.countNote.textContent =
           String(n) + " " + t("market.discrete_fills", "fills");
       } else {
-        state.countNote.textContent =
-          CANDLE_COUNT + " × " + bucketLabel(state.bucket) + " candles";
+        var actual = -1;
+        try {
+          var key = state.bucket + "|" + CANDLE_COUNT;
+          if (state.candleKey === key && state.candles &&
+              Array.isArray(state.candles.buckets)) {
+            actual = state.candles.buckets.length;
+          }
+        } catch (e) { actual = -1; }
+        if (actual >= 0 && actual < CANDLE_COUNT) {
+          state.countNote.textContent = t("market_ind.count_partial",
+            "%(actual)s of %(requested)s × %(bucket)s candles",
+            { actual: String(actual), requested: String(CANDLE_COUNT), bucket: bucketLabel(state.bucket) });
+        } else {
+          state.countNote.textContent = t("market_ind.count_note",
+            "%(count)s × %(bucket)s candles",
+            { count: String(CANDLE_COUNT), bucket: bucketLabel(state.bucket) });
+        }
       }
     }
   }

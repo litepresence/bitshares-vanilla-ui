@@ -2101,6 +2101,8 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_note",
+      "market_ind.count_partial",
       "market_ind.count_range",
       "market_ind.vwap",
       "market_ind.vwap_label",
@@ -7212,7 +7214,9 @@
     "vwap_skipped": "empty slots skipped",
     "vwap_unavailable": "VWAP unavailable (bucket math or asset precisions missing).",
     "candle_count": "Candles",
-    "count_range": "Enter 1–5000 candles."
+    "count_range": "Enter 1–5000 candles.",
+    "count_note": "%(count)s × %(bucket)s candles",
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
   },
   "txbuilder": {
     "title": "Transaction Builder",

@@ -565,6 +565,7 @@ MarketDesk._panels = MarketDesk._panels || {};
         Market.candles(b.id, q.id, state.bucket, count).then(function (c2) {
           var k2 = b.id + "|" + q.id + "|" + state.bucket + "|" + count;
           if (k2 !== key) return;
+          try { state.candleKey = state.bucket + "|" + count; } catch (e) { /* note falls back to requested */ }
           try {
             if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
           } catch (e) { /* headless: keep going */ }

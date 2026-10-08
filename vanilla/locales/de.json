@@ -2101,6 +2101,8 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_note",
+      "market_ind.count_partial",
       "market_ind.count_range",
       "market_ind.vwap",
       "market_ind.vwap_label",
@@ -7212,7 +7214,9 @@
     "vwap_skipped": "leere Slots übersprungen",
     "vwap_unavailable": "VWAP nicht verfügbar (Bucket-Mathe oder Asset-Präzisionen fehlen).",
     "candle_count": "Kerzen",
-    "count_range": "1–5000 Kerzen eingeben."
+    "count_range": "1–5000 Kerzen eingeben.",
+    "count_note": "%(count)s × %(bucket)s candles",
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
   },
   "txbuilder": {
     "title": "Transaktionsbaukasten",

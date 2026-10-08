@@ -2101,6 +2101,8 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_note",
+      "market_ind.count_partial",
       "market_ind.count_range",
       "market_ind.vwap",
       "market_ind.vwap_label",
@@ -7212,7 +7214,9 @@
     "vwap_skipped": "已跳过空槽",
     "vwap_unavailable": "成交量加权均价不可用（分桶计算或资产精度缺失）。",
     "candle_count": "K 线数量",
-    "count_range": "请输入 1–5000 根 K 线。"
+    "count_range": "请输入 1–5000 根 K 线。",
+    "count_note": "%(count)s × %(bucket)s candles",
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
   },
   "txbuilder": {
     "title": "交易构建器",

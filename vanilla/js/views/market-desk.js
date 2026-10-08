@@ -1059,6 +1059,10 @@ if (__partRequire && (!MarketDesk._query || !MarketDesk._panels || !MarketDesk._
                 buckets: merged, closes: [], deep: state.deep,
                 places: (state.candles && Number.isInteger(state.candles.places)
                   ? state.candles.places : undefined) };
+              /* Same window by construction (mergeWindows caps at the live
+               * count, same bucket) — keep the candleKey fresh so the note
+               * keeps stating actual delivery, not the request. */
+              try { state.candleKey = state.bucket + "|" + count; } catch (e) { /* note falls back to requested */ }
               try { state.deep = deepNow; } catch (e) { state.deep = false; }
               try {
                 if (typeof MarketInd !== "undefined" && MarketInd &&
