@@ -761,6 +761,69 @@ MarketDesk._fill = MarketDesk._fill || {};
        * visually, aria-checked carries it to assistive tech. */
     } catch (e) { /* switch stands */ }
   }
+  /* minFillsNow: the live noise floor for the market map. The desk state
+   * carries it once the input exists; otherwise the persisted profile value
+   * (or the shipped default) answers. Anything unreadable reads as "show
+   * everything". Never throws.
+   * @param {Object} state desk state. @returns {number} >= 1. */
+  function minFillsNow(state) {
+    try {
+      if (state && typeof state.minFills === "number" && isFinite(state.minFills) && state.minFills >= 1) {
+        return Math.floor(state.minFills);
+      }
+      if (typeof MarketHops !== "undefined" && MarketHops && typeof MarketHops.readMinFills === "function") {
+        return MarketHops.readMinFills();
+      }
+    } catch (e) { /* default below */ }
+    return 5;
+  }
+
+  /* ensureMinFillsInput: the "Min fills" number input ahead of the map note
+   * (market worlds only — pool worlds never prune, so they never offer it).
+   * Built once per desk (guarded on state); a valid change persists per
+   * profile and repaints the map, an invalid one reverts. Never throws.
+   * @param {Document} doc owner document. @param {Object} state desk state.
+   * @returns {void}. */
+  function ensureMinFillsInput(doc, state) {
+    try {
+      if (!doc || !state.graphWrap || !state.graphNote) return;
+      if (state.minFillsBox && state.minFillsBox.parentNode === state.graphWrap) return;
+      if (typeof doc.createElement !== "function") return;
+      var MH = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+      if (!MH || typeof MH.writeMinFills !== "function") return;
+      if (typeof state.minFills !== "number") {
+        try { state.minFills = minFillsNow(state); } catch (e) { state.minFills = 5; }
+      }
+      var row = doc.createElement("div");
+      row.className = "mkt-mapfilter";
+      var lab = doc.createElement("label");
+      lab.textContent = t("market.min_fills", "Min fills") + " ";
+      var inp = doc.createElement("input");
+      inp.type = "number";
+      inp.min = "1";
+      inp.value = String(minFillsNow(state));
+      try { inp.style.maxWidth = "90px"; } catch (e) { /* stylesheet stands */ }
+      try { inp.setAttribute("inputmode", "numeric"); } catch (e) { /* value stands */ }
+      try { inp.setAttribute("aria-label", t("market.min_fills", "Min fills")); } catch (e) { /* label stands */ }
+      touchable(inp);
+      lab.appendChild(inp);
+      row.appendChild(lab);
+      try { state.graphWrap.insertBefore(row, state.graphNote); } catch (e) { state.graphWrap.appendChild(row); }
+      state.minFillsBox = row;
+      inp.addEventListener("change", function () {
+        var v = parseInt(inp.value, 10);
+        var okW = false;
+        try { okW = MH.writeMinFills(v); } catch (e) { okW = false; }
+        if (!okW) {
+          try { inp.value = String(minFillsNow(state)); } catch (e) { /* stands */ }
+          return;
+        }
+        try { state.minFills = MH.readMinFills(); } catch (e) { state.minFills = v; }
+        try { redrawPoolMap(doc, state); } catch (e) { /* map stands */ }
+      });
+    } catch (e) { /* map stands without the filter */ }
+  }
+
   function ensurePhysSwitch(doc, state) {
     try {
       if (!doc || !state.graphWrap) return;
@@ -884,16 +947,31 @@ MarketDesk._fill = MarketDesk._fill || {};
       /* kind + meta + routeDeskIds travel with every frame: drawLive replays
        * them through the same painter, so the live loop cannot drift back to
        * pool semantics mid-settle. */
+      /* Min-fills declutter (owner 2026-10-08): the market web is complete
+       * in state.graphData, but the pane paints the pruned subset — thin
+       * pairs hide while the BTS route and the desk legs always paint. The
+       * note below states the shown/total split, so nothing hides silently.
+       * Pool worlds never prune (their 25-node cap already bounds them). */
+      var MHp = (typeof MarketHops !== "undefined" && MarketHops) ? MarketHops : null;
+      var minF = minFillsNow(state);
+      var shownGraph = gd.graph, shownTotal = (gd.graph.edges || []).length;
+      if (isMarket && MHp && typeof MHp.pruneGraph === "function") {
+        try {
+          shownGraph = MHp.pruneGraph(gd.graph, minF, hi, [gd.assetA, gd.assetB]);
+        } catch (eP) { shownGraph = gd.graph; }
+        ensureMinFillsInput(doc, state);
+      }
+      var shownN = (shownGraph.edges || []).length;
       var paintOpts = { assetA: gd.assetA, assetB: gd.assetB, highlightPools: hi, explicit: !!explicit,
         nav: navMode, kind: isMarket ? "market" : "pool",
         meta: (isMarket ? (gd.meta || null) : null), routeDeskIds: hi };
       if (liveOn) {
-        PoolGraph.drawLive(doc, state.graphCanvas, gd.graph, paintOpts);
+        PoolGraph.drawLive(doc, state.graphCanvas, shownGraph, paintOpts);
       } else {
         try {
           if (typeof PoolGraph.stopLive === "function") PoolGraph.stopLive(state.graphCanvas);
         } catch (e) { /* static paint stands */ }
-        PoolGraph.drawGraph(doc, state.graphCanvas, gd.graph, paintOpts);
+        PoolGraph.drawGraph(doc, state.graphCanvas, shownGraph, paintOpts);
       }
       /* Below-map note (owner wording): the connects definition, never a
        * title. Strict when the 24h probe gated this render (with the honest
@@ -908,7 +986,17 @@ MarketDesk._fill = MarketDesk._fill || {};
        * calm "no route" note. Never a warning — an unreachable BTS through
        * markets is ordinary, not a scam signal. */
       if (isMarket) {
-        var noteTxt = t("market.map_hops_note", "A line is a market that filled in the past 24 hours. %(pairs)s pairs shown.", { pairs: String(n) });
+        /* The connects definition names the filter (owner 2026-10-08): a
+         * filtered map says so — "Showing 54 of 85 pairs (min 5 fills/24h)"
+         * — while an unfiltered map keeps the plain pair count. */
+        var noteTxt;
+        if (shownN < shownTotal) {
+          noteTxt = t("market.map_hops_filtered",
+            "A line is a market that filled in the past 24 hours. Showing %(shown)s of %(total)s pairs (min %(min)s fills/24h).",
+            { shown: String(shownN), total: String(shownTotal), min: String(minF) });
+        } else {
+          noteTxt = t("market.map_hops_note", "A line is a market that filled in the past 24 hours. %(pairs)s pairs shown.", { pairs: String(shownTotal) });
+        }
         var hasRoute = false;
         try {
           hasRoute = hi.length > 0;

@@ -135,5 +135,31 @@ var noSyms = MarketHops.toGraph(MarketHops.hopsFrom([{ a: "1.3.7", b: "1.3.8", f
 assert(noSyms.graph.edges.length === 0, "toGraph: unknown symbols drop the edge rather than build a broken desk id");
 assert(MarketHops.toGraph(null, {}) !== null && MarketHops.toGraph(null, {}).graph.edges.length === 0, "toGraph: null hops is an honest empty, never a throw");
 
+/* ---- pruneGraph: the desk declutter (owner 2026-10-08) ---- */
+var pg = {
+  nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" },
+    { assetId: "1.3.2", sym: "BTC" }, { assetId: "1.3.3", sym: "CNY" }],
+  edges: [
+    { id: "USD_BTS", poolId: "USD_BTS", a: "1.3.0", b: "1.3.1", fills: 900, sizeRaw: "900" },
+    { id: "BTC_BTS", poolId: "BTC_BTS", a: "1.3.0", b: "1.3.2", fills: 3, sizeRaw: "3" },
+    { id: "CNY_BTC", poolId: "CNY_BTC", a: "1.3.2", b: "1.3.3", fills: 2, sizeRaw: "2" }
+  ]
+};
+var pr1 = MarketHops.pruneGraph(pg, 1, [], ["1.3.0", "1.3.3"]);
+assert(pr1.edges.length === 3 && pr1.nodes.length === 4, "prune: min 1 keeps everything");
+var pr5 = MarketHops.pruneGraph(pg, 5, [], ["1.3.0", "1.3.3"]);
+assert(pr5.edges.length === 1, "prune: thin pairs hide below the floor");
+assert(pr5.nodes.length === 3, "prune: CNY leg kept as anchor, orphan BTC drops (legs + endpoints only)");
+assert(pr5.nodes.some(function (n) { return n.assetId === "1.3.3"; }), "prune: edgeless desk leg stays as anchor");
+assert(!pr5.nodes.some(function (n) { return n.assetId === "1.3.2"; }), "prune: isolated BTC drops out");
+var prRoute = MarketHops.pruneGraph(pg, 5, ["BTC_BTS"], ["1.3.0", "1.3.3"]);
+assert(prRoute.edges.length === 2, "prune: the BTS route is exempt, always paints");
+assert(prRoute.edges.some(function (e) { return e.id === "BTC_BTS"; }), "prune: exempt route edge present");
+var prNone = MarketHops.pruneGraph(pg, 1000, [], ["1.3.0", "1.3.3"]);
+assert(prNone.edges.length === 0 && prNone.nodes.length === 0, "prune: nothing passes -> honest empty, not lonely dots");
+assert(pg.edges.length === 3, "prune: input untouched (no mutation)");
+assert(MarketHops.pruneGraph(null, 5, [], []).edges.length === 0, "prune: null graph is an honest empty");
+assert(MarketHops.readMinFills() === 5, "readMinFills: shipped default is 5");
+
 console.log("market-hops: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

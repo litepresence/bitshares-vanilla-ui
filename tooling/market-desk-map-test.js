@@ -161,5 +161,37 @@ PoolGraph.drawGraph(null, cvNoRoute, deskBuilt.graph, {
 });
 assert(cvNoRoute._calls.lineWidth.indexOf(2.5) === -1, "market: no route -> nothing glows (honest, not a warning)");
 
+/* ---- market node ink: legs green, BTS blue, rest grey (owner 2026-10-08) ---- */
+var cvInk = stubCanvas();
+PoolGraph.drawGraph(null, cvInk, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds
+});
+var fills = cvInk._calls.fill;
+assert(fills.indexOf("#007bff") !== -1, "market: BTS node painted core blue");
+assert(fills.indexOf("#7bd500") !== -1, "market: desk legs painted green");
+assert(fills.indexOf("#f74745") === -1, "market: no red anywhere (thin markets are normal, never warnings)");
+/* Pool ink unchanged: legs keep their trust verdicts. */
+var cvPoolInk = stubCanvas();
+PoolGraph.drawGraph(null, cvPoolInk, { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }], edges: poolEdges }, {
+  assetA: "1.3.0", assetB: "1.3.1"
+});
+assert(cvPoolInk._calls.fill.indexOf("#007bff") !== -1, "pool: BTS node still core blue");
+
+/* ---- market route ink: the BTS triangle reads solid blue ---- */
+var routeStrokes = cvRoute._calls.stroke.filter(function (c) { return c === "#007bff"; });
+assert(routeStrokes.length > 0, "market: the BTS route line is core blue");
+/* ---- hover: yellow, exactly like the pool desk ---- */
+var cvHov = stubCanvas();
+var hovEdge = deskBuilt.graph.edges[0].poolId;
+PoolGraph.drawGraph(null, cvHov, deskBuilt.graph, {
+  assetA: "1.3.1", assetB: "1.3.2", kind: "market", routeDeskIds: routeDeskIds, hoverEdge: hovEdge
+});
+assert(cvHov._calls.stroke.indexOf("#fbbc06") !== -1, "market: hovered line is yellow (pool-desk parity)");
+var cvPoolHov = stubCanvas();
+PoolGraph.drawGraph(null, cvPoolHov, { nodes: [{ assetId: "1.3.0", sym: "BTS" }, { assetId: "1.3.1", sym: "USD" }], edges: poolEdges }, {
+  assetA: "1.3.0", assetB: "1.3.1", hoverEdge: "1.19.1"
+});
+assert(cvPoolHov._calls.stroke.indexOf("#fbbc06") !== -1, "pool: hovered line still yellow");
+
 console.log("market-desk-map: " + ok + " passed, " + bad + " failed");
 if (bad > 0) process.exit(1);

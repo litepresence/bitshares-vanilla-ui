@@ -478,6 +478,75 @@ var MarketHops = (function () {
     return { graph: { nodes: nodes, edges: edges }, meta: meta };
   }
 
+  /* DEFAULT_MIN_FILLS: the desk map's out-of-the-box noise floor (owner
+   * 2026-10-08). Pairs below this hide; the BTS route and the desk legs
+   * never hide. 1 means show everything. Persisted per profile like the
+   * candle count; the input owns the value after load. */
+  var DEFAULT_MIN_FILLS = 5;
+  var MIN_FILLS_KEY = "bts-vanilla-min-fills-v1";
+
+  /* readMinFills: persisted threshold, or the default. Missing/corrupt
+   * storage reads as default; anything-not-a-positive-int reads as default.
+   * Never throws. @returns {number} >= 1. */
+  function readMinFills() {
+    try {
+      if (typeof localStorage !== "undefined") {
+        var v = parseInt(localStorage.getItem(MIN_FILLS_KEY), 10);
+        if (isFinite(v) && v >= 1) return Math.floor(v);
+      }
+    } catch (e) { /* default stands */ }
+    return DEFAULT_MIN_FILLS;
+  }
+
+  /* writeMinFills: persist a validated threshold. Anything-not-a-positive-
+   * int is ignored (the input reverts). Never throws. @returns {boolean}. */
+  function writeMinFills(v) {
+    try {
+      var n = Math.floor(Number(v));
+      if (!isFinite(n) || n < 1) return false;
+      if (typeof localStorage !== "undefined") localStorage.setItem(MIN_FILLS_KEY, String(n));
+      return true;
+    } catch (e) { return false; }
+  }
+
+  /* pruneGraph: the display subset of a market graph — edges below minFills
+   * drop, except the BTS-route edges (keepIds) which always paint: the
+   * route is the map's reason to exist, never noise. Nodes shrink to kept
+   * edge endpoints plus the desk legs (positional anchors, kept even when
+   * edgeless); an unconnected BTS drops out rather than floating alone.
+   * Zero kept edges yields a fully empty graph so the painter's honest
+   * empty sentence paints instead of two lonely dots. Pure (unit-tested).
+   * @param {{nodes: Array, edges: Array}} graph full market graph.
+   * @param {number} minFills noise floor (>= 1; 1 keeps everything).
+   * @param {Array<string>} keepIds route edge ids, exempt always.
+   * @param {Array<string>} legIds desk leg asset ids, kept as nodes.
+   * @returns {{nodes: Array, edges: Array}} pruned graph (input untouched).
+   */
+  function pruneGraph(graph, minFills, keepIds, legIds) {
+    var nodes = (graph && graph.nodes) || [], edges = (graph && graph.edges) || [];
+    var min = Math.floor(Number(minFills));
+    if (!isFinite(min) || min < 1) min = 1;
+    var keep = {};
+    (keepIds || []).forEach(function (id) { if (id) keep[String(id)] = 1; });
+    var legs = {};
+    (legIds || []).forEach(function (id) { if (id) legs[String(id)] = 1; });
+    var kept = edges.filter(function (e) {
+      if (!e) return false;
+      var id = String(e.id || e.poolId || "");
+      if (keep[id]) return true;
+      var f = Number(e.fills);
+      return isFinite(f) && f >= min;
+    });
+    if (!kept.length) return { nodes: [], edges: [] };
+    var onMap = {};
+    kept.forEach(function (e) { onMap[String(e.a)] = 1; onMap[String(e.b)] = 1; });
+    Object.keys(legs).forEach(function (id) { onMap[id] = 1; });
+    return {
+      nodes: nodes.filter(function (n) { return n && onMap[String(n.assetId)]; }),
+      edges: kept
+    };
+  }
+
   /* clearCache: drop the session pair memo (a settings/theme re-probe or a
    * test harness calls this). Never throws. */
   function clearCache() {
@@ -493,6 +562,10 @@ var MarketHops = (function () {
     deskIdsFor: deskIdsFor,
     toGraph: toGraph,
     deskId: deskId,
+    pruneGraph: pruneGraph,
+    readMinFills: readMinFills,
+    writeMinFills: writeMinFills,
+    DEFAULT_MIN_FILLS: DEFAULT_MIN_FILLS,
     clearCache: clearCache,
     tr: tr,
     CORE_ID: CORE_ID,

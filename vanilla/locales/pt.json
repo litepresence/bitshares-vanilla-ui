@@ -1994,8 +1994,10 @@
       "market.map_edge_fills",
       "market.map_edge_price",
       "market.map_hops_empty",
+      "market.map_hops_filtered",
       "market.map_hops_no_route",
       "market.map_hops_note",
+      "market.min_fills",
       "market.my_orders",
       "market.my_trades_hint",
       "market.my_trades_locked",
@@ -5309,7 +5311,9 @@
     "map_hops_empty": "No market filled in the past 24 hours around these legs.",
     "map_aria": "Market network. Lines are markets that filled in the past 24 hours.",
     "map_edge_fills": "%(desk)s · %(a)s–%(b)s · %(fills)s fills/24h",
-    "map_edge_price": "@ %(price)s · %(vol)s"
+    "map_edge_price": "@ %(price)s · %(vol)s",
+    "map_hops_filtered": "A line is a market that filled in the past 24 hours. Showing %(shown)s of %(total)s pairs (min %(min)s fills/24h).",
+    "min_fills": "Min fills"
   },
   "misc": {
     "title": "Fatura",

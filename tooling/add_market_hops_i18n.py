@@ -39,6 +39,8 @@ NEW_KEYS = {
     "market.map_aria": "Market network. Lines are markets that filled in the past 24 hours.",
     "market.map_edge_fills": "%(desk)s · %(a)s–%(b)s · %(fills)s fills/24h",
     "market.map_edge_price": "@ %(price)s · %(vol)s",
+    "market.map_hops_filtered": "A line is a market that filled in the past 24 hours. Showing %(shown)s of %(total)s pairs (min %(min)s fills/24h).",
+    "market.min_fills": "Min fills",
 }
 
 

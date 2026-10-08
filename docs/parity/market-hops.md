@@ -137,7 +137,33 @@ TODO/FIXME/commented-out code (grepped). Tests document the contracts.
   in the two painters + the note switches. Physics, gestures, nav, chrome
   furniture are shared with the pool charts and could not go without breaking them.
 
-## 8. Gates
+## 8. Declutter pass (owner 2026-10-08 — after the audit above)
+
+The 81-edge desk web in its 180px slice read as clutter, so the desk map
+grew a "Min fills" noise floor instead of a cap:
+
+- `MarketHops.pruneGraph` (pure, unit-tested): edges below the floor hide,
+  except the BTS-route edges (always paint — the route is the map's reason
+  to exist) and the desk legs (positional anchors, kept even when edgeless).
+  Zero survivors yields the fully empty graph so the painter's honest empty
+  sentence paints instead of two lonely dots. Input untouched, never mutated.
+- Floor lives in `state.minFills`, persisted per profile
+  (`bts-vanilla-min-fills-v1`, candle-count precedent), shipped default 5.
+  The number input sits ahead of the map note (market worlds only — pool
+  worlds never prune, so they never offer it); invalid entries revert.
+- The connects definition names the filter: "Showing 54 of 85 pairs (min 5
+  fills/24h)." Unfiltered maps keep the plain pair count — a filtered map
+  can never pass as complete.
+- Ink (same pass): desk legs green, BTS core blue (as route context on
+  non-BTS desks; on a BTS desk BTS is a leg, so green wins — legs first),
+  the BTS-route triangle solid core blue with the path glow, hover yellow
+  exactly like the pool desk (headless-pinned on both worlds).
+- Live vectors (BTS/CNY, mainnet): default "Showing 54 of 85 pairs (min 5
+  fills/24h)"; set 25 → "Showing 22 of 85 pairs (min 25 fills/24h)",
+  persisted, readable 22-node map (`desk-min25-filter.png`). Zero console
+  errors throughout.
+
+## 9. Gates
 
 - `node tooling/market-hops-test.js` → 55 passed, 0 failed (merge, unbounded
   BFS incl. 120-edge no-cap proof, route fewest-hops + widest-bottleneck +

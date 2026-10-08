@@ -1127,7 +1127,8 @@ var PoolGraph = (function () {
           }
         }
       } catch (e2) { baseT = 0; }
-      var col = (st.color === "warn") ? warn : (st.color === "path" ? pathCol : _ramp(baseT, muted, accent));
+      var col = (st.color === "warn") ? warn
+        : (st.color === "path" ? (isMarket ? accent : pathCol) : _ramp(baseT, muted, accent));
       ctx.strokeStyle = col;
       ctx.lineWidth = st.width;
       /* The pair's own line + its route to BTS are the ONLY glowing lines, in
@@ -1160,8 +1161,16 @@ var PoolGraph = (function () {
       if (!p) return;
       var r = _nodeRadius(deg[n.assetId]); /* degree-sized, pixels only */
       /* Owner-spec nodes (from theme.nodeColors): BTS always theme-blue,
-       * each leg green/yellow/red by its OWN BTS verdict, rest grey. */
+       * each leg green/yellow/red by its OWN BTS verdict, rest grey.
+       * Markets carry no trust verdict, so market ink is positional instead:
+       * the two desk legs read green (the pair you are here about), BTS
+       * reads core blue, everything else stays grey (owner 2026-10-08). */
       var ncol = (theme && theme.nodeColors && theme.nodeColors[n.assetId]) || "other";
+      if (isMarket) {
+        if (String(n.assetId) === String(assetA) || String(n.assetId) === String(assetB)) ncol = "pair-good";
+        else if (String(n.assetId) === CORE_ID) ncol = "bts";
+        else ncol = "other";
+      }
       ctx.fillStyle = ncol === "bts" ? accent
         : (ncol === "pair-good" ? live : (ncol === "pair-warn" ? warn : (ncol === "pair-bad" ? danger : muted)));
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 2 * Math.PI); ctx.fill();
