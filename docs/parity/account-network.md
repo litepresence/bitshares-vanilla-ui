@@ -119,7 +119,23 @@ added).
   (3883 keys, 5105 call sites) · `python3 tooling/check_rot.py` PASSED ·
   `scan_dead_css` adds none.
 
-## 9. Defects found and fixed during the build (record, not blame)
+## 9. Audit checklist result (skills/auditing-vanilla-slices)
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Rot gate | PASS (`check_rot.py`; no CDN/framework/package.json) |
+| 2 | Retro look | New page by owner request; shares the shipped network engine, header nav and page furniture (bar still 6 links) |
+| 3 | Feature coverage | §A of the proposal doc, plus credit (the owner asked for credit; margin was explicitly dropped) |
+| 4 | Modern glow | Progressive scan status, honest empties, no hover-only UI, `replaceState` URL sync, cleanup + `gen` guards, shared touch floor |
+| 5 | Themes | Four screenshots (ref / dark / vanilla / 360 px); **zero hardcoded hex** in the slice (verified by grep: `.an-*`, view and adapter contain none) |
+| 6 | Human terms | All amounts via `Format.formatAmount` at render; no `Math.pow(10` outside `format.js`; vectors include a non-BTS precision, a multi-asset edge and the singular count |
+| 7 | Both ends | 360 px and 1440 px recorded; chips/button/input ≥44 px; table twin scrolls |
+| 8 | Built to be read | Headers + JSDoc everywhere; **files split** after the check flagged 808/767 lines; no TODO/FIXME |
+| 9 | Type gate | PASS (`check_types.sh`), two `declare var` lines added per split module |
+| 10 | No recreated utilities | Uses `DOM.*`, shared `touchable`, `TableRenderer.render`, `DOM.pageHead`; grep clean |
+| 11 | i18n | 3883 keys × 12 locales, drift-free |
+
+## 10. Defects found and fixed during the build (record, not blame)
 
 Unit vectors caught: a promise left **unsettled** on mid-walk failure (a
 silent spinner); a deleted deal silently dropped instead of reported missing;
