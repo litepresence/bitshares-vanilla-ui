@@ -252,17 +252,57 @@ var NetPaint = (function () {
         symById[n.assetId] = n.sym || n.assetId;
         brandById[n.assetId] = brandOf(n.sym);
       });
+      /* Account-network mode (2026-10-09): class-coloured edges + arrowheads.
+       * BOTH ARE OPT-IN — the pool/market maps never set these fields, so
+       * their frames take exactly the path they took before.
+       * edgeClassOf(edge) returns a token name; the account page uses it to
+       * say "this line is a credit line, that one is a transfer", which the
+       * volume ramp cannot express (a ramp reads magnitude, not meaning). */
+      var classColorOf = null;
+      try {
+        if (paint && typeof paint.edgeClassOf === "function") classColorOf = paint.edgeClassOf;
+      } catch (eCls) { classColorOf = null; }
+      var CLASS_TOKENS = {
+        buy: ["--buy", "#26de81"], sell: ["--sell", "#ef5350"], accent: ["--accent", "#1E9ED7"],
+        warn: ["--warn", "#ffb300"], muted: ["--muted", "#758696"]
+      };
+      /** Resolve an edge's class token to a theme colour, or null to keep the
+       *  volume ramp. Unknown token / throwing hook => null (display only). */
+      function classColor(e) {
+        if (!classColorOf) return null;
+        var name = null;
+        try { name = classColorOf(e); } catch (x) { return null; }
+        var tok = name ? CLASS_TOKENS[name] : null;
+        return tok ? _cssTok(tok[0], tok[1]) : null;
+      }
+      /* Arrowhead at the `b` end: the direction of the line IS the flow
+       * direction (account -> counterparty), which is the whole point of the
+       * account network. Drawn at ~82% along the path so the tip stays clear
+       * of the node disc. */
+      function arrowHead(x0, y0, x1, y1) {
+        var hx = x0 + (x1 - x0) * 0.82, hy = y0 + (y1 - y0) * 0.82;
+        var ang = Math.atan2(y1 - y0, x1 - x0);
+        var s = 7, spread = 0.42;
+        ctx.beginPath();
+        ctx.moveTo(hx + Math.cos(ang) * s, hy + Math.sin(ang) * s);
+        ctx.lineTo(hx + Math.cos(ang + spread) * s, hy + Math.sin(ang + spread) * s);
+        ctx.lineTo(hx + Math.cos(ang - spread) * s, hy + Math.sin(ang - spread) * s);
+        ctx.closePath();
+        ctx.fill();
+      }
       edges.forEach(function (e, ei) {
         var p = geom[e.a], q = geom[e.b];
         if (!p || !q) return;
         var hot = paint.selPool && String(e.poolId) === String(paint.selPool);
         var onPath = paint.pathSet && paint.pathSet[e.poolId];
-        var hov = paint.hoverEdge && String(e.poolId) === String(paint.hoverEdge);
+        var hov = paint.hoverEdge && String(paint.hoverEdge) === String(e.poolId);
         try {
           /* Data ink is color-only (owner 2026-10-07): the ramp carries
            * size/volume, every base edge shares one constant width.
-           * Interaction states keep overriding both. */
-          ctx.strokeStyle = hot ? buy : ((onPath || hov) ? PATH_WARM : _ramp(edgeT(paint.meta, e.poolId), rampLo, rampHi));
+           * Interaction states keep overriding both; a class colour (when the
+           * caller supplies one) replaces the ramp as the data ink. */
+          var clsInk = classColor(e);
+          ctx.strokeStyle = hot ? buy : ((onPath || hov) ? PATH_WARM : (clsInk || _ramp(edgeT(paint.meta, e.poolId), rampLo, rampHi)));
           ctx.lineWidth = (hot || onPath || hov) ? 2.5 : 1.25;
           if (hot) {
             try { ctx.save(); ctx.shadowColor = buy; ctx.shadowBlur = 12; } catch (x) { /* glow best-effort */ }
@@ -279,8 +319,15 @@ var NetPaint = (function () {
             ctx.lineTo(SX(q.x), SY(q.y));
           }
           ctx.stroke();
+          if (paint && paint.arrows) {
+            try {
+              ctx.fillStyle = ctx.strokeStyle;
+              arrowHead(SX(p.x), SY(p.y), SX(q.x), SY(q.y));
+            } catch (xHead) { /* decoration only; the line still reads */ }
+          }
           if (hot) { try { ctx.restore(); } catch (x) { /* state stands */ } }
         } catch (e2) { /* next edge */ }
+
         /* An edge record carries its SEGMENT and both legs (id + symbol):
          * the whole line is the click target, and the market selector derives
          * the desk id for the pair from those symbols — a midpoint-only record
