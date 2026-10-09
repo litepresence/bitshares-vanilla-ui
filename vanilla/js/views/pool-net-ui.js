@@ -88,11 +88,18 @@ var PoolNetUI = (function () {
     if (!g) return;
     S.W = g.W;
     S.H = g.H;
-    var out = NP.drawScene(g.ctx, g.W, g.H, S.view, S.geom, {
+    /* paintState carries the two OPT-IN display fields the account network
+     * uses (arrowheads, per-class edge colour). Absent here means absent in
+     * the painter, so the pool/market frames are unchanged. */
+    var paintState = {
       scale: S.scale, ox: S.ox, oy: S.oy, pathSet: S.pathSet,
       selPool: S.selPool, meta: S.meta,
       hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: "lively"
-    });
+    };
+    if (S.arrows) paintState.arrows = true;
+    if (typeof S.edgeClassOf === "function") paintState.edgeClassOf = S.edgeClassOf;
+    if (typeof S.nodeFillOf === "function") paintState.nodeFillOf = S.nodeFillOf;
+    var out = NP.drawScene(g.ctx, g.W, g.H, S.view, S.geom, paintState);
     S.hits = out.hits;
     S.mids = out.mids;
   }
@@ -173,6 +180,11 @@ var PoolNetUI = (function () {
         temp: temp0, visible: true,
         dead: false, reduced: reduced, loaded: false, raf: 0, observer: null,
         drag: null, pinch: null, hover: null, wake: null, onResize: null,
+        /* Opt-in display fields (2026-10-09, account network): arrowheads +
+         * per-class edge colour. Absent for the pool/market maps. */
+        arrows: !!(navOpts && navOpts.arrows),
+        edgeClassOf: (navOpts && typeof navOpts.edgeClassOf === "function") ? navOpts.edgeClassOf : null,
+        nodeFillOf: (navOpts && typeof navOpts.nodeFillOf === "function") ? navOpts.nodeFillOf : null,
         navOpts: navOpts
       };
       S.paint = render;
@@ -183,6 +195,18 @@ var PoolNetUI = (function () {
       try { touchFn = (typeof touchable === "function") ? touchable : null; } catch (e) { touchFn = null; }
       var els = NC.build(doc, mk, t, touchFn, S, wrap);
       if (!els || !els.canvas) return api;
+      /* The account network brings its OWN status line (scanned ops, caps,
+       * skips — facts this strip cannot know), so the pool chrome's strip is
+       * hidden rather than left showing "Loading network…". Pool/market maps
+       * never reach this branch. */
+      if (accountMode()) {
+        try {
+          if (els.statusEl) {
+            els.statusEl.textContent = "";
+            els.statusEl.style.display = "none";
+          }
+        } catch (eSt) { /* the strip just stays empty */ }
+      }
       S.canvas = els.canvas;
       var canvas = els.canvas;
 
@@ -192,6 +216,19 @@ var PoolNetUI = (function () {
       function marketMode() {
         try { return !!(navOpts && navOpts.mode === "market"); }
         catch (e) { return false; }
+      }
+
+      /* accountMode: the 2026-10-09 account network. It reuses this engine
+       * but brings its OWN status/detail lines (which state scanned ops,
+       * caps and skips — facts this strip cannot know), so the pool/market
+       * wording below must not paint over them. */
+      function accountMode() {
+        try { return !!(navOpts && navOpts.mode === "account"); }
+        catch (e) { return false; }
+      }
+      function setStatusMode(text) {
+        if (accountMode()) return;
+        setStatus(text);
       }
 
       function getSel() {        var sel = { aId: null, bId: null, s: "" };
@@ -442,11 +479,11 @@ var PoolNetUI = (function () {
         var nE = (S.full.edges || []).length, nN = (S.full.nodes || []).length;
         /* Status states which world is on screen: the full 24h fill web, or
          * the 1-hop ticker fallback (index unavailable). Never both claims. */
-        if (!nE) setStatus(t("market_net.map_empty", "No markets with recent volume."));
-        else if (navOpts.fallback) setStatus(t("market_net.map_fallback", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills unconfirmed", {
+        if (!nE) setStatusMode(t("market_net.map_empty", "No markets with recent volume."));
+        else if (navOpts.fallback) setStatusMode(t("market_net.map_fallback", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills unconfirmed", {
           pairs: String(nE), assets: String(nN)
         }));
-        else setStatus(t("market_net.map_hops_ready", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills", {
+        else setStatusMode(t("market_net.map_hops_ready", "%(pairs)s pairs \u00b7 %(assets)s assets \u00b7 24h fills", {
           pairs: String(nE), assets: String(nN)
         }));
       }

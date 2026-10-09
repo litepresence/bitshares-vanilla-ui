@@ -337,6 +337,7 @@
       "account_net.scanning",
       "account_net.seeds_label",
       "account_net.seeds_placeholder",
+      "account_net.status_credit_index",
       "account_net.status_credit_missing",
       "account_net.status_edge_cap",
       "account_net.status_graph",
@@ -7921,6 +7922,7 @@
     "es_disabled": "The community index is switched off. Turn it on in Settings to draw this map.",
     "es_bad_account": "That name is not an account on this chain.",
     "es_unavailable": "The community index is not reachable right now. Try again in a moment.",
-    "detail_line_one": "%(from)s → %(to)s · %(class)s · %(amount)s · %(count)s op · %(kind)s"
+    "detail_line_one": "%(from)s → %(to)s · %(class)s · %(amount)s · %(count)s op · %(kind)s",
+    "status_credit_index": "%(n)s credit lines resolved from the index (their offer or deal object is gone from chain)"
   }
 }

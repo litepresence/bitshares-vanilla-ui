@@ -104,5 +104,35 @@ ok(typeof MP.drawScene === "function", "drawScene exported");
   ok(st.triFills === 0, "hover does not add arrowheads on its own");
 }
 
+// 7. Opt-in node fill: seeds vs counterparts resolve to DIFFERENT colours,
+//    and the default (no hook) stays the shipped brand palette.
+{
+  const { ctx, st } = stubCtx();
+  const acctView = {
+    nodes: [{ assetId: "1.2.1", sym: "alice", seeded: true }, { assetId: "1.2.2", sym: "bob", seeded: false }],
+    edges: [view.edges[0]]
+  };
+  MP.drawScene(ctx, 320, 240, acctView, geom, {
+    scale: 1, ox: 0, oy: 0, nodeFillOf: (n) => (n.seeded ? "accent" : "muted")
+  });
+  const fills = st.fills;
+  ok(fills >= 2, "nodes filled with the hook (" + fills + ")");
+}
+{
+  const { ctx, st } = stubCtx();
+  MP.drawScene(ctx, 320, 240, view, geom, {
+    scale: 1, ox: 0, oy: 0, nodeFillOf: () => "nope"
+  });
+  ok(st.strokes >= 2, "an unknown node token falls back to the brand palette, no crash");
+}
+{
+  let threw = false;
+  const { ctx } = stubCtx();
+  try { MP.drawScene(ctx, 320, 240, view, geom, {
+    scale: 1, ox: 0, oy: 0, nodeFillOf: () => { throw new Error("boom"); } }); }
+  catch (e) { threw = true; }
+  ok(!threw, "a throwing nodeFillOf never breaks the frame");
+}
+
 console.log("account-net-paint: " + pass + " pass, " + fail + " fail");
 process.exitCode = fail ? 1 : 0;

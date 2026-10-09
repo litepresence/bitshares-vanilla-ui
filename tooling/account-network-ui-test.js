@@ -52,6 +52,16 @@ eq(T.parseSeeds(null), [], "null input is no seeds");
   ok(/2/.test(s) && /credit/i.test(s), "unresolvable credit lines is disclosed");
 }
 {
+  /* Index-resolved credit lines are disclosed, not passed off as chain reads. */
+  const s = T.statusText({ seeds: [{ id: "1.2.1", name: "alice" }], unknown: [],
+    stats: { scanned: 90, edges: 12, nodes: 7, truncated: false, droppedSelf: 0,
+      droppedShape: 0, missingCredit: 1, creditViaIndex: { offers: 5, deals: 44 },
+      caps: {} } });
+  ok(/index/i.test(s), "index-resolved credit lines are disclosed (" + s + ")");
+  ok(/49/.test(s), "the index-resolved count is stated");
+  ok(/1/.test(s) && /not found on chain/.test(s), "the still-unresolvable count is stated too");
+}
+{
   /* A clean run must NOT print a wall of zeros — absence of limits is the
    * default story, and a line of "0 skipped" is noise, not honesty. */
   const s = T.statusText({ seeds: [{ id: "1.2.1", name: "alice" }], unknown: [],

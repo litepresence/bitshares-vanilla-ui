@@ -534,21 +534,31 @@ var AccountNet = (function () {
    * One chunked get_objects pass each way. Missing objects land in
    * `missing` — the caller drops those lines and says so. Never guesses.
    * @param {{offerId?:string[], dealId?:string[]}} refs Referenced ids.
-   * @returns {Promise<{offer:Object, deal:Object, missing:string[]}>}
+   * @returns {Promise<{offer:Object, deal:Object, missing:string[],
+   *   viaIndex:{offers:number, deals:number}}>} viaIndex counts how many
+   *   owners came from the index rather than a live chain object.
    */
   function creditOwners(refs) {
     refs = refs || {};
     var offerIds = (refs.offerId || []).filter(function (v) { return /^1\.21\.\d+$/.test(String(v)); });
     var dealIds = (refs.dealId || []).filter(function (v) { return /^1\.22\.\d+$/.test(String(v)); });
-    var out = { offer: {}, deal: {}, missing: [] };
+    var out = { offer: {}, deal: {}, missing: [], viaIndex: { offers: 0, deals: 0 } };
     if (!offerIds.length && !dealIds.length) return Promise.resolve(out);
     return fetchObjects(offerIds.concat(dealIds)).then(function (rows) {
       var dealOffer = {};
       (rows || []).forEach(function (o) {
         if (!o || !o.id) return;
         var id = String(o.id);
-        if (/^1\.21\./.test(id)) { if (o.owner) out.offer[id] = String(o.owner); }
-        else if (/^1\.22\./.test(id)) { if (o.offer_id) dealOffer[id] = String(o.offer_id); }
+        /* credit_offer_object carries owner_account, NOT owner (verified live
+         * 2026-10-09 against 1.21.79: {"owner_account":"1.2.1809211",...}).
+         * Reading `owner` here reported every credit line missing. `owner` is
+         * accepted as a fallback for index/shape drift. */
+        if (/^1\.21\./.test(id)) {
+          var own = o.owner_account || o.owner;
+          if (own) out.offer[id] = String(own);
+        } else if (/^1\.22\./.test(id)) {
+          if (o.offer_id) dealOffer[id] = String(o.offer_id);
+        }
       });
       var wanted = [];
       Object.keys(dealOffer).forEach(function (d) {
@@ -557,18 +567,30 @@ var AccountNet = (function () {
       });
       return fetchObjects(wanted).then(function (offers) {
         (offers || []).forEach(function (o) {
-          if (o && o.id && o.owner) out.offer[String(o.id)] = String(o.owner);
+          if (!o || !o.id) return;
+          var own = o.owner_account || o.owner;
+          if (own) out.offer[String(o.id)] = String(own);
         });
         Object.keys(dealOffer).forEach(function (d) {
           var own = out.offer[dealOffer[d]];
           if (own) out.deal[d] = own;
         });
-        /* Sweep the REQUESTED ids, not just the ones the chain returned: a
-         * reference the chain does not know (deleted, never existed) must be
-         * reported missing, never silently dropped. */
-        dealIds.forEach(function (d) { if (!out.deal[d]) out.missing.push(d); });
-        offerIds.forEach(function (id) { if (!out.offer[id]) out.missing.push(id); });
-        return out;
+        /* Anything the chain could not answer (deleted object) gets one
+         * index pass before it is called missing — see creditIndexOwners. */
+        var stillMissingDeals = dealIds.filter(function (d) { return !out.deal[d]; });
+        var stillMissingOffers = offerIds.filter(function (id) { return !out.offer[id]; });
+        return creditIndexOwners({ offerId: stillMissingOffers, dealId: stillMissingDeals })
+          .then(function (idx) {
+            Object.keys(idx.deal).forEach(function (d) { if (!out.deal[d]) out.deal[d] = idx.deal[d]; });
+            Object.keys(idx.offer).forEach(function (id) { if (!out.offer[id]) out.offer[id] = idx.offer[id]; });
+            out.viaIndex = idx.viaIndex;
+            /* Sweep the REQUESTED ids, not just the ones a pass returned: a
+             * reference nobody can resolve must be REPORTED, never silently
+             * dropped and never drawn with a guessed counterparty. */
+            dealIds.forEach(function (d) { if (!out.deal[d]) out.missing.push(d); });
+            offerIds.forEach(function (id) { if (!out.offer[id]) out.missing.push(id); });
+            return out;
+          });
       });
     }).catch(function () {
       /* A failed join resolves NO owners: every reference is reported
@@ -576,6 +598,110 @@ var AccountNet = (function () {
       offerIds.concat(dealIds).forEach(function (id) { out.missing.push(id); });
       return out;
     });
+  }
+
+  /* creditIndexOwners: resolve references the chain can NO LONGER answer.
+   *
+   * Why this exists (measured 2026-10-09): credit offers and deals are
+   * deleted objects — `get_objects(["1.22.209"])` returns [null] on a live
+   * node — while their operations live on forever in the history index. For
+   * account 1.2.1804436 that left 49 of 52 credit lines unresolvable, i.e.
+   * the Credit class drew almost nothing.
+   *
+   * The index can answer, because the create operation carries the id it
+   * minted (both term-filterable, verified live 2026-10-09):
+   *   op 69 (offer create): result_object.data_string = the offer id,
+   *                          op_object.owner_account = the lender
+   *   op 72 (offer accept): result_object.data_object.new_objects[0] = the
+   *                          DEAL id, plus op_object.offer_id (the offer it
+   *                          came from) and data_object.impacted_accounts[0]
+   *                          (the lender)
+   * One query per kind, with a terms filter over every referenced id, so the
+   * whole batch costs two requests. Every line resolved this way is reported
+   * as `viaIndex` so the page can disclose it — the lender is read from an
+   * immutable operation, not guessed, but it is still not the live object.
+   * @param {{offerId?:string[], dealId?:string[]}} refs Referenced ids.
+   * @returns {Promise<{offer:Object, deal:Object, viaIndex:Object}>}
+   */
+  function creditIndexOwners(refs) {
+    refs = refs || {};
+    var dealIds = (refs.dealId || []).filter(function (v) { return /^1\.22\.\d+$/.test(String(v)); });
+    var offerIds = (refs.offerId || []).filter(function (v) { return /^1\.21\.\d+$/.test(String(v)); });
+    var out = { offer: {}, deal: {}, viaIndex: { offers: 0, deals: 0 } };
+    if (!dealIds.length && !offerIds.length) return Promise.resolve(out);
+    var HC = _historyCap();
+    if (!HC || !_esOn()) return Promise.resolve(out);
+    /* deal -> {offerId, lender} straight off the accept operation. */
+    var dealQuery = {
+      track_total_hits: false,
+      size: ES_SIZE,
+      _source: ["operation_history", "operation_type"],
+      query: { bool: { filter: [
+        { term: { operation_type: 72 } },
+        { terms: { "operation_history.operation_result_object.data_object.new_objects.keyword": dealIds } } ] } }
+    };
+    /* offer -> lender straight off the create operation. */
+    var offerQuery = {
+      track_total_hits: false,
+      size: ES_SIZE,
+      _source: ["operation_history", "operation_type"],
+      query: { bool: { filter: [
+        { term: { operation_type: 69 } },
+        { terms: { "operation_history.operation_result_object.data_string.keyword": offerIds } } ] } }
+    };
+    var step = function (q) {
+      try { return HC.esSearch("bitshares-*", q, { timeoutMs: 10000 }); }
+      catch (e) { return Promise.reject(e); }
+    };
+    return Promise.all([dealIds.length ? step(dealQuery).catch(function () { return null; }) : null,
+      offerIds.length ? step(offerQuery).catch(function () { return null; }) : null])
+      .then(function (both) {
+        var dealRes = both[0], offerRes = both[1];
+        var seenDeal = {}, seenOffer = {};
+        if (dealRes && dealRes.hits) {
+          (dealRes.hits.hits || []).forEach(function (h) {
+            var s = (h && h._source) || {};
+            var oh = s.operation_history || {};
+            var oo = oh.op_object || {};
+            var res = oh.operation_result_object || {};
+            var data = res.data_object || {};
+            var created = Array.isArray(data.new_objects) ? data.new_objects : [];
+            var impacted = Array.isArray(data.impacted_accounts) ? data.impacted_accounts : [];
+            var lender = acct(impacted[0]);
+            var offer = String(oo.offer_id || "");
+            for (var i = 0; i < created.length; i++) {
+              var dealId = String(created[i] || "");
+              if (!/^1\.22\.\d+$/.test(dealId) || seenDeal[dealId]) continue;
+              seenDeal[dealId] = 1;
+              if (lender && /^1\.21\.\d+$/.test(offer)) {
+                out.deal[dealId] = lender;
+                if (!out.offer[offer]) out.offer[offer] = lender;
+                out.viaIndex.deals++;
+              } else if (lender) {
+                /* the accept op gave us no offer id: keep the lender under a
+                 * per-deal key so the caller can still draw the line */
+                out.deal[dealId] = lender;
+                out.viaIndex.deals++;
+              }
+            }
+          });
+        }
+        if (offerRes && offerRes.hits) {
+          (offerRes.hits.hits || []).forEach(function (h) {
+            var s = (h && h._source) || {};
+            var oh = s.operation_history || {};
+            var oo = oh.op_object || {};
+            var lender = acct(oo.owner_account);
+            if (!lender) return;
+            var created = String((oh.operation_result_object || {}).data_string || "");
+            if (!/^1\.21\.\d+$/.test(created) || seenOffer[created]) return;
+            seenOffer[created] = 1;
+            if (!out.offer[created]) { out.offer[created] = lender; out.viaIndex.offers++; }
+          });
+        }
+        return out;
+      })
+      .catch(function () { return out; });   /* index down => stay honest, draw less */
   }
 
   /**
@@ -658,6 +784,7 @@ var AccountNet = (function () {
           needsJoin: stats.needsJoin, scanCapHit: stats.truncated,
           nodeCap: opts.nodeCap, edgeCap: opts.edgeCap });
         graph.stats.missingCredit = owners.missing.length;
+        graph.stats.creditViaIndex = owners.viaIndex || { offers: 0, deals: 0 };
         graph.stats.unknown = unknown.slice();
         graph.stats.truncated = stats.truncated;
         return { graph: graph, seeds: seeds, unknown: unknown, stats: graph.stats };

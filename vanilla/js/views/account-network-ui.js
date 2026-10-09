@@ -249,6 +249,12 @@ var AccountNetworkUI = (function () {
     if (st.droppedShape) {
       bits.push(t("account_net.status_shape", "%(n)s unreadable entries skipped", { n: String(st.droppedShape) }));
     }
+    var via = st.creditViaIndex || {};
+    if (via.offers || via.deals) {
+      bits.push(t("account_net.status_credit_index",
+        "%(n)s credit lines resolved from the index (their offer or deal object is gone from chain)",
+        { n: String((via.offers || 0) + (via.deals || 0)) }));
+    }
     if (st.missingCredit) {
       bits.push(t("account_net.status_credit_missing",
         "%(n)s credit lines skipped (offer or deal not found on chain)", { n: String(st.missingCredit) }));
@@ -590,6 +596,13 @@ var AccountNetworkUI = (function () {
               return { a: null, b: null, s: state.seeds.join(", ") };
             }, {
               mode: "account", graph: graph,
+              arrows: true,
+              edgeClassOf: function (e) { return classToken(e.cls); },
+              /* Seeds read as the subject, counterparties as context. The
+               * pool brand palette would paint every account the same alert
+               * red (it keys off symbol-like names), which reads as a
+               * warning about each account rather than about the map. */
+              nodeFillOf: function (n) { return n && n.seeded ? "accent" : "muted"; },
               navNode: function (hit) {
                 var name = hit && (hit.sym || (hit.assetId && state.names[hit.assetId]));
                 return name ? "#/account/" + name : null;
@@ -603,12 +616,6 @@ var AccountNetworkUI = (function () {
                 return null;
               }
             });
-            try {
-              if (state.net && state.net.paint) {
-                state.net.paint.arrows = true;
-                state.net.paint.edgeClassOf = function (e) { return classToken(e.cls); };
-              }
-            } catch (e) { /* canvas-only nicety */ }
           } else {
             graphHost.appendChild(_el(doc, "p", t("account_net.canvas_missing",
               "The network canvas is unavailable in this build; the table below still lists every line."), "muted"));

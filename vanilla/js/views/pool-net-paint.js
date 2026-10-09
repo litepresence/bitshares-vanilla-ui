@@ -279,6 +279,22 @@ var NetPaint = (function () {
        * direction (account -> counterparty), which is the whole point of the
        * account network. Drawn at ~82% along the path so the tip stays clear
        * of the node disc. */
+      /* Node fill, same opt-in contract: paint.nodeFillOf(node) -> token
+       * name. The account network uses it because the BRAND palette has no
+       * meaning for account names — every one of them hashes to "other" and
+       * paints the same alert-red as a fee or a failure. */
+      var nodeFillOf = null;
+      try {
+        if (paint && typeof paint.nodeFillOf === "function") nodeFillOf = paint.nodeFillOf;
+      } catch (eN) { nodeFillOf = null; }
+      function nodeInk(n, brand) {
+        if (!nodeFillOf) return null;
+        var name = null;
+        try { name = nodeFillOf(n); } catch (x) { return null; }
+        var tok = name ? CLASS_TOKENS[name] : null;
+        return tok ? _cssTok(tok[0], tok[1]) : null;
+      }
+
       function arrowHead(x0, y0, x1, y1) {
         var hx = x0 + (x1 - x0) * 0.82, hy = y0 + (y1 - y0) * 0.82;
         var ang = Math.atan2(y1 - y0, x1 - x0);
@@ -344,7 +360,7 @@ var NetPaint = (function () {
         var brand = brandById[n.assetId] || "other";
         var hovN = paint.hoverNode && String(n.assetId) === String(paint.hoverNode);
         try {
-          ctx.fillStyle = brandFill(brand);
+          ctx.fillStyle = nodeInk(n, brand) || brandFill(brand);
           ctx.beginPath();
           ctx.arc(SX(g.x), SY(g.y), r, 0, 2 * Math.PI);
           ctx.fill();

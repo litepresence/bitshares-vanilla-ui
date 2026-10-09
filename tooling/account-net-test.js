@@ -315,6 +315,12 @@ function stubFetch(pages) {
 
   // 23. credit join: offers + deals in chunked get_objects; missing ids listed
   {
+    /* Offline guard: creditOwners falls back to the INDEX for references the
+     * chain cannot answer, so these vectors must not reach the network. */
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = function () {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: [] } }) });
+    };
     const prevChain = globalThis.Chain;
     const seen = [];
     globalThis.Chain = {
@@ -324,9 +330,11 @@ function stubFetch(pages) {
         if (method === "get_objects") {
           /* The chain returns NOTHING for an unknown/deleted id — that is
            * exactly the case the missing list exists for. */
+          /* owner_account, NOT owner — the real credit_offer_object field
+           * (verified live 2026-10-09 against 1.21.79). */
           const known = {
-            "1.21.3": { id: "1.21.3", owner: "1.2.777" },
-            "1.21.9": { id: "1.21.9", owner: "1.2.777" },
+            "1.21.3": { id: "1.21.3", owner_account: "1.2.777", asset_type: "1.3.0" },
+            "1.21.9": { id: "1.21.9", owner_account: "1.2.777", asset_type: "1.3.0" },
             "1.22.0": { id: "1.22.0", offer_id: "1.21.9", borrower: "1.2.888" }
           };
           return Promise.resolve(params[0].map((id) => known[id]).filter(Boolean));
@@ -336,21 +344,76 @@ function stubFetch(pages) {
     };
     const res = await AccountNet.creditOwners({ offerId: ["1.21.3"], dealId: ["1.22.0", "1.22.999"] });
     globalThis.Chain = prevChain;
-    eq(res.offer["1.21.3"], "1.2.777", "offer owner resolved from the chain");
+    if (prevFetch !== undefined) globalThis.fetch = prevFetch; else delete globalThis.fetch;
+    eq(res.offer["1.21.3"], "1.2.777", "offer owner resolved from the chain's owner_account field");
     eq(res.deal["1.22.0"], "1.2.777", "deal owner resolved through its offer");
     eq(res.missing.join(","), "1.22.999", "an unresolvable reference is listed, never guessed");
     ok(seen[0][0] === "get_objects", "the join goes through get_objects");
     ok(/1\.21\.3/.test(seen[0][1]) && /1\.22\.0/.test(seen[0][1]), "offer + deal ids batch into one call");
   }
 
+  // 23a2. A legacy `owner` field still resolves (shape drift tolerance).
+  {
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = function () {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: [] } }) });
+    };
+    const prevChain = globalThis.Chain;
+    globalThis.Chain = { db: () => Promise.resolve(0), call: (_a, m, p) => Promise.resolve(
+      m === "get_objects" ? [{ id: p[0][0], owner: "1.2.654" }] : []) };
+    const res = await AccountNet.creditOwners({ offerId: ["1.21.77"] });
+    globalThis.Chain = prevChain;
+    if (prevFetch !== undefined) globalThis.fetch = prevFetch; else delete globalThis.fetch;
+    eq(res.offer["1.21.77"], "1.2.654", "an owner field (index drift) resolves too");
+  }
+
   // 23b. a chain failure during the join degrades to "missing", never a guess
   {
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = function () {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: [] } }) });
+    };
     const prevChain = globalThis.Chain;
     globalThis.Chain = { db: () => Promise.reject(new Error("nc")), call: () => Promise.reject(new Error("nc")) };
     const res = await AccountNet.creditOwners({ offerId: ["1.21.3"] });
     globalThis.Chain = prevChain;
+    if (prevFetch !== undefined) globalThis.fetch = prevFetch; else delete globalThis.fetch;
     eq(Object.keys(res.offer).length, 0, "a failed join resolves no owners");
     eq(res.missing.join(","), "1.21.3", "a failed join reports the reference as missing");
+  }
+
+  // 23c. The INDEX fallback: a DELETED deal/offer (get_objects -> [null]) is
+  // still resolvable, because the create operation carries the id it minted.
+  // Real shapes: op 72 result_object.data_object.new_objects = ["1.22.0"],
+  // op 69 result_object.data_string = "1.21.0" (+ op_object.owner_account).
+  {
+    const prevFetch = globalThis.fetch;
+    globalThis.fetch = function (url, opts) {
+      const body = JSON.parse(String(opts.body));
+      const flt = JSON.stringify(body.query);
+      let hits = [];
+      if (flt.indexOf('new_objects.keyword":["1.22.0"]') !== -1) {
+        hits = [{ sort: [1], _source: { operation_type: 72, operation_history: {
+          op_object: { borrower: "1.2.1804436", offer_id: "1.21.3" },
+          operation_result_object: { which: 5, data_object: {
+            impacted_accounts: ["1.2.1700686"], new_objects: ["1.22.0"] } } } } }];
+      } else if (flt.indexOf('data_string.keyword":["1.21.3"]') !== -1) {
+        hits = [{ sort: [2], _source: { operation_type: 69, operation_history: {
+          op_object: { owner_account: "1.2.1700686", asset_type: "1.3.0" },
+          operation_result_object: { which: 1, data_string: "1.21.3" } } } }];
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: hits } }) });
+    };
+    /* Chain knows NOTHING (objects deleted). */
+    const prevChain = globalThis.Chain;
+    globalThis.Chain = { db: () => Promise.resolve(0), call: () => Promise.resolve([null]) };
+    const res = await AccountNet.creditOwners({ offerId: ["1.21.3"], dealId: ["1.22.0"] });
+    globalThis.Chain = prevChain;
+    if (prevFetch !== undefined) globalThis.fetch = prevFetch; else delete globalThis.fetch;
+    eq(res.offer["1.21.3"], "1.2.1700686", "a deleted offer resolves from its create operation");
+    eq(res.deal["1.22.0"], "1.2.1700686", "a deleted deal resolves from the accept operation");
+    eq(res.missing.length, 0, "nothing is reported missing when the index answers");
+    ok(res.viaIndex.offers + res.viaIndex.deals >= 1, "the index-sourced resolutions are counted for disclosure");
   }
 
   // 24. gather: unknown seeds are reported, known ones still draw

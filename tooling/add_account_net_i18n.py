@@ -52,6 +52,7 @@ NEW_KEYS = {
     "account_net.status_edge_cap": "top %(n)s lines shown",
     "account_net.status_self": "%(n)s self-transfers skipped",
     "account_net.status_shape": "%(n)s unreadable entries skipped",
+    "account_net.status_credit_index": "%(n)s credit lines resolved from the index (their offer or deal object is gone from chain)",
     "account_net.status_credit_missing": "%(n)s credit lines skipped (offer or deal not found on chain)",
     "account_net.status_unknown": "not found: %(names)s",
     # ---- detail line ----
