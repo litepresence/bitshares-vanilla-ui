@@ -8,6 +8,8 @@
  */
 declare var AboutUI: any;
 declare var Account: any;
+declare var AccountNet: any;
+declare var AccountNetworkUI: any;
 declare var AccountUI: any;
 declare var AccountsUI: any;
 declare var ApiLab: any;
