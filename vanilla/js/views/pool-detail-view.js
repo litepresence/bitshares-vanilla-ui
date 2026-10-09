@@ -616,29 +616,37 @@ PoolDetailUI._view = PoolDetailUI._view || {};
      * (state.redraw/state.paintNote precedent) so deepenPool's adopted-tape
      * callbacks — which live outside this closure — route the same way. */
     function repaintForMode() {
-      P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
+      P._deepDone = false; P.esBuckets = null; P._deepBucket = null; P._deepKey = null; P._deepCapped = false;
       if (P.discrete) { rebucketDiscrete(); return; }
       rebucket();
       deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
     }
     try { P.repaintForMode = repaintForMode; } catch (e) { /* callbacks fall back to bucketed */ }
     function rebucket() {
-      /* Lazy-deep merge (2026-10-01 audit): background ES buckets cached by
-       * deepenPool merge UNDER chain authority (fresh P.swaps win every
-       * overlap — same chain-wins rule as the market desk). Bucket-keyed:
-       * a timeframe switch resets the cache, so stale-bucket merges are
-       * impossible. MarketFills missing -> chain buckets stand. */
+      /* Lazy-deep merge (2026-10-01 audit; window-corrected 2026-10-08):
+       * background ES buckets cached by deepenPool merge UNDER chain
+       * authority (fresh P.swaps win every overlap — same chain-wins rule as
+       * the market desk). The cache is keyed by bucket AND count
+       * (`_deepKey`): a timeframe or count change invalidates it, so the
+       * window plotted can never come from a fetch sized for another
+       * request. MarketFills missing -> chain buckets stand. */
       var vv = orientVol();
       /* Live candle window for the merge + slice below (shared input, read
        * fresh every rebucket — a count edit re-windows without refetch). */
-      var pnMerge = 2000;
+      var pn = 2000;
       try {
-        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) pnMerge = MarketInd.CANDLE_COUNT;
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) pn = MarketInd.CANDLE_COUNT;
       } catch (e) { /* default stands */ }
+      var pnMerge = pn;
       var chainBuckets = PoolHistory.swapsToCandles(P.swaps, P.bucket, vv.asset, vv.prec);
       var buckets = chainBuckets;
       try {
+        /* Merge only from a deep cached for THIS window; until the matching
+         * walk lands, chain buckets stand (a short honest chart beats a
+         * stale-window one). */
+        var wantKey = String(P.bucket) + "|" + String(pn);
         if (P.esBuckets && P.esBuckets.length && P._deepBucket === P.bucket &&
+            P._deepKey === wantKey &&
             typeof MarketFills !== "undefined" && MarketFills && typeof MarketFills.mergeDeep === "function") {
           /* Cap is the LIVE count, never a literal: a hardcoded 2000 would
            * truncate a 5000-wide request to 2000 merged buckets. */
@@ -648,16 +656,18 @@ PoolDetailUI._view = PoolDetailUI._view || {};
       /* Candle window (shared input): pools build from the swap tape, so
        * the count applies as a trailing slice, not a fetch window. */
       try {
-        var pn = 2000;
-        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) pn = MarketInd.CANDLE_COUNT;
         if (Array.isArray(buckets) && buckets.length > pn) buckets = buckets.slice(buckets.length - pn);
       } catch (e) { /* full tape stands */ }
       P.candles = { buckets: buckets };
       try { MarketInd.maybeDraw(P); } catch (e) { /* note below carries it */ }
       try {
         var liveSuffix = (typeof poolLive !== "undefined" && poolLive && poolLive.live) ? " · live" : "";
+        /* Truncation honesty (2026-10-08): a deep walk that ended on its
+         * page/event/wall-clock budget says so — otherwise a capped window
+         * reads exactly like "the pool only ever traded that much". */
+        if (P._deepCapped) liveSuffix += " · " + t("pool_detail.candle_capped", "window truncated");
         /* Plotted-bucket honesty (exchange-desk precedent): the tape is
-         * bounded (500 chain / 1000 ES swaps), so wide windows legitimately
+         * bounded (500 chain / deep ES window), so wide windows legitimately
          * hold fewer buckets than requested — the note states plotted AND
          * requested, never the request alone. */
         var plottedN = Array.isArray(buckets) ? buckets.length : 0;
@@ -807,18 +817,30 @@ PoolDetailUI._view = PoolDetailUI._view || {};
   }
 
   /* deepenPool: background ES depth for the pool chart (lazy-deep, 2026-10-01
-   * audit). The desk above already painted chain-first; this fetches the ES
-   * tape ONCE per bucket (2 pages / 1000 events max, ~1.5MB worst, typically
-   * 1 page — measured) and caches its candles for rebucket() to merge under
-   * chain authority. Tape rows stay chain (like the market desk's Recent
-   * tab); only the chart gains depth, and the source line flips to the
-   * existing community-index key. A chain-empty desk (lagging history api)
-   * also fills its tape + history list here. Any failure or empty ES page
-   * keeps the chain paint — never throws outward. No new i18n keys. */
+   * audit; window-corrected 2026-10-08). The desk above already painted
+   * chain-first; this walks the community index in the BACKGROUND until the
+   * candles' own time span (bucket x count) is covered, then caches its
+   * candles for rebucket() to merge under chain authority.
+   *
+   * 2026-10-08 fix — "the chart stops at June": this used to ask for a flat
+   * 1000 newest swaps, and 1000 events span TIME, not candles — on pool
+   * 1.19.2 that was 2026-05-19..2026-10-08 (142 days, measured), so 2000
+   * daily candles painted ~140 and stopped on EVERY timeframe. The adapter
+   * now takes the span (swapsForPoolWindow) and pages until it is covered;
+   * the cache key below includes the count so a count edit re-deepens
+   * instead of reusing a window sized for the old request. A budget-capped
+   * walk (ES pages/events/wall clock) sets P._deepCapped, which rebucket
+   * reports honestly rather than implying the pool has no older swaps.
+   *
+   * Tape rows stay chain (like the market desk's Recent tab); only the chart
+   * gains depth, and the source line flips to the existing community-index
+   * key. A chain-empty desk (lagging history api) also fills its tape +
+   * history list here. Any failure or empty ES page keeps the chain paint —
+   * never throws outward. */
   function deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook) {
     try {
       if (P._deepFlight || P._deepDone) return;
-      if (typeof PoolHistory === "undefined" || !PoolHistory || typeof PoolHistory.swapsForPool !== "function") return;
+      if (typeof PoolHistory === "undefined" || !PoolHistory || typeof PoolHistory.swapsForPoolWindow !== "function") return;
       var net = "mainnet";
       try {
         if (typeof Store !== "undefined" && Store && typeof Store.loadSettings === "function") {
@@ -827,64 +849,98 @@ PoolDetailUI._view = PoolDetailUI._view || {};
         }
       } catch (e) { /* mainnet default stands */ }
       if (net !== "mainnet") return;
+      /* The span these candles need, in SECONDS (bucket x count) — read
+       * through the same MarketInd.CANDLE_COUNT the merge + slice use, so
+       * the fetched window can never drift from the plotted window. */
+      var deepCount = 2000;
+      try {
+        if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) deepCount = MarketInd.CANDLE_COUNT;
+      } catch (e) { /* default stands */ }
+      var deepKey = String(P.bucket) + "|" + String(deepCount);
+      if (P._deepKey === deepKey) return;
       P._deepFlight = true;
-      PoolHistory.swapsForPool(r.id, 1000, { network: net, legA: r.asset_a_id, legB: r.asset_b_id }).then(function (res) {
+      /* Progressive paint: adopt every page the walk delivers (onPage), not
+       * only its final result. A 2000-daily-candle window is 60k+ swaps and
+       * tens of seconds (measured 2026-10-08); painting per page means the
+       * chart visibly deepens instead of sitting at the chain-only tape.
+       * `adopt` is the single place buckets are built + merged, so the
+       * in-flight pages and the terminal result take identical code. */
+      function adopt(swaps, meta) {
+        if (!live(myGen, uiGen)) return;
+        if (P.discrete) return;
+        if (!swaps || !swaps.length) return;
+        /* Orientation-bound (invert wiring): the ES tape enriches + buckets
+         * on the current legs, never a cached orientation. Copy first — the
+         * walk owns its array. */
+        var tape = swaps.slice();
+        try {
+          if (P.inverted) PoolHistory.enrich(tape, r.asset_b_id, precOr5(r.prec_b), r.asset_a_id, precOr5(r.prec_a));
+          else PoolHistory.enrich(tape, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b));
+        } catch (e) { /* tape renders unpriced */ }
+        var esBuckets = [];
+        try {
+          var ev = P.inverted ? { asset: r.asset_a_id, prec: precOr5(r.prec_a) } : { asset: r.asset_b_id, prec: precOr5(r.prec_b) };
+          esBuckets = PoolHistory.swapsToCandles(tape, P.bucket, ev.asset, ev.prec);
+        } catch (e) { esBuckets = []; }
+        if (!esBuckets.length) return;
+        /* Mid-walk pages are marked with the key they belong to, so rebucket
+         * merges them under chain authority immediately; only the terminal
+         * page seals _deepKey/_deepDone. */
+        P.esBuckets = esBuckets;
+        P._deepBucket = P.bucket;
+        P._deepKey = deepKey;
+        P._deepCapped = !!(meta && meta.capped);
+        if (meta && meta.done) P._deepDone = true;
+        try { rebucket(); } catch (e) { /* chain paint stands */ }
+        if (!P.swaps.length && meta && meta.done) adoptTapeList(tape);
+      }
+      function adoptTapeList(tape) {
+        /* Chain was empty (lagging history api): adopt the ES tape for the
+         * list too (cap like the live tip), then paint timeframes + chart.
+         * Live-tip stays off here — parity with the old empty-tape path,
+         * which never reached the watchHead setup either. */
+        P.swaps = tape.slice(0, 500);
+        try {
+          MarketInd.paintTimeframes(doc, P, function () {
+            if (!live(myGen, uiGen)) return;
+            /* Mode router rides P (state.redraw/state.paintNote precedent):
+             * chartPane assigns it below; the fallback preserves the old
+             * bucketed behavior when absent. */
+            if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
+            P._deepDone = false; P.esBuckets = null; P._deepBucket = null; P._deepKey = null; P._deepCapped = false;
+            rebucket();
+            deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+          });
+          if (typeof MarketInd.paintCountInput === "function") {
+            MarketInd.paintCountInput(doc, P, function () {
+              if (!live(myGen, uiGen)) return;
+              if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
+              P._deepDone = false; P.esBuckets = null; P._deepBucket = null; P._deepKey = null; P._deepCapped = false;
+              rebucket();
+              deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
+            });
+          }
+        } catch (e) { /* default bucket stands */ }
+        try {
+          if (histHook && typeof histHook.setTape === "function") histHook.setTape(P.swaps, "es");
+        } catch (e) { /* chart below still paints */ }
+        P._tapeSource = "es";
+      }
+      PoolHistory.swapsForPoolWindow(r.id, P.bucket * deepCount, {
+        network: net, legA: r.asset_a_id, legB: r.asset_b_id, onPage: adopt
+      }).then(function (res) {
         P._deepFlight = false;
         if (!live(myGen, uiGen)) return;
         /* A deepen flight landing while Discrete is active stands down:
          * the raw tape IS the source and ES depth is meaningless there.
          * Returning to buckets re-runs deepen through repaintForMode. */
         if (P.discrete) return;
-        var swaps = (res && res.swaps) || [];
-        if (!swaps.length) return;
-        /* Orientation-bound (invert wiring): the ES tape enriches + buckets
-         * on the current legs, never a cached orientation. */
-        try {
-          if (P.inverted) PoolHistory.enrich(swaps, r.asset_b_id, precOr5(r.prec_b), r.asset_a_id, precOr5(r.prec_a));
-          else PoolHistory.enrich(swaps, r.asset_a_id, precOr5(r.prec_a), r.asset_b_id, precOr5(r.prec_b));
-        } catch (e) { /* tape renders unpriced */ }
-        var esBuckets = [];
-        try {
-          var ev = P.inverted ? { asset: r.asset_a_id, prec: precOr5(r.prec_a) } : { asset: r.asset_b_id, prec: precOr5(r.prec_b) };
-          esBuckets = PoolHistory.swapsToCandles(swaps, P.bucket, ev.asset, ev.prec);
-        } catch (e) { esBuckets = []; }
-        if (!esBuckets.length) return;
-        if (!P.swaps.length) {
-          /* Chain was empty (lagging history api): adopt the ES tape for the
-           * list too (cap like the live tip), then paint timeframes + chart.
-           * Live-tip stays off here — parity with the old empty-tape path,
-           * which never reached the watchHead setup either. */
-          P.swaps = swaps.slice(0, 500);
-          try {
-            MarketInd.paintTimeframes(doc, P, function () {
-              if (!live(myGen, uiGen)) return;
-              /* Mode router rides P (state.redraw/state.paintNote precedent):
-               * chartPane assigns it below; the fallback preserves the old
-               * bucketed behavior when absent. */
-              if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
-              P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
-              rebucket();
-              deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
-            });
-            if (typeof MarketInd.paintCountInput === "function") {
-              MarketInd.paintCountInput(doc, P, function () {
-                if (!live(myGen, uiGen)) return;
-                if (typeof P.repaintForMode === "function") { P.repaintForMode(); return; }
-                P._deepDone = false; P.esBuckets = null; P._deepBucket = null;
-                rebucket();
-                deepenPool(doc, P, r, note, myGen, uiGen, rebucket, histHook);
-              });
-            }
-          } catch (e) { /* default bucket stands */ }
-          try {
-            if (histHook && typeof histHook.setTape === "function") histHook.setTape(P.swaps, "es");
-          } catch (e) { /* chart below still paints */ }
-          P._tapeSource = "es";
-        }
-        P.esBuckets = esBuckets;
-        P._deepBucket = P.bucket;
-        P._deepDone = true;
-        try { rebucket(); } catch (e) { /* chain paint stands */ }
+        /* The walk already painted each page through adopt(); the terminal
+         * pass only seals the flags and the source line. `res.capped` marks
+         * a walk that ended on its budget rather than on coverage — rebucket
+         * discloses it so a truncated window is never mistaken for "this is
+         * all the pool has". */
+        adopt((res && res.swaps) || [], { pages: res && res.pages, capped: !!(res && res.capped), done: true });
         try { note.textContent = P.swaps.length + " swaps. " + t("pool.hist_source_es", "Swap history via community index."); } catch (e) { /* count stands */ }
       }).catch(function () { P._deepFlight = false; /* chain paint stands */ });
     } catch (e) { /* deep is best-effort */ }

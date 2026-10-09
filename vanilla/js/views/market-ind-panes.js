@@ -545,15 +545,24 @@ MarketInd._panes = MarketInd._panes || {};
             actual = state.candles.buckets.length;
           }
         } catch (e) { actual = -1; }
+        var text;
         if (actual >= 0 && actual < CANDLE_COUNT) {
-          state.countNote.textContent = t("market_ind.count_partial",
+          text = t("market_ind.count_partial",
             "%(actual)s of %(requested)s × %(bucket)s candles",
             { actual: String(actual), requested: String(CANDLE_COUNT), bucket: bucketLabel(state.bucket) });
         } else {
-          state.countNote.textContent = t("market_ind.count_note",
+          text = t("market_ind.count_note",
             "%(count)s × %(bucket)s candles",
             { count: String(CANDLE_COUNT), bucket: bucketLabel(state.bucket) });
         }
+        /* Truncation disclosure (2026-10-08): when the ES walk behind a deep
+         * paint ended on its page/event/wall-clock budget, the window is
+         * short of the request — say so, or a capped walk reads exactly like
+         * "the market never traded further back". */
+        try {
+          if (state.deepCapped) text += " · " + t("market_ind.count_capped", "window truncated");
+        } catch (e) { /* note stands without the suffix */ }
+        state.countNote.textContent = text;
       }
     }
   }

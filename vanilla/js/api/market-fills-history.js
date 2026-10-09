@@ -50,6 +50,37 @@ var MarketFills = (function () {
   var ES_MAX_PAGES = 2;
   var ES_MAX_EVENTS = 1000;
 
+  /* Deep-window walk (2026-10-08 audit — "the chart stops at June").
+   *
+   * WHY: the caps above bound EVENTS, not TIME. 1000 newest fills is
+   * however much wall-clock that happens to be — for a quiet pair a few
+   * days, so a 2000-candle request could never be served no matter what the
+   * timeframe was (BTS/CNY 1h measured 1623 of 2000; 1D 1502; 1W 575 —
+   * the ES side could never go deeper than its 1000 fills).
+   *
+   * HOW (reference pattern — squidKid-deluxe/BitShares-Historical-Charts
+   * books.js + main.js:214-261): compute the span the candles need
+   * (bucket * count), push it into the query as a block_data.block_time
+   * RANGE, and page with search_after until that SPAN IS COVERED rather
+   * than until an event count runs out.
+   *
+   * ES_DEEP_SIZE is 10000 because that is the index's hard ceiling:
+   * measured 2026-10-08, `size: 20000` returns HTTP 200 with ZERO hits —
+   * a silent data-loss trap. Depth is bought with paging, never size.
+   *
+   * Budgets stay bounded and honest: page/event ceilings plus a wall clock,
+   * and `capped` marks a walk that ended before coverage so the caller can
+   * SAY the window was truncated. Foreground never waits on this
+   * (lazy-deep: candles paint chain-first, this runs background-only). */
+  var ES_DEEP_SIZE = 10000;
+  var ES_DEEP_MAX_PAGES = 8;
+  var ES_DEEP_MAX_EVENTS = 80000;
+  /* 60s, not the shallow adapter's 15s: a wide request (2000 weekly candles
+   * = years of fills) is legitimately slow background work. It stays lazy,
+   * cancellable and disclosed, and callers paint every page as it lands
+   * (opts.onPage) so the chart GROWS while the walk runs. */
+  var ES_DEEP_TIMEOUT_MS = 60000;
+
   /* Fixed decimals for BigInt price strings (follows #1 Price.toReal
    * reward `parseFloat(real.toFixed(8))`, MarketClasses.js:284). Kept as the
    * empty/zero-only fallback — live ES candles use the magnitude-aware places
@@ -117,6 +148,50 @@ var MarketFills = (function () {
     };
     if (searchAfter) q.search_after = searchAfter;
     return q;
+  }
+
+  /* Deep-window query: esQuery + the block_data.block_time RANGE that makes
+   * the window WIDE instead of shallow, and ES_DEEP_SIZE per page. Range
+   * bounds are ISO strings on the same field the query already sorts on (so
+   * it is mapped); `format: strict_date_optional_time` mirrors the reference
+   * books.js. startMs = window floor, searchAfter = previous page's last
+   * sort (verbatim). */
+  function esQueryDeep(baseSym, quoteSym, startMs, searchAfter) {
+    var q = {
+      track_total_hits: false,
+      sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
+      size: ES_DEEP_SIZE,
+      _source: ["account_history", "operation_history", "operation_type", "block_data"],
+      query: {
+        bool: {
+          filter: [
+            { match: { operation_type: "4" } },
+            { multi_match: { type: "best_fields", query: String(baseSym), lenient: true } },
+            { multi_match: { type: "best_fields", query: String(quoteSym), lenient: true } },
+            { multi_match: { type: "best_fields", query: "operation_history.op_object.is_maker : false", lenient: true } },
+            {
+              range: {
+                "block_data.block_time": {
+                  format: "strict_date_optional_time",
+                  gte: _iso(startMs),
+                  lte: _iso(Date.now())
+                }
+              }
+            }
+          ]
+        }
+      }
+    };
+    if (searchAfter) q.search_after = searchAfter;
+    return q;
+  }
+
+  /* epoch ms -> ISO string (search bounds only; a non-numeric value reads
+   * as epoch, which ES treats as "no floor" rather than an error). */
+  function _iso(ms) {
+    var n = Number(ms);
+    if (!isFinite(n)) return new Date(0).toISOString();
+    return new Date(n).toISOString();
   }
 
   /* One ES hit -> normalized fill {time, paid, received} or null. The ES
@@ -244,6 +319,101 @@ var MarketFills = (function () {
     });
   }
 
+  /* esFillsWindow: deep-window ES walk for candles that need TIME, not a
+   * fixed event count. coverSec = the span the candles must cover
+   * (bucket * count), so the walk pages until the oldest fetched fill is at
+   * least that far back instead of stopping at 1000 events.
+   * Resolves {fills (newest first), source:"es", pages, capped}; `capped`
+   * means a budget ended the walk before coverage (the caller discloses it),
+   * false means full coverage or an exhausted range (both complete).
+   * Coverage is measured from the PARSED fills' own .time, never from the
+   * hit's `sort` value: on the live index sort[0] is epoch MILLIS
+   * (measured 2026-10-08) and Date.parse() of that is NaN.
+   * Rejects only on seam/shape failure (caller falls back to chain); a
+   * mid-walk page failure keeps what was already fetched. */
+  function esFillsWindow(baseId, quoteId, coverSec, opts) {
+    assertMarketIds(baseId, quoteId);
+    opts = opts || {};
+    var coverMs = Math.floor(Number(coverSec) * 1000);
+    if (!(coverMs > 0)) coverMs = 0;
+    var maxPages = opts.maxPages ? Math.floor(Number(opts.maxPages)) : ES_DEEP_MAX_PAGES;
+    if (!(maxPages >= 1)) maxPages = ES_DEEP_MAX_PAGES;
+    var maxEvents = opts.maxEvents ? Math.floor(Number(opts.maxEvents)) : ES_DEEP_MAX_EVENTS;
+    if (!(maxEvents >= 1)) maxEvents = ES_DEEP_MAX_EVENTS;
+    var budgetMs = opts.timeoutMs ? Math.floor(Number(opts.timeoutMs)) : ES_DEEP_TIMEOUT_MS;
+    if (!(budgetMs > 0)) budgetMs = ES_DEEP_TIMEOUT_MS;
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var deadline = Date.now() + budgetMs;
+      var out = [];
+      var searchAfter = null;
+      var pages = 0;
+      var capped = false;
+      var oldestMs = null;
+      function finish() {
+        if (done) return; done = true;
+        /* Final hand-off: the last page's paint above plus the terminal
+         * flags (capped = the walk ended on a budget, not on coverage). */
+        if (typeof opts.onPage === "function") {
+          try { opts.onPage({ fills: out.slice(), pages: pages, capped: capped, done: true }); } catch (e) { /* painter is optional */ }
+        }
+        resolve({ fills: out, source: "es", pages: pages, capped: capped });
+      }
+      function fail(e) {
+        if (done) return; done = true;
+        reject(e instanceof Error ? e : new Error("es-unavailable"));
+      }
+      /* Coverage reached? Only a real, parsed, strictly older fill counts —
+       * an unparseable time must never end the walk with a false "full". */
+      function covered() {
+        return coverMs > 0 && oldestMs !== null && (Date.now() - oldestMs) >= coverMs;
+      }
+      try {
+        var HC = _historyCap();
+        if (!HC) { fail(new Error("no history-cap")); return; }
+        var startMs = Date.now() - coverMs;
+        function fetchPage() {
+          if (done) return;
+          if (pages >= maxPages || out.length >= maxEvents) { capped = true; finish(); return; }
+          if (covered()) { finish(); return; }
+          var remain = deadline - Date.now();
+          if (remain <= 0) { capped = out.length > 0; finish(); return; }
+          HC.esSearch("bitshares-*", esQueryDeep(baseId, quoteId, startMs, searchAfter), { timeoutMs: remain }).then(function (data) {
+            if (done) return;
+            var hits = (data && data.hits && data.hits.hits) || [];
+            for (var i = 0; i < hits.length && out.length < maxEvents; i++) {
+              var f = esFill(hits[i], baseId, quoteId);
+              if (!f || !f.time) continue;
+              out.push(f);
+              var t = Date.parse(f.time);
+              if (isFinite(t) && (oldestMs === null || t < oldestMs)) oldestMs = t;
+            }
+            pages++;
+            /* Progressive paint (2026-10-08): hand the caller what we have
+             * after EVERY page so the chart deepens while the walk runs —
+             * a 2000-candle window can take minutes, and showing it only at
+             * the end means staring at a short chart the whole time. */
+            if (typeof opts.onPage === "function") {
+              try { opts.onPage({ fills: out.slice(), pages: pages, capped: false, done: false }); } catch (e) { /* painter is optional */ }
+            }
+            if (hits.length < ES_DEEP_SIZE) { finish(); return; }
+            if (out.length >= maxEvents) { capped = true; finish(); return; }
+            var last = hits[hits.length - 1];
+            if (!last || !last.sort) { capped = true; finish(); return; }
+            searchAfter = last.sort;
+            fetchPage();
+          }).catch(function (e) {
+            /* Mid-walk failure keeps the pages already paid for; page 1
+             * failure rejects so the caller can fall back to chain. */
+            if (out.length) { capped = true; finish(); }
+            else fail(e);
+          });
+        }
+        fetchPage();
+      } catch (e) { fail(e); }
+    });
+  }
+
   /* One chain row (order_history object: op.pays/receives + time) ->
    * normalized fill or null. Maker fills skip (same rule as #1
    * MarketsStore activeMarketHistory: taker-only, no double-count). */
@@ -298,6 +468,32 @@ var MarketFills = (function () {
     if (opts.network && opts.network !== "mainnet") return chain();
     if (!_esOn()) return chain();
     return esFills(baseId, quoteId, lim).then(function (res) {
+      if (res.fills.length) return res;
+      return chain();
+    }).catch(chain);
+  }
+
+  /* fillsForMarketWindow: fillsForMarket's deep twin — same mainnet /
+   * ES-pref contract, but the ES side walks until coverSec of HISTORY is in
+   * hand (esFillsWindow) instead of until 1000 events run out. Chain
+   * fallback stays the authority and stays shallow (get_fill_order_history
+   * is capped by the node); the window is an ES-only enrichment, exactly as
+   * the deepen path was before. Resolves {fills, source, pages, capped};
+   * never rejects except bad ids / both paths down. */
+  function fillsForMarketWindow(baseId, quoteId, coverSec, opts) {
+    assertMarketIds(baseId, quoteId);
+    opts = opts || {};
+    var lim = opts.chainLimit === undefined ? 100 : opts.chainLimit;
+    function chain() {
+      return chainFills(baseId, quoteId, lim).then(function (res) {
+        res.pages = 0;
+        res.capped = false;
+        return res;
+      });
+    }
+    if (opts.network && opts.network !== "mainnet") return chain();
+    if (!_esOn()) return chain();
+    return esFillsWindow(baseId, quoteId, coverSec, opts).then(function (res) {
       if (res.fills.length) return res;
       return chain();
     }).catch(chain);
@@ -510,9 +706,12 @@ var MarketFills = (function () {
     fillsForMarket: fillsForMarket, fillsToCandles: fillsToCandles, fillsToPoints: fillsToPoints, mergeDeep: mergeDeep,
     esQuery: esQuery, esFill: esFill, priceHuman: priceHuman,
     chainFills: chainFills, esFills: esFills,
+    fillsForMarketWindow: fillsForMarketWindow, esFillsWindow: esFillsWindow,
     ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS, ES_SIZE: ES_SIZE,
     ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
-    _test: { esQuery: esQuery, esFill: esFill, chainRow: chainRow }
+    ES_DEEP_SIZE: ES_DEEP_SIZE, ES_DEEP_MAX_PAGES: ES_DEEP_MAX_PAGES,
+    ES_DEEP_MAX_EVENTS: ES_DEEP_MAX_EVENTS, ES_DEEP_TIMEOUT_MS: ES_DEEP_TIMEOUT_MS,
+    _test: { esQuery: esQuery, esQueryDeep: esQueryDeep, esFill: esFill, chainRow: chainRow }
   };
 })();
 

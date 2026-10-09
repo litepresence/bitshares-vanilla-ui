@@ -41,6 +41,40 @@ var PoolHistory = (function () {
   var ES_MAX_PAGES = 2;
   var ES_MAX_EVENTS = 1000;
 
+  /* Deep-window walk (2026-10-08 audit — the "chart stops at June" bug).
+   *
+   * WHY: the caps above bound EVENTS, not TIME. A 1000-event newest-first
+   * walk on a sparse pool spans only months — measured on pool 1.19.2:
+   * 1000 swaps covered 2026-05-19..2026-10-08 (142 days), so a 2000-daily
+   * candle request painted ~140 candles and stopped, on EVERY timeframe,
+   * because the window never widened. The index actually holds 69,722
+   * swaps for that pool back to 2021-04-18 (measured 2026-10-08).
+   *
+   * HOW (reference pattern — squidKid-deluxe/BitShares-Historical-Charts
+   * pools.js:2-49 + main.js:214-261): compute the span the request needs
+   * (bucket * count), push it into the query as a block_data.block_time
+   * RANGE, and page with search_after until the SPAN IS COVERED rather
+   * than until an event count runs out.
+   *
+   * ES_DEEP_SIZE is 10000 because that is the index's hard ceiling:
+   * measured 2026-10-08, `size: 20000` returns HTTP 200 with ZERO hits —
+   * a silent data loss trap, so depth is bought with paging, never size.
+   *
+   * Budgets keep it honest and bounded: ES_DEEP_MAX_PAGES (80k events),
+   * ES_DEEP_MAX_EVENTS, ES_DEEP_TIMEOUT_MS wall clock. Hitting one sets
+   * `capped` so the chart can SAY the window was truncated instead of
+   * pretending the pool only ever traded that much. Foreground never waits
+   * on this (lazy-deep: chain paint first, walk in background). */
+  var ES_DEEP_SIZE = 10000;
+  var ES_DEEP_MAX_PAGES = 8;
+  var ES_DEEP_MAX_EVENTS = 80000;
+  /* 60s, not the shallow adapter's 15s: a wide request (2000 daily candles
+   * on an active pool = 60k+ swaps, measured 2026-10-08) is legitimately
+   * minutes of background work. It stays lazy, cancellable and disclosed,
+   * and callers paint every page as it lands (opts.onPage), so the chart
+   * GROWS while the walk runs instead of sitting short until the end. */
+  var ES_DEEP_TIMEOUT_MS = 60000;
+
   /* Fixed decimals for BigInt-computed price strings (follows #1's
    * Price.toReal reward — `parseFloat(real.toFixed(8))`,
    * MarketClasses.js:284). Kept as the default — sub-satoshi tapes use the
@@ -103,6 +137,53 @@ var PoolHistory = (function () {
     };
     if (searchAfter) q.search_after = searchAfter;
     return q;
+  }
+
+  /* Deep-window query: esQuery + the block_data.block_time RANGE that makes
+   * the window WIDE instead of shallow, and ES_DEEP_SIZE per page.
+   * Range bounds are ISO strings (the same field/sort the shallow query
+   * already uses, so it is mapped — `format: strict_date_optional_time`
+   * mirrors the reference pools.js:32-38). Narrow _source: the deep walk
+   * only ever reads op_object + operation_result_object + block_data, and
+   * dropping account_history halves the page (measured 2026-10-08: 2.05MB
+   * vs 4.11MB per 10k-hit page, 100% parse rate either way).
+   * startMs (optional): floor of the window. searchAfter (optional): the
+   * previous page's last sort, verbatim. */
+  function esQueryDeep(poolId, startMs, searchAfter) {
+    var q = {
+      track_total_hits: false,
+      sort: [{ "block_data.block_time": { order: "desc", unmapped_type: "boolean" } }],
+      size: ES_DEEP_SIZE,
+      _source: ["operation_history.operation_result_object", "operation_history.op_object", "operation_type", "block_data"],
+      query: {
+        bool: {
+          filter: [
+            { match: { operation_type: "63" } },
+            { multi_match: { type: "best_fields", query: poolId, lenient: true } },
+            {
+              range: {
+                "block_data.block_time": {
+                  format: "strict_date_optional_time",
+                  gte: _iso(startMs),
+                  lte: _iso(Date.now())
+                }
+              }
+            }
+          ]
+        }
+      }
+    };
+    if (searchAfter) q.search_after = searchAfter;
+    return q;
+  }
+
+  /* epoch ms -> ISO string. ES date math here is display-independent (the
+   * range bounds only ever steer the search); undefined -> epoch, which ES
+   * reads as "no floor" rather than an error. */
+  function _iso(ms) {
+    var n = Number(ms);
+    if (!isFinite(n)) return new Date(0).toISOString();
+    return new Date(n).toISOString();
   }
 
   /* One ES hit -> normalized swap. The ES text match is loose (pool ids
@@ -213,6 +294,102 @@ var PoolHistory = (function () {
     });
   }
 
+  /* esSwapsWindow: deep-window ES walk for a chart that needs TIME, not a
+   * fixed event count. coverSec = the span the candles must cover
+   * (bucket * count), so the walk pages until the oldest fetched swap is at
+   * least that far back, instead of stopping at 1000 events.
+   * Resolves {swaps (newest first), source:"es", pages, capped} —
+   * `capped` true means a budget (pages/events/wall clock) ended the walk
+   * before coverage, so the caller can say the window was truncated; false
+   * means either full coverage or an exhausted range (both complete).
+   * Coverage is measured from the PARSED swaps' own .time, never from the
+   * hit's `sort` value: on the live index sort[0] is epoch MILLIS
+   * (measured 2026-10-08), and Date.parse() of that is NaN.
+   * Rejects only on seam/shape failure (caller falls back to chain) — a
+   * partial walk never throws, it reports capped and keeps what it got. */
+  function esSwapsWindow(poolId, coverSec, opts) {
+    assertPoolId(poolId);
+    opts = opts || {};
+    var coverMs = Math.floor(Number(coverSec) * 1000);
+    if (!(coverMs > 0)) coverMs = 0;
+    var maxPages = opts.maxPages ? Math.floor(Number(opts.maxPages)) : ES_DEEP_MAX_PAGES;
+    if (!(maxPages >= 1)) maxPages = ES_DEEP_MAX_PAGES;
+    var maxEvents = opts.maxEvents ? Math.floor(Number(opts.maxEvents)) : ES_DEEP_MAX_EVENTS;
+    if (!(maxEvents >= 1)) maxEvents = ES_DEEP_MAX_EVENTS;
+    var budgetMs = opts.timeoutMs ? Math.floor(Number(opts.timeoutMs)) : ES_DEEP_TIMEOUT_MS;
+    if (!(budgetMs > 0)) budgetMs = ES_DEEP_TIMEOUT_MS;
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      var deadline = Date.now() + budgetMs;
+      var out = [];
+      var searchAfter = null;
+      var pages = 0;
+      var capped = false;
+      var oldestMs = null;
+      function finish() {
+        if (done) return; done = true;
+        /* Final hand-off: the last page's paint above plus the terminal
+         * flags (capped = the walk ended on a budget, not on coverage). */
+        if (typeof opts.onPage === "function") {
+          try { opts.onPage({ swaps: out.slice(), pages: pages, capped: capped, done: true }); } catch (e) { /* painter is optional */ }
+        }
+        resolve({ swaps: out, source: "es", pages: pages, capped: capped });
+      }
+      function fail(e) {
+        if (done) return; done = true;
+        reject(e instanceof Error ? e : new Error("es-unavailable"));
+      }
+      /* Coverage reached? Only a real, parsed, strictly older swap counts —
+       * an unparseable time never ends the walk early with a false "full". */
+      function covered() {
+        return coverMs > 0 && oldestMs !== null && (Date.now() - oldestMs) >= coverMs;
+      }
+      try {
+        var HC = _historyCap();
+        if (!HC) { fail(new Error("no history-cap")); return; }
+        var startMs = Date.now() - coverMs;
+        function fetchPage() {
+          if (done) return;
+          if (pages >= maxPages || out.length >= maxEvents) { capped = true; finish(); return; }
+          if (covered()) { finish(); return; }
+          var remain = deadline - Date.now();
+          if (remain <= 0) { capped = out.length > 0; finish(); return; }
+          HC.esSearch("bitshares-*", esQueryDeep(poolId, startMs, searchAfter), { timeoutMs: remain }).then(function (data) {
+            if (done) return;
+            var hits = (data && data.hits && data.hits.hits) || [];
+            for (var i = 0; i < hits.length && out.length < maxEvents; i++) {
+              var sw = esSwap(hits[i], poolId);
+              if (!sw || !sw.time) continue;
+              out.push(sw);
+              var t = Date.parse(sw.time);
+              if (isFinite(t) && (oldestMs === null || t < oldestMs)) oldestMs = t;
+            }
+            pages++;
+            /* Progressive paint (2026-10-08): hand the caller what we have
+             * after EVERY page so the chart deepens while the walk runs —
+             * a 2000-candle window can take minutes, and showing it only at
+             * the end means staring at a short chart the whole time. */
+            if (typeof opts.onPage === "function") {
+              try { opts.onPage({ swaps: out.slice(), pages: pages, capped: false, done: false }); } catch (e) { /* painter is optional */ }
+            }
+            if (hits.length < ES_DEEP_SIZE) { finish(); return; }
+            if (out.length >= maxEvents) { capped = true; finish(); return; }
+            var last = hits[hits.length - 1];
+            if (!last || !last.sort) { capped = true; finish(); return; }
+            searchAfter = last.sort;
+            fetchPage();
+          }).catch(function (e) {
+            /* A failed page mid-walk keeps the pages already fetched (the
+             * chart still deepens); a failure on page 1 rejects to chain. */
+            if (out.length) { capped = true; finish(); }
+            else fail(e);
+          });
+        }
+        fetchPage();
+      } catch (e) { fail(e); }
+    });
+  }
+
   /* Chain fallback: get_liquidity_pool_history rows (op + executed result,
    * proven live 2026-09-28) — newest first already. Pool filter is exact
    * (rows carry .pool). Rows without results are skipped, never guessed.
@@ -283,6 +460,34 @@ var PoolHistory = (function () {
     if (opts.network && opts.network !== "mainnet") return chain();
     if (!_esOn()) return chain();
     return esSwaps(poolId, lim).then(function (res) {
+      res.swaps = legs(res.swaps);
+      if (res.swaps.length) return res;
+      return chain();
+    }).catch(chain);
+  }
+
+  /* swapsForPoolWindow: swapsForPool's deep twin — same mainnet/ES-pref/
+   * leg-filter contract, but the ES side walks until coverSec of HISTORY is
+   * in hand (esSwapsWindow) instead of until 1000 events run out. Chain
+   * fallback stays the authority and stays shallow (the history api caps
+   * at 101 rows — the window is an ES-only enrichment, exactly as the
+   * deepen path was before). Resolves {swaps, source, pages, capped};
+   * never rejects except bad pool id / both paths down. */
+  function swapsForPoolWindow(poolId, coverSec, opts) {
+    assertPoolId(poolId);
+    opts = opts || {};
+    function legs(swaps) { return filterLegs(swaps, opts.legA, opts.legB); }
+    function chain() {
+      return chainSwaps(poolId, opts.chainLimit).then(function (res) {
+        res.swaps = legs(res.swaps);
+        res.pages = 0;
+        res.capped = false;
+        return res;
+      });
+    }
+    if (opts.network && opts.network !== "mainnet") return chain();
+    if (!_esOn()) return chain();
+    return esSwapsWindow(poolId, coverSec, opts).then(function (res) {
       res.swaps = legs(res.swaps);
       if (res.swaps.length) return res;
       return chain();
@@ -678,6 +883,7 @@ var PoolHistory = (function () {
 
   return {
     swapsForPool: swapsForPool, chainSwaps: chainSwaps, esSwaps: esSwaps,
+    swapsForPoolWindow: swapsForPoolWindow, esSwapsWindow: esSwapsWindow,
     poolsActive24h: poolsActive24h,
     poolSwapCounts: poolSwapCounts,
     readMinSwaps: readMinSwaps, writeMinSwaps: writeMinSwaps,
@@ -686,7 +892,9 @@ var PoolHistory = (function () {
     filterLegs: filterLegs,
     synthBook: synthBook, ES_URL: ES_URL, ES_TIMEOUT_MS: ES_TIMEOUT_MS,
     ES_SIZE: ES_SIZE, ES_MAX_PAGES: ES_MAX_PAGES, ES_MAX_EVENTS: ES_MAX_EVENTS,
-    _test: { esSwap: esSwap, esQuery: esQuery, esActiveQuery: esActiveQuery, filterLegs: filterLegs, SLICES: SLICES, countSwaps: countSwaps }
+    ES_DEEP_SIZE: ES_DEEP_SIZE, ES_DEEP_MAX_PAGES: ES_DEEP_MAX_PAGES,
+    ES_DEEP_MAX_EVENTS: ES_DEEP_MAX_EVENTS, ES_DEEP_TIMEOUT_MS: ES_DEEP_TIMEOUT_MS,
+    _test: { esSwap: esSwap, esQuery: esQuery, esQueryDeep: esQueryDeep, esActiveQuery: esActiveQuery, filterLegs: filterLegs, SLICES: SLICES, countSwaps: countSwaps }
   };
 })();
 

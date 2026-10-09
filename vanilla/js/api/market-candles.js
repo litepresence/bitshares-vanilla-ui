@@ -426,8 +426,12 @@ var MarketCandles = (function () {
      * mainnet-only); empty cache = chain-only with deep=false, never
      * a throw. */
     var deep = false;
+    var deepCapped = false;
     try {
-      var dkey = baseId + "|" + quoteId + "|" + bucket;
+      /* Key includes the count (deepen() caches per bucket+count): a count
+       * edit re-windows the merged output instead of reusing a span sized
+       * for the previous request. */
+      var dkey = baseId + "|" + quoteId + "|" + bucket + "|" + count;
       if (_deepCache && _deepCache.key === dkey &&
         Array.isArray(_deepCache.esBuckets) && _deepCache.esBuckets.length > 0 &&
         typeof MarketFills !== "undefined" && MarketFills &&
@@ -438,6 +442,9 @@ var MarketCandles = (function () {
           return isNaN(n) ? null : n; // pixels only, not money
         });
         deep = true;
+        /* A budget-capped walk leaves a short window; the desk note says so
+         * rather than implying the market has no older trades. */
+        deepCapped = !!_deepCache.capped;
       }
     } catch (e) { deep = false; /* cache merge never breaks chain paint */ }
     /* Merged-window places: the ES backfill may widen the range, so the
@@ -457,24 +464,44 @@ var MarketCandles = (function () {
         finalPlaces = _sigPlaces(mergedHumans);
       }
     } catch (e) { finalPlaces = places; }
-    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep, places: finalPlaces };
+    return { bucket: bucket, start: startISO, end: endISO, buckets: out, closes: closes, deep: deep, deepCapped: deepCapped, places: finalPlaces };
   }
 
   /* deepen: background ES backfill for one pair+bucket (lazy-deep, Playwright
    *   desk calls this ONCE per pair+bucket after the chain-first paint; the
    *   next candles() call merges the result under fresh chain authority).
-   * ES want is 1000 fills (2 pages max, ~1.4MB worst, typically 1 page —
-   *   measured 2026-10-01); the 2000-bucket window needs far fewer. Mainnet
-   *   only (community index is mainnet-only); any failure or empty ES page
+   *
+   *   Window-corrected 2026-10-08 — this used to ask for a flat 1000 fills,
+   *   which bounds EVENTS, not TIME: 1000 fills is however much wall-clock
+   *   that happens to be (BTS/CNY 1h 1623-of-2000, 1D 1502, 1W 575 measured —
+   *   the ES side could never go past its 1000 fills, so a wide request was
+   *   unreachable however the user set the count). It now walks the index
+   *   until the candles' own span (bucket * count) is covered
+   *   (MarketFills.fillsForMarketWindow) and carries the walk's `capped` flag
+   *   so a truncated window is disclosed instead of implied.
+   *
+   *   countSec = the candle count in force when the deepen started (the desk
+   *   passes the live input value; defaults to 2000). Mainnet only
+   *   (community index is mainnet-only); any failure or empty ES page
    *   resolves null and the desk keeps its chain-only paint — never rejects,
    *   never throws outward (bad bucket still throws like candles()).
-   * Returns {key, fills} on success (fills = raw ES fill count, newest
-   *   first) or null when there is nothing to merge. Pure side effect: one
-   *   _deepCache entry; no DOM, no storage. */
-  async function deepen(baseId, quoteId, bucketSec) {
+   *   Returns {key, fills, capped} on success or null when there is nothing
+   *   to merge. Pure side effect: one _deepCache entry; no DOM, no storage.
+   *
+   *   onPage (optional): called with "page N arrived" after every page, so
+   *   the desk can repaint while a minutes-long walk runs instead of
+   *   staring at the chain-only chart until it lands. The callback is given
+   *   no arguments (the cache is already updated — a repaint just re-reads
+   *   candles()); failures inside it never break the walk. */
+  async function deepen(baseId, quoteId, bucketSec, countSec, onPage) {
     var bucket = Math.floor(bucketSec);
     if (!(bucket >= 1)) throw new Error("bad-bucket");
-    var key = baseId + "|" + quoteId + "|" + bucket;
+    var want = Math.floor(Number(countSec));
+    if (!(want >= 1)) want = 2000;
+    /* Cache identity includes the count: a count edit asks for a different
+     * span, so reusing a window sized for the previous request would
+     * silently under-fill the chart. */
+    var key = baseId + "|" + quoteId + "|" + bucket + "|" + want;
     try {
       var net = "mainnet";
       try {
@@ -489,16 +516,38 @@ var MarketCandles = (function () {
       }
       if (_deepCache && _deepCache.key === key) return null; // already deep
       if (typeof MarketFills === "undefined" || !MarketFills ||
-        typeof MarketFills.fillsForMarket !== "function" ||
+        typeof MarketFills.fillsForMarketWindow !== "function" ||
         typeof MarketFills.fillsToCandles !== "function") return null;
-      var fres = await MarketFills.fillsForMarket(baseId, quoteId, 1000, { network: net });
+      var precs = await _precisions([baseId, quoteId]);
+      /* Progressive paint: bucket + cache each page, then let the caller
+       * repaint. `publish` is the one place the cache is written, so an
+       * intermediate page and the terminal result are identical in shape. */
+      function publish(fills, capped) {
+        if (!Array.isArray(fills) || fills.length === 0) return false;
+        var esBuckets = MarketFills.fillsToCandles(fills, bucket, baseId, precs[baseId], precs[quoteId], quoteId);
+        if (!Array.isArray(esBuckets) || esBuckets.length === 0) return false;
+        _deepCache = { key: key, esBuckets: esBuckets, capped: !!capped };
+        return true;
+      }
+      var paint = function () {
+        try { if (typeof onPage === "function") onPage(); } catch (e) { /* painter is optional */ }
+      };
+      var seen = { n: 0 };
+      var fres = await MarketFills.fillsForMarketWindow(baseId, quoteId, bucket * want, {
+        network: net,
+        onPage: function (m) {
+          if (!publish(m.fills, m.capped)) return;
+          seen.n++;
+          paint();
+        }
+      });
       var fills = fres && fres.fills ? fres.fills : [];
       if (!Array.isArray(fills) || fills.length === 0) return null;
-      var precs = await _precisions([baseId, quoteId]);
-      var esBuckets = MarketFills.fillsToCandles(fills, bucket, baseId, precs[baseId], precs[quoteId], quoteId);
-      if (!Array.isArray(esBuckets) || esBuckets.length === 0) return null;
-      _deepCache = { key: key, esBuckets: esBuckets };
-      return { key: key, fills: fills.length };
+      /* Terminal pass: re-publish under the walk's own verdict so the cache
+       * can never disagree with what the caller was told. */
+      if (!seen.n || (_deepCache && _deepCache.key !== key)) publish(fills, fres && fres.capped);
+      paint();
+      return { key: key, fills: fills.length, capped: !!(fres && fres.capped) };
     } catch (e) { return null; /* ES/chain throw → chain-only stands */ }
   }
 

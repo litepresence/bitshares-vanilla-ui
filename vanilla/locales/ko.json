@@ -2107,6 +2107,7 @@
       "market_book.title",
       "market_charts.title",
       "market_ind.candle_count",
+      "market_ind.count_capped",
       "market_ind.count_note",
       "market_ind.count_partial",
       "market_ind.count_range",
@@ -2629,6 +2630,7 @@
       "pool.withdrawal_row",
       "pool.withdrawal_zero_note",
       "pool.zero_supply_hint",
+      "pool_detail.candle_capped",
       "pool_detail.candle_count",
       "pool_detail.candle_count_partial",
       "pool_detail.invert",
@@ -5502,7 +5504,8 @@
     "map_connects_fallback": "A line connects two assets when a funded pool exists. 24h trade activity is unconfirmed (history unavailable) — showing funded pools.",
     "map_min_swaps": "(min %(min)s swaps)",
     "candle_count": "%(swaps)s swaps · %(count)s × %(bucket)s candles",
-    "candle_count_partial": "%(swaps)s swaps · %(actual)s of %(requested)s × %(bucket)s candles"
+    "candle_count_partial": "%(swaps)s swaps · %(actual)s of %(requested)s × %(bucket)s candles",
+    "candle_capped": "window truncated"
   },
   "swap": {
     "title": "스왑"
@@ -7236,7 +7239,8 @@
     "candle_count": "캔들",
     "count_range": "1–5000 캔들을 입력하십시오.",
     "count_note": "%(count)s × %(bucket)s candles",
-    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles"
+    "count_partial": "%(actual)s of %(requested)s × %(bucket)s candles",
+    "count_capped": "window truncated"
   },
   "txbuilder": {
     "title": "트랜잭션 빌더",

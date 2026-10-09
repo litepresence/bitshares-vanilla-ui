@@ -170,7 +170,7 @@ eq(q._source.slice().sort(), ["account_history", "block_data", "operation_histor
     globalThis.fetch = function () {
       return Promise.resolve({ ok: true, json: function () { return Promise.resolve({ hits: { hits: hits2 } }); } });
     };
-    var dd = await MC2.deepen("1.3.0", "1.3.113", 3600);
+    var dd = await MC2.deepen("1.3.0", "1.3.113", 3600, 5); /* count-aware (2026-10-08 window fix) */
     eq(dd && dd.fills, 2, "deepen fetches ES backfill");
     var rd = await MC2.candles("1.3.0", "1.3.113", 3600, 5);
     eq(rd.deep, true, "candles merge the deep cache");

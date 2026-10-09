@@ -20,13 +20,17 @@ function eqDeep(actual, expected, name) {
   passed++;
 }
 
-/* savedRange — captures {from,to} or null, never throws. */
+/* savedRange — captures {from,to,len} or null, never throws.
+ * `len` is the bar count the range was captured AGAINST (2026-10-08: a
+ * range is only meaningful for the dataset it was zoomed on — see
+ * restoreRange below). Handles without a recorded bar count (canvas
+ * fallback / hand-made fixtures) report len undefined. */
 var T = ChartsLwc._test;
 assert.ok(T && typeof T.savedRange === "function", "savedRange exported");
 assert.ok(typeof T.restoreRange === "function", "restoreRange exported");
 eqDeep(T.savedRange({ chart: { timeScale: function () {
   return { getVisibleLogicalRange: function () { return { from: 10, to: 50 }; } };
-} } }), { from: 10, to: 50 }, "captures zoomed range");
+} } }), { from: 10, to: 50, len: undefined }, "captures zoomed range");
 eq(T.savedRange({ chart: null }), null, "null chart -> null");
 eq(T.savedRange(null), null, "null handle -> null");
 eq(T.savedRange({ chart: { timeScale: function () {
@@ -36,19 +40,42 @@ eq(T.savedRange({ chart: { timeScale: function () {
   return { getVisibleLogicalRange: function () { return { from: 5, to: 5 }; } };
 } } }), null, "degenerate range -> null");
 eq(T.savedRange({ chart: { timeScale: function () { throw new Error("x"); } } }), null, "throwing chart -> null");
+eqDeep(T.savedRange({ key: { n: 1930 }, chart: { timeScale: function () {
+  return { getVisibleLogicalRange: function () { return { from: 10, to: 50 }; } };
+} } }), { from: 10, to: 50, len: 1930 }, "captures the bar count the zoom belongs to");
 
 /* restoreRange — replays onto fresh chart, silent otherwise. */
 var seen = null;
 T.restoreRange({ timeScale: function () {
   return { setVisibleLogicalRange: function (r) { seen = r; } };
-} }, { from: 10, to: 50 });
+} }, { from: 10, to: 50 }, 1930);
 eqDeep(seen, { from: 10, to: 50 }, "restores captured range");
 seen = "untouched";
-T.restoreRange({ timeScale: function () { return {}; } }, { from: 1, to: 2 });
+T.restoreRange({ timeScale: function () { return {}; } }, { from: 1, to: 2 }, 10);
 eq(seen, "untouched", "missing setter is silent");
-T.restoreRange(null, { from: 1, to: 2 });
+T.restoreRange(null, { from: 1, to: 2 }, 10);
 T.restoreRange({ chart: 1 }, null);
 passed += 2; // no-throw paths
+
+/* Dataset-change guard (2026-10-08 — "the deep candles are off-screen"):
+ * a captured range is replayed ONLY against the same-size dataset. When the
+ * bars changed (the ES deepen landed, a timeframe/count switch, a wider
+ * window) the old range would pin the view to a slice of the NEW data —
+ * 1930 freshly loaded daily candles rendered behind a 150-bar window, i.e.
+ * invisible history. On a size change the restore is skipped and the
+ * chart's own fit-content stands. */
+var seen2 = "untouched";
+var fakeChart = { timeScale: function () { return { setVisibleLogicalRange: function (r) { seen2 = r; } }; } };
+T.restoreRange(fakeChart, { from: 0, to: 150, len: 150 }, 1930);
+eq(seen2, "untouched", "range is NOT replayed onto a different-size dataset (deepen landed)");
+T.restoreRange(fakeChart, { from: 0, to: 150, len: 150 }, 149);
+eqDeep(seen2, { from: 0, to: 150 }, "a one-bar difference (live tip rollover) still restores");
+T.restoreRange(fakeChart, { from: 0, to: 150, len: 150 }, 150);
+eqDeep(seen2, { from: 0, to: 150 }, "same size restores (theme toggle / resize keep the zoom)");
+T.restoreRange(fakeChart, { from: 0, to: 150 }, 1930);
+eqDeep(seen2, { from: 0, to: 150 }, "unknown previous size (no handle.key) keeps the legacy restore");
+T.restoreRange(fakeChart, { from: 0, to: 150, len: 150 }, null);
+eqDeep(seen2, { from: 0, to: 150 }, "unknown new size (canvas fallback pane) keeps the legacy restore");
 
 /* validCount — 1..5000 ints, default boundary behavior. */
 var M = MarketInd._test;
@@ -136,9 +163,70 @@ globalThis.Chain = {
   eq(Date.now() - t1 < 2 * 3600 * 1000, true, "newest slot is fresh (was 2022 before the fix)");
   eq(__calls <= 4, true, "bounded chunk fetches (got " + __calls + ")");
   eq(r.deep, false, "no ES in stub (chain-only flag honest)");
-  console.log("chart-zoom-test: " + passed + " passed, 0 failed");
   } finally { Date.now = _realDateNow; }
 })().catch(function (e) {
   console.error("chart-zoom-test FAILED: " + (e && e.message));
   process.exit(1);
 });
+
+/* tryPriceUpdate — the in-place fast path must ONLY handle same-size repaints
+ * and the live tip rolling over by one bar. A materially different dataset
+ * (the ES deepen landing: 150 daily candles -> 1930) must return FALSE so the
+ * caller rebuilds: an in-place setData keeps the OLD visible range, which is
+ * exactly how years of freshly-loaded history stayed hidden off-screen
+ * (2026-10-08). Rebuilt charts then hit restoreRange's size guard and fit the
+ * new window. */
+var TT = ChartsLwc._test;
+assert.ok(typeof TT.tryPriceUpdate === "function", "tryPriceUpdate exported");
+var frame = "pb|gr|txt|lin|custom";
+function bar(t) { return { time: t, open: "1", high: "2", low: "0.5", close: "1.5" }; }
+function fakePrev(n, first, last) {
+  var calls = { update: 0, setData: 0 };
+  return {
+    calls: calls,
+    handle: {
+      kind: "lwc", host: "H",
+      chart: { timeScale: function () { return {}; } },
+      candle: { update: function () { calls.update++; }, setData: function () { calls.setData++; } },
+      lines: [],
+      key: { n: n, first: first, last: last, lastOhlc: "x", frame: frame, ovShape: "0" }
+    }
+  };
+}
+var hostEl = "H", colors = { paneBg: "pb", grid: "gr", text: "txt" };
+var optsOv = { overlays: [], logScale: false };
+var timesOv = { times: [1, 2, 3] };
+
+/* same size, last bar moved: in-place update (no rebuild, zoom preserved) */
+var a = fakePrev(3, 100, 300);
+var barsA = [bar(100), bar(200), bar(300)];
+eq(TT.tryPriceUpdate(hostEl, a.handle, barsA, optsOv, colors, timesOv), true, "same-size repaint stays on the fast path");
+eq(a.calls.setData, 0, "same-size repaint does not setData");
+
+/* +1 rollover (a new candle appeared): still the fast path */
+var b = fakePrev(3, 100, 300);
+var barsB = [bar(100), bar(200), bar(300), bar(400)];
+eq(TT.tryPriceUpdate(hostEl, b.handle, barsB, optsOv, colors, timesOv), true, "tip rollover (+1) stays on the fast path");
+eq(b.calls.update, 1, "tip rollover updates the live bar only");
+
+/* materially wider dataset (the deep walk landing): MUST rebuild */
+var c = fakePrev(3, 100, 300);
+var barsC = []; for (var ci = 0; ci < 1930; ci++) barsC.push(bar(100 + ci));
+eq(TT.tryPriceUpdate(hostEl, c.handle, barsC, optsOv, colors, timesOv), false, "a materially wider dataset rebuilds (deepen landing)");
+eq(c.calls.setData, 0, "the rebuild path owns the data swap, not the fast path");
+
+/* narrower dataset (window shrink / shorter range): also rebuilds */
+var d = fakePrev(1930, 100, 300);
+eq(TT.tryPriceUpdate(hostEl, d.handle, [bar(100), bar(200), bar(300)], optsOv, colors, timesOv), false, "a narrower dataset rebuilds");
+
+/* the guard is about size, not direction: -1 bar is still a rebuild */
+var e2 = fakePrev(4, 100, 400);
+eq(TT.tryPriceUpdate(hostEl, e2.handle, [bar(100), bar(200), bar(300)], optsOv, colors, timesOv), false, "shrinking by one bar still rebuilds");
+
+/* unrelated guards still hold: wrong frame / no previous / wrong host */
+var f2 = fakePrev(3, 100, 300);
+eq(TT.tryPriceUpdate(hostEl, f2.handle, barsA, { overlays: [], logScale: true }, colors, timesOv), false, "a log/linear switch rebuilds");
+eq(TT.tryPriceUpdate(hostEl, null, barsA, optsOv, colors, timesOv), false, "no previous handle rebuilds");
+eq(TT.tryPriceUpdate("OTHER", f2.handle, barsA, optsOv, colors, timesOv), false, "a different host rebuilds");
+
+console.log("chart-zoom-test: " + passed + " passed, 0 failed");

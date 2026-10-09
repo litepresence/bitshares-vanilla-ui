@@ -436,23 +436,43 @@ var ChartsLwc = (function () {
         }
         return true;
       }
-      prev.candle.setData(bars.map(mkBar));
-      for (c = 0; c < ovs.length; c++) {
-        var e2 = prev.lines[c];
-        try {
-          if (e2 && e2.series && typeof e2.series.setData === "function") {
-            var vv = (ovs[c] || {}).values;
-            e2.series.setData(lineData(times, vv));
-            e2.tail = { n: Array.isArray(vv) ? vv.length : 0,
-              lv: (Array.isArray(vv) && vv.length) ? vv[vv.length - 1] : null };
-          }
-        } catch (e3) { /* line keeps its prior paint */ }
-      }
-      prev.key = { n: bars.length, first: bars[0].time, last: last.time,
-        lastOhlc: ohlcKey(last), frame: frame, ovShape: ovShape(ovs) };
-      return true;
+      /* A MATERIALLY different dataset (2026-10-08): the background ES deepen
+       * landing turns 150 daily candles into 1930, and a timeframe/count
+       * switch reshapes the window outright. Swapping the data in place would
+       * keep the chart's CURRENT visible range — so the new history would
+       * arrive off-screen to the left and read as "no data back there". The
+       * deep window is the whole point of that fetch, so return false and let
+       * the rebuild path run: a fresh chart fits its data, and restoreRange's
+       * size guard (the captured zoom belongs to the old dataset) keeps the
+       * stale range off it. Only the two cases above stay in place. */
+      return false;
     } catch (e) { return false; }
   }
+  /* Fit the whole dataset into view, DEFERRED BY ONE FRAME.
+   *
+   * Why this exists (2026-10-08): the vendored build does NOT fit content on
+   * its own — measured in the browser: after setData of 1930 daily bars the
+   * visible logical range was {from: 1798.7, to: 1931}, i.e. the last ~132
+   * bars, and a synchronous fitContent() did nothing. That is how the pool
+   * desk kept showing "June onward" after the deep walk loaded years of
+   * candles: correct data, view pinned to the newest sliver. One
+   * requestAnimationFrame later, fitContent() takes effect.
+   *
+   * Called only when the dataset changed materially (a deep walk landed, the
+   * timeframe or candle count moved) — never on same-size repaints, so the
+   * user's zoom survives theme toggles, resizes and live-tip refreshes.
+   * Params: chart (LWC chart, may be null). Returns nothing. Never throws. */
+  function fitOnNextFrame(chart) {
+    try {
+      if (!chart || typeof chart.timeScale !== "function") return;
+      var ts = chart.timeScale();
+      if (!ts || typeof ts.fitContent !== "function") return;
+      var go = function () { try { ts.fitContent(); } catch (e) { /* fresh fit stands */ } };
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(go);
+      else setTimeout(go, 0);
+    } catch (e) { /* range stays */ }
+  }
+
   /* Muted centered empty-state div; panes never render blank. */
   function emptyPane(doc, hostEl, text) {
     var d = doc.createElement("div");
@@ -478,14 +498,20 @@ var ChartsLwc = (function () {
 
   /* Zoom memory: capture the visible logical range of a live handle's
    * chart before a rebuild destroys it. Params: handle (previous draw
-   * handle). Returns {from, to} or null. Never throws. */
+   * handle). Returns {from, to, len} or null, where `len` is the bar count
+   * the zoom was captured ON (handle.key.n). It matters: a logical range
+   * is meaningless against a different dataset, and restoring one onto
+   * changed data is how 1930 freshly-loaded candles ended up hidden behind
+   * a 150-bar window (see restoreRange). `len` is undefined for handles
+   * that never recorded one (canvas fallback). Never throws. */
   function savedRange(handle) {
     try {
       if (handle && handle.chart && handle.chart.timeScale &&
           typeof handle.chart.timeScale().getVisibleLogicalRange === "function") {
         var r = handle.chart.timeScale().getVisibleLogicalRange();
         if (r && isFinite(r.from) && isFinite(r.to) && r.to > r.from) {
-          return { from: r.from, to: r.to };
+          var n = handle.key && handle.key.n;
+          return { from: r.from, to: r.to, len: (typeof n === "number" && isFinite(n)) ? n : undefined };
         }
       }
     } catch (e) { /* no memory */ }
@@ -494,14 +520,26 @@ var ChartsLwc = (function () {
 
   /* Restore a captured range onto a fresh chart after setData (zoom stops
    * resetting on every repaint: toggles, theme, resize, live-tip refresh).
-   * No-op when nothing was captured or the chart rejects it (fresh
-   * fit-content stands). Never throws. */
-  function restoreRange(chart, range) {
+   * GUARD (2026-10-08): the range is replayed only onto the SAME-SIZE
+   * dataset. When the bars changed — the background ES deepen landed, the
+   * user switched timeframe or candle count, a wider window arrived — the
+   * old range would pin the view to one slice of the new data and the newly
+   * loaded history would sit off-screen. On a size change this returns
+   * without touching the chart, so its own fit-content stands. A one-bar
+   * difference is the live tip rolling over: that keeps the zoom. An
+   * unknown size on either side (no key.n, canvas fallback) keeps the
+   * legacy restore. No-op when nothing was captured or the chart rejects
+   * it. Never throws. */
+  function restoreRange(chart, range, len) {
     if (!range) return;
+    try {
+      if (typeof range.len === "number" && typeof len === "number" &&
+          Math.abs(len - range.len) > 1) return;
+    } catch (e) { /* legacy restore below */ }
     try {
       if (chart && chart.timeScale &&
           typeof chart.timeScale().setVisibleLogicalRange === "function") {
-        chart.timeScale().setVisibleLogicalRange(range);
+        chart.timeScale().setVisibleLogicalRange({ from: range.from, to: range.to });
       }
     } catch (e) { /* fresh fit stands */ }
   }
@@ -597,6 +635,17 @@ var ChartsLwc = (function () {
       return opts.previous;
     }
     var keep = savedRange(opts.previous);
+    /* Dataset-change guard (2026-10-08): a captured zoom is replayed only
+     * onto a same-size dataset. When the bars changed (the ES deepen landed,
+     * a timeframe/count switch, a wider window) the old range would pin the
+     * view to one slice of the new data and hide the freshly loaded history,
+     * so the chart's own fit-content stands instead. Every pane applies this
+     * to ITSELF from its own handle + data — both are fed the same times
+     * array by the state layer, so their verdicts agree without sharing an
+     * options object. */
+    var barsN = Array.isArray(bars) ? bars.length : 0;
+    var refit = false;
+    if (keep && typeof keep.len === "number" && Math.abs(barsN - keep.len) > 1) { keep = null; refit = true; }
     clearHost(hostEl, opts.previous);
     drawToken(hostEl);
     var crossMode = 0;
@@ -648,7 +697,10 @@ var ChartsLwc = (function () {
       lines.push({ series: line,
         tail: { n: ov.values.length, lv: ov.values.length ? ov.values[ov.values.length - 1] : null } });
     }
-    restoreRange(chart, keep);
+    restoreRange(chart, keep, barsN);
+    /* Changed dataset: no stale zoom is replayed (above), so show the window
+     * that was actually fetched instead of the newest sliver of it. */
+    if (refit) fitOnNextFrame(chart);
     handle.kind = "lwc";
     handle.chart = chart;
     /* Tip-update cache (tryPriceUpdate above): host identity, live candle
@@ -680,9 +732,13 @@ var ChartsLwc = (function () {
     var handle = { kind: "none", chart: null };
     if (!hostEl) return handle;
     var keep = savedRange(opts.previous);
-    clearHost(hostEl, opts.previous);
     var colors = paneColors(opts.colors);
     var times = Array.isArray(opts.times) ? opts.times : [];
+    /* Same dataset-change guard as the price pane (above): a zoom belongs to
+     * the dataset it was captured on. */
+    var refit = false;
+    if (keep && typeof keep.len === "number" && Math.abs(times.length - keep.len) > 1) { keep = null; refit = true; }
+    clearHost(hostEl, opts.previous);
     var entries = Array.isArray(opts.series) ? opts.series : [];
     var i, k;
     var anyPts = false;
@@ -798,9 +854,13 @@ var ChartsLwc = (function () {
         ls.setData(lineData(times, s.values));
       }
     }
-    restoreRange(chart, keep);
+    restoreRange(chart, keep, times.length);
+    if (refit) fitOnNextFrame(chart);
     handle.kind = "lwc";
     handle.chart = chart;
+    /* Bar count of this pane's dataset — savedRange reads it (handle.key.n)
+     * so the NEXT redraw can tell a same-size repaint from changed data. */
+    handle.key = { n: times.length };
     return handle;
   }
 
@@ -875,7 +935,7 @@ var ChartsLwc = (function () {
     removePane: removePane,
     linkTimeScales: linkTimeScales,
     hasLightweight: hasLightweight,
-    _test: { savedRange: savedRange, restoreRange: restoreRange, priceTick: priceTick, priceFormatCustom: priceFormatCustom, lineData: lineData }
+    _test: { savedRange: savedRange, restoreRange: restoreRange, tryPriceUpdate: tryPriceUpdate, priceTick: priceTick, priceFormatCustom: priceFormatCustom, lineData: lineData }
   };
 })();
 

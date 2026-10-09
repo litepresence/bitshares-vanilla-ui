@@ -547,11 +547,11 @@ MarketDesk._panels = MarketDesk._panels || {};
       if (state.deepKey === key || state._deepFlight === key) return;
       if (typeof Market === "undefined" || !Market || typeof Market.deepen !== "function") return;
       state._deepFlight = key;
-      Market.deepen(b.id, q.id, state.bucket).then(function (d) {
-        if (state._deepFlight === key) state._deepFlight = null;
-        if (!d) return;
-        var nowKey = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
-        if (nowKey !== key) return; // bucket/pair/count moved on mid-flight
+      /* The walk is sized by the candles' own span (bucket x count) — the
+       * same window the merge + note slice to (2026-10-08 window fix) — and
+       * it paints through onPage so the chart deepens page by page instead
+       * of sitting chain-only until a possibly minutes-long walk finishes. */
+      function repaintWith(why) {
         try {
           if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
         } catch (e) { /* headless: keep going */ }
@@ -559,9 +559,9 @@ MarketDesk._panels = MarketDesk._panels || {};
          * bucketed candles must never paint over raw dots (state.points
          * stands; returning to buckets re-runs deepen through fill). */
         if (state.discrete) return;
-        state.deepKey = key;
-        var count = 2000;
-        try { if (typeof MarketInd !== "undefined" && MarketInd && MarketInd.CANDLE_COUNT) count = MarketInd.CANDLE_COUNT; } catch (e) { /* default stands */ }
+        var nowKey = b.id + "|" + q.id + "|" + state.bucket + "|" + deepCount;
+        if (nowKey !== key) return; // bucket/pair/count moved on mid-flight
+        var count = deepCount;
         Market.candles(b.id, q.id, state.bucket, count).then(function (c2) {
           var k2 = b.id + "|" + q.id + "|" + state.bucket + "|" + count;
           if (k2 !== key) return;
@@ -569,16 +569,29 @@ MarketDesk._panels = MarketDesk._panels || {};
           try {
             if (String((typeof location !== "undefined" && location.hash) || "").toUpperCase().indexOf(state.id) === -1) return;
           } catch (e) { /* headless: keep going */ }
-          /* Newest paint wins (see refreshTip): deepen completion invalidates
+          /* Newest paint wins (see refreshTip): a deepen paint invalidates
            * older in-flight tips before its own synchronous paint. */
           try { state.tipSeq = (state.tipSeq || 0) + 1; } catch (e) { /* seq best-effort */ }
           state.candles = c2;
           try { state.deep = !!(c2 && c2.deep); } catch (err) { state.deep = false; }
+          /* Truncation disclosure (2026-10-08): a walk that ended on its
+           * page/event/wall-clock budget leaves a short window — the count
+           * note says so instead of implying no older trades exist. */
+          try { state.deepCapped = !!(c2 && c2.deepCapped); } catch (err) { state.deepCapped = false; }
           try { MarketInd.maybeDraw(state); } catch (err) { /* chart best-effort */ }
           /* paintNote rides state (module scope cannot see the nested
            * closure); missing means a torn-down desk — never throws. */
           try { if (typeof state.paintNote === "function") state.paintNote(); } catch (err) { /* note best-effort */ }
         }).catch(function () { /* chain paint stands */ });
+      }
+      Market.deepen(b.id, q.id, state.bucket, deepCount, repaintWith).then(function (d) {
+        if (state._deepFlight === key) state._deepFlight = null;
+        if (!d) return;
+        /* The per-page paints above already drew every intermediate state;
+         * the terminal pass seals state.deepKey so an idle desk does not
+         * re-walk the same window, and repaints once with the final merge. */
+        state.deepKey = key;
+        repaintWith("terminal");
       }).catch(function () {
         if (state._deepFlight === key) state._deepFlight = null;
       });
