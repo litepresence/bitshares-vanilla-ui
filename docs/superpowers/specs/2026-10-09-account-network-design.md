@@ -224,6 +224,7 @@ custom properties the pool map uses, class colours picked from the existing
 | `vanilla/js/api/account-net.js` | **new** — pure adapter (classes, seeds, scan, classify, join, graph) |
 | `vanilla/js/views/account-network-ui.js` | **new** — page shell + table twin |
 | `vanilla/css/app.css` | edit — `.an-*` block (chips wrap, 44px, twin scrolls under 640px) |
+| `vanilla/js/globals.d.ts` | edit — two `declare var` lines (tsc hard gate) |
 | `vanilla/js/api/pool-net-paint.js` | edit — opt-in arrowheads + per-class edge colour (guarded) |
 | `vanilla/js/router.js` | edit — route + `ROUTE_META` entry |
 | `vanilla/js/views/menu-ui.js` | edit — Labs section card (title/blurb/keys) |
