@@ -17,6 +17,23 @@
 - New raw-ES access goes through `HistoryCap.esSearch` only; the index is mainnet-only, pref-gated by `esEnabled`, and page size is pinned at `10000` (measured: `size: 20000` returns HTTP 200 with **zero** hits).
 - Every op extractor validates its expected field names per hit and counts mismatches — the index's `operation_type` numbering disagrees with `Tx.OP` for 10/11/22/23/39 (measured), so op numbers are never trusted alone.
 - Shared utilities are mandatory, never re-created: `DOM.*`, `Forms.*`, `TableRenderer.render`, `ConfirmDialog`, `Overlay`, `Event.delegate`, `DOM.touchable` (AGENTS.md §7 rule 9).
+- Types (hard gate, `skills/building-vanilla-slices`): JSDoc `@param`/`@returns`
+  on every touched seam; cross-file shapes as `@typedef` in the owning module
+  (documented ONCE, referenced in prose elsewhere — `pool-net-phys.js:18` is the
+  precedent); parenthesized `/** @type {X} */ (expr)` seam-casts on cross-part
+  calls; new globals declared `declare var AccountNet: any;` /
+  `AccountNetworkUI: any;` in `vanilla/js/globals.d.ts` (alphabetical,
+  dev-only, never a `<script>` tag).
+- i18n from day one: every visible string is `t(key, englishDefault)`; the
+  English literal must be byte-identical in code and in all 12
+  `vanilla/locales/*.json` plus the `en.json` `_meta.translated` inventory;
+  `%(name)s` placeholders stay verbatim.
+- UX floor: `DOM.pageHead` for the single `h1`; `aria-label` on the seed input
+  and `th scope="col"` in the twin; theme tokens only (`--border/--text/
+  --muted/--accent`), no hardcoded hex; >=44px targets; every listener/interval
+  registered in `_cleanups` and focus returned on teardown.
+- No dead selectors: run `python3 tooling/scan_dead_css.py` after touching
+  `app.css`.
 - `bash tooling/check_types.sh` (tsc `checkJs`, zero emit) must pass.
 - Phone 360px → 4K; 44px touch targets; `prefers-reduced-motion` settles with zero frames.
 - Module format: block header (owns / consumes / globals / created-by), IIFE, `globalThis` guard + `module.exports` tail, script tag with the shared cache-bust token.
@@ -1495,7 +1512,7 @@ git commit -m "feat(account-network): page shell, class chips, status/detail, ta
 ### Task 6: Wire route, sitemap card, account-page seed button, i18n
 
 **Files:**
-- Modify: `vanilla/js/router.js` (route + `ROUTE_META`), `vanilla/js/views/menu-ui.js` (Labs card), `vanilla/js/views/account-ui.js` (seed button), `vanilla/index.html` (script tags)
+- Modify: `vanilla/js/router.js` (route + `ROUTE_META`), `vanilla/js/views/menu-ui.js` (Labs card), `vanilla/js/views/account-ui.js` (seed button), `vanilla/index.html` (script tags), `vanilla/js/globals.d.ts` (two `declare var` lines, alphabetical)
 - Create: `tooling/add_account_net_i18n.py`
 - Test: `tooling/menu-test.js` (counts), plus the i18n/types/rot gates
 
