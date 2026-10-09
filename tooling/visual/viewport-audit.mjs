@@ -139,6 +139,8 @@ export const ROUTES = [
   { src: "/txbuilder", hash: "#/txbuilder", group: "static" },
   { src: "/api-lab", hash: "#/api-lab", group: "static" },
   { src: "/es-lab", hash: "#/es-lab", group: "static" },
+  { src: "/account-network", hash: "#/account-network", group: "static" },
+  { src: "/menu/labs", hash: "#/menu/labs", group: "expanded" },
   { src: "/menu", hash: "#/menu", group: "static" },
   { src: "/menu/:section", hash: "#/menu/wallet", group: "expanded" },
   { src: "/menu/:section", hash: "#/menu/trade", group: "expanded" },

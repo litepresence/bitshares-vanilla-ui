@@ -40,7 +40,7 @@ Data-only: no operation is ever built, signed or broadcast here.
 | `vanilla/js/api/account-net.js` | 458 | the RULES: class table, strict extraction, dedupe, per-asset aggregation (pure; re-exports the transport half) |
 | `vanilla/js/api/account-net-es.js` | 439 | the TRANSPORT: HistoryCap seam, paged ES walk, chunked `get_objects` credit join, index fallback for deleted offers/deals, `gather` |
 | `vanilla/js/views/account-network-copy.js` | 362 | every user-visible string, as pure builders |
-| `vanilla/js/views/account-network-ui.js` | 475 | the WIDGETS: seeds, chips, status, detail, table twin, canvas mount, hash sync |
+| `vanilla/js/views/account-network-ui.js` | 512 | the WIDGETS: seeds, chips, status, detail, table twin, canvas mount, hash sync; clears the router mount first, appends `DOM.pageHead`, and uses the existing `wrap mkt-wrap` for the dense graph view |
 | `vanilla/js/views/pool-net-paint.js` | +45 | opt-in arrowheads, per-class edge colour, per-node fill |
 | `vanilla/js/views/pool-net-ui.js` | +25 | injected-graph gate, mount opts (`arrows`/`edgeClassOf`/`nodeFillOf`), account status isolation |
 | `vanilla/css/app.css` | +18 | `.an-*` block |
@@ -79,6 +79,9 @@ decision: no honest account↔account meaning).
 ## 5. Themes, viewports, a11y
 
 - `account-network-{credit,dark,vanilla}-1440.png` + `account-network-phone-360.png`.
+- After the navigation regression fix, the dense graph uses the existing
+  `wrap mkt-wrap` width rule and passes the viewport audit at phone and desk
+  widths.
 - Canvas reuses the shipped engine: wheel/pinch zoom, drag, tap, keyboard
   Enter, resize, IntersectionObserver, `prefers-reduced-motion` (settles with
   zero frames).
@@ -109,6 +112,9 @@ added).
 
 - New vectors: `account-net` **85**, `account-net-paint` **15**,
   `account-network-ui` **62** — all pass.
+- `tooling/audit_view_mounts.py` passes; `tooling/visual/probe-nav-mount.mjs`
+  passes, including in-app navigation, Back/forward, deep links, the
+  three-theme phone/desk sweep, and a live mainnet draw.
 - Both slice files were split after the audit's size check (§3.7 ~400-line
   rule): rules vs transport, words vs widgets. Re-verified live after the
   split (all four globals resolve, 70 lines, canvas, zero console errors).
@@ -116,7 +122,7 @@ added).
   `market-desk-map` 44, `pool-history` 65, `market-fills` 29, candle suites
   7/8/9/5.
 - `bash tooling/check_types.sh` PASS · `python3 tooling/check_i18n.py` OK
-  (3883 keys, 5105 call sites) · `python3 tooling/check_rot.py` PASSED ·
+  (3883 keys, 5104 call sites) · `python3 tooling/check_rot.py` PASSED ·
   `scan_dead_css` adds none.
 
 ## 9. Audit checklist result (skills/auditing-vanilla-slices)
@@ -150,3 +156,43 @@ found"); `TableRenderer.render(cfg)` returning a table rather than taking a
 host; `credit_offer_object.owner_account` misread as `owner`; deleted
 offers/deals unresolvable from chain; the pool status strip and
 "Loading network…" leaking in; every node painted alert-red; `"1 ops"`.
+
+## 11. Navigation regression found after the original audit (2026-10-09)
+
+The page was its own route in `vanilla/js/router.js:293`, but clicking its
+Labs TOC card left the Labs TOC rendered above the account page. The causes
+were in `vanilla/js/views/account-network-ui.js:126-159`:
+
+- the renderer appended a new `.wrap` without clearing `#view`, so direct
+  URLs looked correct while in-app navigation stacked pages;
+- it called `DOM.pageHead(...)` without appending the returned `h1`, so the
+  prior `"connected"` icon fix was not actually visible in the document.
+
+The fix clears the mount first, appends the returned heading, and switches the
+dense graph view from the 720 px `.wrap` to the existing `wrap mkt-wrap`.
+No new dependency, route, or CSS was added for this regression.
+
+Regression proof from `tooling/visual/probe-nav-mount.mjs`:
+
+- `#/menu/labs` → card click → `#/account-network`.
+- Exactly one `.wrap`; first/only `h1` is `Account Network`.
+- Heading icon resolves to `assets/icons/connected.svg`.
+- Zero stale `.menu-card` or `.menu-crumb` nodes.
+- Browser Back returns cleanly to `Labs (4)` with the four Labs cards.
+- Deep link
+  `#/account-network?seeds=committee-account&classes=transfer,credit`
+  renders the same page and prefills the seed field.
+- Three themes × phone/desk: heading and eight controls present, `0` px
+  horizontal overflow, no stacked view, no console errors.
+- Mainnet live draw: `committee-account · 2065 indexed operations from
+  1 account(s) · 41 accounts · 45 lines · top 40 counterparties shown`,
+  with a 1350×640 canvas and a 46-row accessible table.
+
+The app-wide view-mount checker is `tooling/audit_view_mounts.py`. It passes
+after the fix and, against the pre-fix tree, reports both account-network
+defects and no others.
+
+Viewport result: `#/account-network` passes at phone and desk widths. The
+newly added `#/menu/labs` sweep still reports the pre-existing A3 stranded
+column at desk width (`div.wrap` occupies 42% of the viewport); that separate
+Labs TOC layout issue is not changed by this fix.

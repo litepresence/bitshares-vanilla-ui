@@ -132,17 +132,31 @@ var AccountNetworkUI = (function () {
       _gen++;
       var gen = _gen;
 
-      var wrap = _el(doc, "div", null, "wrap");
+      /* Clear the router mount FIRST (the shared convention every view in
+       * this app follows): the router hands us #view with the previous page
+       * still in it, so appending without clearing stacks this page UNDER the
+       * stale view — arriving from the Labs TOC left the TOC's heading and
+       * cards on screen above ours (fixed 2026-10-09). */
+      _clear(root);
+
+      /* mkt-wrap, not the plain 720px .wrap: this is a dense graph view that
+       * reuses the pool-net canvas engine, so it earns the wide cap the same
+       * way the market desk does (principle #7 — wide screens must not strand
+       * a 4K monitor in whitespace; viewport-audit A3 flagged 42% at desk
+       * width before this, 2026-10-09). No new CSS: mkt-wrap already exists. */
+      var wrap = _el(doc, "div", null, "wrap mkt-wrap");
       root.appendChild(wrap);
+      /* pageHead BUILDS AND RETURNS the h1 — its return value must be
+       * appended, or the page renders with no heading at all (the icon fix
+       * for "connected" was invisible while this was the case). */
+      var head = null;
       try {
         if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
-          DOM.pageHead(doc, t("account_net.title", "Account Network"), "connected");
-        } else {
-          wrap.appendChild(_el(doc, "h1", t("account_net.title", "Account Network")));
+          head = DOM.pageHead(doc, t("account_net.title", "Account Network"), "connected");
         }
-      } catch (eHead) {
-        wrap.appendChild(_el(doc, "h1", t("account_net.title", "Account Network")));
-      }
+      } catch (eHead) { head = null; }
+      if (head) wrap.appendChild(head);
+      else wrap.appendChild(_el(doc, "h1", t("account_net.title", "Account Network")));
       wrap.appendChild(_el(doc, "p", t("account_net.intro",
         "Enter one or more accounts to see who they send to, lend to and borrow from. "
         + "Read from the community history index; nothing is signed and nothing is stored."),
