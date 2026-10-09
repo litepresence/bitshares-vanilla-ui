@@ -72,13 +72,14 @@ Per-family endpoint fields, as probed:
 | Credit | 69, 70, 71, 72, 73, 76 | **72** (accept), **73** (repay) | 72: lender → borrower · 73: borrower → lender | 72: `borrow_amount` · 73: `repay_amount` | flow |
 | Override transfer | 38 | 38 | `from` → `to` | `amount_` | flow |
 | Direct debit | 25, 26, 27, 28 | 25, 26, 28 (permission), 27 (drawdown) | owner (`withdraw_from_account`) → `authorized_account` / `withdraw_to_account` | `withdrawal_limit` / `amount_to_withdraw` | **relation** (25/26/28) · flow (27) |
-| HTLC | 49, 50, 51, 52 | 49 (create), 50 (redeem) | 49: `from` → `to` · 50: `to` → `redeemer` | `amount_` | flow |
+| HTLC | 49, 50, 51, 52 | **49, 51** | `from` → `to` | `amount_` | flow |
 | Vesting update | 34 | 34 | `initializer` → `owner_` | `daily_pay` | **relation** (authority, not a flow) |
 
 **Ops that deliberately draw no line** (lifecycle, not counterparty): credit
 69/70/71 (offer create/delete/update — only the owner is named;
 `acceptable_borrowers` is a permission list, not a flow), credit 76 (deal
-auto-repay flag — no amount), HTLC 51/52 (update/extend — no amount). They
+auto-repay flag — no amount), HTLC 50 (redeem — only `redeemer` and
+`htlc_id`, no second account) and 52 (extend — only `update_issuer`). They
 ride along only because the class ships them together; the extractor skips
 them silently (not as errors).
 
@@ -222,6 +223,7 @@ custom properties the pool map uses, class colours picked from the existing
 |---|---|
 | `vanilla/js/api/account-net.js` | **new** — pure adapter (classes, seeds, scan, classify, join, graph) |
 | `vanilla/js/views/account-network-ui.js` | **new** — page shell + table twin |
+| `vanilla/css/app.css` | edit — `.an-*` block (chips wrap, 44px, twin scrolls under 640px) |
 | `vanilla/js/api/pool-net-paint.js` | edit — opt-in arrowheads + per-class edge colour (guarded) |
 | `vanilla/js/router.js` | edit — route + `ROUTE_META` entry |
 | `vanilla/js/views/menu-ui.js` | edit — Labs section card (title/blurb/keys) |
