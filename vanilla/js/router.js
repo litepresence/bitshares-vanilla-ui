@@ -290,6 +290,10 @@ var Router = (function () {
     { path: "/txbuilder", title: "Transaction Builder", render: function (root) { TxBuilderUI.renderDesk(root); } },
     { path: "/api-lab", title: "API Lab", render: function (root) { ApiLabUI.renderLab(root); } },
     { path: "/es-lab", title: "ES Lab", render: function (root) { EsLabUI.renderLab(root); } },
+    { path: "/account-network", title: "Account Network", render: function (root) {
+        if (typeof AccountNetworkUI !== "undefined" && AccountNetworkUI && typeof AccountNetworkUI.renderAccountNetwork === "function") { AccountNetworkUI.renderAccountNetwork(root); return; }
+        placeholder("Account Network")(root);
+    } },
     { path: "/menu", title: "Menu", render: function (root) {
       if (typeof MenuUI !== "undefined" && MenuUI && typeof MenuUI.renderMenu === "function") { MenuUI.renderMenu(root); return; }
       placeholder("Menu")(root);
@@ -326,6 +330,7 @@ var Router = (function () {
     "/transfer": { titleKey: "seo.title_transfer", title: "Send Funds — BitShares Wallet", descKey: "seo.desc_transfer", description: "Send BitShares assets to any account. Review every field, then sign locally — keys never leave your device." },
     "/account/:name": { titleKey: "seo.title_account", title: "Account %(name)s — BitShares Wallet", descKey: "seo.desc_account", description: "View this BitShares account — balances, orders and history read live from the chain. No login needed." },
     "/voting": { titleKey: "seo.title_voting", title: "Vote Witnesses — BitShares Wallet", descKey: "seo.desc_voting", description: "Vote for BitShares witnesses, committee members and workers. Every ballot is signed locally on your device." },
+    "/account-network": { titleKey: "seo.title_account_net", title: "Account Network — BitShares Wallet", descKey: "seo.desc_account_net", description: "Map who an account sends to, lends to and borrows from — read from the community index. No login needed." },
     "/about": { titleKey: "seo.title_about", title: "About — BitShares Wallet", descKey: "seo.desc_about", description: "About this BitShares wallet — local keys, no signup, no tracking. Browse freely and sign locally." },
     "/help": { titleKey: "seo.title_help", title: "Help — BitShares Wallet", descKey: "seo.desc_help", description: "BitShares wallet help — guides for accounts, trading, voting and recovery. Start here when stuck." },
     "/login": { titleKey: "seo.title_login", title: "Log In — BitShares Wallet", descKey: "seo.desc_login", description: "Unlock your local BitShares wallet — password, brainkey or imported keys. Keys never leave this device." }

@@ -609,7 +609,13 @@ var PoolNetUI = (function () {
         } catch (e) { /* down */ }
       };
 
-      if (navOpts && navOpts.mode === "market" && navOpts.graph) mountMarketGraph();
+      /* An injected graph is an injected graph: any mode that hands one over
+       * gets it mounted (market map + the 2026-10-09 account network). The
+       * gate used to test mode === "market", so the account page silently
+       * fell through to skeletonFirst() and drew the POOL skeleton over the
+       * account graph it had just built. Pool mode passes no graph, so the
+       * skeleton path is still exactly the pool path. */
+      if (navOpts && navOpts.graph && Array.isArray(navOpts.graph.nodes)) mountMarketGraph();
       else skeletonFirst();
       return api;
     } catch (e) {

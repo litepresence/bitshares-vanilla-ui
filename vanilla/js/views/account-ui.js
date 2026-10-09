@@ -1327,6 +1327,23 @@ if (__partRequire && (!AccountUI._history || !AccountUI._membership)) {
     sub.className = "muted";
     sub.textContent = acct.id;
     wrap.appendChild(sub);
+    /* Draw-network seed button (2026-10-09): the account page is where the
+     * question "who does this account deal with?" gets asked, so the map is
+     * one tap away and already seeded with this account. Plain anchor + hash
+     * (the page owns its own parsing); 44px, muted until hovered like the
+     * other inline actions here. */
+    (function netLink() {
+      try {
+        var link = doc.createElement("a");
+        link.className = "muted";
+        link.href = "#/account-network?seeds=" + encodeURIComponent(acct.name) + "&classes=transfer,credit";
+        link.textContent = t("account.draw_network", "Draw network");
+        link.style.minHeight = "44px";
+        link.style.display = "inline-block";
+        link.style.lineHeight = "44px";
+        wrap.appendChild(link);
+      } catch (eNet) { /* the map is reachable from the burger either way */ }
+    })();
     /* Copy-share-link row (hash deep link the router already resolves:
      * #/account/:name, router.js). Clipboard API with an execCommand
      * textarea fallback; the result reads inline via aria-live, never a

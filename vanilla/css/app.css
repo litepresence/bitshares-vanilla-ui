@@ -1684,3 +1684,27 @@ p.muted[aria-live="polite"],
 .pool-net-twin { margin: 8px 0; }
 .pool-net-twin > summary { min-height: 44px; cursor: pointer; }
 .pool-net-twinbox { overflow-x: auto; }
+
+/* Account-network page (#/account-network): seeds, class chips, the honesty
+ * status line, the detail line, and the table twin. Tokens only, so all
+ * three themes read without a per-theme rule; the chips wrap at phone width
+ * and keep a 44px touch height (principle #7). The canvas itself is the
+ * shipped .pool-net-canvas — this page reuses the engine, not a new one. */
+.an-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.an-seeds { flex: 1 1 260px; max-width: 520px; min-height: 44px; }
+.an-go { min-height: 44px; }
+.an-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 10px; }
+.an-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+  padding: 0 12px; border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; background: var(--panel); color: var(--text); }
+.an-chip input { width: 18px; height: 18px; }
+.an-status { margin: 6px 0; }
+.an-detail { min-height: 24px; margin: 6px 0; color: var(--text); }
+.an-graph { margin: 8px 0; }
+.an-twin { margin: 10px 0; }
+.an-twin > summary { min-height: 44px; cursor: pointer; }
+.an-twin-body { overflow-x: auto; }
+.an-table table { width: 100%; }
+@media (max-width: 640px) {
+  .an-chips { gap: 6px; }
+}
