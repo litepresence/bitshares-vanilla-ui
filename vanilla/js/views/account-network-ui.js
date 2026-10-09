@@ -136,7 +136,7 @@ var AccountNetworkUI = (function () {
       root.appendChild(wrap);
       try {
         if (typeof DOM !== "undefined" && DOM && typeof DOM.pageHead === "function") {
-          DOM.pageHead(doc, t("account_net.title", "Account Network"), "share-alt");
+          DOM.pageHead(doc, t("account_net.title", "Account Network"), "connected");
         } else {
           wrap.appendChild(_el(doc, "h1", t("account_net.title", "Account Network")));
         }

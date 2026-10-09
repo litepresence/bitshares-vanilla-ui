@@ -127,7 +127,7 @@ var MenuUI = (function () {
         { href: "#/api-lab", icon: "insight", titleKey: "menu.p_apilab", titleDefault: "API Lab", blurbKey: "menu.d_apilab", blurbDefault: "Probe node methods with a 29-call catalog." },
         { href: "#/es-lab", icon: "zoom", titleKey: "menu.p_eslab", titleDefault: "ES Lab", blurbKey: "menu.d_eslab", blurbDefault: "Search the community history index." },
         { href: "#/txbuilder", icon: "checkmark-circle", titleKey: "menu.p_txbuilder", titleDefault: "Transaction Builder", blurbKey: "menu.d_txbuilder", blurbDefault: "Compose many operations, sign once." },
-        { href: "#/account-network", icon: "share-alt", titleKey: "menu.p_account_net", titleDefault: "Account Network", blurbKey: "menu.d_account_net", blurbDefault: "transfer tracking" }
+        { href: "#/account-network", icon: "connected", titleKey: "menu.p_account_net", titleDefault: "Account Network", blurbKey: "menu.d_account_net", blurbDefault: "transfer tracking" }
       ] },
     { slug: "personal", icon: "user",
       titleKey: "menu.section_personal", titleDefault: "Personal",
