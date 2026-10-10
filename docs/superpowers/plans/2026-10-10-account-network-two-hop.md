@@ -429,7 +429,7 @@ Expected i18n output: `OK: 12 dicts key-complete`.
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `node tooling/account-network-ui-test.js`
-Expected: `account-network-ui: 71 pass, 0 fail`.
+Expected: `account-network-ui: 74 pass, 0 fail`.
 
 - [ ] **Step 5: Commit**
 
@@ -493,7 +493,7 @@ node tooling/account-network-ui-test.js
 bash tooling/check_types.sh
 ```
 
-Expected: `account-network-ui: 72 pass, 0 fail`, `check_types: PASS`.
+Expected: `account-network-ui: 75 pass, 0 fail`, `check_types: PASS`.
 
 - [ ] **Step 5: Commit**
 
@@ -559,7 +559,7 @@ python3 tooling/check_rot.py
 python3 tooling/audit_view_mounts.py
 ```
 
-Expected: `106/15/72/28` passes respectively, all static checks green.
+Expected: `106/15/75/28` passes respectively, all static checks green.
 
 - [ ] **Step 4: Run navigation and viewport checks**
 
