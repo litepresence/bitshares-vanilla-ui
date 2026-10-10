@@ -20,6 +20,7 @@ var AccountNetworkCopy = (function () {
 
   var SEEDS_KEY = "accountNet.seeds.v1";
   var CLASSES_KEY = "accountNet.classes.v1";
+  var DEPTH_KEY = "accountNet.depth.v1";
 
   /**
    * Localized string with the repo's inline-substitution fallback (so a
@@ -154,6 +155,184 @@ var AccountNetworkCopy = (function () {
       "&classes=" + encodeURIComponent((classes || []).join(","));
   }
 
+  /* The depth policy module, resolved at CALL time with the same guarded
+   * pattern account-net-es.js uses (globalThis first, then module.require,
+   * then null => literal fallbacks). The copy module must never throw when
+   * the policy script is missing — words still render with depth 1.
+   * @returns {any} AccountNetDepth, or null when it is not loadable here. */
+  function depthPolicy() {
+    try {
+      if (typeof AccountNetDepth !== "undefined" && AccountNetDepth) return AccountNetDepth;
+    } catch (e) { /* fall through */ }
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.AccountNetDepth) return globalThis.AccountNetDepth;
+    } catch (e2) { /* fall through */ }
+    try {
+      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require) {
+        return /** @type {any} */ (module).require("/workspace/vanilla/js/api/account-net-depth.js");
+      }
+    } catch (e3) { /* not loadable here */ }
+    return null;
+  }
+
+  /**
+   * depthOr: normalize depth through the policy, falling back to 1.
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw depth value.
+   * @returns {number} 1 or 2.
+   */
+  function depthOr(D, v) {
+    try {
+      if (D && typeof D.normalizeDepth === "function") return D.normalizeDepth(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    return (n === 1 || n === 2) ? n : 1;
+  }
+
+  /**
+   * ring1Or: normalize the Ring 1 count, falling back to 40 (1..40).
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw ring-1 value.
+   * @returns {number} 1..40.
+   */
+  function ring1Or(D, v) {
+    try {
+      if (D && typeof D.normalizeRing1 === "function") return D.normalizeRing1(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    if (!isFinite(n)) return 40;
+    if (n < 1) return 1;
+    if (n > 40) return 40;
+    return n;
+  }
+
+  /**
+   * ring2Or: normalize the Ring 2 count, falling back to 8 (1..8).
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw ring-2 value.
+   * @returns {number} 1..8.
+   */
+  function ring2Or(D, v) {
+    try {
+      if (D && typeof D.normalizeRing2 === "function") return D.normalizeRing2(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    if (!isFinite(n)) return 8;
+    if (n < 1) return 1;
+    if (n > 8) return 8;
+    return n;
+  }
+
+  /**
+   * parseDepth: read the depth + ring params out of a shareable hash.
+   * Absent params yield the policy defaults (depth 1, ring1 40, ring2 8);
+   * out-of-range values normalize the same way the gather path does.
+   * @param {string} hash location.hash (or any string).
+   * @returns {{depth:number, ring1:number, ring2:number}} In exactly this key order.
+   */
+  function parseDepth(hash) {
+    var D = depthPolicy();
+    var rawDepth, rawRing1, rawRing2;
+    var s = String(hash === undefined || hash === null ? "" : hash);
+    var qi = s.indexOf("?");
+    if (qi !== -1) {
+      s.slice(qi + 1).split("&").forEach(function (part) {
+        var eqi = part.indexOf("=");
+        if (eqi === -1) return;
+        var k = "", v = "";
+        try { k = decodeURIComponent(part.slice(0, eqi)); } catch (e) { k = part.slice(0, eqi); }
+        try { v = decodeURIComponent(part.slice(eqi + 1)); } catch (e2) { v = part.slice(eqi + 1); }
+        if (k === "depth") rawDepth = v;
+        else if (k === "ring1") rawRing1 = v;
+        else if (k === "ring2") rawRing2 = v;
+      });
+    }
+    return { depth: depthOr(D, rawDepth), ring1: ring1Or(D, rawRing1), ring2: ring2Or(D, rawRing2) };
+  }
+
+  /**
+   * hashForDepth: the shareable URL contract with depth + ring params, so a
+   * 2-hop map links back to itself. Coexists with hashFor (which stays
+   * depth-free); parseDepth reads either shape.
+   * @param {string[]} seeds @param {string[]} classes
+   * @param {*} depth @param {*} ring1 @param {*} ring2 Raw prefs (normalized).
+   * @returns {string} Hash target for the current state.
+   */
+  function hashForDepth(seeds, classes, depth, ring1, ring2) {
+    var D = depthPolicy();
+    return "#/account-network?seeds=" + encodeURIComponent((seeds || []).join(",")) +
+      "&classes=" + encodeURIComponent((classes || []).join(",")) +
+      "&depth=" + encodeURIComponent(String(depthOr(D, depth))) +
+      "&ring1=" + encodeURIComponent(String(ring1Or(D, ring1))) +
+      "&ring2=" + encodeURIComponent(String(ring2Or(D, ring2)));
+  }
+
+  /**
+   * readDepthPrefs: the saved depth prefs ({depth, ring1, ring2} JSON under
+   * DEPTH_KEY). A missing entry, bad JSON, or out-of-range value yields the
+   * policy defaults — never throws, never returns a partial object.
+   * @returns {{depth:number, ring1:number, ring2:number}} In exactly this key order.
+   */
+  function readDepthPrefs() {
+    var D = depthPolicy();
+    var raw = null;
+    try { raw = JSON.parse(_lsGet(DEPTH_KEY) || ""); } catch (e) { raw = null; }
+    if (!raw || typeof raw !== "object") return { depth: 1, ring1: 40, ring2: 8 };
+    return { depth: depthOr(D, raw.depth), ring1: ring1Or(D, raw.ring1), ring2: ring2Or(D, raw.ring2) };
+  }
+
+  /**
+   * writeDepthPrefs: persist the depth prefs (normalized first, so storage
+   * never holds an out-of-range value). Session-only when storage is absent.
+   * @param {*} depth @param {*} ring1 @param {*} ring2 Raw prefs.
+   * @returns {void}
+   */
+  function writeDepthPrefs(depth, ring1, ring2) {
+    var D = depthPolicy();
+    _lsSet(DEPTH_KEY, JSON.stringify(
+      { depth: depthOr(D, depth), ring1: ring1Or(D, ring1), ring2: ring2Or(D, ring2) }));
+  }
+
+  /**
+   * depthLabel: "1 hop" vs "2 hops" (two keys, not a plural engine — the
+   * detail line's "1 ops" lesson).
+   * @param {*} depth Raw depth.
+   * @returns {string}
+   */
+  function depthLabel(depth) {
+    var d = depthOr(depthPolicy(), depth);
+    if (d === 2) return t("account_net.depth_2", "2 hops");
+    return t("account_net.depth_1", "1 hop");
+  }
+
+  /**
+   * ringLabel: which neighbor ring a count belongs to.
+   * @param {*} which Raw ring number (1 or 2; anything else reads as ring 1).
+   * @returns {string}
+   */
+  function ringLabel(which) {
+    if (Math.floor(Number(which)) === 2) return t("account_net.ring2_label", "Ring 2");
+    return t("account_net.ring1_label", "Ring 1");
+  }
+
+  /**
+   * depthFieldLabel: the depth control's own label (Task 4 owns the widget;
+   * the word lives here so the drift gate checks it).
+   * @returns {string}
+   */
+  function depthFieldLabel() {
+    return t("account_net.depth_label", "Depth");
+  }
+
+  /**
+   * staleSettingsText: shown when saved depth/neighbor prefs differ from the
+   * drawn map — the map on screen is honest but stale until re-drawn.
+   * @returns {string}
+   */
+  function staleSettingsText() {
+    return t("account_net.stale_settings", "Depth or neighbor settings changed — press Draw network.");
+  }
+
   /**
    * assetLabel / humanAmount: symbol + precision for an asset id.
    * @param {string} assetId @param {Object<string,{sym:string, prec:number}>} assets
@@ -221,6 +400,10 @@ var AccountNetworkCopy = (function () {
       { scanned: String(st.scanned || 0), n: String(seeds.length) }));
     bits.push(t("account_net.status_graph", "%(nodes)s accounts · %(edges)s lines",
       { nodes: String(st.nodes || 0), edges: String(st.edges || 0) }));
+    /* The map scope up front: a 2-hop map and a 1-hop map are different
+     * claims about the same seeds, so the depth always reads out. */
+    var mapDepth = depthOr(depthPolicy(), st.depth);
+    bits.push(t("account_net.status_depth", "%(depth)s map", { depth: depthLabel(mapDepth) }));
     if (st.truncated) {
       bits.push(t("account_net.status_truncated", "newest %(n)s operations per account",
         { n: String(AccountNet.SCAN_CAP) }));
@@ -247,6 +430,29 @@ var AccountNetworkCopy = (function () {
     if (st.missingCredit) {
       bits.push(t("account_net.status_credit_missing",
         "%(n)s credit lines skipped (offer or deal not found on chain)", { n: String(st.missingCredit) }));
+    }
+    /* Depth-2 expansion honesty. Shown only at depth 2: at depth 1 nothing
+     * was eligible for expansion, so the retained count is not news (Task 2
+     * reports it as `unexpanded`, but surfacing it would read like a skip).
+     * The expanded list names ATTEMPTED expansions — an id stays listed even
+     * when its scan failed or contributed nothing (Task 2 semantics). */
+    if (mapDepth >= 2) {
+      if (st.expanded && st.expanded.length) {
+        bits.push(t("account_net.status_expanded", "expanded: %(names)s",
+          { names: st.expanded.join(", ") }));
+      }
+      if (Number(st.unexpanded) > 0) {
+        bits.push(t("account_net.status_unexpanded", "%(n)s direct counterparties unexpanded",
+          { n: String(st.unexpanded) }));
+      }
+      if (Number(st.expansionScanned) > 0) {
+        bits.push(t("account_net.status_expansion_scanned", "%(n)s indexed operations from expansions",
+          { n: String(st.expansionScanned) }));
+      }
+    }
+    if (st.expansionTruncated) {
+      bits.push(t("account_net.status_expansion_truncated",
+        "expansion scans truncated to newest operations"));
     }
     if (unknown.length) {
       bits.push(t("account_net.status_unknown", "not found: %(names)s", { names: unknown.join(", ") }));
@@ -286,7 +492,7 @@ var AccountNetworkCopy = (function () {
    * never the only source of truth.
    * @param {Object} graph @param {Object<string,string>} names @param {Object} assets
    * @returns {Array<{rowkey:string, from:string, to:string, cls:string, kind:string,
-   *   amount:string, count:string, span:string}>} TableRenderer row objects.
+   *   amount:string, count:string, span:string, depth:string}>} TableRenderer row objects.
    */
   function twinRows(graph, names, assets) {
     var out = [];
@@ -307,7 +513,8 @@ var AccountNetworkCopy = (function () {
           e.kind === "relation" ? "relation" : "flow"),
         amount: amountsText(e.perAsset, assets),
         count: String(e.count || 0),
-        span: (e.firstSeen || "—") + " → " + (e.lastSeen || "—")
+        span: (e.firstSeen || "—") + " → " + (e.lastSeen || "—"),
+        depth: depthLabel(e && e.depth)
       });
     });
     return out;
@@ -317,6 +524,7 @@ var AccountNetworkCopy = (function () {
    * twinColumns: the twin's header in TableRenderer's column shape
    * ({key, title}); the keys are exactly the twinRows field names, because
    * the renderer reads cells BY KEY (a mismatch renders a blank column).
+   * The hop column stays LAST, so existing columns keep their order.
    * @returns {Array<{key:string, title:string}>}
    */
   function twinColumns() {
@@ -327,7 +535,8 @@ var AccountNetworkCopy = (function () {
       { key: "kind", title: t("account_net.twin_relation", "Flow/relation") },
       { key: "amount", title: t("account_net.twin_amount", "Amount") },
       { key: "count", title: t("account_net.twin_count", "Ops") },
-      { key: "span", title: t("account_net.twin_span", "First → last") }
+      { key: "span", title: t("account_net.twin_span", "First → last") },
+      { key: "depth", title: t("account_net.twin_depth", "Hop") }
     ];
   }
 
@@ -351,10 +560,14 @@ var AccountNetworkCopy = (function () {
 
   return {
     parseSeeds: parseSeeds, chipModel: chipModel, classToken: classToken,
-    parseHash: parseHash, hashFor: hashFor, statusText: statusText,
+    parseHash: parseHash, hashFor: hashFor, parseDepth: parseDepth,
+    hashForDepth: hashForDepth, readDepthPrefs: readDepthPrefs,
+    writeDepthPrefs: writeDepthPrefs, depthLabel: depthLabel,
+    ringLabel: ringLabel, depthFieldLabel: depthFieldLabel,
+    staleSettingsText: staleSettingsText, statusText: statusText,
     detailText: detailText, twinRows: twinRows, twinColumns: twinColumns,
     amountsText: amountsText, esErrorText: esErrorText,
-    SEEDS_KEY: SEEDS_KEY, CLASSES_KEY: CLASSES_KEY
+    SEEDS_KEY: SEEDS_KEY, CLASSES_KEY: CLASSES_KEY, DEPTH_KEY: DEPTH_KEY
   };
 })();
 

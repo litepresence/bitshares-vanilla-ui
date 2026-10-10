@@ -133,8 +133,8 @@ eq(T.parseSeeds(null), [], "null input is no seeds");
   eq(rows[0].count, "2", "twin row states the op count");
   /* The columns must match the row keys exactly — TableRenderer reads by key,
    * so a mismatch renders an empty column instead of failing loudly. */
-  eq(AccountNetworkUI._test.twinColumns().map((c) => c.key).join(","),
-     "from,to,cls,kind,amount,count,span", "column keys line up with the row keys");
+   eq(AccountNetworkUI._test.twinColumns().map((c) => c.key).join(","),
+      "from,to,cls,kind,amount,count,span,depth", "column keys line up with the row keys");
   ok(AccountNetworkUI._test.twinColumns().every((c) => typeof c.title === "string" && c.title.length),
      "every column has a title");
 }
@@ -166,6 +166,32 @@ eq(T.parseSeeds(null), [], "null input is no seeds");
   eq(T.classToken("credit"), "buy", "credit lines take the buy ink");
   eq(T.classToken("vesting"), "muted", "relation lines stay muted");
   eq(T.classToken("nope"), "muted", "an unknown class stays muted (never crashes the canvas)");
+}
+
+/* ---- depth prefs + hash ---- */
+{
+  const d = T.parseDepth("#/account-network?seeds=a&depth=2&ring1=12&ring2=3");
+  eq(d, { depth: 2, ring1: 12, ring2: 3 }, "depth hash parses depth + rings");
+  eq(T.parseDepth("#/account-network?depth=9"), { depth: 1, ring1: 40, ring2: 8 }, "bad depth normalizes");
+  const h = T.hashForDepth(["a"], ["transfer"], 2, 12, 3);
+  ok(h.indexOf("depth=2") !== -1 && h.indexOf("ring1=12") !== -1 && h.indexOf("ring2=3") !== -1, "depth hash round-trips (" + h + ")");
+  eq(T.depthLabel(2), "2 hops", "depth label is plural");
+  eq(T.depthLabel(1), "1 hop", "depth label is singular");
+}
+
+/* ---- depth status + twin ---- */
+{
+  const s = T.statusText({ seeds: [{ id: "1.2.1", name: "alice" }], unknown: [],
+    stats: { scanned: 10, edges: 3, nodes: 4, truncated: false, droppedSelf: 0,
+      droppedShape: 0, missingCredit: 0, caps: {}, depth: 2, ring1: 40, ring2: 1,
+      expanded: ["1.2.2"], unexpanded: 1, expansionScanned: 4, expansionTruncated: false } });
+  ok(/2 hops/.test(s), "depth-2 status names the depth (" + s + ")");
+  ok(/1\.2\.2/.test(s) && /unexpanded/.test(s), "expanded and unexpanded accounts are disclosed");
+  const rows = T.twinRows({ nodes: [{ assetId: "1.2.1", sym: "alice" }, { assetId: "1.2.2", sym: "bob" }],
+    edges: [{ a: "1.2.1", b: "1.2.2", poolId: "k1", cls: "transfer", kind: "flow", count: 2,
+      perAsset: {}, firstSeen: null, lastSeen: null, depth: 2 }] }, {}, {});
+  eq(rows[0].depth, "2 hops", "twin rows carry hop depth");
+  eq(T.twinColumns().map((c) => c.key).join(","), "from,to,cls,kind,amount,count,span,depth", "twin adds a depth column");
 }
 
 console.log("account-network-ui: " + pass + " pass, " + fail + " fail");

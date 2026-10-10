@@ -78,6 +78,19 @@ NEW_KEYS = {
     "account_net.es_disabled": "The community index is switched off. Turn it on in Settings to draw this map.",
     "account_net.es_bad_account": "That name is not an account on this chain.",
     "account_net.es_unavailable": "The community index is not reachable right now. Try again in a moment.",
+    # ---- two-hop depth words (account-network-copy.js) ----
+    "account_net.depth_label": "Depth",
+    "account_net.depth_1": "1 hop",
+    "account_net.depth_2": "2 hops",
+    "account_net.ring1_label": "Ring 1",
+    "account_net.ring2_label": "Ring 2",
+    "account_net.stale_settings": "Depth or neighbor settings changed — press Draw network.",
+    "account_net.status_depth": "%(depth)s map",
+    "account_net.status_expanded": "expanded: %(names)s",
+    "account_net.status_unexpanded": "%(n)s direct counterparties unexpanded",
+    "account_net.status_expansion_scanned": "%(n)s indexed operations from expansions",
+    "account_net.status_expansion_truncated": "expansion scans truncated to newest operations",
+    "account_net.twin_depth": "Hop",
     # ---- account page seed button (account-ui.js) ----
     "account.draw_network": "Draw network",
     # ---- sitemap card (menu-ui.js, Labs section) ----
