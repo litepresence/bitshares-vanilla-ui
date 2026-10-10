@@ -226,7 +226,7 @@ var AssetUI = (function () {
     })();
     var list = el(d, "div", null, "asset-list"); w.appendChild(list);
     var fees = el(d, "div", null, "asset-fees"); w.appendChild(fees);
-    if (typeof AssetFeedUI !== "undefined" && AssetFeedUI.feeSection) AssetFeedUI.feeSection(d, fees);
+    if (typeof FeesUI !== "undefined" && FeesUI && typeof FeesUI.renderTables === "function") FeesUI.renderTables(d, fees);
     Account.myAccountId().then(function (id) { return Account.resolve(id); }).then(function (me) {
       if (g === gen && !f.input.value) { f.input.value = me.name; try { go.click(); } catch (e) { /* manual LOAD stands */ } } }).catch(function () { /* manual stands */ });
     go.addEventListener("click", function () {

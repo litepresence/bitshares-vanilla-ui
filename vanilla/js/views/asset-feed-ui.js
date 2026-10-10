@@ -30,7 +30,7 @@ var AssetFeedUI = (function () {
     return dflt;
   }
   var CORE = "1.3.0", PLACES = 8;
-  var gen = 0, feeGen = 0;
+  var gen = 0;
   function el(d, t, x, c) { var n = d.createElement(t); if (c) n.className = c; if (x !== undefined && x !== null) n.textContent = x; return n; }
   function touch(n) { n.style.minHeight = "44px"; return n; }
   function wipe(r) { while (r.firstChild) r.removeChild(r.firstChild); }
@@ -108,57 +108,6 @@ var AssetFeedUI = (function () {
   /* No local confirm builder — use ConfirmDialog.show (title/rows/feeHuman/
    * Back/Sign&Send). Fee/network rows are built at the call site; status +
    * sendAndProve stay in the caller's onSend. */
-  /* feeSection: read-only fee-schedule table (slice-9 deferral, Ref #20).
-   * Own per-call token (separate from renderFeed's gen): AssetUI's list
-   * embeds this section but owns a different gen counter, so comparing the
-   * caller's gen against this module's gen never matched and the table
-   * never rendered. The token only guards this box's own async fill, on a
-   * separate counter so it never disturbs renderFeed's gen. */
-  function feeSection(d, box) {
-    var my = ++feeGen;
-    box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees")));
-    status(d, box, t("asset.loading_fees", "Loading fee schedule…"));
-    Asset.feeSchedule().then(function (s) {
-      if (my !== feeGen) return; wipe(box);
-      box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees")));
-      if (!s.fees.length) { box.appendChild(el(d, "p", t("asset.no_fee_rows", "No fee rows returned.") + t("asset.schedule_hint", " The node sent an empty schedule — retry or check Settings → Nodes."), "muted")); return; }
-      var sc = el(d, "div", null, "xplore-scroll"); sc.style.overflowX = "auto";
-      var tb = d.createElement("table"), th = d.createElement("thead"), hr = d.createElement("tr");
-      tb.setAttribute("aria-label", t("fees.network_fees", "Network fees"));
-      [t("asset.op_col", "Op"),  "Fee"].forEach(function (h) { var thc = el(d, "th", h); thc.setAttribute("scope", "col"); hr.appendChild(thc); });
-      th.appendChild(hr); tb.appendChild(th);
-      var tb2 = d.createElement("tbody");
-      s.fees.forEach(function (f) {
-        var tr = d.createElement("tr");
-        var td0 = d.createElement("td");
-        /* The op name links to its desk (same map the standalone #/fees page
-         * uses — FeesUI.deskFor, guarded so a missing fees script degrades
-         * to the plain "id · name" text instead of breaking the table). */
-        var href = null;
-        try {
-          if (typeof FeesUI !== "undefined" && FeesUI && typeof FeesUI.deskFor === "function") {
-            href = FeesUI.deskFor(f.opId);
-          }
-        } catch (e) { href = null; }
-        td0.textContent = f.opId + " · ";
-        if (href) {
-          var a = d.createElement("a");
-          try { a.setAttribute("href", href); } catch (e2) { a.href = href; }
-          a.textContent = f.name;
-          a.title = f.opId + " · " + f.name;
-          td0.appendChild(a);
-        } else {
-          td0.textContent = f.opId + " · " + f.name;
-        }
-        tr.appendChild(td0);
-        var td1 = d.createElement("td");
-        if (f.fee_raw === null) td1.textContent = "—";
-        else { try { td1.textContent = Format.formatAmount(f.fee_raw, s.fee_asset_precision); } catch (e) { td1.textContent = String(f.fee_raw); } td1.title = String(f.fee_raw); }
-        if (f.price_per_kbyte !== undefined) td1.title = (td1.title ? td1.title + " " : "") + "+/kB " + f.price_per_kbyte;
-        tr.appendChild(td1); tb2.appendChild(tr); });
-      tb.appendChild(tb2); sc.appendChild(tb); box.appendChild(sc);
-    }).catch(function (e) { if (my === feeGen) { wipe(box); box.appendChild(el(d, "h2", t("fees.network_fees", "Network fees"))); err(d, box,e,t("asset.fees_failed", "Could not load fees.")); } });
-  }
   /* feedPrice: settlement/CER pair -> 4-sf human string with BOTH
    * precisions (global price rule). Display-only; raw legs stay on the
    * callers' dd titles. */
@@ -588,7 +537,7 @@ var AssetFeedUI = (function () {
       })().catch(function (e) { rev.disabled = false; err(d, body,e,t("asset.producers_prepare_failed", "Could not prepare the producer update.")); });
     });
   }
-  return { renderFeed: renderFeed, feeSection: feeSection };
+  return { renderFeed: renderFeed };
 })();
 if (typeof globalThis !== "undefined" && typeof globalThis.AssetFeedUI === "undefined") { globalThis.AssetFeedUI = AssetFeedUI; }
 if (typeof module !== "undefined") { module.exports = AssetFeedUI; }

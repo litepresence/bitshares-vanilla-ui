@@ -1,15 +1,19 @@
-/* fees-ui.js — standalone network fee-schedule page (matrix C31).
- * Owns: #/fees (read-only grouped table of every op fee, live from the
- *   chain via Asset.feeSchedule — this page's OWN renderer, not
- *   AssetFeedUI.feeSection, so the page carries a single heading plus the
- *   full fee concept set: five groups, named ops, per-fee-type rows,
- *   schedule scale, and the lifetime-member column).
+/* fees-ui.js — the SINGLE shared fee-tables renderer (matrix C31, merged
+ * 2026-10-10: the standalone #/fees page and the compact explorer fork are
+ * gone — every fee surface mounts these tables).
+ * Owns: the read-only grouped table of every op fee, live from the chain
+ *   via Asset.feeSchedule — five groups, named ops (each hyperlinked to its
+ *   desk via OP_DESKS), per-fee-type rows, schedule scale, and the
+ *   lifetime-member column. Mounted by #/explorer/fees (explorer-tabs.js
+ *   feesTab) and the #/assets page. The old #/fees route is deleted outright
+ *   (no redirect — redirects are rot); every menu, help, and explorer link
+ *   points at #/explorer/fees.
  * Consumes: Asset.feeSchedule (sole chain reader — groups, scale,
  *   network_percent_of_fee, per-op raw/scaled maps), Format (human strings;
- *   raw ints in title attributes), Chain (connect gate), Store (reconnect
- *   subscribe). No wallet, no signing, no broadcasts.
- * Globals/side effects: DOM under root only; global FeesUI. Gen counter
- *   tears down stale reconnect work.
+ *   raw ints in title attributes), MarketUI.defaultMarket (network-aware
+ *   exchange-desk target, guarded). No wallet, no signing, no broadcasts.
+ * Globals/side effects: DOM under the given box only; global FeesUI. A
+ *   per-call token tears down stale async fills.
  * Refs (CONCEPTS only, no code): #1 Blockchain/Fees.jsx:18-42 (the five
  *   groups), :45 (ltm_required registrar-paid ops), :70-71 (network_fee =
  *   network_percent_of_fee/1e4, scale = current_fees.scale), :76-94 (op
@@ -41,7 +45,7 @@ var FeesUI = (function () {
     } catch (e) { /* default below */ }
     return dflt;
   }
-  var gen = 0;
+  var secGen = 0;
 
   /* Group order + display names (plain English per header i18n NOTE; the
    * words follow #1 locale-en transaction.feeGroups). */
@@ -167,11 +171,6 @@ var FeesUI = (function () {
   /* No local el — use DOM.el */
   /* Touch floor (principle #7): interactive elements >= 44px one dimension. */
 /* clearRoot removed — use DOM.clear */
-  /* makeWrap: plain .wrap plus the fees-view scoping hook (polish Task 2:
-   * the wide-screen width cap in app.css targets .wrap.fees-view so the
-   * global .wrap both dense and narrow pages share stays untouched). */
-  function makeWrap(doc, root) {
-    var w = doc.createElement("div"); w.className = "wrap fees-view"; root.appendChild(w); return w; }
   /* Inline error panel, never blank. */
   function showError(doc, wrap, e, fallback) {
     var msg = (e && typeof e.message === "string" && e.message) ? e.message : String(e || fallback || t("common.unexpected_error", "Unexpected error"));
@@ -358,84 +357,27 @@ var FeesUI = (function () {
     return missing;
   }
 
-  /* Route entry: single heading + honest scope notes, then the five group
-   * tables from the live schedule. Offline renders Retry + auto-reruns on
-   * reconnect (transfer-ui.js connect-wait pattern, gen-guarded). */
-  function renderFees(root) {
-    if (!root) return;
-    var doc = root.ownerDocument || (typeof document !== "undefined" ? document : null);
-    if (!doc) return;
-    var myGen = ++gen;
-    DOM.clear(root);
-    var wrap = makeWrap(doc, root);
+  /* Route entry: heading + explainer + the shared tables. Hosts without a
+   * page of their own (#/explorer/fees, #/assets) call renderTables below
+   * directly — one renderer, every fee surface. */
+  function renderTables(doc, box) {
+    if (!doc || !box) return;
+    var myGen = ++secGen;
     if (typeof Asset === "undefined" || !Asset || typeof Asset.feeSchedule !== "function") {
-      showError(doc, wrap, t("fees.fee_backend_missing_js_asset_js_failed_to_loa", "Fee backend missing: js/asset.js failed to load."));
+      showError(doc, box, t("fees.fee_backend_missing_js_asset_js_failed_to_loa", "Fee backend missing: js/asset.js failed to load."));
       return;
     }
-    wrap.appendChild(DOM.pageHead(doc, t("fees.network_fees", "Network fees"), "dollar"));
-    wrap.appendChild(DOM.el(doc, "p",
+    box.appendChild(DOM.el(doc, "h2", t("fees.network_fees", "Network fees")));
+    box.appendChild(DOM.el(doc, "p",
       "Every operation fee charged by the network, fetched live from the chain's fee schedule. " +
       "Fees are shown in the core asset; each amount's title (hover or long-press) carries the raw chain value and the schedule scale. " +
       "Each operation name links to the page where you perform it.",
       "muted"));
-    if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
-        Chain.status().state !== "open") {
-      wrap.appendChild(DOM.el(doc, "p", t("common.status_connecting", "Connecting to network…"), "muted"));
-      var fstat = DOM.el(doc, "p", "", "muted");
-      try { fstat.setAttribute("aria-live", "polite"); } catch (e) { /* text stands */ }
-      wrap.appendChild(fstat);
-      var frow = DOM.el(doc, "div", null, "pools-offline-row");
-      wrap.appendChild(frow);
-      var retry = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
-      retry.type = "button"; frow.appendChild(retry);
-      var foff = null;
-      try { foff = (typeof Offline !== "undefined" && Offline) ? Offline : null; } catch (e) { foff = null; }
-      var frender = function () {
-        if (!settled) { settled = true; try { off(); } catch (e) {} }
-        if (myGen === gen) renderFees(root);
-      };
-      if (foff && typeof foff.wire === "function") {
-        try { foff.wire(retry, fstat, frender, t); } catch (e) { retry.addEventListener("click", frender); }
-      } else {
-        retry.addEventListener("click", frender);
-      }
-      var flink = null;
-      if (foff && typeof foff.settingsLink === "function") {
-        try { flink = foff.settingsLink(doc, t); } catch (e) { flink = null; }
-      }
-      if (!flink) {
-        flink = DOM.el(doc, "a", t("notice.open_settings", "Open Settings"));
-        try { flink.setAttribute("href", "#/settings"); } catch (e) { /* label stands */ }
-        touchable(flink);
-      }
-      frow.appendChild(flink);
-      var hashAtEntry = (typeof location !== "undefined" && location.hash) || "", settled = false;
-      var off = function () {};
-      if (typeof Store !== "undefined" && Store && typeof Store.subscribe === "function") {
-        off = Store.subscribe("connection", function (st) {
-          if (settled || myGen !== gen) return;
-          if (st && st.state === "open") {
-            settled = true; try { off(); } catch (e) {}
-            if (typeof location === "undefined" || location.hash === hashAtEntry) renderFees(root);
-          }
-        });
-      }
-      /* Automated handshake on entry (shared Offline helper owns the throttle).
-       * The Retry button is wired via Offline.wire above (handshake-first);
-       * its frender settles this wait the same way the old handler did. */
-      try { if (typeof Offline !== "undefined" && Offline && typeof Offline.ensure === "function") Offline.ensure(); } catch (e) { /* wait above covers */ }
-      var timer = setTimeout(function () {
-        if (settled || myGen !== gen) return;
-        settled = true; try { off(); } catch (e) {}
-      }, 15000);
-      return;
-    }
-    var box = doc.createElement("div");
-    wrap.appendChild(box);
     box.appendChild(DOM.el(doc, "p", t("fees.loading_fee_schedule", "Loading fee schedule…"), "muted"));
     Asset.feeSchedule().then(function (s) {
-      if (myGen !== gen) return;
+      if (myGen !== secGen) return;
       DOM.clear(box);
+      box.appendChild(DOM.el(doc, "h2", t("fees.network_fees", "Network fees")));
       var byId = {}, i;
       (s.fees || []).forEach(function (f) { byId[f.opId] = f; });
       var ltmReq = {};
@@ -467,21 +409,26 @@ var FeesUI = (function () {
           "related operation's fee (e.g. collateral bids fall back to the margin-update fee).",
           "muted"));
       }
-      var more = DOM.el(doc, "p", null, "muted");
-      var a = doc.createElement("a");
-      a.href = "#/assets"; a.textContent = t("fees.back_to_assets", "Back to Assets");
-      more.appendChild(a); box.appendChild(more);
     }).catch(function (e) {
-      if (myGen !== gen) return;
+      if (myGen !== secGen) return;
       DOM.clear(box);
+      box.appendChild(DOM.el(doc, "h2", t("fees.network_fees", "Network fees")));
       showError(doc, box, e, t("asset.fees_failed", "Could not load fees."));
-      var retry2 = touchable(DOM.el(doc, "button", t("fees.retry", "Retry")));
-      retry2.type = "button"; box.appendChild(retry2);
-      retry2.addEventListener("click", function () { if (myGen === gen) renderFees(root); });
+      var retryBtn = DOM.el(doc, "button", t("fees.retry", "Retry"));
+      retryBtn.type = "button";
+      try {
+        if (typeof touchable !== "undefined" && touchable) touchable(retryBtn);
+      } catch (eR) { /* label stands */ }
+      box.appendChild(retryBtn);
+      retryBtn.addEventListener("click", function () {
+        if (myGen !== secGen) return;
+        DOM.clear(box);
+        renderTables(doc, box);
+      });
     });
   }
 
-  return { renderFees: renderFees, deskFor: deskFor, _test: { deskFor: deskFor } };
+  return { renderTables: renderTables, deskFor: deskFor, _test: { deskFor: deskFor } };
 })();
 
 if (typeof module !== "undefined") { module.exports = FeesUI; }

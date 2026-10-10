@@ -9,7 +9,7 @@
  *   ExplorerBlocks/ExplorerAssets). No signing, no storage.
  * Consumes: Pool.list (pool rows), Chain (lookup_accounts, get_top_markets),
  *   Asset.describe (market symbols, fail-open per row), Vote.lists
- *   (witness/committee entries), AssetFeedUI.feeSection (fee table),
+ *   (witness/committee entries), FeesUI.renderTables (fee tables),
  *   ExplorerUI gen guard via isCurrent callback passed by the shell —
  *   callers pass a live() closure, never the counter. Side effects: DOM
  *   under the given body only; global ExplorerTabs only.
@@ -475,22 +475,19 @@ var ExplorerTabs = (function () {
     });
   }
 
-  /* feesTab: the SAME shared fee table #/fees embeds (no fork). */
+  /* feesTab: the shared fee tables (FeesUI.renderTables — the single fee
+   * renderer every surface mounts; the old compact fork is gone). */
   function feesTab(doc, body, live) {
     void live;
-    if (typeof AssetFeedUI !== "undefined" && AssetFeedUI &&
-        typeof AssetFeedUI.feeSection === "function") {
+    if (typeof FeesUI !== "undefined" && FeesUI &&
+        typeof FeesUI.renderTables === "function") {
       try {
-        AssetFeedUI.feeSection(doc, body);
+        FeesUI.renderTables(doc, body);
       } catch (e) {
         errBox(doc, body, (e && e.message) || "Could not load fees.");
-        return;
       }
-      var p = el(doc, "p", null, "muted");
-      p.appendChild(link(doc, "#/fees", "Open the full fee schedule →"));
-      body.appendChild(p);
     } else {
-      errBox(doc, body, "Fee backend missing: js/asset-feed-ui.js failed to load.");
+      errBox(doc, body, "Fee backend missing: js/views/fees-ui.js failed to load.");
     }
   }
 

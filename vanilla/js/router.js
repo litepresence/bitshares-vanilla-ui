@@ -282,7 +282,6 @@ var Router = (function () {
     { path: "/assets/update/:symbol", title: "Update Asset", render: function (root, params) { AssetManageUI.renderUpdate(root, params && params.symbol); } },
     { path: "/assets/issue", title: "Issue Asset", render: function (root) { AssetManageUI.renderIssue(root); } },
     { path: "/assets/feed", title: "Publish Feed", render: function (root) { AssetFeedUI.renderFeed(root); } },
-    { path: "/fees", title: "Network Fees", render: function (root) { FeesUI.renderFees(root); } },
     { path: "/referrals", title: "Referrals", render: function (root) { ReferralsUI.renderReferrals(root); } },
     { path: "/favourites", title: "Favourites", render: function (root) { FavouritesUI.renderFavourites(root); } },
     { path: "/top-ops", title: "Top Operations", render: function (root) { TopOpsUI.renderTopOps(root); } },

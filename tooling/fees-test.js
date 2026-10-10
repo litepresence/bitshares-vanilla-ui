@@ -14,6 +14,7 @@ function eq(g, w, n) {
 
 const T = { deskFor: FeesUI.deskFor };
 ok(typeof FeesUI.deskFor === "function", "deskFor is a public export (the explorer fees tab consumes it)");
+ok(typeof FeesUI.renderTables === "function", "renderTables is the single shared fee-tables renderer (used by #/explorer/fees and #/assets)");
 ok(T && typeof T.deskFor === "function", "deskFor exported for vectors");
 
 /* Every op id 0..77 resolves to an in-app hash link. */

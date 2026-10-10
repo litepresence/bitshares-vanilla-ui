@@ -87,7 +87,7 @@ var HelpUI = (function () {
     ["lists", "Allow and block lists", "Control who can hold or transact your assets.", "#/lists"],
     ["airdrop", "Airdrops", "Distribute an asset to many accounts in one plan.", "#/airdrop"],
     ["invoice", "Invoices", "Request a specific payment with a shareable invoice.", "#/invoice"],
-    ["fees", "Network fees", "What each operation costs and which asset pays it.", "#/fees"],
+    ["fees", "Network fees", "What each operation costs and which asset pays it.", "#/explorer/fees"],
     ["referrals", "Referrals", "How registration splits fees between referrer and registrar.", "#/referrals"],
     ["favourites", "Favourites", "Pin markets, assets and accounts for quick access.", "#/favourites"],
     ["tour", "Welcome tour", "The five-step first-run walkthrough; replay it any time.", "#/"],

@@ -222,8 +222,9 @@ var Asset = (function () {
    * "op_<id>"), virtual, group (group key or null), raw ({fee-param key ->
    * UNSCALED raw string, every key the schedule carries}), scaled ({same
    * keys -> raw * scale / 10000, BigInt floor <- #1 Fees.jsx:106, never
-   * float}), fee_raw (LEGACY for asset-feed-ui.js feeSection: scaled "fee"
-   * string, null when the op carries no flat fee), price_per_kbyte (LEGACY
+   * float}), fee_raw (unread since the 2026-10-10 fee merge retired the
+   * compact table: scaled "fee" string, null when the op carries no flat
+   * fee — kept for shape stability), price_per_kbyte (likewise unread;
    * scaled number, absent when the schedule carries none)}]}. Only
    * additive fields were added — issuedBy/describe/feeSchedule shapes that
    * older callers use are unchanged (fee_raw stays null-for-no-flat-fee so

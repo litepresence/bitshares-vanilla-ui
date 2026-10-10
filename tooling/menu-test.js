@@ -20,7 +20,7 @@ eq(new Set(all).size, all.length, "no href listed twice (single-home)");
  * routable, it is simply no longer a navbar destination. */
 ["#/", "#/transfer", "#/markets", "#/samet", "#/barter", "#/spotlight",
  "#/direct-debit", "#/api-lab", "#/es-lab", "#/txbuilder", "#/ops", "#/top-ops",
- "#/registration", "#/voting", "#/fees", "#/news", "#/community", "#/about"].forEach(function (h) {
+ "#/registration", "#/voting", "#/explorer/fees", "#/news", "#/community", "#/about"].forEach(function (h) {
   ok(all.indexOf(h) !== -1, h + " listed");
 });
 eq(MenuUI._test.findSection("earn").links.length, 7, "earn has 7 links");

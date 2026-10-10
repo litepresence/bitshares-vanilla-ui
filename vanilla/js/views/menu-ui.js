@@ -115,7 +115,7 @@ var MenuUI = (function () {
         { href: "#/assets/create", icon: "plus-circle", titleKey: "menu.p_asset_create", titleDefault: "Create asset", blurbKey: "menu.d_asset_create", blurbDefault: "Issue your own token." },
         { href: "#/assets/issue", icon: "deposit", titleKey: "menu.p_asset_issue", titleDefault: "Issue Asset", blurbKey: "menu.d_asset_issue", blurbDefault: "Mint supply of an asset you control." },
         { href: "#/assets/feed", icon: "connected", titleKey: "menu.p_asset_feed", titleDefault: "Publish feed", blurbKey: "menu.d_asset_feed", blurbDefault: "Publish price feeds as issuer or witness." },
-        { href: "#/fees", icon: "dollar-green", titleKey: "menu.p_fees", titleDefault: "Network fees", blurbKey: "menu.d_fees", blurbDefault: "What each operation costs." },
+        { href: "#/explorer/fees", icon: "dollar-green", titleKey: "menu.p_fees", titleDefault: "Network fees", blurbKey: "menu.d_fees", blurbDefault: "What each operation costs." },
         { href: "#/ops", icon: "list", titleKey: "menu.p_ops", titleDefault: "Operations", blurbKey: "menu.d_ops", blurbDefault: "Ranked operation counts from recent blocks." },
         { href: "#/top-ops", icon: "fire", titleKey: "menu.p_topops", titleDefault: "Top Operations", blurbKey: "menu.d_topops", blurbDefault: "Rankings with the chain-activity donut." },
         { href: "#/news", icon: "news", titleKey: "menu.p_news", titleDefault: "News", blurbKey: "menu.d_news", blurbDefault: "Project news and updates." }
