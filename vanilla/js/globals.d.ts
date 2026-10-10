@@ -9,6 +9,7 @@
 declare var AboutUI: any;
 declare var Account: any;
 declare var AccountNet: any;
+declare var AccountNetDepth: any;
 declare var AccountNetES: any;
 declare var AccountNetworkCopy: any;
 declare var AccountNetworkUI: any;

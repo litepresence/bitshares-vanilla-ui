@@ -224,6 +224,23 @@ eq(AccountNet.dedupeKey({ _source: { block_data: {}, account_history: {} } }), n
   ok(w === "999999999", "weightRaw is the largest single asset sum, not a total (" + w + ")");
 })();
 
+const AccountNetDepth = require("/workspace/vanilla/js/api/account-net-depth.js");
+
+/* ================= Two-hop depth planner ================= */
+eq(AccountNetDepth.normalizeDepth("2"), 2, "depth accepts 2");
+eq(AccountNetDepth.normalizeDepth("7"), 1, "depth above 2 normalizes to 1");
+eq(AccountNetDepth.normalizeDepth(0), 1, "depth below 1 normalizes to 1");
+eq(AccountNetDepth.normalizeRing1("999"), 40, "ring 1 clamps to 40");
+eq(AccountNetDepth.normalizeRing2("0"), 1, "ring 2 clamps up to 1");
+eq(AccountNetDepth.expansionCount(2, 8), 8, "depth 2 allows 8 expansions");
+eq(AccountNetDepth.expansionCount(1, 8), 0, "depth 1 expands nothing");
+eq(AccountNetDepth.topCounterparties({ "1.2.2": 5, "1.2.3": 9, "1.2.4": 9 }, { "1.2.1": 1 }, 2),
+  ["1.2.3", "1.2.4"], "top counterparties rank by ops, ties break by id");
+eq(AccountNetDepth.planExpansions({ "1.2.2": 5, "1.2.1": 9 }, { "1.2.1": 1 }, {}, 2),
+  ["1.2.2"], "seeds are never expansion targets");
+eq(AccountNetDepth.planExpansions({ "1.2.2": 5 }, { "1.2.1": 1 }, { "1.2.2": 1 }, 2),
+  [], "already-scanned accounts are not expanded again");
+
 /* ================= Task 3: ES walk + credit join ================= */
 
 function esPage(n, tag) {
