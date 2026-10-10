@@ -196,3 +196,75 @@ Viewport result: `#/account-network` passes at phone and desk widths. The
 newly added `#/menu/labs` sweep still reports the pre-existing A3 stranded
 column at desk width (`div.wrap` occupies 42% of the viewport); that separate
 Labs TOC layout issue is not changed by this fix.
+
+## 12. Two-hop expansion (plan Task 5, 2026-10-10)
+
+Wiring + proof of the optional second hop. Design (Tasks 1–4 built it;
+this task wires and proves it):
+
+- **Policy** (`vanilla/js/api/account-net-depth.js`, global
+  `AccountNetDepth`): depth ∈ {1, 2}, ring1 default 40 (range 1–40), ring2
+  default 8 (range 1–8). Ring-1 keeps the top-40 direct counterparties by
+  line count; ring-2 expands at most 8 of them (same ranking), each
+  expansion scan truncated to newest operations. Global dedupe across both
+  rings by block + operation id.
+- **Widget** (`vanilla/js/views/account-network-depth-ui.js`, global
+  `AccountNetworkDepthUI`): `1 hop` / `2 hops` segmented buttons
+  (`aria-pressed`) plus overlaid Ring 1/Ring 2 number pills on the canvas
+  stage; when the stage is absent the same nodes mount in normal flow
+  before the twin (fallback). Edits persist prefs, re-sync the shareable
+  hash via `replaceState`, and mark the on-screen map stale — never
+  auto-rescan (depth-2 is the expensive mode).
+- **Wiring (this task)**: `vanilla/index.html` gains two script tags in
+  dependency order (`account-net-depth.js` after the transport script,
+  `account-network-depth-ui.js` after the copy script, same `?v=b519fbf`
+  token); `vanilla/js/globals.d.ts` gains alphabetical dev-only
+  `declare var AccountNetDepth` / `AccountNetworkDepthUI`;
+  `tooling/visual/viewport-audit.mjs` gains the idle depth route
+  `#/account-network?depth=2&ring1=40&ring2=8` (group `static`).
+
+Live proof (mainnet, `committee-account`, classes transfer+credit,
+depth=2&ring1=40&ring2=8):
+
+- One `.wrap`, `Account Network` h1, `assets/icons/connected.svg` icon;
+  `2 hops` pressed, Ring 1 = 40 / Ring 2 = 8, both enabled.
+- Status names everything honestly:
+  `committee-account · 2065 indexed operations from 1 account(s) · 41
+  accounts · 71 lines · 2 hops map · top 40 counterparties shown · top 400
+  lines shown · expanded: 1.2.1798435, … (8 ids) · 32 direct
+  counterparties unexpanded · 6167 indexed operations from expansions ·
+  expansion scans truncated to newest operations`.
+- Live canvas (1348×638 desk, 326×478 phone) with labeled nodes + arrowed
+  edges; twin table 71 rows with the depth-labeled `Hop` column last
+  (`1 hop` / `2 hops` per row, verified in node against
+  `AccountNetworkCopy.twinRows`/`twinColumns`).
+- Stale: editing Ring 1 → status becomes `Depth or neighbor settings
+  changed — press Draw network.`, hash re-syncs (`ring1=10`), canvas kept
+  (no auto re-scan).
+- Fallback (engine mount script blocked): pills mount in normal flow, the
+  honest canvas-missing copy shows, the twin still lists all 71 lines.
+- Three themes × 360 px / 1440 px: all render; zero app console errors in
+  every run (the single `net::ERR_FAILED` in the fallback run is the probe
+  deliberately aborting the engine script, not app output).
+- Gates: `account-net` **106**, `account-net-paint` **15**,
+  `account-network-ui` **75**, `menu-test` **28** — all pass;
+  `check_types.sh` PASS · `check_i18n.py` OK (3895 keys, 5116 call sites) ·
+  `check_rot.py` PASSED · `audit_view_mounts.py` PASS.
+- Nav-mount probe PASS (incl. live draw); targeted viewport sweep
+  `#/account-network` × phone/desk: **4/4 PASS**. The sweep regenerates
+  standing artifacts, so `docs/parity/viewport-audit-2.json` and
+  `docs/parity/viewport-shots/` were restored afterwards — the commit
+  carries only the route-table line.
+
+Known issue found by this audit (NOT fixed here — pre-existing Tasks-1–4
+mount, needs its own task + vectors, so deliberately outside this
+commit's four files): below the account canvas the shared engine's pool
+chrome leaks pool wording into account mode — `71 pools · 41 assets`,
+the `BLUE3 / OTHER` brand legend, `Pool size: small → large`, and a
+`Pool rows (71)` details table duplicating the account twin (whose own
+`Table view (accessible)` with the Hop column is the honest table).
+Account mode already suppresses the engine's status strip
+(`pool-net-ui.js:202-209`) but not its verdict/legend/twin
+(`NC.twin` runs unconditionally at `pool-net-ui.js:398`). The account
+twin itself is correct; only the pool chrome needs an account-mode
+guard.

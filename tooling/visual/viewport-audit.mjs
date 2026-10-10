@@ -140,6 +140,7 @@ export const ROUTES = [
   { src: "/api-lab", hash: "#/api-lab", group: "static" },
   { src: "/es-lab", hash: "#/es-lab", group: "static" },
   { src: "/account-network", hash: "#/account-network", group: "static" },
+  { src: "/account-network-depth", hash: "#/account-network?depth=2&ring1=40&ring2=8", group: "static" },
   { src: "/menu/labs", hash: "#/menu/labs", group: "expanded" },
   { src: "/menu", hash: "#/menu", group: "static" },
   { src: "/menu/:section", hash: "#/menu/wallet", group: "expanded" },

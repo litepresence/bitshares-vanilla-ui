@@ -12,6 +12,7 @@ declare var AccountNet: any;
 declare var AccountNetDepth: any;
 declare var AccountNetES: any;
 declare var AccountNetworkCopy: any;
+declare var AccountNetworkDepthUI: any;
 declare var AccountNetworkUI: any;
 declare var AccountUI: any;
 declare var AccountsUI: any;
