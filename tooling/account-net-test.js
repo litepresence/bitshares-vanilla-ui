@@ -482,6 +482,36 @@ function stubFetch(pages) {
     eq(seenBodies.length, 2, "one ring-0 scan plus one expansion scan ran");
   }
 
+  // 25b. depth 2 with ring1 < ring2 expands only the retained ring-1 pool
+  {
+    const seenBodies = [];
+    const prevFetch = globalThis.fetch;
+    const prevAccount = globalThis.Account;
+    globalThis.Account = { resolve: (n) => Promise.resolve({ id: "1.2.1", name: "alice" }) };
+    globalThis.fetch = function (url, opts) {
+      const body = JSON.parse(String(opts.body));
+      seenBodies.push(body);
+      const party = JSON.stringify(body.query);
+      function hit(from, to, seq) {
+        return { sort: [1790000000000 + seq], _source: { operation_type: 0,
+          account_history: { account: from, operation_id: 9000 + seq },
+          block_data: { block_num: 80000 + seq, block_time: "2026-09-01T10:00:00" },
+          operation_history: { op_object: { from: from, to: to,
+            amount_: { amount: "1000000", asset_id: "1.3.0" }, fee: { amount: 0, asset_id: "1.3.0" } } } } };
+      }
+      let hits = [];
+      if (party.indexOf('"1.2.1"') !== -1) hits = [hit("1.2.1", "1.2.2", 1), hit("1.2.1", "1.2.2", 2), hit("1.2.1", "1.2.3", 3)];
+      else if (party.indexOf('"1.2.2"') !== -1) hits = [hit("1.2.2", "1.2.4", 4)];
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ hits: { hits: hits } }) });
+    };
+    const out = await AccountNet.gather(["alice"], ["transfer"], { depth: 2, ring1: 1, ring2: 8 });
+    globalThis.fetch = prevFetch;
+    globalThis.Account = prevAccount;
+    eq(out.graph.stats.expanded.join(","), "1.2.2", "ring1=1 retains only the top counterparty for expansion");
+    eq(seenBodies.length, 2, "ring1=1 runs one ring-0 scan plus one expansion scan");
+    ok(JSON.stringify(seenBodies).indexOf('"1.2.3"') === -1, "unretained counterparty 1.2.3 is never scanned");
+  }
+
   console.log("account-net: " + pass + " pass, " + fail + " fail");
   /* exitCode, not exit(): process.exit() can drop a piped stdout write. */
   process.exitCode = fail ? 1 : 0;

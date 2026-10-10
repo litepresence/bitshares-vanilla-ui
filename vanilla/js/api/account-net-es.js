@@ -590,11 +590,18 @@ var AccountNetES = (function () {
         });
         var wanted = [];
         if (depth >= 2 && maxExpansions > 0) {
+          /* Ring 1 controls the expansion pool: depth-2 targets are chosen
+           * from the RETAINED top-ring1 set, not from full counts. Seeds and
+           * already-scanned exclusions stay as-is inside planExpansions. */
+          var retainedCounts = {};
+          retained.forEach(function (id) {
+            if (counts[id] !== undefined) retainedCounts[id] = counts[id];
+          });
           try {
-            if (D && typeof D.planExpansions === "function") wanted = D.planExpansions(counts, seedIds, scannedIds, maxExpansions);
+            if (D && typeof D.planExpansions === "function") wanted = D.planExpansions(retainedCounts, seedIds, scannedIds, maxExpansions);
           } catch (e) { wanted = null; }
           if (!Array.isArray(wanted)) {
-            wanted = rankTopFallback(counts, seedIds, Object.keys(counts).length)
+            wanted = rankTopFallback(retainedCounts, seedIds, Object.keys(retainedCounts).length)
               .filter(function (id) { return !scannedIds[id]; }).slice(0, maxExpansions);
           }
         }
