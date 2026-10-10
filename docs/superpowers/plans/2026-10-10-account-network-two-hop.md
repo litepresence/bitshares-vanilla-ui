@@ -147,11 +147,14 @@ var AccountNetDepth = (function () {
   }
 
   /**
-   * normalizeDepth: only 1 or 2 exist.
+   * normalizeDepth: only 1 or 2 exist. Anything else resets to the default —
+   * a clamp would silently promote an invalid depth to 2, the expensive mode.
    * @param {*} v Raw depth. @returns {number} 1 or 2.
    */
   function normalizeDepth(v) {
-    return clampInt(v, DEFAULT_DEPTH, 1, MAX_DEPTH);
+    var n = Math.floor(Number(v));
+    if (n !== 1 && n !== 2) return DEFAULT_DEPTH;
+    return n;
   }
 
   /**
