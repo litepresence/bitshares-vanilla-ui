@@ -205,5 +205,11 @@ eq(T.parseSeeds(null), [], "null input is no seeds");
   eq(T.twinColumns().map((c) => c.key).join(","), "from,to,cls,kind,amount,count,span,depth", "twin adds a depth column");
 }
 
+const DepthUI = require("/workspace/vanilla/js/views/account-network-depth-ui.js");
+
+/* ---- depth widget sanitizer ---- */
+eq(DepthUI.sanitize({ depth: "2", ring1: "999", ring2: "0" }),
+  { depth: 2, ring1: 40, ring2: 1 }, "widget sanitizes depth inputs through the depth policy");
+
 console.log("account-network-ui: " + pass + " pass, " + fail + " fail");
 process.exitCode = fail ? 1 : 0;

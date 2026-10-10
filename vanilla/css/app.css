@@ -1708,3 +1708,33 @@ p.muted[aria-live="polite"],
 @media (max-width: 640px) {
   .an-chips { gap: 6px; }
 }
+/* Account-network depth pills (two-hop plan Task 4): the depth selector is
+ * two aria-pressed buttons in the existing controls row; the Ring 1/Ring 2
+ * numerics ride ONE .an-depth pill that overlays the canvas top-right when
+ * the engine built a .pool-net-stage, else sits in the normal-flow
+ * .an-depth-fallback under the graph. Tokens only (all three themes); the
+ * overlay is pointer-transparent except its controls so canvas gestures
+ * keep working; inputs keep the 44px touch floor (principle #7). */
+.an-depth-btns { display: inline-flex; gap: 6px; align-items: center; }
+.an-depth-btn { min-height: 44px; min-width: 44px; padding: 6px 12px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.an-depth-btn[aria-pressed="true"] { border-color: var(--accent); font-weight: bold; }
+.an-depth-btn[aria-pressed="false"] { opacity: 0.65; }
+.an-depth { position: absolute; top: 12px; right: 12px;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  margin: 0; padding: 4px 8px; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--border); }
+.pool-net-stage > .an-depth { pointer-events: none; }
+.pool-net-stage > .an-depth label, .pool-net-stage > .an-depth input { pointer-events: auto; }
+.an-depth-fallback { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.an-depth-fallback > .an-depth { position: static; }
+.an-depth label, .an-depth-fallback label { display: inline-flex; gap: 6px; align-items: center;
+  font-weight: bold; color: var(--text); }
+.an-depth input, .an-depth-fallback input { max-width: 64px; min-height: 44px;
+  background: var(--panel); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px; }
+.an-depth input:disabled, .an-depth-fallback input:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (max-width: 640px) {
+  .an-depth { top: 8px; right: 8px; padding: 2px 6px; }
+}

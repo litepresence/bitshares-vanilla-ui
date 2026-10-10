@@ -6,11 +6,12 @@
  *   the mount of the shared network canvas in account mode. DATA ONLY: this
  *   page never builds, signs or broadcasts anything.
  * Consumes: AccountNet (gather/classify tables — all graph rules live
- *   there), PoolNetUI.mount (physics, zoom/pan, drag, tap, keyboard,
- *   resize, IntersectionObserver, reduced-motion), Account.resolve + Credit
- *   (inside AccountNet), Asset.describe for symbols/precisions, Format for
- *   human amounts AT RENDER, TableRenderer, DOM.*, Router.query, I18n.t,
- *   localStorage (recent seeds only).
+ *   there), AccountNetworkDepthUI (depth selector + overlaid Ring 1/Ring 2
+ *   pills; prefs/hash/stale stay here), PoolNetUI.mount (physics, zoom/pan,
+ *   drag, tap, keyboard, resize, IntersectionObserver, reduced-motion),
+ *   Account.resolve + Credit (inside AccountNet), Asset.describe for
+ *   symbols/precisions, Format for human amounts AT RENDER, TableRenderer,
+ *   DOM.*, Router.query, I18n.t, localStorage (recent seeds only).
  * Side effects: one lazy ES scan + chain reads per explicit draw (never on
  *   boot), a canvas rAF loop owned by PoolNetUI, and listeners drained by
  *   _cleanups on route leave. Global AccountNetworkUI.
@@ -54,6 +55,22 @@ var AccountNetworkUI = (function () {
   var SEEDS_KEY = String((COPY && COPY.SEEDS_KEY) || "accountNet.seeds.v1");
   /** @type {string} */
   var CLASSES_KEY = String((COPY && COPY.CLASSES_KEY) || "accountNet.classes.v1");
+
+  /**
+   * depthUI: the AccountNetworkDepthUI widget module (depth selector + ring
+   * pills). A missing script degrades to no pills — prefs, hash and the
+   * depth gather still work, because those live here and in the copy module.
+   * Reads the global off globalThis (no bare name: the Task 5 wiring owns
+   * the globals.d.ts declaration).
+   * @returns {any} The widget module, or null when it is not loadable here.
+   */
+  function depthUI() {
+    try {
+      var g = (typeof globalThis !== "undefined") ? globalThis : null;
+      if (g && /** @type {any} */ (g).AccountNetworkDepthUI) return /** @type {any} */ (g).AccountNetworkDepthUI;
+    } catch (e) { /* fall through */ }
+    return null;
+  }
 
   /* localStorage reads for the seeds box and the class selection (the copy
    * module only READS the saved selection; writes stay here, with the page). */
@@ -200,9 +217,21 @@ var AccountNetworkUI = (function () {
 
       /* ---- state ---- */
       var fromHash = COPY.parseHash(typeof location !== "undefined" ? location.hash : "");
+      /* Depth prefs: the hash wins when it names a depth (a shared 2-hop
+       * link must open as one); otherwise the saved prefs stand, else the
+       * policy defaults. The widget re-sanitizes on mount. */
+      var depthInit = null;
+      try { depthInit = COPY.readDepthPrefs(); } catch (eDepth) { depthInit = null; }
+      try {
+        if (typeof location !== "undefined" && location && /[?&]depth=/.test(String(location.hash || ""))) {
+          depthInit = COPY.parseDepth(location.hash);
+        }
+      } catch (eDepthHash) { /* saved prefs stand */ }
+      if (!depthInit || typeof depthInit !== "object") depthInit = { depth: 1, ring1: 40, ring2: 8 };
       var state = {
         seeds: fromHash.seeds.length ? fromHash.seeds : COPY.parseSeeds(_lsGet(SEEDS_KEY)),
         classes: fromHash.classes.length ? fromHash.classes : null,
+        depth: depthInit,
         names: {}, assets: {}, graph: null, net: null, busy: false
       };
       seedInput.value = state.seeds.join(", ");
@@ -247,7 +276,8 @@ var AccountNetworkUI = (function () {
        * fallback for hosts without the History API. */
       function syncHash() {
         try {
-          var next = COPY.hashFor(state.seeds, activeClasses());
+          var dd = (state && state.depth) || { depth: 1, ring1: 40, ring2: 8 };
+          var next = COPY.hashForDepth(state.seeds, activeClasses(), dd.depth, dd.ring1, dd.ring2);
           try {
             if (typeof location === "undefined") return;
             if (location.hash === next) return;
@@ -259,6 +289,45 @@ var AccountNetworkUI = (function () {
           if (typeof location !== "undefined") location.hash = next;
         } catch (e) { /* keep the current url */ }
       }
+
+      /* ---- depth selector + ring pills (AccountNetworkDepthUI) ---- */
+      var drawn = null;   /* what the map on screen was drawn with; null = nothing drawn yet */
+      var depthWidget = null;
+      /**
+       * onDepthChange: a depth/ring edit is already persisted (the widget did
+       * that) — re-sync the shareable hash and mark the on-screen map stale.
+       * Never auto-scans: a depth-2 draw is the expensive mode, so the user
+       * re-draws when ready.
+       * @param {{depth:number, ring1:number, ring2:number}} next Committed widget state.
+       * @returns {void}
+       */
+      function onDepthChange(next) {
+        state.depth = { depth: next.depth, ring1: next.ring1, ring2: next.ring2 };
+        syncHash();
+        if (drawn && (drawn.depth !== next.depth || drawn.ring1 !== next.ring1 || drawn.ring2 !== next.ring2)) {
+          try { status.textContent = COPY.staleSettingsText(); } catch (eStale) { /* facts stand */ }
+        }
+      }
+      (function mountDepth() {
+        var DUI = depthUI();
+        if (!DUI || typeof DUI.mount !== "function") return;
+        try {
+          depthWidget = DUI.mount(doc, {
+            controlsRow: controls,
+            graphHost: graphHost,
+            fallbackHost: wrap,
+            fallbackBefore: twin,
+            initial: depthInit,
+            onChange: onDepthChange
+          });
+        } catch (eMount) { depthWidget = null; }
+        if (depthWidget && typeof depthWidget.get === "function") {
+          try { state.depth = depthWidget.get(); } catch (eGet) { /* prefs stand */ }
+        }
+        if (depthWidget && typeof depthWidget.destroy === "function") {
+          _cleanups.push(depthWidget.destroy);
+        }
+      })();
 
       /* ---- asset + account name lookup (display only) ---- */
       function loadAssets(ids) {
@@ -323,6 +392,7 @@ var AccountNetworkUI = (function () {
           loaded[1] && Object.keys(loaded[1]).forEach(function (k) { state.assets[k] = loaded[1][k]; });
           graph.nodes.forEach(function (n) { if (!n.sym) n.sym = state.names[n.assetId] || n.assetId; });
           status.textContent = COPY.statusText({ seeds: res.seeds, unknown: res.unknown, stats: res.stats });
+          drawn = { depth: state.depth.depth, ring1: state.depth.ring1, ring2: state.depth.ring2 };
           paintTwin(graph);
           if (typeof PoolNetUI !== "undefined" && PoolNetUI && typeof PoolNetUI.mount === "function") {
             if (state.net && typeof state.net.destroy === "function") { try { state.net.destroy(); } catch (e) {} }
@@ -354,6 +424,11 @@ var AccountNetworkUI = (function () {
             graphHost.appendChild(_el(doc, "p", t("account_net.canvas_missing",
               "The network canvas is unavailable in this build; the table below still lists every line."), "muted"));
           }
+          /* The canvas mount cleared the graph host — re-home the SAME pill
+           * nodes (stage overlay when one exists, normal-flow fallback
+           * otherwise), so the pills survive every re-draw. */
+          try { if (depthWidget && typeof depthWidget.place === "function") depthWidget.place(); }
+          catch (ePlace) { /* pills stand where they are */ }
         });
       }
 
@@ -453,7 +528,8 @@ var AccountNetworkUI = (function () {
         detail.textContent = COPY.detailText({ edge: null });
         _drawSeq++;
         var myDraw = _drawSeq;
-        AccountNet.gather(seeds, classes, {}).then(function (res) {
+        var dd = (state && state.depth) || { depth: 1, ring1: 40, ring2: 8 };
+        AccountNet.gather(seeds, classes, { depth: dd.depth, ring1: dd.ring1, ring2: dd.ring2 }).then(function (res) {
           if (myDraw !== _drawSeq) return;      /* a newer press won */
           state.busy = false;
           return paintGraph(res);
