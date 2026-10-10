@@ -195,6 +195,7 @@ declare var EventDelegate: any;
 declare var nobleGetPublicKey: any;
 declare var nobleSignAsync: any;
 declare var nobleGetSharedSecret: any;
+declare var ScryptKdf: any;
 declare var I18n: any;
 declare var chrome: any;
 declare var browser: any;

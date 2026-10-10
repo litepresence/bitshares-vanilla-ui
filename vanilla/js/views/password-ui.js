@@ -11,7 +11,7 @@
  *   No Chain, no Account, no Format (no amounts on screen).
  * Globals/side effects: DOM under root only; localStorage envelope rewrite
  *   via Wallet.create; global PasswordUI. Gen counter tears down stale async.
- * Refs: slice-02 keystore (PBKDF2-600k/AES-GCM, wallet.js:10-24);
+ * Refs: slice-02 keystore + v2 scrypt/HKDF/verifier upgrade (wallet.js);
  *   wallet-extension keystore discipline (verify-before-rewrite, #3).
  * Created by: deferred-matrix close-out (C30/C31/C34/C35 batch).
  */

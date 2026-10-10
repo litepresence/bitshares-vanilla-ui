@@ -5,14 +5,21 @@
 // Usage (server must be running: python3 -m http.server 8081 --directory vanilla):
 //   node shot.mjs --url http://localhost:8081/#/settings --width 1440 --out /tmp/s.png
 //   node shot.mjs --url http://localhost:8081/#/settings --width 390 --theme dark --out /tmp/s-mobile.png
+//   node shot.mjs --url http://localhost:8081/#/settings --browser firefox --out /tmp/s.png
 //
-// Requires: PLAYWRIGHT_BROWSERS_PATH=$PWD/.browsers (this dir). Stdlib + playwright-core only.
+// --browser picks the Playwright engine (chromium default | firefox | webkit).
+// Use whichever engine is actually installed in the shared ms-playwright
+// cache; on this machine only firefox-1543 is present, so pass
+// --browser firefox. PLAYWRIGHT_BROWSERS_PATH=$PWD/.browsers is optional —
+// the default shared cache (~/.cache/ms-playwright) works when the browser
+// was installed elsewhere. Stdlib + playwright-core only (dev-only: the
+// human browser pass stays the gate).
 // OS deps (Ubuntu 22.04, one-time as root — the failure mode is the
 // headless shell exiting on missing libnspr4.so; unblocked 2026-10-01):
 //   apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2
 //     libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2
 //     libgbm1 libpango-1.0-0 libcairo2 libasound2
-import { chromium } from "playwright-core";
+import { chromium, firefox, webkit } from "playwright-core";
 
 const args = Object.fromEntries(
   process.argv.slice(2).reduce((acc, cur, i, arr) => {
@@ -31,7 +38,11 @@ const noTour = args.notour || null;
 const locale = args.locale || null;
 const waitMs = Number(args.wait || 12000);
 
-const browser = await chromium.launch();
+/* Engine choice: --browser chromium|firefox|webkit (default chromium).
+ * Params: args.browser (string). Returns the Playwright browser type.
+ * Fails: unknown name falls back to chromium (never throws). */
+const engine = { chromium, firefox, webkit }[(args.browser || "chromium").toLowerCase()] || chromium;
+const browser = await engine.launch();
 const page = await browser.newPage({ viewport: { width, height } });
 const errors = [];
 page.on("console", (msg) => {

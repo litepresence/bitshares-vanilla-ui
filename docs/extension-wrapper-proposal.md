@@ -29,8 +29,8 @@ Date: 2026-09-28.
 
 | Asset | At rest | While unlocked | Notes |
 |---|---|---|---|
-| Brainkey-derived keys | AES-256-GCM envelope in `localStorage` (`bts-vanilla-wallet-v1`), PBKDF2-HMAC-SHA-256/600k + per-wallet salt (`wallet.js:15,84-86,118-123`) | Plaintext in JS memory (`Wallet.keys`), never DOM | Same properties as #3's keystore |
-| Password/verifier | Never stored (verification is trial-decrypt) | n/a | No hash to steal |
+| Brainkey-derived keys | AES-256-GCM envelope in `localStorage` (`bts-vanilla-wallet-v1`), scrypt (N=2^15, r=8, p=1) + HKDF-SHA-256 + timing-safe HMAC verifier + per-wallet salt (`wallet.js`); v1 PBKDF2-600k envelopes read + auto-upgraded | Plaintext in JS memory (`Wallet.keys`), never DOM | Same properties as #3's keystore |
+| Password/verifier | Password never stored; v2 stores a keyed HMAC-SHA256 verifier in the envelope (wrong-password vs corrupt-envelope distinction) | n/a | Verifier enables offline password checks by design — same capability the ciphertext already grants; no key material |
 | Settings (nodes, theme, locale) | Plain `localStorage` (`store.js`) | n/a | Non-sensitive, but node list is trust-relevant |
 | Transaction payloads | Constructed in memory, signed in memory (`tx.js`, vendored secp256k1) | WIF touches JS values only, never DOM | `crypto.js` documents provenance per fn |
 
@@ -59,8 +59,10 @@ heartbeat + block-push keepalive, capped auto-reconnect.
    change the ceiling.
 2. **No unlock rate-limit.** pi314x persists exponential backoff across
    restarts (`wallet-manager.js:855+`); vanilla has none. Local attacker with
-   the envelope gets unlimited guesses at JS speed (PBKDF2-600k ≈ ~1s/try on
-   desktop — strong but not rate-limited). **The wrapper must close this.**
+   the envelope gets unlimited guesses at JS speed (scrypt N=2^15 ≈ ~1.8s and
+   32MiB/try on desktop — strong but not rate-limited). **The wrapper must
+   close this.** (Vanilla later added persisted exponential backoff; this
+   proposal predates it.)
 3. **Envelope metadata in `localStorage`.** Ciphertext-only, but its
    existence/fingerprint is visible to page-origin code. Minor.
 4. **No CSP on `file://`/static hosting.** A CSP header is a server
@@ -85,7 +87,7 @@ popup approves operations per origin, content scripts expose
 - Zero-dep crypto core (`crypto-utils.js` + vendored curve): WebCrypto
   SHA/PBKDF2/AES + noble secp256k1, constant-time boundaries documented.
   → We byte-copied the curve with provenance; reimplemented the flows.
-- Keystore properties: PBKDF2-600k + salt, AES-256-GCM, unlock in
+- Keystore properties: memory-hard KDF + salt, AES-256-GCM, unlock in
   `chrome.storage.session` only, `chrome.alarms` auto-lock, **persisted
   unlock rate-limit**, per-account keys, watch-only.
 - Approval UX: 78-op human-readable confirm table (`popup.js`) — our

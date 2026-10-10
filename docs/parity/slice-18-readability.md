@@ -42,6 +42,10 @@ rot gate green, drift gate green; 8-route headless smoke, zero console errors.
   + a load-order edge for zero gain (recorded, not deferred).
 - proposal-ui.js 566 — shared `_ui` toolkit host (~290) + views (~190);
   consumers bind to `ProposalUI._ui` names; split would scatter the toolkit.
+- wallet.js 628 (after v2 scrypt/HKDF upgrade; see
+  `docs/parity/wallet-v2-scrypt.md`) — one keystore unit (envelope crypto +
+  lifecycle + storage seam); a split adds load-order seams across browser +
+  extension-wrapper + tests for no gain.
 - account-ui.js 502, explorer-assets.js 496, explorer-render.js 451,
   market-ind.js 436, charts-lwc.js 493, htlc.js/htlc-ui.js ~420 — one coherent
   view/layer each, fully headered + described + dead-free; further splits

@@ -1,4 +1,6 @@
-/* Wallet: encrypted brainkey keystore (PBKDF2-600k + AES-GCM).
+/* Wallet: encrypted brainkey keystore. Writes v2 (scrypt + HKDF-SHA256 +
+ *   timing-safe HMAC verifier + AES-256-GCM); reads v1 (PBKDF2-600k +
+ *   AES-GCM) transparently and upgrades it to v2 on unlock.
  * Owns: wallet envelope under bts-vanilla-wallet-v1, in-memory unlock
  *   state (Wallet.keys), 5-minute inactivity auto-lock + hidden-tab lock,
  *   unlock rate-limit (in-memory exponential + persisted lockout stamp).
@@ -25,9 +27,29 @@ var Wallet = (function () {
 
   var LS_KEY = "bts-vanilla-wallet-v1";
   var ENVELOPE_V = 1;
-  var ITERATIONS = 600000;
+  var ENVELOPE_V2 = 2;
+  var ITERATIONS = 600000; // v1 KDF only
   var SALT_LEN = 16;
   var IV_LEN = 12;
+  /* scrypt params (v2), stored per-envelope so a future bump needs no format
+   * change. Benchmarked 2026-10-08 (desktop Firefox, pure-JS ROMix): N=2^15
+   * ~1.8s and 32MiB per derivation, chosen as the phone-first ceiling
+   * (N=2^16 measured ~3.5s; N=2^17 ~7s). Far costlier to attack offline than
+   * the v1 PBKDF2-600k this replaces. */
+  var SCRYPT_N = 32768;
+  var SCRYPT_R = 8;
+  var SCRYPT_P = 1;
+  /* Hard envelope-param ceilings (review hardening — the params come from
+   * the stored envelope, so a forged/corrupt envelope must fail fast AND
+   * cheap, before the verifier can even be checked): romixBlock holds N
+   * live Uint8Arrays, so N itself is capped at 2^17 (a million-plus live
+   * arrays OOMs via per-object overhead long before any byte budget bites),
+   * and total work 128*N*r*p is capped at 4x production (33.5MiB nominal).
+   * Production sits 4x below both ceilings. */
+  var SCRYPT_MAX_N = 131072; // 2^17 live-array cap
+  var SCRYPT_MAX_WORK = 134217728; // 128 MiB nominal total-work cap
+  var VERIFIER_LABEL = "bts-vanilla-wallet-v2:verifier";
+  var HKDF_INFO = "bts-vanilla-wallet-v2:enc-key";
   var LOCK_MS = 5 * 60 * 1000;
   var MIN_BRAINKEY_LEN = 50;
 
@@ -123,8 +145,9 @@ var Wallet = (function () {
     return u8;
   }
 
-  /* Derive an AES-256-GCM key from password+salt via PBKDF2-HMAC-SHA-256. */
-  function _deriveKey(password, saltU8) {
+  /* v1 legacy: derive an AES-256-GCM key from password+salt via
+   * PBKDF2-HMAC-SHA-256. Only reached for un-migrated envelopes. */
+  function _deriveKeyV1(password, saltU8) {
     var subtle = _subtle();
     var pwU8 = new TextEncoder().encode(password);
     return subtle.importKey("raw", pwU8, { name: "PBKDF2" }, false, ["deriveKey"])
@@ -139,7 +162,63 @@ var Wallet = (function () {
       });
   }
 
-  /* Read + shape-check the stored envelope. Throws no-wallet / corrupt. */
+  /* v2 vault key: scrypt via the vendored ScryptKdf global. Params:
+   * password, saltU8, N, r, p. Returns Promise<Uint8Array(32)>. Fails
+   * (throws): backend missing, or N/r/p outside the safe bounds (a corrupt
+   * envelope must fail before allocating: the V table is N live arrays and
+   * total work scales with N*r*p, and the verifier can only be checked
+   * after the derive). */
+  function _scryptDerive(password, saltU8, N, r, p) {
+    var kdf = (typeof ScryptKdf !== "undefined" && ScryptKdf) || null;
+    if (!kdf || typeof kdf.derive !== "function") {
+      throw new Error("crypto unavailable: scrypt backend missing");
+    }
+    if (!(N >= 2 && N <= SCRYPT_MAX_N) || (N & (N - 1)) !== 0) {
+      throw new Error("corrupt wallet envelope: bad scrypt N");
+    }
+    if (!(r >= 1 && r <= 32)) throw new Error("corrupt wallet envelope: bad scrypt r");
+    if (!(p >= 1 && p <= 16)) throw new Error("corrupt wallet envelope: bad scrypt p");
+    if (128 * N * r * p > SCRYPT_MAX_WORK) throw new Error("corrupt wallet envelope: scrypt params too large");
+    var pwU8 = new TextEncoder().encode(password);
+    return Promise.resolve(kdf.derive(pwU8, saltU8, 32, { N: N, r: r, p: p }));
+  }
+
+  /* HKDF-SHA256 (RFC 5869) via WebCrypto. Params: ikmU8, saltU8, info
+   * (string), len (bytes). Returns Promise<Uint8Array(len)>. */
+  function _hkdfKey(ikmU8, saltU8, info, len) {
+    var subtle = _subtle();
+    return subtle.importKey("raw", ikmU8, { name: "HKDF" }, false, ["deriveBits"])
+      .then(function (base) {
+        return subtle.deriveBits(
+          { name: "HKDF", hash: "SHA-256", salt: saltU8, info: new TextEncoder().encode(info) },
+          base,
+          len * 8
+        );
+      })
+      .then(function (bits) { return new Uint8Array(bits); });
+  }
+
+  /* HMAC-SHA256 via WebCrypto over a UTF-8 label. Params: keyU8 (non-empty),
+   * label (string). Returns Promise<Uint8Array(32)>. */
+  function _hmacSha256(keyU8, label) {
+    var subtle = _subtle();
+    return subtle.importKey("raw", keyU8, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
+      .then(function (key) { return subtle.sign("HMAC", key, new TextEncoder().encode(label)); })
+      .then(function (sig) { return new Uint8Array(sig); });
+  }
+
+  /* Constant-time byte compare (no early exit). Params: a, b (Uint8Array).
+   * Returns boolean. Fails: never. */
+  function _timingSafeEqual(a, b) {
+    if (!a || !b || a.length !== b.length) return false;
+    var diff = 0;
+    for (var i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
+    return diff === 0;
+  }
+
+  /* Read + shape-check the stored envelope. Returns {env, raw}: the parsed
+   * envelope plus the exact stored string, so writers can compare-and-swap
+   * against what was read. Throws no-wallet / corrupt. */
   async function _readEnvelope() {
     var raw;
     try {
@@ -154,33 +233,86 @@ var Wallet = (function () {
     } catch (e) {
       throw new Error("corrupt wallet envelope: invalid JSON");
     }
-    if (!env || typeof env !== "object" || env.v !== ENVELOPE_V ||
+    if (!env || typeof env !== "object" ||
       typeof env.salt !== "string" || typeof env.iv !== "string" ||
-      typeof env.data !== "string" || env.iterations !== ITERATIONS) {
+      typeof env.data !== "string") {
       throw new Error("corrupt wallet envelope: bad shape or version");
     }
-    return env;
+    if (env.v === ENVELOPE_V) {
+      if (env.iterations !== ITERATIONS) throw new Error("corrupt wallet envelope: bad shape or version");
+      return { env: env, raw: raw };
+    }
+    if (env.v === ENVELOPE_V2) {
+      if (env.kdf !== "scrypt" || typeof env.hkdfSalt !== "string" ||
+        typeof env.verifier !== "string" ||
+        !(env.N > 1) || !(env.r > 0) || !(env.p > 0)) {
+        throw new Error("corrupt wallet envelope: bad shape or version");
+      }
+      return { env: env, raw: raw };
+    }
+    throw new Error("corrupt wallet envelope: bad shape or version");
   }
 
-  /* Encrypt plaintext object -> versioned envelope. Random salt+iv per call. */
+  /* Encrypt a plaintext object -> v2 envelope (scrypt vault key -> HKDF
+   * record key + HMAC verifier -> AES-256-GCM). Random salt/HKDF-salt/IV per
+   * call. Params: password, plain. Returns Promise<envelope>. Fails:
+   * missing scrypt backend / WebCrypto. */
   function _encryptPlain(password, plain) {
     var salt = _randU8(SALT_LEN);
+    var hkdfSalt = _randU8(SALT_LEN);
     var iv = _randU8(IV_LEN);
     var bytes = new TextEncoder().encode(JSON.stringify(plain));
-    return _deriveKey(password, salt).then(function (key) {
-      return _subtle().encrypt({ name: "AES-GCM", iv: iv }, key, bytes);
-    }).then(function (ct) {
-      return {
-        v: ENVELOPE_V,
-        salt: _b64encodeU8(salt),
-        iterations: ITERATIONS,
-        iv: _b64encodeU8(iv),
-        data: _b64encodeU8(new Uint8Array(ct))
-      };
+    return _scryptDerive(password, salt, SCRYPT_N, SCRYPT_R, SCRYPT_P).then(function (vaultKey) {
+      return Promise.all([
+        _hkdfKey(vaultKey, hkdfSalt, HKDF_INFO, 32),
+        _hmacSha256(vaultKey, VERIFIER_LABEL)
+      ]).then(function (pair) {
+        var encKey = pair[0];
+        var verifier = pair[1];
+        return _subtle().importKey("raw", encKey, { name: "AES-GCM" }, false, ["encrypt"]).then(function (key) {
+          return _subtle().encrypt({ name: "AES-GCM", iv: iv }, key, bytes);
+        }).then(function (ct) {
+          return {
+            v: ENVELOPE_V2,
+            kdf: "scrypt",
+            N: SCRYPT_N,
+            r: SCRYPT_R,
+            p: SCRYPT_P,
+            salt: _b64encodeU8(salt),
+            hkdfSalt: _b64encodeU8(hkdfSalt),
+            verifier: _b64encodeU8(verifier),
+            iv: _b64encodeU8(iv),
+            data: _b64encodeU8(new Uint8Array(ct))
+          };
+        });
+      });
     });
   }
 
-  /* Decrypt envelope -> plaintext object. Auth failure maps to wrong-password. */
+  /* Shape-check a decrypted plaintext object. Params: pt (ArrayBuffer or
+   * Uint8Array). Returns plain. Fails (throws): corrupt wallet plaintext. */
+  function _checkPlain(pt) {
+    var plain;
+    try {
+      plain = JSON.parse(new TextDecoder().decode(new Uint8Array(pt)));
+    } catch (e) {
+      throw new Error("corrupt wallet plaintext: invalid JSON");
+    }
+    if (!plain || typeof plain !== "object" || typeof plain.brainkey !== "string" ||
+      !plain.keys || !plain.keys.owner || !plain.keys.active || !plain.keys.memo ||
+      typeof plain.keys.owner.wif !== "string" || typeof plain.keys.owner.pub !== "string" ||
+      typeof plain.keys.active.wif !== "string" || typeof plain.keys.active.pub !== "string" ||
+      typeof plain.keys.memo.wif !== "string" || typeof plain.keys.memo.pub !== "string") {
+      throw new Error("corrupt wallet plaintext: bad shape");
+    }
+    return plain;
+  }
+
+  /* Decrypt an envelope -> plaintext object. v2 verifies a timing-safe HMAC
+   * first, so wrong password and corruption are distinct; v1 detects a wrong
+   * password via AES-GCM auth failure (legacy behavior). Params: password,
+   * env (v1 or v2). Returns Promise<plain>. Fails: wrong password, corrupt
+   * wallet, missing crypto. */
   function _decryptPlain(password, env) {
     var saltU8, ivU8, dataU8;
     try {
@@ -190,26 +322,41 @@ var Wallet = (function () {
     } catch (e) {
       throw new Error("corrupt wallet envelope: bad base64");
     }
-    return _deriveKey(password, saltU8).then(function (key) {
-      return _subtle().decrypt({ name: "AES-GCM", iv: ivU8 }, key, dataU8);
-    }).then(function (pt) {
-      var plain;
+
+    if (env.v === ENVELOPE_V2) {
+      var hkdfSaltU8, verifierU8;
       try {
-        plain = JSON.parse(new TextDecoder().decode(new Uint8Array(pt)));
+        hkdfSaltU8 = _b64decodeToU8(env.hkdfSalt);
+        verifierU8 = _b64decodeToU8(env.verifier);
       } catch (e) {
-        throw new Error("corrupt wallet plaintext: invalid JSON");
+        throw new Error("corrupt wallet envelope: bad base64");
       }
-      if (!plain || typeof plain !== "object" || typeof plain.brainkey !== "string" ||
-        !plain.keys || !plain.keys.owner || !plain.keys.active || !plain.keys.memo ||
-        typeof plain.keys.owner.wif !== "string" || typeof plain.keys.owner.pub !== "string" ||
-        typeof plain.keys.active.wif !== "string" || typeof plain.keys.active.pub !== "string" ||
-        typeof plain.keys.memo.wif !== "string" || typeof plain.keys.memo.pub !== "string") {
-        throw new Error("corrupt wallet plaintext: bad shape");
-      }
-      return plain;
-    }).catch(function (e) {
+      return _scryptDerive(password, saltU8, env.N, env.r, env.p).then(function (vaultKey) {
+        return _hmacSha256(vaultKey, VERIFIER_LABEL).then(function (want) {
+          if (!_timingSafeEqual(want, verifierU8)) {
+            throw new Error("wrong password: verifier mismatch");
+          }
+          return _hkdfKey(vaultKey, hkdfSaltU8, HKDF_INFO, 32);
+        });
+      }).then(function (encKey) {
+        return _subtle().importKey("raw", encKey, { name: "AES-GCM" }, false, ["decrypt"]).then(function (key) {
+          return _subtle().decrypt({ name: "AES-GCM", iv: ivU8 }, key, dataU8);
+        });
+      }).then(_checkPlain).catch(function (e) {
+        if (e && typeof e.message === "string" &&
+          (e.message.indexOf("wrong password") === 0 || e.message.indexOf("corrupt wallet") === 0 ||
+            e.message.indexOf("crypto unavailable") === 0)) throw e;
+        throw new Error("corrupt wallet: decrypt failed");
+      });
+    }
+
+    /* v1 legacy: PBKDF2 + AES-GCM; an auth failure means wrong password. */
+    return _deriveKeyV1(password, saltU8).then(function (key) {
+      return _subtle().decrypt({ name: "AES-GCM", iv: ivU8 }, key, dataU8);
+    }).then(_checkPlain).catch(function (e) {
       if (e && typeof e.message === "string" &&
-        (e.message.indexOf("wrong password") === 0 || e.message.indexOf("corrupt wallet") === 0)) throw e;
+        (e.message.indexOf("wrong password") === 0 || e.message.indexOf("corrupt wallet") === 0 ||
+          e.message.indexOf("crypto unavailable") === 0)) throw e;
       throw new Error("wrong password: decrypt failed");
     });
   }
@@ -348,14 +495,48 @@ var Wallet = (function () {
     if (effCount > 0) {
       await new Promise(function (res) { setTimeout(res, _backoffMs(effCount)); });
     }
-    var env = await _readEnvelope();
+    var read = await _readEnvelope();
+    var env = read.env, entryRaw = read.raw;
     try {
       var plain = await _decryptPlain(password, env);
+      /* Hidden-tab race: the scrypt derive above awaits seconds, so a tab
+       * hidden mid-derive must not finish unlocked. Abort before any key
+       * material is pinned. Not a password failure: bypass the backoff
+       * accounting in the catch below (the password verified — retrying
+       * visible must not be penalized). */
+      try {
+        if (typeof document !== "undefined" && document && document.hidden) {
+          throw new Error("wallet locked: tab hidden during unlock; reload and retry");
+        }
+      } catch (eH) {
+        if (eH && typeof eH.message === "string" &&
+            eH.message.indexOf("tab hidden during unlock") !== -1) throw eH;
+        /* document unreadable: proceed, the visibility listener still guards */
+      }
       _failCount = 0;
       await _writeLockout(0, 0);
       _setUnlocked(plain);
+      if (env.v === ENVELOPE_V) {
+        /* Transparent v1→v2 upgrade. Compare-and-swap: only replace the
+         * exact v1 envelope read at entry — a concurrent create or
+         * password change wins, the working v1 stays, next unlock retries.
+         * B policy (in-place replace): any tab running older JS must reload
+         * before unlocking or it reads v2 as corrupt — see the parity note.
+         * Best-effort throughout: a failed/skipped rewrite leaves a working
+         * wallet either way. */
+        try {
+          var upgraded = await _encryptPlain(password, plain);
+          var current = null;
+          try { current = await _store().getItem(LS_KEY); } catch (eRd) { current = null; }
+          if (current === entryRaw) {
+            await _store().setItem(LS_KEY, JSON.stringify(upgraded));
+          }
+        } catch (e) { /* migration best-effort */ }
+      }
       return api.keys;
     } catch (e) {
+      if (e && typeof e.message === "string" &&
+          e.message.indexOf("tab hidden during unlock") !== -1) throw e;
       var next = effCount + 1;
       _failCount = next;
       await _writeLockout(next, Date.now() + _backoffMs(next));

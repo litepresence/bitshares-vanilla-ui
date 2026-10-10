@@ -23,3 +23,18 @@
   197922 bytes. Do NOT edit by hand. Doctrine note: self-contained UMD/global
   build exposing `LightweightCharts`, no backend, pinned copy; canvas fallback
   retained in market-charts.js.
+- scrypt.js: port of DEXBot2 `modules/crypto/pure_scrypt.ts`
+  (https://github.com/bitshares/DEXBot2, MIT, Copyright (c) 2025 froooze;
+  local HEAD f28145fdb5fbe2ea06362b210c547878948a7f64, source sha256
+  cd2b60583bfbd0f6745225a96ff20beaf683cdfcc452455172f160e28aae2c5b).
+  TRANSFORM: TypeScript stripped, wrapped as global `ScryptKdf.derive`.
+  TWO DEVIATIONS from upstream, both forced by the RFC 7914 KAT:
+  (1) upstream's ROMix reset X to the input block before phase 2, mixing from
+      X_0 instead of X_N (RFC 7914 §5) — it matches no RFC vector; fixed by
+      tracking X through phase 1;
+  (2) upstream derived p*128*r bytes in one WebCrypto deriveBits call, which
+      Firefox caps at 256 bytes (OperationError at r=8) — replaced with
+      RFC 8018 block-wise PBKDF2-HMAC-SHA-256 over subtle.digest.
+  Correctness: RFC 7914 vectors (N=16/1024/16384) + equality with Node
+  crypto.scryptSync at N=2^15, r=8, p=1 (tooling/wallet-scrypt-test.js).
+  Used for: v2 wallet password KDF. Do NOT hand-edit.
