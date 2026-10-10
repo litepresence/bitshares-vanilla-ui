@@ -268,3 +268,48 @@ Account mode already suppresses the engine's status strip
 (`NC.twin` runs unconditionally at `pool-net-ui.js:398`). The account
 twin itself is correct; only the pool chrome needs an account-mode
 guard.
+
+## 13. Follow-up batch (2026-10-10): pool-chrome guard, menu width, labels, node re-seed, id seeds
+
+Owner follow-ups, all shipped together:
+
+- **Pool-chrome guard (the §12 known issue).** `pool-net-chrome.js` gains
+  `isAccount(S)`; the verdict line, brand legend and pool twin stay
+  detached in account mode, and `pool-net-ui.js` skips the three
+  `NC.verdict/legend/twin` paint calls there. Pool/market frames are
+  untouched (both branches are mode-gated). Vectors: an account-mode
+  stub-DOM mount asserts no `pool-net-legend`, no `pool-net-twin`, no
+  pool verdict — while the canvas still mounts.
+- **Menu width.** Menu overview + section pages use `wrap mkt-wrap`
+  instead of the 720 px `.wrap` (no new CSS): the `#/menu/labs` A3
+  stranded-column failure (42% at desk) is fixed, and all menu routes
+  pass the viewport sweep at phone + desk (18/18).
+- **Node labels.** The painter takes an opt-in `labelPx` (plumbed
+  `navOpts → S → paintState → drawScene`); the account map passes 13,
+  pool/market maps pass nothing and stay byte-identical at 10 px.
+- **Node tap re-seeds the map.** `navNode` now returns
+  `hashForDepth([hit.assetId], …)` — tapping a node walks the graph one
+  account at a time (the deep link auto-draws). Edge taps still select
+  without navigating. Note: this replaces the old node → account-page
+  jump; the account page stays reachable via menu/search/seed box.
+- **Account-id seeds.** `Account.resolve` already accepts `1.2.x`
+  (`account.js:61-64`); locked with a gather vector proving an id seed
+  resolves verbatim and draws. Placeholder already showed an id example.
+
+Proof (all live, mainnet): no pool legend/twin/wording on the drawn
+page; keyboard node activation navigates to `seeds=1.2.0` and the id
+seed auto-draws committee-account's map; typing `1.2.0` + Draw draws
+the same map; edge-midpoint tap selects without navigating; 360 px
+shows no overflow; zero console errors throughout. Canvas-click
+near-misses can resolve to an incident edge (which then correctly
+selects) — engine-wide hit-test behavior shared with the pool maps,
+not an account-map defect.
+
+Gates after this batch: `account-net` **108**, `account-net-paint`
+**18**, `account-network-ui` **78**, `pool-net-ui` **114**,
+`menu-test` **28** — all pass; `check_types.sh` PASS ·
+`check_i18n.py` OK (3895 keys, 5116 call sites) · `check_rot.py`
+PASSED · `audit_view_mounts.py` PASS · nav-mount probe (with the new
+pool-chrome + node-nav + id-seed assertions folded in) PASS · menu
+viewport sweep 18/18 PASS. No new display strings, no new CSS, no new
+dependencies.

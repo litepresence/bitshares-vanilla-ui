@@ -171,6 +171,31 @@ check("live draw reports real counts (no raw integers on screen)",
   /accounts/.test(live.status) && /lines/.test(live.status) && live.rows > 1, "status=" + JSON.stringify(live.status.slice(0, 80)));
 await page.screenshot({ path: "/tmp/opencode/an-live-draw.png" });
 
+/* 8. follow-up batch, kept green here (probe-followups retired into this gate):
+ * no pool chrome on the account page; node activation re-seeds the map with
+ * the node's account ID; account-id seeds draw. */
+const chrome = await page.evaluate(() => {
+  const view = document.getElementById("view");
+  return {
+    legend: view.querySelectorAll(".pool-net-legend").length,
+    twin: view.querySelectorAll(".pool-net-twin").length,
+    poolWords: /pools ·|Pool rows/.test(view.innerText || ""),
+  };
+});
+check("no pool chrome on the account page", chrome.legend === 0 && chrome.twin === 0 && !chrome.poolWords, JSON.stringify(chrome));
+await page.locator("#view canvas").first().focus();
+await page.keyboard.press("Enter");
+await page.waitForTimeout(1500);
+const keynav = await page.evaluate(() => location.hash);
+check("node activation re-seeds the map", keynav.startsWith("#/account-network?seeds="), "hash=" + keynav);
+check("node activation seeds the account id", /seeds=1\.2\.\d+/.test(keynav), "hash=" + keynav);
+await page.waitForTimeout(9000);
+const iddraw = await page.evaluate(() => ({
+  status: ((document.querySelector(".an-status") || {}).textContent || "").trim(),
+  canvas: document.querySelectorAll("#view canvas").length,
+}));
+check("id-seeded map auto-draws", iddraw.canvas === 1 && iddraw.status.length > 20, JSON.stringify(iddraw.status.slice(0, 80)));
+
 console.log("console errors after all steps:", errs.length ? errs : "none");
 check("still no console errors", errs.length === 0);
 await page.screenshot({ path: "/tmp/opencode/nav-mount-account-network.png" });

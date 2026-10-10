@@ -57,6 +57,34 @@ var AccountNetworkUI = (function () {
   var CLASSES_KEY = String((COPY && COPY.CLASSES_KEY) || "accountNet.classes.v1");
 
   /**
+   * nodeTarget: a tapped node re-seeds THIS map with the node's account id
+   * (owner call) — the deep link auto-draws after the node opens, so a tap
+   * walks the graph one account at a time. Pure: a hash string, or null when
+   * the hit names no account. Module scope (not render scope) so vectors can
+   * pin it.
+   * @param {Object} hit Engine hit ({assetId}).
+   * @param {string[]} classes Enabled class ids.
+   * @param {{depth:number,ring1:number,ring2:number}} [dd] Depth prefs.
+   * @returns {string|null} Hash target, or null.
+   */
+  function nodeTarget(hit, classes, dd) {
+    try {
+      var id = hit && hit.assetId ? String(hit.assetId) : "";
+      if (!/^1\.2\.\d+$/.test(id)) return null;
+      var C = copy();
+      var d = dd || { depth: 1, ring1: 40, ring2: 8 };
+      if (C && typeof C.hashForDepth === "function") {
+        return C.hashForDepth([id], classes || [], d.depth, d.ring1, d.ring2);
+      }
+      return "#/account-network?seeds=" + encodeURIComponent(id) +
+        "&classes=" + encodeURIComponent((classes || []).join(",")) +
+        "&depth=" + encodeURIComponent(String(d.depth === 2 ? 2 : 1)) +
+        "&ring1=" + encodeURIComponent(String(d.ring1 || 40)) +
+        "&ring2=" + encodeURIComponent(String(d.ring2 || 8));
+    } catch (eT) { return null; }
+  }
+
+  /**
    * depthUI: the AccountNetworkDepthUI widget module (depth selector + ring
    * pills). A missing script degrades to no pills — prefs, hash and the
    * depth gather still work, because those live here and in the copy module.
@@ -401,15 +429,22 @@ var AccountNetworkUI = (function () {
             }, {
               mode: "account", graph: graph,
               arrows: true,
+              /* Account names read at 13px (owner call — 10px pool labels
+               * are too small on an account map); pool/market maps keep 10px
+               * because they never set this opt. */
+              labelPx: 13,
               edgeClassOf: function (e) { return COPY.classToken(e.cls); },
               /* Seeds read as the subject, counterparties as context. The
                * pool brand palette would paint every account the same alert
                * red (it keys off symbol-like names), which reads as a
                * warning about each account rather than about the map. */
               nodeFillOf: function (n) { return n && n.seeded ? "accent" : "muted"; },
+              /* Node taps re-seed THIS map with the node's account id: the
+               * deep link auto-draws after the node opens, so a tap walks
+               * the graph one account at a time. */
               navNode: function (hit) {
-                var name = hit && (hit.sym || (hit.assetId && state.names[hit.assetId]));
-                return name ? "#/account/" + name : null;
+                var dd = (state && state.depth) || { depth: 1, ring1: 40, ring2: 8 };
+                return nodeTarget(hit, activeClasses(), dd);
               },
               /* Edge taps SELECT, they do not navigate: the account page's
                * history filter cannot open a credit line honestly, so the
@@ -570,6 +605,7 @@ var AccountNetworkUI = (function () {
      * sentences live) through the same accessors the page uses. */
     _test: {
       parseSeeds: function (v) { return copy().parseSeeds(v); },
+      nodeTarget: function (h, c, d) { return nodeTarget(h, c, d); },
       chipModel: function () { return copy().chipModel(); },
       classToken: function (v) { return copy().classToken(v); },
       parseHash: function (v) { return copy().parseHash(v); },

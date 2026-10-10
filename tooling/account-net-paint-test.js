@@ -134,5 +134,23 @@ ok(typeof MP.drawScene === "function", "drawScene exported");
   ok(!threw, "a throwing nodeFillOf never breaks the frame");
 }
 
+// 8. Opt-in node label size: account maps read bigger labels, the
+//    pool/market default stays exactly as shipped.
+{
+  const { ctx } = stubCtx();
+  MP.drawScene(ctx, 320, 240, view, geom, { scale: 1, ox: 0, oy: 0 });
+  ok(ctx.font === "10px system-ui, sans-serif", "default node labels stay 10px (" + ctx.font + ")");
+}
+{
+  const { ctx } = stubCtx();
+  MP.drawScene(ctx, 320, 240, view, geom, { scale: 1, ox: 0, oy: 0, labelPx: 13 });
+  ok(ctx.font === "13px system-ui, sans-serif", "labelPx sizes node labels (" + ctx.font + ")");
+}
+{
+  const { ctx } = stubCtx();
+  MP.drawScene(ctx, 320, 240, view, geom, { scale: 1, ox: 0, oy: 0, labelPx: -4 });
+  ok(ctx.font === "10px system-ui, sans-serif", "a bad labelPx falls back to 10px");
+}
+
 console.log("account-net-paint: " + pass + " pass, " + fail + " fail");
 process.exitCode = fail ? 1 : 0;

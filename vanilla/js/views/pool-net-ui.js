@@ -97,6 +97,7 @@ var PoolNetUI = (function () {
       hoverNode: S.hoverNode, hoverEdge: S.hoverEdge, phys: "lively"
     };
     if (S.arrows) paintState.arrows = true;
+    if (S.labelPx) paintState.labelPx = S.labelPx;
     if (typeof S.edgeClassOf === "function") paintState.edgeClassOf = S.edgeClassOf;
     if (typeof S.nodeFillOf === "function") paintState.nodeFillOf = S.nodeFillOf;
     var out = NP.drawScene(g.ctx, g.W, g.H, S.view, S.geom, paintState);
@@ -185,6 +186,9 @@ var PoolNetUI = (function () {
         arrows: !!(navOpts && navOpts.arrows),
         edgeClassOf: (navOpts && typeof navOpts.edgeClassOf === "function") ? navOpts.edgeClassOf : null,
         nodeFillOf: (navOpts && typeof navOpts.nodeFillOf === "function") ? navOpts.nodeFillOf : null,
+        /* labelPx: opt-in node-label size (account maps). Absent here means
+         * absent in the painter, so pool/market frames stay byte-identical. */
+        labelPx: (navOpts && typeof navOpts.labelPx === "number" && navOpts.labelPx > 0) ? navOpts.labelPx : 0,
         navOpts: navOpts
       };
       S.paint = render;
@@ -393,9 +397,15 @@ var PoolNetUI = (function () {
         S.hoverNode = null;
         S.hoverEdge = null;
         try { els.hoverEl.textContent = ""; } catch (e) { /* stands */ }
-        NC.verdict(S, els, t);
-        NC.legend(doc, mk, t, S, els, render, onBrandToggle);
-        NC.twin(doc, mk, t, S, els, navOpts);
+        /* Account mode brings its own status/detail lines and table twin:
+         * the pool verdict, brand legend and pool twin paint calls stand
+         * down here (their containers are not even mounted — see
+         * buildChrome). Pool/market frames are untouched. */
+        if (!accountMode()) {
+          NC.verdict(S, els, t);
+          NC.legend(doc, mk, t, S, els, render, onBrandToggle);
+          NC.twin(doc, mk, t, S, els, navOpts);
+        }
         try { render(S); } catch (e) { /* loop paints */ }
         try {
           canvas._netHits = S.hits;

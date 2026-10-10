@@ -45,6 +45,16 @@ var NetChrome = (function () {
     catch (e) { return false; }
   }
 
+  /* isAccount: the account-network world reuses this chrome for its canvas
+   * ONLY. The account page brings its own status/detail lines and table
+   * twin, so the pool verdict line, brand legend and pool twin must never
+   * mount here (they paint pool wording — "Pool rows (N)" — over an
+   * account map). Reads the mount opts the composer already stores. */
+  function isAccount(S) {
+    try { return !!(S && S.navOpts && S.navOpts.mode === "account"); }
+    catch (e) { return false; }
+  }
+
   function poolCount(S, assetId) {
     var n = 0;
     (S.view.edges || []).forEach(function (e) { if (e.a === assetId || e.b === assetId) n++; });
@@ -278,9 +288,15 @@ var NetChrome = (function () {
       wrap.appendChild(els.statusEl);
       wrap.appendChild(els.stage);
       wrap.appendChild(els.hoverEl);
-      wrap.appendChild(els.verdictEl);
-      wrap.appendChild(els.legendEl);
-      if (els.twin) { els.twin.appendChild(els.twinSummary); els.twin.appendChild(els.twinBox); wrap.appendChild(els.twin); }
+      /* Account mode mounts canvas-only (see isAccount): the verdict,
+       * legend and twin containers stay detached — their paint calls are
+       * likewise guarded in pool-net-ui.js, so pool/market frames are
+       * untouched. */
+      if (!isAccount(S)) {
+        wrap.appendChild(els.verdictEl);
+        wrap.appendChild(els.legendEl);
+        if (els.twin) { els.twin.appendChild(els.twinSummary); els.twin.appendChild(els.twinBox); wrap.appendChild(els.twin); }
+      }
     } catch (e) { return null; }
     return els;
   }

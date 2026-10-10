@@ -552,5 +552,44 @@ var skel = { pools: [
   ok(widths[0] === 1.25 && widths[1] === 1.25 && widths[2] === 1.25, "base edges share one constant width (got " + JSON.stringify(widths.slice(0, 3)) + ")");
 })();
 
+// Account mode: the shared engine mounts canvas-only on the account page —
+// no pool legend, pool verdict, or pool twin may render there (the account
+// page brings its own status/detail lines and table twin).
+(function () {
+  var NC = null;
+  try { NC = require("../vanilla/js/views/pool-net-chrome.js"); } catch (e) { NC = null; }
+  if (NC) globalThis.NetChrome = NC;
+  function findClass(root, cls) {
+    var out = null;
+    (function walk(n) {
+      if (out) return;
+      if (n && n.className === cls) { out = n; return; }
+      (n.children || []).forEach(walk);
+    })(root);
+    return out;
+  }
+  function findTag(root, tag) {
+    var out = null;
+    (function walk(n) {
+      if (out) return;
+      if (n && n.tag === tag) { out = n; return; }
+      (n.children || []).forEach(walk);
+    })(root);
+    return out;
+  }
+  var doc = { createElement: function (tag) { return fakeEl(tag); } };
+  var wrap = fakeEl("div");
+  var graph = { nodes: [{ assetId: "1.2.1", sym: "alice" }, { assetId: "1.2.2", sym: "bob" }],
+    edges: [{ a: "1.2.1", b: "1.2.2", poolId: "1.2.1|1.2.2|transfer", cls: "transfer" }] };
+  var handle = PoolNetUI.mount(doc, wrap, function () { return { aId: null, bId: null, s: "" }; },
+    { mode: "account", graph: graph, arrows: true });
+  ok(findClass(wrap, "pool-net-legend") === null, "account mode mounts no pool legend");
+  ok(findClass(wrap, "pool-net-twin") === null, "account mode mounts no pool twin");
+  var verdict = findClass(wrap, "pool-net-verdict");
+  ok(verdict === null || verdict.textContent === "", "account mode shows no pool verdict");
+  ok(!!findTag(wrap, "canvas"), "account mode still mounts its canvas");
+  try { if (handle && handle.destroy) handle.destroy(); } catch (e) { /* headless stands */ }
+})();
+
 console.log(pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

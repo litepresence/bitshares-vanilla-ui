@@ -512,6 +512,20 @@ function stubFetch(pages) {
     ok(JSON.stringify(seenBodies).indexOf('"1.2.3"') === -1, "unretained counterparty 1.2.3 is never scanned");
   }
 
+  // 24b. gather: an account-id seed resolves verbatim and draws
+  {
+    const prevAcc = globalThis.Account;
+    globalThis.Account = { resolve: (n) => (/^1\.2\.\d+$/.test(String(n))
+      ? Promise.resolve({ id: String(n), name: String(n) })
+      : Promise.reject(new Error("unknown-account"))) };
+    const st = stubFetch([esPage(2, "id")]);
+    const out = await AccountNet.gather(["1.2.9"], ["transfer"], {});
+    st.restore();
+    globalThis.Account = prevAcc;
+    eq(out.seeds.map((s) => s.id).join(","), "1.2.9", "an account id seed resolves verbatim");
+    ok(out.graph.nodes.length >= 1, "an id seed draws its graph");
+  }
+
   console.log("account-net: " + pass + " pass, " + fail + " fail");
   /* exitCode, not exit(): process.exit() can drop a piped stdout write. */
   process.exitCode = fail ? 1 : 0;

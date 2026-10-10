@@ -369,7 +369,10 @@ var NetPaint = (function () {
           ctx.lineWidth = hovN ? 2 : 1;
           ctx.stroke();
           var label = String(symById[n.assetId]).slice(0, 12);
-          ctx.font = "10px system-ui, sans-serif";
+          /* labelPx is OPT-IN (account maps read bigger type): absent or bad
+           * means the shipped 10px pool/market labels, byte-identical. */
+          var labelPx = (paint && typeof paint.labelPx === "number" && paint.labelPx > 0) ? paint.labelPx : 10;
+          ctx.font = labelPx + "px system-ui, sans-serif";
           ctx.textAlign = "center";
           try {
             ctx.lineWidth = 3;
@@ -404,7 +407,8 @@ var NetPaint = (function () {
     var out = drawScene(g.ctx, g.W, g.H, graph, circleLayout((graph && graph.nodes) || [], g.W, g.H), {
       scale: 1, ox: 0, oy: 0, pathSet: pathSet,
       selPool: opts.selPool || null, dim: opts.dimBrands || {},
-      meta: opts.meta || {}, hoverNode: null, hoverEdge: null, phys: "lively"
+      meta: opts.meta || {}, hoverNode: null, hoverEdge: null, phys: "lively",
+      labelPx: opts.labelPx || 0
     });
     try {
       canvas.setAttribute("tabindex", "0");

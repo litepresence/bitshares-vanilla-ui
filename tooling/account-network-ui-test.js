@@ -211,5 +211,15 @@ const DepthUI = require("/workspace/vanilla/js/views/account-network-depth-ui.js
 eq(DepthUI.sanitize({ depth: "2", ring1: "999", ring2: "0" }),
   { depth: 2, ring1: 40, ring2: 1 }, "widget sanitizes depth inputs through the depth policy");
 
+/* ---- node tap target: back into the account map with the node's id ---- */
+{
+  const dd = { depth: 2, ring1: 40, ring2: 8 };
+  eq(T.nodeTarget({ assetId: "1.2.1798435", sym: "committee" }, ["transfer", "credit"], dd),
+    "#/account-network?seeds=1.2.1798435&classes=transfer%2Ccredit&depth=2&ring1=40&ring2=8",
+    "node tap re-seeds the map with the account id");
+  eq(T.nodeTarget(null, ["transfer"], dd), null, "null hit navigates nowhere");
+  eq(T.nodeTarget({ assetId: "BTS" }, ["transfer"], dd), null, "a non-account id navigates nowhere");
+}
+
 console.log("account-network-ui: " + pass + " pass, " + fail + " fail");
 process.exitCode = fail ? 1 : 0;

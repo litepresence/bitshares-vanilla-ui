@@ -246,7 +246,7 @@ var MenuUI = (function () {
     if (!doc) return;
     DOM.clear(root);
     var wrap = doc.createElement("div");
-    wrap.className = "wrap";
+    wrap.className = "wrap mkt-wrap";
     root.appendChild(wrap);
     wrap.appendChild(DOM.pageHead(doc, t("menu.title", "Menu"), "list"));
     wrap.appendChild(DOM.el(doc, "p",
@@ -288,7 +288,10 @@ var MenuUI = (function () {
     if (!doc) return;
     DOM.clear(root);
     var wrap = doc.createElement("div");
-    wrap.className = "wrap";
+    /* mkt-wrap, not the 720px .wrap: a card index strands a desk monitor in
+     * whitespace (viewport-audit A3 flagged 42% on #/menu/labs) — the wide
+     * cap lets the card grid earn its pixels. No new CSS. */
+    wrap.className = "wrap mkt-wrap";
     root.appendChild(wrap);
     var section = findSection(slug);
     if (!section) {
