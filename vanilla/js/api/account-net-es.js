@@ -377,8 +377,9 @@ var AccountNetES = (function () {
   }
 
   /* The depth policy module, resolved at CALL time with the same guarded
-   * pattern the core uses for its ES half (globalThis first, then
-   * module.require with the seam cast, then null => literal fallbacks).
+   * pattern the core uses for its ES half (globalThis first, then a
+   * bound-relative module.require with the seam cast, then null => literal
+   * fallbacks).
    * @returns {any} AccountNetDepth, or null when it is not loadable here. */
   function depthPolicy() {
     try {
@@ -388,8 +389,9 @@ var AccountNetES = (function () {
       if (typeof globalThis !== "undefined" && globalThis.AccountNetDepth) return globalThis.AccountNetDepth;
     } catch (e2) { /* fall through */ }
     try {
-      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require) {
-        return /** @type {any} */ (module).require("/workspace/vanilla/js/api/account-net-depth.js");
+      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) {
+        var esReq = /** @type {any} */ (module).require.bind(module);
+        return esReq("./account-net-depth.js");
       }
     } catch (e3) { /* not loadable here */ }
     return null;

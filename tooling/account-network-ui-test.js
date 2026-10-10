@@ -70,6 +70,17 @@ eq(T.parseSeeds(null), [], "null input is no seeds");
   ok(!/skipped|truncat/i.test(s), "a clean run reports no skips (" + s + ")");
   ok(/42/.test(s) && /3/.test(s), "a clean run still states the counts");
 }
+{
+  /* Expansion honesty is depth-2-only: a depth-1 map must print no expansion
+   * bit at all, even when the flags are set. */
+  const s = T.statusText({ seeds: [{ id: "1.2.1", name: "alice" }], unknown: [],
+    stats: { scanned: 42, edges: 3, nodes: 4, truncated: false, droppedSelf: 0,
+      droppedShape: 0, missingCredit: 0, caps: {}, depth: 1,
+      expanded: ["1.2.2"], unexpanded: 1, expansionScanned: 4, expansionTruncated: true } });
+  ok(!/expansion scans truncated/.test(s), "depth-1 hides the expansion-truncation line (" + s + ")");
+  ok(!/expanded:/.test(s) && !/unexpanded/.test(s), "depth-1 hides the expanded/unexpanded bits");
+  ok(!/from expansions/.test(s), "depth-1 hides the expansion scan count");
+}
 
 /* ---- detail: human amount, both ends, count, flow-vs-relation ---- */
 {

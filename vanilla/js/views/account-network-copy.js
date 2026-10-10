@@ -155,10 +155,11 @@ var AccountNetworkCopy = (function () {
       "&classes=" + encodeURIComponent((classes || []).join(","));
   }
 
-  /* The depth policy module, resolved at CALL time with the same guarded
-   * pattern account-net-es.js uses (globalThis first, then module.require,
-   * then null => literal fallbacks). The copy module must never throw when
-   * the policy script is missing — words still render with depth 1.
+  /** The depth policy module, resolved at CALL time with the same guarded
+   * pattern account-net-es.js uses (globalThis first, then a bound-relative
+   * module.require, then null => literal fallbacks). The copy module must
+   * never throw when the policy script is missing — words still render with
+   * depth 1.
    * @returns {any} AccountNetDepth, or null when it is not loadable here. */
   function depthPolicy() {
     try {
@@ -168,8 +169,9 @@ var AccountNetworkCopy = (function () {
       if (typeof globalThis !== "undefined" && globalThis.AccountNetDepth) return globalThis.AccountNetDepth;
     } catch (e2) { /* fall through */ }
     try {
-      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require) {
-        return /** @type {any} */ (module).require("/workspace/vanilla/js/api/account-net-depth.js");
+      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require && /** @type {any} */ (module).require.bind) {
+        var copyReq = /** @type {any} */ (module).require.bind(module);
+        return copyReq("../api/account-net-depth.js");
       }
     } catch (e3) { /* not loadable here */ }
     return null;
@@ -435,7 +437,9 @@ var AccountNetworkCopy = (function () {
      * was eligible for expansion, so the retained count is not news (Task 2
      * reports it as `unexpanded`, but surfacing it would read like a skip).
      * The expanded list names ATTEMPTED expansions — an id stays listed even
-     * when its scan failed or contributed nothing (Task 2 semantics). */
+     * when its scan failed or contributed nothing (Task 2 semantics). The
+     * truncation line is gated here too: a depth-1 map never ran an
+     * expansion scan, so it must never claim one was truncated. */
     if (mapDepth >= 2) {
       if (st.expanded && st.expanded.length) {
         bits.push(t("account_net.status_expanded", "expanded: %(names)s",
@@ -449,10 +453,10 @@ var AccountNetworkCopy = (function () {
         bits.push(t("account_net.status_expansion_scanned", "%(n)s indexed operations from expansions",
           { n: String(st.expansionScanned) }));
       }
-    }
-    if (st.expansionTruncated) {
-      bits.push(t("account_net.status_expansion_truncated",
-        "expansion scans truncated to newest operations"));
+      if (st.expansionTruncated) {
+        bits.push(t("account_net.status_expansion_truncated",
+          "expansion scans truncated to newest operations"));
+      }
     }
     if (unknown.length) {
       bits.push(t("account_net.status_unknown", "not found: %(names)s", { names: unknown.join(", ") }));
