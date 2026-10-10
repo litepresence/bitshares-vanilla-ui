@@ -327,7 +327,7 @@ Restructure `gather()` in `vanilla/js/api/account-net-es.js` without changing th
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `node tooling/account-net-test.js`
-Expected: `account-net: 103 pass, 0 fail`.
+Expected: `account-net: 106 pass, 0 fail`.
 
 - [ ] **Step 5: Commit**
 
@@ -559,7 +559,7 @@ python3 tooling/check_rot.py
 python3 tooling/audit_view_mounts.py
 ```
 
-Expected: `103/15/72/28` passes respectively, all static checks green.
+Expected: `106/15/72/28` passes respectively, all static checks green.
 
 - [ ] **Step 4: Run navigation and viewport checks**
 
