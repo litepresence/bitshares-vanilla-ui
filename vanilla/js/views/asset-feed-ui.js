@@ -130,7 +130,27 @@ var AssetFeedUI = (function () {
       var tb2 = d.createElement("tbody");
       s.fees.forEach(function (f) {
         var tr = d.createElement("tr");
-        var td0 = d.createElement("td"); td0.textContent = f.opId + " · " + f.name; tr.appendChild(td0);
+        var td0 = d.createElement("td");
+        /* The op name links to its desk (same map the standalone #/fees page
+         * uses — FeesUI.deskFor, guarded so a missing fees script degrades
+         * to the plain "id · name" text instead of breaking the table). */
+        var href = null;
+        try {
+          if (typeof FeesUI !== "undefined" && FeesUI && typeof FeesUI.deskFor === "function") {
+            href = FeesUI.deskFor(f.opId);
+          }
+        } catch (e) { href = null; }
+        td0.textContent = f.opId + " · ";
+        if (href) {
+          var a = d.createElement("a");
+          try { a.setAttribute("href", href); } catch (e2) { a.href = href; }
+          a.textContent = f.name;
+          a.title = f.opId + " · " + f.name;
+          td0.appendChild(a);
+        } else {
+          td0.textContent = f.opId + " · " + f.name;
+        }
+        tr.appendChild(td0);
         var td1 = d.createElement("td");
         if (f.fee_raw === null) td1.textContent = "—";
         else { try { td1.textContent = Format.formatAmount(f.fee_raw, s.fee_asset_precision); } catch (e) { td1.textContent = String(f.fee_raw); } td1.title = String(f.fee_raw); }

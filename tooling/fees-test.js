@@ -12,7 +12,8 @@ function eq(g, w, n) {
   else { fail++; console.log("FAIL " + n + "\n  got  " + JSON.stringify(g) + "\n  want " + JSON.stringify(w)); }
 }
 
-const T = FeesUI._test;
+const T = { deskFor: FeesUI.deskFor };
+ok(typeof FeesUI.deskFor === "function", "deskFor is a public export (the explorer fees tab consumes it)");
 ok(T && typeof T.deskFor === "function", "deskFor exported for vectors");
 
 /* Every op id 0..77 resolves to an in-app hash link. */

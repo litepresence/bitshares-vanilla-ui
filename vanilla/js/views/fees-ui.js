@@ -481,7 +481,7 @@ var FeesUI = (function () {
     });
   }
 
-  return { renderFees: renderFees, _test: { deskFor: deskFor } };
+  return { renderFees: renderFees, deskFor: deskFor, _test: { deskFor: deskFor } };
 })();
 
 if (typeof module !== "undefined") { module.exports = FeesUI; }
