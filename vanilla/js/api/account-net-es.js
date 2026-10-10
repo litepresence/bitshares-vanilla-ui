@@ -376,28 +376,151 @@ var AccountNetES = (function () {
     if (edge.refs.dealId && refs.dealId.indexOf(edge.refs.dealId) === -1) refs.dealId.push(edge.refs.dealId);
   }
 
+  /* The depth policy module, resolved at CALL time with the same guarded
+   * pattern the core uses for its ES half (globalThis first, then
+   * module.require with the seam cast, then null => literal fallbacks).
+   * @returns {any} AccountNetDepth, or null when it is not loadable here. */
+  function depthPolicy() {
+    try {
+      if (typeof AccountNetDepth !== "undefined" && AccountNetDepth) return AccountNetDepth;
+    } catch (e) { /* fall through */ }
+    try {
+      if (typeof globalThis !== "undefined" && globalThis.AccountNetDepth) return globalThis.AccountNetDepth;
+    } catch (e2) { /* fall through */ }
+    try {
+      if (typeof module !== "undefined" && module && /** @type {any} */ (module).require) {
+        return /** @type {any} */ (module).require("/workspace/vanilla/js/api/account-net-depth.js");
+      }
+    } catch (e3) { /* not loadable here */ }
+    return null;
+  }
+
+  /**
+   * depthOr: normalize depth through the policy, falling back to 1.
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw depth opt.
+   * @returns {number} 1 or 2.
+   */
+  function depthOr(D, v) {
+    try {
+      if (D && typeof D.normalizeDepth === "function") return D.normalizeDepth(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    return (n === 1 || n === 2) ? n : 1;
+  }
+
+  /**
+   * ring1Or: normalize the Ring 1 count, falling back to 40 (1..40).
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw ring1 opt.
+   * @returns {number} 1..40.
+   */
+  function ring1Or(D, v) {
+    try {
+      if (D && typeof D.normalizeRing1 === "function") return D.normalizeRing1(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    if (!isFinite(n)) return 40;
+    if (n < 1) return 1;
+    if (n > 40) return 40;
+    return n;
+  }
+
+  /**
+   * ring2Or: normalize the Ring 2 count, falling back to 8 (1..8).
+   * @param {any} D AccountNetDepth or null.
+   * @param {*} v Raw ring2 opt.
+   * @returns {number} 1..8.
+   */
+  function ring2Or(D, v) {
+    try {
+      if (D && typeof D.normalizeRing2 === "function") return D.normalizeRing2(v);
+    } catch (e) { /* fallback below */ }
+    var n = Math.floor(Number(v));
+    if (!isFinite(n)) return 8;
+    if (n < 1) return 1;
+    if (n > 8) return 8;
+    return n;
+  }
+
+  /**
+   * isAcct: strict 1.2.x reader for the depth fallback path (mirrors
+   * AccountNetDepth's own check; used only when the policy is missing).
+   * @param {*} v Raw value.
+   * @returns {boolean} True for a canonical account id.
+   */
+  function isAcct(v) {
+    return /^1\.2\.\d+$/.test(String(v === undefined || v === null ? "" : v));
+  }
+
+  /**
+   * rankTopFallback: top-N by count then id, used only when AccountNetDepth
+   * is unreachable (mirrors its topCounterparties contract).
+   * @param {Object<string,number>} counts Account id -> indexed operations.
+   * @param {Object<string,number>} seedIds Seed ids to exclude.
+   * @param {number} lim Maximum ids.
+   * @returns {string[]} Ranked account ids.
+   */
+  function rankTopFallback(counts, seedIds, lim) {
+    var ids = Object.keys(counts || {}).filter(function (id) {
+      return isAcct(id) && !(seedIds && seedIds[id]);
+    });
+    ids.sort(function (a, b) {
+      var ca = Number(counts[a]) || 0, cb = Number(counts[b]) || 0;
+      if (cb !== ca) return cb - ca;
+      return a < b ? -1 : (a > b ? 1 : 0);
+    });
+    return ids.slice(0, Math.max(0, Math.floor(Number(lim) || 0)));
+  }
+
   /**
    * gather: seeds -> scan -> classify -> credit join -> aggregate. Seeds are
    * scanned SEQUENTIALLY (the index is a courtesy) and opts.onSeed fires
    * after each so the page can paint as results land. One seed failing is
-   * reported in `unknown` and never blanks the others.
+   * reported in `unknown` and never blanks the others. At depth 2 a bounded
+   * second ring expands the top-ranked depth-1 counterparties (sequential
+   * scans with the fixed expansion budget); ring-0 behavior at depth 1 is
+   * unchanged. Output nodes carry `ring` (0 seed, 1 direct, 2 expansion-only
+   * — minimum distance) and output edges carry `depth` (1 or 2, first
+   * discovery wins).
    * @param {string[]} seedNames Raw names or ids typed by the user.
    * @param {string[]} enabledIds Enabled class ids.
    * @param {{onSeed?:Function, nodeCap?:number, edgeCap?:number,
-   *   cap?:number, timeoutMs?:number}} [opts]
+   *   cap?:number, timeoutMs?:number, depth?:number, ring1?:number,
+   *   ring2?:number}} [opts]
    * @returns {Promise<{graph:Object, seeds:Array, unknown:string[], stats:Object}>}
-   *   the graph is AccountNetGraph (typedef lives in account-net.js).
+   *   the graph is AccountNetGraph (typedef lives in account-net.js) with
+   *   stats extended by {depth, ring1, ring2, expanded, unexpanded,
+   *   expansionScanned, expansionTruncated}.
    */
   function gather(seedNames, enabledIds, opts) {
     var A = core();
     if (!A) return Promise.reject(new Error("account-net-core-missing"));
     opts = opts || {};
+    var D = depthPolicy();
+    var depth = depthOr(D, opts.depth);
+    var ring1 = ring1Or(D, opts.ring1);
+    var ring2 = ring2Or(D, opts.ring2);
+    var expansionCap = (D && typeof D.EXPANSION_SCAN_CAP === "number" && isFinite(D.EXPANSION_SCAN_CAP))
+      ? D.EXPANSION_SCAN_CAP : 2000;
+    var expansionPages = (D && typeof D.EXPANSION_SCAN_MAX_PAGES === "number" && isFinite(D.EXPANSION_SCAN_MAX_PAGES))
+      ? D.EXPANSION_SCAN_MAX_PAGES : 2;
+    var maxExpansions = 0;
+    try {
+      if (depth >= 2) {
+        if (D && typeof D.expansionCount === "function") maxExpansions = D.expansionCount(depth, ring2);
+        else maxExpansions = ring2;
+      }
+    } catch (e) { maxExpansions = depth >= 2 ? ring2 : 0; }
+    maxExpansions = Math.max(0, Math.floor(Number(maxExpansions) || 0));
     var en = A.enabled(enabledIds);
     var ops = A.opUnion(enabledIds);
     var names = (seedNames || []).map(function (s) { return String(s).trim(); })
       .filter(function (s) { return s.length; }).slice(0, A.MAX_SEEDS);
-    var seeds = [], unknown = [], all = [], seen = {}, refs = { offerId: [], dealId: [] };
+    var seeds = [], unknown = [], ring0Edges = [], expansionEdges = [];
+    var seen = {}, ring0Keys = {}, expSeen = {}, refs = { offerId: [], dealId: [] };
     var stats = { scanned: 0, truncated: false, droppedSelf: 0, droppedShape: 0, needsJoin: 0 };
+    var expansionScanned = 0, expansionTruncated = false;
     function resolveOne(n) {
       if (typeof Account === "undefined" || !Account || typeof Account.resolve !== "function") {
         return Promise.reject(new Error("unknown-account"));
@@ -416,14 +539,19 @@ var AccountNetES = (function () {
             var perSeed = {};
             res.hits.forEach(function (hit) {
               /* Per-party duplicates: one op, two docs when both ends are
-               * seeds. Dedupe WITHIN this seed's page set. */
+               * seeds. Dedupe WITHIN this seed's page set; the global
+               * ring0Keys copy is write-only here so a later expansion can
+               * skip an operation the first ring already saw. */
               var dk = A.dedupeKey(hit);
-              if (dk) { if (perSeed[dk]) return; perSeed[dk] = 1; }
+              if (dk) { if (perSeed[dk]) return; perSeed[dk] = 1; ring0Keys[dk] = 1; }
               var got = A.classify(hit, { enabled: en, seedId: r.id });
               if (got.skip === "self") stats.droppedSelf++;
               else if (got.skip === "shape") stats.droppedShape++;
-              else if (got.skip === "needs-join") { stats.needsJoin++; all.push(got.edge); collectRefs(got.edge, refs); }
-              else if (got.edge) all.push(got.edge);
+              else if (got.skip === "needs-join") {
+                stats.needsJoin++;
+                if (got.edge) { got.edge.scanDepth = 1; ring0Edges.push(got.edge); collectRefs(got.edge, refs); }
+              }
+              else if (got.edge) { got.edge.scanDepth = 1; ring0Edges.push(got.edge); }
             });
             if (typeof opts.onSeed === "function") { try { opts.onSeed(seeds.slice(), stats); } catch (e) { /* painter is optional */ } }
             return null;
@@ -431,8 +559,88 @@ var AccountNetES = (function () {
         }).catch(function () { unknown.push(n); return null; });
       });
     }, Promise.resolve([]))
-      .then(function () { return creditOwners(refs); })
-      .then(function (owners) {
+      .then(function () {
+        var seedIds = {}, scannedIds = {};
+        seeds.forEach(function (s) { if (s && s.id) { seedIds[s.id] = 1; scannedIds[s.id] = 1; } });
+        var counts = {};
+        ring0Edges.forEach(function (e) {
+          if (!e) return;
+          if (e.from && !seedIds[e.from]) counts[e.from] = (counts[e.from] || 0) + 1;
+          if (e.to && !seedIds[e.to]) counts[e.to] = (counts[e.to] || 0) + 1;
+        });
+        var retained = null;
+        try {
+          if (D && typeof D.topCounterparties === "function") retained = D.topCounterparties(counts, seedIds, ring1);
+        } catch (e) { retained = null; }
+        if (!Array.isArray(retained)) retained = rankTopFallback(counts, seedIds, ring1);
+        var retainedSet = {};
+        retained.forEach(function (id) { retainedSet[id] = 1; });
+        var allowed = {};
+        Object.keys(seedIds).forEach(function (id) { allowed[id] = 1; });
+        retained.forEach(function (id) { allowed[id] = 1; });
+        var kept0 = [];
+        ring0Edges.forEach(function (e) {
+          if (!e) return;
+          if (e.refs && (!e.from || !e.to)) {
+            var known = e.from || e.to;
+            if (known && allowed[known]) kept0.push(e);
+            return;
+          }
+          if (e.from && e.to && allowed[e.from] && allowed[e.to]) kept0.push(e);
+        });
+        var wanted = [];
+        if (depth >= 2 && maxExpansions > 0) {
+          try {
+            if (D && typeof D.planExpansions === "function") wanted = D.planExpansions(counts, seedIds, scannedIds, maxExpansions);
+          } catch (e) { wanted = null; }
+          if (!Array.isArray(wanted)) {
+            wanted = rankTopFallback(counts, seedIds, Object.keys(counts).length)
+              .filter(function (id) { return !scannedIds[id]; }).slice(0, maxExpansions);
+          }
+        }
+        var expanded = Array.isArray(wanted) ? wanted.slice() : [];
+        var expandedSet = {};
+        expanded.forEach(function (id) { expandedSet[id] = 1; });
+        var unexpanded = retained.filter(function (id) { return !expandedSet[id]; }).length;
+        return expanded.reduce(function (p, id) {
+          return p.then(function () {
+            return scanSeed(id, ops, { cap: expansionCap, maxPages: expansionPages, timeoutMs: opts.timeoutMs })
+              .then(function (res) {
+                expansionScanned += res.scanned;
+                if (res.truncated) expansionTruncated = true;
+                res.hits.forEach(function (hit) {
+                  var dk = A.dedupeKey(hit);
+                  if (dk) {
+                    if (ring0Keys[dk]) return;
+                    if (expSeen[dk]) return;
+                    expSeen[dk] = 1;
+                  }
+                  var got = A.classify(hit, { enabled: en, seedId: id });
+                  if (got.skip === "self") stats.droppedSelf++;
+                  else if (got.skip === "shape") stats.droppedShape++;
+                  else if (got.skip === "needs-join") {
+                    stats.needsJoin++;
+                    if (got.edge) { got.edge.scanDepth = 2; expansionEdges.push(got.edge); collectRefs(got.edge, refs); }
+                  }
+                  else if (got.edge) { got.edge.scanDepth = 2; expansionEdges.push(got.edge); }
+                });
+                return null;
+              })
+              .catch(function () { expansionTruncated = true; return null; });
+          });
+        }, Promise.resolve([])).then(function () {
+          return { kept0: kept0, retained: retained, retainedSet: retainedSet,
+            expanded: expanded, expandedSet: expandedSet, unexpanded: unexpanded };
+        });
+      })
+      .then(function (rings) {
+        var all = rings.kept0.concat(expansionEdges);
+        return creditOwners(refs).then(function (owners) {
+          return { all: all, rings: rings, owners: owners };
+        });
+      })
+      .then(function (ctx) {
+        var all = ctx.all, rings = ctx.rings, owners = ctx.owners;
         var edges = [];
         all.forEach(function (e) {
           if (!e.refs) { edges.push(e); return; }
@@ -442,14 +650,49 @@ var AccountNetES = (function () {
           if (!e.from || !e.to || e.from === e.to) return;
           edges.push(e);
         });
+        var edgeDepth = {};
+        edges.forEach(function (e) {
+          try {
+            var k = A.edgeKey(e);
+            if (!edgeDepth[k]) edgeDepth[k] = (e.scanDepth === 2) ? 2 : 1;
+          } catch (e2) { /* unkeyable edge keeps the default below */ }
+        });
         var graph = A.buildGraph(edges, seeds, { scanned: stats.scanned,
           droppedSelf: stats.droppedSelf, droppedShape: stats.droppedShape,
           needsJoin: stats.needsJoin, scanCapHit: stats.truncated,
           nodeCap: opts.nodeCap, edgeCap: opts.edgeCap });
+        graph.edges.forEach(function (e) {
+          var k = null;
+          try { k = e.poolId || A.edgeKey({ from: e.a, to: e.b, cls: e.cls }); } catch (x) { k = null; }
+          e.depth = (k && edgeDepth[k]) ? edgeDepth[k] : 1;
+        });
+        var minDepth = {};
+        graph.edges.forEach(function (e) {
+          var d = (e.depth === 2) ? 2 : 1;
+          [e.a, e.b].forEach(function (id) {
+            if (!id) return;
+            if (!minDepth[id] || d < minDepth[id]) minDepth[id] = d;
+          });
+        });
+        var seedIds = {};
+        seeds.forEach(function (s) { if (s && s.id) seedIds[s.id] = 1; });
+        graph.nodes.forEach(function (n) {
+          if (seedIds[n.assetId]) n.ring = 0;
+          else if (minDepth[n.assetId]) n.ring = minDepth[n.assetId];
+          else if (rings.retainedSet[n.assetId]) n.ring = 1;
+          else n.ring = 2;
+        });
         graph.stats.missingCredit = owners.missing.length;
         graph.stats.creditViaIndex = owners.viaIndex || { offers: 0, deals: 0 };
         graph.stats.unknown = unknown.slice();
         graph.stats.truncated = stats.truncated;
+        graph.stats.depth = depth;
+        graph.stats.ring1 = ring1;
+        graph.stats.ring2 = ring2;
+        graph.stats.expanded = rings.expanded.slice();
+        graph.stats.unexpanded = rings.unexpanded;
+        graph.stats.expansionScanned = expansionScanned;
+        graph.stats.expansionTruncated = expansionTruncated;
         return { graph: graph, seeds: seeds, unknown: unknown, stats: graph.stats };
       });
   }
