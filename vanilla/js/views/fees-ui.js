@@ -78,6 +78,80 @@ var FeesUI = (function () {
   /* Virtual execution events (never signed, marker only) — same set as
    * asset.js VIRTUAL <- operations.hpp "// VIRTUAL" marks. */
   var VIRTUAL = { 4: 1, 42: 1, 44: 1, 46: 1, 51: 1, 53: 1, 74: 1 };
+  /* OP_DESKS: op snake-name -> the in-app desk where you PERFORM it, so
+   * every fee row links somewhere actionable. Keyed by NAME (not id): the
+   * schedule hands us names for live rows and ids for the rest, and names
+   * survive chain renumbering better than positions. Coverage rule, pinned
+   * by tooling/fees-test.js: every one of the 78 OP_NAMES entries resolves.
+   * Trading ops point at the default market desk (network-aware via
+   * MarketUI.defaultMarket); chain-only execution events with no desk of
+   * their own point at the explorer (chain truth, read-only). */
+  var OP_DESKS = {
+    transfer: "#/transfer", limit_order_create: "market", limit_order_cancel: "market",
+    call_order_update: "#/borrow", fill_order: "market",
+    account_create: "#/create-account", account_update: "#/accounts",
+    account_whitelist: "#/accounts", account_upgrade: "#/accounts",
+    account_transfer: "#/accounts",
+    asset_create: "#/assets/create", asset_update: "#/assets",
+    asset_update_bitasset: "#/assets", asset_update_feed_producers: "#/assets",
+    asset_issue: "#/assets/issue", asset_reserve: "#/assets",
+    asset_fund_fee_pool: "#/assets", asset_settle: "#/assets",
+    asset_global_settle: "#/assets", asset_publish_feed: "#/assets/feed",
+    witness_create: "#/voting", witness_update: "#/voting",
+    proposal_create: "#/proposals", proposal_update: "#/proposals",
+    proposal_delete: "#/proposals",
+    withdraw_permission_create: "#/direct-debit", withdraw_permission_update: "#/direct-debit",
+    withdraw_permission_claim: "#/direct-debit", withdraw_permission_delete: "#/direct-debit",
+    committee_member_create: "#/voting", committee_member_update: "#/voting",
+    committee_member_update_global_parameters: "#/voting",
+    vesting_balance_create: "#/vesting", vesting_balance_withdraw: "#/vesting",
+    worker_create: "#/create-worker",
+    custom: "#/txbuilder", assert: "#/txbuilder",
+    balance_claim: "#/accounts", override_transfer: "#/transfer",
+    transfer_to_blind: "#/transfer", blind_transfer: "#/transfer",
+    transfer_from_blind: "#/transfer", asset_settle_cancel: "market",
+    asset_claim_fees: "#/assets", fba_distribute: "#/explorer",
+    bid_collateral: "#/borrow", execute_bid: "#/borrow",
+    asset_claim_pool: "#/assets", asset_update_issuer: "#/assets",
+    htlc_create: "#/htlc", htlc_redeem: "#/htlc", htlc_redeemed: "#/htlc",
+    htlc_extend: "#/htlc", htlc_refund: "#/htlc",
+    custom_authority_create: "#/authorities", custom_authority_update: "#/authorities",
+    custom_authority_delete: "#/authorities",
+    ticket_create: "#/tickets", ticket_update: "#/tickets",
+    liquidity_pool_create: "#/pools", liquidity_pool_delete: "#/pools",
+    liquidity_pool_deposit: "#/pools", liquidity_pool_withdraw: "#/pools",
+    liquidity_pool_exchange: "#/pools",
+    samet_fund_create: "#/samet", samet_fund_delete: "#/samet",
+    samet_fund_update: "#/samet", samet_fund_borrow: "#/samet",
+    samet_fund_repay: "#/samet",
+    credit_offer_create: "#/credit-offer", credit_offer_delete: "#/credit-offer",
+    credit_offer_update: "#/credit-offer", credit_offer_accept: "#/credit-offer",
+    credit_deal_repay: "#/credit-offer", credit_deal_expired: "#/credit-offer",
+    liquidity_pool_update: "#/pools", credit_deal_update: "#/credit-offer",
+    limit_order_update: "market"
+  };
+  /* marketDesk: the "market" sentinel resolved at render — the network's
+   * default desk when the market module is loaded, else the market browser
+   * (always a valid page; the desk needs a pair). Never throws. */
+  function marketDesk() {
+    try {
+      if (typeof MarketUI !== "undefined" && MarketUI && typeof MarketUI.defaultMarket === "function") {
+        var m = MarketUI.defaultMarket();
+        if (m) return "#/market/" + m;
+      }
+    } catch (e) { /* browser below */ }
+    return "#/markets";
+  }
+  /* deskFor: op id (number) -> in-app hash href, or null when unknown.
+   * Pure (no DOM, no chain): the market sentinel resolves through
+   * marketDesk(), so headless callers get the always-valid browser. */
+  function deskFor(id) {
+    var name = OP_NAMES[id];
+    if (!name) return null;
+    var href = OP_DESKS[name];
+    if (!href) return null;
+    return href === "market" ? marketDesk() : href;
+  }
   /* Canonical fee-param row order (schedule order would shuffle per node;
    * unknown future params append after these in chain order). Wording
    * follows #1 feeTypes en + #2 EXTRA_PARAM_LABELS (concepts, Table below). */
@@ -118,6 +192,29 @@ var FeesUI = (function () {
     var virt = row ? !!row.virtual : !!VIRTUAL[id];
     var disp = name + (virt ? " (virtual)" : "");
     return { name: disp, virtual: virt, title: id + " · " + disp };
+  }
+  /* opCell: the Operation cell — the op name hyperlinked to its desk
+   * (deskFor), so every fee row links somewhere the fee can be acted on.
+   * The "# · name" provenance stays in the title (hover/long-press).
+   * Unmapped ops (should not happen — pinned by fees-test.js) render as
+   * plain text, never blank. Params: doc, lab (opLabel result), id,
+   * rowspan or null. Returns the td. */
+  function opCell(doc, lab, id, rowspan) {
+    var td = doc.createElement("td");
+    var href = null;
+    try { href = deskFor(id); } catch (e) { href = null; }
+    if (href) {
+      var a = doc.createElement("a");
+      try { a.setAttribute("href", href); } catch (e2) { a.href = href; }
+      a.textContent = lab.name;
+      a.title = lab.title;
+      td.appendChild(a);
+    } else {
+      td.textContent = lab.name;
+      td.title = lab.title;
+    }
+    if (rowspan) td.setAttribute("rowspan", String(rowspan));
+    return td;
   }
   /* orderedKeys: fee-param keys in canonical TYPE_ORDER, unknown keys appended in chain order. */
   function orderedKeys(raw) {
@@ -198,7 +295,7 @@ var FeesUI = (function () {
         missing += 1;
         var tr0 = doc.createElement("tr");
         var tdId0 = DOM.el(doc, "td", String(id)); tdId0.title = title; tr0.appendChild(tdId0);
-        var tdOp0 = DOM.el(doc, "td", lab.name); tdOp0.title = title; tr0.appendChild(tdOp0);
+        tr0.appendChild(opCell(doc, lab, id, null));
         tr0.appendChild(DOM.el(doc, "td", "—"));
         var tdM = DOM.el(doc, "td", t("fees.not_in_schedule", "Not in schedule"));
         tdM.title = t("fees.no_entry_for_op", "No entry for op ") + id + t("fees.in_the_current_fee_schedule_the_chain_falls_b", " in the current fee schedule — the chain falls back to a related operation's fee.");
@@ -215,7 +312,7 @@ var FeesUI = (function () {
          * cost nothing and are never signed directly. */
         var tr1 = doc.createElement("tr");
         var tdId1 = DOM.el(doc, "td", String(id)); tdId1.title = title; tr1.appendChild(tdId1);
-        var tdOp1 = DOM.el(doc, "td", lab.name); tdOp1.title = title; tr1.appendChild(tdOp1);
+        tr1.appendChild(opCell(doc, lab, id, null));
         tr1.appendChild(DOM.el(doc, "td", "—"));
         var tdF = DOM.el(doc, "td", t("fees.free_of_charge", "Free of charge"));
         tdF.title = lab.virtual
@@ -231,8 +328,7 @@ var FeesUI = (function () {
         if (ki === 0) {
           var tdId = DOM.el(doc, "td", String(id)); tdId.title = title;
           tdId.setAttribute("rowspan", String(keys.length)); tr.appendChild(tdId);
-          var tdOp = DOM.el(doc, "td", lab.name); tdOp.title = title;
-          tdOp.setAttribute("rowspan", String(keys.length)); tr.appendChild(tdOp);
+          var tdOp = opCell(doc, lab, id, keys.length); tr.appendChild(tdOp);
         }
         tr.appendChild(DOM.el(doc, "td", typeLabel(k)));
         var rawK = row.raw[k], scaledK = (row.scaled && row.scaled[k] !== undefined) ? row.scaled[k] : rawK;
@@ -279,7 +375,8 @@ var FeesUI = (function () {
     wrap.appendChild(DOM.pageHead(doc, t("fees.network_fees", "Network fees"), "dollar"));
     wrap.appendChild(DOM.el(doc, "p",
       "Every operation fee charged by the network, fetched live from the chain's fee schedule. " +
-      "Fees are shown in the core asset; each amount's title (hover or long-press) carries the raw chain value and the schedule scale.",
+      "Fees are shown in the core asset; each amount's title (hover or long-press) carries the raw chain value and the schedule scale. " +
+      "Each operation name links to the page where you perform it.",
       "muted"));
     if (typeof Chain !== "undefined" && Chain && typeof Chain.status === "function" &&
         Chain.status().state !== "open") {
@@ -384,7 +481,7 @@ var FeesUI = (function () {
     });
   }
 
-  return { renderFees: renderFees };
+  return { renderFees: renderFees, _test: { deskFor: deskFor } };
 })();
 
 if (typeof module !== "undefined") { module.exports = FeesUI; }
